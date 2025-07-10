@@ -16,6 +16,7 @@
             --border: #cbd5e1;
             --error: #ef4444;
             --success: #22c55e;
+            --warning: #f59e0b;
         }
         
         * {
@@ -64,6 +65,7 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             padding: 30px;
             margin-bottom: 40px;
+            position: relative;
         }
         
         .progress-container {
@@ -244,6 +246,10 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         
         .btn-primary {
@@ -272,6 +278,15 @@
         
         .btn-save:hover {
             background-color: #e2e8f0;
+        }
+        
+        .btn-warning {
+            background-color: var(--warning);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #e69008;
         }
         
         .error-message {
@@ -303,6 +318,44 @@
             max-width: 600px;
             margin: 0 auto 25px;
             font-size: 1.1rem;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            display: none;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(37, 99, 235, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error-message-global {
+            background-color: #fee2e2;
+            color: var(--error);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
         }
         
         footer {
@@ -341,6 +394,13 @@
         </header>
         
         <div class="form-container">
+            <div class="error-message-global" id="global-error"></div>
+            
+            <div class="loading-overlay" id="loading-overlay">
+                <div class="spinner"></div>
+                <p>Enviando sua pesquisa...</p>
+            </div>
+            
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
@@ -348,7 +408,7 @@
                 <div class="progress-text">Passo <span id="current-step">1</span> de <span>4</span></div>
             </div>
             
-            <form id="survey-form">
+            <form id="survey-form" action="https://formspree.io/f/xgvygojd" method="POST">
                 <!-- Seção 1: Informações do Cliente -->
                 <div class="form-section active" id="section1">
                     <h2>Informações do Cliente</h2>
@@ -608,7 +668,7 @@
                         <button type="button" class="btn btn-outline" id="back3">
                             <i class="fas fa-arrow-left"></i> Voltar
                         </button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
                             <i class="fas fa-paper-plane"></i> Enviar Pesquisa
                         </button>
                     </div>
@@ -652,6 +712,9 @@
             const surveyForm = document.getElementById('survey-form');
             const thankYou = document.getElementById('thank-you');
             const newSurvey = document.getElementById('new-survey');
+            const submitBtn = document.getElementById('submit-btn');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const globalError = document.getElementById('global-error');
             
             // Atualizar progresso
             function updateProgress() {
@@ -740,6 +803,23 @@
                 return isValid;
             }
             
+            // Validação de todos os campos
+            function validateAllSections() {
+                let allValid = true;
+                
+                for (let i = 0; i < sections.length; i++) {
+                    if (!validateSection(`section${i+1}`)) {
+                        allValid = false;
+                        if (i !== currentStep) {
+                            showSection(i);
+                        }
+                        break;
+                    }
+                }
+                
+                return allValid;
+            }
+            
             // Salvar progresso
             function saveProgress() {
                 const formData = new FormData(surveyForm);
@@ -778,6 +858,13 @@
                                     }
                                 }
                             }
+                            
+                            // Atualizar radio buttons e checkboxes
+                            if (element.type === 'radio' || element.type === 'checkbox') {
+                                if (element.value === data[key]) {
+                                    element.checked = true;
+                                }
+                            }
                         }
                     }
                     
@@ -785,6 +872,59 @@
                     if (savedStep) {
                         showSection(parseInt(savedStep));
                     }
+                }
+            }
+            
+            // Enviar formulário
+            async function submitForm() {
+                // Validar todo o formulário
+                if (!validateAllSections()) {
+                    globalError.textContent = "Por favor, preencha todos os campos obrigatórios em todas as seções.";
+                    globalError.style.display = 'block';
+                    return;
+                }
+                
+                // Mostrar loading
+                loadingOverlay.style.display = 'flex';
+                globalError.style.display = 'none';
+                
+                try {
+                    const formData = new FormData(surveyForm);
+                    
+                    // Enviar para Formspree
+                    const response = await fetch(surveyForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        // Sucesso
+                        surveyForm.style.display = 'none';
+                        thankYou.style.display = 'block';
+                        
+                        // Limpar localStorage após envio
+                        localStorage.removeItem('surveyProgress');
+                        localStorage.removeItem('surveyStep');
+                    } else {
+                        // Tratar erros
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Erro ao enviar formulário');
+                    }
+                } catch (error) {
+                    // Mostrar erro
+                    globalError.textContent = `Erro ao enviar: ${error.message || 'Por favor tente novamente mais tarde'}`;
+                    globalError.style.display = 'block';
+                    
+                    // Mudar o botão para tentar novamente
+                    submitBtn.innerHTML = '<i class="fas fa-redo"></i> Tentar Novamente';
+                    submitBtn.className = 'btn btn-warning';
+                    submitBtn.onclick = submitForm;
+                } finally {
+                    // Esconder loading
+                    loadingOverlay.style.display = 'none';
                 }
             }
             
@@ -823,18 +963,7 @@
             
             surveyForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                
-                if (validateSection('section4')) {
-                    // Simular envio dos dados
-                    setTimeout(function() {
-                        surveyForm.style.display = 'none';
-                        thankYou.style.display = 'block';
-                        
-                        // Limpar localStorage após envio
-                        localStorage.removeItem('surveyProgress');
-                        localStorage.removeItem('surveyStep');
-                    }, 1000);
-                }
+                submitForm();
             });
             
             newSurvey.addEventListener('click', function() {
@@ -843,10 +972,20 @@
                 thankYou.style.display = 'none';
                 showSection(0);
                 
+                // Resetar botão de envio
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Pesquisa';
+                submitBtn.className = 'btn btn-primary';
+                
                 // Resetar seleções visuais
                 document.querySelectorAll('.rating-option, .nps-option').forEach(el => {
                     el.classList.remove('selected');
                 });
+                
+                // Resetar erros
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.style.display = 'none';
+                });
+                globalError.style.display = 'none';
             });
             
             // Inicializar
