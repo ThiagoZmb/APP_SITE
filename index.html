@@ -1,999 +1,447 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pesquisa de Satisfação - TechSolutions</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --secondary: #10b981;
-            --dark: #1e293b;
-            --light: #f8fafc;
-            --gray: #64748b;
-            --border: #cbd5e1;
-            --error: #ef4444;
-            --success: #22c55e;
-            --warning: #f59e0b;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background-color: #f1f5f9;
-            color: var(--dark);
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        header {
-            text-align: center;
-            padding: 30px 20px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border-radius: 10px 10px 0 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        header h1 {
-            font-size: 2.2rem;
-            margin-bottom: 10px;
-        }
-        
-        header p {
-            font-size: 1.1rem;
-            max-width: 600px;
-            margin: 0 auto;
-            opacity: 0.9;
-        }
-        
-        .form-container {
-            background-color: white;
-            border-radius: 0 0 10px 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            padding: 30px;
-            margin-bottom: 40px;
-            position: relative;
-        }
-        
-        .progress-container {
-            margin-bottom: 30px;
-        }
-        
-        .progress-bar {
-            height: 8px;
-            background-color: #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background-color: var(--secondary);
-            width: 25%;
-            transition: width 0.4s ease;
-        }
-        
-        .progress-text {
-            text-align: right;
-            font-size: 0.9rem;
-            color: var(--gray);
-        }
-        
-        .form-section {
-            display: none;
-            animation: fadeIn 0.5s ease;
-        }
-        
-        .form-section.active {
-            display: block;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        h2 {
-            color: var(--primary);
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--border);
-        }
-        
-        .form-group {
-            margin-bottom: 25px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        
-        .required::after {
-            content: " *";
-            color: var(--error);
-        }
-        
-        input, select, textarea {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-        
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-        }
-        
-        .rating-container {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 5px;
-        }
-        
-        .rating-option {
-            flex: 1;
-            text-align: center;
-            padding: 15px 5px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin: 0 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .rating-option:hover {
-            background-color: #f1f5f9;
-        }
-        
-        .rating-option.selected {
-            background-color: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-        
-        .rating-option i {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
-            display: block;
-        }
-        
-        .checkbox-group, .radio-group {
-            margin: 15px 0;
-        }
-        
-        .checkbox-group label, .radio-group label {
-            display: flex;
-            align-items: center;
-            font-weight: normal;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        
-        .checkbox-group input, .radio-group input {
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .nps-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin: 15px 0;
-        }
-        
-        .nps-option {
-            flex: 1;
-            min-width: 40px;
-            text-align: center;
-            padding: 12px 5px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .nps-option:hover {
-            background-color: #f1f5f9;
-        }
-        
-        .nps-option.selected {
-            background-color: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-        
-        .nps-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 5px;
-            color: var(--gray);
-            font-size: 0.9rem;
-        }
-        
-        .form-actions {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-        }
-        
-        .btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-        }
-        
-        .btn-outline {
-            background-color: transparent;
-            border: 1px solid var(--border);
-            color: var(--gray);
-        }
-        
-        .btn-outline:hover {
-            background-color: #f8fafc;
-        }
-        
-        .btn-save {
-            background-color: #f1f5f9;
-            color: var(--dark);
-        }
-        
-        .btn-save:hover {
-            background-color: #e2e8f0;
-        }
-        
-        .btn-warning {
-            background-color: var(--warning);
-            color: white;
-        }
-        
-        .btn-warning:hover {
-            background-color: #e69008;
-        }
-        
-        .error-message {
-            color: var(--error);
-            font-size: 0.9rem;
-            margin-top: 5px;
-            display: none;
-        }
-        
-        .thank-you {
-            text-align: center;
-            padding: 40px 20px;
-        }
-        
-        .thank-you i {
-            font-size: 4rem;
-            color: var(--success);
-            margin-bottom: 20px;
-        }
-        
-        .thank-you h2 {
-            color: var(--dark);
-            font-size: 2rem;
-            margin-bottom: 15px;
-            border: none;
-        }
-        
-        .thank-you p {
-            max-width: 600px;
-            margin: 0 auto 25px;
-            font-size: 1.1rem;
-        }
-        
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(255, 255, 255, 0.9);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            display: none;
-        }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(37, 99, 235, 0.2);
-            border-radius: 50%;
-            border-top-color: var(--primary);
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .error-message-global {
-            background-color: #fee2e2;
-            color: var(--error);
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: var(--gray);
-            font-size: 0.9rem;
-        }
-        
-        @media (max-width: 600px) {
-            .rating-container {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .rating-option {
-                margin: 0;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .form-actions .btn {
-                width: 100%;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Elegance</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="a" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:%23ffffff;stop-opacity:0.1"/><stop offset="100%" style="stop-color:%23ffffff;stop-opacity:0"/></radialGradient></defs><circle cx="20" cy="20" r="20" fill="url(%23a)"/><circle cx="80" cy="40" r="15" fill="url(%23a)"/><circle cx="40" cy="80" r="25" fill="url(%23a)"/></svg>') repeat;
+      opacity: 0.3;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-20px) rotate(180deg); }
+    }
+
+    .login-container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 48px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      position: relative;
+      transform: translateY(0);
+      transition: all 0.3s ease;
+    }
+
+    .login-container:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.2);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .login-header h2 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .login-header p {
+      color: #666;
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 16px 20px;
+      border: 2px solid #e1e5e9;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      background: #fff;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .form-group input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .form-group input::placeholder {
+      color: #999;
+      font-weight: 400;
+    }
+
+    .input-icon {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+      font-size: 18px;
+      transition: color 0.3s ease;
+    }
+
+    .form-group input:focus + .input-icon {
+      color: #667eea;
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.5px;
+    }
+
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .login-btn:hover::before {
+      left: 100%;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(102, 126, 234, 0.4);
+    }
+
+    .login-btn:active {
+      transform: translateY(0);
+    }
+
+    .forgot-password {
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    .forgot-password a {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    .forgot-password a:hover {
+      color: #764ba2;
+      text-decoration: underline;
+    }
+
+    .social-login {
+      margin-top: 32px;
+      text-align: center;
+    }
+
+    .social-login p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .social-login p::before,
+    .social-login p::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #e1e5e9;
+    }
+
+    .social-login p::before {
+      left: 0;
+    }
+
+    .social-login p::after {
+      right: 0;
+    }
+
+    .social-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .social-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: 2px solid #e1e5e9;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 20px;
+    }
+
+    .social-btn:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .loading {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #ffffff;
+      border-top: 2px solid transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+
+    .result.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    @media (max-width: 480px) {
+      .login-container {
+        padding: 32px 24px;
+        margin: 20px;
+      }
+
+      .login-header h2 {
+        font-size: 28px;
+      }
+
+      body {
+        padding: 12px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-comment-alt"></i> Pesquisa de Satisfação</h1>
-            <p>Seu feedback é essencial para melhorarmos nossos produtos e serviços. Agradecemos por dedicar alguns minutos para responder esta pesquisa.</p>
-        </header>
-        
-        <div class="form-container">
-            <div class="error-message-global" id="global-error"></div>
-            
-            <div class="loading-overlay" id="loading-overlay">
-                <div class="spinner"></div>
-                <p>Enviando sua pesquisa...</p>
-            </div>
-            
-            <div class="progress-container">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill"></div>
-                </div>
-                <div class="progress-text">Passo <span id="current-step">1</span> de <span>4</span></div>
-            </div>
-            
-            <form id="survey-form" action="https://formspree.io/f/xgvygojd" method="POST">
-                <!-- Seção 1: Informações do Cliente -->
-                <div class="form-section active" id="section1">
-                    <h2>Informações do Cliente</h2>
-                    <div class="form-group">
-                        <label for="name" class="required">Nome Completo</label>
-                        <input type="text" id="name" name="name" required>
-                        <div class="error-message" id="name-error">Por favor, informe seu nome</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email" class="required">E-mail</label>
-                        <input type="email" id="email" name="email" required>
-                        <div class="error-message" id="email-error">Por favor, informe um e-mail válido</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="company" class="required">Empresa</label>
-                        <input type="text" id="company" name="company" required>
-                        <div class="error-message" id="company-error">Por favor, informe o nome da sua empresa</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="customer-type" class="required">Tipo de Cliente</label>
-                        <select id="customer-type" name="customer-type" required>
-                            <option value="">Selecione uma opção</option>
-                            <option value="new">Novo cliente (menos de 6 meses)</option>
-                            <option value="regular">Cliente regular (6 meses a 2 anos)</option>
-                            <option value="long-term">Cliente de longo prazo (mais de 2 anos)</option>
-                            <option value="former">Ex-cliente</option>
-                        </select>
-                        <div class="error-message" id="customer-type-error">Por favor, selecione o tipo de cliente</div>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-save" id="save-btn">
-                            <i class="fas fa-save"></i> Salvar e Continuar Depois
-                        </button>
-                        <button type="button" class="btn btn-primary" id="next1">Próximo</button>
-                    </div>
-                </div>
-                
-                <!-- Seção 2: Avaliação do Produto/Serviço -->
-                <div class="form-section" id="section2">
-                    <h2>Avaliação do Produto/Serviço</h2>
-                    
-                    <div class="form-group">
-                        <label class="required">Qual sua satisfação geral com nosso produto?</label>
-                        <div class="rating-container">
-                            <div class="rating-option" data-value="1">
-                                <i class="fas fa-frown"></i>
-                                <div>Insatisfeito</div>
-                            </div>
-                            <div class="rating-option" data-value="2">
-                                <i class="fas fa-meh"></i>
-                                <div>Neutro</div>
-                            </div>
-                            <div class="rating-option" data-value="3">
-                                <i class="fas fa-smile"></i>
-                                <div>Satisfeito</div>
-                            </div>
-                            <div class="rating-option" data-value="4">
-                                <i class="fas fa-grin"></i>
-                                <div>Muito Satisfeito</div>
-                            </div>
-                            <div class="rating-option" data-value="5">
-                                <i class="fas fa-grin-stars"></i>
-                                <div>Extremamente Satisfeito</div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="overall-rating" name="overall-rating" required>
-                        <div class="error-message" id="rating-error">Por favor, selecione uma opção</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="required">Como você avalia a qualidade do nosso produto?</label>
-                        <div class="rating-container">
-                            <div class="rating-option" data-value="1">
-                                <div>1 - Ruim</div>
-                            </div>
-                            <div class="rating-option" data-value="2">
-                                <div>2</div>
-                            </div>
-                            <div class="rating-option" data-value="3">
-                                <div>3 - Regular</div>
-                            </div>
-                            <div class="rating-option" data-value="4">
-                                <div>4</div>
-                            </div>
-                            <div class="rating-option" data-value="5">
-                                <div>5 - Excelente</div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="quality-rating" name="quality-rating" required>
-                        <div class="error-message" id="quality-error">Por favor, selecione uma opção</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="product-usage">Com que frequência você utiliza nosso produto?</label>
-                        <select id="product-usage" name="product-usage">
-                            <option value="">Selecione uma opção</option>
-                            <option value="daily">Diariamente</option>
-                            <option value="weekly">Semanalmente</option>
-                            <option value="monthly">Mensalmente</option>
-                            <option value="rarely">Raramente</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-outline" id="back1">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </button>
-                        <button type="button" class="btn btn-primary" id="next2">Próximo</button>
-                    </div>
-                </div>
-                
-                <!-- Seção 3: Atendimento e Experiência -->
-                <div class="form-section" id="section3">
-                    <h2>Atendimento e Experiência</h2>
-                    
-                    <div class="form-group">
-                        <label class="required">Como você avalia nosso suporte ao cliente?</label>
-                        <div class="rating-container">
-                            <div class="rating-option" data-value="1">
-                                <div>1 - Ruim</div>
-                            </div>
-                            <div class="rating-option" data-value="2">
-                                <div>2</div>
-                            </div>
-                            <div class="rating-option" data-value="3">
-                                <div>3 - Regular</div>
-                            </div>
-                            <div class="rating-option" data-value="4">
-                                <div>4</div>
-                            </div>
-                            <div class="rating-option" data-value="5">
-                                <div>5 - Excelente</div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="support-rating" name="support-rating" required>
-                        <div class="error-message" id="support-error">Por favor, selecione uma opção</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="required">O tempo de resposta do suporte foi adequado?</label>
-                        <div class="radio-group">
-                            <label>
-                                <input type="radio" name="response-time" value="yes" required> Sim, foi rápido e eficiente
-                            </label>
-                            <label>
-                                <input type="radio" name="response-time" value="moderate"> Aceitável, mas pode melhorar
-                            </label>
-                            <label>
-                                <input type="radio" name="response-time" value="no"> Não, foi lento e insatisfatório
-                            </label>
-                        </div>
-                        <div class="error-message" id="response-error">Por favor, selecione uma opção</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="required">Como você avalia a facilidade do processo de compra/assinatura?</label>
-                        <div class="rating-container">
-                            <div class="rating-option" data-value="1">
-                                <div>1 - Muito Difícil</div>
-                            </div>
-                            <div class="rating-option" data-value="2">
-                                <div>2</div>
-                            </div>
-                            <div class="rating-option" data-value="3">
-                                <div>3 - Neutro</div>
-                            </div>
-                            <div class="rating-option" data-value="4">
-                                <div>4</div>
-                            </div>
-                            <div class="rating-option" data-value="5">
-                                <div>5 - Muito Fácil</div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="purchase-rating" name="purchase-rating" required>
-                        <div class="error-message" id="purchase-error">Por favor, selecione uma opção</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Em quais áreas podemos melhorar? (Selecione até 3 opções)</label>
-                        <div class="checkbox-group">
-                            <label>
-                                <input type="checkbox" name="improvement" value="interface"> Interface do usuário
-                            </label>
-                            <label>
-                                <input type="checkbox" name="improvement" value="performance"> Desempenho do produto
-                            </label>
-                            <label>
-                                <input type="checkbox" name="improvement" value="features"> Funcionalidades
-                            </label>
-                            <label>
-                                <input type="checkbox" name="improvement" value="support"> Atendimento ao cliente
-                            </label>
-                            <label>
-                                <input type="checkbox" name="improvement" value="documentation"> Documentação
-                            </label>
-                            <label>
-                                <input type="checkbox" name="improvement" value="pricing"> Preços e planos
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-outline" id="back2">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </button>
-                        <button type="button" class="btn btn-primary" id="next3">Próximo</button>
-                    </div>
-                </div>
-                
-                <!-- Seção 4: Recomendação e Feedback -->
-                <div class="form-section" id="section4">
-                    <h2>Recomendação e Feedback</h2>
-                    
-                    <div class="form-group">
-                        <label class="required">Qual a probabilidade de você recomendar nosso produto a um colega ou amigo?</label>
-                        <div class="nps-container">
-                            <div class="nps-option" data-value="0">0</div>
-                            <div class="nps-option" data-value="1">1</div>
-                            <div class="nps-option" data-value="2">2</div>
-                            <div class="nps-option" data-value="3">3</div>
-                            <div class="nps-option" data-value="4">4</div>
-                            <div class="nps-option" data-value="5">5</div>
-                            <div class="nps-option" data-value="6">6</div>
-                            <div class="nps-option" data-value="7">7</div>
-                            <div class="nps-option" data-value="8">8</div>
-                            <div class="nps-option" data-value="9">9</div>
-                            <div class="nps-option" data-value="10">10</div>
-                        </div>
-                        <input type="hidden" id="nps-score" name="nps-score" required>
-                        <div class="nps-labels">
-                            <span>Pouco provável</span>
-                            <span>Muito provável</span>
-                        </div>
-                        <div class="error-message" id="nps-error">Por favor, selecione uma pontuação</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="suggestions">O que mais gostou em nosso produto/serviço?</label>
-                        <textarea id="suggestions" name="suggestions" rows="3" placeholder="Descreva o que mais gostou..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="improvements">O que podemos melhorar?</label>
-                        <textarea id="improvements" name="improvements" rows="3" placeholder="Descreva o que podemos melhorar..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="comments">Comentários adicionais</label>
-                        <textarea id="comments" name="comments" rows="4" placeholder="Deixe aqui outros comentários, sugestões ou observações..."></textarea>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-outline" id="back3">
-                            <i class="fas fa-arrow-left"></i> Voltar
-                        </button>
-                        <button type="submit" class="btn btn-primary" id="submit-btn">
-                            <i class="fas fa-paper-plane"></i> Enviar Pesquisa
-                        </button>
-                    </div>
-                </div>
-            </form>
-            
-            <!-- Tela de Agradecimento -->
-            <div class="thank-you" id="thank-you" style="display: none;">
-                <i class="fas fa-check-circle"></i>
-                <h2>Obrigado pelo seu feedback!</h2>
-                <p>Sua opinião é muito importante para nós. Analisaremos todas as respostas para continuarmos melhorando nossos produtos e serviços.</p>
-                <p>Em breve você receberá um e-mail com um resumo das novidades que estamos preparando.</p>
-                <button type="button" class="btn btn-primary" id="new-survey">
-                    <i class="fas fa-redo"></i> Preencher nova pesquisa
-                </button>
-            </div>
-        </div>
-        
-        <footer>
-            <p>&copy; 2023 TechSolutions. Todos os direitos reservados.</p>
-        </footer>
+  <div class="login-container">
+    <div class="login-header">
+      <h2>Bem-vindo</h2>
+      <p>Faça login para continuar</p>
     </div>
     
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Elementos do DOM
-            const sections = document.querySelectorAll('.form-section');
-            const progressFill = document.getElementById('progress-fill');
-            const currentStepEl = document.getElementById('current-step');
-            const totalSteps = sections.length;
-            let currentStep = 0;
-            
-            // Elementos de navegação
-            const next1 = document.getElementById('next1');
-            const next2 = document.getElementById('next2');
-            const next3 = document.getElementById('next3');
-            const back1 = document.getElementById('back1');
-            const back2 = document.getElementById('back2');
-            const back3 = document.getElementById('back3');
-            const saveBtn = document.getElementById('save-btn');
-            const surveyForm = document.getElementById('survey-form');
-            const thankYou = document.getElementById('thank-you');
-            const newSurvey = document.getElementById('new-survey');
-            const submitBtn = document.getElementById('submit-btn');
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const globalError = document.getElementById('global-error');
-            
-            // Atualizar progresso
-            function updateProgress() {
-                const progress = ((currentStep + 1) / totalSteps) * 100;
-                progressFill.style.width = `${progress}%`;
-                currentStepEl.textContent = currentStep + 1;
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Usuário</label>
+        <div class="input-wrapper">
+          <input type="text" id="username" placeholder="Digite seu usuário" required>
+          <span class="input-icon">👤</span>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <div class="input-wrapper">
+          <input type="password" id="password" placeholder="Digite sua senha" required>
+          <span class="input-icon">🔒</span>
+        </div>
+      </div>
+      
+      <button type="submit" class="login-btn">
+        <span class="loading"></span>
+        <span class="btn-text">Entrar</span>
+      </button>
+    </form>
+    
+    <div class="forgot-password">
+      <a href="#" onclick="showMessage('Função em desenvolvimento!', 'error')">Esqueceu sua senha?</a>
+    </div>
+    
+    <div class="social-login">
+      <p>ou continue com</p>
+      <div class="social-buttons">
+        <div class="social-btn" onclick="showMessage('Login social em desenvolvimento!', 'error')">📱</div>
+        <div class="social-btn" onclick="showMessage('Login social em desenvolvimento!', 'error')">🔗</div>
+        <div class="social-btn" onclick="showMessage('Login social em desenvolvimento!', 'error')">📧</div>
+      </div>
+    </div>
+    
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    // Função para mostrar loading
+    function showLoading(show) {
+      const loading = document.querySelector('.loading');
+      const btnText = document.querySelector('.btn-text');
+      const btn = document.querySelector('.login-btn');
+      
+      if (show) {
+        loading.style.display = 'inline-block';
+        btnText.textContent = 'Entrando...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+      } else {
+        loading.style.display = 'none';
+        btnText.textContent = 'Entrar';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    }
+
+    // Interceptar o submit para adicionar loading
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('loginForm');
+      const originalSubmit = form.addEventListener;
+      
+      form.addEventListener('submit', function(e) {
+        showLoading(true);
+        
+        // Observar mudanças no div result para parar o loading
+        const resultDiv = document.getElementById('result');
+        const observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' || mutation.type === 'characterData') {
+              showLoading(false);
+              observer.disconnect();
             }
-            
-            // Navegação entre seções
-            function showSection(index) {
-                sections.forEach((section, i) => {
-                    if (i === index) {
-                        section.classList.add('active');
-                    } else {
-                        section.classList.remove('active');
-                    }
-                });
-                currentStep = index;
-                updateProgress();
-            }
-            
-            // Configurar eventos de rating
-            function setupRatingEvents() {
-                document.querySelectorAll('.rating-option').forEach(option => {
-                    option.addEventListener('click', function() {
-                        const container = this.parentElement;
-                        const hiddenInput = container.nextElementSibling;
-                        
-                        // Remover seleção de todos
-                        container.querySelectorAll('.rating-option').forEach(el => {
-                            el.classList.remove('selected');
-                        });
-                        
-                        // Selecionar atual
-                        this.classList.add('selected');
-                        hiddenInput.value = this.dataset.value;
-                        
-                        // Remover mensagem de erro
-                        const error = hiddenInput.nextElementSibling;
-                        error.style.display = 'none';
-                    });
-                });
-            }
-            
-            // Configurar eventos NPS
-            function setupNpsEvents() {
-                document.querySelectorAll('.nps-option').forEach(option => {
-                    option.addEventListener('click', function() {
-                        const container = this.parentElement;
-                        const hiddenInput = container.nextElementSibling;
-                        
-                        // Remover seleção de todos
-                        container.querySelectorAll('.nps-option').forEach(el => {
-                            el.classList.remove('selected');
-                        });
-                        
-                        // Selecionar atual
-                        this.classList.add('selected');
-                        hiddenInput.value = this.dataset.value;
-                        
-                        // Remover mensagem de erro
-                        const error = hiddenInput.nextElementSibling.nextElementSibling;
-                        error.style.display = 'none';
-                    });
-                });
-            }
-            
-            // Validação de campos obrigatórios
-            function validateSection(sectionId) {
-                let isValid = true;
-                const section = document.getElementById(sectionId);
-                
-                // Campos obrigatórios
-                const requiredInputs = section.querySelectorAll('[required]');
-                requiredInputs.forEach(input => {
-                    if (!input.value) {
-                        isValid = false;
-                        const errorId = input.id + '-error';
-                        const errorElement = document.getElementById(errorId);
-                        if (errorElement) {
-                            errorElement.style.display = 'block';
-                        }
-                    }
-                });
-                
-                return isValid;
-            }
-            
-            // Validação de todos os campos
-            function validateAllSections() {
-                let allValid = true;
-                
-                for (let i = 0; i < sections.length; i++) {
-                    if (!validateSection(`section${i+1}`)) {
-                        allValid = false;
-                        if (i !== currentStep) {
-                            showSection(i);
-                        }
-                        break;
-                    }
-                }
-                
-                return allValid;
-            }
-            
-            // Salvar progresso
-            function saveProgress() {
-                const formData = new FormData(surveyForm);
-                const data = {};
-                
-                for (const [key, value] of formData.entries()) {
-                    data[key] = value;
-                }
-                
-                localStorage.setItem('surveyProgress', JSON.stringify(data));
-                localStorage.setItem('surveyStep', currentStep);
-                alert('Progresso salvo! Você pode retomar a pesquisa a qualquer momento.');
-            }
-            
-            // Carregar progresso salvo
-            function loadProgress() {
-                const savedData = localStorage.getItem('surveyProgress');
-                const savedStep = localStorage.getItem('surveyStep');
-                
-                if (savedData && savedStep) {
-                    const data = JSON.parse(savedData);
-                    
-                    // Preencher campos
-                    for (const key in data) {
-                        const element = document.querySelector(`[name="${key}"]`);
-                        if (element) {
-                            element.value = data[key];
-                            
-                            // Atualizar seleções visuais
-                            if (element.type === 'hidden' && element.value) {
-                                const container = element.previousElementSibling;
-                                if (container) {
-                                    const selectedOption = container.querySelector(`[data-value="${element.value}"]`);
-                                    if (selectedOption) {
-                                        selectedOption.classList.add('selected');
-                                    }
-                                }
-                            }
-                            
-                            // Atualizar radio buttons e checkboxes
-                            if (element.type === 'radio' || element.type === 'checkbox') {
-                                if (element.value === data[key]) {
-                                    element.checked = true;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Ir para o passo salvo
-                    if (savedStep) {
-                        showSection(parseInt(savedStep));
-                    }
-                }
-            }
-            
-            // Enviar formulário
-            async function submitForm() {
-                // Validar todo o formulário
-                if (!validateAllSections()) {
-                    globalError.textContent = "Por favor, preencha todos os campos obrigatórios em todas as seções.";
-                    globalError.style.display = 'block';
-                    return;
-                }
-                
-                // Mostrar loading
-                loadingOverlay.style.display = 'flex';
-                globalError.style.display = 'none';
-                
-                try {
-                    const formData = new FormData(surveyForm);
-                    
-                    // Enviar para Formspree
-                    const response = await fetch(surveyForm.action, {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        // Sucesso
-                        surveyForm.style.display = 'none';
-                        thankYou.style.display = 'block';
-                        
-                        // Limpar localStorage após envio
-                        localStorage.removeItem('surveyProgress');
-                        localStorage.removeItem('surveyStep');
-                    } else {
-                        // Tratar erros
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Erro ao enviar formulário');
-                    }
-                } catch (error) {
-                    // Mostrar erro
-                    globalError.textContent = `Erro ao enviar: ${error.message || 'Por favor tente novamente mais tarde'}`;
-                    globalError.style.display = 'block';
-                    
-                    // Mudar o botão para tentar novamente
-                    submitBtn.innerHTML = '<i class="fas fa-redo"></i> Tentar Novamente';
-                    submitBtn.className = 'btn btn-warning';
-                    submitBtn.onclick = submitForm;
-                } finally {
-                    // Esconder loading
-                    loadingOverlay.style.display = 'none';
-                }
-            }
-            
-            // Event Listeners
-            next1.addEventListener('click', function() {
-                if (validateSection('section1')) {
-                    showSection(1);
-                }
-            });
-            
-            next2.addEventListener('click', function() {
-                if (validateSection('section2')) {
-                    showSection(2);
-                }
-            });
-            
-            next3.addEventListener('click', function() {
-                if (validateSection('section3')) {
-                    showSection(3);
-                }
-            });
-            
-            back1.addEventListener('click', function() {
-                showSection(0);
-            });
-            
-            back2.addEventListener('click', function() {
-                showSection(1);
-            });
-            
-            back3.addEventListener('click', function() {
-                showSection(2);
-            });
-            
-            saveBtn.addEventListener('click', saveProgress);
-            
-            surveyForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                submitForm();
-            });
-            
-            newSurvey.addEventListener('click', function() {
-                surveyForm.reset();
-                surveyForm.style.display = 'block';
-                thankYou.style.display = 'none';
-                showSection(0);
-                
-                // Resetar botão de envio
-                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Pesquisa';
-                submitBtn.className = 'btn btn-primary';
-                
-                // Resetar seleções visuais
-                document.querySelectorAll('.rating-option, .nps-option').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                
-                // Resetar erros
-                document.querySelectorAll('.error-message').forEach(el => {
-                    el.style.display = 'none';
-                });
-                globalError.style.display = 'none';
-            });
-            
-            // Inicializar
-            setupRatingEvents();
-            setupNpsEvents();
-            loadProgress();
-            updateProgress();
+          });
         });
-    </script>
+        
+        observer.observe(resultDiv, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+        
+        // Fallback para parar loading após 10 segundos
+        setTimeout(() => {
+          showLoading(false);
+          observer.disconnect();
+        }, 10000);
+      });
+    });
+
+    // Efeito de focus nos inputs
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('focus', function() {
+        this.parentElement.parentElement.style.transform = 'translateY(-2px)';
+      });
+      
+      input.addEventListener('blur', function() {
+        this.parentElement.parentElement.style.transform = 'translateY(0)';
+      });
+    });
+
+    // Animação de entrada
+    window.addEventListener('load', function() {
+      document.querySelector('.login-container').style.animation = 'fadeInUp 0.6s ease-out';
+    });
+
+    // Definir animação CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  </script>
+  <script src="login.js" defer></script>
 </body>
 </html>
