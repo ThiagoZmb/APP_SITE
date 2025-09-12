@@ -34,7 +34,7 @@ const dbConfig = {
 
 
 // Endpoint de login
-app.post('/login', async (req, res) => {
+app.post('/login1', async (req, res) => {
   const { username, password } = req.body;
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -73,7 +73,7 @@ app.post('/login', async (req, res) => {
 
 
 // Backend - Endpoint de Login Corrigido
-app.post('/loginteste', async (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password, cnpj } = req.body;
   
   // Validação dos dados recebidos
