@@ -21,7 +21,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
   resDiv.textContent = 'Verificando credenciais...';
   resDiv.className = 'result show';
   
-  const apiUrl = 'https://elegance-backend-hrho.onrender.com/login';
+  const apiUrl = 'https://app-cek0.onrender.com/login';
   
   try {
     const res = await fetch(apiUrl, {
@@ -37,15 +37,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     
 
     const data = await res.json();
-    console.log('Resposta da API:', data);
-    const userName = data.user.nome;
-    console.log(userName);
-
-
-
-
-
-    
+   
     if (data.success) {
       // NOVO: Salvar dados do usuário no localStorage
       if (data.user) {
@@ -145,7 +137,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
       
       // Redirecionar após 1 segundo
       setTimeout(() => {
-        //window.location.href = "https://thiagozmb.github.io/elegance_app/painel_inicial.html";
+        window.location.href = "https://thiagozmb.github.io/elegance_app/painel_inicial.html";
       }, 1000);
       
     } else {
