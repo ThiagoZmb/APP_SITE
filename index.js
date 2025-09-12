@@ -53,40 +53,6 @@ app.post('/login', async (req, res) => {
 
 
 
-
-
-
-
-
-
-// Endpoint para buscar pedidos
-app.get('/pedidos', async (req, res) => {
-  try {
-    const conn = await mysql.createConnection(dbConfig);
-    
-    const [rows] = await conn.execute(`
-      SELECT 
-        RAZAO_SOCIAL AS razaosocial
-      FROM ped_orc 
-      WHERE NUMERO='22570'
-    `);
-    
-    await conn.end();
-    res.json(rows);
-  } catch (err) {
-    console.error('Erro ao buscar pedidos:', err);
-    res.status(500).json({ error: 'Erro de servidor' });
-  }
-});
-
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
-
-
-
-
 // Endpoint para buscar dados dos pedidos
 app.get('/dados_pedidos', async (req, res) => {
   try {
