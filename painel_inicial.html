@@ -1176,9 +1176,10 @@ console.log('Receita total:', revenue);
 
         // Inicialização quando o DOM estiver carregado
         document.addEventListener('DOMContentLoaded', () => {
+             loadPedidos();
             carregarDadosUsuario();
            
-            loadPedidos();
+           
             setupSearch();
             
             //document.getElementById('refresh-btn').addEventListener('click', checkAuthAndLoadPedidos);
