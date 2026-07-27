@@ -110,7 +110,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
       welcomeDiv.offsetHeight;
 
       setTimeout(() => {
-        window.location.href = 'https://thiagozmb.github.io/elegance_app/painel_inicial.html';
+        window.location.href = 'https://thiagozmb.github.io/APP_SITE/painel_inicial.html';
       }, 1000);
 
     } else {
