@@ -21,8 +21,8 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
   resDiv.textContent = 'Verificando credenciais...';
   resDiv.className = 'result show';
   
-  const apiUrl = 'https://elegance-backend-hrho.onrender.com/login';
-  //const apiUrl = 'https://app-site-0m5b.onrender.com/login';
+  //const apiUrl = 'https://elegance-backend-hrho.onrender.com/login';
+  const apiUrl = 'https://app-site-0m5b.onrender.com/login';
   
   try {
     const res = await fetch(apiUrl, {
