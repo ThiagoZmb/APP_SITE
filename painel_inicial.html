@@ -13,7 +13,6 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
         :root {
             --primary-color: #8B0000;
             --primary-light: rgba(139, 0, 0, 0.1);
@@ -34,7 +33,6 @@
             --danger-color: #dc3545;
             --info-color: #17a2b8;
         }
-
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             color: var(--text-dark);
@@ -42,7 +40,6 @@
             min-height: 100vh;
             padding: 20px;
         }
-
         .container {
             display: grid;
             grid-template-columns: 280px 1fr;
@@ -57,8 +54,6 @@
             box-shadow: var(--shadow-heavy);
             overflow: hidden;
         }
-
-        /* Header Moderno */
         header {
             grid-area: header;
             background: var(--gradient-primary);
@@ -71,7 +66,6 @@
             position: relative;
             z-index: 1000;
         }
-
         .logo {
             font-size: 28px;
             font-weight: 700;
@@ -80,19 +74,16 @@
             align-items: center;
             gap: 10px;
         }
-
         .logo::before {
             content: "◆";
             font-size: 24px;
             opacity: 0.8;
         }
-
         .header-right {
             display: flex;
             align-items: center;
             gap: 20px;
         }
-
         .user-profile {
             display: flex;
             align-items: center;
@@ -103,11 +94,9 @@
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
         }
-
         .user-profile:hover {
             background: rgba(255, 255, 255, 0.2);
         }
-
         .user-avatar {
             width: 40px;
             height: 40px;
@@ -119,8 +108,6 @@
             font-weight: 600;
             font-size: 16px;
         }
-
-        /* Sidebar Moderno */
         .sidebar {
             grid-area: sidebar;
             background: var(--white);
@@ -130,7 +117,6 @@
             position: relative;
             overflow-y: auto;
         }
-
         .menu-title {
             color: var(--text-light);
             margin: 0 30px 25px;
@@ -139,7 +125,6 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
-
         .menu-item {
             padding: 15px 30px;
             margin: 0 20px 8px;
@@ -153,7 +138,6 @@
             font-weight: 500;
             color: var(--text-dark);
         }
-
         .menu-item::before {
             content: "";
             width: 6px;
@@ -163,29 +147,23 @@
             opacity: 0;
             transition: all 0.3s ease;
         }
-
         .menu-item:hover {
             background: var(--primary-light);
             transform: translateX(5px);
             color: var(--primary-color);
         }
-
         .menu-item:hover::before {
             opacity: 1;
         }
-
         .menu-item.active {
             background: var(--gradient-primary);
             color: white;
             box-shadow: var(--shadow-medium);
         }
-
         .menu-item.active::before {
             background: white;
             opacity: 1;
         }
-
-        /* Main Content Moderno */
         main {
             grid-area: main;
             padding: 40px;
@@ -193,22 +171,18 @@
             overflow-y: auto;
             animation: fadeIn 0.5s ease-out;
         }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
         .welcome-section {
             margin-bottom: 40px;
             animation: slideIn 0.6s ease-out;
         }
-
         @keyframes slideIn {
             from { opacity: 0; transform: translateX(-30px); }
             to { opacity: 1; transform: translateX(0); }
         }
-
         .welcome-title {
             font-size: 36px;
             margin-bottom: 8px;
@@ -216,20 +190,17 @@
             font-weight: 700;
             line-height: 1.2;
         }
-
         .welcome-subtitle {
             font-size: 16px;
             color: var(--text-light);
             font-weight: 400;
         }
-
         .cards-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 30px;
             margin-bottom: 50px;
         }
-
         .card {
             background: var(--gradient-card);
             border-radius: 20px;
@@ -240,7 +211,6 @@
             overflow: hidden;
             border: 1px solid var(--border-color);
         }
-
         .card::before {
             content: "";
             position: absolute;
@@ -251,19 +221,16 @@
             background: var(--gradient-primary);
             border-radius: 20px 20px 0 0;
         }
-
         .card:hover {
             transform: translateY(-10px);
             box-shadow: var(--shadow-heavy);
         }
-
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 20px;
         }
-
         .card-title {
             font-size: 16px;
             font-weight: 600;
@@ -271,7 +238,6 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-
         .card-icon {
             width: 48px;
             height: 48px;
@@ -283,7 +249,6 @@
             font-size: 20px;
             color: var(--primary-color);
         }
-
         .card-value {
             font-size: 42px;
             font-weight: 700;
@@ -291,21 +256,12 @@
             margin-bottom: 8px;
             line-height: 1;
         }
-
         .card-change {
             font-size: 14px;
             font-weight: 500;
         }
-
-        .card-change.positive {
-            color: var(--success-color);
-        }
-
-        .card-change.negative {
-            color: var(--danger-color);
-        }
-
-        /* Tabela de Pedidos */
+        .card-change.positive { color: var(--success-color); }
+        .card-change.negative { color: var(--danger-color); }
         .table-container {
             background: var(--white);
             border-radius: 20px;
@@ -315,7 +271,6 @@
             position: relative;
             overflow: hidden;
         }
-
         .table-container::before {
             content: "";
             position: absolute;
@@ -326,14 +281,12 @@
             background: var(--gradient-primary);
             border-radius: 20px 20px 0 0;
         }
-
         .table-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
         }
-
         .table-title {
             font-size: 24px;
             color: var(--text-dark);
@@ -342,16 +295,13 @@
             align-items: center;
             gap: 10px;
         }
-
         .search-filter-container {
             display: flex;
             gap: 15px;
         }
-
         .search-box {
             position: relative;
         }
-
         .search-box input {
             padding: 12px 15px 12px 40px;
             border: 1px solid var(--border-color);
@@ -361,13 +311,11 @@
             transition: all 0.3s ease;
             background-color: var(--secondary-color);
         }
-
         .search-box input:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
         }
-
         .search-box::before {
             content: "🔍";
             position: absolute;
@@ -377,7 +325,6 @@
             color: var(--text-light);
             font-size: 16px;
         }
-
         .filter-btn {
             padding: 12px 20px;
             background: var(--primary-light);
@@ -391,18 +338,15 @@
             font-weight: 500;
             transition: all 0.3s ease;
         }
-
         .filter-btn:hover {
             background: var(--primary-color);
             color: white;
         }
-
         .orders-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-
         .orders-table th {
             background: var(--secondary-color);
             padding: 15px 12px;
@@ -415,18 +359,15 @@
             top: 0;
             z-index: 10;
         }
-
         .orders-table td {
             padding: 15px 12px;
             border-bottom: 1px solid var(--border-color);
             font-size: 14px;
             color: var(--text-dark);
         }
-
         .orders-table tr:hover {
             background: var(--secondary-color);
         }
-
         .status-badge {
             padding: 5px 12px;
             border-radius: 20px;
@@ -435,64 +376,22 @@
             text-align: center;
             white-space: nowrap;
         }
-
-        .status-em-producao {
-            background-color: rgba(23, 162, 184, 0.1);
-            color: var(--info-color);
-        }
-
-        .status-pronto {
-            background-color: rgba(255, 193, 7, 0.1);
-            color: var(--warning-color);
-        }
-
-        .status-entregue {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: var(--success-color);
-        }
-
-        .status-retirado {
-            background-color: rgba(108, 117, 125, 0.1);
-            color: var(--text-light);
-        }
-
+        .status-em-producao { background-color: rgba(23, 162, 184, 0.1); color: var(--info-color); }
+        .status-pronto { background-color: rgba(255, 193, 7, 0.1); color: var(--warning-color); }
+        .status-entregue { background-color: rgba(40, 167, 69, 0.1); color: var(--success-color); }
+        .status-retirado { background-color: rgba(108, 117, 125, 0.1); color: var(--text-light); }
         .financial-badge {
             padding: 4px 8px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
         }
-
-        .financial-a-receber {
-            background-color: rgba(220, 53, 69, 0.1);
-            color: var(--danger-color);
-        }
-
-        .financial-recebido {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: var(--success-color);
-        }
-
-        .order-number {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-
-        .client-name {
-            font-weight: 500;
-            color: var(--text-dark);
-        }
-
-        .price-value {
-            font-weight: 600;
-            color: var(--success-color);
-        }
-
-        .date-cell {
-            font-size: 13px;
-            color: var(--text-light);
-        }
-
+        .financial-a-receber { background-color: rgba(220, 53, 69, 0.1); color: var(--danger-color); }
+        .financial-recebido { background-color: rgba(40, 167, 69, 0.1); color: var(--success-color); }
+        .order-number { font-weight: 600; color: var(--primary-color); }
+        .client-name { font-weight: 500; color: var(--text-dark); }
+        .price-value { font-weight: 600; color: var(--success-color); }
+        .date-cell { font-size: 13px; color: var(--text-light); }
         .obs-cell {
             font-size: 12px;
             color: var(--text-light);
@@ -501,19 +400,13 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
-        .highlighted-row {
-            background-color: rgba(255, 255, 0, 0.1);
-        }
-
-        /* Gráficos */
+        .highlighted-row { background-color: rgba(255, 255, 0, 0.1); }
         .charts-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
             margin-bottom: 40px;
         }
-
         .chart-card {
             background: var(--white);
             border-radius: 20px;
@@ -523,7 +416,6 @@
             position: relative;
             overflow: hidden;
         }
-
         .chart-card::before {
             content: "";
             position: absolute;
@@ -534,7 +426,6 @@
             background: var(--gradient-primary);
             border-radius: 20px 20px 0 0;
         }
-
         .chart-title {
             font-size: 18px;
             font-weight: 600;
@@ -544,13 +435,10 @@
             align-items: center;
             gap: 10px;
         }
-
         .chart-container {
             height: 250px;
             position: relative;
         }
-
-        /* Loading */
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -564,7 +452,6 @@
             z-index: 100;
             border-radius: 20px;
         }
-
         .loading-spinner {
             width: 50px;
             height: 50px;
@@ -573,13 +460,10 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* Mensagem de erro */
         .error-message {
             background-color: #ffebee;
             color: #c62828;
@@ -590,73 +474,31 @@
             align-items: center;
             gap: 10px;
         }
-
-        /* Scrollbar personalizada */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--secondary-color);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--primary-color);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-dark);
-        }
-
-        /* Responsive */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--secondary-color); }
+        ::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary-dark); }
         @media (max-width: 1024px) {
-            .charts-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .orders-table {
-                font-size: 12px;
-            }
-            
-            .orders-table th,
-            .orders-table td {
-                padding: 10px 8px;
-            }
+            .charts-container { grid-template-columns: 1fr; }
+            .orders-table { font-size: 12px; }
+            .orders-table th, .orders-table td { padding: 10px 8px; }
         }
-
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
-                grid-template-areas:
-                    "header"
-                    "main";
+                grid-template-areas: "header" "main";
             }
-            
-            .sidebar {
-                display: none;
-            }
-
-            main {
-                padding: 20px;
-            }
-
-            .table-container {
-                padding: 20px;
-                overflow-x: auto;
-            }
-
-            .orders-table {
-                min-width: 800px;
-            }
+            .sidebar { display: none; }
+            main { padding: 20px; }
+            .table-container { padding: 20px; overflow-x: auto; }
+            .orders-table { min-width: 800px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header Moderno -->
         <header>
-            <div class="logo" id="user-empresa"><!-- Empresa será preenchida aqui --></div>
+            <div class="logo" id="user-empresa"></div>
             <div class="header-right">
                 <div class="user-profile">
                     <div class="user-avatar" id="user-avatar">E</div>
@@ -664,8 +506,6 @@
                 </div>
             </div>
         </header>
-
-        <!-- Sidebar Moderno -->
         <div class="sidebar">
             <div class="menu-title">Menu Principal</div>
             <div class="menu-item">Dashboard</div>
@@ -675,14 +515,11 @@
             <div class="menu-item">Financeiro</div>
             <div class="menu-item">Relatórios</div>
         </div>
-
-        <!-- Conteúdo Principal -->
         <main>
             <section class="welcome-section">
                 <h1 class="welcome-title">Controle de Pedidos 📋</h1>
                 <p class="welcome-subtitle">Gerencie todos os seus pedidos de forma organizada e eficiente!</p>
             </section>
-
             <section class="cards-container">
                 <div class="card">
                     <div class="card-header">
@@ -692,7 +529,6 @@
                     <div class="card-value" id="today-orders">0</div>
                     <div class="card-change" id="today-change">Carregando...</div>
                 </div>
-                
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Em Produção</h3>
@@ -701,7 +537,6 @@
                     <div class="card-value" id="production-orders">0</div>
                     <div class="card-change" id="production-change">Carregando...</div>
                 </div>
-                
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Prontos</h3>
@@ -710,7 +545,6 @@
                     <div class="card-value" id="ready-orders">0</div>
                     <div class="card-change" id="ready-change">Carregando...</div>
                 </div>
-
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Faturamento</h3>
@@ -720,7 +554,6 @@
                     <div class="card-change" id="revenue-change">Carregando...</div>
                 </div>
             </section>
-
             <section class="charts-container">
                 <div class="chart-card">
                     <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Status</h3>
@@ -735,12 +568,10 @@
                     </div>
                 </div>
             </section>
-
             <section class="table-container">
                 <div class="loading-overlay" id="table-loading">
                     <div class="loading-spinner"></div>
                 </div>
-                
                 <div class="table-header">
                     <h2 class="table-title">
                         <i class="fas fa-clipboard-list"></i>
@@ -756,7 +587,6 @@
                         </button>
                     </div>
                 </div>
-                
                 <div id="table-content" style="max-height: 500px; overflow-y: auto;">
                     <table class="orders-table">
                         <thead>
@@ -773,69 +603,55 @@
                                 <th>Data Entrega</th>
                             </tr>
                         </thead>
-                        <tbody id="orders-tbody">
-                            <!-- Dados serão carregados dinamicamente -->
-                        </tbody>
+                        <tbody id="orders-tbody"></tbody>
                     </table>
                 </div>
             </section>
         </main>
     </div>
-
     <script>
-        // Função para formatar valor monetário
         function formatCurrency(value) {
             return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',');
         }
 
-      
-        // Função para carregar pedidos do banco de dados
+        // ✅ CORREÇÃO 4: Fetch com timeout de 60s (cold start do Render)
         async function loadPedidos() {
             try {
-                // Mostrar loading
                 document.getElementById('table-loading').style.display = 'flex';
-                
-                // Atualizar indicadores de carregamento
                 document.querySelectorAll('.card-change').forEach(el => {
                     el.textContent = 'Carregando...';
                     el.className = 'card-change';
                 });
-                
-                // Fazer requisição para o endpoint de pedidos
-                const res = await fetch('https://elegance-backend-hrho.onrender.com/dados_pedidos_rj');
-                 
-                
-                // Verificar se a resposta é válida
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+                const res = await fetch('https://elegance-backend-hrho.onrender.com/dados_pedidos_rj', {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
                 if (!res.ok) {
                     throw new Error(`Erro HTTP: ${res.status}`);
                 }
-                
                 const pedidos = await res.json();
-                
-                // Atualizar cards de resumo
+
                 updateSummaryCards(pedidos);
-                
-                // Renderizar gráficos
                 renderCharts(pedidos);
-                
+
                 const tbody = document.getElementById('orders-tbody');
                 tbody.innerHTML = '';
 
                 if (pedidos.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-light);">Nenhum pedido encontrado</td></tr>`;
+                    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-light);">Nenhum pedido encontrado</td></tr>';
                 } else {
                     pedidos.forEach(pedido => {
                         const row = document.createElement('tr');
-                        
-                        // Destacar linhas com status "Em Produção"
                         if (pedido.situacao === 'Em Produção') {
                             row.classList.add('highlighted-row');
                         }
-
-                        // Determinar classes CSS para situação e financeiro
                         const situacaoClass = `status-${pedido.situacao.toLowerCase().replace(' ', '-')}`;
                         const financeiroClass = `financial-${pedido.financeiro.toLowerCase().replace(' ', '-')}`;
-
                         row.innerHTML = `
                             <td class="order-number">${pedido.numero}</td>
                             <td class="client-name">${pedido.cliente}</td>
@@ -848,24 +664,17 @@
                             <td><span class="financial-badge ${financeiroClass}">${pedido.financeiro}</span></td>
                             <td class="date-cell">${pedido.dataEntrega || '-'}</td>
                         `;
-
                         tbody.appendChild(row);
                     });
                 }
-                
-                // Esconder loading
                 document.getElementById('table-loading').style.display = 'none';
-                
             } catch (err) {
                 console.error('Erro ao carregar pedidos:', err);
-                
-                // Atualizar UI com mensagem de erro
                 document.getElementById('table-loading').style.display = 'none';
                 document.querySelectorAll('.card-change').forEach(el => {
                     el.textContent = 'Erro ao carregar dados';
                     el.className = 'card-change negative';
                 });
-                
                 document.getElementById('orders-tbody').innerHTML = `
                     <tr>
                         <td colspan="10" style="text-align: center; padding: 30px; color: var(--danger-color);">
@@ -876,160 +685,78 @@
             }
         }
 
-        // Atualizar cards de resumo
         function updateSummaryCards(pedidos) {
-            
-            // Pedidos de hoje
             const today = new Date();
             const todayFormatted = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
             const todayOrders = pedidos.filter(p => p.data === todayFormatted).length;
             document.getElementById('today-orders').textContent = todayOrders;
-            document.getElementById('today-change').textContent = todayOrders > 0 ? 
+            document.getElementById('today-change').textContent = todayOrders > 0 ?
                 `+${todayOrders} novos pedidos` : 'Sem novos pedidos hoje';
-            document.getElementById('today-change').className = todayOrders > 0 ? 
+            document.getElementById('today-change').className = todayOrders > 0 ?
                 'card-change positive' : 'card-change';
-            
 
+            const productionOrders = pedidos.filter(p => {
+                if (!p.situacao) return false;
+                const situacao = String(p.situacao).trim().toLowerCase();
+                return situacao.includes('em produção') ||
+                       situacao.includes('em producao') ||
+                       situacao.includes('producao') ||
+                       situacao.includes('produção');
+            }).length;
+            const productionOrdersElement = document.getElementById('production-orders');
+            const productionChangeElement = document.getElementById('production-change');
+            if (productionOrdersElement) productionOrdersElement.textContent = productionOrders;
+            if (productionChangeElement) {
+                productionChangeElement.textContent = 'Em Produção';
+                productionChangeElement.className = 'card-change';
+            }
 
+            const readyOrders = pedidos.filter(p => {
+                if (!p.situacao) return false;
+                const situacao = String(p.situacao).trim().toLowerCase();
+                return situacao.includes('pronto') ||
+                       situacao.includes('finalizado') ||
+                       situacao.includes('concluído') ||
+                       situacao.includes('concluido') ||
+                       situacao.includes('acabado') ||
+                       situacao === 'ok' ||
+                       situacao === 'finish' ||
+                       situacao === 'done';
+            }).length;
+            const readyOrdersElement = document.getElementById('ready-orders');
+            const readyChangeElement = document.getElementById('ready-change');
+            if (readyOrdersElement) readyOrdersElement.textContent = readyOrders;
+            if (readyChangeElement) {
+                readyChangeElement.textContent = 'Pedidos prontos';
+                readyChangeElement.className = 'card-change';
+            }
 
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            const pedidosDoMes = pedidos.filter(p => {
+                if (!p.data) return false;
+                const [dia, mes, ano] = p.data.split('/');
+                if (!dia || !mes || !ano) return false;
+                const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+                if (isNaN(date.getTime())) return false;
+                return (date.getMonth() + 1) === currentMonth &&
+                       date.getFullYear() === currentYear;
+            });
+            const revenue = pedidosDoMes.reduce((sum, p) => {
+                const valor = parseFloat(p.valor) || 0;
+                return sum + valor;
+            }, 0);
+            const revenueElement = document.getElementById('revenue');
+            const revenueChangeElement = document.getElementById('revenue-change');
+            if (revenueElement) revenueElement.textContent = formatCurrency(revenue);
+            if (revenueChangeElement) {
+                revenueChangeElement.textContent = 'Total do mês';
+                revenueChangeElement.className = 'card-change';
+            }
+        }
 
-            // Pedidos em produção com tratamento robusto
-const productionOrders = pedidos.filter(p => {
-  // Verificar se p.situacao existe e não é nulo/undefined
-  if (!p.situacao) return false;
-  
-  // Converter para string, remover espaços e converter para minúsculas
-  const situacao = String(p.situacao).trim().toLowerCase();
-  
-  // Verificar se contém "em produção" (ou variações)
-  return situacao.includes('em produção') || 
-         situacao.includes('em producao') || // sem acento
-         situacao.includes('producao') ||    // apenas "produção"
-         situacao.includes('produção');      // apenas "produção" com acento
-}).length;
-
-// Atualizar o DOM com verificação de existência dos elementos
-const productionOrdersElement = document.getElementById('production-orders');
-const productionChangeElement = document.getElementById('production-change');
-
-if (productionOrdersElement) {
-  productionOrdersElement.textContent = productionOrders;
-}
-
-if (productionChangeElement) {
-  productionChangeElement.textContent = 'Em Produção';
-  productionChangeElement.className = 'card-change';
-}
-
-// Debug: mostrar os valores de situação para identificar o problema
-console.log('Situações encontradas:', [...new Set(pedidos.map(p => p.situacao))]);
-console.log('Pedidos em produção:', productionOrders);
-
-
-
-
-            
-            
-            // Pedidos prontos com tratamento robusto
-const readyOrders = pedidos.filter(p => {
-  // Verificar se p.situacao existe e não é nulo/undefined
-  if (!p.situacao) return false;
-  
-  // Converter para string, remover espaços e converter para minúsculas
-  const situacao = String(p.situacao).trim().toLowerCase();
-  
-  // Verificar se contém "pronto" (ou variações)
-  return situacao.includes('pronto') || 
-         situacao.includes('finalizado') ||
-         situacao.includes('concluído') ||
-         situacao.includes('concluido') ||    // sem acento
-         situacao.includes('acabado') ||
-         situacao === 'ok' ||                 // caso use apenas "OK"
-         situacao === 'finish' ||             // caso use inglês
-         situacao === 'done';                 // caso use inglês
-}).length;
-
-// Atualizar o DOM com verificação de existência dos elementos
-const readyOrdersElement = document.getElementById('ready-orders');
-const readyChangeElement = document.getElementById('ready-change');
-
-if (readyOrdersElement) {
-  readyOrdersElement.textContent = readyOrders;
-}
-
-if (readyChangeElement) {
-  readyChangeElement.textContent = 'Pedidos prontos';
-  readyChangeElement.className = 'card-change';
-}
-
-// Debug: mostrar os valores de situação para identificar o problema
-console.log('Situações encontradas (Prontos):', [...new Set(pedidos.map(p => p.situacao))]);
-console.log('Pedidos prontos:', readyOrders);
-
-
-
-
-            
-         // Obter data atual (mês e ano)
-const now = new Date();
-const currentMonth = now.getMonth() + 1; // Ajustado: Janeiro = 1 (para corresponder ao MySQL)
-const currentYear = now.getFullYear();
-
-// Filtrar pedidos do mês atual
-const pedidosDoMes = pedidos.filter(p => {
-  // Verifica se o pedido tem uma data válida
-  if (!p.data) return false;
-  
-  // Converter formato dd/mm/yyyy (vindo do MySQL) para Date
-  const [dia, mes, ano] = p.data.split('/');
-  
-  // Validar se a divisão funcionou corretamente
-  if (!dia || !mes || !ano) return false;
-  
-  // Criar objeto Date (mes-1 porque Date usa 0-11)
-  const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-  
-  // Verifica se a data é válida
-  if (isNaN(date.getTime())) return false;
-  
-  // Comparar mês e ano (getMonth() + 1 para corresponder ao formato MySQL)
-  return (date.getMonth() + 1) === currentMonth && 
-         date.getFullYear() === currentYear;
-});
-
-// Soma dos valores com tratamento para valores nulos
-const revenue = pedidosDoMes.reduce((sum, p) => {
-  const valor = parseFloat(p.valor) || 0;
-  return sum + valor;
-}, 0);
-
-// Atualizar o DOM com verificação de existência dos elementos
-const revenueElement = document.getElementById('revenue');
-const revenueChangeElement = document.getElementById('revenue-change');
-
-if (revenueElement) {
-  revenueElement.textContent = formatCurrency(revenue);
-}
-
-if (revenueChangeElement) {
-  revenueChangeElement.textContent = 'Total do mês';
-  revenueChangeElement.className = 'card-change';
-}
-
-// Debug: mostrar quantos pedidos foram encontrados
-console.log(`Pedidos do mês ${currentMonth}/${currentYear}:`, pedidosDoMes.length);
-console.log('Receita total:', revenue);
-
-
-
-
-        }//Final na function
-
-
-        
-        // Renderizar gráficos
         function renderCharts(pedidos) {
-            // Gráfico de pizza - Distribuição de status
             const statusCtx = document.getElementById('status-chart').getContext('2d');
             const statusCounts = {
                 'Em Produção': pedidos.filter(p => p.situacao === 'Em Produção').length,
@@ -1037,7 +764,6 @@ console.log('Receita total:', revenue);
                 'Entregue': pedidos.filter(p => p.situacao === 'Entregue').length,
                 'Retirado': pedidos.filter(p => p.situacao === 'Retirado').length
             };
-            
             new Chart(statusCtx, {
                 type: 'doughnut',
                 data: {
@@ -1059,10 +785,7 @@ console.log('Receita total:', revenue);
                     plugins: {
                         legend: {
                             position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true
-                            }
+                            labels: { padding: 20, usePointStyle: true }
                         },
                         tooltip: {
                             callbacks: {
@@ -1078,27 +801,19 @@ console.log('Receita total:', revenue);
                     }
                 }
             });
-            
-            // Gráfico de barras - Pedidos por dia
+
             const ordersCtx = document.getElementById('orders-chart').getContext('2d');
-            
-            // Calcular pedidos dos últimos 7 dias
             const dates = [];
             const ordersData = [];
-            
             for (let i = 6; i >= 0; i--) {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
                 const dateStr = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}`;
-                
                 dates.push(dateStr);
-                
-                // Contar pedidos para este dia
                 const fullDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getFullYear()}`;
                 const count = pedidos.filter(p => p.data === fullDate).length;
                 ordersData.push(count);
             }
-            
             new Chart(ordersCtx, {
                 type: 'bar',
                 data: {
@@ -1113,40 +828,26 @@ console.log('Receita total:', revenue);
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: {
-                                precision: 0
-                            },
-                            title: {
-                                display: true,
-                                text: 'Número de Pedidos'
-                            }
+                            ticks: { precision: 0 },
+                            title: { display: true, text: 'Número de Pedidos' }
                         },
                         x: {
-                            title: {
-                                display: true,
-                                text: 'Data'
-                            }
+                            title: { display: true, text: 'Data' }
                         }
                     }
                 }
             });
         }
 
-        // Função de busca
         function setupSearch() {
             const searchInput = document.getElementById('search-input');
             searchInput.addEventListener('input', function() {
                 const searchTerm = this.value.toLowerCase();
                 const rows = document.querySelectorAll('#orders-tbody tr');
-                
                 rows.forEach(row => {
                     const text = row.textContent.toLowerCase();
                     row.style.display = text.includes(searchTerm) ? '' : 'none';
@@ -1154,36 +855,24 @@ console.log('Receita total:', revenue);
             });
         }
 
-        // Função para carregar dados do usuário
+        // ✅ CORREÇÃO 3: Redireciona para login se não houver sessão
         function carregarDadosUsuario() {
-            console.log('Carregando dados do usuário atual');
-            
             const userData = localStorage.getItem('user');
-            
             if (userData) {
                 const user = JSON.parse(userData);
-                // Preencher os elementos
                 document.getElementById('user-empresa').textContent = user.empresa || 'Empresa';
                 document.getElementById('user-name').textContent = user.nome || 'Usuário';
-                
-                // Atualizar avatar com primeira letra do nome
-                const firstLetter = user.nome.charAt(0).toUpperCase();
-                document.getElementById('user-avatar').textContent = firstLetter;
+                document.getElementById('user-avatar').textContent = user.nome.charAt(0).toUpperCase();
             } else {
-                // Se não há dados do usuário, redirecionar para login
-                console.warn('Usuário não encontrado no localStorage');
+                // Redireciona para a página de login
+                window.location.href = 'login.html';
             }
         }
 
-        // Inicialização quando o DOM estiver carregado
         document.addEventListener('DOMContentLoaded', () => {
-             loadPedidos();
             carregarDadosUsuario();
-           
-           
+            loadPedidos();
             setupSearch();
-            
-            //document.getElementById('refresh-btn').addEventListener('click', checkAuthAndLoadPedidos);
         });
     </script>
 </body>
