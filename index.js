@@ -60,6 +60,7 @@ app.get('/dados_pedidos', async (req, res) => {
         p.SITUACAO as situacao,
         p.FINANCEIRO as financeiro,
         DATE_FORMAT(p.DATA_ENTREGA, '%d/%m/%Y') as dataEntrega
+        WHERE p.TIPO='Pedido'
       FROM ped_orc p
     `);
     await conn.end();
