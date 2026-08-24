@@ -63,6 +63,7 @@ app.get('/dados_pedidos', async (req, res) => {
        
       FROM ped_orc p
        WHERE p.TIPO='Pedido'
+       ORDER BY NUMERO DESC
     `);
     await conn.end();
     res.json(rows);
