@@ -138,6 +138,13 @@
             font-weight: 500;
             color: var(--text-dark);
         }
+        .sidebar a.menu-item {
+            text-decoration: none;   /* tira o sublinhado */
+            color: var(--text-dark); /* texto escuro, igual aos outros itens */
+        }
+        .sidebar a.menu-item.active {
+            color: white;            /* item "Pedidos" ativo fica com texto branco */
+        }
         .menu-item::before {
             content: "";
             width: 6px;
