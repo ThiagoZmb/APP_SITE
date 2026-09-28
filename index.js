@@ -144,15 +144,20 @@ app.get('/dados_compras_orcamentos', async (req, res) => {
     const cliente = req.query.cliente;
     const estado = req.query.estado;
 
-    let filtroExtra = '';
+        let filtroExtra = '';
     let params = [];
 
     if (cliente) {
-      filtroExtra = 'WHERE p.RAZAO_SOCIAL = ?';
+      // Cliente selecionado + SOMENTE ano vigente
+      filtroExtra = 'WHERE p.RAZAO_SOCIAL = ? AND YEAR(p.DATA) = YEAR(CURDATE())';
       params = [cliente];
     } else if (estado) {
-      filtroExtra = 'WHERE c.ESTADO = ?';
+      // Representante: estado RJ + SOMENTE ano vigente
+      filtroExtra = "WHERE c.ESTADO = ? AND YEAR(p.DATA) = YEAR(CURDATE())";
       params = [estado];
+    } else {
+      // Visão geral (Administrador sem cliente): ano vigente
+      filtroExtra = 'WHERE YEAR(p.DATA) = YEAR(CURDATE())';
     }
 
     const sql = `
