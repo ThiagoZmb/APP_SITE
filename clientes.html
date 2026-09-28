@@ -174,7 +174,7 @@
             document.querySelectorAll('#clients-tbody tr[data-razao]').forEach(row => {
                 row.addEventListener('click', () => {
                     const razao = encodeURIComponent(row.dataset.razao);
-                    window.location.href = `grafico_pedidos.html?cliente=${razao}`;
+                    window.location.href = `graficos_pedidos.html?cliente=${razao}`;
                 });
             });
         }
