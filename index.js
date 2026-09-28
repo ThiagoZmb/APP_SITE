@@ -137,12 +137,12 @@ app.get('/dados_clientes', async (req, res) => {
 
 
 
-/// Endpoint: comparação Orçamentos x Pedidos por mês, FILTRADO POR CLIENTE
+// Endpoint: comparação Orçamentos x Pedidos por mês
 app.get('/dados_compras_orcamentos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
-    const cliente = req.query.cliente;        // ex: /dados_compras_orcamentos?cliente=EMPRESA XYZ LTDA
-    const estado = req.query.estado;          // usado pelo Representante (sem cliente escolhido)
+    const cliente = req.query.cliente;
+    const estado = req.query.estado;
 
     let filtroExtra = '';
     let params = [];
@@ -168,8 +168,18 @@ app.get('/dados_compras_orcamentos', async (req, res) => {
     `;
     const [rows] = await conn.execute(sql, params);
     await conn.end();
-    ...
-    // resto igual ao que te passei antes
+
+    const resultado = rows.map(r => ({
+      mes: r.mes,
+      orcamentos: parseFloat(r.orcamentos) || 0,
+      pedidos: parseFloat(r.pedidos) || 0
+    }));
+    res.json(resultado);
+  } catch (err) {
+    console.error('Erro ao buscar compras x orçamentos:', err);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
 
 
 // ✅ ISTO FALTAVA — inicia o servidor
