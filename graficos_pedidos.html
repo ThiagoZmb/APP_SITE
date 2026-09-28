@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Pedidos x Orçamentos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px);
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--shadow-heavy);
+            overflow: hidden;
+        }
+        header {
+            grid-area: header;
+            background: var(--gradient-primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+        .logo { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .menu-item {
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; font-weight: 500; text-decoration: none; color: var(--text-dark);
+        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 40px; }
+        .chart-card {
+            background: var(--white); border-radius: 20px; padding: 30px;
+            box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative;
+        }
+        .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
+        .chart-container { height: 420px; position: relative; }
+        .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 40px; }
+        .card {
+            background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative;
+        }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .card-title { font-size: 14px; font-weight: 600; color: var(--text-light); text-transform: uppercase; }
+        .card-value { font-size: 34px; font-weight: 700; color: var(--text-dark); margin-top: 12px; }
+        .loading-overlay {
+            position: absolute; inset: 0; background: rgba(255,255,255,.85);
+            display: flex; align-items: center; justify-content: center; border-radius: 20px;
+        }
+        .loading-spinner {
+            width: 50px; height: 50px; border: 5px solid rgba(139,0,0,.2);
+            border-top: 5px solid var(--primary-color); border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            main { padding: 20px; }
+            .chart-container { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile"><span id="user-name"></span></div>
+        </header>
+        <nav style="grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color);">
+            <div style="margin: 0 30px 25px; font-size: 12px; font-weight: 600; color: var(--text-light); letter-spacing: 1px;">MENU PRINCIPAL</div>
+            <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
+            <a class="menu-item" href="clientes.html">👥 Clientes</a>
+            <a class="menu-item active" href="grafico_pedidos.html">📊 Orçamentos x Pedidos</a>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Orçamentos x Pedidos 📊</h1>
+            <p class="welcome-subtitle">Comparação dos últimos 7 meses — valores em reais</p>
+            <section class="cards-container">
+                <div class="card">
+                    <div class="card-title">Total Orçamentos (7 meses)</div>
+                    <div class="card-value" id="total-orcamentos">R$ 0,00</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Total Pedidos (7 meses)</div>
+                    <div class="card-value" id="total-pedidos">R$ 0,00</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Conversão (Pedidos / Orçamentos)</div>
+                    <div class="card-value" id="taxa-conversao">0%</div>
+                </div>
+            </section>
+            <section class="chart-card">
+                <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Orçamentos x Pedidos por Mês</h3>
+                <div class="loading-overlay" id="chart-loading"><div class="loading-spinner"></div></div>
+                <div class="chart-container">
+                    <canvas id="grafico-comparativo"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        let chartInstance = null;
+
+        function getUsuarioLogado() {
+            try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+            catch { return {}; }
+        }
+
+        function formatCurrency(value) {
+            return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
+        }
+
+        // ✅ Mesmo filtro do painel: Representante Comercial → somente RJ
+       function getUrlGrafico() {
+    const user = getUsuarioLogado();
+    const cargo = String(user.cargo || '').trim().toLowerCase();
+    // Cliente vindo da URL (?cliente=...) tem prioridade — veio do clique na lista
+    const ClienteDaURL = new URLSearchParams(window.location.search).get('cliente');
+
+    if (ClienteDaURL) {
+        return `${API_BASE}/dados_compras_orcamentos?cliente=${encodeURIComponent(ClienteDaURL)}`;
+    }
+    // Sem cliente na URL: comportamento por cargo (Representante = RJ)
+    return cargo.includes('representante')
+        ? `${API_BASE}/dados_compras_orcamentos?estado=RJ`
+        : `${API_BASE}/dados_compras_orcamentos`;
+}
+
+        async function loadGrafico() {
+            try {
+                document.getElementById('chart-loading').style.display = 'flex';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                const res = await fetch(getUrlGrafico(), { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+                const dados = await res.json();
+
+                const labels = dados.map(d => d.mes);
+                const orcamentos = dados.map(d => d.orcamentos);
+                const pedidos = dados.map(d => d.pedidos);
+
+                // Cards de resumo
+                const totalOrc = orcamentos.reduce((a, b) => a + b, 0);
+                const totalPed = pedidos.reduce((a, b) => a + b, 0);
+                document.getElementById('total-orcamentos').textContent = formatCurrency(totalOrc);
+                document.getElementById('total-pedidos').textContent = formatCurrency(totalPed);
+                const conversao = totalOrc > 0 ? Math.round((totalPed / totalOrc) * 100) : 0;
+                document.getElementById('taxa-conversao').textContent = conversao + '%';
+
+                // Destroi gráfico anterior (botão Atualizar / recarregamento)
+                if (chartInstance) chartInstance.destroy();
+
+                const ctx = document.getElementById('grafico-comparativo').getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Orçamentos',          // = Series1 do VB (laranja)
+                                data: orcamentos,
+                                backgroundColor: 'rgba(255, 165, 0, 0.8)',
+                                borderRadius: 5
+                            },
+                            {
+                                label: 'Pedidos',             // = Series2 do VB (verde)
+                                data: pedidos,
+                                backgroundColor: 'rgba(0, 128, 0, 0.8)',
+                                borderRadius: 5
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { padding: 20, usePointStyle: true } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${formatCurrency(context.raw)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toLocaleString('pt-BR');
+                                    }
+                                },
+                                title: { display: true, text: 'Valor (R$)' }
+                            },
+                            x: {
+                                title: { display: true, text: 'Mês' },
+                                grid: { display: false }   // = MajorGrid.LineWidth = 0 do VB
+                            }
+                        }
+                    }
+                });
+
+                document.getElementById('chart-loading').style.display = 'none';
+            } catch (err) {
+                console.error('Erro ao carregar gráfico:', err);
+                document.getElementById('chart-loading').style.display = 'none';
+                alert('Erro ao carregar dados do gráfico: ' + err.message);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+    const user = getUsuarioLogado();
+    if (!user || !user.nome) {
+        window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        return;
+    }
+    document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
+    document.getElementById('user-name').textContent = user.nome || '';
+
+    const ClienteDaURL = new URLSearchParams(window.location.search).get('cliente');
+    if (ClienteDaURL) {
+        document.querySelector('.welcome-title')?.replaceChildren(
+            document.createTextNode(ClienteDaURL + ' 📊')
+        );
+        document.querySelector('.welcome-subtitle')?.replaceChildren(
+            document.createTextNode('Orçamentos x Pedidos deste cliente — valores em reais')
+        );
+    }
+    loadGrafico();
+});
+      
+    </script>
+</body>
+</html>

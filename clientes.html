@@ -41,14 +41,17 @@
             padding: 0 40px;
         }
         .logo { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .user-profile { font-size: 15px; font-weight: 500; }
         .menu-item {
             padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
-            display: flex; align-items: center; gap: 12px; font-weight: 500; text-decoration: none; color: inherit;
+            display: flex; align-items: center; gap: 12px; font-weight: 500;
+            text-decoration: none; color: var(--text-dark);
         }
         .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
         .menu-item.active { background: var(--gradient-primary); color: white; }
         main { grid-area: main; padding: 40px; overflow-y: auto; }
         .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 40px; }
         .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 40px; }
         .card {
             background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
@@ -61,24 +64,29 @@
             background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
             box-shadow: var(--shadow-light); position: relative;
         }
-        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .table-actions { display: flex; gap: 15px; align-items: center; }
         .search-box input {
-            padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 12px; width: 250px; font-size: 14px;
+            padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 12px;
+            width: 250px; font-size: 14px; background-color: var(--secondary-color);
         }
+        .search-box input:focus { outline: none; border-color: var(--primary-color); }
         .clients-table { width: 100%; border-collapse: collapse; }
         .clients-table th {
             background: var(--secondary-color); padding: 15px 12px; text-align: left; font-weight: 600;
             border-bottom: 2px solid var(--border-color); font-size: 14px;
         }
         .clients-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        .clients-table tr:hover { background: var(--secondary-color); }
+        /* ✅ Linha clicável: indicação visual e hover */
+        .clients-table tbody tr[data-razao] { cursor: pointer; }
+        .clients-table tbody tr[data-razao]:hover { background: var(--primary-light); }
         .client-code { font-weight: 600; color: var(--primary-color); }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
         .status-ativo { background: rgba(40,167,69,.1); color: #28a745; }
         .status-inativo { background: rgba(220,53,69,.1); color: #dc3545; }
         .loading-overlay {
             position: absolute; inset: 0; background: rgba(255,255,255,.85);
-            display: flex; align-items: center; justify-content: center; border-radius: 20px;
+            display: flex; align-items: center; justify-content: center; border-radius: 20px; z-index: 100;
         }
         .loading-spinner {
             width: 50px; height: 50px; border: 5px solid rgba(139,0,0,.2);
@@ -88,6 +96,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 768px) {
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            main { padding: 20px; }
             .table-container { padding: 20px; overflow-x: auto; }
             .clients-table { min-width: 900px; }
         }
@@ -103,9 +112,11 @@
             <div style="margin: 0 30px 25px; font-size: 12px; font-weight: 600; color: var(--text-light); letter-spacing: 1px;">MENU PRINCIPAL</div>
             <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
             <a class="menu-item active" href="clientes.html">👥 Clientes</a>
+            <a class="menu-item" href="grafico_pedidos.html">📊 Orçamentos x Pedidos</a>
         </nav>
         <main>
             <h1 class="welcome-title">Clientes 👥</h1>
+            <p class="welcome-subtitle" id="welcome-subtitle">Clique em um cliente para abrir o gráfico de Orçamentos x Pedidos dele</p>
             <section class="cards-container">
                 <div class="card">
                     <div class="card-title">Clientes Cadastrados</div>
@@ -117,18 +128,24 @@
                 </div>
             </section>
             <section class="table-container">
-                <div class="loading-overlay" id="table-loading"><div class="loading-spinner"></div></div>
+                <div class="loading-overlay" id="table-loading" style="display:none;"><div class="loading-spinner"></div></div>
                 <div class="table-header">
                     <h2>Lista de Clientes</h2>
-                    <div class="search-box">
-                        <input type="text" placeholder="Buscar clientes..." id="search-input">
+                    <div class="table-actions">
+                        <div class="search-box">
+                            <input type="text" placeholder="Buscar clientes..." id="search-input">
+                        </div>
+                        <button id="voltar-btn" class="menu-item" style="margin:0; padding:10px 20px; border:1px solid var(--border-color); display:none;">
+                            ⬅️ Voltar
+                        </button>
                     </div>
                 </div>
                 <div id="table-content" style="max-height: 500px; overflow-y: auto;">
                     <table class="clients-table">
                         <thead>
                             <tr>
-                                <th>Código</th><th>Razão Social</th><th>Fantasia</th><th>CNPJ/CPF</th><th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Situação</th>
+                                <th>Código</th><th>Razão Social</th><th>Fantasia</th><th>CNPJ/CPF</th>
+                                <th>Telefone</th><th>E-mail</th><th>Cidade/UF</th><th>Situação</th>
                             </tr>
                         </thead>
                         <tbody id="clients-tbody"></tbody>
@@ -138,45 +155,62 @@
         </main>
     </div>
     <script>
-        // Escapa HTML — evita quebra se o nome do cliente tiver caracteres especiais
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+
+        function getUsuarioLogado() {
+            try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+            catch { return {}; }
+        }
+
+        // Escapa HTML — proteção contra caracteres especiais/XSS
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text == null ? '' : String(text);
             return div.innerHTML;
         }
 
+        function adicionarEventosClique() {
+            // ✅ NOVO: linha clicável → abre gráfico do cliente (?cliente=RAZAO_SOCIAL)
+            document.querySelectorAll('#clients-tbody tr[data-razao]').forEach(row => {
+                row.addEventListener('click', () => {
+                    const razao = encodeURIComponent(row.dataset.razao);
+                    window.location.href = `grafico_pedidos.html?cliente=${razao}`;
+                });
+            });
+        }
+
         async function loadClientes() {
-    try {
-        document.getElementById('table-loading').style.display = 'flex';
+            try {
+                document.getElementById('table-loading').style.display = 'flex';
 
-        // Representante Comercial → somente RJ
-        const userData = JSON.parse(localStorage.getItem('user') || '{}');
-        const cargo = (userData.cargo || '').trim().toLowerCase();
-        const filtroRj = cargo === 'representante comercial' ? '?estado=RJ' : '';
+                // ✅ Representante Comercial → somente clientes do RJ
+                const user = getUsuarioLogado();
+                const cargo = String(user.cargo || '').trim().toLowerCase();
+                const filtroRj = cargo.includes('representante') ? '?estado=RJ' : '';
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
-        const res = await fetch(
-            `https://elegance-backend-hrho.onrender.com/dados_clientes${filtroRj}`,
-            { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-
-
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                const res = await fetch(`${API_BASE}/dados_clientes${filtroRj}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
 
                 if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
                 const clientes = await res.json();
 
+                // Cards de resumo
                 document.getElementById('total-clientes').textContent = clientes.length;
-                const ativos = clientes.filter(c => String(c.situacao || '').toLowerCase().includes('ativo')).length;
+                const ativos = clientes.filter(c =>
+                    String(c.situacao || '').toLowerCase().includes('ativo')).length;
                 document.getElementById('clientes-ativos').textContent = ativos;
 
+                // Tabela com data-razao em cada linha (identifica o cliente clicado)
                 const tbody = document.getElementById('clients-tbody');
                 tbody.innerHTML = clientes.length === 0
                     ? '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum cliente cadastrado</td></tr>'
                     : clientes.map(c => `
-                        <tr>
-                            <td class="client-code">${escapeHtml(c.codigo)}</td>
+                        <tr data-razao="${escapeHtml(c.razaoSocial)}">
+                            <td class="client-code">${escapeHtml(c.coding)}</td>
                             <td><b>${escapeHtml(c.razaoSocial)}</b></td>
                             <td>${escapeHtml(c.fantasia || '-')}</td>
                             <td>${escapeHtml(c.cnpjCpf || '-')}</td>
@@ -186,15 +220,17 @@
                             <td><span class="status-badge ${String(c.situacao || '').toLowerCase().includes('ativo') ? 'status-ativo' : 'status-inativo'}">${escapeHtml(c.situacao || '-')}</span></td>
                         </tr>`).join('');
 
+                adicionarEventosClique();
                 document.getElementById('table-loading').style.display = 'none';
             } catch (err) {
                 console.error('Erro ao carregar clientes:', err);
                 document.getElementById('table-loading').style.display = 'none';
                 document.getElementById('clients-tbody').innerHTML =
-                    `<tr><td colspan="8" style="text-align:center;padding:30px;color:#dc3545">Erro ao carregar: ${err.message}</td></tr>`;
+                    `<tr><td colspan="8" style="text-align:center;padding:30px;color:#dc3545">Erro ao carregar: ${escapeHtml(err.message || 'Verifique a conexão')}</td></tr>`;
             }
         }
 
+        // Busca em tempo real
         document.getElementById('search-input').addEventListener('input', function() {
             const term = this.value.toLowerCase();
             document.querySelectorAll('#clients-tbody tr').forEach(row => {
@@ -203,14 +239,24 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-            const userData = localStorage.getItem('user');
-            if (userData) {
-                const u = JSON.parse(userData);
-                document.getElementById('user-empresa').textContent = u.empresa || 'Elegance';
-                document.getElementById('user-name').textContent = u.nome || '';
-            } else {
+            const user = getUsuarioLogado();
+            if (!user || !user.nome) {
+                // Sem sessão → volta para o login
                 window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+                return;
             }
+            document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
+            document.getElementById('user-name').textContent = user.nome || '';
+
+            // ✅ Botão Voltar: aparece se o usuário veio de outra página do sistema
+            if (document.referrer &&
+                document.referrer.includes('thiagozmb.github.io') &&
+                !document.referrer.includes('login')) {
+                const btn = document.getElementById('voltar-btn');
+                btn.style.display = 'flex';
+                btn.addEventListener('click', () => history.back());
+            }
+
             loadClientes();
         });
     </script>

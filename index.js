@@ -135,6 +135,43 @@ app.get('/dados_clientes', async (req, res) => {
   }
 });
 
+
+
+/// Endpoint: comparação Orçamentos x Pedidos por mês, FILTRADO POR CLIENTE
+app.get('/dados_compras_orcamentos', async (req, res) => {
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const cliente = req.query.cliente;        // ex: /dados_compras_orcamentos?cliente=EMPRESA XYZ LTDA
+    const estado = req.query.estado;          // usado pelo Representante (sem cliente escolhido)
+
+    let filtroExtra = '';
+    let params = [];
+
+    if (cliente) {
+      filtroExtra = 'WHERE p.RAZAO_SOCIAL = ?';
+      params = [cliente];
+    } else if (estado) {
+      filtroExtra = 'WHERE c.ESTADO = ?';
+      params = [estado];
+    }
+
+    const sql = `
+      SELECT
+        DATE_FORMAT(p.DATA, '%m/%Y') as mes,
+        SUM(CASE WHEN p.TIPO = 'Orçamento' THEN p.TOTAL ELSE 0 END) as orcamentos,
+        SUM(CASE WHEN p.TIPO = 'Pedido'    THEN p.TOTAL ELSE 0 END) as pedidos
+      FROM ped_orc p
+      INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL
+      ${filtroExtra}
+      GROUP BY DATE_FORMAT(p.DATA, '%m/%Y'), YEAR(p.DATA), MONTH(p.DATA)
+      ORDER BY YEAR(p.DATA) ASC, MONTH(p.DATA) ASC
+    `;
+    const [rows] = await conn.execute(sql, params);
+    await conn.end();
+    ...
+    // resto igual ao que te passei antes
+
+
 // ✅ ISTO FALTAVA — inicia o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
