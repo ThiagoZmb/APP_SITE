@@ -146,14 +146,24 @@
         }
 
         async function loadClientes() {
-            try {
-                document.getElementById('table-loading').style.display = 'flex';
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const res = await fetch('https://elegance-backend-hrho.onrender.com/dados_clientes', {
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
+    try {
+        document.getElementById('table-loading').style.display = 'flex';
+
+        // Representante Comercial → somente RJ
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        const cargo = (userData.cargo || '').trim().toLowerCase();
+        const filtroRj = cargo === 'representante comercial' ? '?estado=RJ' : '';
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        const res = await fetch(
+            `https://elegance-backend-hrho.onrender.com/dados_clientes${filtroRj}`,
+            { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+
+
+
                 if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
                 const clientes = await res.json();
 

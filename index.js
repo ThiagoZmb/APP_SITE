@@ -18,7 +18,7 @@ const dbConfig = {
   database: process.env.DB_NAME || 'db_elegance_v4'
 };
 
-// Endpoint de login
+// Endpoint de login — agora retorna o CARGO do usuário
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -33,7 +33,11 @@ app.post('/login', async (req, res) => {
       const user = rows[0];
       res.json({
         success: true,
-        user: { nome: user.NOME, empresa: user.RAZAO_SOCIAL }
+        user: {
+          nome: user.NOME,
+          empresa: user.RAZAO_SOCIAL,
+          cargo: user.CARGO   // ⚠️ veja observação abaixo sobre o nome da coluna
+        }
       });
     } else {
       res.json({ success: false });
@@ -102,37 +106,27 @@ app.get('/dados_pedidos_rj', async (req, res) => {
   }
 });
 
-// Endpoint para listar clientes cadastrados
+// APLICADO CONFORME INSTRUÇÕES DO SISTEMA
 app.get('/dados_clientes', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
-    const [rows] = await conn.execute(`
+    const estado = req.query.estado; // ex: /dados_clientes?estado=RJ
+
+    const sql = `
       SELECT
-        CODIGO                 as codigo,
-        RAZAO_SOCIAL           as razaoSocial,
-        FANTASIA               as fantasia,
-        TIPO                   as tipo,
-        CNPJ_CPF               as cnpjCpf,
-        IE_RG                  as ieRg,
-        CEP                    as cep,
-        ENDERECO               as endereco,
-        NUMERO                 as numero,
-        BAIRRO                 as bairro,
-        CIDADE                 as cidade,
-        ESTADO                 as estado,
-        SITUACAO               as situacao,
-        MEDICAO                as medicao,
-        CONDICAO               as condicao,
-        CREDITO                as credito,
-        DESCONTO               as desconto,
-        OBSERVACAO             as observacao,
-        CONTATO                as contato,
-        TELEFONE               as telefone,
-        EMAIL                  as email,
-        REPRESENTANTE          as representante
+        CODIGO as codigo, RAZAO_SOCIAL as razaoSocial, FANTASIA as fantasia,
+        TIPO as tipo, CNPJ_CPF as cnpjCpf, IE_RG as ieRg,
+        CEP as cep, ENDERECO as endereco, NUMERO as numero,
+        BAIRRO as bairro, CIDADE as cidade, ESTADO as estado,
+        SITUACAO as situacao, CONDICAO as condicao,
+        CREDITO as credito, DESCONTO as desconto,
+        OBSERVACAO as observacao, CONTATO as contato,
+        TELEFONE as telefone, EMAIL as email, REPRESENTANTE as representante
       FROM cadastro_clientes
+      ${estado ? 'WHERE ESTADO = ?' : ''}
       ORDER BY RAZAO_SOCIAL ASC
-    `);
+    `;
+    const [rows] = await conn.execute(sql, estado ? [estado] : []);
     await conn.end();
     res.json(rows);
   } catch (err) {

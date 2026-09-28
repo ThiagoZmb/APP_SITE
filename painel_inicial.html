@@ -7,18 +7,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
             --primary-color: #8B0000;
             --primary-light: rgba(139, 0, 0, 0.1);
             --primary-dark: #600000;
             --secondary-color: #f8f9fa;
-            --accent-color: #ff6b6b;
             --text-dark: #2c3e50;
             --text-light: #6c757d;
             --white: #ffffff;
@@ -33,22 +27,13 @@
             --danger-color: #dc3545;
             --info-color: #17a2b8;
         }
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            color: var(--text-dark);
-            overflow-x: hidden;
-            min-height: 100vh;
-            padding: 20px;
-        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); overflow-x: hidden; min-height: 100vh; padding: 20px; }
         .container {
             display: grid;
             grid-template-columns: 280px 1fr;
             grid-template-rows: 80px 1fr;
-            grid-template-areas:
-                "header header"
-                "sidebar main";
+            grid-template-areas: "header header" "sidebar main";
             min-height: calc(100vh - 40px);
-            position: relative;
             background: var(--white);
             border-radius: 20px;
             box-shadow: var(--shadow-heavy);
@@ -63,438 +48,111 @@
             justify-content: space-between;
             padding: 0 40px;
             box-shadow: var(--shadow-medium);
-            position: relative;
-            z-index: 1000;
         }
-        .logo {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .logo::before {
-            content: "◆";
-            font-size: 24px;
-            opacity: 0.8;
-        }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            border-radius: 50px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-        .user-profile:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
         .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 40px; height: 40px; border-radius: 50%;
             background: linear-gradient(135deg, #ff6b6b, #ffa500);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 16px;
         }
-        .sidebar {
-            grid-area: sidebar;
-            background: var(--white);
-            padding: 30px 0;
-            border-right: 1px solid var(--border-color);
-            box-shadow: var(--shadow-light);
-            position: relative;
-            overflow-y: auto;
-        }
-        .menu-title {
-            color: var(--text-light);
-            margin: 0 30px 25px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; background: var(--white); padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .menu-item {
-            padding: 15px 30px;
-            margin: 0 20px 8px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 500;
-            color: var(--text-dark);
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 12px;
+            font-weight: 500; color: var(--text-dark);
         }
-        .sidebar a.menu-item {
-            text-decoration: none;   /* tira o sublinhado */
-            color: var(--text-dark); /* texto escuro, igual aos outros itens */
-        }
-        .sidebar a.menu-item.active {
-            color: white;            /* item "Pedidos" ativo fica com texto branco */
-        }
-        .menu-item::before {
-            content: "";
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--primary-color);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-        .menu-item:hover {
-            background: var(--primary-light);
-            transform: translateX(5px);
-            color: var(--primary-color);
-        }
-        .menu-item:hover::before {
-            opacity: 1;
-        }
-        .menu-item.active {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: var(--shadow-medium);
-        }
-        .menu-item.active::before {
-            background: white;
-            opacity: 1;
-        }
-        main {
-            grid-area: main;
-            padding: 40px;
-            background: transparent;
-            overflow-y: auto;
-            animation: fadeIn 0.5s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .welcome-section {
-            margin-bottom: 40px;
-            animation: slideIn 0.6s ease-out;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-30px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        .welcome-title {
-            font-size: 36px;
-            margin-bottom: 8px;
-            color: var(--text-dark);
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        .welcome-subtitle {
-            font-size: 16px;
-            color: var(--text-light);
-            font-weight: 400;
-        }
-        .cards-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin-bottom: 50px;
-        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        /* ✅ Passo 2: corrige estilo padrão dos links do menu */
+        .sidebar a.menu-item { text-decoration: none; color: var(--text-dark); }
+        .sidebar a.menu-item.active { color: white; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .welcome-section { margin-bottom: 40px; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); }
+        .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 50px; }
         .card {
-            background: var(--gradient-card);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: var(--shadow-light);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
+            background: var(--gradient-card); border-radius: 20px; padding: 30px;
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden; border: 1px solid var(--border-color);
         }
-        .card::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--gradient-primary);
-            border-radius: 20px 20px 0 0;
-        }
-        .card:hover {
-            transform: translateY(-10px);
-            box-shadow: var(--shadow-heavy);
-        }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
-        }
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-light);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: var(--primary-light);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: var(--primary-color);
-        }
-        .card-value {
-            font-size: 42px;
-            font-weight: 700;
-            color: var(--text-dark);
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-        .card-change {
-            font-size: 14px;
-            font-weight: 500;
-        }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .card:hover { transform: translateY(-10px); box-shadow: var(--shadow-heavy); }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .card-title { font-size: 16px; font-weight: 600; color: var(--text-light); text-transform: uppercase; }
+        .card-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--primary-color); }
+        .card-value { font-size: 42px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; line-height: 1; }
+        .card-change { font-size: 14px; font-weight: 500; }
         .card-change.positive { color: var(--success-color); }
         .card-change.negative { color: var(--danger-color); }
         .table-container {
-            background: var(--white);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: var(--shadow-light);
-            border: 1px solid var(--border-color);
-            position: relative;
-            overflow: hidden;
+            background: var(--white); border-radius: 20px; padding: 30px;
+            box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; overflow: hidden;
         }
-        .table-container::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--gradient-primary);
-            border-radius: 20px 20px 0 0;
-        }
-        .table-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        .table-title {
-            font-size: 24px;
-            color: var(--text-dark);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .search-filter-container {
-            display: flex;
-            gap: 15px;
-        }
-        .search-box {
-            position: relative;
-        }
+        .table-container::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
+        .table-title { font-size: 24px; color: var(--text-dark); font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .search-filter-container { display: flex; gap: 15px; }
+        .search-box { position: relative; }
         .search-box input {
-            padding: 12px 15px 12px 40px;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            width: 250px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            background-color: var(--secondary-color);
+            padding: 12px 15px 12px 40px; border: 1px solid var(--border-color); border-radius: 12px;
+            width: 250px; font-size: 14px; background-color: var(--secondary-color);
         }
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
-        }
-        .search-box::before {
-            content: "🔍";
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-light);
-            font-size: 16px;
-        }
+        .search-box input:focus { outline: none; border-color: var(--primary-color); }
+        .search-box::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-size: 16px; }
         .filter-btn {
-            padding: 12px 20px;
-            background: var(--primary-light);
-            color: var(--primary-color);
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-            transition: all 0.3s ease;
+            padding: 12px 20px; background: var(--primary-light); color: var(--primary-color);
+            border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500;
         }
-        .filter-btn:hover {
-            background: var(--primary-color);
-            color: white;
-        }
-        .orders-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
+        .filter-btn:hover { background: var(--primary-color); color: white; }
+        .orders-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .orders-table th {
-            background: var(--secondary-color);
-            padding: 15px 12px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-dark);
-            border-bottom: 2px solid var(--border-color);
-            font-size: 14px;
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            background: var(--secondary-color); padding: 15px 12px; text-align: left; font-weight: 600;
+            border-bottom: 2px solid var(--border-color); font-size: 14px; position: sticky; top: 0; z-index: 10;
         }
-        .orders-table td {
-            padding: 15px 12px;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 14px;
-            color: var(--text-dark);
-        }
-        .orders-table tr:hover {
-            background: var(--secondary-color);
-        }
-        .status-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-align: center;
-            white-space: nowrap;
-        }
-        .status-em-producao { background-color: rgba(23, 162, 184, 0.1); color: var(--info-color); }
-        .status-pronto { background-color: rgba(255, 193, 7, 0.1); color: var(--warning-color); }
-        .status-entregue { background-color: rgba(40, 167, 69, 0.1); color: var(--success-color); }
-        .status-retirado { background-color: rgba(108, 117, 125, 0.1); color: var(--text-light); }
-        .financial-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .financial-a-receber { background-color: rgba(220, 53, 69, 0.1); color: var(--danger-color); }
-        .financial-recebido { background-color: rgba(40, 167, 69, 0.1); color: var(--success-color); }
+        .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .orders-table tr:hover { background: var(--secondary-color); }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .status-em-producao { background-color: rgba(23,162,184,.1); color: var(--info-color); }
+        .status-pronto { background-color: rgba(255,193,7,.1); color: var(--warning-color); }
+        .status-entregue { background-color: rgba(40,167,69,.1); color: var(--success-color); }
+        .status-retirado, .status-cancelado { background-color: rgba(108,117,125,.1); color: var(--text-light); }
+        .financial-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .financial-a-receber { background-color: rgba(220,53,69,.1); color: var(--danger-color); }
+        .financial-recebido { background-color: rgba(40,167,69,.1); color: var(--success-color); }
         .order-number { font-weight: 600; color: var(--primary-color); }
-        .client-name { font-weight: 500; color: var(--text-dark); }
+        .client-name { font-weight: 500; }
         .price-value { font-weight: 600; color: var(--success-color); }
         .date-cell { font-size: 13px; color: var(--text-light); }
-        .obs-cell {
-            font-size: 12px;
-            color: var(--text-light);
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .highlighted-row { background-color: rgba(255, 255, 0, 0.1); }
-        .charts-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-        .chart-card {
-            background: var(--white);
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: var(--shadow-light);
-            border: 1px solid var(--border-color);
-            position: relative;
-            overflow: hidden;
-        }
-        .chart-card::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--gradient-primary);
-            border-radius: 20px 20px 0 0;
-        }
-        .chart-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: var(--text-dark);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .chart-container {
-            height: 250px;
-            position: relative;
-        }
+        .obs-cell { font-size: 12px; color: var(--text-light); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .highlighted-row { background-color: rgba(255,255,0,.1); }
+        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+        .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
+        .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
+        .chart-container { height: 250px; position: relative; }
         .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            border-radius: 20px;
+            position: absolute; inset: 0; background: rgba(255,255,255,.8);
+            display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 20px;
         }
         .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(139, 0, 0, 0.2);
-            border-top: 5px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+            width: 50px; height: 50px; border: 5px solid rgba(139,0,0,.2);
+            border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .error-message {
-            background-color: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: var(--secondary-color); }
         ::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--primary-dark); }
-        @media (max-width: 1024px) {
-            .charts-container { grid-template-columns: 1fr; }
-            .orders-table { font-size: 12px; }
-            .orders-table th, .orders-table td { padding: 10px 8px; }
-        }
+        @media (max-width: 1024px) { .charts-container { grid-template-columns: 1fr; } }
         @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-                grid-template-areas: "header" "main";
-            }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             .sidebar { display: none; }
             main { padding: 20px; }
             .table-container { padding: 20px; overflow-x: auto; }
@@ -509,19 +167,22 @@
             <div class="header-right">
                 <div class="user-profile">
                     <div class="user-avatar" id="user-avatar">E</div>
-                    <span id="user-name">Empresa XXX</span>
+                    <div class="user-info">
+                        <span id="user-name">Usuário</span>
+                        <span class="user-cargo" id="user-cargo"></span>
+                    </div>
                 </div>
             </div>
         </header>
         <div class="sidebar">
-    <div class="menu-title">Menu Principal</div>
-    <div class="menu-item" onclick="alert('Módulo em desenvolvimento!')">📊 Dashboard</div>
-    <a class="menu-item active" href="painel_inicial.html">📋 Pedidos</a>
-    <a class="menu-item" href="clientes.html">👥 Clientes</a>
-    <div class="menu-item" onclick="alert('Módulo em desenvolvimento!')">📦 Produtos</div>
-    <div class="menu-item" onclick="alert('Módulo em desenvolvimento!')">💰 Financeiro</div>
-    <div class="menu-item" onclick="alert('Módulo em desenvolvimento!')">📈 Relatórios</div>
-</div>
+            <div class="menu-title">Menu Principal</div>
+            <div class="menu-item">📊 Dashboard</div>
+            <a class="menu-item active" href="painel_inicial.html">📋 Pedidos</a>
+            <a class="menu-item" href="clientes.html">👥 Clientes</a>
+            <div class="menu-item">📦 Produtos</div>
+            <div class="menu-item">💰 Financeiro</div>
+            <div class="menu-item">📈 Relatórios</div>
+        </div>
         <main>
             <section class="welcome-section">
                 <h1 class="welcome-title">Controle de Pedidos 📋</h1>
@@ -564,15 +225,11 @@
             <section class="charts-container">
                 <div class="chart-card">
                     <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Status</h3>
-                    <div class="chart-container">
-                        <canvas id="status-chart"></canvas>
-                    </div>
+                    <div class="chart-container"><canvas id="status-chart"></canvas></div>
                 </div>
                 <div class="chart-card">
                     <h3 class="chart-title"><i class="fas fa-chart-line"></i> Pedidos por Dia (Últimos 7 dias)</h3>
-                    <div class="chart-container">
-                        <canvas id="orders-chart"></canvas>
-                    </div>
+                    <div class="chart-container"><canvas id="orders-chart"></canvas></div>
                 </div>
             </section>
             <section class="table-container">
@@ -580,10 +237,7 @@
                     <div class="loading-spinner"></div>
                 </div>
                 <div class="table-header">
-                    <h2 class="table-title">
-                        <i class="fas fa-clipboard-list"></i>
-                        Lista de Pedidos
-                    </h2>
+                    <h2 class="table-title"><i class="fas fa-clipboard-list"></i> Lista de Pedidos</h2>
                     <div class="search-filter-container">
                         <div class="search-box">
                             <input type="text" placeholder="Buscar pedidos..." id="search-input">
@@ -598,16 +252,8 @@
                     <table class="orders-table">
                         <thead>
                             <tr>
-                                <th>Número</th>
-                                <th>Cliente</th>
-                                <th>Cliente Final</th>
-                                <th>Data</th>
-                                <th>Pronto em</th>
-                                <th>Valor</th>
-                                <th>Observação</th>
-                                <th>Situação</th>
-                                <th>Financeiro</th>
-                                <th>Data Entrega</th>
+                                <th>Número</th><th>Cliente</th><th>Cliente Final</th><th>Data</th><th>Pronto em</th>
+                                <th>Valor</th><th>Observação</th><th>Situação</th><th>Financeiro</th><th>Data Entrega</th>
                             </tr>
                         </thead>
                         <tbody id="orders-tbody"></tbody>
@@ -617,11 +263,37 @@
         </main>
     </div>
     <script>
-        function formatCurrency(value) {
-            return 'R$ ' + parseFloat(value).toFixed(2).replace('.', ',');
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        let statusChartInstance = null;
+        let ordersChartInstance = null;
+
+        function getUsuarioLogado() {
+            try {
+                return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch { return {}; }
         }
 
-        // ✅ CORREÇÃO 4: Fetch com timeout de 60s (cold start do Render)
+        // ✅ NOVO: escolhe o endpoint conforme o cargo do usuário logado
+        function getUrlPedidos() {
+            const user = getUsuarioLogado();
+            const cargo = String(user.cargo || '').trim().toLowerCase();
+            // Representante Comercial → somente pedidos do RJ
+            // Administrador (e qualquer outro cargo) → todos os pedidos
+            return cargo === 'representante comercial'
+                ? `${API_BASE}/dados_pedidos_rj`
+                : `${API_BASE}/dados_pedidos`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        function formatCurrency(value) {
+            return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
+        }
+
         async function loadPedidos() {
             try {
                 document.getElementById('table-loading').style.display = 'flex';
@@ -630,50 +302,19 @@
                     el.className = 'card-change';
                 });
 
+                // Fetch com timeout de 60s (cold start do Render)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-                const res = await fetch('https://elegance-backend-hrho.onrender.com/dados_pedidos', {
-                    signal: controller.signal
-                });
+                const res = await fetch(getUrlPedidos(), { signal: controller.signal });
                 clearTimeout(timeoutId);
 
-                if (!res.ok) {
-                    throw new Error(`Erro HTTP: ${res.status}`);
-                }
+                if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
                 const pedidos = await res.json();
 
                 updateSummaryCards(pedidos);
                 renderCharts(pedidos);
+                renderTabela(pedidos);
 
-                const tbody = document.getElementById('orders-tbody');
-                tbody.innerHTML = '';
-
-                if (pedidos.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-light);">Nenhum pedido encontrado</td></tr>';
-                } else {
-                    pedidos.forEach(pedido => {
-                        const row = document.createElement('tr');
-                        if (pedido.situacao === 'Em Produção') {
-                            row.classList.add('highlighted-row');
-                        }
-                        const situacaoClass = `status-${pedido.situacao.toLowerCase().replace(' ', '-')}`;
-                        const financeiroClass = `financial-${pedido.financeiro.toLowerCase().replace(' ', '-')}`;
-                        row.innerHTML = `
-                            <td class="order-number">${pedido.numero}</td>
-                            <td class="client-name">${pedido.cliente}</td>
-                            <td>${pedido.clienteFinal || '-'}</td>
-                            <td class="date-cell">${pedido.data}</td>
-                            <td class="date-cell">${pedido.prontoEm || '-'}</td>
-                            <td class="price-value">${formatCurrency(pedido.valor)}</td>
-                            <td class="obs-cell">${pedido.observacao || '-'}</td>
-                            <td><span class="status-badge ${situacaoClass}">${pedido.situacao}</span></td>
-                            <td><span class="financial-badge ${financeiroClass}">${pedido.financeiro}</span></td>
-                            <td class="date-cell">${pedido.dataEntrega || '-'}</td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                }
                 document.getElementById('table-loading').style.display = 'none';
             } catch (err) {
                 console.error('Erro ao carregar pedidos:', err);
@@ -683,87 +324,87 @@
                     el.className = 'card-change negative';
                 });
                 document.getElementById('orders-tbody').innerHTML = `
-                    <tr>
-                        <td colspan="10" style="text-align: center; padding: 30px; color: var(--danger-color);">
-                            Erro ao carregar dados: ${err.message || 'Verifique a conexão com o servidor'}
-                        </td>
-                    </tr>
-                `;
+                    <tr><td colspan="10" style="text-align:center;padding:30px;color:var(--danger-color)">
+                        Erro ao carregar dados: ${escapeHtml(err.message || 'Verifique a conexão')}
+                    </td></tr>`;
             }
+        }
+
+        function renderTabela(pedidos) {
+            const tbody = document.getElementById('orders-tbody');
+            tbody.innerHTML = '';
+            if (pedidos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum pedido encontrado</td></tr>';
+                return;
+            }
+            pedidos.forEach(pedido => {
+                const row = document.createElement('tr');
+                if (pedido.situacao === 'Em Produção') row.classList.add('highlighted-row');
+
+                const situacaoLimpa = String(pedido.situacao || '').toLowerCase().replace(/\s+/g, '-');
+                const financeiroLimpo = String(pedido.financeiro || '').toLowerCase().replace(/\s+/g, '-');
+
+                // escapeHtml em TODOS os campos vindos do banco (proteção contra XSS)
+                row.innerHTML = `
+                    <td class="order-number">${escapeHtml(pedido.numero)}</td>
+                    <td class="client-name">${escapeHtml(pedido.cliente)}</td>
+                    <td>${escapeHtml(pedido.clienteFinal || '-')}</td>
+                    <td class="date-cell">${escapeHtml(pedido.data)}</td>
+                    <td class="date-cell">${escapeHtml(pedido.prontoEm || '-')}</td>
+                    <td class="price-value">${formatCurrency(pedido.valor)}</td>
+                    <td class="obs-cell" title="${escapeHtml(pedido.observacao || '')}">${escapeHtml(pedido.observacao || '-')}</td>
+                    <td><span class="status-badge ${situacaoLimpa}">${escapeHtml(pedido.situacao || '-')}</span></td>
+                    <td><span class="financial-badge ${financeiroLimpo}">${escapeHtml(pedido.financeiro || '-')}</span></td>
+                    <td class="date-cell">${escapeHtml(pedido.dataEntrega || '-')}</td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         function updateSummaryCards(pedidos) {
             const today = new Date();
-            const todayFormatted = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+            const todayFormatted = `${today.getDate().toString().padStart(2,'0')}/${(today.getMonth()+1).toString().padStart(2,'0')}/${today.getFullYear()}`;
+
             const todayOrders = pedidos.filter(p => p.data === todayFormatted).length;
             document.getElementById('today-orders').textContent = todayOrders;
-            document.getElementById('today-change').textContent = todayOrders > 0 ?
-                `+${todayOrders} novos pedidos` : 'Sem novos pedidos hoje';
-            document.getElementById('today-change').className = todayOrders > 0 ?
-                'card-change positive' : 'card-change';
+            const todayChange = document.getElementById('today-change');
+            todayChange.textContent = todayOrders > 0 ? `+${todayOrders} novos pedidos` : 'Sem novos pedidos hoje';
+            todayChange.className = todayOrders > 0 ? 'card-change positive' : 'card-change';
 
             const productionOrders = pedidos.filter(p => {
-                if (!p.situacao) return false;
-                const situacao = String(p.situacao).trim().toLowerCase();
-                return situacao.includes('em produção') ||
-                       situacao.includes('em producao') ||
-                       situacao.includes('producao') ||
-                       situacao.includes('produção');
+                const situacao = String(p.situacao || '').trim().toLowerCase();
+                return situacao.includes('produ') ;
             }).length;
-            const productionOrdersElement = document.getElementById('production-orders');
-            const productionChangeElement = document.getElementById('production-change');
-            if (productionOrdersElement) productionOrdersElement.textContent = productionOrders;
-            if (productionChangeElement) {
-                productionChangeElement.textContent = 'Em Produção';
-                productionChangeElement.className = 'card-change';
-            }
+            document.getElementById('production-orders').textContent = productionOrders;
+            document.getElementById('production-change').textContent = 'Em Produção';
 
             const readyOrders = pedidos.filter(p => {
-                if (!p.situacao) return false;
-                const situacao = String(p.situacao).trim().toLowerCase();
-                return situacao.includes('pronto') ||
-                       situacao.includes('finalizado') ||
-                       situacao.includes('concluído') ||
-                       situacao.includes('concluido') ||
-                       situacao.includes('acabado') ||
-                       situacao === 'ok' ||
-                       situacao === 'finish' ||
-                       situacao === 'done';
+                const situacao = String(p.situacao || '').trim().toLowerCase();
+                return situacao.includes('pronto') || situacao.includes('finalizado') ||
+                       situacao.includes('conclu') || situacao === 'ok' || situacao === 'done';
             }).length;
-            const readyOrdersElement = document.getElementById('ready-orders');
-            const readyChangeElement = document.getElementById('ready-change');
-            if (readyOrdersElement) readyOrdersElement.textContent = readyOrders;
-            if (readyChangeElement) {
-                readyChangeElement.textContent = 'Pedidos prontos';
-                readyChangeElement.className = 'card-change';
-            }
+            document.getElementById('ready-orders').textContent = readyOrders;
+            document.getElementById('ready-change').textContent = 'Pedidos prontos';
 
             const now = new Date();
             const currentMonth = now.getMonth() + 1;
             const currentYear = now.getFullYear();
             const pedidosDoMes = pedidos.filter(p => {
                 if (!p.data) return false;
-                const [dia, mes, ano] = p.data.split('/');
-                if (!dia || !mes || !ano) return false;
-                const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-                if (isNaN(date.getTime())) return false;
-                return (date.getMonth() + 1) === currentMonth &&
-                       date.getFullYear() === currentYear;
+                const parts = p.data.split('/');
+                if (parts.length !== 3) return false;
+                return (parseInt(parts[1]) === currentMonth && parseInt(parts[2]) === currentYear);
             });
-            const revenue = pedidosDoMes.reduce((sum, p) => {
-                const valor = parseFloat(p.valor) || 0;
-                return sum + valor;
-            }, 0);
-            const revenueElement = document.getElementById('revenue');
-            const revenueChangeElement = document.getElementById('revenue-change');
-            if (revenueElement) revenueElement.textContent = formatCurrency(revenue);
-            if (revenueChangeElement) {
-                revenueChangeElement.textContent = 'Total do mês';
-                revenueChangeElement.className = 'card-change';
-            }
+            const revenue = pedidosDoMes.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+            document.getElementById('revenue').textContent = formatCurrency(revenue);
+            document.getElementById('revenue-change').textContent = 'Total do mês';
         }
 
         function renderCharts(pedidos) {
+            // ✅ CORREÇÃO: destrói gráficos anteriores antes de recriar (botão Atualizar)
+            if (statusChartInstance) statusChartInstance.destroy();
+            if (ordersChartInstance) ordersChartInstance.destroy();
+
             const statusCtx = document.getElementById('status-chart').getContext('2d');
             const statusCounts = {
                 'Em Produção': pedidos.filter(p => p.situacao === 'Em Produção').length,
@@ -771,37 +412,30 @@
                 'Entregue': pedidos.filter(p => p.situacao === 'Entregue').length,
                 'Retirado': pedidos.filter(p => p.situacao === 'Retirado').length
             };
-            new Chart(statusCtx, {
+            statusChartInstance = new Chart(statusCtx, {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(statusCounts),
                     datasets: [{
                         data: Object.values(statusCounts),
                         backgroundColor: [
-                            'rgba(23, 162, 184, 0.7)',
-                            'rgba(255, 193, 7, 0.7)',
-                            'rgba(40, 167, 69, 0.7)',
-                            'rgba(108, 117, 125, 0.7)'
+                            'rgba(23,162,184,.7)', 'rgba(255,193,7,.7)',
+                            'rgba(40,167,69,.7)', 'rgba(108,117,125,.7)'
                         ],
                         borderWidth: 0
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { padding: 20, usePointStyle: true }
-                        },
+                        legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const label = context.label || '';
                                     const value = context.raw || 0;
                                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = Math.round((value / total) * 100);
-                                    return `${label}: ${value} (${percentage}%)`;
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return `${context.label}: ${value} (${percentage}%)`;
                                 }
                             }
                         }
@@ -810,70 +444,54 @@
             });
 
             const ordersCtx = document.getElementById('orders-chart').getContext('2d');
-            const dates = [];
-            const ordersData = [];
+            const dates = [], ordersData = [];
             for (let i = 6; i >= 0; i--) {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
-                const dateStr = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}`;
-                dates.push(dateStr);
-                const fullDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getFullYear()}`;
-                const count = pedidos.filter(p => p.data === fullDate).length;
-                ordersData.push(count);
+                const fullDate = `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
+                dates.push(`${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}`);
+                ordersData.push(pedidos.filter(p => p.data === fullDate).length);
             }
-            new Chart(ordersCtx, {
+            ordersChartInstance = new Chart(ordersCtx, {
                 type: 'bar',
                 data: {
                     labels: dates,
-                    datasets: [{
-                        label: 'Pedidos',
-                        data: ordersData,
-                        backgroundColor: 'rgba(139, 0, 0, 0.7)',
-                        borderRadius: 5
-                    }]
+                    datasets: [{ label: 'Pedidos', data: ordersData, backgroundColor: 'rgba(139,0,0,.7)', borderRadius: 5 }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { precision: 0 },
-                            title: { display: true, text: 'Número de Pedidos' }
-                        },
-                        x: {
-                            title: { display: true, text: 'Data' }
-                        }
+                        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Número de Pedidos' } },
+                        x: { title: { display: true, text: 'Data' } }
                     }
                 }
             });
         }
 
         function setupSearch() {
-            const searchInput = document.getElementById('search-input');
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const rows = document.querySelectorAll('#orders-tbody tr');
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(searchTerm) ? '' : 'none';
+            document.getElementById('search-input').addEventListener('input', function() {
+                const term = this.value.toLowerCase();
+                document.querySelectorAll('#orders-tbody tr').forEach(row => {
+                    row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
                 });
             });
+            /* ✅ Passo 1/complemento: botão Atualizar agora realmente recarrega */
+            document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
         }
 
-        // ✅ CORREÇÃO 3: Redireciona para login se não houver sessão
+        // ✅ CORREÇÃO: carrega cargo e exibe no header
         function carregarDadosUsuario() {
-            const userData = localStorage.getItem('user');
-            if (userData) {
-                const user = JSON.parse(userData);
-                document.getElementById('user-empresa').textContent = user.empresa || 'Empresa';
-                document.getElementById('user-name').textContent = user.nome || 'Usuário';
-                document.getElementById('user-avatar').textContent = user.nome.charAt(0).toUpperCase();
-            } else {
-                // Redireciona para a página de login
-               window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+            const user = getUsuarioLogado();
+            if (!user || !user.nome) {
+                // Sem sessão → volta para o login
+                window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+                return;
             }
+            document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
+            document.getElementById('user-name').textContent = user.nome || 'Usuário';
+            document.getElementById('user-cargo').textContent = user.cargo || '';
+            document.getElementById('user-avatar').textContent = (user.nome || 'E').charAt(0).toUpperCase();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
