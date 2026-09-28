@@ -102,6 +102,45 @@ app.get('/dados_pedidos_rj', async (req, res) => {
   }
 });
 
+// Endpoint para listar clientes cadastrados
+app.get('/dados_clientes', async (req, res) => {
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute(`
+      SELECT
+        CODIGO                 as codigo,
+        RAZAO_SOCIAL           as razaoSocial,
+        FANTASIA               as fantasia,
+        TIPO                   as tipo,
+        CNPJ_CPF               as cnpjCpf,
+        IE_RG                  as ieRg,
+        CEP                    as cep,
+        ENDERECO               as endereco,
+        NUMERO                 as numero,
+        BAIRRO                 as bairro,
+        CIDADE                 as cidade,
+        ESTADO                 as estado,
+        SITUACAO               as situacao,
+        MEDICAO                as medicao,
+        CONDICAO               as condicao,
+        CREDITO                as credito,
+        DESCONTO               as desconto,
+        OBSERVACAO             as observacao,
+        CONTATO                as contato,
+        TELEFONE               as telefone,
+        EMAIL                  as email,
+        REPRESENTANTE          as representante
+      FROM cadastro_clientes
+      ORDER BY RAZAO_SOCIAL ASC
+    `);
+    await conn.end();
+    res.json(rows);
+  } catch (err) {
+    console.error('Erro ao buscar clientes:', err);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
 // ✅ ISTO FALTAVA — inicia o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
