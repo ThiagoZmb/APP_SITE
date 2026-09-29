@@ -330,7 +330,68 @@
             }
         }
 
-        function renderTabela(pedidos) {
+      function renderTabela(pedidos) {
+    const tbody = document.getElementById('orders-tbody');
+    tbody.innerHTML = '';
+    if (pedidos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum pedido encontrado</td></tr>';
+        return;
+    }
+    pedidos.forEach(pedido => {
+        const row = document.createElement('tr');
+
+        // Normaliza a situação: minúsculas, sem espaços extras e sem acento
+        const situacaoNorm = String(pedido.situacao || '')
+            .trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        // Cor fixa inline (laranja = cancelado / amarelo = em produção)
+        if (situacaoNorm === 'em producao') {
+            row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
+        }
+        if (situacaoNorm.includes('cancelad')) {
+            row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
+        }
+
+        // Badge colorido da situação (também inline)
+        let badgeStyle = 'padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;';
+        if (situacaoNorm.includes('producao')) badgeStyle += 'background:rgba(23,162,184,.1);color:#17a2b8;';
+        if (situacaoNorm.includes('pronto'))   badgeStyle += 'background:rgba(255,193,7,.1);color:#ffc107;';
+        if (situacaoNorm.includes('entregue')) badgeStyle += 'background:rgba(40,167,69,.1);color:#28a745;';
+        if (situacaoNorm.includes('cancelad')) badgeStyle += 'background:rgba(255,165,0,.25);color:#c96a00;font-weight:700;';
+
+        const financeiroNorm = String(pedido.financeiro || '')
+            .trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        // ✅ NOVO: guarda o número do pedido na linha (para o clique abrir o PDF)
+        row.dataset.numero = pedido.numero;
+        row.style.cursor = 'pointer';
+
+        row.innerHTML = `
+            <td class="order-number">${escapeHtml(pedido.numero)}</td>
+            <td class="client-name">${escapeHtml(pedido.cliente)}</td>
+            <td>${escapeHtml(pedido.clienteFinal || '-')}</td>
+            <td class="date-cell">${escapeHtml(pedido.data)}</td>
+            <td class="date-cell">${escapeHtml(pedido.prontoEm || '-')}</td>
+            <td class="price-value">${formatCurrency(pedido.valor)}</td>
+            <td class="obs-cell" title="${escapeHtml(pedido.observacao || '')}">${escapeHtml(pedido.observacao || '-')}</td>
+            <td><span style="${badgeStyle}">${escapeHtml(pedido.situacao || '-')}</span></td>
+            <td><span class="financial-badge ${financeiroNorm.includes('receber') ? 'financial-a-receber' : 'financial-recebido'}">${escapeHtml(pedido.financeiro || '-')}</span></td>
+            <td class="date-cell">${escapeHtml(pedido.dataEntrega || '-')}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // ✅ NOVO: após o forEach — clique na linha abre o PDF do pedido em nova aba
+    document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
+        r.addEventListener('click', () => {
+            const numero = encodeURIComponent(r.dataset.numero);
+            const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=Pedido`;
+            window.open(url, '_blank');  // abre o PDF (pode salvar/imprimir)
+        });
+    });
+}
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
             if (pedidos.length === 0) {
@@ -359,7 +420,10 @@
                 `;
                 tbody.appendChild(row);
             });
-        }
+
+
+
+        
 
         function updateSummaryCards(pedidos) {
             const today = new Date();
