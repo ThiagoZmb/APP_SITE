@@ -120,6 +120,15 @@ button:hover {
   color: var(--text-light);
 }
 
+.status-cancelado {
+  background-color: rgba(161, 87, 64, 0.322);
+  color: var(--text-light);
+}
+.status-retirado {
+  background-color: rgba(161, 87, 64, 0.322);
+  color: var(--text-light);
+}
+
 /* Classes para status financeiro */
 .financial-a-receber {
   background-color: rgba(220, 53, 69, 0.1);
