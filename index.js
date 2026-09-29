@@ -187,6 +187,15 @@ app.get('/dados_compras_orcamentos', async (req, res) => {
 });
 
 
+
+
+
+
+
+
+
+
+
 const PDFDocument = require('pdfkit');
 
 // ✅ PDF do Pedido/Orçamento — versão corrigida (sem sobreposição)
@@ -377,6 +386,13 @@ app.get('/dados_pdf', async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
   }
 });
+
+
+
+
+
+
+
 
 
 
