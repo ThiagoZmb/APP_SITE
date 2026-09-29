@@ -389,7 +389,39 @@ app.get('/dados_pdf', async (req, res) => {
 
 
 
+// ✅ Endpoint único: ?tipo=Pedido|Orçamento  +  ?estado=RJ (representante)
+app.get('/dados_lista', async (req, res) => {
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
+    const estado = req.query.estado;
 
+    const sql = `
+      SELECT 
+        p.NUMERO as numero,
+        p.RAZAO_SOCIAL as cliente,
+        p.CLIENTE_FINAL as clienteFinal,
+        DATE_FORMAT(p.DATA, '%d/%m/%Y') as data,
+        DATE_FORMAT(p.DATA_PRONTO, '%d/%m/%Y') as prontoEm,
+        p.TOTAL as valor,
+        p.OBS_GERAL as observacao,
+        p.SITUACAO as situacao,
+        p.FINANCEIRO as financeiro,
+        DATE_FORMAT(p.DATA_ENTREGA, '%d/%m/%Y') as dataEntrega
+      FROM ped_orc p
+      ${estado ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
+      WHERE p.TIPO = ? ${estado ? 'AND c.ESTADO = ?' : ''}
+      ORDER BY p.NUMERO DESC
+    `;
+    const params = estado ? [tipo, estado] : [tipo];
+    const [rows] = await conn.execute(sql, params);
+    await conn.end();
+    res.json(rows);
+  } catch (err) {
+    console.error('Erro ao buscar lista:', err);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
 
 
 

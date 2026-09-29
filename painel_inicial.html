@@ -66,13 +66,10 @@
         .menu-item {
             padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
             transition: all 0.3s ease; display: flex; align-items: center; gap: 12px;
-            font-weight: 500; color: var(--text-dark);
+            font-weight: 500; color: var(--text-dark); text-decoration: none;
         }
         .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
         .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
-        /* ✅ Passo 2: corrige estilo padrão dos links do menu */
-        .sidebar a.menu-item { text-decoration: none; color: var(--text-dark); }
-        .sidebar a.menu-item.active { color: white; }
         main { grid-area: main; padding: 40px; overflow-y: auto; animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .welcome-section { margin-bottom: 40px; }
@@ -112,20 +109,36 @@
             border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500;
         }
         .filter-btn:hover { background: var(--primary-color); color: white; }
+        /* ✅ NOVO: toggle Pedidos / Orçamentos */
+        .tipo-toggle {
+            display: flex;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            width: fit-content;
+        }
+        .toggle-btn {
+            padding: 10px 22px;
+            border: none;
+            background: var(--secondary-color);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        .toggle-btn.active { background: var(--gradient-primary); color: white; }
+        .toggle-btn:hover:not(.active) { background: var(--primary-light); color: var(--primary-color); }
         .orders-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .orders-table th {
             background: var(--secondary-color); padding: 15px 12px; text-align: left; font-weight: 600;
             border-bottom: 2px solid var(--border-color); font-size: 14px; position: sticky; top: 0; z-index: 10;
         }
         .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        /* Hover vermelho claro — vale para todas as linhas; a cor fixa retorna ao sair */
         .orders-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
         .orders-table tbody tr:hover { background: var(--primary-light); }
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .status-em-producao { background-color: rgba(23,162,184,.1); color: var(--info-color); }
-        .status-pronto { background-color: rgba(255,193,7,.1); color: var(--warning-color); }
-        .status-entregue { background-color: rgba(40,167,69,.1); color: var(--success-color); }
-        .status-retirado, .status-cancelado { background-color: rgba(108,117,125,.1); color: var(--text-light); }
         .financial-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .financial-a-receber { background-color: rgba(220,53,69,.1); color: var(--danger-color); }
         .financial-recebido { background-color: rgba(40,167,69,.1); color: var(--success-color); }
@@ -223,25 +236,20 @@
                     <div class="card-change" id="revenue-change">Carregando...</div>
                 </div>
             </section>
-            <section class="charts-container">
-                <div class="chart-card">
-                    <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Status</h3>
-                    <div class="chart-container"><canvas id="status-chart"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <h3 class="chart-title"><i class="fas fa-chart-line"></i> Pedidos por Dia (Últimos 7 dias)</h3>
-                    <div class="chart-container"><canvas id="orders-chart"></canvas></div>
-                </div>
-            </section>
             <section class="table-container">
                 <div class="loading-overlay" id="table-loading">
                     <div class="loading-spinner"></div>
                 </div>
                 <div class="table-header">
-                    <h2 class="table-title"><i class="fas fa-clipboard-list"></i> Lista de Pedidos</h2>
+                    <h2 class="table-title" id="table-title"><i class="fas fa-clipboard-list"></i> Lista de Pedidos</h2>
+                    <!-- ✅ NOVO: alternância Pedidos / Orçamentos -->
+                    <div class="tipo-toggle">
+                        <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
+                        <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
+                    </div>
                     <div class="search-filter-container">
                         <div class="search-box">
-                            <input type="text" placeholder="Buscar pedidos..." id="search-input">
+                            <input type="text" placeholder="Buscar..." id="search-input">
                         </div>
                         <button class="filter-btn" id="refresh-btn">
                             <i class="fas fa-sync-alt"></i>
@@ -268,6 +276,8 @@
         let statusChartInstance = null;
         let ordersChartInstance = null;
 
+        let tipoAtual = 'Pedido';   // ✅ NOVO: tipo da lista em exibição
+
         function getUsuarioLogado() {
             try { return JSON.parse(localStorage.getItem('user') || '{}'); }
             catch { return {}; }
@@ -283,22 +293,24 @@
             return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
         }
 
-        // Normaliza texto: minúsculas, sem espaços extras e sem acento
         function normalizar(texto) {
             return String(texto || '')
                 .trim().toLowerCase()
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         }
 
-        // ✅ Escolhe o endpoint conforme o cargo do usuário logado
+        // ✅ Cargo decide o estado; toggle decide o tipo
         function getUrlPedidos() {
             const user = getUsuarioLogado();
             const cargo = normalizar(user.cargo);
-            // Representante Comercial → somente pedidos do RJ
-            // Administrador (e qualquer outro cargo) → todos os pedidos
-            return cargo.includes('representante')
-                ? `${API_BASE}/dados_pedidos_rj`
-                : `${API_BASE}/dados_pedidos`;
+            const estado = cargo.includes('representante') ? '&estado=RJ' : '';
+            // Se o backend usar endpoint único /dados_lista:
+            return `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}${estado}`;
+            // Caso ainda use os endpoints separados, troque por:
+            // const filtro = cargo.includes('representante')
+            //     ? `${API_BASE}/dados_pedidos_rj`
+            //     : `${API_BASE}/dados_pedidos`;
+            // return filtro;
         }
 
         async function loadPedidos() {
@@ -308,19 +320,20 @@
                     el.textContent = 'Carregando...';
                     el.className = 'card-change';
                 });
-                // Fetch com timeout de 60s (cold start do Render)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
                 const res = await fetch(getUrlPedidos(), { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
                 const pedidos = await res.json();
+                window._pedidosAtuais = pedidos;   // ✅ guarda para o filtro de busca
                 updateSummaryCards(pedidos);
-                renderCharts(pedidos);
                 renderTabela(pedidos);
+                document.getElementById('table-title').innerHTML =
+                    `<i class="fas fa-clipboard-list"></i> Lista de ${tipoAtual === 'Pedido' ? 'Pedidos' : 'Orçamentos'}`;
                 document.getElementById('table-loading').style.display = 'none';
             } catch (err) {
-                console.error('Erro ao carregar pedidos:', err);
+                console.error('Erro ao carregar lista:', err);
                 document.getElementById('table-loading').style.display = 'none';
                 document.querySelectorAll('.card-change').forEach(el => {
                     el.textContent = 'Erro ao carregar dados';
@@ -337,23 +350,16 @@
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
             if (pedidos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum pedido encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum registro encontrado</td></tr>';
                 return;
             }
             pedidos.forEach(pedido => {
                 const row = document.createElement('tr');
-
                 const situacaoNorm = normalizar(pedido.situacao);
 
-                // Cor fixa aplicada INLINE (não depende do CSS): amarelo = Em Produção / laranja = Cancelado
-                if (situacaoNorm === 'em producao') {
-                    row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
-                }
-                if (situacaoNorm.includes('cancelad')) {
-                    row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
-                }
+                if (situacaoNorm === 'em producao') row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
+                if (situacaoNorm.includes('cancelad')) row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
 
-                // Badge colorido da situação (também inline)
                 let badgeStyle = 'padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;';
                 if (situacaoNorm.includes('producao')) badgeStyle += 'background:rgba(23,162,184,.1);color:#17a2b8;';
                 if (situacaoNorm.includes('pronto') || situacaoNorm === 'ok') badgeStyle += 'background:rgba(255,193,7,.1);color:#ffc107;';
@@ -362,7 +368,6 @@
 
                 const financeiroNorm = normalizar(pedido.financeiro);
 
-                // ✅ Guarda o número do pedido na linha (para o clique abrir o PDF)
                 row.dataset.numero = pedido.numero;
 
                 row.innerHTML = `
@@ -380,135 +385,73 @@
                 tbody.appendChild(row);
             });
 
-            // ✅ Após o forEach — clique na linha abre o PDF do pedido em nova aba
+            // ✅ Clique na linha — abre o PDF do tipo ATIVO (orçamento ou pedido)
             document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
                 r.addEventListener('click', () => {
                     const numero = encodeURIComponent(r.dataset.numero);
-                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=Pedido`;
-                    window.open(url, '_blank');  // abre o PDF (pode salvar/imprimir)
+                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}`;
+                    window.open(url, '_blank');
                 });
             });
         }
 
         function updateSummaryCards(pedidos) {
-            const today = new Date();
-            const todayFormatted = `${today.getDate().toString().padStart(2,'0')}/${(today.getMonth()+1).toString().padStart(2,'0')}/${today.getFullYear()}`;
-            const todayOrders = pedidos.filter(p => p.data === todayFormatted).length;
-            document.getElementById('today-orders').textContent = todayOrders;
-            const todayChange = document.getElementById('today-change');
-            todayChange.textContent = todayOrders > 0 ? `+${todayOrders} novos pedidos` : 'Sem novos pedidos hoje';
-            todayChange.className = todayOrders > 0 ? 'card-change positive' : 'card-change';
+            const hoje = new Date();
+            const hojeFmt = `${hoje.getDate().toString().padStart(2,'0')}/${(hoje.getMonth()+1).toString().padStart(2,'0')}/${hoje.getFullYear()}`;
+            const hojeQtd = pedidos.filter(p => p.data === hojeFmt).length;
+            document.getElementById('today-orders').textContent = hojeQtd;
+            const hojeInfo = document.getElementById('today-change');
+            hojeInfo.textContent = hojeQtd > 0 ? `+${hojeQtd} novos hoje` : 'Sem novos hoje';
+            hojeInfo.className = hojeQtd > 0 ? 'card-change positive' : 'card-change';
 
-            const productionOrders = pedidos.filter(p => normalizar(p.situacao).includes('produ')).length;
-            document.getElementById('production-orders').textContent = productionOrders;
+            const emProducao = pedidos.filter(p => normalizar(p.situacao).includes('produ')).length;
+            document.getElementById('production-orders').textContent = emProducao;
             document.getElementById('production-change').textContent = 'Em Produção';
 
-            const readyOrders = pedidos.filter(p => {
+            const prontos = pedidos.filter(p => {
                 const s = normalizar(p.situacao);
                 return s.includes('pronto') || s.includes('finalizado') ||
                        s.includes('conclu') || s === 'ok' || s === 'done';
             }).length;
-            document.getElementById('ready-orders').textContent = readyOrders;
-            document.getElementById('ready-change').textContent = 'Pedidos prontos';
+            document.getElementById('ready-orders').textContent = prontos;
+            document.getElementById('ready-change').textContent = 'Prontos';
 
-            const now = new Date();
-            const currentMonth = now.getMonth() + 1;
-            const currentYear = now.getFullYear();
-            const pedidosDoMes = pedidos.filter(p => {
+            const mes = hoje.getMonth() + 1, ano = hoje.getFullYear();
+            const doMes = pedidos.filter(p => {
                 if (!p.data) return false;
-                const parts = p.data.split('/');
-                if (parts.length !== 3) return false;
-                return (parseInt(parts[1]) === currentMonth && parseInt(parts[2]) === currentYear);
+                const p_ = p.data.split('/');
+                return p_.length === 3 && parseInt(p_[1]) === mes && parseInt(p_[2]) === ano;
             });
-            const revenue = pedidosDoMes.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-            document.getElementById('revenue').textContent = formatCurrency(revenue);
+            const total = doMes.reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+            document.getElementById('revenue').textContent = formatCurrency(total);
             document.getElementById('revenue-change').textContent = 'Total do mês';
         }
 
-        function renderCharts(pedidos) {
-            // Destroi gráficos anteriores antes de recriar (botão Atualizar)
-            if (statusChartInstance) statusChartInstance.destroy();
-            if (ordersChartInstance) ordersChartInstance.destroy();
-
-            const statusCtx = document.getElementById('status-chart').getContext('2d');
-            const statusCounts = {
-                'Em Produção': pedidos.filter(p => normalizar(p.situacao) === 'em producao').length,
-                'Pronto': pedidos.filter(p => normalizar(p.situacao) === 'pronto').length,
-                'Entregue': pedidos.filter(p => normalizar(p.situacao) === 'entregue').length,
-                'Retirado': pedidos.filter(p => normalizar(p.situacao) === 'retirado').length
-            };
-            statusChartInstance = new Chart(statusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(statusCounts),
-                    datasets: [{
-                        data: Object.values(statusCounts),
-                        backgroundColor: [
-                            'rgba(23,162,184,.7)', 'rgba(255,193,7,.7)',
-                            'rgba(40,167,69,.7)', 'rgba(108,117,125,.7)'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw || 0;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                                    return `${context.label}: ${value} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            const ordersCtx = document.getElementById('orders-chart').getContext('2d');
-            const dates = [], ordersData = [];
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                const fullDate = `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
-                dates.push(`${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}`);
-                ordersData.push(pedidos.filter(p => p.data === fullDate).length);
-            }
-            ordersChartInstance = new Chart(ordersCtx, {
-                type: 'bar',
-                data: {
-                    labels: dates,
-                    datasets: [{ label: 'Pedidos', data: ordersData, backgroundColor: 'rgba(139,0,0,.7)', borderRadius: 5 }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Número de Pedidos' } },
-                        x: { title: { display: true, text: 'Data' } }
-                    }
-                }
-            });
-        }
-
-        function setupSearch() {
+        function setupControles() {
+            // Busca em tempo real (data-attribute, sobrevive à troca de tipo)
             document.getElementById('search-input').addEventListener('input', function() {
                 const term = this.value.toLowerCase();
                 document.querySelectorAll('#orders-tbody tr').forEach(row => {
                     row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
                 });
             });
-            // Botão Atualizar realmente recarrega
             document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
+
+            // ✅ Toggle: alterna tipo e recarrega
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.tipo === tipoAtual) return;
+                    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    tipoAtual = btn.dataset.tipo;
+                    loadPedidos();
+                });
+            });
         }
 
         function carregarDadosUsuario() {
             const user = getUsuarioLogado();
             if (!user || !user.nome) {
-                // Sem sessão → volta para o login
                 window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
                 return;
             }
@@ -520,8 +463,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             carregarDadosUsuario();
+            setupControles();
             loadPedidos();
-            setupSearch();
         });
     </script>
 </body>
