@@ -118,7 +118,9 @@
             border-bottom: 2px solid var(--border-color); font-size: 14px; position: sticky; top: 0; z-index: 10;
         }
         .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        .orders-table tr:hover { background: rgba(160, 52, 52, 0.363); transition: background 0.2s ease;cursor: pointer; }
+        /* Hover vermelho claro — vale para todas as linhas; a cor fixa retorna ao sair */
+        .orders-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
+        .orders-table tbody tr:hover { background: var(--primary-light); }
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
         .status-em-producao { background-color: rgba(23,162,184,.1); color: var(--info-color); }
         .status-pronto { background-color: rgba(255,193,7,.1); color: var(--warning-color); }
@@ -132,7 +134,6 @@
         .price-value { font-weight: 600; color: var(--primary-color); }
         .date-cell { font-size: 13px; color: var(--text-light); }
         .obs-cell { font-size: 12px; color: var(--text-light); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .highlighted-row { background-color: rgba(255,255,0,.1); }
         .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
         .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
         .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
@@ -268,20 +269,8 @@
         let ordersChartInstance = null;
 
         function getUsuarioLogado() {
-            try {
-                return JSON.parse(localStorage.getItem('user') || '{}');
-            } catch { return {}; }
-        }
-
-        // ✅ NOVO: escolhe o endpoint conforme o cargo do usuário logado
-        function getUrlPedidos() {
-            const user = getUsuarioLogado();
-            const cargo = String(user.cargo || '').trim().toLowerCase();
-            // Representante Comercial → somente pedidos do RJ
-            // Administrador (e qualquer outro cargo) → todos os pedidos
-            return cargo === 'representante comercial'
-                ? `${API_BASE}/dados_pedidos_rj`
-                : `${API_BASE}/dados_pedidos`;
+            try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+            catch { return {}; }
         }
 
         function escapeHtml(text) {
@@ -294,6 +283,24 @@
             return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
         }
 
+        // Normaliza texto: minúsculas, sem espaços extras e sem acento
+        function normalizar(texto) {
+            return String(texto || '')
+                .trim().toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        // ✅ Escolhe o endpoint conforme o cargo do usuário logado
+        function getUrlPedidos() {
+            const user = getUsuarioLogado();
+            const cargo = normalizar(user.cargo);
+            // Representante Comercial → somente pedidos do RJ
+            // Administrador (e qualquer outro cargo) → todos os pedidos
+            return cargo.includes('representante')
+                ? `${API_BASE}/dados_pedidos_rj`
+                : `${API_BASE}/dados_pedidos`;
+        }
+
         async function loadPedidos() {
             try {
                 document.getElementById('table-loading').style.display = 'flex';
@@ -301,20 +308,16 @@
                     el.textContent = 'Carregando...';
                     el.className = 'card-change';
                 });
-
                 // Fetch com timeout de 60s (cold start do Render)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
                 const res = await fetch(getUrlPedidos(), { signal: controller.signal });
                 clearTimeout(timeoutId);
-
                 if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
                 const pedidos = await res.json();
-
                 updateSummaryCards(pedidos);
                 renderCharts(pedidos);
                 renderTabela(pedidos);
-
                 document.getElementById('table-loading').style.display = 'none';
             } catch (err) {
                 console.error('Erro ao carregar pedidos:', err);
@@ -330,68 +333,7 @@
             }
         }
 
-      function renderTabela(pedidos) {
-    const tbody = document.getElementById('orders-tbody');
-    tbody.innerHTML = '';
-    if (pedidos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum pedido encontrado</td></tr>';
-        return;
-    }
-    pedidos.forEach(pedido => {
-        const row = document.createElement('tr');
-
-        // Normaliza a situação: minúsculas, sem espaços extras e sem acento
-        const situacaoNorm = String(pedido.situacao || '')
-            .trim().toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-        // Cor fixa inline (laranja = cancelado / amarelo = em produção)
-        if (situacaoNorm === 'em producao') {
-            row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
-        }
-        if (situacaoNorm.includes('cancelad')) {
-            row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
-        }
-
-        // Badge colorido da situação (também inline)
-        let badgeStyle = 'padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;';
-        if (situacaoNorm.includes('producao')) badgeStyle += 'background:rgba(23,162,184,.1);color:#17a2b8;';
-        if (situacaoNorm.includes('pronto'))   badgeStyle += 'background:rgba(255,193,7,.1);color:#ffc107;';
-        if (situacaoNorm.includes('entregue')) badgeStyle += 'background:rgba(40,167,69,.1);color:#28a745;';
-        if (situacaoNorm.includes('cancelad')) badgeStyle += 'background:rgba(255,165,0,.25);color:#c96a00;font-weight:700;';
-
-        const financeiroNorm = String(pedido.financeiro || '')
-            .trim().toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-        // ✅ NOVO: guarda o número do pedido na linha (para o clique abrir o PDF)
-        row.dataset.numero = pedido.numero;
-        row.style.cursor = 'pointer';
-
-        row.innerHTML = `
-            <td class="order-number">${escapeHtml(pedido.numero)}</td>
-            <td class="client-name">${escapeHtml(pedido.cliente)}</td>
-            <td>${escapeHtml(pedido.clienteFinal || '-')}</td>
-            <td class="date-cell">${escapeHtml(pedido.data)}</td>
-            <td class="date-cell">${escapeHtml(pedido.prontoEm || '-')}</td>
-            <td class="price-value">${formatCurrency(pedido.valor)}</td>
-            <td class="obs-cell" title="${escapeHtml(pedido.observacao || '')}">${escapeHtml(pedido.observacao || '-')}</td>
-            <td><span style="${badgeStyle}">${escapeHtml(pedido.situacao || '-')}</span></td>
-            <td><span class="financial-badge ${financeiroNorm.includes('receber') ? 'financial-a-receber' : 'financial-recebido'}">${escapeHtml(pedido.financeiro || '-')}</span></td>
-            <td class="date-cell">${escapeHtml(pedido.dataEntrega || '-')}</td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    // ✅ NOVO: após o forEach — clique na linha abre o PDF do pedido em nova aba
-    document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
-        r.addEventListener('click', () => {
-            const numero = encodeURIComponent(r.dataset.numero);
-            const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=Pedido`;
-            window.open(url, '_blank');  // abre o PDF (pode salvar/imprimir)
-        });
-    });
-}
+        function renderTabela(pedidos) {
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
             if (pedidos.length === 0) {
@@ -400,12 +342,29 @@
             }
             pedidos.forEach(pedido => {
                 const row = document.createElement('tr');
-                if (pedido.situacao === 'Em Produção') row.classList.add('highlighted-row');
 
-                const situacaoLimpa = String(pedido.situacao || '').toLowerCase().replace(/\s+/g, '-');
-                const financeiroLimpo = String(pedido.financeiro || '').toLowerCase().replace(/\s+/g, '-');
+                const situacaoNorm = normalizar(pedido.situacao);
 
-                // escapeHtml em TODOS os campos vindos do banco (proteção contra XSS)
+                // Cor fixa aplicada INLINE (não depende do CSS): amarelo = Em Produção / laranja = Cancelado
+                if (situacaoNorm === 'em producao') {
+                    row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
+                }
+                if (situacaoNorm.includes('cancelad')) {
+                    row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
+                }
+
+                // Badge colorido da situação (também inline)
+                let badgeStyle = 'padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;';
+                if (situacaoNorm.includes('producao')) badgeStyle += 'background:rgba(23,162,184,.1);color:#17a2b8;';
+                if (situacaoNorm.includes('pronto') || situacaoNorm === 'ok') badgeStyle += 'background:rgba(255,193,7,.1);color:#ffc107;';
+                if (situacaoNorm.includes('entregue')) badgeStyle += 'background:rgba(40,167,69,.1);color:#28a745;';
+                if (situacaoNorm.includes('cancelad')) badgeStyle += 'background:rgba(255,165,0,.25);color:#c96a00;font-weight:700;';
+
+                const financeiroNorm = normalizar(pedido.financeiro);
+
+                // ✅ Guarda o número do pedido na linha (para o clique abrir o PDF)
+                row.dataset.numero = pedido.numero;
+
                 row.innerHTML = `
                     <td class="order-number">${escapeHtml(pedido.numero)}</td>
                     <td class="client-name">${escapeHtml(pedido.cliente)}</td>
@@ -414,38 +373,40 @@
                     <td class="date-cell">${escapeHtml(pedido.prontoEm || '-')}</td>
                     <td class="price-value">${formatCurrency(pedido.valor)}</td>
                     <td class="obs-cell" title="${escapeHtml(pedido.observacao || '')}">${escapeHtml(pedido.observacao || '-')}</td>
-                    <td><span class="status-badge ${situacaoLimpa}">${escapeHtml(pedido.situacao || '-')}</span></td>
-                    <td><span class="financial-badge ${financeiroLimpo}">${escapeHtml(pedido.financeiro || '-')}</span></td>
+                    <td><span style="${badgeStyle}">${escapeHtml(pedido.situacao || '-')}</span></td>
+                    <td><span class="financial-badge ${financeiroNorm.includes('receber') ? 'financial-a-receber' : 'financial-recebido'}">${escapeHtml(pedido.financeiro || '-')}</span></td>
                     <td class="date-cell">${escapeHtml(pedido.dataEntrega || '-')}</td>
                 `;
                 tbody.appendChild(row);
             });
 
-
-
-        
+            // ✅ Após o forEach — clique na linha abre o PDF do pedido em nova aba
+            document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
+                r.addEventListener('click', () => {
+                    const numero = encodeURIComponent(r.dataset.numero);
+                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=Pedido`;
+                    window.open(url, '_blank');  // abre o PDF (pode salvar/imprimir)
+                });
+            });
+        }
 
         function updateSummaryCards(pedidos) {
             const today = new Date();
             const todayFormatted = `${today.getDate().toString().padStart(2,'0')}/${(today.getMonth()+1).toString().padStart(2,'0')}/${today.getFullYear()}`;
-
             const todayOrders = pedidos.filter(p => p.data === todayFormatted).length;
             document.getElementById('today-orders').textContent = todayOrders;
             const todayChange = document.getElementById('today-change');
             todayChange.textContent = todayOrders > 0 ? `+${todayOrders} novos pedidos` : 'Sem novos pedidos hoje';
             todayChange.className = todayOrders > 0 ? 'card-change positive' : 'card-change';
 
-            const productionOrders = pedidos.filter(p => {
-                const situacao = String(p.situacao || '').trim().toLowerCase();
-                return situacao.includes('produ') ;
-            }).length;
+            const productionOrders = pedidos.filter(p => normalizar(p.situacao).includes('produ')).length;
             document.getElementById('production-orders').textContent = productionOrders;
             document.getElementById('production-change').textContent = 'Em Produção';
 
             const readyOrders = pedidos.filter(p => {
-                const situacao = String(p.situacao || '').trim().toLowerCase();
-                return situacao.includes('pronto') || situacao.includes('finalizado') ||
-                       situacao.includes('conclu') || situacao === 'ok' || situacao === 'done';
+                const s = normalizar(p.situacao);
+                return s.includes('pronto') || s.includes('finalizado') ||
+                       s.includes('conclu') || s === 'ok' || s === 'done';
             }).length;
             document.getElementById('ready-orders').textContent = readyOrders;
             document.getElementById('ready-change').textContent = 'Pedidos prontos';
@@ -465,16 +426,16 @@
         }
 
         function renderCharts(pedidos) {
-            // ✅ CORREÇÃO: destrói gráficos anteriores antes de recriar (botão Atualizar)
+            // Destroi gráficos anteriores antes de recriar (botão Atualizar)
             if (statusChartInstance) statusChartInstance.destroy();
             if (ordersChartInstance) ordersChartInstance.destroy();
 
             const statusCtx = document.getElementById('status-chart').getContext('2d');
             const statusCounts = {
-                'Em Produção': pedidos.filter(p => p.situacao === 'Em Produção').length,
-                'Pronto': pedidos.filter(p => p.situacao === 'Pronto').length,
-                'Entregue': pedidos.filter(p => p.situacao === 'Entregue').length,
-                'Retirado': pedidos.filter(p => p.situacao === 'Retirado').length
+                'Em Produção': pedidos.filter(p => normalizar(p.situacao) === 'em producao').length,
+                'Pronto': pedidos.filter(p => normalizar(p.situacao) === 'pronto').length,
+                'Entregue': pedidos.filter(p => normalizar(p.situacao) === 'entregue').length,
+                'Retirado': pedidos.filter(p => normalizar(p.situacao) === 'retirado').length
             };
             statusChartInstance = new Chart(statusCtx, {
                 type: 'doughnut',
@@ -540,11 +501,10 @@
                     row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
                 });
             });
-            /* ✅ Passo 1/complemento: botão Atualizar agora realmente recarrega */
+            // Botão Atualizar realmente recarrega
             document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
         }
 
-        // ✅ CORREÇÃO: carrega cargo e exibe no header
         function carregarDadosUsuario() {
             const user = getUsuarioLogado();
             if (!user || !user.nome) {
@@ -566,4 +526,3 @@
     </script>
 </body>
 </html>
-Exibindo colagem-01a0ed82-27cd-7351-84ce-4a9bfdbf1f18.txt…
