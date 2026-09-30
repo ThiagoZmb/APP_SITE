@@ -11,11 +11,11 @@ app.use(express.json());
 
 // Configuração do banco de dados
 const dbConfig = {
-  host: process.env.DB_HOST || 'db-elegance-v4.mysql.uhserver.com',
-    user: process.env.DB_USER || 'tfz',
-    password: process.env.DB_PASS || '@04t28b03p',
-    port: process.env.DB_PORT || '3306',
-    database: process.env.DB_NAME || 'db_elegance_v4'
+  host: process.env.DB_HOST || 'nspro60.hostgator.com.br',
+  user: process.env.DB_USER || 'thia1272_thiago',
+  password: process.env.DB_PASS || '04t28b03p',
+  port: process.env.DB_PORT || '3306',
+  database: process.env.DB_NAME || 'thia1272_db_elegance'
 };
 
 // Endpoint de login — agora retorna o CARGO do usuário
