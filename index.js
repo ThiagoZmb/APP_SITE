@@ -188,8 +188,8 @@ app.get('/migrar_senhas', async (req, res) => {
     }
     res.json({ success: true, convertidas, jaHash, total: rows.length });
   } catch (err) {
-    console.error('Erro na migração:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });   // ← linha ATUAL
+     console.error('Erro na migração:', err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.sqlMessage || err.message });
   }
 });
 
