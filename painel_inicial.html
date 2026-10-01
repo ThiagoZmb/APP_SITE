@@ -61,6 +61,12 @@
         }
         .user-info { display: flex; flex-direction: column; line-height: 1.2; }
         .user-cargo { font-size: 11px; opacity: 0.8; }
+        .btn-sair {
+            padding: 8px 18px; background: rgba(255,255,255,0.1); color: white;
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 50px;
+            cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.3s ease;
+        }
+        .btn-sair:hover { background: rgba(255,255,255,0.25); }
         .sidebar { grid-area: sidebar; background: var(--white); padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
         .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .menu-item {
@@ -109,7 +115,7 @@
             border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500;
         }
         .filter-btn:hover { background: var(--primary-color); color: white; }
-        /* ✅ NOVO: toggle Pedidos / Orçamentos */
+        /* Toggle Pedidos / Orçamentos */
         .tipo-toggle {
             display: flex;
             border-radius: 12px;
@@ -137,8 +143,8 @@
         }
         .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         .orders-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
+        /* Hover vermelho passa por cima de qualquer linha; cor fixa volta ao sair */
         .orders-table tbody tr:hover { background: var(--primary-light) !important; }
-        
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
         .financial-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .financial-a-receber { background-color: rgba(220,53,69,.1); color: var(--danger-color); }
@@ -148,11 +154,6 @@
         .price-value { font-weight: 600; color: var(--primary-color); }
         .date-cell { font-size: 13px; color: var(--text-light); }
         .obs-cell { font-size: 12px; color: var(--text-light); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
-        .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
-        .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
-        .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
-        .chart-container { height: 250px; position: relative; }
         .loading-overlay {
             position: absolute; inset: 0; background: rgba(255,255,255,.8);
             display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 20px;
@@ -187,6 +188,7 @@
                         <span class="user-cargo" id="user-cargo"></span>
                     </div>
                 </div>
+                <button class="btn-sair" id="btn-sair">Sair</button>
             </div>
         </header>
         <div class="sidebar">
@@ -243,7 +245,6 @@
                 </div>
                 <div class="table-header">
                     <h2 class="table-title" id="table-title"><i class="fas fa-clipboard-list"></i> Lista de Pedidos</h2>
-                    <!-- ✅ NOVO: alternância Pedidos / Orçamentos -->
                     <div class="tipo-toggle">
                         <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
                         <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
@@ -274,14 +275,26 @@
     </div>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
-        let statusChartInstance = null;
-        let ordersChartInstance = null;
+        let tipoAtual = 'Pedido';   // tipo da lista em exibição (Pedido ou Orçamento)
 
-        let tipoAtual = 'Pedido';   // ✅ NOVO: tipo da lista em exibição
-
+        // ================= AUTENTICAÇÃO =================
+        function getAuth() {
+            try { return JSON.parse(localStorage.getItem('auth') || 'null'); }
+            catch { return null; }
+        }
         function getUsuarioLogado() {
-            try { return JSON.parse(localStorage.getItem('user') || '{}'); }
-            catch { return {}; }
+            const auth = getAuth();
+            return auth ? auth.user : {};
+        }
+        function voltarLogin() {
+            localStorage.removeItem('auth');
+            localStorage.removeItem('user');
+            window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        }
+
+        // Cargo NÃO é lido no navegador — o servidor filtra sozinho
+        function getUrlPedidos() {
+            return `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}`;
         }
 
         function escapeHtml(text) {
@@ -300,20 +313,7 @@
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         }
 
-        // ✅ Cargo decide o estado; toggle decide o tipo
-        function getUrlPedidos() {
-            const user = getUsuarioLogado();
-            const cargo = normalizar(user.cargo);
-            const estado = cargo.includes('representante') ? '&estado=RJ' : '';
-            // Se o backend usar endpoint único /dados_lista:
-            return `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}${estado}`;
-            // Caso ainda use os endpoints separados, troque por:
-            // const filtro = cargo.includes('representante')
-            //     ? `${API_BASE}/dados_pedidos_rj`
-            //     : `${API_BASE}/dados_pedidos`;
-            // return filtro;
-        }
-
+        // ================= CARREGAMENTO =================
         async function loadPedidos() {
             try {
                 document.getElementById('table-loading').style.display = 'flex';
@@ -321,13 +321,24 @@
                     el.textContent = 'Carregando...';
                     el.className = 'card-change';
                 });
+
+                const auth = getAuth();
+                if (!auth || !auth.token) { voltarLogin(); return; }
+
+                // ✅ CORRIGIDO: controller declarado ANTES do uso
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const res = await fetch(getUrlPedidos(), { signal: controller.signal });
+                const res = await fetch(getUrlPedidos(), {
+                    signal: controller.signal,
+                    headers: { 'Authorization': 'Bearer ' + auth.token }
+                });
                 clearTimeout(timeoutId);
+
+                if (res.status === 401) { voltarLogin(); return; } // sessão expirada
                 if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+
                 const pedidos = await res.json();
-                window._pedidosAtuais = pedidos;   // ✅ guarda para o filtro de busca
+                window._pedidosAtuais = pedidos;
                 updateSummaryCards(pedidos);
                 renderTabela(pedidos);
                 document.getElementById('table-title').innerHTML =
@@ -347,6 +358,7 @@
             }
         }
 
+        // ================= TABELA =================
         function renderTabela(pedidos) {
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
@@ -358,6 +370,8 @@
                 const row = document.createElement('tr');
                 const situacaoNorm = normalizar(pedido.situacao);
 
+                // Cores fixas aplicadas INLINE desde o carregamento:
+                // amarelo = Em Produção / laranja = Cancelado
                 if (situacaoNorm === 'em producao') row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
                 if (situacaoNorm.includes('cancelad')) row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
 
@@ -386,16 +400,19 @@
                 tbody.appendChild(row);
             });
 
-            // ✅ Clique na linha — abre o PDF do tipo ATIVO (orçamento ou pedido)
+            // ✅ CORRIGIDO: clique na linha — bloco único, com token na URL
             document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
                 r.addEventListener('click', () => {
+                    const auth = getAuth();
+                    if (!auth || !auth.token) { voltarLogin(); return; }
                     const numero = encodeURIComponent(r.dataset.numero);
-                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}`;
+                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}&token=${encodeURIComponent(auth.token)}`;
                     window.open(url, '_blank');
                 });
             });
         }
 
+        // ================= CARDS =================
         function updateSummaryCards(pedidos) {
             const hoje = new Date();
             const hojeFmt = `${hoje.getDate().toString().padStart(2,'0')}/${(hoje.getMonth()+1).toString().padStart(2,'0')}/${hoje.getFullYear()}`;
@@ -428,8 +445,9 @@
             document.getElementById('revenue-change').textContent = 'Total do mês';
         }
 
+        // ================= CONTROLES =================
         function setupControles() {
-            // Busca em tempo real (data-attribute, sobrevive à troca de tipo)
+            // Busca em tempo real
             document.getElementById('search-input').addEventListener('input', function() {
                 const term = this.value.toLowerCase();
                 document.querySelectorAll('#orders-tbody tr').forEach(row => {
@@ -438,7 +456,7 @@
             });
             document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
 
-            // ✅ Toggle: alterna tipo e recarrega
+            // Toggle: alterna tipo e recarrega
             document.querySelectorAll('.toggle-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.dataset.tipo === tipoAtual) return;
@@ -448,12 +466,16 @@
                     loadPedidos();
                 });
             });
+
+            // Sair: limpa sessão e volta ao login
+            document.getElementById('btn-sair').addEventListener('click', voltarLogin);
         }
 
+        // ================= USUÁRIO NO HEADER =================
         function carregarDadosUsuario() {
             const user = getUsuarioLogado();
             if (!user || !user.nome) {
-                window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+                voltarLogin();
                 return;
             }
             document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
