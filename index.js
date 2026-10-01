@@ -5,7 +5,6 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -15,7 +14,7 @@ const OBRIGATORIAS = ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'];
 const faltando = OBRIGATORIAS.filter(k => !process.env[k]);
 if (!JWT_SECRET || faltando.length > 0) {
   console.error('FATAL: variáveis de ambiente ausentes:', [...faltando, ...(JWT_SECRET ? [] : ['JWT_SECRET'])]);
-  process.exit(1); // não sobe servidor com configuração incompleta
+  process.exit(1);
 }
 
 const dbConfig = {
@@ -26,23 +25,22 @@ const dbConfig = {
   database: process.env.DB_NAME
 };
 
-// Pool de conexões (mais seguro e rápido que abrir conexão por request)
 const pool = mysql.createPool({
   ...dbConfig,
   connectionLimit: 10,
   waitForConnections: true,
-  dateStrings: true,   // datas já vêm 'YYYY-MM-DD' — evita bug de fuso
+  dateStrings: true,        // datas vêm 'YYYY-MM-DD' — evita bug de fuso
   multipleStatements: false // bloqueia SQL stacking
 });
 
-app.use(helmet()); // headers de segurança padrão
+app.use(helmet());
 app.use(cors({ origin: ['https://thiagozmb.github.io'] }));
-app.use(express.json({ limit: '10kb' })); // payload limitado
+app.use(express.json({ limit: '10kb' }));
 
 // ================= RATE LIMIT — trava força bruta =================
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // janela de 15 min
-  max: 5,                    // 5 tentativas por IP
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   message: { success: false, message: 'Muitas tentativas. Aguarde 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -51,7 +49,7 @@ const loginLimiter = rateLimit({
 // ================= JWT — sessão assinada =================
 function gerarToken(usuario) {
   return jwt.sign(
-    { id: usuario.ID, nome: usuario.NOME, cargo: usuario.CARGO },
+    { id: usuario.CODIGO, nome: usuario.NOME, cargo: usuario.CARGO },  // ✅ CODIGO (não ID)
     JWT_SECRET,
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
@@ -60,9 +58,7 @@ function gerarToken(usuario) {
 // Middleware: exige token válido (header Bearer OU ?token= para PDFs)
 function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ')
-    ? header.slice(7)
-    : (req.query.token || null);
+  const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
   if (!token) return res.status(401).json({ error: 'Não autenticado' });
   try {
     req.user = jwt.verify(token, JWT_SECRET, { issuer: 'elegance-api' });
@@ -72,7 +68,7 @@ function autenticar(req, res, next) {
   }
 }
 
-// Cargo do TOKEN decide o filtro — o navegador não manda mais nada
+// Cargo do TOKEN decide o filtro — o navegador não manda nada
 function ehRepresentante(req) {
   return String(req.user.cargo || '').toLowerCase().includes('representante');
 }
@@ -81,52 +77,45 @@ function ehRepresentante(req) {
 app.post('/login', loginLimiter, async (req, res) => {
   const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
-
-  // Validação de entrada: tamanho máximo evita abuso; mensagem genérica evita enumeração
   if (!username || !password || username.length > 100 || password.length > 200) {
     return res.status(400).json({ success: false, message: 'Usuário ou senha inválidos.' });
   }
-
   try {
+    // ✅ CORRIGIDO: CODIGO (a tabela não tem coluna ID)
     const [rows] = await pool.execute(
-      'SELECT ID, NOME, RAZAO_SOCIAL, CARGO, SENHA FROM cliente_usuarios WHERE NOME = ? LIMIT 1',
+      'SELECT CODIGO, NOME, RAZAO_SOCIAL, CARGO, SENHA FROM cliente_usuarios WHERE NOME = ? LIMIT 1',
       [username]
     );
-
     if (rows.length === 0) {
-      // Mensagem idêntica nos dois casos (não revela se o usuário existe)
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
-
     const user = rows[0];
     const senhaOk = await bcrypt.compare(password, user.SENHA);
     if (!senhaOk) {
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
-
     res.json({
       success: true,
       token: gerarToken(user),
       user: { nome: user.NOME, empresa: user.RAZAO_SOCIAL, cargo: user.CARGO }
     });
   } catch (err) {
-    console.error('Erro no login:', err.message); // log sem detalhes internos
+    console.error('Erro no login:', err.message);
     res.status(500).json({ success: false, message: 'Erro de servidor.' });
   }
 });
 
-// ================= VERIFICAÇÃO DE SESSÃO (frontend usa no guard) =================
+// ================= VERIFICAÇÃO DE SESSÃO =================
 app.get('/auth/verify', autenticar, (req, res) => {
   res.json({ valid: true, user: { nome: req.user.nome, cargo: req.user.cargo } });
 });
 
-// ================= DADOS (todos protegidos) =================
+// ================= DADOS: LISTA ÚNICA (Pedido ou Orçamento) =================
 app.get('/dados_lista', autenticar, async (req, res) => {
   try {
     const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
     // ✅ Autorização no SERVIDOR: representante é FORÇADO a RJ, ignore o que o cliente pedir
     const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
-
     const sql = `
       SELECT 
         p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
@@ -148,7 +137,7 @@ app.get('/dados_lista', autenticar, async (req, res) => {
   }
 });
 
-// Mantidos por compatibilidade — agora também protegidos
+// Mantidos por compatibilidade — também protegidos
 app.get('/dados_pedidos', autenticar, async (req, res) => {
   try {
     const where = ehRepresentante(req)
@@ -166,33 +155,6 @@ app.get('/dados_pedidos', autenticar, async (req, res) => {
     res.status(500).json({ error: 'Erro de servidor' });
   }
 });
-
-
-// MIGRAÇÃO DE SENHAS — texto puro → bcrypt. Protegida e idempotente.
-app.get('/migrar_senhas', async (req, res) => {
-  if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Acesso negado' });
-  }
-  try {
-    const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
-    let convertidas = 0, jaHash = 0;
-    for (const r of rows) {
-      const atual = String(r.SENHA || '');
-      if (!atual.startsWith('$2')) {                    // só converte quem ainda é texto
-        const hash = await bcrypt.hash(atual, 12);
-        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
-        convertidas++;
-      } else {
-        jaHash++;
-      }
-    }
-    res.json({ success: true, convertidas, jaHash, total: rows.length });
-  } catch (err) {
-    console.error('Erro na migração:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });
-  }
-});
-
 
 app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
   try {
@@ -279,6 +241,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
        FROM ped_orc WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
     const cab = cabs[0];
+
     const [itens] = await pool.execute(
       `SELECT * FROM ped_orc_lista_itens WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
     const [v4] = await pool.execute(
@@ -369,7 +332,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       return linhas.filter(l => l && l.trim() !== '');
     }
 
-    // TABELA COM GRADE
+    // TABELA COM GRADE (altura medida — sem sobreposição)
     const cols = [
       { label: 'Item',       w: W * 0.07, align: 'center' },
       { label: 'Qtd',        w: W * 0.07, align: 'center' },
@@ -446,7 +409,32 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
   }
 });
 
-// ================= ADMIN: definir/trocar senha (protegido por chave, não por login) =================
+// ================= MIGRAÇÃO DE SENHAS (one-time, protegida) =================
+app.get('/migrar_senhas', async (req, res) => {
+  if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+  try {
+    const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
+    let convertidas = 0, jaHash = 0;
+    for (const r of rows) {
+      const atual = String(r.SENHA || '');
+      if (!atual.startsWith('$2')) {
+        const hash = await bcrypt.hash(atual, 12);
+        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
+        convertidas++;
+      } else {
+        jaHash++;
+      }
+    }
+    res.json({ success: true, convertidas, jaHash, total: rows.length });
+  } catch (err) {
+    console.error('Erro na migração:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// ================= ADMIN: definir/trocar senha =================
 app.post('/admin/definir_senha', async (req, res) => {
   const chave = req.headers['x-admin-key'];
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
@@ -457,7 +445,7 @@ app.post('/admin/definir_senha', async (req, res) => {
     return res.status(400).json({ error: 'Usuário obrigatório e senha com no mínimo 8 caracteres' });
   }
   try {
-    const hash = await bcrypt.hash(novaSenha, 12); // custo 12 = padrão robusto
+    const hash = await bcrypt.hash(novaSenha, 12);
     const [r] = await pool.execute(
       'UPDATE cliente_usuarios SET SENHA = ? WHERE NOME = ?', [hash, username]);
     if (r.affectedRows === 0) return res.status(404).json({ error: 'Usuário não encontrado' });

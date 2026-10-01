@@ -61,21 +61,17 @@
         }
         .user-info { display: flex; flex-direction: column; line-height: 1.2; }
         .user-cargo { font-size: 11px; opacity: 0.8; }
-        .btn-sair {
-            padding: 8px 18px; background: rgba(255,255,255,0.1); color: white;
-            border: 1px solid rgba(255,255,255,0.3); border-radius: 50px;
-            cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.3s ease;
-        }
-        .btn-sair:hover { background: rgba(255,255,255,0.25); }
         .sidebar { grid-area: sidebar; background: var(--white); padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
         .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .menu-item {
             padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
             transition: all 0.3s ease; display: flex; align-items: center; gap: 12px;
-            font-weight: 500; color: var(--text-dark); text-decoration: none;
+            font-weight: 500; color: var(--text-dark);
         }
         .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
         .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        .sidebar a.menu-item { text-decoration: none; color: var(--text-dark); }
+        .sidebar a.menu-item.active { color: white; }
         main { grid-area: main; padding: 40px; overflow-y: auto; animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .welcome-section { margin-bottom: 40px; }
@@ -115,7 +111,7 @@
             border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500;
         }
         .filter-btn:hover { background: var(--primary-color); color: white; }
-        /* Toggle Pedidos / Orçamentos */
+        /* ✅ Alternância Pedidos / Orçamentos */
         .tipo-toggle {
             display: flex;
             border-radius: 12px;
@@ -143,9 +139,7 @@
         }
         .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         .orders-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
-        /* Hover vermelho passa por cima de qualquer linha; cor fixa volta ao sair */
-        .orders-table tbody tr:hover { background: var(--primary-light) !important; }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .orders-table tbody tr:hover { background: var(--primary-light); }
         .financial-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .financial-a-receber { background-color: rgba(220,53,69,.1); color: var(--danger-color); }
         .financial-recebido { background-color: rgba(40,167,69,.1); color: var(--success-color); }
@@ -154,6 +148,11 @@
         .price-value { font-weight: 600; color: var(--primary-color); }
         .date-cell { font-size: 13px; color: var(--text-light); }
         .obs-cell { font-size: 12px; color: var(--text-light); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+        .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
+        .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
+        .chart-container { height: 250px; position: relative; }
         .loading-overlay {
             position: absolute; inset: 0; background: rgba(255,255,255,.8);
             display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 20px;
@@ -188,7 +187,6 @@
                         <span class="user-cargo" id="user-cargo"></span>
                     </div>
                 </div>
-                <button class="btn-sair" id="btn-sair">Sair</button>
             </div>
         </header>
         <div class="sidebar">
@@ -208,7 +206,7 @@
             <section class="cards-container">
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Pedidos Hoje</h3>
+                        <h3 class="card-title" id="card1-title">Pedidos Hoje</h3>
                         <div class="card-icon">📦</div>
                     </div>
                     <div class="card-value" id="today-orders">0</div>
@@ -216,7 +214,7 @@
                 </div>
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Em Produção</h3>
+                        <h3 class="card-title" id="card2-title">Em Produção</h3>
                         <div class="card-icon">⚙️</div>
                     </div>
                     <div class="card-value" id="production-orders">0</div>
@@ -224,7 +222,7 @@
                 </div>
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Prontos</h3>
+                        <h3 class="card-title" id="card3-title">Prontos</h3>
                         <div class="card-icon">✅</div>
                     </div>
                     <div class="card-value" id="ready-orders">0</div>
@@ -232,11 +230,21 @@
                 </div>
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Faturamento</h3>
+                        <h3 class="card-title" id="card4-title">Faturamento</h3>
                         <div class="card-icon">💰</div>
                     </div>
                     <div class="card-value" id="revenue">R$ 0,00</div>
                     <div class="card-change" id="revenue-change">Carregando...</div>
+                </div>
+            </section>
+            <section class="charts-container">
+                <div class="chart-card">
+                    <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Status</h3>
+                    <div class="chart-container"><canvas id="status-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3 class="chart-title"><i class="fas fa-chart-line"></i> Pedidos por Dia (Últimos 7 dias)</h3>
+                    <div class="chart-container"><canvas id="orders-chart"></canvas></div>
                 </div>
             </section>
             <section class="table-container">
@@ -275,26 +283,31 @@
     </div>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
-        let tipoAtual = 'Pedido';   // tipo da lista em exibição (Pedido ou Orçamento)
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        let statusChartInstance = null;
+        let ordersChartInstance = null;
+        let tipoAtual = 'Pedido'; // ✅ tipo da lista em exibição
 
-        // ================= AUTENTICAÇÃO =================
+        // ================= SESSÃO (formato novo: 'auth' com token) =================
         function getAuth() {
-            try { return JSON.parse(localStorage.getItem('auth') || 'null'); }
-            catch { return null; }
-        }
-        function getUsuarioLogado() {
-            const auth = getAuth();
-            return auth ? auth.user : {};
-        }
-        function voltarLogin() {
-            localStorage.removeItem('auth');
-            localStorage.removeItem('user');
-            window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
+            try {
+                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!auth || !auth.token || !auth.user) return null;
+                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return auth;
+            } catch { return null; }
         }
 
-        // Cargo NÃO é lido no navegador — o servidor filtra sozinho
-        function getUrlPedidos() {
-            return `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}`;
+        function getToken() {
+            const auth = getAuth();
+            return auth ? auth.token : '';
+        }
+
+        // Guard: sem sessão válida → volta pro login
+        function exigirSessao() {
+            const auth = getAuth();
+            if (!auth) { window.location.href = LOGIN_URL; return null; }
+            return auth.user;
         }
 
         function escapeHtml(text) {
@@ -313,7 +326,20 @@
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         }
 
-        // ================= CARREGAMENTO =================
+        // ✅ Fetch com Bearer + redirecionamento em 401
+        async function fetchAutenticado(url) {
+            const res = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (res.status === 401) {
+                localStorage.removeItem('auth');
+                window.location.href = LOGIN_URL;
+                throw new Error('Sessão expirada');
+            }
+            if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+            return res.json();
+        }
+
         async function loadPedidos() {
             try {
                 document.getElementById('table-loading').style.display = 'flex';
@@ -321,25 +347,13 @@
                     el.textContent = 'Carregando...';
                     el.className = 'card-change';
                 });
-
-                const auth = getAuth();
-                if (!auth || !auth.token) { voltarLogin(); return; }
-
-                // ✅ CORRIGIDO: controller declarado ANTES do uso
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const res = await fetch(getUrlPedidos(), {
-                    signal: controller.signal,
-                    headers: { 'Authorization': 'Bearer ' + auth.token }
-                });
+                const url = `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}`;
+                const pedidos = await fetchAutenticado(url);
                 clearTimeout(timeoutId);
-
-                if (res.status === 401) { voltarLogin(); return; } // sessão expirada
-                if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
-
-                const pedidos = await res.json();
-                window._pedidosAtuais = pedidos;
                 updateSummaryCards(pedidos);
+                renderCharts(pedidos);
                 renderTabela(pedidos);
                 document.getElementById('table-title').innerHTML =
                     `<i class="fas fa-clipboard-list"></i> Lista de ${tipoAtual === 'Pedido' ? 'Pedidos' : 'Orçamentos'}`;
@@ -358,20 +372,17 @@
             }
         }
 
-        // ================= TABELA =================
         function renderTabela(pedidos) {
             const tbody = document.getElementById('orders-tbody');
             tbody.innerHTML = '';
             if (pedidos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum registro encontrado</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum registro encontrado</td></tr>`;
                 return;
             }
             pedidos.forEach(pedido => {
                 const row = document.createElement('tr');
                 const situacaoNorm = normalizar(pedido.situacao);
 
-                // Cores fixas aplicadas INLINE desde o carregamento:
-                // amarelo = Em Produção / laranja = Cancelado
                 if (situacaoNorm === 'em producao') row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
                 if (situacaoNorm.includes('cancelad')) row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
 
@@ -400,20 +411,22 @@
                 tbody.appendChild(row);
             });
 
-            // ✅ CORRIGIDO: clique na linha — bloco único, com token na URL
+            // ✅ Clique na linha — abre o PDF do tipo ATIVO, com token na URL
             document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
                 r.addEventListener('click', () => {
-                    const auth = getAuth();
-                    if (!auth || !auth.token) { voltarLogin(); return; }
                     const numero = encodeURIComponent(r.dataset.numero);
-                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}&token=${encodeURIComponent(auth.token)}`;
+                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}&token=${encodeURIComponent(getToken())}`;
                     window.open(url, '_blank');
                 });
             });
         }
 
-        // ================= CARDS =================
         function updateSummaryCards(pedidos) {
+            const ehOrcamento = tipoAtual === 'Orçamento';
+            document.getElementById('card1-title').textContent = ehOrcamento ? 'Orçamentos Hoje' : 'Pedidos Hoje';
+            document.getElementById('card2-title').textContent = ehOrcamento ? 'Em Aberto' : 'Em Produção';
+            document.getElementById('card3-title').textContent = ehOrcamento ? 'Fechados' : 'Prontos';
+
             const hoje = new Date();
             const hojeFmt = `${hoje.getDate().toString().padStart(2,'0')}/${(hoje.getMonth()+1).toString().padStart(2,'0')}/${hoje.getFullYear()}`;
             const hojeQtd = pedidos.filter(p => p.data === hojeFmt).length;
@@ -424,7 +437,7 @@
 
             const emProducao = pedidos.filter(p => normalizar(p.situacao).includes('produ')).length;
             document.getElementById('production-orders').textContent = emProducao;
-            document.getElementById('production-change').textContent = 'Em Produção';
+            document.getElementById('production-change').textContent = ehOrcamento ? 'Em aberto' : 'Em Produção';
 
             const prontos = pedidos.filter(p => {
                 const s = normalizar(p.situacao);
@@ -432,7 +445,7 @@
                        s.includes('conclu') || s === 'ok' || s === 'done';
             }).length;
             document.getElementById('ready-orders').textContent = prontos;
-            document.getElementById('ready-change').textContent = 'Prontos';
+            document.getElementById('ready-change').textContent = ehOrcamento ? 'Fechados' : 'Prontos';
 
             const mes = hoje.getMonth() + 1, ano = hoje.getFullYear();
             const doMes = pedidos.filter(p => {
@@ -445,9 +458,78 @@
             document.getElementById('revenue-change').textContent = 'Total do mês';
         }
 
-        // ================= CONTROLES =================
+        function renderCharts(pedidos) {
+            if (statusChartInstance) statusChartInstance.destroy();
+            if (ordersChartInstance) ordersChartInstance.destroy();
+
+            const statusCtx = document.getElementById('status-chart').getContext('2d');
+            const statusCounts = {
+                'Em Produção': pedidos.filter(p => normalizar(p.situacao) === 'em producao').length,
+                'Pronto': pedidos.filter(p => normalizar(p.situacao) === 'pronto').length,
+                'Entregue': pedidos.filter(p => normalizar(p.situacao) === 'entregue').length,
+                'Outros': pedidos.filter(p => {
+                    const s = normalizar(p.situacao);
+                    return s !== 'em producao' && s !== 'pronto' && s !== 'entregue';
+                }).length
+            };
+            statusChartInstance = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: [
+                            'rgba(23,162,184,.7)', 'rgba(255,193,7,.7)',
+                            'rgba(40,167,69,.7)', 'rgba(108,117,125,.7)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return `${context.label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ordersCtx = document.getElementById('orders-chart').getContext('2d');
+            const dates = [], ordersData = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const fullDate = `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
+                dates.push(`${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}`);
+                ordersData.push(pedidos.filter(p => p.data === fullDate).length);
+            }
+            ordersChartInstance = new Chart(ordersCtx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: tipoAtual === 'Orçamento' ? 'Orçamentos' : 'Pedidos', data: ordersData, backgroundColor: 'rgba(139,0,0,.7)', borderRadius: 5 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Quantidade' } },
+                        x: { title: { display: true, text: 'Data' } }
+                    }
+                }
+            });
+        }
+
         function setupControles() {
-            // Busca em tempo real
             document.getElementById('search-input').addEventListener('input', function() {
                 const term = this.value.toLowerCase();
                 document.querySelectorAll('#orders-tbody tr').forEach(row => {
@@ -456,7 +538,7 @@
             });
             document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
 
-            // Toggle: alterna tipo e recarrega
+            // ✅ Toggle: alterna o tipo e recarrega tudo
             document.querySelectorAll('.toggle-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.dataset.tipo === tipoAtual) return;
@@ -466,18 +548,11 @@
                     loadPedidos();
                 });
             });
-
-            // Sair: limpa sessão e volta ao login
-            document.getElementById('btn-sair').addEventListener('click', voltarLogin);
         }
 
-        // ================= USUÁRIO NO HEADER =================
         function carregarDadosUsuario() {
-            const user = getUsuarioLogado();
-            if (!user || !user.nome) {
-                voltarLogin();
-                return;
-            }
+            const user = exigirSessao();
+            if (!user) return;
             document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
             document.getElementById('user-name').textContent = user.nome || 'Usuário';
             document.getElementById('user-cargo').textContent = user.cargo || '';
