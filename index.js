@@ -168,19 +168,19 @@ app.get('/dados_pedidos', autenticar, async (req, res) => {
 });
 
 
-// MIGRAÇÃO DE SENHAS — converte texto puro → bcrypt. Protegida e idempotente.
+// MIGRAÇÃO DE SENHAS — texto puro → bcrypt. Protegida e idempotente.
 app.get('/migrar_senhas', async (req, res) => {
   if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) {
     return res.status(403).json({ error: 'Acesso negado' });
   }
   try {
-    const [rows] = await pool.execute('SELECT ID, SENHA FROM cliente_usuarios');
+    const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
     let convertidas = 0, jaHash = 0;
     for (const r of rows) {
       const atual = String(r.SENHA || '');
       if (!atual.startsWith('$2')) {                    // só converte quem ainda é texto
         const hash = await bcrypt.hash(atual, 12);
-        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE ID = ?', [hash, r.ID]);
+        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
         convertidas++;
       } else {
         jaHash++;
@@ -188,8 +188,8 @@ app.get('/migrar_senhas', async (req, res) => {
     }
     res.json({ success: true, convertidas, jaHash, total: rows.length });
   } catch (err) {
-     console.error('Erro na migração:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.sqlMessage || err.message });
+    console.error('Erro na migração:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
