@@ -469,6 +469,12 @@ async function calcularPrecoAutomatico() {
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
 
+        function atualizarTotalItem() {
+            const u = parseFloat(document.getElementById('f-valor').value.replace(',', '.')) || 0;
+            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
+            const campo = document.getElementById('f-total-item');
+            if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
+        }
         // ============ SALVAR (rascunho local — backend vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
