@@ -304,23 +304,26 @@
         }
 
         // ============ MOTOR FINANCEIRO (cálculo automático) ============
-        let timerPreco = null;
+let timerPreco = null;
 async function calcularPrecoAutomatico() {
     const status = document.getElementById('calc-status');
     const g = id => document.getElementById(id).value.trim();
     const cliente = document.getElementById('sel-cliente');
     const clienteNome = cliente.options[cliente.selectedIndex]?.text || '';
+    const clienteCodigo = cliente.value || ''; // ✅ CONSERTO: CODIGO do banco (busca precisa)
 
     let payload = null;
     if (frenteAtual === 'Serralheria') {
         if (!g('f-produto') || !g('f-material')) { document.getElementById('f-valor').value = ''; status.textContent = ''; return; }
-        payload = { frente: 'Serralheria', cliente: clienteNome,
+        payload = { frente: 'Serralheria',
+                    cliente: clienteNome, clienteCodigo,          // ✅ código + fallback nome
                     produto: g('f-produto'), material: g('f-material'), acabamento: g('f-acab-serr'),
                     altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
                     soldas: g('f-soldas'), qtd: g('f-qtd') };
     } else {
         if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) { document.getElementById('f-valor').value = ''; status.textContent = ''; return; }
-        payload = { frente: frenteAtual, cliente: clienteNome,
+        payload = { frente: frenteAtual,
+                    cliente: clienteNome, clienteCodigo,          // ✅ código + fallback nome
                     altura: g('f-altura'), largura: g('f-largura'), qtd: g('f-qtd'),
                     perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                     puxador: g('f-puxador'), acabPuxador: g('f-acab'), posicaoPuxador: g('f-posicao'), tamanhoPuxador: '',
@@ -343,6 +346,7 @@ async function calcularPrecoAutomatico() {
             document.getElementById('f-valor').value = '';
         }
     }, 400);
+
 }
 
         // ============ FORMULÁRIO ============
