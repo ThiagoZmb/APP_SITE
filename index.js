@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const PDFDocument = require('pdfkit');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -32,7 +33,7 @@ const pool = mysql.createPool({
 
 app.use(helmet());
 app.use(cors({ origin: ['https://thiagozmb.github.io'] }));
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '100kb' }));
 
 // ================= RATE LIMIT =================
 const loginLimiter = rateLimit({
@@ -51,7 +52,6 @@ function gerarToken(usuario) {
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
 }
-
 function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
@@ -63,7 +63,6 @@ function autenticar(req, res, next) {
     return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   }
 }
-
 // Cargo do TOKEN decide o filtro — o navegador não manda nada
 function ehRepresentante(req) {
   return String(req.user.cargo || '').toLowerCase().includes('representante');
@@ -236,7 +235,6 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
        FROM ped_orc WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
     const cab = cabs[0];
-
     const [itens] = await pool.execute(
       `SELECT * FROM ped_orc_lista_itens WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
     const [v4] = await pool.execute(
@@ -260,14 +258,12 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
     const compPor = agrupar(comps, 'ITEM_PEDIDO');
     const compSerrPor = agrupar(compSerr, 'ITEM_PEDIDO');
     const furosPor = agrupar(furos, 'ITEM');
-
     const fmtD = v => v ? new Date(v).toLocaleDateString('pt-BR') : '-';
     const fmtM = v => (parseFloat(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition',
       `inline; filename="${numero}_${String(cab.RAZAO_SOCIAL).replace(/[^\w ]/g, '').trim()}.pdf"`);
-
     const doc = new PDFDocument({ size: 'A4', margin: 15 });
     doc.pipe(res);
     const M = doc.page.margins.left;
@@ -337,7 +333,6 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       { label: 'Total',      w: W * 0.09, align: 'right' }
     ];
     const fontCel = 7.5, PAD = 4;
-
     function drawHeader(y0) {
       doc.rect(M, y0, W, 16).stroke();
       let x = M;
@@ -348,27 +343,22 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       });
       return y0 + 16;
     }
-
     let y = doc.y + 8;
     y = drawHeader(y);
-
     itens.forEach(i => {
       const itemID = String(i.ITEM || '').trim();
       const descLinhas = descritivo(itemID, String(i.TIPO_PRODUTO || ''));
       const descTexto = descLinhas.join('\n') || '-';
       const obsTexto = String(i.OBSERVACAO || '-');
-
       doc.font('Helvetica').fontSize(fontCel);
       const hDesc = doc.heightOfString(descTexto, { width: cols[2].w - 6 });
       const hObs  = doc.heightOfString(obsTexto,  { width: cols[3].w - 6 });
       const rowH  = Math.max(hDesc, hObs, 14) + PAD * 2;
-
       if (y + rowH > doc.page.height - doc.page.margins.bottom - 60) {
         doc.addPage();
         y = doc.page.margins.top;
         y = drawHeader(y);
       }
-
       let x = M;
       doc.text(String(itemID), x + 2, y + PAD, { width: cols[0].w - 4, align: 'center', height: rowH, ellipsis: true }); x += cols[0].w;
       doc.text(String(i.QTD || ''), x + 2, y + PAD, { width: cols[1].w - 4, align: 'center', height: rowH, ellipsis: true }); x += cols[1].w;
@@ -376,7 +366,6 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       doc.text(obsTexto, x + 2, y + PAD, { width: cols[3].w - 4, height: rowH, ellipsis: true }); x += cols[3].w;
       doc.text(fmtM(i.UNITARIO), x + 2, y + PAD, { width: cols[4].w - 4, align: 'right', height: rowH, ellipsis: true }); x += cols[4].w;
       doc.text(fmtM(i.TOTAL), x + 2, y + PAD, { width: cols[5].w - 4, align: 'right', height: rowH, ellipsis: true });
-
       doc.moveTo(M, y).lineTo(M + W, y).stroke();
       let gx = M;
       cols.forEach(c => { doc.moveTo(gx, y).lineTo(gx, y + rowH).stroke(); gx += c.w; });
@@ -396,7 +385,6 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
     doc.text(`Subtotal: ${fmtM(cab.SUB_TOTAL)}`, { width: W, align: 'right' });
     doc.text(`Desconto: ${(parseFloat(cab.DESCONTO) || 0).toFixed(2)} %`, { width: W, align: 'right' });
     doc.text(`TOTAL: ${fmtM(cab.TOTAL)}`, { width: W, align: 'right' });
-
     doc.end();
   } catch (err) {
     console.error('Erro ao gerar PDF:', err.message);
@@ -422,13 +410,38 @@ app.post('/admin/definir_senha', async (req, res) => {
     res.json({ success: true, message: 'Senha atualizada com hash bcrypt' });
   } catch (err) {
     console.error('Erro /admin/definir_senha:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
 });
 
+// ================= MIGRAÇÃO DE SENHAS (rodar UMA VEZ, depois remover) =================
+// Corrigido: tabela usa CODIGO (não ID) — colunas: CODIGO, NOME, CARGO, SENHA, SITUACAO...
+app.get('/migrar_senhas', async (req, res) => {
+  const chave = req.query.key;
+  if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+  try {
+    const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
+    let convertidos = 0, jaHash = 0;
+    for (const r of rows) {
+      if (!String(r.SENHA || '').startsWith('$2')) {
+        const hash = await bcrypt.hash(String(r.SENHA), 12);
+        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
+        convertidos++;
+      } else {
+        jaHash++;
+      }
+    }
+    res.json({ success: true, convertidos, jaHash, total: rows.length });
+  } catch (err) {
+    console.error('Erro /migrar_senhas:', err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+  }
+});
 
 // ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
-// ⚠️ AJUSTE OS NOMES DAS TABELAS conforme o banco real (SHOW TABLES no phpMyAdmin)
+// ✅ Nomes confirmados no dump + valores reais de CLASSE
 const TABELAS_CATALOGO = {
   // FRENTES DE PORTAS (alumínio)
   perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil'"],
@@ -436,90 +449,43 @@ const TABELAS_CATALOGO = {
   revestimentos: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Revestimento'"],
   sistemas:      ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Sistema de correr'"],
   divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"],
-
-  // FRENTE SERRALHERIA
+  // FRENTE SERRALHERIA (Perfil AC = aço carbono)
   materiais_serr: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil AC'"],
-
   // GERAIS
   acabamentos:   ['acabamentos',          'ACABAMENTO', "WHERE SITUACAO = 'Ativo'"],
   produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
   cores:         ['cores', 'NOME_COR', '']
 };
-
 app.get('/catalogos', autenticar, async (req, res) => {
   const saida = {};
   for (const [chave, [tabela, coluna, where]] of Object.entries(TABELAS_CATALOGO)) {
     try {
-      // nomes de tabela/coluna vêm SÓ do mapa acima (nunca do cliente) — seguro
       const [rows] = await pool.execute(
         `SELECT DISTINCT ${coluna} AS nome FROM ${tabela} ${where || ''} ORDER BY ${coluna}`);
       saida[chave] = rows.map(r => r.nome).filter(n => n);
     } catch (e) {
-      saida[chave] = []; // tabela ausente/errada → combo vazio, página continua
+      saida[chave] = []; // tabela ausente → combo vazio, página continua
     }
   }
   res.json(saida);
 });
 
-
-
-
-
-
-
-
-
-
-// ================= MOTOR FINANCEIRO — PORTA =================
-// ⚠️ MAPA DE COLUNAS: confirme com DESCRIBE cadastro_de_produtos
-//    - VALOR_CHEIO: assumi FIXO + FIXO×PORCENTAGEM/100 (confirmar no RepositorioProdutos)
-//    - DESCONTO_VIDRO / DESC_PERFIL_PUXADOR / TIPO: nomes a confirmar
-const COLUNAS_PROD = {
-  fixo: 'FIXO',
-  porcentagem: 'PORCENTAGEM',
-  descontoVidro: 'DESCONTO_VIDRO',        // ⚠️ ajustar
-  descontoPerfilPux: 'DESC_PERFIL_PUXADOR', // ⚠️ ajustar
-  tipoPuxador: 'TIPO'                      // ⚠️ ajustar
-};
-
-async function buscarDadosProduto(nome) {
-  if (!nome) return null;
-  const [rows] = await pool.execute(
-    `SELECT MODELO, ${COLUNAS_PROD.fixo} AS fixo, ${COLUNAS_PROD.porcentagem} AS pct,
-            ${COLUNAS_PROD.descontoVidro} AS descVidro, ${COLUNAS_PROD.descontoPerfilPux} AS descPux,
-            ${COLUNAS_PROD.tipoPuxador} AS tipo
-     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
-  if (!rows.length) return null;
-  const fixo = parseFloat(rows[0].fixo) || 0;
-  const pct = parseFloat(rows[0].pct) || 0;
-  return {
-    valorFixo: fixo,
-    valorCheio: fixo + fixo * (pct / 100),   // ⚠️ fórmula do ValorCheio a confirmar
-    descontoVidro: parseFloat(rows[0].descVidro) || 0,
-    descontoPerfilPux: parseFloat(rows[0].descPux) || 0,
-    tipoPuxador: String(rows[0].tipo || '')
-  };
-}
-
-async function taxaAcabamento(nome) {
-  if (!nome) return 0;
-  try {
-    const [rows] = await pool.execute(
-      'SELECT VALOR FROM acabamentos WHERE TRIM(ACABAMENTO) = TRIM(?) LIMIT 1', [nome]);
-    return rows.length ? (parseFloat(rows[0].VALOR) || 0) : 0;
-  } catch { return 0; }
-}
-
-// ================= MOTOR FINANCEIRO — PORTAS + SERRALHERIA (fiel ao VB) =================
+// ============================================================
+// MOTOR FINANCEIRO — PORTAS + SERRALHERIA (fiel ao VB)
+// ✅ VERSÃO ÚNICA (removeu o bloco antigo duplicado com
+//    COLUNAS_PROD errado — causa do ER_BAD_FIELD_ERROR)
+// Colunas confirmadas no VB: VALOR_CHEIO, VALOR_FIXO,
+// DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
+// ============================================================
 async function buscarDadosProduto(nome) {
   if (!nome) return null;
   const [rows] = await pool.execute(
     `SELECT CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
-     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'ATIVO' LIMIT 1`, [nome]);
+     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
   if (!rows.length) return null;
   return {
     valorFixo: parseFloat(rows[0].VALOR_FIXO) || 0,
-    valorCheio: parseFloat(rows[0].VALOR_CHEIO) || 0,     // ✅ coluna direta
+    valorCheio: parseFloat(rows[0].VALOR_CHEIO) || 0,
     descontoVidro: parseFloat(rows[0].DESCONTO_VIDRO) || 0,
     descontoPerfilPux: parseFloat(rows[0].DESC_PERF_PUX) || 0,
     tipoPuxador: String(rows[0].TIPO_PUXADOR || '')
@@ -535,8 +501,12 @@ async function taxaAcabamento(nome) {
   } catch { return 0; }
 }
 
+// auxiliares
 const precoBase = (d, isFixo) => isFixo ? d.valorFixo : d.valorCheio;
 const comAcab = (base, taxa) => base + base * (taxa / 100);
+const alturaS = b => parseFloat(b.altura) || 0;
+const largS = b => parseFloat(b.largura) || 0;
+const profS = b => parseFloat(b.profundidade) || 0;
 
 function aplicarPercentuais(valor, texto) {
   let v = valor;
@@ -553,14 +523,22 @@ function aplicarPercentuais(valor, texto) {
 app.post('/calcular_preco', autenticar, async (req, res) => {
   const b = req.body || {};
   try {
-    // Política comercial do cliente (TIPO_DESCONTO + DESCONTO)
-    const [cli] = await pool.execute(
-      'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE TRIM(RAZAO_SOCIAL) = TRIM(?) LIMIT 1',
-      [b.cliente || '']);
+    // Política comercial do cliente — por CODIGO (preciso) com fallback por nome
+    let cli = [];
+    if (b.clienteCodigo) {
+      [cli] = await pool.execute(
+        'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1',
+        [b.clienteCodigo]);
+    } else if (b.cliente) {
+      [cli] = await pool.execute(
+        'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE TRIM(RAZAO_SOCIAL) = TRIM(?) LIMIT 1',
+        [b.cliente]);
+    }
     const isFixo = String(cli[0]?.TIPO_DESCONTO || '').toUpperCase().includes('FIXO');
     const descontoCliente = cli.length ? (parseFloat(cli[0].DESCONTO) || 0) : 0;
 
     let subtotal = 0; // base ANTES do desconto do cliente
+    let diag = { clienteEncontrado: cli.length > 0, isFixo, descontoCliente };
 
     // ============ FRENTE SERRALHERIA (MotorPrecificacaoSerralheria.vb) ============
     if (b.frente === 'Serralheria') {
@@ -578,7 +556,7 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       const qtdP = parseFloat(b.qtdProfundidade) > 0 ? parseFloat(b.qtdProfundidade) : 1;
       const metragem = (alturaS(b) / 1000) * qtdA + (largS(b) / 1000) * qtdL + (profS(b) / 1000) * qtdP;
 
-      const material = metragem * comAcab(precoBase(dadosMat, isFixo), 0); // acabamento entra como % à parte (fiel ao VB)
+      const material = metragem * precoBase(dadosMat, isFixo);
       subtotal += material;
 
       // Solda: produto "Solda" no cadastro (VALOR_FIXO, senão VALOR_CHEIO)
@@ -594,7 +572,7 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       const pctAcab = await taxaAcabamento(b.acabamento);
       subtotal += material * (pctAcab / 100);
 
-      // Complementos (estrutura pronta — a UI de complementos vem depois)
+      // Complementos (qtd × valor unitário)
       (Array.isArray(b.complementos) ? b.complementos : []).forEach(c => {
         subtotal += (parseFloat(c.qtd) || 0) * (parseFloat(c.valorUnit) || 0);
       });
@@ -606,9 +584,11 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       if (descontoCliente > 0) final *= (100 - descontoCliente) / 100;
       final = aplicarPercentuais(final, b.percentuais);
 
+      diag.serralheria = { metragem, precoM: Math.round(material / (metragem || 1) * 100) / 100, valorFixoProduto };
       return res.json({
         unitario: Math.round((final / qtd) * 100) / 100,
-        total: Math.round(final * 100) / 100
+        total: Math.round(final * 100) / 100,
+        ...(b.debug ? { diag } : {})
       });
     }
 
@@ -628,7 +608,7 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
 
     const temPux = !!dadosPux;
     const posPux = String(b.posicaoPuxador || '').toUpperCase();
-    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase(); // ✅ TIPO_PUXADOR do banco
+    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase(); // TIPO_PUXADOR do banco
     const qtdPux = posPux ? posPux.split(',').filter(p => p.trim()).length : 0;
     const isSobreposto = tipoPux.includes('SOBREPOSTO');
     const isEmbutido = tipoPux.includes('EMBUTIDO');
@@ -640,7 +620,8 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
     const perimetro = (temPux && isTotal && !isSobreposto && !isEmbutido)
       ? 2 * ladoOp + ladoPux * Math.max(0, 2 - qtdPux)
       : 2 * altura + 2 * largura;
-    subtotal += (perimetro / 1000) * comAcab(precoBase(dadosPerfil, isFixo), taxaPerfil);
+    const precoMPerfil = comAcab(precoBase(dadosPerfil, isFixo), taxaPerfil);
+    subtotal += (perimetro / 1000) * precoMPerfil;
 
     // 2. PUXADOR (mínimo R$ 20/un — fiel ao VB)
     if (dadosPux) {
@@ -676,22 +657,22 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
     final = aplicarPercentuais(final, b.percentuais);
 
     const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
+    diag.perfil = {
+      fixo: dadosPerfil.valorFixo, cheio: dadosPerfil.valorCheio,
+      taxaAcab: taxaPerfil, precoM: Math.round(precoMPerfil * 100) / 100
+    };
+    diag.perimetroMm = perimetro;
+
     res.json({
       unitario: Math.round(final * 100) / 100,
-      total: Math.round(final * qtd * 100) / 100
+      total: Math.round(final * qtd * 100) / 100,
+      ...(b.debug ? { diag } : {})
     });
   } catch (err) {
     console.error('Erro /calcular_preco:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
 });
-
-// auxiliares das medidas da serralheria
-const alturaS = b => parseFloat(b.altura) || 0;
-const largS = b => parseFloat(b.largura) || 0;
-const profS = b => parseFloat(b.profundidade) || 0;
-
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
