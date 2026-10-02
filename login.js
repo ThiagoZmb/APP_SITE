@@ -120,4 +120,4 @@ async function checkExistingLogin() {
   } catch { localStorage.removeItem('auth'); }
 }
 
-document.addEventListener('DOMContentLoaded', checkExistingLogin);
+//document.addEventListener('DOMContentLoaded', checkExistingLogin);
