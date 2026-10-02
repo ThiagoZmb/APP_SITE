@@ -520,6 +520,12 @@ function aplicarPercentuais(valor, texto) {
   return v;
 }
 
+function atualizarTotalItem() {
+    const u = parseFloat(document.getElementById('f-valor').value.replace(',', '.')) || 0;
+    const q = parseFloat(document.getElementById('f-qtd').value) || 1;
+    document.getElementById('f-total-item').value = (u * q).toFixed(2).replace('.', ',');
+}
+
 app.post('/calcular_preco', autenticar, async (req, res) => {
   const b = req.body || {};
   try {

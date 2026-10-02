@@ -178,6 +178,7 @@
                     <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                     <!-- Comuns a todos -->
                     <div class="form-group"><label id="lbl-valor">Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
+                    <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
                     <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
                 </div>
                 <div class="acoes-linha">
@@ -339,6 +340,7 @@ async function calcularPrecoAutomatico() {
                 body: JSON.stringify(payload)
             });
             document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+            atualizarTotalItem();
             status.textContent = '✅ Calculado pelo motor';
             setTimeout(() => { if (status.textContent === '✅ Calculado pelo motor') status.textContent = ''; }, 3000);
         } catch (e) {
@@ -506,10 +508,11 @@ async function calcularPrecoAutomatico() {
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
-
+        document.getElementById('f-qtd').addEventListener('input', atualizarTotalItem);
         // Motor financeiro: recalcula ao mudar qualquer campo relevante
         ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-revest','f-cor-revest',
-         'f-divisores','f-altura','f-largura','f-qtd','sel-cliente']
+         'f-divisores','f-altura','f-largura','f-qtd','sel-cliente',
+         'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
 
         document.addEventListener('DOMContentLoaded', () => {
