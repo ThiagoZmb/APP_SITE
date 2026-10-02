@@ -430,15 +430,20 @@ app.post('/admin/definir_senha', async (req, res) => {
 // ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
 // ⚠️ AJUSTE OS NOMES DAS TABELAS conforme o banco real (SHOW TABLES no phpMyAdmin)
 const TABELAS_CATALOGO = {
-  perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE IN ('Perfil','Perfil AC')"],
+  // FRENTES DE PORTAS (alumínio)
+  perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil'"],
   puxadores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Puxador'"],
   revestimentos: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Revestimento'"],
   sistemas:      ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Sistema de correr'"],
-  divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"], // sem classe no banco → combo vazio
-  materiais:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo'"], // na cascata, filtra por produto escolhido
+  divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"],
+
+  // FRENTE SERRALHERIA
+  materiais_serr: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil AC'"],
+
+  // GERAIS
   acabamentos:   ['acabamentos',          'ACABAMENTO', "WHERE SITUACAO = 'Ativo'"],
   produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
-  cores:         ['cores', 'NOME_COR', ''] // ✅ confirmado
+  cores:         ['cores', 'NOME_COR', '']
 };
 
 app.get('/catalogos', autenticar, async (req, res) => {
@@ -455,6 +460,237 @@ app.get('/catalogos', autenticar, async (req, res) => {
   }
   res.json(saida);
 });
+
+
+
+
+
+
+
+
+
+
+// ================= MOTOR FINANCEIRO — PORTA =================
+// ⚠️ MAPA DE COLUNAS: confirme com DESCRIBE cadastro_de_produtos
+//    - VALOR_CHEIO: assumi FIXO + FIXO×PORCENTAGEM/100 (confirmar no RepositorioProdutos)
+//    - DESCONTO_VIDRO / DESC_PERFIL_PUXADOR / TIPO: nomes a confirmar
+const COLUNAS_PROD = {
+  fixo: 'FIXO',
+  porcentagem: 'PORCENTAGEM',
+  descontoVidro: 'DESCONTO_VIDRO',        // ⚠️ ajustar
+  descontoPerfilPux: 'DESC_PERFIL_PUXADOR', // ⚠️ ajustar
+  tipoPuxador: 'TIPO'                      // ⚠️ ajustar
+};
+
+async function buscarDadosProduto(nome) {
+  if (!nome) return null;
+  const [rows] = await pool.execute(
+    `SELECT MODELO, ${COLUNAS_PROD.fixo} AS fixo, ${COLUNAS_PROD.porcentagem} AS pct,
+            ${COLUNAS_PROD.descontoVidro} AS descVidro, ${COLUNAS_PROD.descontoPerfilPux} AS descPux,
+            ${COLUNAS_PROD.tipoPuxador} AS tipo
+     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
+  if (!rows.length) return null;
+  const fixo = parseFloat(rows[0].fixo) || 0;
+  const pct = parseFloat(rows[0].pct) || 0;
+  return {
+    valorFixo: fixo,
+    valorCheio: fixo + fixo * (pct / 100),   // ⚠️ fórmula do ValorCheio a confirmar
+    descontoVidro: parseFloat(rows[0].descVidro) || 0,
+    descontoPerfilPux: parseFloat(rows[0].descPux) || 0,
+    tipoPuxador: String(rows[0].tipo || '')
+  };
+}
+
+async function taxaAcabamento(nome) {
+  if (!nome) return 0;
+  try {
+    const [rows] = await pool.execute(
+      'SELECT VALOR FROM acabamentos WHERE TRIM(ACABAMENTO) = TRIM(?) LIMIT 1', [nome]);
+    return rows.length ? (parseFloat(rows[0].VALOR) || 0) : 0;
+  } catch { return 0; }
+}
+
+// ================= MOTOR FINANCEIRO — PORTAS + SERRALHERIA (fiel ao VB) =================
+async function buscarDadosProduto(nome) {
+  if (!nome) return null;
+  const [rows] = await pool.execute(
+    `SELECT CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
+     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'ATIVO' LIMIT 1`, [nome]);
+  if (!rows.length) return null;
+  return {
+    valorFixo: parseFloat(rows[0].VALOR_FIXO) || 0,
+    valorCheio: parseFloat(rows[0].VALOR_CHEIO) || 0,     // ✅ coluna direta
+    descontoVidro: parseFloat(rows[0].DESCONTO_VIDRO) || 0,
+    descontoPerfilPux: parseFloat(rows[0].DESC_PERF_PUX) || 0,
+    tipoPuxador: String(rows[0].TIPO_PUXADOR || '')
+  };
+}
+
+async function taxaAcabamento(nome) {
+  if (!nome) return 0;
+  try {
+    const [rows] = await pool.execute(
+      'SELECT VALOR FROM acabamentos WHERE TRIM(ACABAMENTO) = TRIM(?) LIMIT 1', [nome]);
+    return rows.length ? (parseFloat(rows[0].VALOR) || 0) : 0;
+  } catch { return 0; }
+}
+
+const precoBase = (d, isFixo) => isFixo ? d.valorFixo : d.valorCheio;
+const comAcab = (base, taxa) => base + base * (taxa / 100);
+
+function aplicarPercentuais(valor, texto) {
+  let v = valor;
+  for (const parte of String(texto || '').split(';')) {
+    let t = parte.trim(); if (!t) continue;
+    let sinal = '+', num = t;
+    if (t.startsWith('+') || t.startsWith('-')) { sinal = t[0]; num = t.slice(1); }
+    const pct = parseFloat(num.replace(/%/g, '').replace(',', '.'));
+    if (!isNaN(pct)) v = sinal === '+' ? v * (1 + pct / 100) : v * (1 - pct / 100);
+  }
+  return v;
+}
+
+app.post('/calcular_preco', autenticar, async (req, res) => {
+  const b = req.body || {};
+  try {
+    // Política comercial do cliente (TIPO_DESCONTO + DESCONTO)
+    const [cli] = await pool.execute(
+      'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE TRIM(RAZAO_SOCIAL) = TRIM(?) LIMIT 1',
+      [b.cliente || '']);
+    const isFixo = String(cli[0]?.TIPO_DESCONTO || '').toUpperCase().includes('FIXO');
+    const descontoCliente = cli.length ? (parseFloat(cli[0].DESCONTO) || 0) : 0;
+
+    let subtotal = 0; // base ANTES do desconto do cliente
+
+    // ============ FRENTE SERRALHERIA (MotorPrecificacaoSerralheria.vb) ============
+    if (b.frente === 'Serralheria') {
+      const [prod] = await pool.execute(
+        'SELECT COALESCE(fixo,0) AS fixo FROM serralheria_produtos WHERE TRIM(nome_modelo) = TRIM(?) LIMIT 1',
+        [b.produto || '']);
+      const valorFixoProduto = prod.length ? (parseFloat(prod[0].fixo) || 0) : 0;
+
+      const dadosMat = await buscarDadosProduto(b.material);
+      if (!dadosMat) return res.status(400).json({ error: `Material '${b.material}' não encontrado ou sem preços.` });
+
+      // Metragem: (A/1000 × qtdA) + (L/1000 × qtdL) + (P/1000 × qtdP) — qtds padrão 1
+      const qtdA = parseFloat(b.qtdAltura) > 0 ? parseFloat(b.qtdAltura) : 1;
+      const qtdL = parseFloat(b.qtdLargura) > 0 ? parseFloat(b.qtdLargura) : 1;
+      const qtdP = parseFloat(b.qtdProfundidade) > 0 ? parseFloat(b.qtdProfundidade) : 1;
+      const metragem = (alturaS(b) / 1000) * qtdA + (largS(b) / 1000) * qtdL + (profS(b) / 1000) * qtdP;
+
+      const material = metragem * comAcab(precoBase(dadosMat, isFixo), 0); // acabamento entra como % à parte (fiel ao VB)
+      subtotal += material;
+
+      // Solda: produto "Solda" no cadastro (VALOR_FIXO, senão VALOR_CHEIO)
+      try {
+        const [sol] = await pool.execute(
+          `SELECT COALESCE(NULLIF(VALOR_FIXO,0), NULLIF(VALOR_CHEIO,0), 0) AS v
+           FROM cadastro_de_produtos WHERE TRIM(MODELO) = 'Solda' LIMIT 1`);
+        const soldas = parseFloat(b.soldas) || 0;
+        subtotal += (parseFloat(sol[0]?.v) || 0) * soldas;
+      } catch { /* Solda sem cadastro → 0 */ }
+
+      // Acabamento % sobre o material
+      const pctAcab = await taxaAcabamento(b.acabamento);
+      subtotal += material * (pctAcab / 100);
+
+      // Complementos (estrutura pronta — a UI de complementos vem depois)
+      (Array.isArray(b.complementos) ? b.complementos : []).forEach(c => {
+        subtotal += (parseFloat(c.qtd) || 0) * (parseFloat(c.valorUnit) || 0);
+      });
+
+      subtotal += valorFixoProduto; // fixo do produto entra na base
+
+      const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
+      let final = subtotal * qtd;
+      if (descontoCliente > 0) final *= (100 - descontoCliente) / 100;
+      final = aplicarPercentuais(final, b.percentuais);
+
+      return res.json({
+        unitario: Math.round((final / qtd) * 100) / 100,
+        total: Math.round(final * 100) / 100
+      });
+    }
+
+    // ============ FRENTE PORTAS (MotorFinanceiro.CalcularValorVendaPorta) ============
+    const altura = parseFloat(b.altura) || 0;
+    const largura = parseFloat(b.largura) || 0;
+
+    const dadosPerfil = await buscarDadosProduto(b.perfil);
+    if (!dadosPerfil) return res.status(400).json({ error: `Perfil '${b.perfil}' não encontrado ou sem preços.` });
+    const dadosPux = b.puxador ? await buscarDadosProduto(b.puxador) : null;
+    const dadosRev = b.revestimento ? await buscarDadosProduto(b.revestimento) : null;
+    const dadosDiv = b.divisor ? await buscarDadosProduto(b.divisor) : null;
+
+    const taxaPerfil = await taxaAcabamento(b.acabPerfil);
+    const taxaPux = dadosPux ? await taxaAcabamento(b.acabPuxador) : 0;
+    const taxaRev = dadosRev ? await taxaAcabamento(b.acabRevest) : 0;
+
+    const temPux = !!dadosPux;
+    const posPux = String(b.posicaoPuxador || '').toUpperCase();
+    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase(); // ✅ TIPO_PUXADOR do banco
+    const qtdPux = posPux ? posPux.split(',').filter(p => p.trim()).length : 0;
+    const isSobreposto = tipoPux.includes('SOBREPOSTO');
+    const isEmbutido = tipoPux.includes('EMBUTIDO');
+    const isTotal = tipoPux.includes('TOTAL') || posPux.includes('TOTAL');
+
+    // 1. PERFIL (puxador Total desconta o lado dele)
+    const ladoPux = (posPux.includes('TOPO') || posPux.includes('BASE')) ? largura : altura;
+    const ladoOp  = (posPux.includes('TOPO') || posPux.includes('BASE')) ? altura : largura;
+    const perimetro = (temPux && isTotal && !isSobreposto && !isEmbutido)
+      ? 2 * ladoOp + ladoPux * Math.max(0, 2 - qtdPux)
+      : 2 * altura + 2 * largura;
+    subtotal += (perimetro / 1000) * comAcab(precoBase(dadosPerfil, isFixo), taxaPerfil);
+
+    // 2. PUXADOR (mínimo R$ 20/un — fiel ao VB)
+    if (dadosPux) {
+      const compUnit = isTotal ? ladoPux : (parseFloat(b.tamanhoPuxador) || 0);
+      const custo = (compUnit * qtdPux / 1000) * comAcab(precoBase(dadosPux, isFixo), taxaPux);
+      subtotal += Math.max(20 * qtdPux, custo);
+    }
+
+    // 3. DIVISORES
+    let compDiv = 0;
+    if (dadosDiv) {
+      const largV = Math.max(0, largura - dadosPerfil.descontoVidro);
+      const altV  = Math.max(0, altura - dadosPerfil.descontoVidro);
+      compDiv = (parseInt(b.qtdDivH) || 0) * largV + (parseInt(b.qtdDivV) || 0) * altV;
+      subtotal += (compDiv / 1000) * comAcab(precoBase(dadosDiv, isFixo), taxaPerfil);
+    }
+
+    // 4. REVESTIMENTO (área líquida, com dedução do divisor)
+    if (dadosRev) {
+      let descX = dadosPerfil.descontoVidro, descY = dadosPerfil.descontoVidro;
+      if (temPux && isSobreposto) {
+        if (posPux.includes('TOPO') || posPux.includes('BASE')) descY += dadosPerfil.descontoPerfilPux * qtdPux;
+        else descX += dadosPerfil.descontoPerfilPux * qtdPux;
+      }
+      const area = Math.max(0, (Math.max(0, altura - descY) / 1000) * (Math.max(0, largura - descX) / 1000));
+      const areaDiv = (compDiv / 1000) * 0.015;
+      subtotal += Math.max(0, area - areaDiv) * comAcab(precoBase(dadosRev, isFixo), taxaRev);
+    }
+
+    // 5. Desconto do cliente + percentuais da linha
+    let final = subtotal;
+    if (descontoCliente > 0) final *= (100 - descontoCliente) / 100;
+    final = aplicarPercentuais(final, b.percentuais);
+
+    const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
+    res.json({
+      unitario: Math.round(final * 100) / 100,
+      total: Math.round(final * qtd * 100) / 100
+    });
+  } catch (err) {
+    console.error('Erro /calcular_preco:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// auxiliares das medidas da serralheria
+const alturaS = b => parseFloat(b.altura) || 0;
+const largS = b => parseFloat(b.largura) || 0;
+const profS = b => parseFloat(b.profundidade) || 0;
+
 
 
 app.listen(PORT, () => {

@@ -70,6 +70,7 @@
             font-size: 14px; background: var(--secondary-color); font-family: inherit;
         }
         .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
+        .form-group input[readonly] { background: #eef1f4; font-weight: 700; color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
         .btn {
             padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
@@ -79,7 +80,8 @@
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
-        .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+        .calc-status { font-size: 13px; color: var(--text-light); }
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
         td { padding: 13px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
@@ -91,7 +93,7 @@
         }
         .btn-mini:hover { background: var(--primary-light); color: var(--primary-color); }
         .btn-mini.excluir:hover { background: rgba(220,53,69,.1); color: #dc3545; }
-        .totais { display: flex; justify-content: flex-end; gap: 40px; margin-top: 20px; flex-wrap: wrap; }
+        .totais { display: flex; justify-content: flex-end; gap: 40px; margin-top: 20px; flex-wrap: wrap; align-items: flex-end; }
         .totais .grupo { text-align: right; }
         .totais .rotulo { font-size: 13px; color: var(--text-light); font-weight: 600; text-transform: uppercase; }
         .totais .valor { font-size: 24px; font-weight: 700; color: var(--primary-color); }
@@ -121,7 +123,7 @@
         </nav>
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
-            <p class="welcome-subtitle">Monte o orçamento por frente — os catálogos vêm do banco</p>
+            <p class="welcome-subtitle">Monte o orçamento por frente — preços calculados automaticamente pelo motor financeiro</p>
 
             <section class="card">
                 <div class="card-title">1. Cliente</div>
@@ -147,8 +149,8 @@
                     <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                     <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                     <div class="form-group f-porta"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Acabamento</label><select id="f-acab"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Cor</label><select id="f-cor"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Acabamento do perfil</label><select id="f-acab"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-porta"><label>Puxador</label><select id="f-puxador"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-porta"><label>Posição do puxador</label>
                         <select id="f-posicao">
@@ -170,15 +172,18 @@
                     <div class="form-group f-serr" style="display:none"><label>Material</label><select id="f-material"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-serr" style="display:none"><label>Acabamento</label><select id="f-acab-serr"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-serr" style="display:none"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
                     <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
                     <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                     <!-- Comuns a todos -->
-                    <div class="form-group"><label>Valor unitário (R$)</label><input type="number" step="0.01" id="f-valor" placeholder="0,00"></div>
+                    <div class="form-group"><label id="lbl-valor">Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                     <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
                 </div>
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
                     <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                    <span class="calc-status" id="calc-status"></span>
                 </div>
             </section>
 
@@ -226,8 +231,11 @@
             } catch { return null; }
         }
         function getToken() { const a = getAuth(); return a ? a.token : ''; }
-        async function fetchAutenticado(url) {
-            const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+        async function fetchAutenticado(url, opts = {}) {
+            const res = await fetch(url, {
+                ...opts,
+                headers: { 'Authorization': 'Bearer ' + getToken(), ...(opts.headers || {}) }
+            });
             if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
             return res.json();
@@ -248,6 +256,7 @@
                 frenteAtual = btn.dataset.frente;
                 document.getElementById('frente-atual').textContent = frenteAtual;
                 aplicarVisibilidadeCampos();
+                calcularPrecoAutomatico();
             });
         });
         function aplicarVisibilidadeCampos() {
@@ -257,13 +266,16 @@
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+            // Portas: valor calculado pelo motor (readonly) | Serralheria: manual (motor ainda não integrado)
+            const inp = document.getElementById('f-valor');
+            inp.readOnly = !ehSerr;
+            document.getElementById('lbl-valor').textContent = ehSerr ? 'Valor unitário (manual)' : 'Valor unitário (auto)';
         }
 
         // ============ CATÁLOGOS DO BANCO → COMBOS ============
         async function carregarCatalogos() {
             try {
                 const cat = await fetchAutenticado(`${API_BASE}/catalogos`);
-                // [id do select, chave do catálogo]
                 const mapa = [
                     ['f-perfil', 'perfis'],
                     ['f-acab', 'acabamentos'],
@@ -273,7 +285,7 @@
                     ['f-cor-revest', 'cores'],
                     ['f-sistema', 'sistemas'],
                     ['f-produto', 'produtos_serr'],
-                    ['f-material', 'materiais'],
+                    ['f-material', 'materiais_serr'],
                     ['f-acab-serr', 'acabamentos'],
                     ['f-cor-serr', 'cores']
                 ];
@@ -291,13 +303,55 @@
             }
         }
 
+        // ============ MOTOR FINANCEIRO (cálculo automático) ============
+        let timerPreco = null;
+async function calcularPrecoAutomatico() {
+    const status = document.getElementById('calc-status');
+    const g = id => document.getElementById(id).value.trim();
+    const cliente = document.getElementById('sel-cliente');
+    const clienteNome = cliente.options[cliente.selectedIndex]?.text || '';
+
+    let payload = null;
+    if (frenteAtual === 'Serralheria') {
+        if (!g('f-produto') || !g('f-material')) { document.getElementById('f-valor').value = ''; status.textContent = ''; return; }
+        payload = { frente: 'Serralheria', cliente: clienteNome,
+                    produto: g('f-produto'), material: g('f-material'), acabamento: g('f-acab-serr'),
+                    altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
+                    soldas: g('f-soldas'), qtd: g('f-qtd') };
+    } else {
+        if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) { document.getElementById('f-valor').value = ''; status.textContent = ''; return; }
+        payload = { frente: frenteAtual, cliente: clienteNome,
+                    altura: g('f-altura'), largura: g('f-largura'), qtd: g('f-qtd'),
+                    perfil: g('f-perfil'), acabPerfil: g('f-acab'),
+                    puxador: g('f-puxador'), acabPuxador: g('f-acab'), posicaoPuxador: g('f-posicao'), tamanhoPuxador: '',
+                    revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
+                    divisor: '', qtdDivH: 0, qtdDivV: 0 };
+    }
+    clearTimeout(timerPreco);
+    status.textContent = 'Calculando...';
+    timerPreco = setTimeout(async () => {
+        try {
+            const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+            status.textContent = '✅ Calculado pelo motor';
+            setTimeout(() => { if (status.textContent === '✅ Calculado pelo motor') status.textContent = ''; }, 3000);
+        } catch (e) {
+            status.textContent = '⚠️ ' + (e.message === 'Erro HTTP: 400' ? 'Item sem preço no banco' : 'Erro no cálculo');
+            document.getElementById('f-valor').value = '';
+        }
+    }, 400);
+}
+
         // ============ FORMULÁRIO ============
         function coletarForm() {
             const g = id => document.getElementById(id).value.trim();
             let desc = '';
             if (frenteAtual === 'Serralheria') {
                 desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
-                       ` — H=${g('f-altura') || 0} x L=${g('f-largura') || 0} x P=${g('f-profundidade') || 0} mm`;
+                       ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm`;
             } else {
                 desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}` +
                        ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}` +
@@ -307,8 +361,8 @@
             return {
                 frente: frenteAtual,
                 qtd: parseFloat(g('f-qtd')) || 1,
-                altura: parseFloat(g('f-altura')) || 0,
-                largura: parseFloat(g('f-largura')) || 0,
+                altura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
+                largura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
                 soldas: parseInt(g('f-soldas')) || 0,
                 detalhes: {
@@ -347,12 +401,13 @@
             document.getElementById('f-qtd').value = 1;
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
+            document.getElementById('calc-status').textContent = '';
         }
 
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
             const item = coletarForm();
-            if (item.valor <= 0) { alert('Informe o valor unitário do item.'); return; }
+            if (item.valor <= 0) { alert('Informe o valor do item (nas portas ele é calculado automaticamente ao escolher perfil e medidas).'); return; }
             if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
             else itens.push(item);
             renderItens();
@@ -408,6 +463,7 @@
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
 
+        // ============ SALVAR (rascunho local — backend vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
@@ -426,6 +482,7 @@
             alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo.');
         }
 
+        // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');
             try {
@@ -437,6 +494,7 @@
             }
         }
 
+        // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
         document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
         document.getElementById('btn-vazio').addEventListener('click', () => {
@@ -444,6 +502,11 @@
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
+
+        // Motor financeiro: recalcula ao mudar qualquer campo relevante
+        ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-revest','f-cor-revest',
+         'f-divisores','f-altura','f-largura','f-qtd','sel-cliente']
+            .forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
 
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
