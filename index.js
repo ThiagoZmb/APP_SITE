@@ -430,15 +430,15 @@ app.post('/admin/definir_senha', async (req, res) => {
 // ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
 // ⚠️ AJUSTE OS NOMES DAS TABELAS conforme o banco real (SHOW TABLES no phpMyAdmin)
 const TABELAS_CATALOGO = {
-  perfis:         ['cadastro_perfis',         'NOME'],
-  acabamentos:    ['cadastro_acabamentos',    'NOME'],
-  cores:          ['cadastro_cores',          'NOME'],
-  puxadores:      ['cadastro_puxadores',      'NOME'],
-  revestimentos:  ['cadastro_revestimentos',  'NOME'],
-  divisores:      ['cadastro_divisores',      'NOME'],
-  sistemas:       ['cadastro_sistemas',       'NOME'],
-  produtos_serr:  ['serralheria_produtos',    'nome_modelo', 'WHERE ativo = 1'],
-  materiais:      ['cadastro_de_produtos',    'MODELO',      "WHERE SITUACAO = 'Ativo'"]
+  perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE IN ('Perfil','Perfil AC')"],
+  puxadores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Puxador'"],
+  revestimentos: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Revestimento'"],
+  sistemas:      ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Sistema de correr'"],
+  divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"], // sem classe no banco → combo vazio
+  materiais:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo'"], // na cascata, filtra por produto escolhido
+  acabamentos:   ['acabamentos',          'ACABAMENTO', "WHERE SITUACAO = 'Ativo'"],
+  produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
+  cores:         ['cores', 'NOME_COR', ''] // ✅ confirmado
 };
 
 app.get('/catalogos', autenticar, async (req, res) => {
