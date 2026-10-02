@@ -95,8 +95,8 @@
             <a class="menu-item active" href="graficos_pedidos.html">📊 Orçamentos x Pedidos</a>
         </nav>
         <main>
-            <h1 class="welcome-title">Orçamentos x Pedidos 📊</h1>
-            <p class="welcome-subtitle">Comparação dos últimos 7 meses — valores em reais</p>
+            <h1 class="welcome-title" id="titulo-pagina">Orçamentos x Pedidos 📊</h1>
+            <p class="welcome-subtitle" id="subtitulo-pagina">Comparação dos últimos meses — valores em reais</p>
             <section class="cards-container">
                 <div class="card">
                     <div class="card-title">Total Orçamentos</div>
@@ -122,42 +122,59 @@
     </div>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
         let chartInstance = null;
 
-        function getUsuarioLogado() {
-            try { return JSON.parse(localStorage.getItem('user') || '{}'); }
-            catch { return {}; }
+        // ================= SESSÃO (formato novo: 'auth' com token) =================
+        function getAuth() {
+            try {
+                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!auth || !auth.token || !auth.user) return null;
+                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return auth;
+            } catch { return null; }
+        }
+
+        function getToken() {
+            const auth = getAuth();
+            return auth ? auth.token : '';
         }
 
         function formatCurrency(value) {
             return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
         }
 
-        // ✅ Mesmo filtro do painel: Representante Comercial → somente RJ
-       function getUrlGrafico() {
-    const user = getUsuarioLogado();
-    const cargo = String(user.cargo || '').trim().toLowerCase();
-    // Cliente vindo da URL (?cliente=...) tem prioridade — veio do clique na lista
-    const ClienteDaURL = new URLSearchParams(window.location.search).get('cliente');
+        // ✅ Fetch com Bearer + redirecionamento em 401
+        async function fetchAutenticado(url) {
+            const res = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            if (res.status === 401) {
+                localStorage.removeItem('auth');
+                window.location.href = LOGIN_URL;
+                throw new Error('Sessão expirada');
+            }
+            if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+            return res.json();
+        }
 
-    if (ClienteDaURL) {
-        return `${API_BASE}/dados_compras_orcamentos?cliente=${encodeURIComponent(ClienteDaURL)}`;
-    }
-    // Sem cliente na URL: comportamento por cargo (Representante = RJ)
-    return cargo.includes('representante')
-        ? `${API_BASE}/dados_compras_orcamentos?estado=RJ`
-        : `${API_BASE}/dados_compras_orcamentos`;
-}
+        // ✅ URL SEM lógica de cargo no cliente — o SERVIDOR decide o filtro RJ
+        // Cliente vindo da URL (?cliente=...) tem prioridade — veio do clique na lista
+        function getUrlGrafico() {
+            const clienteDaURL = new URLSearchParams(window.location.search).get('cliente');
+            if (clienteDaURL) {
+                return `${API_BASE}/dados_compras_orcamentos?cliente=${encodeURIComponent(clienteDaURL)}`;
+            }
+            return `${API_BASE}/dados_compras_orcamentos`;
+        }
 
         async function loadGrafico() {
             try {
                 document.getElementById('chart-loading').style.display = 'flex';
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const res = await fetch(getUrlGrafico(), { signal: controller.signal });
+                const dados = await fetchAutenticado(getUrlGrafico());
                 clearTimeout(timeoutId);
-                if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
-                const dados = await res.json();
 
                 const labels = dados.map(d => d.mes);
                 const orcamentos = dados.map(d => d.orcamentos);
@@ -171,9 +188,8 @@
                 const conversao = totalOrc > 0 ? Math.round((totalPed / totalOrc) * 100) : 0;
                 document.getElementById('taxa-conversao').textContent = conversao + '%';
 
-                // Destroi gráfico anterior (botão Atualizar / recarregamento)
+                // Destroi gráfico anterior (recarregamento)
                 if (chartInstance) chartInstance.destroy();
-
                 const ctx = document.getElementById('grafico-comparativo').getContext('2d');
                 chartInstance = new Chart(ctx, {
                     type: 'bar',
@@ -224,36 +240,33 @@
                         }
                     }
                 });
-
                 document.getElementById('chart-loading').style.display = 'none';
             } catch (err) {
                 console.error('Erro ao carregar gráfico:', err);
                 document.getElementById('chart-loading').style.display = 'none';
-                alert('Erro ao carregar dados do gráfico: ' + err.message);
+                document.getElementById('subtitulo-pagina').textContent =
+                    'Erro ao carregar dados: ' + (err.message || 'Verifique a conexão');
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-    const user = getUsuarioLogado();
-    if (!user || !user.nome) {
-        window.location.href = 'https://thiagozmb.github.io/APP_SITE/login.html';
-        return;
-    }
-    document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
-    document.getElementById('user-name').textContent = user.nome || '';
+            const auth = getAuth();
+            if (!auth) {
+                window.location.href = LOGIN_URL;
+                return;
+            }
+            document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            document.getElementById('user-name').textContent = auth.user.nome || '';
 
-    const ClienteDaURL = new URLSearchParams(window.location.search).get('cliente');
-    if (ClienteDaURL) {
-        document.querySelector('.welcome-title')?.replaceChildren(
-            document.createTextNode(ClienteDaURL + ' 📊')
-        );
-        document.querySelector('.welcome-subtitle')?.replaceChildren(
-            document.createTextNode('Orçamentos x Pedidos deste cliente — valores em reais')
-        );
-    }
-    loadGrafico();
-});
-      
+            // Se veio do clique num cliente, personaliza o título
+            const clienteDaURL = new URLSearchParams(window.location.search).get('cliente');
+            if (clienteDaURL) {
+                document.getElementById('titulo-pagina').textContent = decodeURIComponent(clienteDaURL) + ' 📊';
+                document.getElementById('subtitulo-pagina').textContent =
+                    'Orçamentos x Pedidos deste cliente — valores em reais';
+            }
+            loadGrafico();
+        });
     </script>
 </body>
 </html>

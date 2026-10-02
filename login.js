@@ -1,5 +1,13 @@
 const API_BASE = 'https://elegance-backend-hrho.onrender.com';
 
+// Mensagens de links secundários ("Esqueceu sua senha?", botões sociais)
+function showMessage(msg, tipo) {
+  const resDiv = document.getElementById('result');
+  if (!resDiv) return;
+  resDiv.textContent = msg;
+  resDiv.className = `result ${tipo} show`;
+}
+
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 

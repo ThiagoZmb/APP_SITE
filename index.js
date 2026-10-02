@@ -5,10 +5,11 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+const PDFDocument = require('pdfkit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ================= VALIDAÇÃO DE AMBIENTE (falha rápido se faltar algo) =================
+// ================= VALIDAÇÃO DE AMBIENTE =================
 const JWT_SECRET = process.env.JWT_SECRET;
 const OBRIGATORIAS = ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'];
 const faltando = OBRIGATORIAS.filter(k => !process.env[k]);
@@ -17,27 +18,23 @@ if (!JWT_SECRET || faltando.length > 0) {
   process.exit(1);
 }
 
-const dbConfig = {
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   port: parseInt(process.env.DB_PORT || '3306', 10),
-  database: process.env.DB_NAME
-};
-
-const pool = mysql.createPool({
-  ...dbConfig,
+  database: process.env.DB_NAME,
   connectionLimit: 10,
   waitForConnections: true,
-  dateStrings: true,        // datas vêm 'YYYY-MM-DD' — evita bug de fuso
-  multipleStatements: false // bloqueia SQL stacking
+  dateStrings: true,
+  multipleStatements: false
 });
 
 app.use(helmet());
 app.use(cors({ origin: ['https://thiagozmb.github.io'] }));
 app.use(express.json({ limit: '10kb' }));
 
-// ================= RATE LIMIT — trava força bruta =================
+// ================= RATE LIMIT =================
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -46,16 +43,15 @@ const loginLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// ================= JWT — sessão assinada =================
+// ================= JWT =================
 function gerarToken(usuario) {
   return jwt.sign(
-    { id: usuario.CODIGO, nome: usuario.NOME, cargo: usuario.CARGO },  // ✅ CODIGO (não ID)
+    { id: usuario.CODIGO, nome: usuario.NOME, cargo: usuario.CARGO },
     JWT_SECRET,
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
 }
 
-// Middleware: exige token válido (header Bearer OU ?token= para PDFs)
 function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
@@ -81,7 +77,6 @@ app.post('/login', loginLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Usuário ou senha inválidos.' });
   }
   try {
-    // ✅ CORRIGIDO: CODIGO (a tabela não tem coluna ID)
     const [rows] = await pool.execute(
       'SELECT CODIGO, NOME, RAZAO_SOCIAL, CARGO, SENHA FROM cliente_usuarios WHERE NOME = ? LIMIT 1',
       [username]
@@ -110,11 +105,10 @@ app.get('/auth/verify', autenticar, (req, res) => {
   res.json({ valid: true, user: { nome: req.user.nome, cargo: req.user.cargo } });
 });
 
-// ================= DADOS: LISTA ÚNICA (Pedido ou Orçamento) =================
+// ================= LISTA ÚNICA (Pedido ou Orçamento) =================
 app.get('/dados_lista', autenticar, async (req, res) => {
   try {
     const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
-    // ✅ Autorização no SERVIDOR: representante é FORÇADO a RJ, ignore o que o cliente pedir
     const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
     const sql = `
       SELECT 
@@ -137,7 +131,7 @@ app.get('/dados_lista', autenticar, async (req, res) => {
   }
 });
 
-// Mantidos por compatibilidade — também protegidos
+// Mantidos por compatibilidade
 app.get('/dados_pedidos', autenticar, async (req, res) => {
   try {
     const where = ehRepresentante(req)
@@ -173,6 +167,7 @@ app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
   }
 });
 
+// ================= CLIENTES =================
 app.get('/dados_clientes', autenticar, async (req, res) => {
   try {
     const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
@@ -195,6 +190,7 @@ app.get('/dados_clientes', autenticar, async (req, res) => {
   }
 });
 
+// ================= GRÁFICO: ORÇAMENTOS x PEDIDOS =================
 app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
   try {
     const cliente = req.query.cliente;
@@ -229,8 +225,7 @@ app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
   }
 });
 
-const PDFDocument = require('pdfkit');
-// PDF do Pedido/Orçamento — protegido por token (via header OU ?token=)
+// ================= PDF =================
 app.get('/dados_pdf', autenticar, async (req, res) => {
   const { numero, tipo } = req.query;
   if (!numero || !tipo) return res.status(400).json({ error: 'Informe numero e tipo' });
@@ -332,7 +327,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       return linhas.filter(l => l && l.trim() !== '');
     }
 
-    // TABELA COM GRADE (altura medida — sem sobreposição)
+    // TABELA COM GRADE
     const cols = [
       { label: 'Item',       w: W * 0.07, align: 'center' },
       { label: 'Qtd',        w: W * 0.07, align: 'center' },
@@ -406,31 +401,6 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
   } catch (err) {
     console.error('Erro ao gerar PDF:', err.message);
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
-  }
-});
-
-// ================= MIGRAÇÃO DE SENHAS (one-time, protegida) =================
-app.get('/migrar_senhas', async (req, res) => {
-  if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Acesso negado' });
-  }
-  try {
-    const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
-    let convertidas = 0, jaHash = 0;
-    for (const r of rows) {
-      const atual = String(r.SENHA || '');
-      if (!atual.startsWith('$2')) {
-        const hash = await bcrypt.hash(atual, 12);
-        await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
-        convertidas++;
-      } else {
-        jaHash++;
-      }
-    }
-    res.json({ success: true, convertidas, jaHash, total: rows.length });
-  } catch (err) {
-    console.error('Erro na migração:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
