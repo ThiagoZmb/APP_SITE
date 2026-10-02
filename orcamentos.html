@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Orçamento</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --secondary-color: #f8f9fa;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px);
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--shadow-heavy);
+            overflow: hidden;
+        }
+        header {
+            grid-area: header;
+            background: var(--gradient-primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+        .logo { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .user-profile { font-size: 15px; font-weight: 500; }
+        .menu-item {
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; font-weight: 500; text-decoration: none; color: var(--text-dark);
+        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+
+        /* Frentes (abas) */
+        .frentes { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
+        .frente-btn {
+            padding: 14px 26px; border: 1px solid var(--border-color); border-radius: 14px;
+            background: var(--secondary-color); font-weight: 600; font-size: 15px; cursor: pointer;
+            color: var(--text-light); transition: all .2s ease; font-family: inherit;
+        }
+        .frente-btn.active { background: var(--gradient-primary); color: white; border-color: transparent; box-shadow: var(--shadow-light); }
+        .frente-btn:hover:not(.active) { background: var(--primary-light); color: var(--primary-color); }
+
+        .card {
+            background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); margin-bottom: 30px;
+        }
+        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); }
+        .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 11px 14px; border: 1px solid var(--border-color); border-radius: 10px;
+            font-size: 14px; background: var(--secondary-color); font-family: inherit;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: var(--primary-color);
+        }
+        .form-group.full { grid-column: 1 / -1; }
+        .check-line { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; padding-top: 26px; }
+        .btn {
+            padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
+            cursor: pointer; font-family: inherit; transition: all .2s ease;
+        }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
+        td { padding: 13px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr:hover { background: var(--primary-light); }
+        .item-desc { color: var(--text-light); font-size: 12px; }
+        .btn-mini {
+            padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            background: white; cursor: pointer; font-size: 13px; font-family: inherit;
+        }
+        .btn-mini:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini.excluir:hover { background: rgba(220,53,69,.1); color: #dc3545; }
+        .totais { display: flex; justify-content: flex-end; gap: 40px; margin-top: 20px; flex-wrap: wrap; }
+        .totais .grupo { text-align: right; }
+        .totais .rotulo { font-size: 13px; color: var(--text-light); font-weight: 600; text-transform: uppercase; }
+        .totais .valor { font-size: 24px; font-weight: 700; color: var(--primary-color); }
+        .badge-frente { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
+        .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
+        .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            main { padding: 20px; }
+            .card { overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile"><span id="user-name"></span></div>
+        </header>
+        <nav style="grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color);">
+            <div style="margin: 0 30px 25px; font-size: 12px; font-weight: 600; color: var(--text-light); letter-spacing: 1px;">MENU PRINCIPAL</div>
+            <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
+            <a class="menu-item" href="clientes.html">👥 Clientes</a>
+            <a class="menu-item" href="graficos_pedidos.html">📊 Orçamentos x Pedidos</a>
+            <a class="menu-item active" href="orcamento.html">🧾 Novo Orçamento</a>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Novo Orçamento 🧾</h1>
+            <p class="welcome-subtitle">Monte o orçamento por frente — os itens entram na lista abaixo</p>
+
+            <!-- CLIENTE -->
+            <section class="card">
+                <div class="card-title">1. Cliente</div>
+                <div class="grid-form">
+                    <div class="form-group full">
+                        <label for="sel-cliente">Cliente (Razão Social)</label>
+                        <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FRENTES -->
+            <div class="frentes">
+                <button class="frente-btn active" data-frente="Porta de Abrir">🚪 Portas de Abrir</button>
+                <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
+                <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
+            </div>
+
+            <!-- FORM DO ITEM -->
+            <section class="card">
+                <div class="card-title">2. Item — <span id="frente-atual">Porta de Abrir</span></div>
+                <div class="grid-form">
+                    <!-- Comuns às portas -->
+                    <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
+                    <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
+                    <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                    <div class="form-group f-porta"><label>Perfil</label><input id="f-perfil" list="dl-perfil" placeholder="Ex.: Linha Suprema"><datalist id="dl-perfil"></datalist></div>
+                    <div class="form-group f-porta"><label>Acabamento</label><input id="f-acab" list="dl-acab" placeholder="Ex.: Anodizado"><datalist id="dl-acab"></datalist></div>
+                    <div class="form-group f-porta"><label>Cor</label><input id="f-cor" list="dl-cor" placeholder="Ex.: Preto"><datalist id="dl-cor"></datalist></div>
+                    <div class="form-group f-porta"><label>Puxador</label><input id="f-puxador" list="dl-pux" placeholder="Ex.: Ciega Embutida"><datalist id="dl-pux"></datalist></div>
+                    <div class="form-group f-porta"><label>Posição do puxador</label>
+                        <select id="f-posicao">
+                            <option value="">—</option>
+                            <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
+                            <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
+                            <option>Topo Esquerda</option><option>Topo Direita</option>
+                            <option>Base Total</option><option>Topo Total</option>
+                        </select>
+                    </div>
+                    <div class="form-group f-porta"><label>Revestimento</label><input id="f-revest" placeholder="Ex.: Vidro Incolor"></div>
+                    <div class="form-group f-porta"><label>Cor do revestimento</label><input id="f-cor-revest" placeholder="—"></div>
+                    <div class="form-group f-porta"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
+                    <!-- Exclusivo Portas de Correr -->
+                    <div class="form-group f-correr" style="display:none"><label>Sistema (trilhos)</label><input id="f-sistema" placeholder="Ex.: 2 folhas c/ trilho simples"></div>
+                    <div class="form-group f-correr" style="display:none"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+                    <!-- Exclusivo Serralheria -->
+                    <div class="form-group f-serr" style="display:none"><label>Produto (modelo)</label><input id="f-produto" list="dl-produto" placeholder="Ex.: Estrutura metálica"><datalist id="dl-produto"></datalist></div>
+                    <div class="form-group f-serr" style="display:none"><label>Material</label><input id="f-material" placeholder="Ex.: Metalon 30x30"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><input id="f-acab-serr" placeholder="Ex.: Pintura Sólida"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Cor</label><input id="f-cor-serr" placeholder="Ex.: Preto"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
+                    <!-- Comuns a todos -->
+                    <div class="form-group"><label>Valor unitário (R$)</label><input type="number" step="0.01" id="f-valor" placeholder="0,00"></div>
+                    <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+                </div>
+                <div class="acoes-linha">
+                    <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
+                    <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                </div>
+            </section>
+
+            <!-- LISTA DE ITENS -->
+            <section class="card">
+                <div class="card-title">3. Itens do orçamento</div>
+                <div style="overflow-x:auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Frente</th><th>Descrição</th><th>Qtd</th>
+                                <th>Unitário</th><th>Total</th><th>Obs</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itens-tbody">
+                            <tr><td colspan="8" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="totais">
+                    <div class="grupo"><div class="rotulo">Subtotal</div><div class="valor" id="tot-subtotal">R$ 0,00</div></div>
+                    <div class="grupo">
+                        <div class="rotulo">Desconto %</div>
+                        <input type="number" id="desconto" min="0" max="100" value="0" style="width:90px;padding:8px;border:1px solid var(--border-color);border-radius:8px;text-align:right;">
+                    </div>
+                    <div class="grupo"><div class="rotulo">Total</div><div class="valor" id="tot-geral">R$ 0,00</div></div>
+                </div>
+                <div class="acoes-linha">
+                    <button class="btn btn-primary" id="btn-salvar">💾 Salvar orçamento</button>
+                    <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+
+        // ============ SESSÃO (padrão do sistema) ============
+        function getAuth() {
+            try {
+                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!auth || !auth.token || !auth.user) return null;
+                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return auth;
+            } catch { return null; }
+        }
+        function getToken() { const a = getAuth(); return a ? a.token : ''; }
+        async function fetchAutenticado(url) {
+            const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+            return res.json();
+        }
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+        function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
+
+        // ============ ESTADO ============
+        let frenteAtual = 'Porta de Abrir';
+        let itens = [];          // itens do orçamento em construção
+        let editandoIndex = -1;  // índice do item em edição
+
+        // ============ FRENTES ============
+        document.querySelectorAll('.frente-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.frente-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                frenteAtual = btn.dataset.frente;
+                document.getElementById('frente-atual').textContent = frenteAtual;
+                aplicarVisibilidadeCampos();
+            });
+        });
+
+        function aplicarVisibilidadeCampos() {
+            const ehPorta = frenteAtual !== 'Serralheria';
+            const ehCorrer = frenteAtual === 'Porta de Correr';
+            const ehSerr = frenteAtual === 'Serralheria';
+            document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
+            document.querySelectorAll('.f-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
+            document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+        }
+
+        // ============ FORMULÁRIO ============
+        function coletarForm() {
+            const g = id => document.getElementById(id).value.trim();
+            let desc = '';
+            if (frenteAtual === 'Serralheria') {
+                desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
+                       ` — H=${g('f-altura') || 0} x L=${g('f-largura') || 0} x P=${g('f-profundidade') || 0} mm`;
+            } else {
+                desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}` +
+                       ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}` +
+                       ` | Revest: ${g('f-revest') || '-'}` +
+                       (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '');
+            }
+            return {
+                frente: frenteAtual,
+                qtd: parseFloat(g('f-qtd')) || 1,
+                altura: parseFloat(g('f-altura')) || 0,
+                largura: parseFloat(g('f-largura')) || 0,
+                profundidade: parseFloat(g('f-profundidade')) || 0,
+                soldas: parseInt(g('f-soldas')) || 0,
+                detalhes: {
+                    perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'),
+                    puxador: g('f-puxador'), posicao: g('f-posicao'),
+                    revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
+                    divisores: parseInt(g('f-divisores')) || 0,
+                    sistema: g('f-sistema'), transpasse: g('f-transpasse'),
+                    produto: g('f-produto'), material: g('f-material'),
+                    acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr')
+                },
+                valor: parseFloat(g('f-valor').replace(',', '.')) || 0,
+                obs: g('f-obs'),
+                descricao: desc
+            };
+        }
+
+        function preencherForm(item) {
+            const d = item.detalhes || {};
+            const set = (id, v) => document.getElementById(id).value = v ?? '';
+            set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
+            set('f-valor', item.valor); set('f-obs', item.obs);
+            set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
+            set('f-puxador', d.puxador); set('f-posicao', d.posicao);
+            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest); set('f-divisores', d.divisores);
+            set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
+            set('f-produto', d.produto); set('f-material', d.material);
+            set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
+            set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
+        }
+
+        function limparForm() {
+            document.querySelectorAll('.card .grid-form input, .card .grid-form select').forEach(el => {
+                if (el.id !== 'f-qtd') el.value = '';
+            });
+            document.getElementById('f-qtd').value = 1;
+            editandoIndex = -1;
+            document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
+        }
+
+        // ============ LISTA DE ITENS ============
+        function adicionarItem() {
+            const item = coletarForm();
+            if (item.valor <= 0) { alert('Informe o valor unitário do item.'); return; }
+            if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
+            else itens.push(item);
+            renderItens();
+            limparForm();
+        }
+
+        function renderItens() {
+            const tbody = document.getElementById('itens-tbody');
+            tbody.innerHTML = itens.length === 0
+                ? '<tr><td colspan="8" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>'
+                : itens.map((it, i) => `
+                    <tr>
+                        <td><b>${i + 1}</b></td>
+                        <td><span class="badge-frente ${it.frente === 'Porta de Abrir' ? 'bf-abrir' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
+                        <td>${escapeHtml(it.descricao)}</td>
+                        <td>${it.qtd}</td>
+                        <td>${formatCurrency(it.valor)}</td>
+                        <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
+                        <td class="item-desc">${escapeHtml(it.obs || '-')}</td>
+                        <td>
+                            <button class="btn-mini" onclick="editarItem(${i})">✏️</button>
+                            <button class="btn-mini excluir" onclick="removerItem(${i})">🗑️</button>
+                        </td>
+                    </tr>`).join('');
+            atualizarTotais();
+        }
+
+        function editarItem(i) {
+            const it = itens[i];
+            // Ativa a aba da frente do item antes de preencher
+            document.querySelectorAll('.frente-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.frente === it.frente);
+            });
+            frenteAtual = it.frente;
+            document.getElementById('frente-atual').textContent = it.frente;
+            aplicarVisibilidadeCampos();
+            preencherForm(it);
+            editandoIndex = i;
+            document.getElementById('btn-adicionar').textContent = '💾 Atualizar item';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function removerItem(i) {
+            if (!confirm('Remover este item do orçamento?')) return;
+            itens.splice(i, 1);
+            renderItens();
+        }
+
+        function atualizarTotais() {
+            const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
+            const descPct = parseFloat(document.getElementById('desconto').value) || 0;
+            const total = subtotal * (1 - descPct / 100);
+            document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
+            document.getElementById('tot-geral').textContent = formatCurrency(total);
+        }
+
+        // ============ SALVAR (rascunho local — backend vem depois) ============
+        function salvarOrcamento() {
+            if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
+            const clienteSel = document.getElementById('sel-cliente');
+            if (!clienteSel.value) { alert('Selecione o cliente.'); return; }
+            const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
+            const descPct = parseFloat(document.getElementById('desconto').value) || 0;
+            const rascunho = {
+                data: new Date().toLocaleString('pt-BR'),
+                cliente: clienteSel.options[clienteSel.selectedIndex].text,
+                itens, desconto: descPct,
+                subtotal, total: subtotal * (1 - descPct / 100)
+            };
+            const lista = JSON.parse(localStorage.getItem('rascunhos_orcamento') || '[]');
+            lista.push(rascunho);
+            localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista));
+            alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo do desenvolvimento.');
+        }
+
+        // ============ CARREGAMENTO ============
+        async function carregarClientes() {
+            const sel = document.getElementById('sel-cliente');
+            try {
+                const clientes = await fetchAutenticado(`${API_BASE}/dados_clientes`);
+                sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
+                    clientes.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razaoSocial)}</option>`).join('');
+            } catch (err) {
+                sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
+            }
+        }
+
+        // ============ INIT ============
+        document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
+        document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
+        document.getElementById('btn-vazio').addEventListener('click', () => {
+            if (itens.length && confirm('Esvaziar a lista de itens?')) { itens = []; renderItens(); }
+        });
+        document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
+        document.getElementById('desconto').addEventListener('input', atualizarTotais);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const auth = getAuth();
+            if (!auth) { window.location.href = LOGIN_URL; return; }
+            document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            document.getElementById('user-name').textContent = auth.user.nome || '';
+            aplicarVisibilidadeCampos();
+            renderItens();
+            carregarClientes();
+        });
+    </script>
+</body>
+</html>
