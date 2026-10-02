@@ -50,8 +50,6 @@
         main { grid-area: main; padding: 40px; overflow-y: auto; }
         .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); }
         .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
-
-        /* Frentes (abas) */
         .frentes { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
         .frente-btn {
             padding: 14px 26px; border: 1px solid var(--border-color); border-radius: 14px;
@@ -60,7 +58,6 @@
         }
         .frente-btn.active { background: var(--gradient-primary); color: white; border-color: transparent; box-shadow: var(--shadow-light); }
         .frente-btn:hover:not(.active) { background: var(--primary-light); color: var(--primary-color); }
-
         .card {
             background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
             box-shadow: var(--shadow-light); margin-bottom: 30px;
@@ -68,15 +65,12 @@
         .card-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); }
         .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
-        .form-group input, .form-group select, .form-group textarea {
+        .form-group input, .form-group select {
             width: 100%; padding: 11px 14px; border: 1px solid var(--border-color); border-radius: 10px;
             font-size: 14px; background: var(--secondary-color); font-family: inherit;
         }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none; border-color: var(--primary-color);
-        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
-        .check-line { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; padding-top: 26px; }
         .btn {
             padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
             cursor: pointer; font-family: inherit; transition: all .2s ease;
@@ -86,7 +80,6 @@
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
-
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
         td { padding: 13px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
@@ -128,9 +121,8 @@
         </nav>
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
-            <p class="welcome-subtitle">Monte o orçamento por frente — os itens entram na lista abaixo</p>
+            <p class="welcome-subtitle">Monte o orçamento por frente — os catálogos vêm do banco</p>
 
-            <!-- CLIENTE -->
             <section class="card">
                 <div class="card-title">1. Cliente</div>
                 <div class="grid-form">
@@ -141,14 +133,12 @@
                 </div>
             </section>
 
-            <!-- FRENTES -->
             <div class="frentes">
                 <button class="frente-btn active" data-frente="Porta de Abrir">🚪 Portas de Abrir</button>
                 <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                 <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
             </div>
 
-            <!-- FORM DO ITEM -->
             <section class="card">
                 <div class="card-title">2. Item — <span id="frente-atual">Porta de Abrir</span></div>
                 <div class="grid-form">
@@ -156,10 +146,10 @@
                     <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                     <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                     <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
-                    <div class="form-group f-porta"><label>Perfil</label><input id="f-perfil" list="dl-perfil" placeholder="Ex.: Linha Suprema"><datalist id="dl-perfil"></datalist></div>
-                    <div class="form-group f-porta"><label>Acabamento</label><input id="f-acab" list="dl-acab" placeholder="Ex.: Anodizado"><datalist id="dl-acab"></datalist></div>
-                    <div class="form-group f-porta"><label>Cor</label><input id="f-cor" list="dl-cor" placeholder="Ex.: Preto"><datalist id="dl-cor"></datalist></div>
-                    <div class="form-group f-porta"><label>Puxador</label><input id="f-puxador" list="dl-pux" placeholder="Ex.: Ciega Embutida"><datalist id="dl-pux"></datalist></div>
+                    <div class="form-group f-porta"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Acabamento</label><select id="f-acab"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Cor</label><select id="f-cor"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Puxador</label><select id="f-puxador"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-porta"><label>Posição do puxador</label>
                         <select id="f-posicao">
                             <option value="">—</option>
@@ -169,17 +159,17 @@
                             <option>Base Total</option><option>Topo Total</option>
                         </select>
                     </div>
-                    <div class="form-group f-porta"><label>Revestimento</label><input id="f-revest" placeholder="Ex.: Vidro Incolor"></div>
-                    <div class="form-group f-porta"><label>Cor do revestimento</label><input id="f-cor-revest" placeholder="—"></div>
+                    <div class="form-group f-porta"><label>Revestimento</label><select id="f-revest"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-porta"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
                     <!-- Exclusivo Portas de Correr -->
-                    <div class="form-group f-correr" style="display:none"><label>Sistema (trilhos)</label><input id="f-sistema" placeholder="Ex.: 2 folhas c/ trilho simples"></div>
+                    <div class="form-group f-correr" style="display:none"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-correr" style="display:none"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                     <!-- Exclusivo Serralheria -->
-                    <div class="form-group f-serr" style="display:none"><label>Produto (modelo)</label><input id="f-produto" list="dl-produto" placeholder="Ex.: Estrutura metálica"><datalist id="dl-produto"></datalist></div>
-                    <div class="form-group f-serr" style="display:none"><label>Material</label><input id="f-material" placeholder="Ex.: Metalon 30x30"></div>
-                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><input id="f-acab-serr" placeholder="Ex.: Pintura Sólida"></div>
-                    <div class="form-group f-serr" style="display:none"><label>Cor</label><input id="f-cor-serr" placeholder="Ex.: Preto"></div>
+                    <div class="form-group f-serr" style="display:none"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Material</label><select id="f-material"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><select id="f-acab-serr"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
                     <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                     <!-- Comuns a todos -->
@@ -192,7 +182,6 @@
                 </div>
             </section>
 
-            <!-- LISTA DE ITENS -->
             <section class="card">
                 <div class="card-title">3. Itens do orçamento</div>
                 <div style="overflow-x:auto">
@@ -248,8 +237,8 @@
 
         // ============ ESTADO ============
         let frenteAtual = 'Porta de Abrir';
-        let itens = [];          // itens do orçamento em construção
-        let editandoIndex = -1;  // índice do item em edição
+        let itens = [];
+        let editandoIndex = -1;
 
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
@@ -261,7 +250,6 @@
                 aplicarVisibilidadeCampos();
             });
         });
-
         function aplicarVisibilidadeCampos() {
             const ehPorta = frenteAtual !== 'Serralheria';
             const ehCorrer = frenteAtual === 'Porta de Correr';
@@ -269,6 +257,38 @@
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+        }
+
+        // ============ CATÁLOGOS DO BANCO → COMBOS ============
+        async function carregarCatalogos() {
+            try {
+                const cat = await fetchAutenticado(`${API_BASE}/catalogos`);
+                // [id do select, chave do catálogo]
+                const mapa = [
+                    ['f-perfil', 'perfis'],
+                    ['f-acab', 'acabamentos'],
+                    ['f-cor', 'cores'],
+                    ['f-puxador', 'puxadores'],
+                    ['f-revest', 'revestimentos'],
+                    ['f-cor-revest', 'cores'],
+                    ['f-sistema', 'sistemas'],
+                    ['f-produto', 'produtos_serr'],
+                    ['f-material', 'materiais'],
+                    ['f-acab-serr', 'acabamentos'],
+                    ['f-cor-serr', 'cores']
+                ];
+                mapa.forEach(([id, chave]) => {
+                    const sel = document.getElementById(id);
+                    const lista = cat[chave] || [];
+                    sel.innerHTML = '<option value="">— Selecione —</option>' +
+                        lista.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+                    if (lista.length === 0) {
+                        sel.innerHTML = '<option value="">(catálogo vazio — verifique a tabela no backend)</option>';
+                    }
+                });
+            } catch (err) {
+                console.error('Erro ao carregar catálogos:', err);
+            }
         }
 
         // ============ FORMULÁRIO ============
@@ -362,7 +382,6 @@
 
         function editarItem(i) {
             const it = itens[i];
-            // Ativa a aba da frente do item antes de preencher
             document.querySelectorAll('.frente-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.frente === it.frente);
             });
@@ -389,7 +408,6 @@
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
 
-        // ============ SALVAR (rascunho local — backend vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
@@ -405,10 +423,9 @@
             const lista = JSON.parse(localStorage.getItem('rascunhos_orcamento') || '[]');
             lista.push(rascunho);
             localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista));
-            alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo do desenvolvimento.');
+            alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo.');
         }
 
-        // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');
             try {
@@ -420,7 +437,6 @@
             }
         }
 
-        // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
         document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
         document.getElementById('btn-vazio').addEventListener('click', () => {
@@ -437,6 +453,7 @@
             aplicarVisibilidadeCampos();
             renderItens();
             carregarClientes();
+            carregarCatalogos();
         });
     </script>
 </body>

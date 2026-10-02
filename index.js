@@ -426,6 +426,37 @@ app.post('/admin/definir_senha', async (req, res) => {
   }
 });
 
+
+// ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
+// ⚠️ AJUSTE OS NOMES DAS TABELAS conforme o banco real (SHOW TABLES no phpMyAdmin)
+const TABELAS_CATALOGO = {
+  perfis:         ['cadastro_perfis',         'NOME'],
+  acabamentos:    ['cadastro_acabamentos',    'NOME'],
+  cores:          ['cadastro_cores',          'NOME'],
+  puxadores:      ['cadastro_puxadores',      'NOME'],
+  revestimentos:  ['cadastro_revestimentos',  'NOME'],
+  divisores:      ['cadastro_divisores',      'NOME'],
+  sistemas:       ['cadastro_sistemas',       'NOME'],
+  produtos_serr:  ['serralheria_produtos',    'nome_modelo', 'WHERE ativo = 1'],
+  materiais:      ['cadastro_de_produtos',    'MODELO',      "WHERE SITUACAO = 'Ativo'"]
+};
+
+app.get('/catalogos', autenticar, async (req, res) => {
+  const saida = {};
+  for (const [chave, [tabela, coluna, where]] of Object.entries(TABELAS_CATALOGO)) {
+    try {
+      // nomes de tabela/coluna vêm SÓ do mapa acima (nunca do cliente) — seguro
+      const [rows] = await pool.execute(
+        `SELECT DISTINCT ${coluna} AS nome FROM ${tabela} ${where || ''} ORDER BY ${coluna}`);
+      saida[chave] = rows.map(r => r.nome).filter(n => n);
+    } catch (e) {
+      saida[chave] = []; // tabela ausente/errada → combo vazio, página continua
+    }
+  }
+  res.json(saida);
+});
+
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
