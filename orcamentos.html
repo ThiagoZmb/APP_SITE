@@ -134,12 +134,12 @@
                 </div>
             </section>
             <div class="frentes">
-                <button class="frente-btn active" data-frente="Porta de Abrir">🚪 Portas de Abrir</button>
+                <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
                 <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                 <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
             </div>
             <section class="card">
-                <div class="card-title">2. Item — <span id="frente-atual">Porta de Abrir</span></div>
+                <div class="card-title">2. Item — <span id="frente-atual">Porta de giro</span></div>
                 <div class="grid-form">
                     <!-- Comuns às portas -->
                     <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
@@ -241,7 +241,9 @@
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
         function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
         // ============ ESTADO ============
-        let frenteAtual = 'Porta de Abrir';
+        // ✅ CORREÇÃO CRÍTICA: era "Porta de Abrir" — agora usa a nomenclatura real da base
+        //    (TIPO_PRODUTO de perfis_permitidos), que é "Porta de giro"
+        let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
         // ============ FRENTES ============
@@ -525,7 +527,7 @@
                 : itens.map((it, i) => `
                     <tr>
                         <td><b>${i + 1}</b></td>
-                        <td><span class="badge-frente ${it.frente === 'Porta de Abrir' ? 'bf-abrir' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
+                        <td><span class="badge-frente ${it.frente === 'Porta de giro' ? 'bf-abrir' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
                         <td>${escapeHtml(it.descricao)}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
@@ -621,7 +623,7 @@
             renderItens();
             carregarClientes();
             carregarCatalogosIniciais();
-            carregarPerfis(); // perfis da frente inicial
+            carregarPerfis(); // perfis da frente inicial ("Porta de giro")
         });
     </script>
 </body>
