@@ -141,7 +141,8 @@
             <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
             <a class="menu-item" href="clientes.html">👥 Clientes</a>
             <a class="menu-item" href="graficos_pedidos.html">📊 Orçamentos x Pedidos</a>
-            <a class="menu-item active" href="orcamento.html">🧾 Novo Orçamento</a>
+            <!-- ✅ CORREÇÃO: arquivo real é orcamentos.html (com S) — antes dava 404 -->
+            <a class="menu-item active" href="orcamentos.html">🧾 Novo Orçamento</a>
         </nav>
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
@@ -175,7 +176,8 @@
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
                         <div class="grid-form">
-                            <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
+                            <!-- ✅ CORREÇÃO: Qtd SEM f-porta — comum às 3 frentes (antes sumia na Serralheria) -->
+                            <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                             <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                             <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
@@ -318,10 +320,10 @@
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
         function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
         // ============ ESTADO ============
-        let frenteAtual = 'Porta de giro';
+        let frenteAtual = 'Porta de giro'; // nomenclatura real da TIPO_PRODUTO da base
         let itens = [];
         let editandoIndex = -1;
-        // ============ TRAVA DE CLIENTE (🔒 libera itens só com cliente escolhido) ============
+        // ============ TRAVA DE CLIENTE ============
         function atualizarBloqueioCliente() {
             const temCliente = !!document.getElementById('sel-cliente').value;
             const form = document.getElementById('form-item');
@@ -356,7 +358,6 @@
             document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.secao-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
-            // Qtd é comum: fica na seção de medidas para as 3 frentes
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
@@ -394,7 +395,7 @@
                     fetchAutenticado(`${API_BASE}/catalogos`),
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
-                popularCores('f-cor', coresGrupos);        // CORES agrupadas por TIPO (Sólida/Metálica)
+                popularCores('f-cor', coresGrupos);        // cores agrupadas por TIPO (Sólida/Metálica)
                 popularCores('f-cor-revest', coresGrupos);
                 popularCores('f-cor-serr', coresGrupos);
                 popularLista('f-produto', cat.produtos_serr);
@@ -471,7 +472,7 @@
         // ============ MOTOR FINANCEIRO (cálculo automático) ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
-            if (!document.getElementById('sel-cliente').value) return; // 🔒 sem cliente, sem cálculo
+            if (!document.getElementById('sel-cliente').value) return; // sem cliente, sem cálculo
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
@@ -511,9 +512,10 @@
             status.textContent = 'Calculando...';
             timerPreco = setTimeout(async () => {
                 try {
+                    // ✅ TEMPORÁRIO: debug:true devolve o "diag" no Network → calibrar vs VB
                     const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
                     atualizarTotalItem();
@@ -659,7 +661,7 @@
             document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
-        // ============ SALVAR (rascunho local — backend vem depois) ============
+        // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
@@ -716,7 +718,7 @@
             document.getElementById('user-name').textContent = auth.user.nome || '';
             aplicarVisibilidadeCampos();
             renderItens();
-            atualizarBloqueioCliente(); // 🔒 inicia travado até o cliente ser escolhido
+            atualizarBloqueioCliente(); // inicia travado até o cliente ser escolhido
             carregarClientes();
             carregarCatalogosIniciais();
             carregarPerfis();

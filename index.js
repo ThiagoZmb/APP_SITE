@@ -423,7 +423,7 @@ app.post('/admin/definir_senha', async (req, res) => {
 });
 
 // ================= MIGRAÇÃO DE SENHAS (rodar UMA VEZ, depois remover) =================
-// Corrigido: tabela usa CODIGO (não ID) — colunas: CODIGO, NOME, CARGO, SENHA, SITUACAO...
+// Tabela usa CODIGO (não ID) — colunas: CODIGO, NOME, CARGO, SENHA, SITUACAO...
 app.get('/migrar_senhas', async (req, res) => {
   const chave = req.query.key;
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
@@ -449,13 +449,13 @@ app.get('/migrar_senhas', async (req, res) => {
 });
 
 // ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
-// ✅ Nomes confirmados no dump + valores reais de CLASSE
 const TABELAS_CATALOGO = {
   // FRENTES DE PORTAS (alumínio)
   perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil'"],
   puxadores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Puxador'"],
   revestimentos: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Revestimento'"],
-  sistemas:      ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Sistema de correr'"],
+  // ✅ PATCH 2: sistemas vem da tabela PRÓPRIA, como o VB lê (RepositorioProdutos.vb)
+  sistemas:      ['sistema_correr', 'NOME', ''],
   divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"],
   // FRENTE SERRALHERIA (Perfil AC = aço carbono)
   materiais_serr: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil AC'"],
@@ -480,9 +480,7 @@ app.get('/catalogos', autenticar, async (req, res) => {
 
 // ============================================================
 // MOTOR FINANCEIRO — PORTAS + SERRALHERIA (fiel ao VB)
-// ✅ VERSÃO ÚNICA (removeu o bloco antigo duplicado com
-//    COLUNAS_PROD errado — causa do ER_BAD_FIELD_ERROR)
-// Colunas confirmadas no VB: VALOR_CHEIO, VALOR_FIXO,
+// Colunas confirmadas no VB + DESCRIBE: VALOR_CHEIO, VALOR_FIXO,
 // DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
 // ============================================================
 async function buscarDadosProduto(nome) {
@@ -528,11 +526,8 @@ function aplicarPercentuais(valor, texto) {
   return v;
 }
 
-function atualizarTotalItem() {
-    const u = parseFloat(document.getElementById('f-valor').value.replace(',', '.')) || 0;
-    const q = parseFloat(document.getElementById('f-qtd').value) || 1;
-    document.getElementById('f-total-item').value = (u * q).toFixed(2).replace('.', ',');
-}
+// ✅ PATCH 1: removida a função atualizarTotalItem colada aqui
+//    (código de navegador NÃO existe no backend — era pólvora)
 
 app.post('/calcular_preco', autenticar, async (req, res) => {
   const b = req.body || {};
@@ -688,15 +683,6 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
 // ============================================================
 // CATÁLOGOS EM CASCATA — fiel ao RepositorioProdutos.vb
 // ============================================================
@@ -733,9 +719,9 @@ const QUERIES_FILTRO = {
               ORDER BY c.MODELO`
 };
 
-// Nomes do FRONT → valores reais da base (ajuste após rodar o SELECT DISTINCT)
+// ✅ PATCH 3: chave do alias = o que o FRONT envia ("Porta de giro")
 const ALIAS_FRENTE = {
-  'Porta de Abrir':  ['Porta de Abrir', 'Porta de abrir', 'Porta de Giro', 'Porta de giro', 'Giro', 'Abrir'],
+  'Porta de giro':   ['Porta de giro', 'Porta de Giro', 'Porta de Abrir', 'Porta de abrir', 'Giro', 'Abrir'],
   'Porta de Correr': ['Porta de Correr', 'Porta de correr', 'Correr']
 };
 
@@ -746,7 +732,7 @@ app.get('/catalogos_filtro', autenticar, async (req, res) => {
   try {
     let params = [chave || ''];
     let sqlFinal = sql;
-    // Perfis: busca por TODOS os aliases da frente (resolve "Abrir" vs "giro")
+    // Perfis: busca por TODOS os aliases da frente (resolve variação de escrita na base)
     if (campo === 'perfis') {
       const aliases = ALIAS_FRENTE[chave] || [chave];
       sqlFinal = sql.replace('p.TIPO_PRODUTO = ?', `p.TIPO_PRODUTO IN (${aliases.map(() => '?').join(',')})`);
@@ -754,7 +740,7 @@ app.get('/catalogos_filtro', autenticar, async (req, res) => {
     }
     const [rows] = await pool.execute(sqlFinal, params);
     let lista = rows.map(r => r.nome).filter(n => n);
-    // FALLBACK: coluna TIPO_PRODUTO vazia na base → não deixa o vendedor travado
+    // FALLBACK: TIPO_PRODUTO vazia na base → não trava o vendedor; Render loga o aviso
     if (lista.length === 0 && campo === 'perfis') {
       console.warn(`PERFIS: nenhum perfil classificado para '${chave}' — usando fallback (todos os perfis ativos). Popule TIPO_PRODUTO em perfis_permitidos.`);
       const [todos] = await pool.execute(
@@ -784,12 +770,6 @@ app.get('/cores_por_tipo', autenticar, async (req, res) => {
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
 });
-
-
-
-
-
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
