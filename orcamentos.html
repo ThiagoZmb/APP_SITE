@@ -64,6 +64,7 @@
         }
         .card-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); }
         .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
+        fieldset { min-width: 0; padding: 0; border: 0; }
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
         .form-group input, .form-group select {
             width: 100%; padding: 11px 14px; border: 1px solid var(--border-color); border-radius: 10px;
@@ -72,6 +73,10 @@
         .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
         .form-group input[readonly] { background: #eef1f4; font-weight: 700; color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
+        .item-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; padding: 16px 0; border-bottom: 1px solid var(--border-color); }
+        .item-section-title { grid-column: 1 / -1; color: var(--text-dark); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+        .item-section .form-group.full { grid-column: 1 / -1; }
+        .item-section:last-child { border-bottom: 0; }
         .btn {
             padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
             cursor: pointer; font-family: inherit; transition: all .2s ease;
@@ -134,57 +139,85 @@
                 </div>
             </section>
             <div class="frentes">
-                <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
-                <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
-                <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
+                <button class="frente-btn active" data-frente="Porta de giro" disabled>🚪 Portas de Giro</button>
+                <button class="frente-btn" data-frente="Porta de Correr" disabled>↔️ Portas de Correr</button>
+                <button class="frente-btn" data-frente="Serralheria" disabled>🔧 Serralheria</button>
             </div>
             <section class="card">
                 <div class="card-title">2. Item — <span id="frente-atual">Porta de giro</span></div>
+                <fieldset id="item-fields" disabled>
                 <div class="grid-form">
-                    <!-- Comuns às portas -->
-                    <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
-                    <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
-                    <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
-                    <div class="form-group f-porta"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
-                    <div class="form-group f-porta"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
-                    <div class="form-group f-porta"><label>Posição do puxador</label>
-                        <select id="f-posicao">
-                            <option value="">—</option>
-                            <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
-                            <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
-                            <option>Topo Esquerda</option><option>Topo Direita</option>
-                            <option>Base Total</option><option>Topo Total</option>
-                        </select>
+                    <div class="item-section">
+                        <div class="item-section-title">Quantidade</div>
+                        <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                     </div>
-                    <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
-                    <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
-                    <div class="form-group f-porta"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
-                    <div class="form-group f-porta"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
-                    <!-- Exclusivo Portas de Correr -->
-                    <div class="form-group f-correr" style="display:none"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-correr" style="display:none"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
-                    <!-- Exclusivo Serralheria -->
-                    <div class="form-group f-serr" style="display:none"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
-                    <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
-                    <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
-                    <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
-                    <!-- Comuns a todos -->
-                    <div class="form-group"><label id="lbl-valor">Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
-                    <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
-                    <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+                    <div class="item-section f-porta">
+                        <div class="item-section-title">Medidas</div>
+                        <div class="form-group"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
+                        <div class="form-group"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                    </div>
+                    <div class="item-section f-porta">
+                        <div class="item-section-title">Perfil</div>
+                        <div class="form-group"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
+                        <div class="form-group"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
+                        <div class="form-group"><label>Cor do perfil</label><select id="f-cor"><option value="">Selecione o acabamento</option></select></div>
+                    </div>
+                    <div class="item-section f-porta">
+                        <div class="item-section-title">Puxador</div>
+                        <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
+                        <div class="form-group"><label>Posição do puxador</label>
+                            <select id="f-posicao">
+                                <option value="">—</option>
+                                <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
+                                <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
+                                <option>Topo Esquerda</option><option>Topo Direita</option>
+                                <option>Base Total</option><option>Topo Total</option>
+                            </select>
+                        </div>
+                        <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
+                        <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
+                    </div>
+                    <div class="item-section f-porta">
+                        <div class="item-section-title">Divisores</div>
+                        <div class="form-group"><label>Quantidade</label><input type="number" id="f-divisores" min="0" value="0"></div>
+                    </div>
+                    <div class="item-section f-porta">
+                        <div class="item-section-title">Revestimento</div>
+                        <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
+                        <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Selecione o acabamento</option></select></div>
+                    </div>
+                    <div class="item-section f-correr" style="display:none">
+                        <div class="item-section-title">Porta de correr</div>
+                        <div class="form-group"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
+                        <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+                    </div>
+                    <div class="item-section f-serr" style="display:none">
+                        <div class="item-section-title">Produto e acabamento</div>
+                        <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
+                        <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
+                        <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
+                        <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Selecione o acabamento</option></select></div>
+                    </div>
+                    <div class="item-section f-serr" style="display:none">
+                        <div class="item-section-title">Medidas e soldas</div>
+                        <div class="form-group"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
+                        <div class="form-group"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
+                        <div class="form-group"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
+                        <div class="form-group"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
+                    </div>
+                    <div class="item-section">
+                        <div class="item-section-title">Valores e observação</div>
+                        <div class="form-group"><label id="lbl-valor">Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
+                        <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
+                        <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+                    </div>
                 </div>
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
                     <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
                     <span class="calc-status" id="calc-status"></span>
                 </div>
+                </fieldset>
             </section>
             <section class="card">
                 <div class="card-title">3. Itens do orçamento</div>
@@ -246,6 +279,12 @@
         let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
+        let coresPorTipo = {};
+        function atualizarTravaCliente() {
+            const liberado = !!document.getElementById('sel-cliente').value;
+            document.getElementById('item-fields').disabled = !liberado;
+            document.querySelectorAll('.frente-btn').forEach(btn => { btn.disabled = !liberado; });
+        }
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -277,16 +316,30 @@
                 l.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
             if (l.length === 0) sel.innerHTML = `<option value="">${escapeHtml(msgVazio || '(nada encontrado para este filtro)')}</option>`;
         }
-        function popularCores(id, grupos) {
+        function popularCores(id, grupos, acabamento) {
             const sel = document.getElementById(id);
             if (!sel) return;
-            let html = '<option value="">— Selecione —</option>';
-            Object.keys(grupos || {}).sort().forEach(tipo => {
+            const acabamentoNorm = String(acabamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const tipoAlvo = acabamentoNorm.includes('solid') ? 'solida' :
+                acabamentoNorm.includes('metal') ? 'metalica' : '';
+            const tiposFiltrados = Object.entries(grupos || {}).filter(([tipo]) => {
+                const tipoNorm = String(tipo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                return tipoAlvo === 'solida' ? tipoNorm.includes('solid') :
+                    tipoAlvo === 'metalica' && tipoNorm.startsWith('metal');
+            });
+            let html = `<option value="">${tipoAlvo ? '— Selecione a cor —' : '— Selecione o acabamento —'}</option>`;
+            tiposFiltrados.sort(([a], [b]) => a.localeCompare(b)).forEach(([tipo, cores]) => {
                 html += `<optgroup label="${escapeHtml(tipo)}">` +
-                    (grupos[tipo] || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
+                    (cores || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
                     '</optgroup>';
             });
             sel.innerHTML = html;
+        }
+        function atualizarCoresPorAcabamento(idCor, idAcabamento) {
+            const cor = document.getElementById(idCor);
+            const valorAtual = cor.value;
+            popularCores(idCor, coresPorTipo, document.getElementById(idAcabamento).value);
+            if ([...cor.options].some(opcao => opcao.value === valorAtual)) cor.value = valorAtual;
         }
         async function catalogoFiltro(campo, chave) {
             if (!chave) return [];
@@ -301,9 +354,10 @@
                     fetchAutenticado(`${API_BASE}/catalogos`),
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
-                popularCores('f-cor', coresGrupos);        // ✅ CORES agrupadas por TIPO (Sólida/Metálica)
-                popularCores('f-cor-revest', coresGrupos);
-                popularCores('f-cor-serr', coresGrupos);
+                coresPorTipo = coresGrupos;
+                atualizarCoresPorAcabamento('f-cor', 'f-acab');
+                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
+                atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
                 popularLista('f-produto', cat.produtos_serr);
                 popularLista('f-sistema', cat.sistemas);   // ✅ do sistema_correr (tabela própria, como no VB)
             } catch (err) { console.error('Erro catálogos iniciais:', err); }
@@ -314,13 +368,25 @@
             document.querySelectorAll('.f-pux-extra').forEach(el => el.style.display = mostrar ? '' : 'none');
         }
         async function carregarPerfis() {
-            if (frenteAtual === 'Serralheria') return;
+            if (!document.getElementById('sel-cliente').value || frenteAtual === 'Serralheria') {
+                popularLista('f-perfil', [], '— selecione um cliente —');
+                popularLista('f-acab', [], '— escolha o perfil —');
+                popularLista('f-puxador', [], '— escolha o perfil —');
+                popularLista('f-revest', [], '— escolha o perfil —');
+                popularLista('f-acab-pux', [], '— escolha o puxador —');
+                atualizarCoresPorAcabamento('f-cor', 'f-acab');
+                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
+                alternarCamposPuxador('');
+                return;
+            }
             const lista = await catalogoFiltro('perfis', frenteAtual);
             popularLista('f-perfil', lista);
             popularLista('f-acab', [], '— escolha o perfil —');
             popularLista('f-puxador', [], '— escolha o perfil —');
             popularLista('f-revest', [], '— escolha o perfil —');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
+            atualizarCoresPorAcabamento('f-cor', 'f-acab');
+            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
             alternarCamposPuxador('');
         }
         async function carregarDependentesPerfil(perfil) {
@@ -329,6 +395,8 @@
                 popularLista('f-puxador', [], '— escolha o perfil —');
                 popularLista('f-revest', [], '— escolha o perfil —');
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
+                atualizarCoresPorAcabamento('f-cor', 'f-acab');
+                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
                 alternarCamposPuxador('');
                 return;
             }
@@ -341,6 +409,8 @@
             popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
             popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
+            atualizarCoresPorAcabamento('f-cor', 'f-acab');
+            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
             alternarCamposPuxador('');
         }
         async function carregarDependentesPuxador(puxador) {
@@ -356,10 +426,12 @@
             if (!produto) {
                 popularLista('f-material', [], '— escolha o produto —');
                 popularLista('f-acab-serr', [], '— escolha o material —');
+                atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
                 return;
             }
             popularLista('f-material', await catalogoFiltro('materiais', produto), '(nenhum material para este produto)');
             popularLista('f-acab-serr', [], '— escolha o material —');
+            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
         }
         async function carregarAcabSerr(material) {
             if (!material) {
@@ -489,22 +561,29 @@
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
             set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
             set('f-valor', item.valor); set('f-obs', item.obs);
-            set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
+            set('f-perfil', d.perfil); set('f-acab', d.acabamento);
+            atualizarCoresPorAcabamento('f-cor', 'f-acab'); set('f-cor', d.cor);
             set('f-puxador', d.puxador); set('f-posicao', d.posicao);
             set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
-            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest); set('f-divisores', d.divisores);
+            set('f-revest', d.revestimento);
+            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab'); set('f-cor-revest', d.corRevest);
+            set('f-divisores', d.divisores);
             set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
             set('f-produto', d.produto); set('f-material', d.material);
-            set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
+            set('f-acab-serr', d.acabSerr);
+            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr'); set('f-cor-serr', d.corSerr);
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
             alternarCamposPuxador(d.puxador);
             atualizarTotalItem();
         }
         function limparForm() {
-            document.querySelectorAll('.card .grid-form input, .card .grid-form select').forEach(el => {
+            document.querySelectorAll('#item-fields .grid-form input, #item-fields .grid-form select').forEach(el => {
                 if (el.id !== 'f-qtd') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
+            atualizarCoresPorAcabamento('f-cor', 'f-acab');
+            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
+            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
             atualizarTotalItem();
             alternarCamposPuxador('');
             editandoIndex = -1;
@@ -594,6 +673,7 @@
             } catch (err) {
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
             }
+            atualizarTravaCliente();
         }
         // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
@@ -611,15 +691,29 @@
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas: recarregam os combos dependentes
         document.getElementById('f-perfil').addEventListener('change', e => carregarDependentesPerfil(e.target.value));
+        document.getElementById('f-acab').addEventListener('change', () => {
+            atualizarCoresPorAcabamento('f-cor', 'f-acab');
+            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
+        });
         document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
+        document.getElementById('f-acab-serr').addEventListener('change', () => {
+            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
+        });
+        document.getElementById('sel-cliente').addEventListener('change', () => {
+            atualizarTravaCliente();
+            if (!document.getElementById('sel-cliente').value) limparForm();
+            carregarPerfis();
+            calcularPrecoAutomatico();
+        });
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) { window.location.href = LOGIN_URL; return; }
             document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
             document.getElementById('user-name').textContent = auth.user.nome || '';
             aplicarVisibilidadeCampos();
+            atualizarTravaCliente();
             renderItens();
             carregarClientes();
             carregarCatalogosIniciais();
