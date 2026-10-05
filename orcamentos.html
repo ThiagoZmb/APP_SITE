@@ -123,7 +123,7 @@
         </nav>
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
-            <p class="welcome-subtitle">Monte o orçamento por frente — preços calculados automaticamente pelo motor financeiro</p>
+            <p class="welcome-subtitle">Monte o orçamento por frente — combos em cascata, fiéis ao EleganSys V5</p>
             <section class="card">
                 <div class="card-title">1. Cliente</div>
                 <div class="grid-form">
@@ -146,9 +146,9 @@
                     <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                     <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                     <div class="form-group f-porta"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Acabamento do perfil</label><select id="f-acab"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
                     <div class="form-group f-porta"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-porta"><label>Puxador</label><select id="f-puxador"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-porta"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
                     <div class="form-group f-porta"><label>Posição do puxador</label>
                         <select id="f-posicao">
                             <option value="">—</option>
@@ -158,7 +158,9 @@
                             <option>Base Total</option><option>Topo Total</option>
                         </select>
                     </div>
-                    <div class="form-group f-porta"><label>Revestimento</label><select id="f-revest"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
+                    <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
+                    <div class="form-group f-porta"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
                     <div class="form-group f-porta"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-porta"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
                     <!-- Exclusivo Portas de Correr -->
@@ -166,8 +168,8 @@
                     <div class="form-group f-correr" style="display:none"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                     <!-- Exclusivo Serralheria -->
                     <div class="form-group f-serr" style="display:none"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Material</label><select id="f-material"><option value="">Carregando...</option></select></div>
-                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><select id="f-acab-serr"><option value="">Carregando...</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
+                    <div class="form-group f-serr" style="display:none"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
                     <div class="form-group f-serr" style="display:none"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
                     <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
                     <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
@@ -250,6 +252,7 @@
                 frenteAtual = btn.dataset.frente;
                 document.getElementById('frente-atual').textContent = frenteAtual;
                 aplicarVisibilidadeCampos();
+                carregarPerfis(); // ✅ CASCATA: perfis dependem da frente (TIPO_PRODUTO)
                 calcularPrecoAutomatico();
             });
         });
@@ -260,41 +263,110 @@
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
-            // ✅ CORREÇÃO 1: valor SEMPRE calculado pelo motor (as 3 frentes) — readonly em todas
             document.getElementById('lbl-valor').textContent = 'Valor unitário (auto)';
+            alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
         }
-        // ============ CATÁLOGOS DO BANCO → COMBOS ============
-        async function carregarCatalogos() {
+        // ============ COMBOS: POPULAÇÃO ============
+        function popularLista(id, lista, msgVazio) {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const l = lista || [];
+            sel.innerHTML = '<option value="">— Selecione —</option>' +
+                l.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+            if (l.length === 0) sel.innerHTML = `<option value="">${escapeHtml(msgVazio || '(nada encontrado para este filtro)')}</option>`;
+        }
+        function popularCores(id, grupos) {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            let html = '<option value="">— Selecione —</option>';
+            Object.keys(grupos || {}).sort().forEach(tipo => {
+                html += `<optgroup label="${escapeHtml(tipo)}">` +
+                    (grupos[tipo] || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
+                    '</optgroup>';
+            });
+            sel.innerHTML = html;
+        }
+        async function catalogoFiltro(campo, chave) {
+            if (!chave) return [];
             try {
-                const cat = await fetchAutenticado(`${API_BASE}/catalogos`);
-                const mapa = [
-                    ['f-perfil', 'perfis'],
-                    ['f-acab', 'acabamentos'],
-                    ['f-cor', 'cores'],
-                    ['f-puxador', 'puxadores'],
-                    ['f-revest', 'revestimentos'],
-                    ['f-cor-revest', 'cores'],
-                    ['f-sistema', 'sistemas'],
-                    ['f-produto', 'produtos_serr'],
-                    ['f-material', 'materiais_serr'],
-                    ['f-acab-serr', 'acabamentos'],
-                    ['f-cor-serr', 'cores']
-                ];
-                mapa.forEach(([id, chave]) => {
-                    const sel = document.getElementById(id);
-                    if (!sel) return; // proteção: ID ausente não quebra o carregamento
-                    const lista = cat[chave] || [];
-                    sel.innerHTML = '<option value="">— Selecione —</option>' +
-                        lista.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-                    if (lista.length === 0) {
-                        sel.innerHTML = '<option value="">(catálogo vazio — verifique a tabela no backend)</option>';
-                    }
-                });
-            } catch (err) {
-                console.error('Erro ao carregar catálogos:', err);
-            }
+                return await fetchAutenticado(`${API_BASE}/catalogos_filtro?campo=${encodeURIComponent(campo)}&chave=${encodeURIComponent(chave)}`);
+            } catch (err) { console.error(`Erro catálogo ${campo}:`, err); return []; }
         }
-        // ============ TOTAL DO ITEM (função ANTES dos usos) ============
+        // ============ CATÁLOGOS INDEPENDENTES (init) ============
+        async function carregarCatalogosIniciais() {
+            try {
+                const [cat, coresGrupos] = await Promise.all([
+                    fetchAutenticado(`${API_BASE}/catalogos`),
+                    fetchAutenticado(`${API_BASE}/cores_por_tipo`)
+                ]);
+                popularCores('f-cor', coresGrupos);        // ✅ CORES agrupadas por TIPO (Sólida/Metálica)
+                popularCores('f-cor-revest', coresGrupos);
+                popularCores('f-cor-serr', coresGrupos);
+                popularLista('f-produto', cat.produtos_serr);
+                popularLista('f-sistema', cat.sistemas);   // ✅ do sistema_correr (tabela própria, como no VB)
+            } catch (err) { console.error('Erro catálogos iniciais:', err); }
+        }
+        // ============ CASCATAS (fiel ao RepositorioProdutos.vb) ============
+        function alternarCamposPuxador(puxador) {
+            const mostrar = !!puxador && frenteAtual !== 'Serralheria';
+            document.querySelectorAll('.f-pux-extra').forEach(el => el.style.display = mostrar ? '' : 'none');
+        }
+        async function carregarPerfis() {
+            if (frenteAtual === 'Serralheria') return;
+            const lista = await catalogoFiltro('perfis', frenteAtual);
+            popularLista('f-perfil', lista);
+            popularLista('f-acab', [], '— escolha o perfil —');
+            popularLista('f-puxador', [], '— escolha o perfil —');
+            popularLista('f-revest', [], '— escolha o perfil —');
+            popularLista('f-acab-pux', [], '— escolha o puxador —');
+            alternarCamposPuxador('');
+        }
+        async function carregarDependentesPerfil(perfil) {
+            if (!perfil) {
+                popularLista('f-acab', [], '— escolha o perfil —');
+                popularLista('f-puxador', [], '— escolha o perfil —');
+                popularLista('f-revest', [], '— escolha o perfil —');
+                popularLista('f-acab-pux', [], '— escolha o puxador —');
+                alternarCamposPuxador('');
+                return;
+            }
+            const [acabs, puxs, revs] = await Promise.all([
+                catalogoFiltro('acabamentos', perfil),   // acabamentos_permitidos
+                catalogoFiltro('puxadores', perfil),     // puxadores_permitidos
+                catalogoFiltro('revestimentos', perfil)  // revestimentos_permitidos
+            ]);
+            popularLista('f-acab', acabs, '(nenhum acabamento para este perfil)');
+            popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
+            popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
+            popularLista('f-acab-pux', [], '— escolha o puxador —');
+            alternarCamposPuxador('');
+        }
+        async function carregarDependentesPuxador(puxador) {
+            if (!puxador) {
+                popularLista('f-acab-pux', [], '— escolha o puxador —');
+                alternarCamposPuxador('');
+                return;
+            }
+            popularLista('f-acab-pux', await catalogoFiltro('acabamentos', puxador), '(nenhum acabamento para este puxador)');
+            alternarCamposPuxador(puxador);
+        }
+        async function carregarMateriais(produto) {
+            if (!produto) {
+                popularLista('f-material', [], '— escolha o produto —');
+                popularLista('f-acab-serr', [], '— escolha o material —');
+                return;
+            }
+            popularLista('f-material', await catalogoFiltro('materiais', produto), '(nenhum material para este produto)');
+            popularLista('f-acab-serr', [], '— escolha o material —');
+        }
+        async function carregarAcabSerr(material) {
+            if (!material) {
+                popularLista('f-acab-serr', [], '— escolha o material —');
+                return;
+            }
+            popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
+        }
+        // ============ TOTAL DO ITEM ============
         function atualizarTotalItem() {
             const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
             const q = parseFloat(document.getElementById('f-qtd').value) || 1;
@@ -308,7 +380,7 @@
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
             const clienteNome = cliente.options[cliente.selectedIndex]?.text || '';
-            const clienteCodigo = cliente.value || ''; // CODIGO do banco (busca precisa)
+            const clienteCodigo = cliente.value || '';
             let payload = null;
             if (frenteAtual === 'Serralheria') {
                 if (!g('f-produto') || !g('f-material')) {
@@ -333,7 +405,9 @@
                             cliente: clienteNome, clienteCodigo,
                             altura: g('f-altura'), largura: g('f-largura'), qtd: g('f-qtd'),
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
-                            puxador: g('f-puxador'), acabPuxador: g('f-acab'), posicaoPuxador: g('f-posicao'), tamanhoPuxador: '',
+                            puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),   // ✅ acabamento PRÓPRIO do puxador
+                            posicaoPuxador: g('f-posicao'),
+                            tamanhoPuxador: g('f-tamanho-pux'),                      // ✅ TAMANHO do puxador
                             revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
                             divisor: '', qtdDivH: 0, qtdDivV: 0 };
             }
@@ -352,7 +426,7 @@
                 } catch (e) {
                     status.textContent = '⚠️ ' + (e.message === 'Erro HTTP: 400' ? 'Item sem preço no banco' : 'Erro no cálculo');
                     document.getElementById('f-valor').value = '';
-                    atualizarTotalItem(); // ✅ CORREÇÃO 4: limpa o total junto
+                    atualizarTotalItem();
                 }
             }, 400);
         }
@@ -365,7 +439,7 @@
                        ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm`;
             } else {
                 desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}` +
-                       ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}` +
+                       ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}${g('f-tamanho-pux') ? ' ' + g('f-tamanho-pux') + 'mm' : ''}` +
                        ` | Revest: ${g('f-revest') || '-'}` +
                        (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '');
             }
@@ -379,6 +453,7 @@
                 detalhes: {
                     perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'),
                     puxador: g('f-puxador'), posicao: g('f-posicao'),
+                    acabPux: g('f-acab-pux'), tamanhoPux: g('f-tamanho-pux'),
                     revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
                     divisores: parseInt(g('f-divisores')) || 0,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
@@ -390,26 +465,46 @@
                 descricao: desc
             };
         }
-        function preencherForm(item) {
+        async function preencherForm(item) {
             const d = item.detalhes || {};
+            // Recria as cascatas ANTES de preencher (combos dependem do pai)
+            if (item.frente !== 'Serralheria') {
+                await carregarPerfis();
+                if (d.perfil) {
+                    await carregarDependentesPerfil(d.perfil);
+                    if (d.puxador) await carregarDependentesPuxador(d.puxador);
+                } else {
+                    await carregarDependentesPerfil('');
+                }
+            } else {
+                if (d.produto) {
+                    await carregarMateriais(d.produto);
+                    if (d.material) await carregarAcabSerr(d.material);
+                } else {
+                    await carregarMateriais('');
+                }
+            }
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
             set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
             set('f-valor', item.valor); set('f-obs', item.obs);
             set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
             set('f-puxador', d.puxador); set('f-posicao', d.posicao);
+            set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
             set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest); set('f-divisores', d.divisores);
             set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
             set('f-produto', d.produto); set('f-material', d.material);
             set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
-            atualizarTotalItem(); // ✅ CORREÇÃO 3: total atualiza ao editar item
+            alternarCamposPuxador(d.puxador);
+            atualizarTotalItem();
         }
         function limparForm() {
             document.querySelectorAll('.card .grid-form input, .card .grid-form select').forEach(el => {
                 if (el.id !== 'f-qtd') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
-            atualizarTotalItem(); // ✅ CORREÇÃO 3: zera o total ao limpar
+            atualizarTotalItem();
+            alternarCamposPuxador('');
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
             document.getElementById('calc-status').textContent = '';
@@ -507,15 +602,16 @@
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('f-qtd').addEventListener('input', atualizarTotalItem);
-        // Motor financeiro: recalcula ao mudar qualquer campo relevante
-        // ✅ CORREÇÃO 2: listeners protegidos — ID ausente no HTML não mata o script
-        ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-revest','f-cor-revest',
-         'f-divisores','f-altura','f-largura','f-qtd','sel-cliente',
+        // Motor: recalcula ao mudar qualquer campo relevante
+        ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-acab-pux','f-tamanho-pux',
+         'f-revest','f-cor-revest','f-divisores','f-altura','f-largura','f-qtd','sel-cliente',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
-            .forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.addEventListener('change', calcularPrecoAutomatico);
-            });
+            .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
+        // Cascatas: recarregam os combos dependentes
+        document.getElementById('f-perfil').addEventListener('change', e => carregarDependentesPerfil(e.target.value));
+        document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
+        document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
+        document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) { window.location.href = LOGIN_URL; return; }
@@ -524,7 +620,8 @@
             aplicarVisibilidadeCampos();
             renderItens();
             carregarClientes();
-            carregarCatalogos();
+            carregarCatalogosIniciais();
+            carregarPerfis(); // perfis da frente inicial
         });
     </script>
 </body>

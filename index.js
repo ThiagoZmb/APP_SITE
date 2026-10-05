@@ -680,6 +680,86 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
+
+// ============================================================
+// CATÁLOGOS EM CASCATA — fiel ao RepositorioProdutos.vb
+// ============================================================
+const QUERIES_FILTRO = {
+  perfis: `SELECT DISTINCT c.MODELO AS nome
+           FROM cadastro_de_produtos c
+           INNER JOIN perfis_permitidos p ON c.MODELO = p.MODELO
+           WHERE c.SITUACAO = 'Ativo' AND p.TIPO_PRODUTO = ?
+           ORDER BY c.MODELO`,
+  acabamentos: `SELECT a.ACABAMENTO AS nome
+                FROM acabamentos a
+                INNER JOIN acabamentos_permitidos p ON a.ACABAMENTO = p.ACABAMENTO
+                WHERE p.MODELO = ?
+                ORDER BY a.ACABAMENTO`,
+  puxadores: `SELECT c.MODELO AS nome
+              FROM cadastro_de_produtos c
+              INNER JOIN puxadores_permitidos p ON c.MODELO = p.PUXADOR_PERMITIDO
+              WHERE p.MODELO = ? AND c.SITUACAO = 'Ativo'
+              ORDER BY c.MODELO`,
+  revestimentos: `SELECT c.MODELO AS nome
+                  FROM cadastro_de_produtos c
+                  INNER JOIN revestimentos_permitidos p ON c.MODELO = p.REVESTIMENTO_PERMITIDO
+                  WHERE p.MODELO = ? AND c.SITUACAO = 'Ativo'
+                  ORDER BY c.MODELO`,
+  divisores: `SELECT c.MODELO AS nome
+              FROM cadastro_de_produtos c
+              INNER JOIN divisores_permitidos p ON c.MODELO = p.DIVISOR
+              WHERE p.MODELO = ? AND c.SITUACAO = 'Ativo'
+              ORDER BY c.MODELO`,
+  materiais: `SELECT DISTINCT c.MODELO AS nome
+              FROM cadastro_de_produtos c
+              INNER JOIN modelos_permitidos_serralheria p ON c.MODELO = p.MODELO
+              WHERE c.SITUACAO = 'Ativo' AND p.PRODUTO = ?
+              ORDER BY c.MODELO`
+};
+
+app.get('/catalogos_filtro', autenticar, async (req, res) => {
+  const { campo, chave } = req.query;
+  const sql = QUERIES_FILTRO[campo]; // nome vem SÓ do whitelist — seguro
+  if (!sql) return res.status(400).json({ error: 'Campo inválido' });
+  try {
+    const [rows] = await pool.execute(sql, [chave || '']);
+    res.json(rows.map(r => r.nome).filter(n => n));
+  } catch (err) {
+    console.error(`Erro /catalogos_filtro (${campo}):`, err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+  }
+});
+
+// Cores agrupadas pela coluna TIPO (Sólida / Metálica)
+app.get('/cores_por_tipo', autenticar, async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT NOME_COR, TIPO FROM cores ORDER BY NOME_COR');
+    const grupos = {};
+    rows.forEach(r => {
+      const tipo = String(r.TIPO || '').trim() || 'Sem tipo';
+      (grupos[tipo] = grupos[tipo] || []).push(r.NOME_COR);
+    });
+    res.json(grupos);
+  } catch (err) {
+    console.error('Erro /cores_por_tipo:', err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+  }
+});
+
+
+
+
+
+
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
