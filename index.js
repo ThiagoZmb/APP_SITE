@@ -725,13 +725,36 @@ const QUERIES_FILTRO = {
               ORDER BY c.MODELO`
 };
 
+// Nomes do FRONT → valores reais da base (ajuste após rodar o SELECT DISTINCT)
+const ALIAS_FRENTE = {
+  'Porta de Abrir':  ['Porta de Abrir', 'Porta de abrir', 'Porta de Giro', 'Porta de giro', 'Giro', 'Abrir'],
+  'Porta de Correr': ['Porta de Correr', 'Porta de correr', 'Correr']
+};
+
 app.get('/catalogos_filtro', autenticar, async (req, res) => {
   const { campo, chave } = req.query;
-  const sql = QUERIES_FILTRO[campo]; // nome vem SÓ do whitelist — seguro
+  const sql = QUERIES_FILTRO[campo];
   if (!sql) return res.status(400).json({ error: 'Campo inválido' });
   try {
-    const [rows] = await pool.execute(sql, [chave || '']);
-    res.json(rows.map(r => r.nome).filter(n => n));
+    let params = [chave || ''];
+    let sqlFinal = sql;
+    // Perfis: busca por TODOS os aliases da frente (resolve "Abrir" vs "giro")
+    if (campo === 'perfis') {
+      const aliases = ALIAS_FRENTE[chave] || [chave];
+      sqlFinal = sql.replace('p.TIPO_PRODUTO = ?', `p.TIPO_PRODUTO IN (${aliases.map(() => '?').join(',')})`);
+      params = aliases;
+    }
+    const [rows] = await pool.execute(sqlFinal, params);
+    let lista = rows.map(r => r.nome).filter(n => n);
+    // FALLBACK: coluna TIPO_PRODUTO vazia na base → não deixa o vendedor travado
+    if (lista.length === 0 && campo === 'perfis') {
+      console.warn(`PERFIS: nenhum perfil classificado para '${chave}' — usando fallback (todos os perfis ativos). Popule TIPO_PRODUTO em perfis_permitidos.`);
+      const [todos] = await pool.execute(
+        `SELECT MODELO AS nome FROM cadastro_de_produtos
+         WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil' ORDER BY MODELO`);
+      lista = todos.map(r => r.nome);
+    }
+    res.json(lista);
   } catch (err) {
     console.error(`Erro /catalogos_filtro (${campo}):`, err.message);
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
