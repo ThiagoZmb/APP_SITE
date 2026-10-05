@@ -32,7 +32,15 @@ const pool = mysql.createPool({
 });
 
 app.use(helmet());
-app.use(cors({ origin: ['https://thiagozmb.github.io'] }));
+app.use(cors({
+  origin(origin, callback) {
+    const origemLocal = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+    if (!origin || origin === 'https://thiagozmb.github.io' || origemLocal.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origem não permitida pelo CORS'));
+  }
+}));
 app.use(express.json({ limit: '100kb' }));
 
 // ================= RATE LIMIT =================

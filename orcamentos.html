@@ -73,8 +73,8 @@
         .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
         .form-group input[readonly] { background: #eef1f4; font-weight: 700; color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
-        .item-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; padding: 16px 0; border-bottom: 1px solid var(--border-color); }
-        .item-section-title { grid-column: 1 / -1; color: var(--text-dark); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+        .item-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; padding: 18px 0; border-bottom: 1px solid var(--border-color); }
+        .item-section-title { grid-column: 1 / -1; color: var(--primary-color); font-size: 13px; font-weight: 700; text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
         .item-section .form-group.full { grid-column: 1 / -1; }
         .item-section:last-child { border-bottom: 0; }
         .btn {
@@ -110,6 +110,7 @@
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 20px; }
             .card { overflow-x: auto; }
+            .item-section { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -671,7 +672,9 @@
                 sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
                     clientes.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razaoSocial)}</option>`).join('');
             } catch (err) {
+                console.error('Erro ao carregar clientes:', err);
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
+                sel.title = err.message || 'Verifique a conexão com o servidor.';
             }
             atualizarTravaCliente();
         }
