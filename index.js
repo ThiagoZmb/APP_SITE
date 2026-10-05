@@ -423,7 +423,6 @@ app.post('/admin/definir_senha', async (req, res) => {
 });
 
 // ================= MIGRAÇÃO DE SENHAS (rodar UMA VEZ, depois remover) =================
-// Tabela usa CODIGO (não ID) — colunas: CODIGO, NOME, CARGO, SENHA, SITUACAO...
 app.get('/migrar_senhas', async (req, res) => {
   const chave = req.query.key;
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
@@ -450,16 +449,13 @@ app.get('/migrar_senhas', async (req, res) => {
 
 // ================= CATÁLOGOS PARA COMBOS DO ORÇAMENTO =================
 const TABELAS_CATALOGO = {
-  // FRENTES DE PORTAS (alumínio)
   perfis:        ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil'"],
   puxadores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Puxador'"],
   revestimentos: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Revestimento'"],
-  // ✅ PATCH 2: sistemas vem da tabela PRÓPRIA, como o VB lê (RepositorioProdutos.vb)
+  // ✅ sistemas vem da tabela PRÓPRIA, como o VB lê (RepositorioProdutos.vb)
   sistemas:      ['sistema_correr', 'NOME', ''],
   divisores:     ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Divisor'"],
-  // FRENTE SERRALHERIA (Perfil AC = aço carbono)
   materiais_serr: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil AC'"],
-  // GERAIS
   acabamentos:   ['acabamentos',          'ACABAMENTO', "WHERE SITUACAO = 'Ativo'"],
   produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
   cores:         ['cores', 'NOME_COR', '']
@@ -525,9 +521,7 @@ function aplicarPercentuais(valor, texto) {
   }
   return v;
 }
-
-// ✅ PATCH 1: removida a função atualizarTotalItem colada aqui
-//    (código de navegador NÃO existe no backend — era pólvora)
+// (Removida função atualizarTotalItem — código de navegador não existe no backend)
 
 app.post('/calcular_preco', autenticar, async (req, res) => {
   const b = req.body || {};
@@ -559,7 +553,6 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       const dadosMat = await buscarDadosProduto(b.material);
       if (!dadosMat) return res.status(400).json({ error: `Material '${b.material}' não encontrado ou sem preços.` });
 
-      // Metragem: (A/1000 × qtdA) + (L/1000 × qtdL) + (P/1000 × qtdP) — qtds padrão 1
       const qtdA = parseFloat(b.qtdAltura) > 0 ? parseFloat(b.qtdAltura) : 1;
       const qtdL = parseFloat(b.qtdLargura) > 0 ? parseFloat(b.qtdLargura) : 1;
       const qtdP = parseFloat(b.qtdProfundidade) > 0 ? parseFloat(b.qtdProfundidade) : 1;
@@ -577,16 +570,14 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
         subtotal += (parseFloat(sol[0]?.v) || 0) * soldas;
       } catch { /* Solda sem cadastro → 0 */ }
 
-      // Acabamento % sobre o material
       const pctAcab = await taxaAcabamento(b.acabamento);
       subtotal += material * (pctAcab / 100);
 
-      // Complementos (qtd × valor unitário)
       (Array.isArray(b.complementos) ? b.complementos : []).forEach(c => {
         subtotal += (parseFloat(c.qtd) || 0) * (parseFloat(c.valorUnit) || 0);
       });
 
-      subtotal += valorFixoProduto; // fixo do produto entra na base
+      subtotal += valorFixoProduto;
 
       const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
       let final = subtotal * qtd;
@@ -617,7 +608,7 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
 
     const temPux = !!dadosPux;
     const posPux = String(b.posicaoPuxador || '').toUpperCase();
-    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase(); // TIPO_PUXADOR do banco
+    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase();
     const qtdPux = posPux ? posPux.split(',').filter(p => p.trim()).length : 0;
     const isSobreposto = tipoPux.includes('SOBREPOSTO');
     const isEmbutido = tipoPux.includes('EMBUTIDO');
@@ -719,11 +710,13 @@ const QUERIES_FILTRO = {
               ORDER BY c.MODELO`
 };
 
-// ✅ PATCH 3: chave do alias = o que o FRONT envia ("Porta de giro")
-const ALIAS_FRENTE = {
-  'Porta de giro':   ['Porta de giro', 'Porta de Giro', 'Porta de Abrir', 'Porta de abrir', 'Giro', 'Abrir'],
-  'Porta de Correr': ['Porta de Correr', 'Porta de correr', 'Correr']
-};
+// ✅ Resolve a família da frente por SEMELHANÇA (imune à grafia: giro/Abrir/Giro...)
+function resolverAliasesFrente(chave) {
+  const c = String(chave || '').toLowerCase();
+  if (c.includes('correr')) return ['Porta de Correr', 'Porta de correr', 'Correr'];
+  // giro / abrir / qualquer outra porta → mesma família
+  return ['Porta de giro', 'Porta de Giro', 'Porta de Abrir', 'Porta de abrir', 'Giro', 'Abrir'];
+}
 
 app.get('/catalogos_filtro', autenticar, async (req, res) => {
   const { campo, chave } = req.query;
@@ -732,21 +725,16 @@ app.get('/catalogos_filtro', autenticar, async (req, res) => {
   try {
     let params = [chave || ''];
     let sqlFinal = sql;
-    // Perfis: busca por TODOS os aliases da frente (resolve variação de escrita na base)
     if (campo === 'perfis') {
-      const aliases = ALIAS_FRENTE[chave] || [chave];
+      const aliases = resolverAliasesFrente(chave);
       sqlFinal = sql.replace('p.TIPO_PRODUTO = ?', `p.TIPO_PRODUTO IN (${aliases.map(() => '?').join(',')})`);
       params = aliases;
     }
     const [rows] = await pool.execute(sqlFinal, params);
-    let lista = rows.map(r => r.nome).filter(n => n);
-    // FALLBACK: TIPO_PRODUTO vazia na base → não trava o vendedor; Render loga o aviso
+    const lista = rows.map(r => r.nome).filter(n => n);
+    // ✅ SEM FALLBACK: filtragem estrita. Lista vazia = problema de dados (visível)
     if (lista.length === 0 && campo === 'perfis') {
-      console.warn(`PERFIS: nenhum perfil classificado para '${chave}' — usando fallback (todos os perfis ativos). Popule TIPO_PRODUTO em perfis_permitidos.`);
-      const [todos] = await pool.execute(
-        `SELECT MODELO AS nome FROM cadastro_de_produtos
-         WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil' ORDER BY MODELO`);
-      lista = todos.map(r => r.nome);
+      console.warn(`PERFIS: nenhum perfil para '${chave}' — verifique TIPO_PRODUTO em perfis_permitidos.`);
     }
     res.json(lista);
   } catch (err) {
