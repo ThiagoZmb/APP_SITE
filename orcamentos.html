@@ -34,9 +34,7 @@
             grid-area: header;
             background: var(--gradient-primary);
             color: white;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
             padding: 0 40px;
         }
         .logo { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
@@ -62,21 +60,39 @@
             background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
             box-shadow: var(--shadow-light); margin-bottom: 30px;
         }
-        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); }
+        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
+        .etapa {
+            width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary);
+            color: #fff; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        /* ===== SEÇÕES INTERNAS DO ITEM ===== */
+        .secao-item {
+            background: var(--secondary-color); border: 1px solid var(--border-color);
+            border-radius: 14px; padding: 20px 20px 8px; margin-bottom: 18px;
+        }
+        .secao-item h4 {
+            font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+            color: var(--primary-color); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+        }
+        .secao-item h4::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
         .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
-        fieldset { min-width: 0; padding: 0; border: 0; }
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
         .form-group input, .form-group select {
             width: 100%; padding: 11px 14px; border: 1px solid var(--border-color); border-radius: 10px;
-            font-size: 14px; background: var(--secondary-color); font-family: inherit;
+            font-size: 14px; background: var(--white); font-family: inherit; transition: border-color .15s ease;
         }
         .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
         .form-group input[readonly] { background: #eef1f4; font-weight: 700; color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
-        .item-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; padding: 18px 0; border-bottom: 1px solid var(--border-color); }
-        .item-section-title { grid-column: 1 / -1; color: var(--primary-color); font-size: 13px; font-weight: 700; text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
-        .item-section .form-group.full { grid-column: 1 / -1; }
-        .item-section:last-child { border-bottom: 0; }
+        /* ===== TRAVA DE CLIENTE ===== */
+        #bloqueio-msg {
+            display: none; align-items: center; gap: 10px; margin-bottom: 18px;
+            padding: 14px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
+            background: rgba(139,0,0,.08); border: 1px dashed rgba(139,0,0,.35); color: var(--primary-color);
+        }
+        #bloqueio-msg.visivel { display: flex; }
+        #form-item.bloqueado { opacity: .5; pointer-events: none; filter: grayscale(.4); }
+        /* ===== BOTÕES ===== */
         .btn {
             padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
             cursor: pointer; font-family: inherit; transition: all .2s ease;
@@ -87,6 +103,7 @@
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
         .calc-status { font-size: 13px; color: var(--text-light); }
+        /* ===== TABELA ===== */
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
         td { padding: 13px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
@@ -110,7 +127,6 @@
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 20px; }
             .card { overflow-x: auto; }
-            .item-section { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -129,99 +145,126 @@
         </nav>
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
-            <p class="welcome-subtitle">Monte o orçamento por frente — combos em cascata, fiéis ao EleganSys V5</p>
+            <p class="welcome-subtitle">1. Selecione o cliente &nbsp;→&nbsp; 2. Escolha a frente &nbsp;→&nbsp; 3. Monte os itens — preços calculados pelo motor financeiro</p>
+
+            <!-- ═══════════ ETAPA 1: CLIENTE ═══════════ -->
             <section class="card">
-                <div class="card-title">1. Cliente</div>
+                <div class="card-title"><span class="etapa">1</span> Cliente</div>
                 <div class="grid-form">
                     <div class="form-group full">
-                        <label for="sel-cliente">Cliente (Razão Social)</label>
+                        <label for="sel-cliente">Cliente (Razão Social) — define a tabela de preço e o desconto</label>
                         <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
                     </div>
                 </div>
             </section>
-            <div class="frentes">
-                <button class="frente-btn active" data-frente="Porta de giro" disabled>🚪 Portas de Giro</button>
-                <button class="frente-btn" data-frente="Porta de Correr" disabled>↔️ Portas de Correr</button>
-                <button class="frente-btn" data-frente="Serralheria" disabled>🔧 Serralheria</button>
-            </div>
+
+            <!-- ═══════════ ETAPA 2: ITEM ═══════════ -->
             <section class="card">
-                <div class="card-title">2. Item — <span id="frente-atual">Porta de giro</span></div>
-                <fieldset id="item-fields" disabled>
-                <div class="grid-form">
-                    <div class="item-section">
-                        <div class="item-section-title">Quantidade</div>
-                        <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
+                <div class="card-title"><span class="etapa">2</span> Item — <span id="frente-atual">Porta de giro</span></div>
+
+                <div id="bloqueio-msg">🔒 Selecione o cliente na etapa 1 para liberar a montagem dos itens</div>
+
+                <div id="form-item" class="bloqueado">
+                    <div class="frentes">
+                        <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
+                        <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
+                        <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
                     </div>
-                    <div class="item-section f-porta">
-                        <div class="item-section-title">Medidas</div>
-                        <div class="form-group"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
-                        <div class="form-group"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
-                    </div>
-                    <div class="item-section f-porta">
-                        <div class="item-section-title">Perfil</div>
-                        <div class="form-group"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
-                        <div class="form-group"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
-                        <div class="form-group"><label>Cor do perfil</label><select id="f-cor"><option value="">Selecione o acabamento</option></select></div>
-                    </div>
-                    <div class="item-section f-porta">
-                        <div class="item-section-title">Puxador</div>
-                        <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
-                        <div class="form-group"><label>Posição do puxador</label>
-                            <select id="f-posicao">
-                                <option value="">—</option>
-                                <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
-                                <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
-                                <option>Topo Esquerda</option><option>Topo Direita</option>
-                                <option>Base Total</option><option>Topo Total</option>
-                            </select>
+
+                    <!-- MEDIDAS -->
+                    <div class="secao-item">
+                        <h4>📐 Medidas e quantidade</h4>
+                        <div class="grid-form">
+                            <div class="form-group f-porta"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
+                            <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
+                            <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                            <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                         </div>
-                        <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
-                        <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
                     </div>
-                    <div class="item-section f-porta">
-                        <div class="item-section-title">Divisores</div>
-                        <div class="form-group"><label>Quantidade</label><input type="number" id="f-divisores" min="0" value="0"></div>
+
+                    <!-- PERFIL -->
+                    <div class="secao-item secao-porta">
+                        <h4>🟦 Perfil e acabamento</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
+                            <div class="form-group"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
+                        </div>
                     </div>
-                    <div class="item-section f-porta">
-                        <div class="item-section-title">Revestimento</div>
-                        <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
-                        <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Selecione o acabamento</option></select></div>
+
+                    <!-- PUXADOR -->
+                    <div class="secao-item secao-porta">
+                        <h4>🟧 Puxador</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
+                            <div class="form-group"><label>Posição do puxador</label>
+                                <select id="f-posicao">
+                                    <option value="">—</option>
+                                    <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
+                                    <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
+                                    <option>Topo Esquerda</option><option>Topo Direita</option>
+                                    <option>Base Total</option><option>Topo Total</option>
+                                </select>
+                            </div>
+                            <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
+                            <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
+                        </div>
                     </div>
-                    <div class="item-section f-correr" style="display:none">
-                        <div class="item-section-title">Porta de correr</div>
-                        <div class="form-group"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
-                        <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+
+                    <!-- REVESTIMENTO -->
+                    <div class="secao-item secao-porta">
+                        <h4>🟩 Revestimento e divisores</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
+                            <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
+                        </div>
                     </div>
-                    <div class="item-section f-serr" style="display:none">
-                        <div class="item-section-title">Produto e acabamento</div>
-                        <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
-                        <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
-                        <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
-                        <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Selecione o acabamento</option></select></div>
+
+                    <!-- SERRALHERIA -->
+                    <div class="secao-item secao-serr" style="display:none">
+                        <h4>🔧 Serralheria — produto e material</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
+                            <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
+                            <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                        </div>
                     </div>
-                    <div class="item-section f-serr" style="display:none">
-                        <div class="item-section-title">Medidas e soldas</div>
-                        <div class="form-group"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
-                        <div class="form-group"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
-                        <div class="form-group"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
-                        <div class="form-group"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
+
+                    <!-- CORRER -->
+                    <div class="secao-item secao-correr" style="display:none">
+                        <h4>↔️ Sistema de correr</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+                        </div>
                     </div>
-                    <div class="item-section">
-                        <div class="item-section-title">Valores e observação</div>
-                        <div class="form-group"><label id="lbl-valor">Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
-                        <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
-                        <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+
+                    <!-- VALORES -->
+                    <div class="secao-item">
+                        <h4>💰 Valores e observação</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
+                            <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
+                            <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+                        </div>
+                    </div>
+
+                    <div class="acoes-linha">
+                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
+                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                        <span class="calc-status" id="calc-status"></span>
                     </div>
                 </div>
-                <div class="acoes-linha">
-                    <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
-                    <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
-                    <span class="calc-status" id="calc-status"></span>
-                </div>
-                </fieldset>
             </section>
+
+            <!-- ═══════════ ETAPA 3: LISTA ═══════════ -->
             <section class="card">
-                <div class="card-title">3. Itens do orçamento</div>
+                <div class="card-title"><span class="etapa">3</span> Itens do orçamento</div>
                 <div style="overflow-x:auto">
                     <table>
                         <thead>
@@ -275,16 +318,24 @@
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
         function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
         // ============ ESTADO ============
-        // ✅ CORREÇÃO CRÍTICA: era "Porta de Abrir" — agora usa a nomenclatura real da base
-        //    (TIPO_PRODUTO de perfis_permitidos), que é "Porta de giro"
         let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
-        let coresPorTipo = {};
-        function atualizarTravaCliente() {
-            const liberado = !!document.getElementById('sel-cliente').value;
-            document.getElementById('item-fields').disabled = !liberado;
-            document.querySelectorAll('.frente-btn').forEach(btn => { btn.disabled = !liberado; });
+        // ============ TRAVA DE CLIENTE (🔒 libera itens só com cliente escolhido) ============
+        function atualizarBloqueioCliente() {
+            const temCliente = !!document.getElementById('sel-cliente').value;
+            const form = document.getElementById('form-item');
+            const msg = document.getElementById('bloqueio-msg');
+            form.classList.toggle('bloqueado', !temCliente);
+            msg.classList.toggle('visivel', !temCliente);
+            form.querySelectorAll('input, select').forEach(el => el.disabled = !temCliente);
+            if (!temCliente) {
+                document.getElementById('f-valor').value = '';
+                document.getElementById('calc-status').textContent = '';
+                atualizarTotalItem();
+            } else {
+                calcularPrecoAutomatico();
+            }
         }
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
@@ -294,7 +345,7 @@
                 frenteAtual = btn.dataset.frente;
                 document.getElementById('frente-atual').textContent = frenteAtual;
                 aplicarVisibilidadeCampos();
-                carregarPerfis(); // ✅ CASCATA: perfis dependem da frente (TIPO_PRODUTO)
+                carregarPerfis();
                 calcularPrecoAutomatico();
             });
         });
@@ -302,10 +353,12 @@
             const ehPorta = frenteAtual !== 'Serralheria';
             const ehCorrer = frenteAtual === 'Porta de Correr';
             const ehSerr = frenteAtual === 'Serralheria';
+            document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
+            document.querySelectorAll('.secao-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
+            document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+            // Qtd é comum: fica na seção de medidas para as 3 frentes
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
-            document.querySelectorAll('.f-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
-            document.getElementById('lbl-valor').textContent = 'Valor unitário (auto)';
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
         }
         // ============ COMBOS: POPULAÇÃO ============
@@ -317,30 +370,16 @@
                 l.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
             if (l.length === 0) sel.innerHTML = `<option value="">${escapeHtml(msgVazio || '(nada encontrado para este filtro)')}</option>`;
         }
-        function popularCores(id, grupos, acabamento) {
+        function popularCores(id, grupos) {
             const sel = document.getElementById(id);
             if (!sel) return;
-            const acabamentoNorm = String(acabamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-            const tipoAlvo = acabamentoNorm.includes('solid') ? 'solida' :
-                acabamentoNorm.includes('metal') ? 'metalica' : '';
-            const tiposFiltrados = Object.entries(grupos || {}).filter(([tipo]) => {
-                const tipoNorm = String(tipo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                return tipoAlvo === 'solida' ? tipoNorm.includes('solid') :
-                    tipoAlvo === 'metalica' && tipoNorm.startsWith('metal');
-            });
-            let html = `<option value="">${tipoAlvo ? '— Selecione a cor —' : '— Selecione o acabamento —'}</option>`;
-            tiposFiltrados.sort(([a], [b]) => a.localeCompare(b)).forEach(([tipo, cores]) => {
+            let html = '<option value="">— Selecione —</option>';
+            Object.keys(grupos || {}).sort().forEach(tipo => {
                 html += `<optgroup label="${escapeHtml(tipo)}">` +
-                    (cores || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
+                    (grupos[tipo] || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
                     '</optgroup>';
             });
             sel.innerHTML = html;
-        }
-        function atualizarCoresPorAcabamento(idCor, idAcabamento) {
-            const cor = document.getElementById(idCor);
-            const valorAtual = cor.value;
-            popularCores(idCor, coresPorTipo, document.getElementById(idAcabamento).value);
-            if ([...cor.options].some(opcao => opcao.value === valorAtual)) cor.value = valorAtual;
         }
         async function catalogoFiltro(campo, chave) {
             if (!chave) return [];
@@ -355,12 +394,11 @@
                     fetchAutenticado(`${API_BASE}/catalogos`),
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
-                coresPorTipo = coresGrupos;
-                atualizarCoresPorAcabamento('f-cor', 'f-acab');
-                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
-                atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
+                popularCores('f-cor', coresGrupos);        // CORES agrupadas por TIPO (Sólida/Metálica)
+                popularCores('f-cor-revest', coresGrupos);
+                popularCores('f-cor-serr', coresGrupos);
                 popularLista('f-produto', cat.produtos_serr);
-                popularLista('f-sistema', cat.sistemas);   // ✅ do sistema_correr (tabela própria, como no VB)
+                popularLista('f-sistema', cat.sistemas);
             } catch (err) { console.error('Erro catálogos iniciais:', err); }
         }
         // ============ CASCATAS (fiel ao RepositorioProdutos.vb) ============
@@ -369,25 +407,13 @@
             document.querySelectorAll('.f-pux-extra').forEach(el => el.style.display = mostrar ? '' : 'none');
         }
         async function carregarPerfis() {
-            if (!document.getElementById('sel-cliente').value || frenteAtual === 'Serralheria') {
-                popularLista('f-perfil', [], '— selecione um cliente —');
-                popularLista('f-acab', [], '— escolha o perfil —');
-                popularLista('f-puxador', [], '— escolha o perfil —');
-                popularLista('f-revest', [], '— escolha o perfil —');
-                popularLista('f-acab-pux', [], '— escolha o puxador —');
-                atualizarCoresPorAcabamento('f-cor', 'f-acab');
-                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
-                alternarCamposPuxador('');
-                return;
-            }
+            if (frenteAtual === 'Serralheria') return;
             const lista = await catalogoFiltro('perfis', frenteAtual);
             popularLista('f-perfil', lista);
             popularLista('f-acab', [], '— escolha o perfil —');
             popularLista('f-puxador', [], '— escolha o perfil —');
             popularLista('f-revest', [], '— escolha o perfil —');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
-            atualizarCoresPorAcabamento('f-cor', 'f-acab');
-            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
             alternarCamposPuxador('');
         }
         async function carregarDependentesPerfil(perfil) {
@@ -396,22 +422,18 @@
                 popularLista('f-puxador', [], '— escolha o perfil —');
                 popularLista('f-revest', [], '— escolha o perfil —');
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
-                atualizarCoresPorAcabamento('f-cor', 'f-acab');
-                atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
                 alternarCamposPuxador('');
                 return;
             }
             const [acabs, puxs, revs] = await Promise.all([
-                catalogoFiltro('acabamentos', perfil),   // acabamentos_permitidos
-                catalogoFiltro('puxadores', perfil),     // puxadores_permitidos
-                catalogoFiltro('revestimentos', perfil)  // revestimentos_permitidos
+                catalogoFiltro('acabamentos', perfil),
+                catalogoFiltro('puxadores', perfil),
+                catalogoFiltro('revestimentos', perfil)
             ]);
             popularLista('f-acab', acabs, '(nenhum acabamento para este perfil)');
             popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
             popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
-            atualizarCoresPorAcabamento('f-cor', 'f-acab');
-            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
             alternarCamposPuxador('');
         }
         async function carregarDependentesPuxador(puxador) {
@@ -427,12 +449,10 @@
             if (!produto) {
                 popularLista('f-material', [], '— escolha o produto —');
                 popularLista('f-acab-serr', [], '— escolha o material —');
-                atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
                 return;
             }
             popularLista('f-material', await catalogoFiltro('materiais', produto), '(nenhum material para este produto)');
             popularLista('f-acab-serr', [], '— escolha o material —');
-            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
         }
         async function carregarAcabSerr(material) {
             if (!material) {
@@ -451,6 +471,7 @@
         // ============ MOTOR FINANCEIRO (cálculo automático) ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
+            if (!document.getElementById('sel-cliente').value) return; // 🔒 sem cliente, sem cálculo
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
@@ -480,9 +501,9 @@
                             cliente: clienteNome, clienteCodigo,
                             altura: g('f-altura'), largura: g('f-largura'), qtd: g('f-qtd'),
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
-                            puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),   // ✅ acabamento PRÓPRIO do puxador
+                            puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
                             posicaoPuxador: g('f-posicao'),
-                            tamanhoPuxador: g('f-tamanho-pux'),                      // ✅ TAMANHO do puxador
+                            tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
                             divisor: '', qtdDivH: 0, qtdDivV: 0 };
             }
@@ -542,7 +563,6 @@
         }
         async function preencherForm(item) {
             const d = item.detalhes || {};
-            // Recria as cascatas ANTES de preencher (combos dependem do pai)
             if (item.frente !== 'Serralheria') {
                 await carregarPerfis();
                 if (d.perfil) {
@@ -562,29 +582,22 @@
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
             set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
             set('f-valor', item.valor); set('f-obs', item.obs);
-            set('f-perfil', d.perfil); set('f-acab', d.acabamento);
-            atualizarCoresPorAcabamento('f-cor', 'f-acab'); set('f-cor', d.cor);
+            set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
             set('f-puxador', d.puxador); set('f-posicao', d.posicao);
             set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
-            set('f-revest', d.revestimento);
-            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab'); set('f-cor-revest', d.corRevest);
-            set('f-divisores', d.divisores);
+            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest); set('f-divisores', d.divisores);
             set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
             set('f-produto', d.produto); set('f-material', d.material);
-            set('f-acab-serr', d.acabSerr);
-            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr'); set('f-cor-serr', d.corSerr);
+            set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
             alternarCamposPuxador(d.puxador);
             atualizarTotalItem();
         }
         function limparForm() {
-            document.querySelectorAll('#item-fields .grid-form input, #item-fields .grid-form select').forEach(el => {
+            document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
                 if (el.id !== 'f-qtd') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
-            atualizarCoresPorAcabamento('f-cor', 'f-acab');
-            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
-            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
             atualizarTotalItem();
             alternarCamposPuxador('');
             editandoIndex = -1;
@@ -593,6 +606,7 @@
         }
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
+            if (!document.getElementById('sel-cliente').value) { alert('Selecione o cliente antes de adicionar itens.'); return; }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
             if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
@@ -672,11 +686,8 @@
                 sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
                     clientes.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razaoSocial)}</option>`).join('');
             } catch (err) {
-                console.error('Erro ao carregar clientes:', err);
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
-                sel.title = err.message || 'Verifique a conexão com o servidor.';
             }
-            atualizarTravaCliente();
         }
         // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
@@ -687,40 +698,28 @@
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('f-qtd').addEventListener('input', atualizarTotalItem);
+        document.getElementById('sel-cliente').addEventListener('change', atualizarBloqueioCliente);
         // Motor: recalcula ao mudar qualquer campo relevante
         ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-acab-pux','f-tamanho-pux',
-         'f-revest','f-cor-revest','f-divisores','f-altura','f-largura','f-qtd','sel-cliente',
+         'f-revest','f-cor-revest','f-divisores','f-altura','f-largura','f-qtd',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas: recarregam os combos dependentes
         document.getElementById('f-perfil').addEventListener('change', e => carregarDependentesPerfil(e.target.value));
-        document.getElementById('f-acab').addEventListener('change', () => {
-            atualizarCoresPorAcabamento('f-cor', 'f-acab');
-            atualizarCoresPorAcabamento('f-cor-revest', 'f-acab');
-        });
         document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
-        document.getElementById('f-acab-serr').addEventListener('change', () => {
-            atualizarCoresPorAcabamento('f-cor-serr', 'f-acab-serr');
-        });
-        document.getElementById('sel-cliente').addEventListener('change', () => {
-            atualizarTravaCliente();
-            if (!document.getElementById('sel-cliente').value) limparForm();
-            carregarPerfis();
-            calcularPrecoAutomatico();
-        });
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) { window.location.href = LOGIN_URL; return; }
             document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
             document.getElementById('user-name').textContent = auth.user.nome || '';
             aplicarVisibilidadeCampos();
-            atualizarTravaCliente();
             renderItens();
+            atualizarBloqueioCliente(); // 🔒 inicia travado até o cliente ser escolhido
             carregarClientes();
             carregarCatalogosIniciais();
-            carregarPerfis(); // perfis da frente inicial ("Porta de giro")
+            carregarPerfis();
         });
     </script>
 </body>
