@@ -53,6 +53,7 @@
         .chart-card {
             background: var(--white); border-radius: 20px; padding: 30px;
             box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative;
+            margin-bottom: 40px;
         }
         .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
         .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
@@ -96,7 +97,8 @@
         </nav>
         <main>
             <h1 class="welcome-title" id="titulo-pagina">Orçamentos x Pedidos 📊</h1>
-            <p class="welcome-subtitle" id="subtitulo-pagina">Comparação dos últimos 6 meses </p>
+            <p class="welcome-subtitle" id="subtitulo-pagina">Comparação dos últimos 6 meses</p>
+
             <section class="cards-container">
                 <div class="card">
                     <div class="card-title">Total Orçamentos</div>
@@ -111,11 +113,20 @@
                     <div class="card-value" id="taxa-conversao">0%</div>
                 </div>
             </section>
+
             <section class="chart-card">
                 <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Orçamentos x Pedidos por Mês</h3>
                 <div class="loading-overlay" id="chart-loading"><div class="loading-spinner"></div></div>
                 <div class="chart-container">
                     <canvas id="grafico-comparativo"></canvas>
+                </div>
+            </section>
+
+            <!-- ✅ NOVO: gráfico de LINHA — proporção de fechamento mês a mês -->
+            <section class="chart-card">
+                <h3 class="chart-title"><i class="fas fa-chart-line"></i> Proporção de Fechamento por Mês</h3>
+                <div class="chart-container">
+                    <canvas id="grafico-conversao"></canvas>
                 </div>
             </section>
         </main>
@@ -124,8 +135,8 @@
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
         let chartInstance = null;
-
-        // ================= SESSÃO (formato novo: 'auth' com token) =================
+        let chartConversao = null;
+        // ================= SESSÃO =================
         function getAuth() {
             try {
                 const auth = JSON.parse(localStorage.getItem('auth') || 'null');
@@ -134,17 +145,19 @@
                 return auth;
             } catch { return null; }
         }
-
         function getToken() {
             const auth = getAuth();
             return auth ? auth.token : '';
         }
-
+        // ✅ CORREÇÃO: formato monetário completo pt-BR (R$ 7.870.785,44)
         function formatCurrency(value) {
-            return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
+            return parseFloat(value || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
         }
-
-        // ✅ Fetch com Bearer + redirecionamento em 401
         async function fetchAutenticado(url) {
             const res = await fetch(url, {
                 headers: { 'Authorization': 'Bearer ' + getToken() }
@@ -157,9 +170,6 @@
             if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
             return res.json();
         }
-
-        // ✅ URL SEM lógica de cargo no cliente — o SERVIDOR decide o filtro RJ
-        // Cliente vindo da URL (?cliente=...) tem prioridade — veio do clique na lista
         function getUrlGrafico() {
             const clienteDaURL = new URLSearchParams(window.location.search).get('cliente');
             if (clienteDaURL) {
@@ -167,19 +177,35 @@
             }
             return `${API_BASE}/dados_compras_orcamentos`;
         }
-
+        // ✅ Complementa os 6 meses: meses sem movimento entram com zero (eixo sempre cheio)
+        function preencherUltimos6Meses(dados) {
+            const mapa = {};
+            (dados || []).forEach(d => { mapa[d.mes] = d; });
+            const agora = new Date();
+            const saida = [];
+            for (let i = 5; i >= 0; i--) {           // mes -6 ... mes atual
+                const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+                const label = String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+                const encontrado = mapa[label];
+                saida.push({
+                    mes: label,
+                    orcamentos: encontrado ? (parseFloat(encontrado.orcamentos) || 0) : 0,
+                    pedidos: encontrado ? (parseFloat(encontrado.pedidos) || 0) : 0
+                });
+            }
+            return saida;
+        }
         async function loadGrafico() {
             try {
                 document.getElementById('chart-loading').style.display = 'flex';
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const dados = await fetchAutenticado(getUrlGrafico());
+                const bruto = await fetchAutenticado(getUrlGrafico());
                 clearTimeout(timeoutId);
-
+                const dados = preencherUltimos6Meses(bruto);
                 const labels = dados.map(d => d.mes);
                 const orcamentos = dados.map(d => d.orcamentos);
                 const pedidos = dados.map(d => d.pedidos);
-
                 // Cards de resumo
                 const totalOrc = orcamentos.reduce((a, b) => a + b, 0);
                 const totalPed = pedidos.reduce((a, b) => a + b, 0);
@@ -187,8 +213,7 @@
                 document.getElementById('total-pedidos').textContent = formatCurrency(totalPed);
                 const conversao = totalOrc > 0 ? Math.round((totalPed / totalOrc) * 100) : 0;
                 document.getElementById('taxa-conversao').textContent = conversao + '%';
-
-                // Destroi gráfico anterior (recarregamento)
+                // ===== GRÁFICO 1: colunas — Orçamentos x Pedidos por mês =====
                 if (chartInstance) chartInstance.destroy();
                 const ctx = document.getElementById('grafico-comparativo').getContext('2d');
                 chartInstance = new Chart(ctx, {
@@ -197,13 +222,13 @@
                         labels: labels,
                         datasets: [
                             {
-                                label: 'Orçamentos',          // = Series1 do VB (laranja)
+                                label: 'Orçamentos',
                                 data: orcamentos,
                                 backgroundColor: 'rgba(255, 165, 0, 0.8)',
                                 borderRadius: 5
                             },
                             {
-                                label: 'Pedidos',             // = Series2 do VB (verde)
+                                label: 'Pedidos',
                                 data: pedidos,
                                 backgroundColor: 'rgba(0, 128, 0, 0.8)',
                                 borderRadius: 5
@@ -235,7 +260,58 @@
                             },
                             x: {
                                 title: { display: true, text: 'Mês' },
-                                grid: { display: false }   // = MajorGrid.LineWidth = 0 do VB
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+                // ===== GRÁFICO 2: LINHA — % de fechamento mês a mês =====
+                const taxaMes = labels.map((m, i) =>
+                    orcamentos[i] > 0 ? Math.round((pedidos[i] / orcamentos[i]) * 100) : 0
+                );
+                if (chartConversao) chartConversao.destroy();
+                const ctx2 = document.getElementById('grafico-conversao').getContext('2d');
+                chartConversao = new Chart(ctx2, {
+                    type: 'line', // ✅ linha, não colunas
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '% Fechamento (Pedidos / Orçamentos)',
+                            data: taxaMes,
+                            borderColor: '#8B0000',
+                            backgroundColor: 'rgba(139,0,0,.12)',
+                            borderWidth: 3,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#8B0000',
+                            tension: 0.35,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { usePointStyle: true } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(c) {
+                                        const i = c.dataIndex;
+                                        // % + volume do mês: mostra se a variação é eficiência ou quantidade
+                                        return `${c.raw}% — ${orcamentos[i]} orç., ${pedidos[i]} pedidos`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { callback: v => v + '%' },
+                                title: { display: true, text: 'Taxa de fechamento (%)' }
+                            },
+                            x: {
+                                title: { display: true, text: 'Mês' },
+                                grid: { display: false }
                             }
                         }
                     }
@@ -248,7 +324,6 @@
                     'Erro ao carregar dados: ' + (err.message || 'Verifique a conexão');
             }
         }
-
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) {
@@ -257,13 +332,11 @@
             }
             document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
             document.getElementById('user-name').textContent = auth.user.nome || '';
-
-            // Se veio do clique num cliente, personaliza o título
             const clienteDaURL = new URLSearchParams(window.location.search).get('cliente');
             if (clienteDaURL) {
                 document.getElementById('titulo-pagina').textContent = decodeURIComponent(clienteDaURL) + ' 📊';
                 document.getElementById('subtitulo-pagina').textContent =
-                    'Orçamentos x Pedidos deste cliente — valores em reais';
+                    'Orçamentos x Pedidos deste cliente — últimos 6 meses';
             }
             loadGrafico();
         });
