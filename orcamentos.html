@@ -354,7 +354,7 @@
         let itens = [];
         let editandoIndex = -1;
 
-        // ============ TOTAL DO ITEM (antes de todos os usos) ============
+        // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
         function atualizarTotalItem() {
             const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
             const q = parseFloat(document.getElementById('f-qtd').value) || 1;
@@ -565,21 +565,21 @@
 
         // ============================================================
         // 🖥️ MOTOR DE DESENHO GRÁFICO — fiel ao frmPortasAbrir.vb
-        // Região 6 do VB: Paint + clique nas zonas fantasma do puxador
+        // FIX 1: cv.height atribuído (fim do desenho cortado)
+        // FIX 2: posição do puxador em MAIÚSCULAS (fim do puxador que não desenha)
+        // FIX 3: cota do puxador junto ao traço (sem colidir com a cota da largura)
         // ============================================================
-        let furos = [];            // [{x, y}] em mm
-        let modoPuxador = false;   // zonas fantasma ativas (como chkConfigPux do VB)
+        let furos = [];
+        let modoPuxador = false;
         let modoFuro = false;
 
-        // NormalizarPosicaoPuxadorCanonica do VB: lado + topo/base
         function inverterLadoPux(pos) {
             return pos.replace('Esquerda', '«E»').replace('Direita', 'Esquerda').replace('«E»', 'Direita');
         }
         function posicaoEspelhada(pos) {
-            // Folha par do par: inverte lado esquerdo/direito (VB: AplicarEspelhamentoPuxadorNaMemoria)
             if (!pos) return '';
-            if (pos.includes('Topo Total')) return pos;   // Topo Total não espelha
-            if (pos.includes('Base Total')) return pos;   // Base Total não espelha
+            if (pos.includes('Topo Total')) return pos;
+            if (pos.includes('Base Total')) return pos;
             return inverterLadoPux(pos);
         }
 
@@ -595,8 +595,9 @@
             const posicao = g('f-posicao');
             const ehPar = document.getElementById('chk-pares')?.checked || false;
             const ctx = cv.getContext('2d');
+            // ✅ FIX 1: AMBAS dimensões atribuídas ao canvas
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
-            const H = cv.height = Math.max(300, cv.clientHeight) * 2;   // ✅ altura atribuída ao canvas
+            const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
 
             if (altura <= 0 || largura <= 0) {
@@ -605,74 +606,73 @@
                 return;
             }
 
-            // ESCALA: quantidade de folhas (par = 2) cabe no canvas com margem para cotas
             const qtdFolhas = ehPar ? 2 : 1;
-            const gap = 30;                    // vão entre folhas do par (mm visual)
-            const margemCota = 90;             // espaço para cotas (mm visual)
+            const gap = 30, margemCota = 90;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
             const dh = altura * esc;
             const oy = (H - dh) / 2;
-            const px = mm => mm * esc;         // mm → pixel (relativo)
-            cv._esc = esc; cv._oy = oy;        // cache p/ conversão de clique
+            const px = mm => mm * esc;
+            cv._esc = esc; cv._oy = oy;
 
-            // Desenha cada folha
             for (let f = 0; f < qtdFolhas; f++) {
                 const ehFolhaEspelhada = ehPar && f === 1;
                 const ox = (W - larguraTotal * esc) / 2 + px(f * (largura + gap));
-                const X = mm => ox + px(mm);   // mm → pixel absoluto desta folha
+                const X = mm => ox + px(mm);
                 const Y = mm => oy + px(mm);
 
-                // vidro
+                // vidro + moldura
                 ctx.fillStyle = 'rgba(173,216,230,.22)';
                 ctx.fillRect(X(0), Y(0), px(largura), dh);
-                // moldura
                 ctx.lineWidth = 12; ctx.strokeStyle = '#5a6b7b';
                 ctx.strokeRect(X(0), Y(0), px(largura), dh);
 
-                // DIVISORES VERTICAIS (barras de topo a base)
+                // divisores verticais e horizontais
                 ctx.lineWidth = 7; ctx.strokeStyle = '#5a6b7b';
                 for (let i = 1; i <= qtdDivV; i++) {
                     const x = X(largura * i / (qtdDivV + 1));
                     ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, Y(altura)); ctx.stroke();
                 }
-                // DIVISORES HORIZONTAIS (barras de lado a lado)
                 for (let i = 1; i <= qtdDivH; i++) {
                     const y = Y(altura * i / (qtdDivH + 1));
                     ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
                 }
 
-                // PU XADOR — posição efetiva (espelhada na folha 2 do par)
-                const posEfetiva = ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao;
+                // ✅ FIX 2: posição normalizada em MAIÚSCULAS
+                const posEfetiva = (ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao || '').toUpperCase();
                 if (puxador && posEfetiva) {
                     const todaExt = document.getElementById('chk-toda-ext')?.checked;
                     const horizontal = posEfetiva.includes('TOPO') || posEfetiva.includes('BASE');
                     const lado = horizontal ? largura : altura;
-                    // AtualizarTravaTamanhoPuxador do VB: Total = lado inteiro
                     const tamPux = todaExt ? lado : (parseFloat(g('f-tamanho-pux')) || lado * 0.5);
                     const marg = 30;
                     ctx.lineWidth = 10; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
                     ctx.beginPath();
+                    let cotaX = X(largura / 2), cotaY = Y(altura) + 40;
                     if (posEfetiva.includes('ESQUERDA')) {
                         const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
                         ctx.moveTo(X(marg), yIni); ctx.lineTo(X(marg), yIni + px(tamPux));
+                        cotaX = X(marg) - 14; cotaY = yIni + px(tamPux) / 2;
                     } else if (posEfetiva.includes('DIREITA')) {
                         const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
                         ctx.moveTo(X(largura - marg), yIni); ctx.lineTo(X(largura - marg), yIni + px(tamPux));
+                        cotaX = X(largura - marg) + 14; cotaY = yIni + px(tamPux) / 2;
                     } else if (posEfetiva.includes('TOPO')) {
                         const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
                         ctx.moveTo(xIni, Y(marg)); ctx.lineTo(xIni + px(tamPux), Y(marg));
+                        cotaX = xIni + px(tamPux) / 2; cotaY = Y(marg) - 12;
                     } else if (posEfetiva.includes('BASE')) {
                         const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
                         ctx.moveTo(xIni, Y(altura - marg)); ctx.lineTo(xIni + px(tamPux), Y(altura - marg));
+                        cotaX = xIni + px(tamPux) / 2; cotaY = Y(altura - marg) + 20;
                     }
                     ctx.stroke();
-                    // cota do puxador
+                    // ✅ FIX 3: cota junto ao traço
                     ctx.font = '16px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
-                    ctx.fillText(`${tamPux} mm`, X(largura / 2), Y(altura) + 40);
+                    ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
                 }
 
-                // FUROS desta folha (folha 2 do par espelha no eixo X)
+                // furos (folha 2 do par espelha no eixo X)
                 ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
                 furos.forEach(fu => {
                     const fx = ehFolhaEspelhada ? (largura - fu.x) : fu.x;
@@ -684,7 +684,7 @@
                     ctx.stroke();
                 });
 
-                // COTAS SEMPRE VISÍVEIS (LerMedidaDesenho do VB)
+                // cotas SEMPRE visíveis
                 ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 16);
@@ -699,35 +699,27 @@
                 }
             }
 
-            // ZONAS FANTASMA do puxador (picDesenho_Paint do VB) — no modo de configuração
+            // zonas fantasma do puxador no modo de posicionamento
             if (modoPuxador) {
                 const ox0 = (W - larguraTotal * esc) / 2;
                 const X0 = mm => ox0 + px(mm);
                 ctx.font = '15px Segoe UI'; ctx.textAlign = 'center';
-                // lateral esquerda
                 ctx.fillStyle = 'rgba(139,0,0,.10)';
                 ctx.fillRect(X0(0) - 26, oy, 26, dh);
-                ctx.fillStyle = '#8B0000';
-                ctx.fillText('ESQ', X0(0) - 13, oy + dh / 2);
-                // lateral direita
+                ctx.fillStyle = '#8B0000'; ctx.fillText('ESQ', X0(0) - 13, oy + dh / 2);
                 ctx.fillStyle = 'rgba(139,0,0,.10)';
                 ctx.fillRect(X0(larguraTotal), oy, 26, dh);
-                ctx.fillStyle = '#8B0000';
-                ctx.fillText('DIR', X0(larguraTotal) + 13, oy + dh / 2);
-                // topo
+                ctx.fillStyle = '#8B0000'; ctx.fillText('DIR', X0(larguraTotal) + 13, oy + dh / 2);
                 ctx.fillStyle = 'rgba(139,0,0,.10)';
                 ctx.fillRect(X0(0), oy - 26, larguraTotal * esc, 26);
-                ctx.fillStyle = '#8B0000';
-                ctx.fillText('TOPO', ox0 + px(larguraTotal) / 2, oy - 10);
-                // base
+                ctx.fillStyle = '#8B0000'; ctx.fillText('TOPO', ox0 + px(larguraTotal) / 2, oy - 10);
                 ctx.fillStyle = 'rgba(139,0,0,.10)';
                 ctx.fillRect(X0(0), oy + dh, larguraTotal * esc, 26);
-                ctx.fillStyle = '#8B0000';
-                ctx.fillText('BASE', ox0 + px(larguraTotal) / 2, oy + dh + 18);
+                ctx.fillStyle = '#8B0000'; ctx.fillText('BASE', ox0 + px(larguraTotal) / 2, oy + dh + 18);
             }
         }
 
-        // picDesenho_MouseClick do VB: identifica a borda mais próxima
+        // clique no canvas: furo ou posicionamento do puxador (fiel ao picDesenho_MouseClick)
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
             const cv = document.getElementById('cv-visualizacao');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -738,12 +730,11 @@
             const rect = cv.getBoundingClientRect();
             const esc = cv._esc || 1, oy = cv._oy || 0;
             const qtdFolhas = ehPar ? 2 : 1;
-            const gap = 30, margemCota = 90;
+            const gap = 30;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const ox0 = (rect.width * 2 - larguraTotal * esc) / 2;
             const cx = (e.clientX - rect.left) * 2;
             const cy = (e.clientY - rect.top) * 2;
-            // qual folha?
             let folha = 0;
             for (let f = 0; f < qtdFolhas; f++) {
                 const ox = ox0 + (f * (largura + gap)) * esc;
@@ -761,10 +752,9 @@
                 document.getElementById('btn-furo').classList.remove('ativo');
                 status.textContent = `Furo marcado em X=${mmX.toFixed(0)}, Y=${mmY.toFixed(0)} mm`;
             } else if (modoPuxador) {
-                // distância até cada borda (NormalizarPosicaoPuxadorCanonica)
                 const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
                 const min = Math.min(dEsq, dDir, dTopo, dBase);
-                const metade = folha === 1; // folha espelhada inverte lado no clique
+                const metade = folha === 1;
                 let nova = '';
                 if (min === dEsq) {
                     nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
@@ -859,7 +849,7 @@
             set('f-produto', d.produto); set('f-material', d.material);
             set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
-            furos = (item.furos || []).map(f => ({ x: f.x, y: f.y })); // restaura furos do item
+            furos = (item.furos || []).map(f => ({ x: f.x, y: f.y }));
             alternarCamposPuxador(d.puxador);
             atualizarTotalItem();
             desenharVisualizacao();
@@ -936,7 +926,7 @@
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
 
-                // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
+        // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
@@ -963,6 +953,7 @@
                 const clientes = await fetchAutenticado(`${API_BASE}/dados_clientes`);
                 sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
                     clientes.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razaoSocial)}</option>`).join('');
+                sel.selectedIndex = 0; // garante o placeholder após carregar
             } catch (err) {
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
             }
@@ -1004,7 +995,7 @@
             document.getElementById('viz-status').textContent = '💡 Clique no canvas onde entra o furo';
             document.getElementById('cv-visualizacao').classList.remove('modo-pux');
         });
-        // Furos automáticos do VB: 1º em 100mm, último em (lado − 100mm), distribuídos igualmente
+        // Furos automáticos do VB: 1º em 100mm, último em (altura − 100mm), distribuídos igualmente
         document.getElementById('btn-dividir')?.addEventListener('click', () => {
             const altura = parseFloat(document.getElementById('f-altura').value) || 0;
             const n = parseInt(prompt('Dividir em quantos furos na lateral esquerda?')) || 0;
@@ -1027,7 +1018,7 @@
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
         ['f-altura', 'f-largura'].forEach(id =>
             document.getElementById(id)?.addEventListener('input', desenharVisualizacao));
-        // Redesenho após troca de frente (o layout precisa recalcular antes de medir o canvas)
+        // Redesenho após troca de frente (layout precisa recalcular antes de medir o canvas)
         document.querySelectorAll('.frente-btn').forEach(btn =>
             btn.addEventListener('click', () => setTimeout(desenharVisualizacao, 120)));
         window.addEventListener('resize', desenharVisualizacao);
