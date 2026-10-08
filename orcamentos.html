@@ -596,7 +596,7 @@
             const ehPar = document.getElementById('chk-pares')?.checked || false;
             const ctx = cv.getContext('2d');
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
-            const H = Math.max(300, cv.clientHeight) * 2;
+            const H = cv.height = Math.max(300, cv.clientHeight) * 2;   // ✅ altura atribuída ao canvas
             ctx.clearRect(0, 0, W, H);
 
             if (altura <= 0 || largura <= 0) {
