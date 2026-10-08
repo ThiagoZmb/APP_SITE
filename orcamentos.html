@@ -354,17 +354,14 @@
         let itens = [];
         let editandoIndex = -1;
 
-        // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
-        function atualizarTotalItem() {
-            const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
-            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
-            const campo = document.getElementById('f-total-item');
-            if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
+        // ============ TRAVA DE CLIENTE (à prova de bala: por selectedIndex) ============
+        function temClienteSelecionado() {
+            const sel = document.getElementById('sel-cliente');
+            if (!sel || sel.options.length === 0) return false;
+            return sel.selectedIndex > 0; // índice 0 = placeholder, sempre
         }
-
-        // ============ TRAVA DE CLIENTE ============
         function atualizarBloqueioCliente() {
-            const temCliente = !!document.getElementById('sel-cliente').value;
+            const temCliente = temClienteSelecionado();
             const form = document.getElementById('form-item');
             const msg = document.getElementById('bloqueio-msg');
             form.classList.toggle('bloqueado', !temCliente);
@@ -377,6 +374,14 @@
             } else {
                 calcularPrecoAutomatico();
             }
+        }
+
+        // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
+        function atualizarTotalItem() {
+            const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
+            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
+            const campo = document.getElementById('f-total-item');
+            if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
         }
 
         // ============ FRENTES ============
@@ -507,7 +512,7 @@
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
-            if (!document.getElementById('sel-cliente').value) return;
+            if (!temClienteSelecionado()) return;
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
@@ -568,6 +573,7 @@
         // FIX 1: cv.height atribuído (fim do desenho cortado)
         // FIX 2: posição do puxador em MAIÚSCULAS (fim do puxador que não desenha)
         // FIX 3: cota do puxador junto ao traço (sem colidir com a cota da largura)
+        // FIX 4: Qtd define as folhas do desenho (Par de Portas força 2; cap 4)
         // ============================================================
         let furos = [];
         let modoPuxador = false;
@@ -593,6 +599,7 @@
             const qtdDivV = parseInt(g('f-div-v')) || 0;
             const puxador = g('f-puxador');
             const posicao = g('f-posicao');
+            const qtd = parseInt(g('f-qtd')) || 1;
             const ehPar = document.getElementById('chk-pares')?.checked || false;
             const ctx = cv.getContext('2d');
             // ✅ FIX 1: AMBAS dimensões atribuídas ao canvas
@@ -606,7 +613,8 @@
                 return;
             }
 
-            const qtdFolhas = ehPar ? 2 : 1;
+            // ✅ FIX 4: Qtd define as folhas — Par de Portas força 2; cap de 4 p/ legibilidade
+            const qtdFolhas = Math.min(ehPar ? 2 : Math.max(1, qtd), 4);
             const gap = 30, margemCota = 90;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
@@ -614,9 +622,11 @@
             const oy = (H - dh) / 2;
             const px = mm => mm * esc;
             cv._esc = esc; cv._oy = oy;
+            cv._qtdFolhas = qtdFolhas;   // cache p/ o clique identificar a folha certa
 
             for (let f = 0; f < qtdFolhas; f++) {
-                const ehFolhaEspelhada = ehPar && f === 1;
+                // folhas pares (2ª, 4ª) espelham o puxador — regra de par do VB
+                const ehFolhaEspelhada = (f % 2) === 1;
                 const ox = (W - larguraTotal * esc) / 2 + px(f * (largura + gap));
                 const X = mm => ox + px(mm);
                 const Y = mm => oy + px(mm);
@@ -638,7 +648,7 @@
                     ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
                 }
 
-                // ✅ FIX 2: posição normalizada em MAIÚSCULAS
+                // ✅ FIX 2: posição em MAIÚSCULAS
                 const posEfetiva = (ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao || '').toUpperCase();
                 if (puxador && posEfetiva) {
                     const todaExt = document.getElementById('chk-toda-ext')?.checked;
@@ -672,7 +682,7 @@
                     ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
                 }
 
-                // furos (folha 2 do par espelha no eixo X)
+                // furos (folhas pares espelham no eixo X)
                 ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
                 furos.forEach(fu => {
                     const fx = ehFolhaEspelhada ? (largura - fu.x) : fu.x;
@@ -684,7 +694,7 @@
                     ctx.stroke();
                 });
 
-                // cotas SEMPRE visíveis
+                // cotas SEMPRE visíveis + rótulo da folha
                 ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 16);
@@ -693,9 +703,9 @@
                 ctx.rotate(-Math.PI / 2);
                 ctx.fillText(`${altura} mm`, 0, 0);
                 ctx.restore();
-                if (ehPar) {
+                if (qtdFolhas > 1) {
                     ctx.font = '15px Segoe UI'; ctx.fillStyle = '#8B0000';
-                    ctx.fillText(ehFolhaEspelhada ? 'Folha 2 (espelhada)' : 'Folha 1', X(largura / 2), Y(0) - 12);
+                    ctx.fillText(ehFolhaEspelhada ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, X(largura / 2), Y(0) - 12);
                 }
             }
 
@@ -719,22 +729,23 @@
             }
         }
 
-        // clique no canvas: furo ou posicionamento do puxador (fiel ao picDesenho_MouseClick)
+        // clique no canvas: furo ou posicionamento do puxador (sincronizado com o desenho)
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
             const cv = document.getElementById('cv-visualizacao');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const altura = parseFloat(g('f-altura')) || 0;
             const largura = parseFloat(g('f-largura')) || 0;
-            const ehPar = document.getElementById('chk-pares')?.checked || false;
             if (!altura || !largura) return;
             const rect = cv.getBoundingClientRect();
             const esc = cv._esc || 1, oy = cv._oy || 0;
-            const qtdFolhas = ehPar ? 2 : 1;
+            // ✅ usa a MESMA contagem de folhas que o desenho usou
+            const qtdFolhas = cv._qtdFolhas || 1;
             const gap = 30;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const ox0 = (rect.width * 2 - larguraTotal * esc) / 2;
             const cx = (e.clientX - rect.left) * 2;
             const cy = (e.clientY - rect.top) * 2;
+            // identifica em qual folha o usuário clicou
             let folha = 0;
             for (let f = 0; f < qtdFolhas; f++) {
                 const ox = ox0 + (f * (largura + gap)) * esc;
@@ -750,11 +761,11 @@
                              y: Math.round(Math.min(Math.max(mmY, 0), altura)) });
                 modoFuro = false;
                 document.getElementById('btn-furo').classList.remove('ativo');
-                status.textContent = `Furo marcado em X=${mmX.toFixed(0)}, Y=${mmY.toFixed(0)} mm`;
+                status.textContent = `Furo marcado em X=${mmX.toFixed(0)}, Y=${mmY.toFixed(0)} mm (folha ${folha + 1})`;
             } else if (modoPuxador) {
                 const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
                 const min = Math.min(dEsq, dDir, dTopo, dBase);
-                const metade = folha === 1;
+                const metade = (folha % 2) === 1; // folhas pares do desenho são espelhadas
                 let nova = '';
                 if (min === dEsq) {
                     nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
@@ -872,7 +883,7 @@
 
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
-            if (!document.getElementById('sel-cliente').value) { alert('Selecione o cliente antes de adicionar itens.'); return; }
+            if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
             if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
@@ -929,8 +940,8 @@
         // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
+            if (!temClienteSelecionado()) { alert('Selecione o cliente.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
-            if (!clienteSel.value) { alert('Selecione o cliente.'); return; }
             const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
             const descPct = parseFloat(document.getElementById('desconto').value) || 0;
             const rascunho = {
@@ -953,10 +964,11 @@
                 const clientes = await fetchAutenticado(`${API_BASE}/dados_clientes`);
                 sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
                     clientes.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razaoSocial)}</option>`).join('');
-                sel.selectedIndex = 0; // garante o placeholder após carregar
+                sel.selectedIndex = 0; // ✅ força o placeholder após carregar
             } catch (err) {
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
             }
+            atualizarBloqueioCliente(); // ✅ trava/destava de acordo com o estado real
         }
 
         // ============ INIT ============
@@ -1011,14 +1023,14 @@
                 alert('Altura mínima de 200mm para dividir furos automaticamente.');
             }
         });
-        document.getElementById('btn-limpar-furos')?.addEventListener('click', () => { furos = []; desenharVisualizacao(); });
+                document.getElementById('btn-limpar-furos')?.addEventListener('click', () => { furos = []; desenharVisualizacao(); document.getElementById('viz-status').textContent = ''; });
         ['chk-toda-ext', 'chk-pares'].forEach(id =>
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
         ['f-altura', 'f-largura', 'f-div-h', 'f-div-v', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
         ['f-altura', 'f-largura'].forEach(id =>
             document.getElementById(id)?.addEventListener('input', desenharVisualizacao));
-        // Redesenho após troca de frente (layout precisa recalcular antes de medir o canvas)
+        // Redesenho após troca de frente (o layout precisa recalcular antes de medir o canvas)
         document.querySelectorAll('.frente-btn').forEach(btn =>
             btn.addEventListener('click', () => setTimeout(desenharVisualizacao, 120)));
         window.addEventListener('resize', desenharVisualizacao);
