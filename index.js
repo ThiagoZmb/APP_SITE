@@ -197,12 +197,11 @@ app.get('/dados_clientes', autenticar, async (req, res) => {
   }
 });
 
-// ================= GRÁFICO: ORÇAMENTOS x PEDIDOS =================
+// ================= GRÁFICO: ORÇAMENTOS x PEDIDOS (últimos 6 meses) =================
 app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
   try {
     const cliente = req.query.cliente;
     const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
-    // ✅ Últimos 6 meses: do dia 1º de meses atrás até hoje (atravessa o ano sem erro)
     let filtroExtra = 'WHERE p.DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 6 MONTH), \'%Y-%m-01\')';
     let params = [];
     if (cliente && !ehRepresentante(req)) {
@@ -522,7 +521,7 @@ function aplicarPercentuais(valor, texto) {
   }
   return v;
 }
-// (Removida função atualizarTotalItem — código de navegador não existe no backend)
+// (Sem código de navegador no backend)
 
 app.post('/calcular_preco', autenticar, async (req, res) => {
   const b = req.body || {};
@@ -631,7 +630,7 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       subtotal += Math.max(20 * qtdPux, custo);
     }
 
-    // 3. DIVISORES
+    // 3. DIVISORES (qtdDivH = horizontais, qtdDivV = verticais — fiel ao VB)
     let compDiv = 0;
     if (dadosDiv) {
       const largV = Math.max(0, largura - dadosPerfil.descontoVidro);

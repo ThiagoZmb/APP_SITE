@@ -65,7 +65,6 @@
             width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary);
             color: #fff; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-        /* ===== SEÇÕES INTERNAS DO ITEM ===== */
         .secao-item {
             background: var(--secondary-color); border: 1px solid var(--border-color);
             border-radius: 14px; padding: 20px 20px 8px; margin-bottom: 18px;
@@ -84,7 +83,6 @@
         .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
         .form-group input[readonly] { background: #eef1f4; font-weight: 700; color: var(--primary-color); }
         .form-group.full { grid-column: 1 / -1; }
-        /* ===== TRAVA DE CLIENTE ===== */
         #bloqueio-msg {
             display: none; align-items: center; gap: 10px; margin-bottom: 18px;
             padding: 14px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
@@ -92,7 +90,6 @@
         }
         #bloqueio-msg.visivel { display: flex; }
         #form-item.bloqueado { opacity: .5; pointer-events: none; filter: grayscale(.4); }
-        /* ===== BOTÕES ===== */
         .btn {
             padding: 13px 28px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px;
             cursor: pointer; font-family: inherit; transition: all .2s ease;
@@ -103,7 +100,6 @@
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
         .calc-status { font-size: 13px; color: var(--text-light); }
-        /* ===== TABELA ===== */
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
         td { padding: 13px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
@@ -115,6 +111,7 @@
         }
         .btn-mini:hover { background: var(--primary-light); color: var(--primary-color); }
         .btn-mini.excluir:hover { background: rgba(220,53,69,.1); color: #dc3545; }
+        .btn-mini.ativo { background: var(--primary-light); color: var(--primary-color); border-color: var(--primary-color); }
         .totais { display: flex; justify-content: flex-end; gap: 40px; margin-top: 20px; flex-wrap: wrap; align-items: flex-end; }
         .totais .grupo { text-align: right; }
         .totais .rotulo { font-size: 13px; color: var(--text-light); font-weight: 600; text-transform: uppercase; }
@@ -123,13 +120,13 @@
         .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
         .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
         .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
-        /* ===== VISUALIZAÇÃO EM TEMPO REAL (adaptado do protótipo) ===== */
+        /* ===== VISUALIZAÇÃO (motor fiel ao frmPortasAbrir.vb) ===== */
         #cv-visualizacao {
-            width: 100%; max-width: 480px; height: 480px;
+            width: 100%; max-width: 560px; height: 520px;
             background: #fafafa; border: 1px solid var(--border-color);
             border-radius: 12px; display: block; margin: 0 auto; cursor: crosshair;
         }
-        #cv-visualizacao.modo-pux { cursor: pointer; border-color: var(--primary-color); }
+        #cv-visualizacao.modo-pux { cursor: pointer; border-color: var(--primary-color); border-width: 2px; }
         .viz-linha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
         .viz-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-light); }
         .viz-status { font-size: 13px; color: var(--primary-color); font-weight: 600; min-height: 18px; margin-top: 6px; }
@@ -185,10 +182,13 @@
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
                         <div class="grid-form">
-                            <!-- Qtd comum às 3 frentes -->
                             <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                             <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                            <div class="form-group f-porta">
+                                <label>&nbsp;</label>
+                                <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (espelha o desenho)</label>
+                            </div>
                             <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
                             <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
                             <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
@@ -225,13 +225,14 @@
                         </div>
                     </div>
 
-                    <!-- REVESTIMENTO -->
+                    <!-- REVESTIMENTO + DIVISORES (H e V, como no VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🟩 Revestimento e divisores</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
-                            <div class="form-group"><label>Divisores (qtd)</label><input type="number" id="f-divisores" min="0" value="0"></div>
+                            <div class="form-group"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
+                            <div class="form-group"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
                         </div>
                     </div>
 
@@ -255,17 +256,16 @@
                         </div>
                     </div>
 
-                    <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (portas) — herdada do protótipo -->
+                    <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🖥️ Visualização em tempo real</h4>
                         <canvas id="cv-visualizacao"></canvas>
                         <div class="viz-linha">
-                            <button class="btn-mini" id="btn-modo-pux">🎯 Posicionar puxador (clique no canvas)</button>
+                            <button class="btn-mini" id="btn-modo-pux">🎯 Posicionar puxador</button>
                             <label class="viz-check"><input type="checkbox" id="chk-toda-ext"> Toda extensão</label>
-                            <button class="btn-mini" id="btn-furo">＋ Furo</button>
+                            <button class="btn-mini" id="btn-furo">＋ Furo (clique)</button>
                             <button class="btn-mini" id="btn-dividir">Dividir igualmente</button>
                             <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
-                            <label class="viz-check"><input type="checkbox" id="chk-referencia"> Referência (mm)</label>
                         </div>
                         <div class="viz-status" id="viz-status"></div>
                     </div>
@@ -323,7 +323,7 @@
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
 
-        // ============ SESSÃO (padrão do sistema) ============
+        // ============ SESSÃO ============
         function getAuth() {
             try {
                 const auth = JSON.parse(localStorage.getItem('auth') || 'null');
@@ -343,20 +343,18 @@
             return res.json();
         }
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
-        // ✅ Formato monetário completo pt-BR: R$ 7.870.785,44
         function formatCurrency(v) {
             return parseFloat(v || 0).toLocaleString('pt-BR', {
-                style: 'currency', currency: 'BRL',
-                minimumFractionDigits: 2, maximumFractionDigits: 2
+                style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2
             });
         }
 
         // ============ ESTADO ============
-        let frenteAtual = 'Porta de giro'; // nomenclatura real da TIPO_PRODUTO da base
+        let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
 
-        // ============ TOTAL DO ITEM (declarada ANTES de todos os usos) ============
+        // ============ TOTAL DO ITEM (antes de todos os usos) ============
         function atualizarTotalItem() {
             const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
             const q = parseFloat(document.getElementById('f-qtd').value) || 1;
@@ -405,7 +403,7 @@
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
         }
 
-        // ============ COMBOS: POPULAÇÃO ============
+        // ============ COMBOS ============
         function popularLista(id, lista, msgVazio) {
             const sel = document.getElementById(id);
             if (!sel) return;
@@ -431,15 +429,13 @@
                 return await fetchAutenticado(`${API_BASE}/catalogos_filtro?campo=${encodeURIComponent(campo)}&chave=${encodeURIComponent(chave)}`);
             } catch (err) { console.error(`Erro catálogo ${campo}:`, err); return []; }
         }
-
-        // ============ CATÁLOGOS INDEPENDENTES (init) ============
         async function carregarCatalogosIniciais() {
             try {
                 const [cat, coresGrupos] = await Promise.all([
                     fetchAutenticado(`${API_BASE}/catalogos`),
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
-                popularCores('f-cor', coresGrupos);        // cores agrupadas por TIPO (Sólida/Metálica)
+                popularCores('f-cor', coresGrupos);
                 popularCores('f-cor-revest', coresGrupos);
                 popularCores('f-cor-serr', coresGrupos);
                 popularLista('f-produto', cat.produtos_serr);
@@ -508,10 +504,10 @@
             popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
         }
 
-        // ============ MOTOR FINANCEIRO (cálculo automático) ============
+        // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
-            if (!document.getElementById('sel-cliente').value) return; // sem cliente, sem cálculo
+            if (!document.getElementById('sel-cliente').value) return;
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
@@ -545,13 +541,12 @@
                             posicaoPuxador: g('f-posicao'),
                             tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
-                            divisor: '', qtdDivH: 0, qtdDivV: 0 };
+                            divisor: '', qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0 };
             }
             clearTimeout(timerPreco);
             status.textContent = 'Calculando...';
             timerPreco = setTimeout(async () => {
                 try {
-                    // debug:true devolve o "diag" no Network → calibrar vs VB
                     const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...payload, debug: true })
@@ -568,10 +563,25 @@
             }, 400);
         }
 
-        // ============ VISUALIZAÇÃO EM TEMPO REAL (adaptado do sistema_html) ============
-        let furos = [];            // {x, y} em mm, origem = canto superior esquerdo
-        let modoPuxador = false;   // aguardando clique para posicionar puxador
-        let modoFuro = false;      // aguardando clique para marcar furo
+        // ============================================================
+        // 🖥️ MOTOR DE DESENHO GRÁFICO — fiel ao frmPortasAbrir.vb
+        // Região 6 do VB: Paint + clique nas zonas fantasma do puxador
+        // ============================================================
+        let furos = [];            // [{x, y}] em mm
+        let modoPuxador = false;   // zonas fantasma ativas (como chkConfigPux do VB)
+        let modoFuro = false;
+
+        // NormalizarPosicaoPuxadorCanonica do VB: lado + topo/base
+        function inverterLadoPux(pos) {
+            return pos.replace('Esquerda', '«E»').replace('Direita', 'Esquerda').replace('«E»', 'Direita');
+        }
+        function posicaoEspelhada(pos) {
+            // Folha par do par: inverte lado esquerdo/direito (VB: AplicarEspelhamentoPuxadorNaMemoria)
+            if (!pos) return '';
+            if (pos.includes('Topo Total')) return pos;   // Topo Total não espelha
+            if (pos.includes('Base Total')) return pos;   // Base Total não espelha
+            return inverterLadoPux(pos);
+        }
 
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
@@ -579,117 +589,202 @@
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const altura = parseFloat(g('f-altura')) || 0;
             const largura = parseFloat(g('f-largura')) || 0;
+            const qtdDivH = parseInt(g('f-div-h')) || 0;
+            const qtdDivV = parseInt(g('f-div-v')) || 0;
+            const puxador = g('f-puxador');
+            const posicao = g('f-posicao');
+            const ehPar = document.getElementById('chk-pares')?.checked || false;
             const ctx = cv.getContext('2d');
-            const W = cv.width = cv.clientWidth * 2;   // nitidez em telas retina
-            const H = cv.height = cv.clientHeight * 2;
+            const W = cv.width = Math.max(300, cv.clientWidth) * 2;
+            const H = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
+
             if (altura <= 0 || largura <= 0) {
-                ctx.font = '28px Segoe UI'; ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
+                ctx.font = '26px Segoe UI'; ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
                 return;
             }
-            // escala: porta cabe no canvas com margem
-            const margem = 60;
-            const esc = Math.min((W - margem * 2) / largura, (H - margem * 2) / altura);
-            const dw = largura * esc, dh = altura * esc;
-            const ox = (W - dw) / 2, oy = (H - dh) / 2;
-            const px = mm => ox + mm * esc;   // mm → pixel
-            const py = mm => oy + mm * esc;
 
-            // vidro
-            ctx.fillStyle = 'rgba(173,216,230,.25)';
-            ctx.fillRect(px(0), py(0), dw, dh);
-            // moldura (perfil)
-            ctx.lineWidth = 14; ctx.strokeStyle = '#5a6b7b';
-            ctx.strokeRect(px(0), py(0), dw, dh);
+            // ESCALA: quantidade de folhas (par = 2) cabe no canvas com margem para cotas
+            const qtdFolhas = ehPar ? 2 : 1;
+            const gap = 30;                    // vão entre folhas do par (mm visual)
+            const margemCota = 90;             // espaço para cotas (mm visual)
+            const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
+            const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
+            const dh = altura * esc;
+            const oy = (H - dh) / 2;
+            const px = mm => mm * esc;         // mm → pixel (relativo)
+            cv._esc = esc; cv._oy = oy;        // cache p/ conversão de clique
 
-            // divisores (verticais, distribuídos igualmente)
-            const qtdDiv = parseInt(g('f-divisores')) || 0;
-            ctx.lineWidth = 8; ctx.strokeStyle = '#5a6b7b';
-            for (let i = 1; i <= qtdDiv; i++) {
-                const x = px(largura * i / (qtdDiv + 1));
-                ctx.beginPath(); ctx.moveTo(x, py(0)); ctx.lineTo(x, py(altura)); ctx.stroke();
-            }
+            // Desenha cada folha
+            for (let f = 0; f < qtdFolhas; f++) {
+                const ehFolhaEspelhada = ehPar && f === 1;
+                const ox = (W - larguraTotal * esc) / 2 + px(f * (largura + gap));
+                const X = mm => ox + px(mm);   // mm → pixel absoluto desta folha
+                const Y = mm => oy + px(mm);
 
-            // puxador
-            const pux = g('f-puxador');
-            const pos = g('f-posicao');
-            if (pux) {
-                const todaExt = document.getElementById('chk-toda-ext')?.checked;
-                const tamPux = todaExt
-                    ? ((pos.includes('TOPO') || pos.includes('BASE')) ? largura : altura)
-                    : (parseFloat(g('f-tamanho-pux')) || altura * 0.5);
-                ctx.lineWidth = 12; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
-                ctx.beginPath();
-                const marg = 34;
-                if (pos.includes('ESQUERDA')) {
-                    const yIni = pos.includes('SUPERIOR') ? py(marg) : py(altura - marg - tamPux);
-                    ctx.moveTo(px(marg), yIni); ctx.lineTo(px(marg), yIni + tamPux * esc);
-                } else if (pos.includes('DIREITA')) {
-                    const yIni = pos.includes('SUPERIOR') ? py(marg) : py(altura - marg - tamPux);
-                    ctx.moveTo(px(largura - marg), yIni); ctx.lineTo(px(largura - marg), yIni + tamPux * esc);
-                } else if (pos.includes('TOPO')) {
-                    const xIni = pos.includes('ESQUERDA') ? px(marg) : px(largura - marg - tamPux);
-                    ctx.moveTo(xIni, py(marg)); ctx.lineTo(xIni + tamPux * esc, py(marg));
-                } else if (pos.includes('BASE')) {
-                    const xIni = pos.includes('ESQUERDA') ? px(marg) : px(largura - marg - tamPux);
-                    ctx.moveTo(xIni, py(altura - marg)); ctx.lineTo(xIni + tamPux * esc, py(altura - marg));
+                // vidro
+                ctx.fillStyle = 'rgba(173,216,230,.22)';
+                ctx.fillRect(X(0), Y(0), px(largura), dh);
+                // moldura
+                ctx.lineWidth = 12; ctx.strokeStyle = '#5a6b7b';
+                ctx.strokeRect(X(0), Y(0), px(largura), dh);
+
+                // DIVISORES VERTICAIS (barras de topo a base)
+                ctx.lineWidth = 7; ctx.strokeStyle = '#5a6b7b';
+                for (let i = 1; i <= qtdDivV; i++) {
+                    const x = X(largura * i / (qtdDivV + 1));
+                    ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, Y(altura)); ctx.stroke();
                 }
-                ctx.stroke();
-                ctx.font = '20px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
-                ctx.fillText(tamPux + ' mm', W / 2, H - 20);
+                // DIVISORES HORIZONTAIS (barras de lado a lado)
+                for (let i = 1; i <= qtdDivH; i++) {
+                    const y = Y(altura * i / (qtdDivH + 1));
+                    ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
+                }
+
+                // PU XADOR — posição efetiva (espelhada na folha 2 do par)
+                const posEfetiva = ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao;
+                if (puxador && posEfetiva) {
+                    const todaExt = document.getElementById('chk-toda-ext')?.checked;
+                    const horizontal = posEfetiva.includes('TOPO') || posEfetiva.includes('BASE');
+                    const lado = horizontal ? largura : altura;
+                    // AtualizarTravaTamanhoPuxador do VB: Total = lado inteiro
+                    const tamPux = todaExt ? lado : (parseFloat(g('f-tamanho-pux')) || lado * 0.5);
+                    const marg = 30;
+                    ctx.lineWidth = 10; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    if (posEfetiva.includes('ESQUERDA')) {
+                        const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
+                        ctx.moveTo(X(marg), yIni); ctx.lineTo(X(marg), yIni + px(tamPux));
+                    } else if (posEfetiva.includes('DIREITA')) {
+                        const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
+                        ctx.moveTo(X(largura - marg), yIni); ctx.lineTo(X(largura - marg), yIni + px(tamPux));
+                    } else if (posEfetiva.includes('TOPO')) {
+                        const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
+                        ctx.moveTo(xIni, Y(marg)); ctx.lineTo(xIni + px(tamPux), Y(marg));
+                    } else if (posEfetiva.includes('BASE')) {
+                        const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
+                        ctx.moveTo(xIni, Y(altura - marg)); ctx.lineTo(xIni + px(tamPux), Y(altura - marg));
+                    }
+                    ctx.stroke();
+                    // cota do puxador
+                    ctx.font = '16px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
+                    ctx.fillText(`${tamPux} mm`, X(largura / 2), Y(altura) + 40);
+                }
+
+                // FUROS desta folha (folha 2 do par espelha no eixo X)
+                ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
+                furos.forEach(fu => {
+                    const fx = ehFolhaEspelhada ? (largura - fu.x) : fu.x;
+                    const cx = X(Math.min(Math.max(fx, 0), largura));
+                    const cy = Y(Math.min(Math.max(fu.y, 0), altura));
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 9, cy); ctx.lineTo(cx + 9, cy);
+                    ctx.moveTo(cx, cy - 9); ctx.lineTo(cx, cy + 9);
+                    ctx.stroke();
+                });
+
+                // COTAS SEMPRE VISÍVEIS (LerMedidaDesenho do VB)
+                ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 16);
+                ctx.save();
+                ctx.translate(ox - 22, oy + dh / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(`${altura} mm`, 0, 0);
+                ctx.restore();
+                if (ehPar) {
+                    ctx.font = '15px Segoe UI'; ctx.fillStyle = '#8B0000';
+                    ctx.fillText(ehFolhaEspelhada ? 'Folha 2 (espelhada)' : 'Folha 1', X(largura / 2), Y(0) - 12);
+                }
             }
 
-            // furos
-            ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
-            furos.forEach(f => {
-                const cx = px(Math.min(f.x, largura)), cy = py(Math.min(f.y, altura));
-                ctx.beginPath();
-                ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
-                ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
-                ctx.stroke();
-            });
-
-            // referência em mm
-            if (document.getElementById('chk-referencia')?.checked) {
-                ctx.font = '18px Segoe UI'; ctx.fillStyle = '#6c757d'; ctx.textAlign = 'left';
-                ctx.fillText(largura + ' mm', ox, oy - 10);
-                ctx.save(); ctx.translate(ox - 14, oy + dh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
-                ctx.fillText(altura + ' mm', 0, 0); ctx.restore();
+            // ZONAS FANTASMA do puxador (picDesenho_Paint do VB) — no modo de configuração
+            if (modoPuxador) {
+                const ox0 = (W - larguraTotal * esc) / 2;
+                const X0 = mm => ox0 + px(mm);
+                ctx.font = '15px Segoe UI'; ctx.textAlign = 'center';
+                // lateral esquerda
+                ctx.fillStyle = 'rgba(139,0,0,.10)';
+                ctx.fillRect(X0(0) - 26, oy, 26, dh);
+                ctx.fillStyle = '#8B0000';
+                ctx.fillText('ESQ', X0(0) - 13, oy + dh / 2);
+                // lateral direita
+                ctx.fillStyle = 'rgba(139,0,0,.10)';
+                ctx.fillRect(X0(larguraTotal), oy, 26, dh);
+                ctx.fillStyle = '#8B0000';
+                ctx.fillText('DIR', X0(larguraTotal) + 13, oy + dh / 2);
+                // topo
+                ctx.fillStyle = 'rgba(139,0,0,.10)';
+                ctx.fillRect(X0(0), oy - 26, larguraTotal * esc, 26);
+                ctx.fillStyle = '#8B0000';
+                ctx.fillText('TOPO', ox0 + px(larguraTotal) / 2, oy - 10);
+                // base
+                ctx.fillStyle = 'rgba(139,0,0,.10)';
+                ctx.fillRect(X0(0), oy + dh, larguraTotal * esc, 26);
+                ctx.fillStyle = '#8B0000';
+                ctx.fillText('BASE', ox0 + px(larguraTotal) / 2, oy + dh + 18);
             }
         }
 
+        // picDesenho_MouseClick do VB: identifica a borda mais próxima
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
             const cv = document.getElementById('cv-visualizacao');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const altura = parseFloat(g('f-altura')) || 0;
             const largura = parseFloat(g('f-largura')) || 0;
+            const ehPar = document.getElementById('chk-pares')?.checked || false;
             if (!altura || !largura) return;
             const rect = cv.getBoundingClientRect();
-            const margem = 60;
-            const esc = Math.min((rect.width * 2 - margem * 2) / largura, (rect.height * 2 - margem * 2) / altura);
-            const ox = (rect.width * 2 - largura * esc) / 2, oy = (rect.height * 2 - altura * esc) / 2;
-            const mmX = Math.round(((e.clientX - rect.left) * 2 - ox) / esc);
-            const mmY = Math.round(((e.clientY - rect.top) * 2 - oy) / esc);
+            const esc = cv._esc || 1, oy = cv._oy || 0;
+            const qtdFolhas = ehPar ? 2 : 1;
+            const gap = 30, margemCota = 90;
+            const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
+            const ox0 = (rect.width * 2 - larguraTotal * esc) / 2;
+            const cx = (e.clientX - rect.left) * 2;
+            const cy = (e.clientY - rect.top) * 2;
+            // qual folha?
+            let folha = 0;
+            for (let f = 0; f < qtdFolhas; f++) {
+                const ox = ox0 + (f * (largura + gap)) * esc;
+                if (cx >= ox && cx <= ox + largura * esc) { folha = f; break; }
+            }
+            const ox = ox0 + (folha * (largura + gap)) * esc;
+            const mmX = (cx - ox) / esc;
+            const mmY = (cy - oy) / esc;
             const status = document.getElementById('viz-status');
 
             if (modoFuro) {
-                furos.push({ x: Math.max(0, mmX), y: Math.max(0, mmY) });
-                modoFuro = false; status.textContent = `Furo marcado em ${mmX}, ${mmY} mm`;
+                furos.push({ x: Math.round(Math.min(Math.max(mmX, 0), largura)),
+                             y: Math.round(Math.min(Math.max(mmY, 0), altura)) });
+                modoFuro = false;
+                document.getElementById('btn-furo').classList.remove('ativo');
+                status.textContent = `Furo marcado em X=${mmX.toFixed(0)}, Y=${mmY.toFixed(0)} mm`;
             } else if (modoPuxador) {
-                const perto = v => Math.abs(v) < Math.max(largura, altura) * 0.15;
+                // distância até cada borda (NormalizarPosicaoPuxadorCanonica)
+                const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
+                const min = Math.min(dEsq, dDir, dTopo, dBase);
+                const metade = folha === 1; // folha espelhada inverte lado no clique
                 let nova = '';
-                if (perto(mmX) && mmY < altura / 2) nova = mmX < largura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Direita Superior';
-                else if (perto(mmX)) nova = mmX < largura / 2 ? 'Lateral Esquerda Inferior' : 'Lateral Direita Inferior';
-                else if (perto(mmY) && mmX < largura / 2) nova = mmY < altura / 2 ? 'Topo Esquerda' : 'Base Total';
-                else if (perto(mmY)) nova = mmY < altura / 2 ? 'Topo Direita' : 'Base Total';
-                if (nova) {
-                    document.getElementById('f-posicao').value = nova;
-                    document.getElementById('f-posicao').dispatchEvent(new Event('change'));
-                    status.textContent = `Puxador posicionado: ${nova}`;
-                } else status.textContent = 'Clique perto de uma das bordas da porta.';
+                if (min === dEsq) {
+                    nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
+                } else if (min === dDir) {
+                    nova = mmY < altura / 2 ? 'Lateral Direita Superior' : 'Lateral Direita Inferior';
+                } else if (min === dTopo) {
+                    nova = mmX < largura / 2 ? 'Topo Esquerda' : 'Topo Direita';
+                } else {
+                    nova = 'Base Total';
+                }
+                if (metade) nova = posicaoEspelhada(nova);
+                const sel = document.getElementById('f-posicao');
+                if ([...sel.options].some(o => o.value === nova)) {
+                    sel.value = nova;
+                    sel.dispatchEvent(new Event('change'));
+                    status.textContent = `Puxador posicionado: ${nova}${metade ? ' (folha espelhada)' : ''}`;
+                } else status.textContent = `Posição '${nova}' indisponível — selecione manualmente.`;
                 modoPuxador = false;
                 cv.classList.remove('modo-pux');
+                document.getElementById('btn-modo-pux').classList.remove('ativo');
             }
             desenharVisualizacao();
         });
@@ -714,12 +809,15 @@
                 largura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
                 soldas: parseInt(g('f-soldas')) || 0,
+                furos: frenteAtual !== 'Serralheria' ? furos.map(f => ({ x: f.x, y: f.y })) : [],
                 detalhes: {
                     perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'),
                     puxador: g('f-puxador'), posicao: g('f-posicao'),
                     acabPux: g('f-acab-pux'), tamanhoPux: g('f-tamanho-pux'),
                     revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
-                    divisores: parseInt(g('f-divisores')) || 0,
+                    divH: parseInt(g('f-div-h')) || 0, divV: parseInt(g('f-div-v')) || 0,
+                    pares: document.getElementById('chk-pares')?.checked || false,
+                    todaExt: document.getElementById('chk-toda-ext')?.checked || false,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     produto: g('f-produto'), material: g('f-material'),
                     acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr')
@@ -731,7 +829,6 @@
         }
         async function preencherForm(item) {
             const d = item.detalhes || {};
-            // Recria as cascatas ANTES de preencher (combos dependem do pai)
             if (item.frente !== 'Serralheria') {
                 await carregarPerfis();
                 if (d.perfil) {
@@ -749,25 +846,31 @@
                 }
             }
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+            const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
             set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
             set('f-valor', item.valor); set('f-obs', item.obs);
             set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
             set('f-puxador', d.puxador); set('f-posicao', d.posicao);
             set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
-            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest); set('f-divisores', d.divisores);
+            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest);
+            set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
+            setChk('chk-pares', d.pares); setChk('chk-toda-ext', d.todaExt);
             set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
             set('f-produto', d.produto); set('f-material', d.material);
             set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
+            furos = (item.furos || []).map(f => ({ x: f.x, y: f.y })); // restaura furos do item
             alternarCamposPuxador(d.puxador);
             atualizarTotalItem();
             desenharVisualizacao();
         }
         function limparForm() {
             document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
-                if (el.id !== 'f-qtd') el.value = '';
+                if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
+            document.getElementById('chk-pares').checked = false;
+            document.getElementById('chk-toda-ext').checked = false;
             atualizarTotalItem();
             alternarCamposPuxador('');
             furos = [];
@@ -833,7 +936,7 @@
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
 
-        // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
+                // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
@@ -873,11 +976,11 @@
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
-        document.getElementById('f-qtd').addEventListener('input', atualizarTotalItem);
+        document.getElementById('f-qtd').addEventListener('input', () => { atualizarTotalItem(); desenharVisualizacao(); });
         document.getElementById('sel-cliente').addEventListener('change', atualizarBloqueioCliente);
         // Motor: recalcula ao mudar qualquer campo relevante
         ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-acab-pux','f-tamanho-pux',
-         'f-revest','f-cor-revest','f-divisores','f-altura','f-largura','f-qtd',
+         'f-revest','f-cor-revest','f-div-h','f-div-v','f-altura','f-largura',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas: recarregam os combos dependentes
@@ -885,32 +988,49 @@
         document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
-        // Visualização: controles e gatilhos
+        // Visualização: controles e gatilhos de redesenho
         document.getElementById('btn-modo-pux')?.addEventListener('click', () => {
             modoPuxador = true; modoFuro = false;
-            document.getElementById('viz-status').textContent = 'Clique no canvas perto da borda onde vai o puxador';
+            document.getElementById('btn-modo-pux').classList.add('ativo');
+            document.getElementById('btn-furo').classList.remove('ativo');
+            document.getElementById('viz-status').textContent = '💡 Clique na borda da porta onde o puxador entra';
             document.getElementById('cv-visualizacao').classList.add('modo-pux');
+            desenharVisualizacao(); // desenha as zonas fantasma
         });
         document.getElementById('btn-furo')?.addEventListener('click', () => {
             modoFuro = true; modoPuxador = false;
-            document.getElementById('viz-status').textContent = 'Clique no canvas onde entra o furo';
+            document.getElementById('btn-furo').classList.add('ativo');
+            document.getElementById('btn-modo-pux').classList.remove('ativo');
+            document.getElementById('viz-status').textContent = '💡 Clique no canvas onde entra o furo';
+            document.getElementById('cv-visualizacao').classList.remove('modo-pux');
         });
+        // Furos automáticos do VB: 1º em 100mm, último em (lado − 100mm), distribuídos igualmente
         document.getElementById('btn-dividir')?.addEventListener('click', () => {
             const altura = parseFloat(document.getElementById('f-altura').value) || 0;
             const n = parseInt(prompt('Dividir em quantos furos na lateral esquerda?')) || 0;
-            if (n > 0 && altura > 0) {
-                for (let i = 1; i <= n; i++) furos.push({ x: 60, y: Math.round(altura * i / (n + 1)) });
-                document.getElementById('viz-status').textContent = `${n} furos distribuídos igualmente`;
+            if (n > 0 && altura > 200) {
+                furos = [];
+                const inicio = 100, fim = altura - 100;
+                for (let i = 0; i < n; i++) {
+                    furos.push({ x: 60, y: Math.round(inicio + (fim - inicio) * i / (n - 1 || 1)) });
+                }
+                document.getElementById('viz-status').textContent = `✅ ${n} furos automáticos (100mm a ${fim}mm)`;
                 desenharVisualizacao();
+            } else if (n > 0) {
+                alert('Altura mínima de 200mm para dividir furos automaticamente.');
             }
         });
         document.getElementById('btn-limpar-furos')?.addEventListener('click', () => { furos = []; desenharVisualizacao(); });
-        ['chk-toda-ext', 'chk-referencia'].forEach(id =>
+        ['chk-toda-ext', 'chk-pares'].forEach(id =>
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
-        ['f-altura', 'f-largura', 'f-divisores', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
+        ['f-altura', 'f-largura', 'f-div-h', 'f-div-v', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
         ['f-altura', 'f-largura'].forEach(id =>
             document.getElementById(id)?.addEventListener('input', desenharVisualizacao));
+        // Redesenho após troca de frente (o layout precisa recalcular antes de medir o canvas)
+        document.querySelectorAll('.frente-btn').forEach(btn =>
+            btn.addEventListener('click', () => setTimeout(desenharVisualizacao, 120)));
+        window.addEventListener('resize', desenharVisualizacao);
 
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
