@@ -123,6 +123,16 @@
         .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
         .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
         .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
+        /* ===== VISUALIZAÇÃO EM TEMPO REAL (adaptado do protótipo) ===== */
+        #cv-visualizacao {
+            width: 100%; max-width: 480px; height: 480px;
+            background: #fafafa; border: 1px solid var(--border-color);
+            border-radius: 12px; display: block; margin: 0 auto; cursor: crosshair;
+        }
+        #cv-visualizacao.modo-pux { cursor: pointer; border-color: var(--primary-color); }
+        .viz-linha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+        .viz-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-light); }
+        .viz-status { font-size: 13px; color: var(--primary-color); font-weight: 600; min-height: 18px; margin-top: 6px; }
         @media (max-width: 768px) {
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 20px; }
@@ -141,7 +151,6 @@
             <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
             <a class="menu-item" href="clientes.html">👥 Clientes</a>
             <a class="menu-item" href="graficos_pedidos.html">📊 Orçamentos x Pedidos</a>
-            <!-- ✅ CORREÇÃO: arquivo real é orcamentos.html (com S) — antes dava 404 -->
             <a class="menu-item active" href="orcamentos.html">🧾 Novo Orçamento</a>
         </nav>
         <main>
@@ -176,7 +185,7 @@
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
                         <div class="grid-form">
-                            <!-- ✅ CORREÇÃO: Qtd SEM f-porta — comum às 3 frentes (antes sumia na Serralheria) -->
+                            <!-- Qtd comum às 3 frentes -->
                             <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                             <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
@@ -246,6 +255,21 @@
                         </div>
                     </div>
 
+                    <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (portas) — herdada do protótipo -->
+                    <div class="secao-item secao-porta">
+                        <h4>🖥️ Visualização em tempo real</h4>
+                        <canvas id="cv-visualizacao"></canvas>
+                        <div class="viz-linha">
+                            <button class="btn-mini" id="btn-modo-pux">🎯 Posicionar puxador (clique no canvas)</button>
+                            <label class="viz-check"><input type="checkbox" id="chk-toda-ext"> Toda extensão</label>
+                            <button class="btn-mini" id="btn-furo">＋ Furo</button>
+                            <button class="btn-mini" id="btn-dividir">Dividir igualmente</button>
+                            <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
+                            <label class="viz-check"><input type="checkbox" id="chk-referencia"> Referência (mm)</label>
+                        </div>
+                        <div class="viz-status" id="viz-status"></div>
+                    </div>
+
                     <!-- VALORES -->
                     <div class="secao-item">
                         <h4>💰 Valores e observação</h4>
@@ -298,6 +322,7 @@
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+
         // ============ SESSÃO (padrão do sistema) ============
         function getAuth() {
             try {
@@ -318,11 +343,27 @@
             return res.json();
         }
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
-        function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ','); }
+        // ✅ Formato monetário completo pt-BR: R$ 7.870.785,44
+        function formatCurrency(v) {
+            return parseFloat(v || 0).toLocaleString('pt-BR', {
+                style: 'currency', currency: 'BRL',
+                minimumFractionDigits: 2, maximumFractionDigits: 2
+            });
+        }
+
         // ============ ESTADO ============
         let frenteAtual = 'Porta de giro'; // nomenclatura real da TIPO_PRODUTO da base
         let itens = [];
         let editandoIndex = -1;
+
+        // ============ TOTAL DO ITEM (declarada ANTES de todos os usos) ============
+        function atualizarTotalItem() {
+            const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
+            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
+            const campo = document.getElementById('f-total-item');
+            if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
+        }
+
         // ============ TRAVA DE CLIENTE ============
         function atualizarBloqueioCliente() {
             const temCliente = !!document.getElementById('sel-cliente').value;
@@ -339,6 +380,7 @@
                 calcularPrecoAutomatico();
             }
         }
+
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -362,6 +404,7 @@
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
         }
+
         // ============ COMBOS: POPULAÇÃO ============
         function popularLista(id, lista, msgVazio) {
             const sel = document.getElementById(id);
@@ -388,6 +431,7 @@
                 return await fetchAutenticado(`${API_BASE}/catalogos_filtro?campo=${encodeURIComponent(campo)}&chave=${encodeURIComponent(chave)}`);
             } catch (err) { console.error(`Erro catálogo ${campo}:`, err); return []; }
         }
+
         // ============ CATÁLOGOS INDEPENDENTES (init) ============
         async function carregarCatalogosIniciais() {
             try {
@@ -402,6 +446,7 @@
                 popularLista('f-sistema', cat.sistemas);
             } catch (err) { console.error('Erro catálogos iniciais:', err); }
         }
+
         // ============ CASCATAS (fiel ao RepositorioProdutos.vb) ============
         function alternarCamposPuxador(puxador) {
             const mostrar = !!puxador && frenteAtual !== 'Serralheria';
@@ -462,13 +507,7 @@
             }
             popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
         }
-        // ============ TOTAL DO ITEM ============
-        function atualizarTotalItem() {
-            const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
-            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
-            const campo = document.getElementById('f-total-item');
-            if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
-        }
+
         // ============ MOTOR FINANCEIRO (cálculo automático) ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
@@ -512,7 +551,7 @@
             status.textContent = 'Calculando...';
             timerPreco = setTimeout(async () => {
                 try {
-                    // ✅ TEMPORÁRIO: debug:true devolve o "diag" no Network → calibrar vs VB
+                    // debug:true devolve o "diag" no Network → calibrar vs VB
                     const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...payload, debug: true })
@@ -528,6 +567,133 @@
                 }
             }, 400);
         }
+
+        // ============ VISUALIZAÇÃO EM TEMPO REAL (adaptado do sistema_html) ============
+        let furos = [];            // {x, y} em mm, origem = canto superior esquerdo
+        let modoPuxador = false;   // aguardando clique para posicionar puxador
+        let modoFuro = false;      // aguardando clique para marcar furo
+
+        function desenharVisualizacao() {
+            const cv = document.getElementById('cv-visualizacao');
+            if (!cv) return;
+            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+            const altura = parseFloat(g('f-altura')) || 0;
+            const largura = parseFloat(g('f-largura')) || 0;
+            const ctx = cv.getContext('2d');
+            const W = cv.width = cv.clientWidth * 2;   // nitidez em telas retina
+            const H = cv.height = cv.clientHeight * 2;
+            ctx.clearRect(0, 0, W, H);
+            if (altura <= 0 || largura <= 0) {
+                ctx.font = '28px Segoe UI'; ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
+                ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
+                return;
+            }
+            // escala: porta cabe no canvas com margem
+            const margem = 60;
+            const esc = Math.min((W - margem * 2) / largura, (H - margem * 2) / altura);
+            const dw = largura * esc, dh = altura * esc;
+            const ox = (W - dw) / 2, oy = (H - dh) / 2;
+            const px = mm => ox + mm * esc;   // mm → pixel
+            const py = mm => oy + mm * esc;
+
+            // vidro
+            ctx.fillStyle = 'rgba(173,216,230,.25)';
+            ctx.fillRect(px(0), py(0), dw, dh);
+            // moldura (perfil)
+            ctx.lineWidth = 14; ctx.strokeStyle = '#5a6b7b';
+            ctx.strokeRect(px(0), py(0), dw, dh);
+
+            // divisores (verticais, distribuídos igualmente)
+            const qtdDiv = parseInt(g('f-divisores')) || 0;
+            ctx.lineWidth = 8; ctx.strokeStyle = '#5a6b7b';
+            for (let i = 1; i <= qtdDiv; i++) {
+                const x = px(largura * i / (qtdDiv + 1));
+                ctx.beginPath(); ctx.moveTo(x, py(0)); ctx.lineTo(x, py(altura)); ctx.stroke();
+            }
+
+            // puxador
+            const pux = g('f-puxador');
+            const pos = g('f-posicao');
+            if (pux) {
+                const todaExt = document.getElementById('chk-toda-ext')?.checked;
+                const tamPux = todaExt
+                    ? ((pos.includes('TOPO') || pos.includes('BASE')) ? largura : altura)
+                    : (parseFloat(g('f-tamanho-pux')) || altura * 0.5);
+                ctx.lineWidth = 12; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
+                ctx.beginPath();
+                const marg = 34;
+                if (pos.includes('ESQUERDA')) {
+                    const yIni = pos.includes('SUPERIOR') ? py(marg) : py(altura - marg - tamPux);
+                    ctx.moveTo(px(marg), yIni); ctx.lineTo(px(marg), yIni + tamPux * esc);
+                } else if (pos.includes('DIREITA')) {
+                    const yIni = pos.includes('SUPERIOR') ? py(marg) : py(altura - marg - tamPux);
+                    ctx.moveTo(px(largura - marg), yIni); ctx.lineTo(px(largura - marg), yIni + tamPux * esc);
+                } else if (pos.includes('TOPO')) {
+                    const xIni = pos.includes('ESQUERDA') ? px(marg) : px(largura - marg - tamPux);
+                    ctx.moveTo(xIni, py(marg)); ctx.lineTo(xIni + tamPux * esc, py(marg));
+                } else if (pos.includes('BASE')) {
+                    const xIni = pos.includes('ESQUERDA') ? px(marg) : px(largura - marg - tamPux);
+                    ctx.moveTo(xIni, py(altura - marg)); ctx.lineTo(xIni + tamPux * esc, py(altura - marg));
+                }
+                ctx.stroke();
+                ctx.font = '20px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
+                ctx.fillText(tamPux + ' mm', W / 2, H - 20);
+            }
+
+            // furos
+            ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
+            furos.forEach(f => {
+                const cx = px(Math.min(f.x, largura)), cy = py(Math.min(f.y, altura));
+                ctx.beginPath();
+                ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+                ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
+                ctx.stroke();
+            });
+
+            // referência em mm
+            if (document.getElementById('chk-referencia')?.checked) {
+                ctx.font = '18px Segoe UI'; ctx.fillStyle = '#6c757d'; ctx.textAlign = 'left';
+                ctx.fillText(largura + ' mm', ox, oy - 10);
+                ctx.save(); ctx.translate(ox - 14, oy + dh / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+                ctx.fillText(altura + ' mm', 0, 0); ctx.restore();
+            }
+        }
+
+        document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
+            const cv = document.getElementById('cv-visualizacao');
+            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+            const altura = parseFloat(g('f-altura')) || 0;
+            const largura = parseFloat(g('f-largura')) || 0;
+            if (!altura || !largura) return;
+            const rect = cv.getBoundingClientRect();
+            const margem = 60;
+            const esc = Math.min((rect.width * 2 - margem * 2) / largura, (rect.height * 2 - margem * 2) / altura);
+            const ox = (rect.width * 2 - largura * esc) / 2, oy = (rect.height * 2 - altura * esc) / 2;
+            const mmX = Math.round(((e.clientX - rect.left) * 2 - ox) / esc);
+            const mmY = Math.round(((e.clientY - rect.top) * 2 - oy) / esc);
+            const status = document.getElementById('viz-status');
+
+            if (modoFuro) {
+                furos.push({ x: Math.max(0, mmX), y: Math.max(0, mmY) });
+                modoFuro = false; status.textContent = `Furo marcado em ${mmX}, ${mmY} mm`;
+            } else if (modoPuxador) {
+                const perto = v => Math.abs(v) < Math.max(largura, altura) * 0.15;
+                let nova = '';
+                if (perto(mmX) && mmY < altura / 2) nova = mmX < largura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Direita Superior';
+                else if (perto(mmX)) nova = mmX < largura / 2 ? 'Lateral Esquerda Inferior' : 'Lateral Direita Inferior';
+                else if (perto(mmY) && mmX < largura / 2) nova = mmY < altura / 2 ? 'Topo Esquerda' : 'Base Total';
+                else if (perto(mmY)) nova = mmY < altura / 2 ? 'Topo Direita' : 'Base Total';
+                if (nova) {
+                    document.getElementById('f-posicao').value = nova;
+                    document.getElementById('f-posicao').dispatchEvent(new Event('change'));
+                    status.textContent = `Puxador posicionado: ${nova}`;
+                } else status.textContent = 'Clique perto de uma das bordas da porta.';
+                modoPuxador = false;
+                cv.classList.remove('modo-pux');
+            }
+            desenharVisualizacao();
+        });
+
         // ============ FORMULÁRIO ============
         function coletarForm() {
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -565,6 +731,7 @@
         }
         async function preencherForm(item) {
             const d = item.detalhes || {};
+            // Recria as cascatas ANTES de preencher (combos dependem do pai)
             if (item.frente !== 'Serralheria') {
                 await carregarPerfis();
                 if (d.perfil) {
@@ -594,6 +761,7 @@
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
             alternarCamposPuxador(d.puxador);
             atualizarTotalItem();
+            desenharVisualizacao();
         }
         function limparForm() {
             document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
@@ -602,10 +770,13 @@
             document.getElementById('f-qtd').value = 1;
             atualizarTotalItem();
             alternarCamposPuxador('');
+            furos = [];
+            desenharVisualizacao();
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
             document.getElementById('calc-status').textContent = '';
         }
+
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
             if (!document.getElementById('sel-cliente').value) { alert('Selecione o cliente antes de adicionar itens.'); return; }
@@ -661,6 +832,7 @@
             document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
+
         // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
@@ -680,6 +852,7 @@
             localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista));
             alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo.');
         }
+
         // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');
@@ -691,6 +864,7 @@
                 sel.innerHTML = '<option value="">Erro ao carregar clientes</option>';
             }
         }
+
         // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
         document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
@@ -711,6 +885,33 @@
         document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
+        // Visualização: controles e gatilhos
+        document.getElementById('btn-modo-pux')?.addEventListener('click', () => {
+            modoPuxador = true; modoFuro = false;
+            document.getElementById('viz-status').textContent = 'Clique no canvas perto da borda onde vai o puxador';
+            document.getElementById('cv-visualizacao').classList.add('modo-pux');
+        });
+        document.getElementById('btn-furo')?.addEventListener('click', () => {
+            modoFuro = true; modoPuxador = false;
+            document.getElementById('viz-status').textContent = 'Clique no canvas onde entra o furo';
+        });
+        document.getElementById('btn-dividir')?.addEventListener('click', () => {
+            const altura = parseFloat(document.getElementById('f-altura').value) || 0;
+            const n = parseInt(prompt('Dividir em quantos furos na lateral esquerda?')) || 0;
+            if (n > 0 && altura > 0) {
+                for (let i = 1; i <= n; i++) furos.push({ x: 60, y: Math.round(altura * i / (n + 1)) });
+                document.getElementById('viz-status').textContent = `${n} furos distribuídos igualmente`;
+                desenharVisualizacao();
+            }
+        });
+        document.getElementById('btn-limpar-furos')?.addEventListener('click', () => { furos = []; desenharVisualizacao(); });
+        ['chk-toda-ext', 'chk-referencia'].forEach(id =>
+            document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
+        ['f-altura', 'f-largura', 'f-divisores', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
+            document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
+        ['f-altura', 'f-largura'].forEach(id =>
+            document.getElementById(id)?.addEventListener('input', desenharVisualizacao));
+
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) { window.location.href = LOGIN_URL; return; }
@@ -722,6 +923,7 @@
             carregarClientes();
             carregarCatalogosIniciais();
             carregarPerfis();
+            desenharVisualizacao();
         });
     </script>
 </body>

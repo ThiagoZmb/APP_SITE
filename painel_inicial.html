@@ -317,10 +317,13 @@
             return div.innerHTML;
         }
 
-        function formatCurrency(value) {
-            return 'R$ ' + parseFloat(value || 0).toFixed(2).replace('.', ',');
+        
+        function formatCurrency(v) {
+            return parseFloat(v || 0).toLocaleString('pt-BR', {
+            style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2
+            });
+        
         }
-
         function normalizar(texto) {
             return String(texto || '')
                 .trim().toLowerCase()
