@@ -153,7 +153,6 @@
         <main>
             <h1 class="welcome-title">Novo Orçamento 🧾</h1>
             <p class="welcome-subtitle">1. Selecione o cliente &nbsp;→&nbsp; 2. Escolha a frente &nbsp;→&nbsp; 3. Monte os itens — preços calculados pelo motor financeiro</p>
-
             <!-- ═══════════ ETAPA 1: CLIENTE ═══════════ -->
             <section class="card">
                 <div class="card-title"><span class="etapa">1</span> Cliente</div>
@@ -164,20 +163,16 @@
                     </div>
                 </div>
             </section>
-
             <!-- ═══════════ ETAPA 2: ITEM ═══════════ -->
             <section class="card">
                 <div class="card-title"><span class="etapa">2</span> Item — <span id="frente-atual">Porta de giro</span></div>
-
                 <div id="bloqueio-msg">🔒 Selecione o cliente na etapa 1 para liberar a montagem dos itens</div>
-
                 <div id="form-item" class="bloqueado">
                     <div class="frentes">
                         <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
                         <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                         <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
                     </div>
-
                     <!-- MEDIDAS -->
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
@@ -187,7 +182,7 @@
                             <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                             <div class="form-group f-porta">
                                 <label>&nbsp;</label>
-                                <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (espelha o desenho)</label>
+                                <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
                             </div>
                             <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
                             <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
@@ -195,7 +190,6 @@
                             <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                         </div>
                     </div>
-
                     <!-- PERFIL -->
                     <div class="secao-item secao-porta">
                         <h4>🟦 Perfil e acabamento</h4>
@@ -205,7 +199,6 @@
                             <div class="form-group"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
                         </div>
                     </div>
-
                     <!-- PUXADOR -->
                     <div class="secao-item secao-porta">
                         <h4>🟧 Puxador</h4>
@@ -224,18 +217,17 @@
                             <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
                         </div>
                     </div>
-
-                    <!-- REVESTIMENTO + DIVISORES (H e V, como no VB) -->
+                    <!-- REVESTIMENTO + DIVISOR + QUANTIDADES (fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🟩 Revestimento e divisores</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
                             <div class="form-group"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
                         </div>
                     </div>
-
                     <!-- SERRALHERIA -->
                     <div class="secao-item secao-serr" style="display:none">
                         <h4>🔧 Serralheria — produto e material</h4>
@@ -246,7 +238,6 @@
                             <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
                         </div>
                     </div>
-
                     <!-- CORRER -->
                     <div class="secao-item secao-correr" style="display:none">
                         <h4>↔️ Sistema de correr</h4>
@@ -255,7 +246,6 @@
                             <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                         </div>
                     </div>
-
                     <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🖥️ Visualização em tempo real</h4>
@@ -269,17 +259,19 @@
                         </div>
                         <div class="viz-status" id="viz-status"></div>
                     </div>
-
                     <!-- VALORES -->
                     <div class="secao-item">
                         <h4>💰 Valores e observação</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                             <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
+                            <div class="form-group">
+                                <label>Percentuais da linha (opcional, ex.: +10%;-5%)</label>
+                                <input type="text" id="f-percentuais" placeholder="+10%;-5%">
+                            </div>
                             <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
                         </div>
                     </div>
-
                     <div class="acoes-linha">
                         <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
                         <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
@@ -287,7 +279,6 @@
                     </div>
                 </div>
             </section>
-
             <!-- ═══════════ ETAPA 3: LISTA ═══════════ -->
             <section class="card">
                 <div class="card-title"><span class="etapa">3</span> Itens do orçamento</div>
@@ -307,11 +298,12 @@
                 <div class="totais">
                     <div class="grupo"><div class="rotulo">Subtotal</div><div class="valor" id="tot-subtotal">R$ 0,00</div></div>
                     <div class="grupo">
-                        <div class="rotulo">Desconto %</div>
+                        <div class="rotulo">Desconto % (variável)</div>
                         <input type="number" id="desconto" min="0" max="100" value="0" style="width:90px;padding:8px;border:1px solid var(--border-color);border-radius:8px;text-align:right;">
                     </div>
                     <div class="grupo"><div class="rotulo">Total</div><div class="valor" id="tot-geral">R$ 0,00</div></div>
                 </div>
+                <div style="font-size:12px;color:var(--text-light);text-align:right;margin-top:6px;" id="desconto-aviso"></div>
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-salvar">💾 Salvar orçamento</button>
                     <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
@@ -322,7 +314,6 @@
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
-
         // ============ SESSÃO ============
         function getAuth() {
             try {
@@ -348,12 +339,12 @@
                 style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2
             });
         }
-
         // ============ ESTADO ============
         let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
-
+        // ✅ CORREÇÃO ④: estado do desconto do cliente vindo do backend
+        let descontoJaAplicado = false; // true = tabela FIXO com desconto no item → trava o campo da tela
         // ============ TRAVA DE CLIENTE (à prova de bala: por selectedIndex) ============
         function temClienteSelecionado() {
             const sel = document.getElementById('sel-cliente');
@@ -375,15 +366,36 @@
                 calcularPrecoAutomatico();
             }
         }
-
+        // ✅ CORREÇÃO ④: trava/destrava o campo "Desconto %" da tela
+        function atualizarTravaDesconto() {
+            const inp = document.getElementById('desconto');
+            const aviso = document.getElementById('desconto-aviso');
+            if (descontoJaAplicado) {
+                inp.value = 0;
+                inp.disabled = true;
+                inp.style.background = '#eef1f4';
+                aviso.textContent = '🔒 Desconto do cliente já aplicado no item (tabela FIXO) — campo travado para evitar desconto em dobro.';
+            } else {
+                inp.disabled = false;
+                inp.style.background = '';
+                aviso.textContent = '';
+            }
+            atualizarTotais();
+        }
+        // ============ QTD EFETIVA (✅ CORREÇÃO ③: Par de Portas fatura 2 folhas) ============
+        function qtdEfetiva() {
+            const qtd = parseInt(document.getElementById('f-qtd').value) || 1;
+            const ehPar = document.getElementById('chk-pares')?.checked || false;
+            // No VB (SincronizarMemoriaPortas) o par cria 2 folhas faturadas
+            return ehPar ? Math.max(2, qtd) : qtd;
+        }
         // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
         function atualizarTotalItem() {
             const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
-            const q = parseFloat(document.getElementById('f-qtd').value) || 1;
+            const q = qtdEfetiva();
             const campo = document.getElementById('f-total-item');
             if (campo) campo.value = (u * q).toFixed(2).replace('.', ',');
         }
-
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -407,7 +419,6 @@
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
         }
-
         // ============ COMBOS ============
         function popularLista(id, lista, msgVazio) {
             const sel = document.getElementById(id);
@@ -447,7 +458,6 @@
                 popularLista('f-sistema', cat.sistemas);
             } catch (err) { console.error('Erro catálogos iniciais:', err); }
         }
-
         // ============ CASCATAS (fiel ao RepositorioProdutos.vb) ============
         function alternarCamposPuxador(puxador) {
             const mostrar = !!puxador && frenteAtual !== 'Serralheria';
@@ -460,6 +470,7 @@
             popularLista('f-acab', [], '— escolha o perfil —');
             popularLista('f-puxador', [], '— escolha o perfil —');
             popularLista('f-revest', [], '— escolha o perfil —');
+            popularLista('f-divisor', [], '— escolha o perfil —');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
             alternarCamposPuxador('');
         }
@@ -468,18 +479,22 @@
                 popularLista('f-acab', [], '— escolha o perfil —');
                 popularLista('f-puxador', [], '— escolha o perfil —');
                 popularLista('f-revest', [], '— escolha o perfil —');
+                popularLista('f-divisor', [], '— escolha o perfil —');
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
                 alternarCamposPuxador('');
                 return;
             }
-            const [acabs, puxs, revs] = await Promise.all([
+            // ✅ CORREÇÃO ①: divisores entram na mesma cascata do perfil
+            const [acabs, puxs, revs, divs] = await Promise.all([
                 catalogoFiltro('acabamentos', perfil),
                 catalogoFiltro('puxadores', perfil),
-                catalogoFiltro('revestimentos', perfil)
+                catalogoFiltro('revestimentos', perfil),
+                catalogoFiltro('divisores', perfil)
             ]);
             popularLista('f-acab', acabs, '(nenhum acabamento para este perfil)');
             popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
             popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
+            popularLista('f-divisor', divs, '(nenhum divisor para este perfil)');
             popularLista('f-acab-pux', [], '— escolha o puxador —');
             alternarCamposPuxador('');
         }
@@ -508,7 +523,6 @@
             }
             popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
         }
-
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
@@ -530,7 +544,9 @@
                             cliente: clienteNome, clienteCodigo,
                             produto: g('f-produto'), material: g('f-material'), acabamento: g('f-acab-serr'),
                             altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
-                            soldas: g('f-soldas'), qtd: g('f-qtd') };
+                            soldas: g('f-soldas'),
+                            qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
+                            percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
             } else {
                 if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) {
                     document.getElementById('f-valor').value = '';
@@ -540,13 +556,16 @@
                 }
                 payload = { frente: frenteAtual,
                             cliente: clienteNome, clienteCodigo,
-                            altura: g('f-altura'), largura: g('f-largura'), qtd: g('f-qtd'),
+                            altura: g('f-altura'), largura: g('f-largura'),
+                            qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
                             posicaoPuxador: g('f-posicao'),
                             tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
-                            divisor: '', qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0 };
+                            divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
+                            qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0,
+                            percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
             }
             clearTimeout(timerPreco);
             status.textContent = 'Calculando...';
@@ -557,6 +576,9 @@
                         body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+                    // ✅ CORREÇÃO ④: se o backend já aplicou desconto FIXO do cliente, trava o campo da tela
+                    descontoJaAplicado = !!(d.diag && d.diag.isFixo && d.diag.descontoCliente > 0);
+                    atualizarTravaDesconto();
                     atualizarTotalItem();
                     status.textContent = '✅ Calculado pelo motor';
                     setTimeout(() => { if (status.textContent === '✅ Calculado pelo motor') status.textContent = ''; }, 3000);
@@ -567,18 +589,12 @@
                 }
             }, 400);
         }
-
         // ============================================================
         // 🖥️ MOTOR DE DESENHO GRÁFICO — fiel ao frmPortasAbrir.vb
-        // FIX 1: cv.height atribuído (fim do desenho cortado)
-        // FIX 2: posição do puxador em MAIÚSCULAS (fim do puxador que não desenha)
-        // FIX 3: cota do puxador junto ao traço (sem colidir com a cota da largura)
-        // FIX 4: Qtd define as folhas do desenho (Par de Portas força 2; cap 4)
         // ============================================================
         let furos = [];
         let modoPuxador = false;
         let modoFuro = false;
-
         function inverterLadoPux(pos) {
             return pos.replace('Esquerda', '«E»').replace('Direita', 'Esquerda').replace('«E»', 'Direita');
         }
@@ -588,7 +604,6 @@
             if (pos.includes('Base Total')) return pos;
             return inverterLadoPux(pos);
         }
-
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
             if (!cv) return;
@@ -599,22 +614,18 @@
             const qtdDivV = parseInt(g('f-div-v')) || 0;
             const puxador = g('f-puxador');
             const posicao = g('f-posicao');
-            const qtd = parseInt(g('f-qtd')) || 1;
             const ehPar = document.getElementById('chk-pares')?.checked || false;
             const ctx = cv.getContext('2d');
-            // ✅ FIX 1: AMBAS dimensões atribuídas ao canvas
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
-
             if (altura <= 0 || largura <= 0) {
                 ctx.font = '26px Segoe UI'; ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
                 return;
             }
-
-            // ✅ FIX 4: Qtd define as folhas — Par de Portas força 2; cap de 4 p/ legibilidade
-            const qtdFolhas = Math.min(ehPar ? 2 : Math.max(1, qtd), 4);
+            // Qtd define as folhas — Par de Portas força 2 (✅ CORREÇÃO ③: mesma regra do faturamento)
+            const qtdFolhas = Math.min(ehPar ? 2 : Math.max(1, parseInt(document.getElementById('f-qtd').value) || 1), 4);
             const gap = 30, margemCota = 90;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
@@ -623,20 +634,17 @@
             const px = mm => mm * esc;
             cv._esc = esc; cv._oy = oy;
             cv._qtdFolhas = qtdFolhas;   // cache p/ o clique identificar a folha certa
-
             for (let f = 0; f < qtdFolhas; f++) {
                 // folhas pares (2ª, 4ª) espelham o puxador — regra de par do VB
                 const ehFolhaEspelhada = (f % 2) === 1;
                 const ox = (W - larguraTotal * esc) / 2 + px(f * (largura + gap));
                 const X = mm => ox + px(mm);
                 const Y = mm => oy + px(mm);
-
                 // vidro + moldura
                 ctx.fillStyle = 'rgba(173,216,230,.22)';
                 ctx.fillRect(X(0), Y(0), px(largura), dh);
                 ctx.lineWidth = 12; ctx.strokeStyle = '#5a6b7b';
                 ctx.strokeRect(X(0), Y(0), px(largura), dh);
-
                 // divisores verticais e horizontais
                 ctx.lineWidth = 7; ctx.strokeStyle = '#5a6b7b';
                 for (let i = 1; i <= qtdDivV; i++) {
@@ -647,8 +655,6 @@
                     const y = Y(altura * i / (qtdDivH + 1));
                     ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
                 }
-
-                // ✅ FIX 2: posição em MAIÚSCULAS
                 const posEfetiva = (ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao || '').toUpperCase();
                 if (puxador && posEfetiva) {
                     const todaExt = document.getElementById('chk-toda-ext')?.checked;
@@ -677,11 +683,9 @@
                         cotaX = xIni + px(tamPux) / 2; cotaY = Y(altura - marg) + 20;
                     }
                     ctx.stroke();
-                    // ✅ FIX 3: cota junto ao traço
                     ctx.font = '16px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
                     ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
                 }
-
                 // furos (folhas pares espelham no eixo X)
                 ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
                 furos.forEach(fu => {
@@ -693,7 +697,6 @@
                     ctx.moveTo(cx, cy - 9); ctx.lineTo(cx, cy + 9);
                     ctx.stroke();
                 });
-
                 // cotas SEMPRE visíveis + rótulo da folha
                 ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
                 ctx.textAlign = 'center';
@@ -708,7 +711,6 @@
                     ctx.fillText(ehFolhaEspelhada ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, X(largura / 2), Y(0) - 12);
                 }
             }
-
             // zonas fantasma do puxador no modo de posicionamento
             if (modoPuxador) {
                 const ox0 = (W - larguraTotal * esc) / 2;
@@ -728,7 +730,6 @@
                 ctx.fillStyle = '#8B0000'; ctx.fillText('BASE', ox0 + px(larguraTotal) / 2, oy + dh + 18);
             }
         }
-
         // clique no canvas: furo ou posicionamento do puxador (sincronizado com o desenho)
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
             const cv = document.getElementById('cv-visualizacao');
@@ -738,7 +739,6 @@
             if (!altura || !largura) return;
             const rect = cv.getBoundingClientRect();
             const esc = cv._esc || 1, oy = cv._oy || 0;
-            // ✅ usa a MESMA contagem de folhas que o desenho usou
             const qtdFolhas = cv._qtdFolhas || 1;
             const gap = 30;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
@@ -755,7 +755,6 @@
             const mmX = (cx - ox) / esc;
             const mmY = (cy - oy) / esc;
             const status = document.getElementById('viz-status');
-
             if (modoFuro) {
                 furos.push({ x: Math.round(Math.min(Math.max(mmX, 0), largura)),
                              y: Math.round(Math.min(Math.max(mmY, 0), altura)) });
@@ -789,7 +788,6 @@
             }
             desenharVisualizacao();
         });
-
         // ============ FORMULÁRIO ============
         function coletarForm() {
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -801,11 +799,13 @@
                 desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}` +
                        ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}${g('f-tamanho-pux') ? ' ' + g('f-tamanho-pux') + 'mm' : ''}` +
                        ` | Revest: ${g('f-revest') || '-'}` +
-                       (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '');
+                       ` | Divisor: ${g('f-divisor') || '-'} (${g('f-div-h') || 0}H/${g('f-div-v') || 0}V)` +
+                       (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '') +
+                       (g('f-percentuais') ? ` | Pct linha: ${g('f-percentuais')}` : '');
             }
             return {
                 frente: frenteAtual,
-                qtd: parseFloat(g('f-qtd')) || 1,
+                qtd: qtdEfetiva(),                                                        // ✅ CORREÇÃO ③
                 altura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
                 largura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
@@ -816,12 +816,14 @@
                     puxador: g('f-puxador'), posicao: g('f-posicao'),
                     acabPux: g('f-acab-pux'), tamanhoPux: g('f-tamanho-pux'),
                     revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
+                    divisor: g('f-divisor'),                                              // ✅ CORREÇÃO ①
                     divH: parseInt(g('f-div-h')) || 0, divV: parseInt(g('f-div-v')) || 0,
                     pares: document.getElementById('chk-pares')?.checked || false,
                     todaExt: document.getElementById('chk-toda-ext')?.checked || false,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     produto: g('f-produto'), material: g('f-material'),
-                    acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr')
+                    acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
+                    percentuais: g('f-percentuais')                                       // ✅ CORREÇÃO ②
                 },
                 valor: parseFloat(g('f-valor').replace(',', '.')) || 0,
                 obs: g('f-obs'),
@@ -854,11 +856,13 @@
             set('f-puxador', d.puxador); set('f-posicao', d.posicao);
             set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
             set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest);
+            set('f-divisor', d.divisor);                                                  // ✅ CORREÇÃO ①
             set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
             setChk('chk-pares', d.pares); setChk('chk-toda-ext', d.todaExt);
             set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
             set('f-produto', d.produto); set('f-material', d.material);
             set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
+            set('f-percentuais', d.percentuais);                                          // ✅ CORREÇÃO ②
             set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
             furos = (item.furos || []).map(f => ({ x: f.x, y: f.y }));
             alternarCamposPuxador(d.puxador);
@@ -880,7 +884,6 @@
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
             document.getElementById('calc-status').textContent = '';
         }
-
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
             if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
@@ -931,19 +934,19 @@
         }
         function atualizarTotais() {
             const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
-            const descPct = parseFloat(document.getElementById('desconto').value) || 0;
+            // ✅ CORREÇÃO ④: quando o desconto FIXO já veio no item, o campo fica travado em 0
+            const descPct = descontoJaAplicado ? 0 : (parseFloat(document.getElementById('desconto').value) || 0);
             const total = subtotal * (1 - descPct / 100);
             document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
-
         // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
             if (!temClienteSelecionado()) { alert('Selecione o cliente.'); return; }
             const clienteSel = document.getElementById('sel-cliente');
             const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
-            const descPct = parseFloat(document.getElementById('desconto').value) || 0;
+            const descPct = descontoJaAplicado ? 0 : (parseFloat(document.getElementById('desconto').value) || 0);
             const rascunho = {
                 data: new Date().toLocaleString('pt-BR'),
                 cliente: clienteSel.options[clienteSel.selectedIndex].text,
@@ -956,8 +959,7 @@
             localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista));
             alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo.');
         }
-
-        // ============ CARREGAMENTO ============
+                // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');
             try {
@@ -970,7 +972,6 @@
             }
             atualizarBloqueioCliente(); // ✅ trava/destava de acordo com o estado real
         }
-
         // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
         document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
@@ -980,10 +981,19 @@
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('f-qtd').addEventListener('input', () => { atualizarTotalItem(); desenharVisualizacao(); });
-        document.getElementById('sel-cliente').addEventListener('change', atualizarBloqueioCliente);
+        document.getElementById('sel-cliente').addEventListener('change', () => {
+            descontoJaAplicado = false; // recém selecionado: reavalia após o 1º cálculo
+            atualizarTravaDesconto();
+            atualizarBloqueioCliente();
+        });
+        document.getElementById('chk-pares').addEventListener('change', () => {
+            atualizarTotalItem();       // ✅ par muda a qtd faturada → recalcula
+            calcularPrecoAutomatico();
+        });
         // Motor: recalcula ao mudar qualquer campo relevante
         ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-acab-pux','f-tamanho-pux',
-         'f-revest','f-cor-revest','f-div-h','f-div-v','f-altura','f-largura',
+         'f-revest','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
+         'f-percentuais',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas: recarregam os combos dependentes
@@ -1023,7 +1033,9 @@
                 alert('Altura mínima de 200mm para dividir furos automaticamente.');
             }
         });
-                document.getElementById('btn-limpar-furos')?.addEventListener('click', () => { furos = []; desenharVisualizacao(); document.getElementById('viz-status').textContent = ''; });
+        document.getElementById('btn-limpar-furos')?.addEventListener('click', () => {
+            furos = []; desenharVisualizacao(); document.getElementById('viz-status').textContent = '';
+        });
         ['chk-toda-ext', 'chk-pares'].forEach(id =>
             document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
         ['f-altura', 'f-largura', 'f-div-h', 'f-div-v', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
@@ -1034,7 +1046,6 @@
         document.querySelectorAll('.frente-btn').forEach(btn =>
             btn.addEventListener('click', () => setTimeout(desenharVisualizacao, 120)));
         window.addEventListener('resize', desenharVisualizacao);
-
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) { window.location.href = LOGIN_URL; return; }
