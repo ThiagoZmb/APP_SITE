@@ -202,7 +202,8 @@ app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
   try {
     const cliente = req.query.cliente;
     const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
-    let filtroExtra = 'WHERE YEAR(p.DATA) = YEAR(CURDATE())';
+    // ✅ Últimos 6 meses: do dia 1º de 5 meses atrás até hoje (atravessa o ano sem erro)
+    let filtroExtra = 'WHERE p.DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 6 MONTH), \'%Y-%m-01\')';
     let params = [];
     if (cliente && !ehRepresentante(req)) {
       filtroExtra += ' AND p.RAZAO_SOCIAL = ?';
