@@ -117,15 +117,16 @@
             <section class="chart-card">
                 <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Orçamentos x Pedidos por Mês</h3>
                 <div class="loading-overlay" id="chart-loading"><div class="loading-spinner"></div></div>
-                <div class="chart-container">
+                <!-- ✅ BLINDAGEM 1: altura inline — o gráfico nunca renderiza com altura 0 -->
+                <div class="chart-container" style="position:relative;height:420px;">
                     <canvas id="grafico-comparativo"></canvas>
                 </div>
             </section>
 
-            <!-- ✅ NOVO: gráfico de LINHA — proporção de fechamento mês a mês -->
+            <!-- Gráfico de LINHA — proporção de fechamento mês a mês -->
             <section class="chart-card">
                 <h3 class="chart-title"><i class="fas fa-chart-line"></i> Proporção de Fechamento por Mês</h3>
-                <div class="chart-container">
+                <div class="chart-container" style="position:relative;height:420px;">
                     <canvas id="grafico-conversao"></canvas>
                 </div>
             </section>
@@ -149,7 +150,7 @@
             const auth = getAuth();
             return auth ? auth.token : '';
         }
-        // ✅ CORREÇÃO: formato monetário completo pt-BR (R$ 7.870.785,44)
+        // Formato monetário completo pt-BR (R$ 7.870.785,44)
         function formatCurrency(value) {
             return parseFloat(value || 0).toLocaleString('pt-BR', {
                 style: 'currency',
@@ -177,7 +178,7 @@
             }
             return `${API_BASE}/dados_compras_orcamentos`;
         }
-        // ✅ Complementa os 6 meses: meses sem movimento entram com zero (eixo sempre cheio)
+        // Complementa os 6 meses: meses sem movimento entram com zero (eixo sempre cheio)
         function preencherUltimos6Meses(dados) {
             const mapa = {};
             (dados || []).forEach(d => { mapa[d.mes] = d; });
@@ -196,6 +197,13 @@
             return saida;
         }
         async function loadGrafico() {
+            // ✅ BLINDAGEM 2: Chart.js ausente (CDN falhou) → aviso visível, sem tela morta
+            if (typeof Chart === 'undefined') {
+                document.getElementById('subtitulo-pagina').textContent =
+                    'Biblioteca de gráficos não carregou — verifique a conexão e recarregue (Ctrl+F5)';
+                document.getElementById('chart-loading').style.display = 'none';
+                return;
+            }
             try {
                 document.getElementById('chart-loading').style.display = 'flex';
                 const controller = new AbortController();
@@ -272,7 +280,7 @@
                 if (chartConversao) chartConversao.destroy();
                 const ctx2 = document.getElementById('grafico-conversao').getContext('2d');
                 chartConversao = new Chart(ctx2, {
-                    type: 'line', // ✅ linha, não colunas
+                    type: 'line',
                     data: {
                         labels: labels,
                         datasets: [{
@@ -296,7 +304,6 @@
                                 callbacks: {
                                     label: function(c) {
                                         const i = c.dataIndex;
-                                        // % + volume do mês: mostra se a variação é eficiência ou quantidade
                                         return `${c.raw}% — ${orcamentos[i]} orç., ${pedidos[i]} pedidos`;
                                     }
                                 }
