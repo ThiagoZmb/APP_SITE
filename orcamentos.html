@@ -140,6 +140,19 @@
         .viz-linha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
         .viz-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-light); }
         .viz-status { font-size: 13px; color: var(--primary-color); font-weight: 600; min-height: 18px; margin-top: 6px; }
+        /* ===== ETAPA 2 EM DUAS COLUNAS: dados à esquerda, desenho à direita ===== */
+        .item-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, .85fr); gap: 22px; align-items: start; }
+        .item-dados { min-width: 0; }
+        .item-visual { position: sticky; top: 84px; min-width: 0; }
+        .item-visual .secao-item { margin-bottom: 16px; }
+        .item-visual #cv-visualizacao { max-width: none; height: 480px; }
+        .item-layout.sem-visual { grid-template-columns: minmax(0, 1fr); }
+        .item-layout.sem-visual .item-visual { display: none; }
+        @media (max-width: 1150px) {
+            .item-layout { grid-template-columns: minmax(0, 1fr); }
+            .item-visual { position: static; }
+            .item-visual #cv-visualizacao { height: 420px; }
+        }
         @media (max-width: 768px) {
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 20px; }
@@ -190,6 +203,8 @@
                         <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                         <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
                     </div>
+                    <div class="item-layout">
+                    <div class="item-dados">
                     <!-- MEDIDAS -->
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
@@ -268,6 +283,26 @@
                             <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                         </div>
                     </div>
+                    <!-- VALORES -->
+                    <div class="secao-item">
+                        <h4>💰 Valores e observação</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
+                            <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
+                            <div class="form-group">
+                                <label>Percentuais da linha (opcional, ex.: +10%;-5%)</label>
+                                <input type="text" id="f-percentuais" placeholder="+10%;-5%">
+                            </div>
+                            <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
+                        </div>
+                    </div>
+                    <div class="acoes-linha">
+                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
+                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                        <span class="calc-status" id="calc-status"></span>
+                    </div>
+                    </div>
+                    <aside class="item-visual">
                     <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🖥️ Visualização em tempo real</h4>
@@ -289,23 +324,7 @@
                         <div id="pnl-furacoes"></div>
                         <div class="viz-status" id="furos-resumo"></div>
                     </div>
-                    <!-- VALORES -->
-                    <div class="secao-item">
-                        <h4>💰 Valores e observação</h4>
-                        <div class="grid-form">
-                            <div class="form-group"><label>Valor unitário (auto)</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
-                            <div class="form-group"><label>Total do item (unit × qtd)</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
-                            <div class="form-group">
-                                <label>Percentuais da linha (opcional, ex.: +10%;-5%)</label>
-                                <input type="text" id="f-percentuais" placeholder="+10%;-5%">
-                            </div>
-                            <div class="form-group full"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
-                        </div>
-                    </div>
-                    <div class="acoes-linha">
-                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
-                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
-                        <span class="calc-status" id="calc-status"></span>
+                    </aside>
                     </div>
                 </div>
             </section>
@@ -460,6 +479,7 @@
                 document.getElementById('f-qtd').value = 1;
             }
             document.querySelectorAll('.secao-furos').forEach(el => el.style.display = ehPortaComFuros() ? '' : 'none');
+            document.querySelector('.item-layout')?.classList.toggle('sem-visual', frenteAtual === 'Serralheria');
             const ehCorrer = frenteAtual === 'Porta de Correr';
             const ehSerr = frenteAtual === 'Serralheria';
             document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
@@ -958,6 +978,8 @@
                 : '';
         }
 
+        // textos do desenho maiores: o canvas é desenhado em 2× e exibido numa coluna estreita
+        const fonte = (px, peso = 600) => `${peso} ${Math.round(px * 1.6)}px 'Plus Jakarta Sans', 'Segoe UI', sans-serif`;
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
             if (!cv) return;
@@ -972,7 +994,7 @@
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
             if (altura <= 0 || largura <= 0) {
-                ctx.font = '26px Segoe UI'; ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
+                ctx.font = fonte(26); ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
                 return;
             }
@@ -1034,7 +1056,7 @@
                         cotaY = yIni + px(tamDesenho) / 2;
                     }
                     ctx.stroke();
-                    ctx.font = '16px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
+                    ctx.font = fonte(16); ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
                     ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
                 }
                 // furos: mesma lista em todas as folhas, no lado de cada uma (sem espelhar as medidas)
@@ -1042,7 +1064,7 @@
                     const ladoF = String(ladosFuros[f] || '').toUpperCase();
                     const recuo = 22;
                     ctx.strokeStyle = '#dc3545'; ctx.fillStyle = '#dc3545'; ctx.lineWidth = 3;
-                    ctx.font = '14px Segoe UI';
+                    ctx.font = fonte(14);
                     furosLista.forEach(m => {
                         let cx, cy;
                         if (ladoF.startsWith('SUPERIOR') || ladoF.startsWith('INFERIOR')) {
@@ -1063,16 +1085,16 @@
                     });
                 }
                 // cotas SEMPRE visíveis + rótulo da folha
-                ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
+                ctx.font = fonte(17); ctx.fillStyle = '#6c757d';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 16);
+                ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 38);
                 ctx.save();
                 ctx.translate(ox - 22, oy + dh / 2);
                 ctx.rotate(-Math.PI / 2);
                 ctx.fillText(`${altura} mm`, 0, 0);
                 ctx.restore();
                 if (qtdFolhas > 1) {
-                    ctx.font = '15px Segoe UI'; ctx.fillStyle = '#8B0000';
+                    ctx.font = fonte(15); ctx.fillStyle = '#8B0000';
                     ctx.fillText(ehFolhaEspelhada ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, X(largura / 2), Y(0) - 12);
                 }
                 // zonas fantasmas do puxador (uma por borda de cada folha)
@@ -1083,7 +1105,7 @@
                     ctx.fillRect(X(largura) - z, Y(0), z, dh);
                     ctx.fillRect(X(0), Y(0), px(largura), z);
                     ctx.fillRect(X(0), Y(altura) - z, px(largura), z);
-                    ctx.fillStyle = '#8B0000'; ctx.font = '14px Segoe UI'; ctx.textAlign = 'center';
+                    ctx.fillStyle = '#8B0000'; ctx.font = fonte(14); ctx.textAlign = 'center';
                     ctx.fillText('ESQ', X(0) + z / 2, oy + dh / 2);
                     ctx.fillText('DIR', X(largura) - z / 2, oy + dh / 2);
                     ctx.fillText('TOPO', X(largura / 2), Y(0) + 18);
