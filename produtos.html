@@ -290,6 +290,8 @@
         .perm-chips span { font-size: 13px; padding: 5px 10px; border-radius: 8px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .perm-vazio { font-size: 13px; color: #adb5bd; }
     </style>
+    <link rel="stylesheet" href="tema.css">
+    <script src="layout.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -314,7 +316,7 @@
             <a class="menu-item" href="financeiro.html">💰 Financeiro</a>
         </nav>
         <main>
-            <h1 class="welcome-title">Cadastro de Produtos 🏷️</h1>
+            <h1 class="welcome-title">Cadastro de Produtos</h1>
             <p class="welcome-subtitle">Produtos de venda usados nos orçamentos: perfis, puxadores, revestimentos, acessórios e sistemas.</p>
 
             <section class="cards">
@@ -859,7 +861,7 @@
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
             if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
-                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Cadastro de Produtos 🏷️</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
+                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Cadastro de Produtos</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
                 return;
             }
             await Promise.all([carregarOpcoes(), carregarProdutos()]);

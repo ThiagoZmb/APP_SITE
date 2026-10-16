@@ -339,6 +339,8 @@
             .col-opc { display: none; }
         }
     </style>
+    <link rel="stylesheet" href="tema.css">
+    <script src="layout.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -363,7 +365,7 @@
             <a class="menu-item active" href="financeiro.html">💰 Financeiro</a>
         </nav>
         <main>
-            <h1 class="welcome-title">Fluxo de Caixa 💰</h1>
+            <h1 class="welcome-title">Fluxo de Caixa</h1>
             <p class="welcome-subtitle">Entradas e saídas, contas a pagar e a receber. Resumo do mês atual.</p>
 
             <section class="cards">
@@ -1027,7 +1029,7 @@
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
             if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
-                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Fluxo de Caixa 💰</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
+                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Fluxo de Caixa</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
                 return;
             }
             carregarOpcoes();

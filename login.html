@@ -4,318 +4,146 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login Elegance</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --vinho: #9b1b30; --vinho-esc: #6e0f20; --ring: rgba(155, 27, 48, .16);
+      --texto: #18151d; --texto-2: #77707f; --borda: #d9d9e3; --fundo: #f4f4f7;
     }
-
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      position: relative;
-      overflow: hidden;
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; background: var(--fundo); color: var(--texto);
+      -webkit-font-smoothing: antialiased;
     }
+    .login-shell { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100vh; }
 
-    body::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="a" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:%23ffffff;stop-opacity:0.1"/><stop offset="100%" style="stop-color:%23ffffff;stop-opacity:0"/></radialGradient></defs><circle cx="20" cy="20" r="20" fill="url(%23a)"/><circle cx="80" cy="40" r="15" fill="url(%23a)"/><circle cx="40" cy="80" r="25" fill="url(%23a)"/></svg>') repeat;
-      opacity: 0.3;
-      animation: float 20s ease-in-out infinite;
+    /* ===== lado da marca ===== */
+    .brand-side {
+      position: relative; overflow: hidden; color: #fff; padding: 48px 56px;
+      display: flex; flex-direction: column; justify-content: space-between;
+      background:
+        radial-gradient(700px 420px at 20% 15%, rgba(255, 255, 255, .10), transparent 60%),
+        radial-gradient(600px 500px at 90% 100%, rgba(255, 120, 140, .18), transparent 60%),
+        linear-gradient(150deg, #b02a3f 0%, #7c1123 55%, #3d0712 100%);
     }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-20px) rotate(180deg); }
+    .brand-side::before {
+      content: ""; position: absolute; inset: 0; opacity: .12; pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+      background-size: 44px 44px;
+      -webkit-mask-image: radial-gradient(ellipse at 30% 40%, #000 0%, transparent 70%);
+      mask-image: radial-gradient(ellipse at 30% 40%, #000 0%, transparent 70%);
     }
-
-    .login-container {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      padding: 48px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      position: relative;
-      transform: translateY(0);
-      transition: all 0.3s ease;
+    .brand-side::after {
+      content: ""; position: absolute; width: 520px; height: 520px; right: -160px; top: 18%;
+      border-radius: 50%; border: 1px solid rgba(255, 255, 255, .14);
+      box-shadow: 0 0 0 60px rgba(255,255,255,.03), 0 0 0 130px rgba(255,255,255,.025);
+      animation: girar 40s linear infinite;
     }
-
-    .login-container:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.2);
+    @keyframes girar { to { transform: rotate(360deg); } }
+    .marca { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+    .marca-logo {
+      width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     }
-
-    .login-header {
-      text-align: center;
-      margin-bottom: 40px;
+    .marca b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; display: block; }
+    .marca small { font-size: 12px; opacity: .75; font-weight: 600; }
+    .brand-texto { position: relative; z-index: 1; max-width: 480px; }
+    .brand-texto h1 { font-size: 40px; line-height: 1.12; font-weight: 800; letter-spacing: -.035em; margin-bottom: 16px; }
+    .brand-texto p { font-size: 16px; line-height: 1.6; opacity: .82; margin-bottom: 28px; }
+    .recursos { list-style: none; display: grid; gap: 12px; }
+    .recursos li { display: flex; align-items: center; gap: 12px; font-size: 14.5px; font-weight: 600; }
+    .recursos li span {
+      width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
+    .recursos svg { width: 16px; height: 16px; }
+    .brand-rodape { position: relative; z-index: 1; font-size: 12.5px; opacity: .6; }
 
-    .login-header h2 {
-      font-size: 32px;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, #8B0000, #600000);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .login-header p {
-      color: #666;
-      font-size: 16px;
-      font-weight: 400;
-    }
-
-    .form-group {
-      margin-bottom: 24px;
-      position: relative;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: #333;
-      font-size: 14px;
-      letter-spacing: 0.5px;
-    }
-
-    .input-wrapper {
-      position: relative;
-    }
-
+    /* ===== lado do formulário ===== */
+    .form-side { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+    .login-container { width: 100%; max-width: 400px; animation: subir .5s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes subir { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    .login-header { margin-bottom: 32px; }
+    .login-header h2 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+    .login-header p { color: var(--texto-2); font-size: 15px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 700; color: #4a4553; margin-bottom: 8px; }
+    .input-wrapper { position: relative; }
     .form-group input {
-      width: 100%;
-      padding: 16px 20px;
-      border: 2px solid #e1e5e9;
-      border-radius: 12px;
-      font-size: 16px;
-      transition: all 0.3s ease;
-      background: #fff;
-      outline: none;
-      font-family: inherit;
+      width: 100%; height: 48px; padding: 0 16px 0 46px; font: inherit; font-size: 15px; color: var(--texto);
+      background: #fff; border: 1px solid var(--borda); border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(20, 16, 28, .04); transition: border-color .15s ease, box-shadow .15s ease;
     }
-
-    .form-group input:focus {
-      border-color: #8B0000;
-      box-shadow: 0 0 0 4px rgba(139, 0, 0, 0.1);
-      transform: translateY(-2px);
-    }
-
-    .form-group input::placeholder {
-      color: #999;
-      font-weight: 400;
-    }
-
+    .form-group input:hover { border-color: #c6c4d0; }
+    .form-group input:focus { outline: none; border-color: var(--vinho); box-shadow: 0 0 0 4px var(--ring); }
+    .form-group input::placeholder { color: #a5a0ad; }
     .input-icon {
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #999;
-      font-size: 18px;
-      transition: color 0.3s ease;
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 15px;
+      filter: grayscale(1); opacity: .55; pointer-events: none; transition: opacity .15s ease, filter .15s ease;
     }
-
-    .form-group input:focus + .input-icon {
-      color: #8B0000;
-    }
-
+    .form-group input:focus + .input-icon { opacity: 1; filter: none; }
     .login-btn {
-      width: 100%;
-      padding: 16px;
-      background: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-      letter-spacing: 0.5px;
+      width: 100%; height: 50px; margin-top: 8px; border: 1px solid #7c1123; border-radius: 12px; cursor: pointer;
+      font: inherit; font-size: 15.5px; font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, #b02a3f 0%, #7c1123 100%);
+      box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 12px 24px -10px rgba(155, 27, 48, .7);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform .15s ease, box-shadow .2s ease;
     }
-
-    .login-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
-    }
-
-    .login-btn:hover::before {
-      left: 100%;
-    }
-
-    .login-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(139, 0, 0, 0.4);
-    }
-
-    .login-btn:active {
-      transform: translateY(0);
-    }
-
-    .forgot-password {
-      text-align: center;
-      margin-top: 24px;
-    }
-
-    .forgot-password a {
-      color: #8B0000;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      transition: color 0.3s ease;
-    }
-
-    .forgot-password a:hover {
-      color: #600000;
-      text-decoration: underline;
-    }
-
-    .social-login {
-      margin-top: 32px;
-      text-align: center;
-    }
-
-    .social-login p {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 16px;
-      position: relative;
-    }
-
-    .social-login p::before,
-    .social-login p::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      width: 40%;
-      height: 1px;
-      background: #e1e5e9;
-    }
-
-    .social-login p::before {
-      left: 0;
-    }
-
-    .social-login p::after {
-      right: 0;
-    }
-
-    .social-buttons {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-    }
-
-    .social-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      border: 2px solid #e1e5e9;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-size: 20px;
-    }
-
-    .social-btn:hover {
-      border-color: #8B0000;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-    }
-
+    .login-btn:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 16px 28px -10px rgba(155, 27, 48, .8); }
+    .login-btn:active { transform: none; }
+    .login-btn:disabled { cursor: wait; }
     .loading {
-      display: none;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #ffffff;
-      border-top: 2px solid transparent;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-right: 8px;
+      display: none; width: 18px; height: 18px; border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .8s linear infinite;
     }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .forgot-password { text-align: center; margin-top: 20px; }
+    .forgot-password a { color: var(--vinho); font-size: 14px; font-weight: 700; text-decoration: none; }
+    .forgot-password a:hover { text-decoration: underline; }
+    .social-login { display: none; }
     .result {
-      margin-top: 20px;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      text-align: center;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.3s ease;
+      margin-top: 20px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 600; text-align: center;
+      max-height: 0; opacity: 0; overflow: hidden; transition: all .25s ease;
     }
+    .result.show { max-height: 120px; opacity: 1; padding: 13px 16px; }
+    .result.success { background: rgba(18, 161, 80, .1); color: #0c7a3c; border: 1px solid rgba(18, 161, 80, .25); }
+    .result.error { background: rgba(224, 56, 75, .08); color: #b8283a; border: 1px solid rgba(224, 56, 75, .25); }
+    .seguro { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 28px; font-size: 12.5px; color: var(--texto-2); }
+    .seguro svg { width: 14px; height: 14px; }
 
-    .result.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .result.success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .result.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    @media (max-width: 480px) {
-      .login-container {
-        padding: 32px 24px;
-        margin: 20px;
-      }
-
-      .login-header h2 {
-        font-size: 28px;
-      }
-
-      body {
-        padding: 12px;
-      }
+    @media (max-width: 900px) {
+      .login-shell { grid-template-columns: 1fr; }
+      .brand-side { padding: 28px 24px; min-height: auto; }
+      .brand-texto h1 { font-size: 26px; margin-bottom: 8px; }
+      .brand-texto p, .recursos, .brand-rodape { display: none; }
+      .brand-side::after { display: none; }
+      .brand-texto { margin-top: 24px; }
     }
   </style>
 </head>
 <body>
+  <div class="login-shell">
+    <aside class="brand-side">
+      <div class="marca"><div class="marca-logo">E</div><div><b>Elegance</b><small>Sistema de gestão</small></div></div>
+      <div class="brand-texto">
+        <h1>Da medida ao pedido, tudo em um só lugar.</h1>
+        <p>Orçamentos com preço calculado na hora, acompanhamento da produção e o financeiro da fábrica sempre à mão.</p>
+        <ul class="recursos">
+          <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span>Orçamentos de portas e serralheria</li>
+          <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Pedidos e produção em tempo real</li>
+          <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-5-9 5 9 5z"/><path d="M3 8v8l9 5 9-5V8"/></svg></span>Estoque, produtos e fluxo de caixa</li>
+        </ul>
+      </div>
+      <div class="brand-rodape">© Elegance Indústria e Comércio de Artefatos de Alumínio</div>
+    </aside>
+    <main class="form-side">
   <div class="login-container">
     <div class="login-header">
-      <h2>Bem-vindo</h2>
-      <p>Faça login para continuar</p>
+      <h2>Bem-vindo de volta</h2>
+      <p>Entre com seu usuário para acessar o sistema.</p>
     </div>
     
     <form id="loginForm">
@@ -355,6 +183,9 @@
     </div>
     
     <div id="result" class="result"></div>
+    <div class="seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Conexão protegida · sessão expira em 8 horas</div>
+  </div>
+    </main>
   </div>
 
   <script>
