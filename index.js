@@ -948,6 +948,321 @@ app.get('/estoque/movimentacao', autenticar, somenteInterno, async (req, res) =>
   res.json(meses);
 });
 
+// ============================================================
+// CADASTRO DE PRODUTOS (venda) — fiel ao frm_Cadastro_Produtos.vb
+// ============================================================
+// Carrega_Treenodes: classes → produtos (exceto situação 'Consulta') + próximo código
+app.get('/produtos', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT CODIGO, MODELO, CLASSE, SITUACAO FROM cadastro_de_produtos
+       WHERE SITUACAO <> 'Consulta' OR SITUACAO IS NULL ORDER BY CLASSE, MODELO`);
+    const [[mx]] = await pool.execute('SELECT MAX(CODIGO) AS m FROM cadastro_de_produtos');
+    res.json({
+      proximoCodigo: (parseInt(mx.m, 10) || 0) + 1,
+      produtos: rows.map(r => ({ codigo: r.CODIGO, modelo: r.MODELO, classe: r.CLASSE || '', situacao: r.SITUACAO || '' }))
+    });
+  } catch (err) {
+    console.error('Erro /produtos:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Combos: classes existentes, classes de acabamento e acessórios (complementos)
+app.get('/produtos/opcoes', autenticar, somenteInterno, async (req, res) => {
+  const lista = async sql => { try { const [r] = await pool.execute(sql); return r.map(x => x.v).filter(Boolean); } catch { return []; } };
+  res.json({
+    classes: await lista('SELECT DISTINCT CLASSE AS v FROM cadastro_de_produtos ORDER BY CLASSE'),
+    classesAcabamento: await lista('SELECT DISTINCT CLASSE AS v FROM acabamentos ORDER BY CLASSE ASC'),
+    complementos: await lista("SELECT MODELO AS v FROM cadastro_de_produtos WHERE CLASSE = 'Acessórios' ORDER BY MODELO")
+  });
+});
+
+// txt_Codigo_TextChanged: ficha do produto + o que ele tem permitido
+app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT CODIGO, MODELO, CLASSE, TIPO_PUXADOR, DESCONTO_VIDRO, DESC_PERF_PUX, VALOR_CHEIO, VALOR_FIXO,
+              OBSERVACAO, COMPLEMENTOS, CLASSE_ACABAMENTOS, SITUACAO, (IMAGEM IS NOT NULL) AS TEM_IMAGEM
+       FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1`, [req.params.codigo]);
+    if (!rows.length) return res.status(404).json({ error: 'Produto não encontrado' });
+    const r = rows[0];
+    const modelo = r.MODELO || '';
+    const permitidos = async sql => { try { const [x] = await pool.execute(sql, [modelo]); return x.map(y => y.v).filter(Boolean); } catch { return []; } };
+    res.json({
+      codigo: r.CODIGO, modelo, classe: r.CLASSE || '', tipoPuxador: r.TIPO_PUXADOR || '',
+      descontoVidro: numEstq(r.DESCONTO_VIDRO), descPerfPux: numEstq(r.DESC_PERF_PUX),
+      valorCheio: numEstq(r.VALOR_CHEIO), valorFixo: numEstq(r.VALOR_FIXO),
+      observacao: r.OBSERVACAO || '', complementos: r.COMPLEMENTOS || '', classeAcabamento: r.CLASSE_ACABAMENTOS || '',
+      situacao: r.SITUACAO || '', temImagem: !!Number(r.TEM_IMAGEM),
+      permitidos: {
+        tiposProduto: await permitidos('SELECT TIPO_PRODUTO AS v FROM perfis_permitidos WHERE MODELO = ? ORDER BY TIPO_PRODUTO'),
+        acabamentos: await permitidos('SELECT ACABAMENTO AS v FROM acabamentos_permitidos WHERE MODELO = ? ORDER BY ACABAMENTO'),
+        puxadores: await permitidos('SELECT PUXADOR_PERMITIDO AS v FROM puxadores_permitidos WHERE MODELO = ? ORDER BY PUXADOR_PERMITIDO'),
+        revestimentos: await permitidos('SELECT REVESTIMENTO_PERMITIDO AS v FROM revestimentos_permitidos WHERE MODELO = ? ORDER BY REVESTIMENTO_PERMITIDO'),
+        divisores: await permitidos('SELECT DIVISOR AS v FROM divisores_permitidos WHERE MODELO = ? ORDER BY DIVISOR')
+      }
+    });
+  } catch (err) {
+    console.error('Erro /produtos/item:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Imagem do produto (coluna IMAGEM, a mesma que o VB lê)
+app.get('/produtos/imagem/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT IMAGEM FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
+    if (!rows.length || !rows[0].IMAGEM) return res.status(404).json({ error: 'Sem imagem' });
+    res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'no-store').send(rows[0].IMAGEM);
+  } catch (err) {
+    console.error('Erro /produtos/imagem:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+app.put('/produtos/imagem/:codigo', autenticar, somenteInterno,
+  express.raw({ type: ['image/jpeg', 'image/png'], limit: '3mb' }), async (req, res) => {
+  if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Imagem inválida' });
+  try {
+    const [r] = await pool.execute('UPDATE cadastro_de_produtos SET IMAGEM = ? WHERE CODIGO = ?', [req.body, req.params.codigo]);
+    if (!r.affectedRows) return res.status(404).json({ error: 'Salve o produto antes de enviar a imagem.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro PUT /produtos/imagem:', err.message);
+    res.status(500).json({ error: 'Erro ao salvar a imagem' });
+  }
+});
+
+// Salvar_Registro: mesmas validações; INSERT (sempre Ativo) ou UPDATE pela existência do CODIGO
+app.post('/produtos/salvar', autenticar, somenteInterno, async (req, res) => {
+  const b = req.body || {};
+  const erro = msg => res.status(400).json({ error: msg });
+  const codigo = String(b.codigo ?? '').trim();
+  const modelo = String(b.modelo ?? '').trim();
+  const classe = txtEstq(b.classe, 100);
+  const tipoPuxador = txtEstq(b.tipoPuxador, 50);
+  const classeAcabamento = txtEstq(b.classeAcabamento, 100);
+  const vazioParaNull = v => (v ? v : null);
+  if (!/^\d+$/.test(codigo)) return erro('Favor inserir o CÓDIGO do produto');
+  if (!modelo) return erro('Favor inserir o MODELO do produto');
+  if (modelo.length > 255) return erro('Dados muito longos para o campo. Reduza o tamanho do texto.');
+  if (classe === 'Puxador' && !tipoPuxador) return erro('Favor escolher o tipo de puxador !');
+  if (!classeAcabamento) return erro('Favor inserir a CLASSE do ACABAMENTO');
+  if (String(b.valorCheio ?? '').trim() === '') return erro('Favor inserir o VALOR CHEIO do produto');
+  if (String(b.valorFixo ?? '').trim() === '') return erro('Favor inserir o VALOR FIXO do produto');
+  const valorCheio = numEstq(b.valorCheio), valorFixo = numEstq(b.valorFixo);
+  const campos = [modelo, valorCheio, valorFixo, numEstq(b.descontoVidro), vazioParaNull(tipoPuxador), vazioParaNull(classe),
+    numEstq(b.descPerfPux)];
+  const obs = vazioParaNull(txtEstq(b.observacao, 2000));
+  const compl = vazioParaNull(txtEstq(b.complementos));
+  let con;
+  try {
+    con = await pool.getConnection();
+    await con.beginTransaction();
+    const [ex] = await con.execute('SELECT COUNT(*) AS n FROM cadastro_de_produtos WHERE CODIGO = ?', [codigo]);
+    const existe = Number(ex[0].n) > 0;
+    if (existe) {
+      const situacao = b.situacao === 'Ativo' ? 'Ativo' : 'Inativo';
+      await con.execute(
+        `UPDATE cadastro_de_produtos SET MODELO = ?, VALOR_CHEIO = ?, VALOR_FIXO = ?, DESCONTO_VIDRO = ?, TIPO_PUXADOR = ?,
+         CLASSE = ?, DESC_PERF_PUX = ?, SITUACAO = ?, OBSERVACAO = ?, COMPLEMENTOS = ?, CLASSE_ACABAMENTOS = ? WHERE CODIGO = ?`,
+        [...campos, situacao, obs, compl, classeAcabamento, codigo]);
+    } else {
+      await con.execute(
+        `INSERT INTO cadastro_de_produtos (CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, CLASSE,
+         DESC_PERF_PUX, SITUACAO, OBSERVACAO, COMPLEMENTOS, CLASSE_ACABAMENTOS) VALUES (?,?,?,?,?,?,?,?,'Ativo',?,?,?)`,
+        [codigo, ...campos, obs, compl, classeAcabamento]);
+    }
+    await con.commit();
+    res.json({ ok: true, codigo: Number(codigo), mensagem: existe ? 'Registro atualizado com sucesso!' : 'Registro inserido com sucesso!' });
+  } catch (err) {
+    if (con) await con.rollback().catch(() => {});
+    console.error('Erro /produtos/salvar:', err.message);
+    const msgs = {
+      ER_DUP_ENTRY: 'Código já existe no sistema!',
+      ER_NO_REFERENCED_ROW_2: 'Erro de integridade referencial. Verifique os dados relacionados.',
+      ER_DATA_TOO_LONG: 'Dados muito longos para o campo. Reduza o tamanho do texto.',
+      ER_BAD_FIELD_ERROR: 'Erro na estrutura da tabela. Contate o suporte técnico.'
+    };
+    res.status(msgs[err.code] ? 400 : 500).json({ error: msgs[err.code] || 'Erro inesperado ao salvar o produto.' });
+  } finally {
+    if (con) con.release();
+  }
+});
+
+// ============================================================
+// FINANCEIRO — FLUXO DE CAIXA (fiel ao frm_Fluxo_Caixa.vb)
+// ============================================================
+const SITUACOES_FLUXO = ['Recebido', 'A Receber', 'Pago', 'A Pagar', 'Faturado', 'Protestado', 'Atrasado'];
+const COLUNAS_FLUXO = `ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, RAZAO_SOCIAL, RAZAO_FABRICANTE, PEDIDO, PDV, PRE_NOTA_FISCAL,
+  NOTA_FISCAL, FORMA_PGTO, BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL`;
+const linhaFluxo = r => ({
+  id: r.ID, data: r.DATA, cliente: r.RAZAO_SOCIAL || '', fornecedor: r.RAZAO_FABRICANTE || '', pedido: r.PEDIDO ?? '',
+  pdv: r.PDV ?? '', preNota: r.PRE_NOTA_FISCAL ?? '', notaFiscal: r.NOTA_FISCAL ?? '', formaPgto: r.FORMA_PGTO || '',
+  banco: r.BANCO || '', situacao: r.SITUACAO || '', valor: numEstq(r.VALOR), observacao: r.OBSERVACAO_GERAL || ''
+});
+function limitesMes(ym) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+  const hoje = new Date();
+  const ano = m ? +m[1] : hoje.getFullYear(), mes = m ? +m[2] : hoje.getMonth() + 1;
+  const ultimo = new Date(ano, mes, 0).getDate();
+  const p2 = n => String(n).padStart(2, '0');
+  return [`${ano}-${p2(mes)}-01`, `${ano}-${p2(mes)}-${p2(ultimo)}`];
+}
+
+// Carregar_Dados (cmb_pesquisa), meses anterior/próximo, filtro por situação e pesquisa
+app.get('/fluxo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const modo = String(req.query.modo || 'mes');
+    const where = [], params = [];
+    const [ini, fim] = limitesMes(req.query.mes);
+    const busca = txtEstq(req.query.busca, 100);
+    const situacao = txtEstq(req.query.situacao, 50);
+    if (busca) {
+      const campos = ['PEDIDO', 'PDV', 'PRE_NOTA_FISCAL', 'NOTA_FISCAL', 'VALOR', 'BANCO', 'SITUACAO', 'RAZAO_FABRICANTE',
+                      'RAZAO_SOCIAL', 'FORMA_PGTO', 'OBSERVACAO_GERAL'];
+      where.push('(' + campos.map(c => `CAST(${c} AS CHAR) LIKE ?`).join(' OR ') + ')');
+      campos.forEach(() => params.push(`%${busca}%`));
+    } else if (modo === 'todos') {
+      // sem filtro
+    } else if (['recebido', 'a_receber', 'pago', 'a_pagar'].includes(modo)) {
+      where.push('SITUACAO = ?');
+      params.push({ recebido: 'Recebido', a_receber: 'A receber', pago: 'Pago', a_pagar: 'A pagar' }[modo]);
+    } else if (modo === 'hoje') {
+      where.push('DATA = CURDATE()');
+    } else if (modo === 'atrasados') {
+      where.push("(SITUACAO = 'Atrasado' OR SITUACAO = 'Protestado')");
+    } else {
+      where.push('DATA BETWEEN ? AND ?');
+      params.push(ini, fim);
+      if (situacao) { where.push('SITUACAO = ?'); params.push(situacao); }
+    }
+    const [rows] = await pool.execute(
+      `SELECT ${COLUNAS_FLUXO} FROM fluxo_de_caixa ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY DATA DESC, ID DESC`, params);
+    res.json(rows.map(linhaFluxo));
+  } catch (err) {
+    console.error('Erro /fluxo:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar o fluxo de caixa' });
+  }
+});
+
+// Carregar_Resumo_Mes (mês atual) — mesmas somas do VB
+app.get('/fluxo/resumo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [[r]] = await pool.execute(`SELECT
+      SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='Pago', VALOR, 0)) AS pago,
+      SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='Recebido', VALOR, 0)) AS recebido,
+      SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='A pagar', VALOR, 0)) AS a_pagar,
+      SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='A receber', VALOR, 0)) AS a_receber,
+      SUM(IF(DATA < CURDATE() AND SITUACAO='A receber', VALOR, 0)) AS atrasado
+      FROM fluxo_de_caixa`);
+    const v = k => numEstq(r[k]);
+    const saldo = v('recebido') + v('a_receber') - v('atrasado') - v('pago') - v('a_pagar');
+    res.json({ pago: v('pago'), recebido: v('recebido'), aPagar: v('a_pagar'), aReceber: v('a_receber'), atrasado: v('atrasado'), saldo });
+  } catch (err) {
+    console.error('Erro /fluxo/resumo:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Combos: situações existentes, formas de pagamento, bancos, clientes, fornecedores e próximo ID
+app.get('/fluxo/opcoes', autenticar, somenteInterno, async (req, res) => {
+  const lista = async sql => { try { const [r] = await pool.execute(sql); return r.map(x => x.v).filter(Boolean); } catch { return []; } };
+  const [[mx]] = await pool.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa').catch(() => [[{ m: 0 }]]);
+  res.json({
+    proximoId: (parseInt(mx.m, 10) || 0) + 1,
+    situacoes: await lista('SELECT DISTINCT SITUACAO AS v FROM fluxo_de_caixa ORDER BY SITUACAO ASC'),
+    formas: await lista("SELECT DISTINCT FORMA_PGTO AS v FROM fluxo_de_caixa WHERE FORMA_PGTO <> '' ORDER BY FORMA_PGTO"),
+    bancos: await lista("SELECT DISTINCT BANCO AS v FROM fluxo_de_caixa WHERE BANCO <> '' ORDER BY BANCO"),
+    clientes: await lista('SELECT RAZAO_SOCIAL AS v FROM cadastro_clientes ORDER BY RAZAO_SOCIAL'),
+    fornecedores: await lista("SELECT DISTINCT RAZAO_FABRICANTE AS v FROM fluxo_de_caixa WHERE RAZAO_FABRICANTE <> '' ORDER BY RAZAO_FABRICANTE")
+  });
+});
+
+// Histórico: recebido x pago dos últimos 12 meses
+app.get('/fluxo/historico', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(`SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes,
+        SUM(IF(SITUACAO = 'Recebido', VALOR, 0)) AS entrada, SUM(IF(SITUACAO = 'Pago', VALOR, 0)) AS saida
+      FROM fluxo_de_caixa WHERE DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+      GROUP BY DATE_FORMAT(DATA, '%Y-%m')`);
+    const porMes = Object.fromEntries(rows.map(r => [r.mes, r]));
+    const hoje = new Date(), saida = [];
+    for (let x = -11; x <= 0; x++) {
+      const m = new Date(hoje.getFullYear(), hoje.getMonth() + x, 1);
+      const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+      saida.push({ mes: k, entrada: numEstq(porMes[k]?.entrada), saida: numEstq(porMes[k]?.saida) });
+    }
+    res.json(saida);
+  } catch (err) {
+    console.error('Erro /fluxo/historico:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Salvar movimento: INSERT se o ID não existe, senão UPDATE
+app.post('/fluxo/salvar', autenticar, somenteInterno, async (req, res) => {
+  const b = req.body || {};
+  const erro = msg => res.status(400).json({ error: msg });
+  const entrada = b.movimento === 'Entrada';
+  if (!['Entrada', 'Saída'].includes(b.movimento)) return erro('Escolha se o movimento é Entrada ou Saída!');
+  const nome = txtEstq(b.nome);
+  if (!nome) return erro(entrada ? 'Favor escolher o cliente!' : 'Favor escolher o fornecedor!');
+  const formaPgto = txtEstq(b.formaPgto, 100);
+  if (!formaPgto) return erro('Favor escolher uma forma de pagamento!');
+  const data = String(b.data || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(new Date(data + 'T00:00:00'))) return erro('Favor inserir uma data válida!');
+  const situacao = txtEstq(b.situacao, 50);
+  if (!SITUACOES_FLUXO.includes(situacao)) return erro('Favor escolher a situação do pagamento!');
+  const valor = numEstq(b.valor);
+  if (!(valor > 0)) return erro('Favor inserir um valor maior que 0!');
+  const dados = [data, entrada ? nome : '', entrada ? '' : nome, txtEstq(b.pedido, 50), txtEstq(b.pdv, 50), txtEstq(b.preNota, 50),
+    txtEstq(b.notaFiscal, 50), formaPgto, txtEstq(b.banco, 100), situacao, valor, txtEstq(b.observacao, 2000)];
+  try {
+    const id = parseInt(b.id, 10) || 0;
+    const [ex] = id ? await pool.execute('SELECT ID FROM fluxo_de_caixa WHERE ID = ? LIMIT 1', [id]) : [[]];
+    if (ex.length) {
+      await pool.execute(
+        `UPDATE fluxo_de_caixa SET DATA=?, RAZAO_SOCIAL=?, RAZAO_FABRICANTE=?, PEDIDO=?, PDV=?, PRE_NOTA_FISCAL=?, NOTA_FISCAL=?,
+         FORMA_PGTO=?, BANCO=?, SITUACAO=?, VALOR=?, OBSERVACAO_GERAL=? WHERE ID=?`, [...dados, id]);
+      return res.json({ ok: true, id, mensagem: 'Registro atualizado com sucesso!' });
+    }
+    const [r] = await pool.execute(
+      `INSERT INTO fluxo_de_caixa (DATA, RAZAO_SOCIAL, RAZAO_FABRICANTE, PEDIDO, PDV, PRE_NOTA_FISCAL, NOTA_FISCAL, FORMA_PGTO,
+       BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, dados);
+    res.json({ ok: true, id: r.insertId, mensagem: 'Registro inserido com sucesso!' });
+  } catch (err) {
+    console.error('Erro /fluxo/salvar:', err.message);
+    res.status(500).json({ error: 'Erro ao salvar o movimento.' });
+  }
+});
+
+// Menu "Alterar para ..." — aceita vários registros de uma vez
+app.post('/fluxo/situacao', autenticar, somenteInterno, async (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(n => parseInt(n, 10)).filter(n => n > 0).slice(0, 500);
+  const situacao = String(req.body?.situacao || '');
+  if (!ids.length) return res.status(400).json({ error: 'Favor escolher um item para ser alterado!' });
+  if (!SITUACOES_FLUXO.includes(situacao)) return res.status(400).json({ error: 'Situação inválida' });
+  try {
+    const [r] = await pool.execute(`UPDATE fluxo_de_caixa SET SITUACAO = ? WHERE ID IN (${ids.map(() => '?').join(',')})`, [situacao, ...ids]);
+    res.json({ ok: true, alterados: r.affectedRows });
+  } catch (err) {
+    console.error('Erro /fluxo/situacao:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+app.delete('/fluxo/:id', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [r] = await pool.execute('DELETE FROM fluxo_de_caixa WHERE ID = ?', [req.params.id]);
+    if (!r.affectedRows) return res.status(404).json({ error: 'Registro não encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro DELETE /fluxo:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
