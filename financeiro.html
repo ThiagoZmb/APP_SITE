@@ -328,6 +328,38 @@
         .link-hoje { float: right; font-size: 12px; font-weight: 700; color: var(--primary-color); cursor: pointer; text-transform: none; letter-spacing: 0; }
         .gaveta .acoes { padding: 16px 24px; }
 
+        /* ===== MENU DO BOTÃO DIREITO (ContextMenuStrip1) ===== */
+        .ctx-menu {
+            position: fixed; z-index: 70; min-width: 250px; padding: 6px; border-radius: 14px;
+            background: rgba(255, 255, 255, .97); border: 1px solid var(--border-color);
+            box-shadow: 0 18px 40px -12px rgba(20, 16, 28, .28), 0 4px 12px -4px rgba(20, 16, 28, .12);
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            opacity: 0; transform: scale(.97); transform-origin: top left; pointer-events: none;
+            transition: opacity .12s ease, transform .12s ease;
+        }
+        .ctx-menu.aberto { opacity: 1; transform: none; pointer-events: auto; }
+        .ctx-cab { padding: 8px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--border-color); }
+        .ctx-cab b { display: block; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+        .ctx-cab small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .ctx-item {
+            position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none;
+            border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--text-dark); cursor: pointer; text-align: left;
+        }
+        .ctx-item:hover, .ctx-item:focus-visible, .ctx-item.sub-aberto { background: var(--primary-light); color: var(--primary-color); outline: none; }
+        .ctx-item .ic { width: 18px; text-align: center; flex-shrink: 0; }
+        .ctx-item .atalho { margin-left: auto; font-size: 11.5px; color: var(--text-light); font-weight: 600; }
+        .ctx-item .seta-sub { margin-left: auto; font-size: 11px; color: var(--text-light); }
+        .ctx-item.perigo { color: #c0283b; }
+        .ctx-item.perigo:hover { background: rgba(224, 56, 75, .1); color: #c0283b; }
+        .ctx-item:disabled { opacity: .4; cursor: default; background: none; color: var(--text-dark); }
+        .ctx-sep { height: 1px; background: var(--border-color); margin: 5px 6px; }
+        .ctx-sub { left: calc(100% + 4px); top: -7px; min-width: 210px; position: absolute; }
+        .ctx-sub.esquerda { left: auto; right: calc(100% + 4px); }
+        .ctx-sit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .ctx-item .marca-atual { margin-left: auto; color: var(--primary-color); font-weight: 800; }
+        .ctx-grupo-tit { padding: 6px 10px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-light); }
+        tbody tr.ctx-alvo { box-shadow: inset 3px 0 0 var(--primary-color) !important; background: rgba(155, 27, 48, .08) !important; }
+
         /* ===== RESUMOS COMPACTOS ===== */
         body .cards.compacto { gap: 12px !important; margin-bottom: 20px !important; }
         body .cards.compacto .card { padding: 13px 16px !important; border-radius: 14px !important; }
@@ -495,7 +527,7 @@
                     </table>
                 </div>
                 <div class="rodape-lista">
-                    <span id="rodape-qtd">0 movimentos</span>
+                    <span><span id="rodape-qtd">0 movimentos</span> · <span style="opacity:.8">clique com o botão direito numa linha para mais opções</span></span>
                     <span>Entradas <b id="rodape-ent">R$ 0,00</b> · Saídas <b id="rodape-sai">R$ 0,00</b></span>
                 </div>
                 <div class="barra-selecao" id="barra-selecao">
@@ -567,6 +599,7 @@
         </div>
     </aside>
 
+    <div class="ctx-menu" id="ctx-menu" role="menu" aria-label="Ações do registro"></div>
     <div id="toasts" aria-live="polite"></div>
     <div class="modal-fundo" id="modal">
         <div class="modal">
@@ -821,22 +854,20 @@
         $('sel-limpar').addEventListener('click', () => { marcados.clear(); renderLista(); });
         $('th-data').addEventListener('click', () => { ordemAsc = !ordemAsc; renderLista(); });
 
-        // Menu "Alterar para ..."
-        $('sel-situacao').addEventListener('change', async e => {
-            const situacao = e.target.value;
-            e.target.value = '';
-            if (!situacao || !marcados.size) return;
+        // ============ AÇÕES SOBRE REGISTROS (usadas pela barra de seleção e pelo menu do botão direito) ============
+        async function alterarSituacao(ids, situacao) {
+            if (!ids.length) { toast('Favor escolher um item para ser alterado!', 'info'); return; }
             try {
-                const r = await api('/fluxo/situacao', { method: 'POST', body: JSON.stringify({ ids: [...marcados], situacao }) });
-                itens.forEach(it => { if (marcados.has(it.id)) it.situacao = situacao; });
+                const r = await api('/fluxo/situacao', { method: 'POST', body: JSON.stringify({ ids, situacao }) });
+                itens.forEach(it => { if (ids.includes(it.id)) it.situacao = situacao; });
                 renderLista();
                 carregarResumo();
+                carregarGastos();
                 carregarOpcoes();
                 toast(`${r.alterados} registro(s) alterado(s) para ${situacao}`, 'ok');
             } catch (err) { toast(err.message, 'erro'); }
-        });
-        $('sel-excluir').addEventListener('click', async () => {
-            const ids = [...marcados];
+        }
+        async function excluirRegistros(ids) {
             if (!ids.length) return;
             if (!(await confirmar('Excluir', ids.length === 1 ? 'Têm certeza que deseja apagar este registro ?' : `Têm certeza que deseja apagar estes ${ids.length} registros ?`))) return;
             let ok = 0;
@@ -846,13 +877,14 @@
             }
             renderLista();
             carregarResumo();
+            carregarGastos();
             if (ok) toast(`${ok} registro(s) excluído(s)`, 'ok');
-        });
-        // EnviarParaExcel: exporta as linhas selecionadas (CSV que o Excel abre direto)
-        $('sel-excel').addEventListener('click', () => {
+        }
+        // EnviarParaExcel: exporta as linhas escolhidas (CSV que o Excel abre direto)
+        function enviarParaExcel(ids) {
             const cab = ['ID', 'Data', 'Entrada', 'Saída', 'Pedido', 'PDV', 'Pre nota', 'Nota fiscal', 'Forma de pagamento', 'Banco', 'Situação Pgto', 'Valor', 'Observação'];
             const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-            const linhas = itens.filter(it => marcados.has(it.id)).map(it => [it.id, dataBR(it.data), it.cliente, it.fornecedor, it.pedido, it.pdv,
+            const linhas = itens.filter(it => ids.includes(it.id)).map(it => [it.id, dataBR(it.data), it.cliente, it.fornecedor, it.pedido, it.pdv,
                 it.preNota, it.notaFiscal, it.formaPgto, it.banco, it.situacao, paraCampo(it.valor), it.observacao].map(cel).join(';'));
             const blob = new Blob(['﻿' + [cab.map(cel).join(';'), ...linhas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
             const a = document.createElement('a');
@@ -860,7 +892,151 @@
             a.download = `fluxo_de_caixa_${hojeISO()}.csv`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+        $('sel-situacao').addEventListener('change', e => {
+            const situacao = e.target.value;
+            e.target.value = '';
+            if (situacao) alterarSituacao([...marcados], situacao);
         });
+        $('sel-excluir').addEventListener('click', () => excluirRegistros([...marcados]));
+        $('sel-excel').addEventListener('click', () => enviarParaExcel([...marcados]));
+
+        // ============ MENU DO BOTÃO DIREITO (ContextMenuStrip1 do VB) ============
+        const COR_SITUACAO = { 'A Receber': '#d98a00', 'Recebido': '#12a150', 'A Pagar': '#d98a00', 'Pago': '#12a150',
+                               'Faturado': '#2b7fd9', 'Protestado': '#e0384b', 'Atrasado': '#e0384b' };
+        const menu = $('ctx-menu');
+        let ctxIds = [];
+        function fecharMenu() {
+            menu.classList.remove('aberto');
+            document.querySelectorAll('tr.ctx-alvo').forEach(tr => tr.classList.remove('ctx-alvo'));
+        }
+        function posicionar(el, x, y) {
+            el.style.left = '0px'; el.style.top = '0px';
+            const r = el.getBoundingClientRect();
+            el.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+            el.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+        }
+        function abrirMenu(x, y, ids) {
+            ctxIds = ids;
+            const regs = itens.filter(it => ids.includes(it.id));
+            if (!regs.length) return;
+            const um = regs.length === 1 ? regs[0] : null;
+            const soma = regs.reduce((t, it) => t + it.valor, 0);
+            const nome = um ? (ehEntrada(um) ? um.cliente : um.fornecedor) || '(sem nome)' : `${regs.length} registros selecionados`;
+            const situacoesAtuais = new Set(regs.map(it => String(it.situacao).toLowerCase()));
+            // mesmas opções "Alterar para" do VB, agrupadas por tipo de movimento
+            const grupos = [['Recebimentos', ['A Receber', 'Recebido']], ['Pagamentos', ['A Pagar', 'Pago']], ['Outras', ['Faturado', 'Protestado', 'Atrasado']]];
+            const sub = grupos.map(([tit, lista]) => `<div class="ctx-grupo-tit">${tit}</div>` + lista.map(sit => `
+                <button class="ctx-item" role="menuitem" data-acao="situacao" data-sit="${sit}">
+                    <span class="ctx-sit-dot" style="background:${COR_SITUACAO[sit]}"></span>${sit}
+                    ${situacoesAtuais.size === 1 && situacoesAtuais.has(sit.toLowerCase()) ? '<span class="marca-atual">✓</span>' : ''}
+                </button>`).join('')).join('');
+            const pessoa = um ? (ehEntrada(um) ? um.cliente : um.fornecedor) : '';
+            menu.innerHTML = `
+                <div class="ctx-cab"><b>${escapeHtml(nome)}</b><small>${um ? `${dataBR(um.data)} · ${escapeHtml(um.situacao || '—')} · ` : ''}${moeda(soma)}</small></div>
+                <button class="ctx-item" role="menuitem" data-acao="editar" ${um ? '' : 'disabled'}><span class="ic">✏️</span>Editar movimento<span class="atalho">Enter</span></button>
+                <button class="ctx-item" role="menuitem" data-acao="novo"><span class="ic">＋</span>Novo movimento</button>
+                <div class="ctx-sep"></div>
+                <div class="ctx-item" role="menuitem" tabindex="0" data-acao="submenu" aria-haspopup="true">
+                    <span class="ic">🔄</span>Alterar situação para<span class="seta-sub">▶</span>
+                    <div class="ctx-menu ctx-sub" role="menu">${sub}</div>
+                </div>
+                <div class="ctx-sep"></div>
+                <button class="ctx-item" role="menuitem" data-acao="filtrar" ${pessoa ? '' : 'disabled'}><span class="ic">🔎</span>Ver lançamentos ${pessoa ? 'deste ' + (ehEntrada(um) ? 'cliente' : 'fornecedor') : 'do mesmo nome'}</button>
+                <button class="ctx-item" role="menuitem" data-acao="copiar"><span class="ic">📋</span>Copiar valor${regs.length > 1 ? ' (soma)' : ''}</button>
+                <button class="ctx-item" role="menuitem" data-acao="excel"><span class="ic">📊</span>Enviar para Excel</button>
+                <div class="ctx-sep"></div>
+                <button class="ctx-item perigo" role="menuitem" data-acao="excluir"><span class="ic">🗑️</span>Excluir registro${regs.length > 1 ? 's' : ''}<span class="atalho">Del</span></button>`;
+            menu.classList.add('aberto');
+            posicionar(menu, x, y);
+            document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.classList.toggle('ctx-alvo', ids.includes(Number(tr.dataset.id))));
+            menu.querySelector('.ctx-item:not(:disabled)')?.focus();
+        }
+        function abrirSubmenu(item) {
+            const sub = item.querySelector('.ctx-sub');
+            if (!sub) return;
+            item.classList.add('sub-aberto');
+            sub.classList.add('aberto');
+            sub.classList.remove('esquerda');
+            const r = sub.getBoundingClientRect();
+            if (r.right > innerWidth - 8) sub.classList.add('esquerda');
+            if (r.bottom > innerHeight - 8) sub.style.top = `${-7 - (r.bottom - innerHeight + 8)}px`; else sub.style.top = '';
+        }
+        function fecharSubmenu() {
+            menu.querySelectorAll('.ctx-sub').forEach(s => s.classList.remove('aberto'));
+            menu.querySelectorAll('.sub-aberto').forEach(s => s.classList.remove('sub-aberto'));
+        }
+        // botão direito na linha: se ela não estiver marcada, seleciona só ela (igual ao ListView)
+        $('tbody').addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr[data-id]');
+            if (!tr) return;
+            e.preventDefault();
+            const id = Number(tr.dataset.id);
+            const ids = marcados.has(id) && marcados.size > 1 ? [...marcados] : [id];
+            abrirMenu(e.clientX, e.clientY, ids);
+        });
+        menu.addEventListener('mouseover', e => {
+            const item = e.target.closest('.ctx-item');
+            if (!item || item.closest('.ctx-sub')) return;
+            if (item.dataset.acao === 'submenu') abrirSubmenu(item); else fecharSubmenu();
+        });
+        menu.addEventListener('click', async e => {
+            const item = e.target.closest('.ctx-item');
+            if (!item || item.disabled) return;
+            const acao = item.dataset.acao;
+            if (acao === 'submenu') { abrirSubmenu(item); return; }
+            const ids = [...ctxIds];
+            const um = ids.length === 1 ? itens.find(it => it.id === ids[0]) : null;
+            fecharMenu();
+            if (acao === 'situacao') return alterarSituacao(ids, item.dataset.sit);
+            if (acao === 'editar' && um) return abrirMovimento(um);
+            if (acao === 'novo') return $('btn-novo').click();
+            if (acao === 'excluir') return excluirRegistros(ids);
+            if (acao === 'excel') return enviarParaExcel(ids);
+            if (acao === 'filtrar' && um) {
+                const nome = ehEntrada(um) ? um.cliente : um.fornecedor;
+                $('pesquisa').value = nome;
+                return carregarDados({ busca: nome });
+            }
+            if (acao === 'copiar') {
+                const soma = itens.filter(it => ids.includes(it.id)).reduce((t, it) => t + it.valor, 0);
+                try { await navigator.clipboard.writeText(paraCampo(Math.round(soma * 100) / 100)); toast(`Valor ${moeda(soma)} copiado`, 'ok'); }
+                catch { toast('Não foi possível copiar o valor', 'erro'); }
+            }
+        });
+        // teclado: setas navegam, → abre o submenu, ← volta, Esc fecha
+        menu.addEventListener('keydown', e => {
+            const nivel = (document.activeElement.closest('.ctx-sub') || menu);
+            const itensNivel = [...nivel.querySelectorAll(':scope > .ctx-item:not(:disabled)')];
+            const i = itensNivel.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prox = itensNivel[(i + (e.key === 'ArrowDown' ? 1 : -1) + itensNivel.length) % itensNivel.length];
+                prox?.focus();
+            } else if (e.key === 'ArrowRight' && document.activeElement.dataset.acao === 'submenu') {
+                e.preventDefault();
+                abrirSubmenu(document.activeElement);
+                document.activeElement.querySelector('.ctx-sub .ctx-item')?.focus();
+            } else if (e.key === 'ArrowLeft' && nivel !== menu) {
+                e.preventDefault();
+                const pai = nivel.closest('.ctx-item');
+                fecharSubmenu();
+                pai?.focus();
+            } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                document.activeElement.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault(); e.stopPropagation();
+                fecharMenu();
+            } else if (e.key === 'Delete') {
+                e.preventDefault();
+                menu.querySelector('[data-acao="excluir"]').click();
+            }
+        });
+        document.addEventListener('mousedown', e => { if (menu.classList.contains('aberto') && !menu.contains(e.target)) fecharMenu(); });
+        window.addEventListener('scroll', fecharMenu, true);
+        window.addEventListener('resize', fecharMenu);
+        window.addEventListener('blur', fecharMenu);
 
         // ExportarDadosFiltrados: mês escolhido, sem os bancos Caixa Econômica Federal e XP
         const BANCOS_FORA_RELATORIO = ['Caixa Econômica Federal', 'Xp Investimentos S.A'];
