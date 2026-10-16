@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Início</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --primary-dark: #600000;
+            --secondary-color: #f8f9fa;
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            --success-color: #28a745;
+            --warning-color: #e0a800;
+            --danger-color: #dc3545;
+            /* cores do Grifar_Estoque do VB */
+            --row-inativo: #e2e3e5;
+            --row-minimo: #ffe4c4;
+            --row-falta: #ffb59a;
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white);
+            border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header {
+            grid-area: header; background: var(--gradient-primary); color: white;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium);
+        }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar {
+            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
+        }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item {
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
+            font-weight: 500; color: var(--text-dark); text-decoration: none; transition: all .3s ease;
+        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; animation: fadeIn .5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+        kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+
+        /* ===== CARDS DE RESUMO ===== */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card {
+            background: var(--gradient-card); border-radius: 20px; padding: 22px 24px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden; cursor: default; transition: transform .25s ease, box-shadow .25s ease;
+        }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .card.clicavel { cursor: pointer; }
+        .card.clicavel:hover { transform: translateY(-4px); box-shadow: var(--shadow-medium); }
+        .card.ativo-filtro { outline: 2px solid var(--primary-color); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; }
+        .card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .card-value { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .card-sub { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+        .card.minimo .card-icon { background: var(--row-minimo); }
+        .card.falta .card-icon { background: var(--row-falta); }
+
+        /* ===== LAYOUT LISTA + FICHA ===== */
+        .workspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .painel {
+            background: var(--white); border-radius: 20px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden;
+        }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 24px 24px 0; }
+        .painel-titulo { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .painel-titulo .contagem { font-size: 13px; font-weight: 600; color: var(--primary-color); background: var(--primary-light); padding: 3px 10px; border-radius: 20px; }
+
+        .busca { position: relative; margin-bottom: 14px; }
+        .busca input {
+            width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
+            font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
+        }
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: #fffbe6; }
+        .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
+        .chip {
+            padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--white);
+            font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer; transition: all .2s ease;
+        }
+        .chip:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .chip.ativo { background: var(--gradient-primary); color: white; border-color: transparent; }
+
+        .tabela-wrap { max-height: 620px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            position: sticky; top: 0; z-index: 1; background: var(--secondary-color); padding: 12px; text-align: left;
+            font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px;
+            border-bottom: 2px solid var(--border-color); white-space: nowrap;
+        }
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr { cursor: pointer; transition: background .15s ease; }
+        tbody tr:hover { background: var(--primary-light); }
+        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
+        tbody tr.minimo { background: var(--row-minimo); }
+        tbody tr.falta { background: var(--row-falta); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        .prod-nome { font-weight: 600; }
+        .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .cod { color: var(--text-light); font-size: 13px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+        .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
+        .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
+        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
+        .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
+        .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+        .legenda .l-min::before { background: var(--row-minimo); }
+        .legenda .l-fal::before { background: var(--row-falta); }
+        .legenda .l-ina::before { background: var(--row-inativo); }
+
+        /* ===== FICHA DO PRODUTO ===== */
+        .ficha { position: sticky; top: 0; }
+        .ficha-topo { padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .ficha-nome { font-size: 20px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+        .ficha-cod { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+        .switch-situacao { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+        .switch-situacao button {
+            border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
+        }
+        .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
+        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+
+        .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
+        .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+        .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
+        .estoque-status { font-size: 13px; font-weight: 700; }
+        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
+        .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
+        .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
+
+        .abas { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+        .aba {
+            border: none; background: none; padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--text-light);
+            border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
+        }
+        .aba.ativa { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .aba-conteudo { display: none; padding: 20px 24px; }
+        .aba-conteudo.ativa { display: block; }
+        .grid-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px;
+            font-size: 14px; background: var(--white); transition: border-color .15s ease;
+        }
+        .form-group textarea { resize: vertical; min-height: 90px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .form-group input[readonly] { background: #eef1f4; color: var(--text-light); }
+        .form-group.full { grid-column: 1 / -1; }
+        .campo-com-botao { display: flex; gap: 8px; }
+        .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
+        .sufixo { position: relative; }
+        .sufixo input { padding-right: 34px; }
+        .sufixo::after { content: attr(data-sufixo); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .dica { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+        .valor-calc { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--primary-light); display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .valor-calc b { font-size: 18px; color: var(--primary-color); font-variant-numeric: tabular-nums; }
+        .grafico-box { height: 260px; }
+        .grafico-vazio { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 14px; }
+
+        .acoes { display: flex; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini { padding: 10px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+        .alteracoes { font-size: 12px; color: var(--warning-color); font-weight: 700; align-self: center; margin-left: auto; display: none; }
+        .alteracoes.visivel { display: block; }
+
+        /* ===== TOAST + MODAL ===== */
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast {
+            min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500;
+            box-shadow: var(--shadow-heavy); animation: entra .25s ease-out;
+        }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+        @keyframes entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: var(--white); border-radius: 18px; padding: 26px; max-width: 420px; width: 100%; box-shadow: var(--shadow-heavy); }
+        .modal h3 { font-size: 18px; margin-bottom: 10px; }
+        .modal p { color: var(--text-light); font-size: 14px; margin-bottom: 20px; }
+        .modal .acoes-modal { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 1200px) {
+            .workspace { grid-template-columns: 1fr; }
+            .ficha { position: static; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .grid-form { grid-template-columns: 1fr; }
+            .col-forn { display: none; }
+        }
+
+        /* ===== INÍCIO ===== */
+        .saudacao { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 26px; }
+        .saudacao .welcome-subtitle { margin-bottom: 0; text-transform: capitalize; }
+        .atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 30px; }
+        .atalho {
+            display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 16px; border: 1px solid var(--border-color);
+            background: var(--white); text-decoration: none; color: var(--text-dark); font-weight: 600; font-size: 14px;
+            box-shadow: var(--shadow-light); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        .atalho:hover { transform: translateY(-3px); box-shadow: var(--shadow-medium); border-color: var(--primary-color); color: var(--primary-color); }
+        .atalho .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 19px; }
+        .atalho small { font-weight: 500; color: var(--text-light); font-size: 12px; }
+        .atalho.destaque { background: var(--gradient-primary); color: white; border-color: transparent; }
+        .atalho.destaque .ic { background: rgba(255,255,255,.18); }
+        .atalho.destaque small { color: rgba(255,255,255,.8); }
+        .atalho.destaque:hover { color: white; }
+
+        .card-value { font-size: 28px; }
+        .card-sub b { color: var(--text-dark); }
+        .delta { font-weight: 700; }
+        .delta.up { color: var(--success-color); }
+        .delta.down { color: var(--danger-color); }
+
+        .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+        .grade .painel { display: flex; flex-direction: column; }
+        .painel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .painel-head .painel-titulo { margin-bottom: 14px; }
+        .ver-tudo { font-size: 13px; font-weight: 600; color: var(--primary-color); text-decoration: none; white-space: nowrap; margin-bottom: 14px; }
+        .ver-tudo:hover { text-decoration: underline; }
+        .lista { list-style: none; border-top: 1px solid var(--border-color); flex: 1; }
+        .lista li { display: flex; align-items: center; gap: 14px; padding: 13px 24px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
+        .lista li:last-child { border-bottom: none; }
+        .lista .num-ped { font-weight: 700; color: var(--primary-color); min-width: 56px; font-variant-numeric: tabular-nums; }
+        .lista .meio { flex: 1; min-width: 0; }
+        .lista .meio b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lista .meio small { color: var(--text-light); font-size: 12px; }
+        .lista .dir { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .lista .dir small { display: block; color: var(--text-light); font-size: 12px; }
+        .lista .vazio { justify-content: center; color: var(--text-light); padding: 30px 24px; }
+        .status { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; background: var(--secondary-color); border: 1px solid var(--border-color); color: var(--text-light); }
+        .status.producao { color: #0f6674; border-color: #9fd4dc; background: #f0fafc; }
+        .status.pronto { color: #1e7e34; border-color: #a3d9b1; background: #f1faf3; }
+        .status.atraso { color: #c0392b; border-color: #f5a08a; background: #fff5f3; }
+
+        .fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px 24px; }
+        .fin-item { border-radius: 14px; padding: 14px 16px; background: var(--secondary-color); border: 1px solid var(--border-color); }
+        .fin-item span { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .3px; }
+        .fin-item b { display: block; font-size: 20px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .fin-item.ent b { color: #1e7e34; }
+        .fin-item.sai b { color: #b02a37; }
+        .fin-item.saldo { grid-column: 1 / -1; background: var(--gradient-primary); border: none; }
+        .fin-item.saldo span, .fin-item.saldo b { color: white; }
+        .fin-item.saldo span { opacity: .85; }
+
+        .grafico-box { height: 300px; padding: 0 24px 24px; }
+        .so-interno[hidden], .menu-item[hidden] { display: none !important; }
+
+        @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+            <a class="menu-item active" href="inicio.html">🏠 Início</a>
+            <a class="menu-item" href="painel_inicial.html">📋 Pedidos/Orçamentos</a>
+            <a class="menu-item" href="clientes.html">👥 Clientes</a>
+            <a class="menu-item" href="orcamentos.html">🏢 Orçamentos</a>
+            <a class="menu-item" href="estoque.html">📦 Estoque</a>
+            <a class="menu-item" href="produtos.html">🏷️ Produtos</a>
+            <a class="menu-item" href="financeiro.html">💰 Financeiro</a>
+        </nav>
+        <main>
+            <section class="saudacao">
+                <div>
+                    <h1 class="welcome-title" id="saudacao">Olá 👋</h1>
+                    <p class="welcome-subtitle" id="hoje">—</p>
+                </div>
+            </section>
+
+            <!-- ===== ATALHOS ===== -->
+            <section class="atalhos">
+                <a class="atalho destaque" href="orcamentos.html"><span class="ic">🧾</span>Novo orçamento<small>montar itens e preços</small></a>
+                <a class="atalho" href="painel_inicial.html"><span class="ic">📋</span>Pedidos/Orçamentos<small>acompanhar situação</small></a>
+                <a class="atalho" href="clientes.html"><span class="ic">👥</span>Clientes<small>cadastro e histórico</small></a>
+                <a class="atalho so-interno" href="estoque.html"><span class="ic">📦</span>Estoque<small>itens e alertas</small></a>
+                <a class="atalho so-interno" href="produtos.html"><span class="ic">🏷️</span>Produtos<small>tabela de venda</small></a>
+                <a class="atalho so-interno" href="financeiro.html"><span class="ic">💰</span>Financeiro<small>fluxo de caixa</small></a>
+            </section>
+
+            <!-- ===== INDICADORES DO MÊS ===== -->
+            <section class="cards">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Pedidos no mês</span><div class="card-icon">📦</div></div>
+                    <div class="card-value" id="k-ped-valor">—</div>
+                    <div class="card-sub" id="k-ped-sub">—</div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Orçamentos no mês</span><div class="card-icon">🧾</div></div>
+                    <div class="card-value" id="k-orc-valor">—</div>
+                    <div class="card-sub" id="k-orc-sub">—</div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Conversão</span><div class="card-icon">🎯</div></div>
+                    <div class="card-value" id="k-conv">—</div>
+                    <div class="card-sub">valor em pedidos ÷ valor orçado no mês</div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Em produção</span><div class="card-icon">⚙️</div></div>
+                    <div class="card-value" id="k-prod">—</div>
+                    <div class="card-sub" id="k-prod-sub">—</div>
+                </div>
+            </section>
+
+            <!-- ===== LISTAS ===== -->
+            <section class="grade">
+                <div class="painel">
+                    <div class="painel-head">
+                        <div class="painel-titulo">Últimos pedidos</div>
+                        <a class="ver-tudo" href="painel_inicial.html">Ver todos →</a>
+                    </div>
+                    <ul class="lista" id="ultimos"><li class="vazio">Carregando...</li></ul>
+                </div>
+                <div class="painel">
+                    <div class="painel-head">
+                        <div class="painel-titulo">Entregas da semana</div>
+                        <a class="ver-tudo" href="painel_inicial.html">Ver pedidos →</a>
+                    </div>
+                    <ul class="lista" id="entregas"><li class="vazio">Carregando...</li></ul>
+                </div>
+            </section>
+
+            <!-- ===== EQUIPE INTERNA: FINANCEIRO + ESTOQUE ===== -->
+            <section class="grade so-interno" id="bloco-interno">
+                <div class="painel">
+                    <div class="painel-head">
+                        <div class="painel-titulo">Financeiro do mês</div>
+                        <a class="ver-tudo" href="financeiro.html">Abrir fluxo de caixa →</a>
+                    </div>
+                    <div class="fin-grid">
+                        <div class="fin-item ent"><span>Recebido</span><b id="f-recebido">—</b></div>
+                        <div class="fin-item ent"><span>A receber</span><b id="f-areceber">—</b></div>
+                        <div class="fin-item sai"><span>Pago</span><b id="f-pago">—</b></div>
+                        <div class="fin-item sai"><span>A pagar</span><b id="f-apagar">—</b></div>
+                        <div class="fin-item sai"><span>Atrasado</span><b id="f-atrasado">—</b></div>
+                        <div class="fin-item"><span>Valor em estoque</span><b id="f-estoque">—</b></div>
+                        <div class="fin-item saldo"><span>Saldo do mês</span><b id="f-saldo">—</b></div>
+                    </div>
+                </div>
+                <div class="painel">
+                    <div class="painel-head">
+                        <div class="painel-titulo">Alertas de estoque <span class="contagem" id="est-qtd">0</span></div>
+                        <a class="ver-tudo" href="estoque.html">Abrir estoque →</a>
+                    </div>
+                    <ul class="lista" id="alertas"><li class="vazio">Carregando...</li></ul>
+                </div>
+            </section>
+
+            <!-- ===== GRÁFICO ===== -->
+            <section class="painel">
+                <div class="painel-head">
+                    <div class="painel-titulo">Orçamentos x Pedidos — últimos 6 meses</div>
+                    <a class="ver-tudo" href="graficos_pedidos.html">Ver detalhes →</a>
+                </div>
+                <div class="grafico-box"><canvas id="grafico"></canvas></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+
+        function getAuth() {
+            try {
+                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!auth || !auth.token || !auth.user) return null;
+                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return auth;
+            } catch { return null; }
+        }
+        async function api(caminho) {
+            const auth = getAuth();
+            const res = await fetch(API_BASE + caminho, { headers: { 'Authorization': 'Bearer ' + (auth ? auth.token : '') } });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const dados = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(dados.error || `Erro HTTP: ${res.status}`);
+            return dados;
+        }
+        const $ = id => document.getElementById(id);
+        const escapeHtml = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; };
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const moedaCurta = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
+        const normalizar = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        // datas do /dados_lista vêm como dd/mm/aaaa
+        const paraData = br => { const p = String(br || '').split('/'); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
+        const ehDoMes = (br, ref) => { const d = paraData(br); return d && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear(); };
+        // mesmas regras de situação do painel de Pedidos/Orçamentos
+        const emProducao = s => normalizar(s).includes('produ');
+        const pronto = s => { const n = normalizar(s); return n.includes('pronto') || n.includes('finalizado') || n.includes('conclu') || n === 'ok' || n === 'done'; };
+        const entregue = s => normalizar(s).includes('entregue');
+        function classeStatus(s) {
+            if (pronto(s)) return 'pronto';
+            if (emProducao(s)) return 'producao';
+            return '';
+        }
+
+        // ============ PEDIDOS E ORÇAMENTOS ============
+        async function carregarComercial() {
+            let pedidos = [], orcamentos = [];
+            try {
+                [pedidos, orcamentos] = await Promise.all([api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=Orçamento')]);
+            } catch (e) {
+                ['ultimos', 'entregas'].forEach(id => $(id).innerHTML = `<li class="vazio">⚠️ ${escapeHtml(e.message)}</li>`);
+                return;
+            }
+            const hoje = new Date();
+            const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+            const soma = l => l.reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
+
+            const pedMes = pedidos.filter(p => ehDoMes(p.data, hoje));
+            const pedAnt = pedidos.filter(p => ehDoMes(p.data, mesPassado));
+            const orcMes = orcamentos.filter(p => ehDoMes(p.data, hoje));
+            const vPed = soma(pedMes), vPedAnt = soma(pedAnt), vOrc = soma(orcMes);
+
+            $('k-ped-valor').textContent = moeda(vPed);
+            const delta = vPedAnt > 0 ? (vPed - vPedAnt) / vPedAnt * 100 : null;
+            $('k-ped-sub').innerHTML = `<b>${pedMes.length}</b> pedido(s)` + (delta === null ? '' :
+                ` · <span class="delta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(0)}%</span> vs. mês anterior`);
+            $('k-orc-valor').textContent = moeda(vOrc);
+            $('k-orc-sub').innerHTML = `<b>${orcMes.length}</b> orçamento(s) emitido(s)`;
+            $('k-conv').textContent = vOrc > 0 ? `${(vPed / vOrc * 100).toFixed(0)}%` : '—';
+
+            const producao = pedidos.filter(p => emProducao(p.situacao));
+            const prontos = pedidos.filter(p => pronto(p.situacao));
+            $('k-prod').textContent = producao.length;
+            $('k-prod-sub').innerHTML = `<b>${prontos.length}</b> pronto(s) aguardando entrega`;
+
+            // últimos 6 pedidos (lista já vem ordenada por número desc)
+            $('ultimos').innerHTML = pedidos.slice(0, 6).map(p => `
+                <li>
+                    <span class="num-ped">#${escapeHtml(p.numero)}</span>
+                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${escapeHtml(p.data || '')}${p.clienteFinal ? ' · ' + escapeHtml(p.clienteFinal) : ''}</small></div>
+                    <div class="dir">${moeda(p.valor)}<small><span class="status ${classeStatus(p.situacao)}">${escapeHtml(p.situacao || '—')}</span></small></div>
+                </li>`).join('') || '<li class="vazio">Nenhum pedido ainda</li>';
+
+            // entregas atrasadas + próximos 7 dias, de pedidos ainda não entregues
+            const zero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+            const limite = new Date(zero); limite.setDate(limite.getDate() + 7);
+            const entregas = pedidos
+                .filter(p => !entregue(p.situacao) && paraData(p.dataEntrega) && paraData(p.dataEntrega) <= limite)
+                .map(p => ({ ...p, quando: paraData(p.dataEntrega) }))
+                .sort((a, b) => a.quando - b.quando)
+                .slice(0, 8);
+            $('entregas').innerHTML = entregas.map(p => {
+                const atrasado = p.quando < zero;
+                const dias = Math.round((p.quando - zero) / 86400000);
+                const quando = atrasado ? `atrasado ${-dias} dia(s)` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
+                return `<li>
+                    <span class="num-ped">#${escapeHtml(p.numero)}</span>
+                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>Entrega ${escapeHtml(p.dataEntrega)}</small></div>
+                    <div class="dir"><span class="status ${atrasado ? 'atraso' : classeStatus(p.situacao)}">${quando}</span><small>${escapeHtml(p.situacao || '')}</small></div>
+                </li>`;
+            }).join('') || '<li class="vazio">Nenhuma entrega prevista para os próximos 7 dias 🎉</li>';
+        }
+
+        // ============ FINANCEIRO + ESTOQUE (equipe interna) ============
+        async function carregarInterno() {
+            api('/fluxo/resumo').then(r => {
+                $('f-recebido').textContent = moeda(r.recebido);
+                $('f-areceber').textContent = moeda(r.aReceber);
+                $('f-pago').textContent = moeda(r.pago);
+                $('f-apagar').textContent = moeda(r.aPagar);
+                $('f-atrasado').textContent = moeda(r.atrasado);
+                $('f-saldo').textContent = moeda(r.saldo);
+            }).catch(() => { $('f-saldo').textContent = 'indisponível'; });
+
+            try {
+                const [resumo, itens] = await Promise.all([api('/estoque/resumo'), api('/estoque')]);
+                $('f-estoque').textContent = moeda(resumo.valorTotal);
+                // mesma regra de alerta da página de estoque
+                const alertas = itens
+                    .filter(it => it.situacao !== 'Inativo' && (it.qtd <= 0 || (it.minimo > 0 && it.qtd <= it.minimo)))
+                    .sort((a, b) => (a.qtd <= 0 ? 0 : 1) - (b.qtd <= 0 ? 0 : 1) || a.qtd - b.qtd);
+                $('est-qtd').textContent = alertas.length;
+                $('alertas').innerHTML = alertas.slice(0, 7).map(it => {
+                    const falta = it.qtd <= 0;
+                    return `<li>
+                        <span class="num-ped" style="color:var(--text-light)">${escapeHtml(it.codigo)}</span>
+                        <div class="meio"><b>${escapeHtml(it.produto)}</b><small>mínimo ${it.minimo.toLocaleString('pt-BR')} ${escapeHtml(it.unidade || '')}</small></div>
+                        <div class="dir"><b>${it.qtd.toLocaleString('pt-BR')}</b><small><span class="status ${falta ? 'atraso' : ''}">${falta ? 'Em falta' : 'No mínimo'}</span></small></div>
+                    </li>`;
+                }).join('') || '<li class="vazio">Nenhum item abaixo do mínimo ✅</li>';
+            } catch (e) {
+                $('alertas').innerHTML = `<li class="vazio">⚠️ ${escapeHtml(e.message)}</li>`;
+            }
+        }
+
+        // ============ GRÁFICO ============
+        async function carregarGrafico() {
+            if (typeof Chart === 'undefined') return;
+            try {
+                const dados = await api('/dados_compras_orcamentos');
+                new Chart($('grafico'), {
+                    type: 'bar',
+                    data: {
+                        labels: dados.map(d => d.mes),
+                        datasets: [
+                            { label: 'Orçamentos', data: dados.map(d => d.orcamentos), backgroundColor: 'rgba(108,117,125,.45)', borderRadius: 5 },
+                            { label: 'Pedidos', data: dados.map(d => d.pedidos), backgroundColor: 'rgba(139,0,0,.8)', borderRadius: 5 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${moeda(c.raw)}` } } },
+                        scales: { y: { beginAtZero: true, ticks: { callback: v => moedaCurta(v) }, grid: { color: '#f1f3f5' } }, x: { grid: { display: false } } }
+                    }
+                });
+            } catch { /* gráfico é complementar */ }
+        }
+
+        // ============ INIT ============
+        document.addEventListener('DOMContentLoaded', () => {
+            const auth = getAuth();
+            if (!auth) { window.location.href = LOGIN_URL; return; }
+            const nome = auth.user.nome || '';
+            $('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            $('user-name').textContent = nome;
+            $('user-cargo').textContent = auth.user.cargo || '';
+            $('user-avatar').textContent = (nome || 'E').charAt(0).toUpperCase();
+            const h = new Date().getHours();
+            $('saudacao').textContent = `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nome ? ', ' + nome.split(' ')[0] : ''} 👋`;
+            $('hoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+            const representante = String(auth.user.cargo || '').toLowerCase().includes('representante');
+            // representante não acessa estoque, produtos nem financeiro
+            document.querySelectorAll('.so-interno').forEach(el => el.hidden = representante);
+            document.querySelectorAll('.sidebar a[href="estoque.html"], .sidebar a[href="produtos.html"], .sidebar a[href="financeiro.html"]')
+                .forEach(a => a.hidden = representante);
+
+            carregarComercial();
+            if (!representante) carregarInterno();
+            carregarGrafico();
+        });
+    </script>
+</body>
+</html>

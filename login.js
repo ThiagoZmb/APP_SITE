@@ -59,7 +59,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
       resDiv.className = 'result success show';
       mostrarBoasVindas(data.user ? data.user.nome : 'Usuário');
       setTimeout(() => {
-        window.location.href = 'https://thiagozmb.github.io/APP_SITE/painel_inicial.html';
+        window.location.href = 'https://thiagozmb.github.io/APP_SITE/inicio.html';
       }, 1000);
     } else {
       resDiv.textContent = data.message || 'Usuário ou senha inválidos.';
@@ -113,7 +113,7 @@ async function checkExistingLogin() {
       headers: { 'Authorization': 'Bearer ' + auth.token }
     });
     if (res.ok) {
-      window.location.href = 'https://thiagozmb.github.io/APP_SITE/painel_inicial.html';
+      window.location.href = 'https://thiagozmb.github.io/APP_SITE/inicio.html';
     } else {
       localStorage.removeItem('auth');
     }
