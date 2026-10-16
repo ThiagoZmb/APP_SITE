@@ -810,7 +810,7 @@
                     return `<tr data-id="${it.id}" class="${e ? 'entrada' : 'saida'}${it.data === hoje ? ' hoje' : ''}${marcados.has(it.id) ? ' marcado' : ''}">
                         <td class="sel"><input type="checkbox" class="chk" ${marcados.has(it.id) ? 'checked' : ''} aria-label="Selecionar"></td>
                         <td class="nowrap">${dataBR(it.data)}</td>
-                        <td><div class="nome-mov"><span class="mov ${e ? 'e' : 's'}">${e ? '↓' : '↑'}</span>${escapeHtml(e ? it.cliente : it.fornecedor)}</div>
+                        <td><div class="nome-mov"><span class="mov ${e ? 'e' : 's'}">${e ? '↓' : '↑'}</span><span class="nm">${escapeHtml(e ? it.cliente : it.fornecedor)}</span></div>
                             ${it.observacao ? `<div class="obs-linha" title="${escapeHtml(it.observacao)}">${escapeHtml(it.observacao)}</div>` : ''}</td>
                         <td class="col-opc">${escapeHtml(it.pedido)}</td>
                         <td class="col-opc">${escapeHtml(it.pdv)}</td>

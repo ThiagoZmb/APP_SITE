@@ -96,6 +96,13 @@
             }
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') document.body.classList.remove('menu-aberto'); });
+
+        // texto cortado com "…" nas listas: mostra o conteúdo inteiro ao passar o mouse
+        document.addEventListener('mouseover', e => {
+            const el = e.target.closest('.nome-mov .nm, tbody td, .obs-linha, .prod-forn, .prod-nome, .lista .meio b, .ranking .nome');
+            if (!el || el.hasAttribute('title')) return;
+            if (el.scrollWidth > el.clientWidth + 1) el.title = el.textContent.replace(/\s+/g, ' ').trim();
+        });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
