@@ -772,6 +772,182 @@ app.get('/cores_por_tipo', autenticar, async (req, res) => {
   }
 });
 
+// ============================================================
+// ESTOQUE — fiel ao frm_Estoque.vb (somente equipe interna)
+// ============================================================
+function somenteInterno(req, res, next) {
+  if (ehRepresentante(req)) return res.status(403).json({ error: 'Acesso restrito ao estoque.' });
+  next();
+}
+const numEstq = v => {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  const t = String(v ?? '').trim().replace(/[R$\s]/g, '');
+  if (!t) return 0;
+  const n = parseFloat(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t);
+  return isFinite(n) ? n : 0;
+};
+const txtEstq = (v, max = 255) => String(v ?? '').trim().slice(0, max);
+
+// Carregar_Estoque + cmb_Filtro: busca por CODIGO/NOME (LIKE) ou por CLASSE
+app.get('/estoque', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const busca = txtEstq(req.query.busca, 100);
+    const classe = txtEstq(req.query.classe, 100);
+    const where = [], params = [];
+    if (classe) { where.push('CLASSE = ?'); params.push(classe); }
+    if (busca) { where.push('(CAST(CODIGO AS CHAR) LIKE ? OR NOME_PRODUTO LIKE ?)'); params.push(`%${busca}%`, `%${busca}%`); }
+    const [rows] = await pool.execute(
+      `SELECT CODIGO, NOME_PRODUTO, NOME_PRODUTO_FORNECEDOR, QTD_ESTOQUE, AGUARDANDO, MIN_ESTOQUE, SITUACAO, CLASSE, UNIDADE
+       FROM estoque ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       ORDER BY SITUACAO ASC, NOME_PRODUTO ASC`, params);
+    res.json(rows.map(r => ({
+      codigo: r.CODIGO, produto: r.NOME_PRODUTO, prodFornecedor: r.NOME_PRODUTO_FORNECEDOR,
+      qtd: numEstq(r.QTD_ESTOQUE), aguardando: r.AGUARDANDO ?? '', minimo: numEstq(r.MIN_ESTOQUE),
+      situacao: r.SITUACAO, classe: r.CLASSE, unidade: r.UNIDADE
+    })));
+  } catch (err) {
+    console.error('Erro /estoque:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Combos (classes/unidades/fornecedores já usados) + Contar_Valor_Estoque + contadores
+app.get('/estoque/resumo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [[tot]] = await pool.execute(
+      `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
+              SUM(SITUACAO = 'Ativo') AS ativos,
+              SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE <= 0) AS falta,
+              SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE > 0 AND MIN_ESTOQUE > 0 AND QTD_ESTOQUE <= MIN_ESTOQUE) AS minimo
+       FROM estoque`);
+    const distintos = async col => {
+      const [r] = await pool.execute(`SELECT DISTINCT ${col} AS v FROM estoque WHERE ${col} IS NOT NULL AND ${col} <> '' ORDER BY ${col}`);
+      return r.map(x => x.v);
+    };
+    res.json({
+      valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0,
+      falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0,
+      classes: await distintos('CLASSE'), unidades: await distintos('UNIDADE'), fornecedores: await distintos('FORNECEDOR')
+    });
+  } catch (err) {
+    console.error('Erro /estoque/resumo:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// txt_codigo_TextChanged: ficha completa do produto
+app.get('/estoque/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT * FROM estoque WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
+    if (!rows.length) return res.status(404).json({ error: 'Produto não encontrado' });
+    const r = rows[0];
+    res.json({
+      codigo: r.CODIGO, codBarras: r.CODIGO_BARRA ?? '', fornecedor: r.FORNECEDOR ?? '', codFornecedor: r.COD_FORNECEDOR ?? '',
+      prodFornecedor: r.NOME_PRODUTO_FORNECEDOR ?? '', produto: r.NOME_PRODUTO ?? '', classe: r.CLASSE ?? '',
+      unidade: r.UNIDADE ?? '', situacao: r.SITUACAO ?? '', qtd: numEstq(r.QTD_ESTOQUE), minimo: numEstq(r.MIN_ESTOQUE),
+      frete: numEstq(r.FRETE), ipi: numEstq(r.IPI), perda: numEstq(r.PERDA), valor: numEstq(r.VALOR),
+      altura: numEstq(r.ALTURA), largura: numEstq(r.LARGURA), tamanho: numEstq(r.TAMANHO),
+      aguardando: r.AGUARDANDO ?? '', observacao: r.OBSERVACAO ?? ''
+    });
+  } catch (err) {
+    console.error('Erro /estoque/item:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// Salvar_Estoque: mesmas validações do VB; INSERT se o código não existe, senão UPDATE
+app.post('/estoque/salvar', autenticar, somenteInterno, async (req, res) => {
+  const b = req.body || {};
+  const d = {
+    codBarras: txtEstq(b.codBarras, 20), fornecedor: txtEstq(b.fornecedor), codFornecedor: txtEstq(b.codFornecedor, 100),
+    prodFornecedor: txtEstq(b.prodFornecedor), produto: String(b.produto ?? '').trim(), classe: txtEstq(b.classe, 100),
+    unidade: txtEstq(b.unidade, 50), situacao: b.situacao === 'Inativo' ? 'Inativo' : 'Ativo',
+    qtd: numEstq(b.qtd), minimo: numEstq(b.minimo), frete: numEstq(b.frete), ipi: numEstq(b.ipi), perda: numEstq(b.perda),
+    valor: numEstq(b.valor), altura: numEstq(b.altura), largura: numEstq(b.largura), tamanho: numEstq(b.tamanho),
+    observacao: txtEstq(b.observacao, 2000)
+  };
+  const erro = msg => res.status(400).json({ error: msg });
+  if (d.produto.length < 1 || d.produto.length > 255) return erro('O nome do produto precisa conter no mínimo 1 e no máximo 255 caracteres !');
+  if (!d.codBarras) return erro('Este produto está sem código de barras!');
+  if (d.fornecedor && !d.prodFornecedor) return erro('Você deve fornecer um nome do produto do fornecedor!');
+  if (!d.classe) return erro('Você deve inserir uma classe para este produto!');
+  if (!d.unidade) return erro('Você deve inserir um tipo de unidade para este produto!');
+  if (!(d.valor > 0)) return erro('O valor do produto precisa ser maior que 0!');
+  try {
+    const codigo = parseInt(b.codigo, 10) || 0;
+    const [existe] = codigo ? await pool.execute('SELECT CODIGO FROM estoque WHERE CODIGO = ? LIMIT 1', [codigo]) : [[]];
+    const [dup] = await pool.execute('SELECT CODIGO FROM estoque WHERE NOME_PRODUTO = ? AND CODIGO <> ? LIMIT 1', [d.produto, existe.length ? codigo : 0]);
+    if (dup.length) return erro('Este nome de produto já existe!');
+    const valores = [d.codBarras, d.fornecedor, d.codFornecedor, d.prodFornecedor, d.produto, d.classe, d.unidade, d.situacao,
+      d.qtd, d.minimo, d.frete, d.ipi, d.perda, d.valor, d.altura, d.largura, d.tamanho, d.observacao];
+    if (existe.length) {
+      await pool.execute(
+        `UPDATE estoque SET CODIGO_BARRA=?, FORNECEDOR=?, COD_FORNECEDOR=?, NOME_PRODUTO_FORNECEDOR=?, NOME_PRODUTO=?, CLASSE=?,
+         UNIDADE=?, SITUACAO=?, QTD_ESTOQUE=?, MIN_ESTOQUE=?, FRETE=?, IPI=?, PERDA=?, VALOR=?, ALTURA=?, LARGURA=?, TAMANHO=?, OBSERVACAO=?
+         WHERE CODIGO = ?`, [...valores, codigo]);
+      return res.json({ ok: true, codigo, acao: 'atualizado', mensagem: 'O registro foi atualizado com sucesso !' });
+    }
+    const [r] = await pool.execute(
+      `INSERT INTO estoque (CODIGO_BARRA, FORNECEDOR, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, CLASSE, UNIDADE, SITUACAO,
+       QTD_ESTOQUE, MIN_ESTOQUE, FRETE, IPI, PERDA, VALOR, ALTURA, LARGURA, TAMANHO, AGUARDANDO, OBSERVACAO)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'',?)`, valores);
+    res.json({ ok: true, codigo: r.insertId, acao: 'inserido', mensagem: 'O registro foi inserido com sucesso !' });
+  } catch (err) {
+    console.error('Erro /estoque/salvar:', err.message);
+    res.status(500).json({ error: 'Ocorreu um erro ao salvar o produto!' });
+  }
+});
+
+// Gerar_Codigo_Barras: mantém o EAN-13 do produto ou gera um novo, único na tabela
+function digitoEAN13(doze) {
+  const soma = [...doze].reduce((s, c, i) => s + Number(c) * (i % 2 ? 3 : 1), 0);
+  return String((10 - (soma % 10)) % 10);
+}
+app.post('/estoque/codigo_barras', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const atual = txtEstq(req.body?.atual, 20);
+    const produto = txtEstq(req.body?.produto);
+    if (/^\d{13}$/.test(atual) && produto) {
+      const [r] = await pool.execute('SELECT CODIGO FROM estoque WHERE CODIGO_BARRA = ? AND NOME_PRODUTO = ? LIMIT 1', [atual, produto]);
+      if (r.length) return res.json({ jaPossui: true, codigo: atual, mensagem: 'Este produto já possui um código de barras' });
+    }
+    for (let i = 0; i < 20; i++) {
+      const doze = '789' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
+      const ean = doze + digitoEAN13(doze);
+      const [r] = await pool.execute('SELECT CODIGO FROM estoque WHERE CODIGO_BARRA = ? LIMIT 1', [ean]);
+      if (!r.length) return res.json({ jaPossui: false, codigo: ean });
+    }
+    res.status(500).json({ error: 'Não foi possível gerar um código de barras único.' });
+  } catch (err) {
+    console.error('Erro /estoque/codigo_barras:', err.message);
+    res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// BackgroundWorker2: entradas x saídas dos últimos 12 meses + médias dos meses com movimento
+app.get('/estoque/movimentacao', autenticar, somenteInterno, async (req, res) => {
+  const produto = txtEstq(req.query.produto);
+  if (!produto) return res.json([]);
+  const porMes = async tabela => {
+    try {
+      const [r] = await pool.execute(
+        `SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(QTD) AS qtd FROM ${tabela}
+         WHERE NOME_PRODUTO = ? AND DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+         GROUP BY DATE_FORMAT(DATA, '%Y-%m')`, [produto]);
+      return Object.fromEntries(r.map(x => [x.mes, numEstq(x.qtd)]));
+    } catch { return {}; }
+  };
+  const [ent, sai] = await Promise.all([porMes('entrada_estoque'), porMes('saida_estoque')]);
+  const hoje = new Date();
+  const meses = [];
+  for (let x = -11; x <= 0; x++) {
+    const m = new Date(hoje.getFullYear(), hoje.getMonth() + x, 1);
+    const chave = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+    meses.push({ mes: chave, entrada: ent[chave] || 0, saida: sai[chave] || 0 });
+  }
+  res.json(meses);
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });

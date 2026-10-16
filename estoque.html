@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Estoque</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --primary-dark: #600000;
+            --secondary-color: #f8f9fa;
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            --success-color: #28a745;
+            --warning-color: #e0a800;
+            --danger-color: #dc3545;
+            /* cores do Grifar_Estoque do VB */
+            --row-inativo: #e2e3e5;
+            --row-minimo: #ffe4c4;
+            --row-falta: #ffb59a;
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white);
+            border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header {
+            grid-area: header; background: var(--gradient-primary); color: white;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium);
+        }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar {
+            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
+        }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item {
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
+            font-weight: 500; color: var(--text-dark); text-decoration: none; transition: all .3s ease;
+        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; animation: fadeIn .5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+        kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+
+        /* ===== CARDS DE RESUMO ===== */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card {
+            background: var(--gradient-card); border-radius: 20px; padding: 22px 24px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden; cursor: default; transition: transform .25s ease, box-shadow .25s ease;
+        }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .card.clicavel { cursor: pointer; }
+        .card.clicavel:hover { transform: translateY(-4px); box-shadow: var(--shadow-medium); }
+        .card.ativo-filtro { outline: 2px solid var(--primary-color); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; }
+        .card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .card-value { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .card-sub { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+        .card.minimo .card-icon { background: var(--row-minimo); }
+        .card.falta .card-icon { background: var(--row-falta); }
+
+        /* ===== LAYOUT LISTA + FICHA ===== */
+        .workspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .painel {
+            background: var(--white); border-radius: 20px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden;
+        }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 24px 24px 0; }
+        .painel-titulo { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .painel-titulo .contagem { font-size: 13px; font-weight: 600; color: var(--primary-color); background: var(--primary-light); padding: 3px 10px; border-radius: 20px; }
+
+        .busca { position: relative; margin-bottom: 14px; }
+        .busca input {
+            width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
+            font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
+        }
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: #fffbe6; }
+        .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
+        .chip {
+            padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--white);
+            font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer; transition: all .2s ease;
+        }
+        .chip:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .chip.ativo { background: var(--gradient-primary); color: white; border-color: transparent; }
+
+        .tabela-wrap { max-height: 620px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            position: sticky; top: 0; z-index: 1; background: var(--secondary-color); padding: 12px; text-align: left;
+            font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px;
+            border-bottom: 2px solid var(--border-color); white-space: nowrap;
+        }
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr { cursor: pointer; transition: background .15s ease; }
+        tbody tr:hover { background: var(--primary-light); }
+        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
+        tbody tr.minimo { background: var(--row-minimo); }
+        tbody tr.falta { background: var(--row-falta); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        .prod-nome { font-weight: 600; }
+        .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .cod { color: var(--text-light); font-size: 13px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+        .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
+        .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
+        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
+        .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
+        .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+        .legenda .l-min::before { background: var(--row-minimo); }
+        .legenda .l-fal::before { background: var(--row-falta); }
+        .legenda .l-ina::before { background: var(--row-inativo); }
+
+        /* ===== FICHA DO PRODUTO ===== */
+        .ficha { position: sticky; top: 0; }
+        .ficha-topo { padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .ficha-nome { font-size: 20px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+        .ficha-cod { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+        .switch-situacao { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+        .switch-situacao button {
+            border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
+        }
+        .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
+        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+
+        .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
+        .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+        .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
+        .estoque-status { font-size: 13px; font-weight: 700; }
+        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
+        .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
+        .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
+
+        .abas { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+        .aba {
+            border: none; background: none; padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--text-light);
+            border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
+        }
+        .aba.ativa { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .aba-conteudo { display: none; padding: 20px 24px; }
+        .aba-conteudo.ativa { display: block; }
+        .grid-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px;
+            font-size: 14px; background: var(--white); transition: border-color .15s ease;
+        }
+        .form-group textarea { resize: vertical; min-height: 90px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .form-group input[readonly] { background: #eef1f4; color: var(--text-light); }
+        .form-group.full { grid-column: 1 / -1; }
+        .campo-com-botao { display: flex; gap: 8px; }
+        .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
+        .sufixo { position: relative; }
+        .sufixo input { padding-right: 34px; }
+        .sufixo::after { content: attr(data-sufixo); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .dica { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+        .valor-calc { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--primary-light); display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .valor-calc b { font-size: 18px; color: var(--primary-color); font-variant-numeric: tabular-nums; }
+        .grafico-box { height: 260px; }
+        .grafico-vazio { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 14px; }
+
+        .acoes { display: flex; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini { padding: 10px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+        .alteracoes { font-size: 12px; color: var(--warning-color); font-weight: 700; align-self: center; margin-left: auto; display: none; }
+        .alteracoes.visivel { display: block; }
+
+        /* ===== TOAST + MODAL ===== */
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast {
+            min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500;
+            box-shadow: var(--shadow-heavy); animation: entra .25s ease-out;
+        }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+        @keyframes entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: var(--white); border-radius: 18px; padding: 26px; max-width: 420px; width: 100%; box-shadow: var(--shadow-heavy); }
+        .modal h3 { font-size: 18px; margin-bottom: 10px; }
+        .modal p { color: var(--text-light); font-size: 14px; margin-bottom: 20px; }
+        .modal .acoes-modal { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 1200px) {
+            .workspace { grid-template-columns: 1fr; }
+            .ficha { position: static; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .grid-form { grid-template-columns: 1fr; }
+            .col-forn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+            <a class="menu-item" href="painel_inicial.html">📋 Pedidos</a>
+            <a class="menu-item" href="clientes.html">👥 Clientes</a>
+            <a class="menu-item" href="orcamentos.html">🏢 Orçamentos</a>
+            <a class="menu-item active" href="estoque.html">📦 Estoque</a>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Estoque 📦</h1>
+            <p class="welcome-subtitle">Cadastre, consulte e acompanhe os itens em estoque. Pressione <kbd>F5</kbd> para pesquisar.</p>
+
+            <!-- ===== RESUMO ===== -->
+            <section class="cards">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Valor total em estoque</span><div class="card-icon">💰</div></div>
+                    <div class="card-value" id="c-valor">—</div>
+                    <div class="card-sub">Revestimento: tamanho × valor × qtd</div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Itens ativos</span><div class="card-icon">✅</div></div>
+                    <div class="card-value" id="c-ativos">—</div>
+                    <div class="card-sub">produtos com situação Ativo</div>
+                </div>
+                <div class="card minimo clicavel" id="card-minimo" title="Mostrar só os itens no mínimo">
+                    <div class="card-header"><span class="card-title">No mínimo</span><div class="card-icon">⚠️</div></div>
+                    <div class="card-value" id="c-minimo">—</div>
+                    <div class="card-sub">estoque ≤ estoque mínimo</div>
+                </div>
+                <div class="card falta clicavel" id="card-falta" title="Mostrar só os itens em falta">
+                    <div class="card-header"><span class="card-title">Em falta</span><div class="card-icon">⛔</div></div>
+                    <div class="card-value" id="c-falta">—</div>
+                    <div class="card-sub">estoque zerado ou negativo</div>
+                </div>
+            </section>
+
+            <section class="workspace">
+                <!-- ===== LISTA ===== -->
+                <div class="painel">
+                    <div class="painel-head">
+                        <div class="painel-titulo">Produtos <span class="contagem" id="contagem">0</span></div>
+                        <div class="busca"><input type="search" id="pesquisa" placeholder="Pesquisar por código ou nome do produto (Enter)" autocomplete="off"></div>
+                        <div class="chips" id="chips-classe"></div>
+                    </div>
+                    <div class="tabela-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Cód</th><th>Produto</th><th class="num">Estoque</th><th class="num">Aguardando</th></tr>
+                            </thead>
+                            <tbody id="tbody"><tr><td colspan="4" class="vazio">Carregando estoque...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="legenda"><span class="l-min">No mínimo</span><span class="l-fal">Em falta</span><span class="l-ina">Inativo</span></div>
+                </div>
+
+                <!-- ===== FICHA ===== -->
+                <div class="painel ficha">
+                    <div class="ficha-topo">
+                        <div>
+                            <div class="ficha-nome" id="ficha-nome">Novo produto</div>
+                            <div class="ficha-cod" id="ficha-cod">Preencha os dados e salve</div>
+                        </div>
+                        <div class="switch-situacao" role="group" aria-label="Situação">
+                            <button type="button" data-sit="Ativo">Ativo</button>
+                            <button type="button" data-sit="Inativo">Inativo</button>
+                        </div>
+                    </div>
+
+                    <div class="estoque-visual">
+                        <div class="estoque-numeros">
+                            <div class="estoque-atual"><span id="v-qtd">0</span> <small id="v-unidade"></small></div>
+                            <div class="estoque-status" id="v-status">—</div>
+                        </div>
+                        <div class="barra"><div class="barra-fill" id="v-fill" style="width:0"></div><div class="barra-min" id="v-min" style="left:0"></div></div>
+                        <div class="estoque-legenda"><span>Mínimo: <b id="v-minimo">0</b></span><span>Aguardando: <b id="v-aguardando">—</b></span></div>
+                    </div>
+
+                    <div class="abas" role="tablist">
+                        <button class="aba ativa" data-aba="geral">Geral</button>
+                        <button class="aba" data-aba="fornecedor">Fornecedor</button>
+                        <button class="aba" data-aba="custos">Estoque e custos</button>
+                        <button class="aba" data-aba="medidas">Medidas</button>
+                        <button class="aba" data-aba="movimento">Movimentação</button>
+                    </div>
+
+                    <form id="form" autocomplete="off" onsubmit="return false">
+                        <input type="hidden" id="f-codigo" value="0">
+                        <div class="aba-conteudo ativa" data-aba="geral">
+                            <div class="grid-form">
+                                <div class="form-group full"><label for="f-produto">Nome do produto</label><input id="f-produto" maxlength="255" placeholder="Ex.: Perfil 2025 Vara 6m"></div>
+                                <div class="form-group"><label for="f-classe">Classe</label><select id="f-classe"></select></div>
+                                <div class="form-group"><label for="f-unidade">Unidade</label><select id="f-unidade"></select></div>
+                                <div class="form-group full">
+                                    <label for="f-barras">Código de barras (EAN-13)</label>
+                                    <div class="campo-com-botao">
+                                        <input id="f-barras" maxlength="13" inputmode="numeric" placeholder="Gere ou digite">
+                                        <button type="button" class="btn btn-secondary btn-mini" id="btn-barras">🏷️ Gerar código</button>
+                                    </div>
+                                </div>
+                                <div class="form-group full"><label for="f-obs">Observação</label><textarea id="f-obs" maxlength="2000"></textarea></div>
+                            </div>
+                        </div>
+                        <div class="aba-conteudo" data-aba="fornecedor">
+                            <div class="grid-form">
+                                <div class="form-group full"><label for="f-fornecedor">Fornecedor</label><input id="f-fornecedor" list="lista-fornecedores" placeholder="Digite ou escolha da lista"></div>
+                                <div class="form-group"><label for="f-cod-forn">Cód. no fornecedor</label><input id="f-cod-forn"></div>
+                                <div class="form-group"><label for="f-prod-forn">Nome no fornecedor</label><input id="f-prod-forn"></div>
+                            </div>
+                            <p class="dica">Com fornecedor informado, o nome do produto no fornecedor é obrigatório.</p>
+                            <datalist id="lista-fornecedores"></datalist>
+                        </div>
+                        <div class="aba-conteudo" data-aba="custos">
+                            <div class="grid-form">
+                                <div class="form-group"><label for="f-qtd">Estoque atual</label><input id="f-qtd" class="num dec" value="0"></div>
+                                <div class="form-group"><label for="f-minimo">Estoque mínimo</label><input id="f-minimo" class="num dec" value="0"></div>
+                                <div class="form-group"><label for="f-valor">Valor de compra</label><input id="f-valor" class="num dec moeda" value="R$ 0,00"></div>
+                                <div class="form-group"><label for="f-frete">Frete</label><div class="sufixo" data-sufixo="%"><input id="f-frete" class="num dec" value="0"></div></div>
+                                <div class="form-group"><label for="f-ipi">IPI</label><div class="sufixo" data-sufixo="%"><input id="f-ipi" class="num dec" value="0"></div></div>
+                                <div class="form-group"><label for="f-perda">Perda</label><div class="sufixo" data-sufixo="%"><input id="f-perda" class="num dec" value="0"></div></div>
+                            </div>
+                            <div class="valor-calc"><span>Valor deste item em estoque</span><b id="v-valor-item">R$ 0,00</b></div>
+                        </div>
+                        <div class="aba-conteudo" data-aba="medidas">
+                            <div class="grid-form">
+                                <div class="form-group"><label for="f-altura">Altura</label><div class="sufixo" data-sufixo="mm"><input id="f-altura" class="num dec" value="0"></div></div>
+                                <div class="form-group"><label for="f-largura">Largura</label><div class="sufixo" data-sufixo="mm"><input id="f-largura" class="num dec" value="0"></div></div>
+                                <div class="form-group"><label for="f-tamanho">Tamanho</label><input id="f-tamanho" class="num dec" value="0"></div>
+                            </div>
+                            <p class="dica">Para Revestimento, o tamanho multiplica o valor no total do estoque.</p>
+                        </div>
+                        <div class="aba-conteudo" data-aba="movimento">
+                            <div class="grafico-box"><canvas id="grafico"></canvas></div>
+                            <div class="grafico-vazio" id="grafico-vazio">Selecione um produto salvo para ver entradas e saídas dos últimos 12 meses.</div>
+                        </div>
+                    </form>
+
+                    <div class="acoes">
+                        <button class="btn btn-primary" id="btn-salvar">💾 Salvar</button>
+                        <button class="btn btn-secondary" id="btn-novo">＋ Novo / Limpar</button>
+                        <span class="alteracoes" id="alteracoes">● alterações não salvas</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toasts" aria-live="polite"></div>
+    <div class="modal-fundo" id="modal">
+        <div class="modal">
+            <h3 id="modal-titulo">Confirmar</h3>
+            <p id="modal-texto"></p>
+            <div class="acoes-modal">
+                <button class="btn btn-secondary" id="modal-nao">Não</button>
+                <button class="btn btn-primary" id="modal-sim">Sim</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        // Listas fixas do frm_Estoque_Load (somadas às que já existem no banco)
+        const CLASSES_PADRAO = ['Perfil', 'Perfil AC', 'Revestimento', 'Insumo', 'Acessório', 'Embalagem'];
+        const UNIDADES_PADRAO = ['Vara', 'UN', 'PCT', 'PAR', 'M²'];
+
+        // ============ SESSÃO ============
+        function getAuth() {
+            try {
+                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!auth || !auth.token || !auth.user) return null;
+                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return auth;
+            } catch { return null; }
+        }
+        async function api(caminho, opts = {}) {
+            const auth = getAuth();
+            const res = await fetch(API_BASE + caminho, {
+                ...opts,
+                headers: { 'Authorization': 'Bearer ' + (auth ? auth.token : ''), ...(opts.body ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) }
+            });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const dados = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(dados.error || `Erro HTTP: ${res.status}`);
+            return dados;
+        }
+
+        // ============ FORMATAÇÃO ============
+        const escapeHtml = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; };
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const numero = v => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+        // aceita "1.234,56", "R$ 10,50" ou "10.5"
+        function lerNumero(t) {
+            const s = String(t ?? '').replace(/[R$\s]/g, '');
+            if (!s) return 0;
+            const n = parseFloat(s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s);
+            return isFinite(n) ? n : 0;
+        }
+        const paraCampo = v => String(Number(v) || 0).replace('.', ',');
+
+        // ============ TOAST / CONFIRMAÇÃO ============
+        function toast(msg, tipo = 'info') {
+            const el = document.createElement('div');
+            el.className = `toast ${tipo}`;
+            el.textContent = msg;
+            document.getElementById('toasts').appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+        function confirmar(titulo, texto) {
+            return new Promise(resolve => {
+                const m = document.getElementById('modal');
+                document.getElementById('modal-titulo').textContent = titulo;
+                document.getElementById('modal-texto').textContent = texto;
+                m.classList.add('aberto');
+                const fechar = r => { m.classList.remove('aberto'); sim.onclick = nao.onclick = null; resolve(r); };
+                const sim = document.getElementById('modal-sim'), nao = document.getElementById('modal-nao');
+                sim.onclick = () => fechar(true);
+                nao.onclick = () => fechar(false);
+                sim.focus();
+            });
+        }
+
+        // ============ ESTADO ============
+        let itens = [];
+        let classeFiltro = '';      // cmb_Filtro
+        let alertaFiltro = '';      // atalho dos cards: 'minimo' | 'falta'
+        let selecionado = null;
+        let situacao = 'Ativo';
+        let alterado = false;
+        let grafico = null;
+
+        // Grifar_Estoque: Inativo → cinza; Ativo em falta → coral; Ativo no mínimo → bisque
+        function alertaDo(it) {
+            if (it.situacao === 'Inativo') return 'inativo';
+            if (it.qtd <= 0) return 'falta';
+            if (it.minimo > 0 && it.qtd <= it.minimo) return 'minimo';
+            return '';
+        }
+        const ROTULO_ALERTA = { minimo: 'Mínimo', falta: 'Falta', inativo: 'Inativo' };
+
+        // ============ LISTA ============
+        async function carregarEstoque() {
+            const busca = document.getElementById('pesquisa').value.trim();
+            const qs = new URLSearchParams();
+            if (busca) qs.set('busca', busca);
+            if (classeFiltro) qs.set('classe', classeFiltro);
+            try {
+                itens = await api('/estoque?' + qs);
+                renderLista();
+            } catch (e) {
+                document.getElementById('tbody').innerHTML = `<tr><td colspan="4" class="vazio">⚠️ ${escapeHtml(e.message)}</td></tr>`;
+            }
+        }
+        function renderLista() {
+            const lista = alertaFiltro ? itens.filter(it => alertaDo(it) === alertaFiltro) : itens;
+            document.getElementById('contagem').textContent = lista.length;
+            const tbody = document.getElementById('tbody');
+            if (!lista.length) { tbody.innerHTML = '<tr><td colspan="4" class="vazio">Nenhum produto encontrado</td></tr>'; return; }
+            tbody.innerHTML = lista.map(it => {
+                const alerta = alertaDo(it);
+                return `<tr data-codigo="${escapeHtml(it.codigo)}" class="${alerta}${String(selecionado) === String(it.codigo) ? ' selecionado' : ''}">
+                    <td class="cod">${escapeHtml(it.codigo)}</td>
+                    <td><div class="prod-nome">${escapeHtml(it.produto)}${alerta ? `<span class="tag ${alerta}">${ROTULO_ALERTA[alerta]}</span>` : ''}</div>
+                        <div class="prod-forn col-forn">${escapeHtml(it.prodFornecedor || '')}</div></td>
+                    <td class="num"><b>${numero(it.qtd)}</b> <span class="cod">${escapeHtml(it.unidade || '')}</span></td>
+                    <td class="num">${escapeHtml(it.aguardando || '—')}</td>
+                </tr>`;
+            }).join('');
+        }
+        document.getElementById('tbody').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-codigo]');
+            if (tr) abrirProduto(tr.dataset.codigo);
+        });
+
+        // ============ RESUMO + COMBOS ============
+        function preencherSelect(id, base, extras) {
+            const sel = document.getElementById(id);
+            const atual = sel.value;
+            const todos = [...new Set([...base, ...(extras || [])])];
+            sel.innerHTML = '<option value="">— Selecione —</option>' + todos.map(v => `<option>${escapeHtml(v)}</option>`).join('');
+            if (atual) garantirOpcao(id, atual);
+        }
+        function garantirOpcao(id, valor) {
+            const sel = document.getElementById(id);
+            if (valor && ![...sel.options].some(o => o.value === valor)) sel.add(new Option(valor, valor));
+            sel.value = valor || '';
+        }
+        async function carregarResumo() {
+            try {
+                const r = await api('/estoque/resumo');
+                document.getElementById('c-valor').textContent = moeda(r.valorTotal);
+                document.getElementById('c-ativos').textContent = r.ativos;
+                document.getElementById('c-minimo').textContent = r.minimo;
+                document.getElementById('c-falta').textContent = r.falta;
+                preencherSelect('f-classe', CLASSES_PADRAO, r.classes);
+                preencherSelect('f-unidade', UNIDADES_PADRAO, r.unidades);
+                document.getElementById('lista-fornecedores').innerHTML = r.fornecedores.map(f => `<option value="${escapeHtml(f)}">`).join('');
+                const chips = document.getElementById('chips-classe');
+                chips.innerHTML = ['', ...r.classes].map(c =>
+                    `<button class="chip${c === classeFiltro ? ' ativo' : ''}" data-classe="${escapeHtml(c)}">${escapeHtml(c || 'Todas')}</button>`).join('');
+            } catch (e) {
+                toast('Não foi possível carregar o resumo do estoque: ' + e.message, 'erro');
+            }
+        }
+        document.getElementById('chips-classe').addEventListener('click', e => {
+            const chip = e.target.closest('.chip');
+            if (!chip) return;
+            classeFiltro = chip.dataset.classe;
+            // cmb_Filtro limpa a pesquisa (e vice-versa)
+            document.getElementById('pesquisa').value = '';
+            document.querySelectorAll('.chip').forEach(c => c.classList.toggle('ativo', c === chip));
+            carregarEstoque();
+        });
+        ['minimo', 'falta'].forEach(tipo => {
+            document.getElementById('card-' + tipo).addEventListener('click', () => {
+                alertaFiltro = alertaFiltro === tipo ? '' : tipo;
+                document.getElementById('card-minimo').classList.toggle('ativo-filtro', alertaFiltro === 'minimo');
+                document.getElementById('card-falta').classList.toggle('ativo-filtro', alertaFiltro === 'falta');
+                renderLista();
+            });
+        });
+
+        // ============ PESQUISA (txt_pesquisa + F5) ============
+        const pesquisa = document.getElementById('pesquisa');
+        let timerBusca = null;
+        pesquisa.addEventListener('input', () => {
+            clearTimeout(timerBusca);
+            timerBusca = setTimeout(() => {
+                if (classeFiltro) {
+                    classeFiltro = '';
+                    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('ativo', c.dataset.classe === ''));
+                }
+                carregarEstoque();
+            }, 350);
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F5') { e.preventDefault(); pesquisa.focus(); pesquisa.select(); }
+            if (e.key === 'Escape') document.getElementById('modal').classList.remove('aberto');
+        });
+
+        // ============ FICHA ============
+        const campos = {
+            codigo: 'f-codigo', produto: 'f-produto', classe: 'f-classe', unidade: 'f-unidade', codBarras: 'f-barras',
+            observacao: 'f-obs', fornecedor: 'f-fornecedor', codFornecedor: 'f-cod-forn', prodFornecedor: 'f-prod-forn',
+            qtd: 'f-qtd', minimo: 'f-minimo', valor: 'f-valor', frete: 'f-frete', ipi: 'f-ipi', perda: 'f-perda',
+            altura: 'f-altura', largura: 'f-largura', tamanho: 'f-tamanho'
+        };
+        const NUMERICOS = ['qtd', 'minimo', 'frete', 'ipi', 'perda', 'altura', 'largura', 'tamanho'];
+        const $ = id => document.getElementById(id);
+
+        function definirSituacao(s) {
+            situacao = s === 'Inativo' ? 'Inativo' : 'Ativo';
+            document.querySelectorAll('.switch-situacao button').forEach(b => {
+                b.className = b.dataset.sit === situacao ? (situacao === 'Ativo' ? 'on-ativo' : 'on-inativo') : '';
+            });
+            atualizarVisualEstoque();
+        }
+        document.querySelectorAll('.switch-situacao button').forEach(b =>
+            b.addEventListener('click', () => { definirSituacao(b.dataset.sit); marcarAlterado(); }));
+
+        function marcarAlterado(sim = true) {
+            alterado = sim;
+            $('alteracoes').classList.toggle('visivel', sim);
+        }
+        function atualizarVisualEstoque() {
+            const qtd = lerNumero($('f-qtd').value);
+            const min = lerNumero($('f-minimo').value);
+            const valor = lerNumero($('f-valor').value);
+            const tam = lerNumero($('f-tamanho').value);
+            $('v-qtd').textContent = numero(qtd);
+            $('v-unidade').textContent = $('f-unidade').value;
+            $('v-minimo').textContent = numero(min);
+            const alerta = alertaDo({ situacao, qtd, minimo: min });
+            const status = $('v-status');
+            const fill = $('v-fill');
+            const escala = Math.max(min * 2, qtd, 1);
+            fill.style.width = Math.max(0, Math.min(100, qtd / escala * 100)) + '%';
+            $('v-min').style.left = Math.min(100, min / escala * 100) + '%';
+            $('v-min').style.display = min > 0 ? '' : 'none';
+            if (alerta === 'inativo') { status.textContent = 'Inativo'; status.style.color = '#6c757d'; fill.style.background = '#adb5bd'; }
+            else if (alerta === 'falta') { status.textContent = '⛔ Em falta'; status.style.color = 'var(--danger-color)'; fill.style.background = 'var(--danger-color)'; }
+            else if (alerta === 'minimo') { status.textContent = '⚠️ No mínimo'; status.style.color = '#b8620b'; fill.style.background = 'var(--warning-color)'; }
+            else { status.textContent = '✅ Normal'; status.style.color = 'var(--success-color)'; fill.style.background = 'var(--success-color)'; }
+            // mesma regra do Contar_Valor_Estoque, para o item aberto
+            const ehRev = $('f-classe').value === 'Revestimento';
+            $('v-valor-item').textContent = moeda(ehRev ? tam * valor * qtd : valor * qtd);
+        }
+
+        function limparDados() {
+            Object.entries(campos).forEach(([k, id]) => {
+                const el = $(id);
+                if (k === 'codigo') el.value = '0';
+                else if (k === 'valor') el.value = moeda(0);
+                else if (NUMERICOS.includes(k)) el.value = '0';
+                else el.value = '';
+            });
+            definirSituacao('Ativo');
+            selecionado = null;
+            $('ficha-nome').textContent = 'Novo produto';
+            $('ficha-cod').textContent = 'Preencha os dados e salve';
+            $('v-aguardando').textContent = '—';
+            document.querySelectorAll('#tbody tr.selecionado').forEach(tr => tr.classList.remove('selecionado'));
+            marcarAlterado(false);
+            limparGrafico();
+            atualizarVisualEstoque();
+        }
+
+        async function abrirProduto(codigo) {
+            if (alterado && !(await confirmar('Descartar alterações?', 'Há alterações não salvas neste produto. Deseja descartá-las?'))) return;
+            try {
+                const p = await api('/estoque/item/' + encodeURIComponent(codigo));
+                Object.entries(campos).forEach(([k, id]) => {
+                    if (k === 'classe' || k === 'unidade') return garantirOpcao(id, p[k]);
+                    if (k === 'valor') $(id).value = moeda(p.valor);
+                    else if (NUMERICOS.includes(k)) $(id).value = paraCampo(p[k]);
+                    else $(id).value = p[k] ?? '';
+                });
+                definirSituacao(p.situacao);
+                selecionado = p.codigo;
+                $('ficha-nome').textContent = p.produto;
+                $('ficha-cod').textContent = `Código ${p.codigo}${p.classe ? ' · ' + p.classe : ''}`;
+                $('v-aguardando').textContent = p.aguardando || '—';
+                document.querySelectorAll('#tbody tr').forEach(tr => tr.classList.toggle('selecionado', tr.dataset.codigo === String(p.codigo)));
+                marcarAlterado(false);
+                atualizarVisualEstoque();
+                carregarMovimentacao(p.produto);
+            } catch (e) {
+                toast('Erro ao carregar dados do produto: ' + e.message, 'erro');
+            }
+        }
+
+        // ============ CAMPOS NUMÉRICOS (KeyPress [0-9,] + LostFocus do VB) ============
+        document.querySelectorAll('input.dec').forEach(inp => {
+            inp.addEventListener('keypress', e => {
+                if (e.key.length === 1 && !/[0-9,]/.test(e.key)) e.preventDefault();
+            });
+            inp.addEventListener('focus', () => {
+                if (inp.classList.contains('moeda')) inp.value = paraCampo(lerNumero(inp.value));
+                inp.select();
+            });
+            inp.addEventListener('blur', () => {
+                let v = inp.value.trim();
+                if (!v || lerNumero(v) === 0) v = '0';
+                else v = v.replace(/^0+(?=\d)/, '');          // TrimStart("0")
+                inp.value = inp.classList.contains('moeda') ? moeda(lerNumero(v)) : v;
+                atualizarVisualEstoque();
+            });
+        });
+        $('f-produto').addEventListener('blur', () => { $('f-produto').value = $('f-produto').value.trim(); });
+        $('f-barras').addEventListener('input', () => { $('f-barras').value = $('f-barras').value.replace(/\D/g, ''); });
+        $('form').addEventListener('input', () => { marcarAlterado(); atualizarVisualEstoque(); });
+        $('form').addEventListener('change', () => { marcarAlterado(); atualizarVisualEstoque(); });
+
+        // ============ ABAS ============
+        document.querySelectorAll('.aba').forEach(aba => aba.addEventListener('click', () => {
+            document.querySelectorAll('.aba').forEach(a => a.classList.toggle('ativa', a === aba));
+            document.querySelectorAll('.aba-conteudo').forEach(c => c.classList.toggle('ativa', c.dataset.aba === aba.dataset.aba));
+            if (aba.dataset.aba === 'movimento' && grafico) grafico.resize();
+        }));
+        function irParaAba(nome) { document.querySelector(`.aba[data-aba="${nome}"]`).click(); }
+
+        // ============ CÓDIGO DE BARRAS (Gerar_Codigo_Barras) ============
+        $('btn-barras').addEventListener('click', async () => {
+            try {
+                const r = await api('/estoque/codigo_barras', {
+                    method: 'POST',
+                    body: JSON.stringify({ atual: $('f-barras').value.trim(), produto: $('f-produto').value.trim() })
+                });
+                if (r.jaPossui) { toast(r.mensagem, 'info'); return; }
+                $('f-barras').value = r.codigo;
+                marcarAlterado();
+                toast('Código de barras gerado: ' + r.codigo, 'ok');
+            } catch (e) { toast(e.message, 'erro'); }
+        });
+
+        // ============ SALVAR (Salvar_Estoque) ============
+        async function salvarEstoque() {
+            const d = {};
+            Object.entries(campos).forEach(([k, id]) => {
+                d[k] = NUMERICOS.includes(k) || k === 'valor' ? lerNumero($(id).value) : $(id).value.trim();
+            });
+            d.situacao = situacao;
+            // mesmas validações e mensagens do VB, antes de ir ao servidor
+            const falha = (msg, aba, campo) => { toast(msg, 'erro'); irParaAba(aba); $(campo).focus(); };
+            if (d.produto.length < 1 || d.produto.length > 255) return falha('O nome do produto precisa conter no mínimo 1 e no máximo 255 caracteres !', 'geral', 'f-produto');
+            if (!d.codBarras) return falha('Este produto está sem código de barras!', 'geral', 'f-barras');
+            if (d.fornecedor && !d.prodFornecedor) return falha('Você deve fornecer um nome do produto do fornecedor!', 'fornecedor', 'f-prod-forn');
+            if (!d.classe) return falha('Você deve inserir uma classe para este produto!', 'geral', 'f-classe');
+            if (!d.unidade) return falha('Você deve inserir um tipo de unidade para este produto!', 'geral', 'f-unidade');
+            if (!(d.valor > 0)) return falha('O valor do produto precisa ser maior que 0!', 'custos', 'f-valor');
+            if (d.qtd === 0 && !(await confirmar('Estoque zerado', 'Têm certeza que o estoque atual será 0 ?'))) return;
+
+            const btn = $('btn-salvar');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+            try {
+                const r = await api('/estoque/salvar', { method: 'POST', body: JSON.stringify(d) });
+                toast(r.mensagem, 'ok');
+                marcarAlterado(false);
+                await Promise.all([carregarEstoque(), carregarResumo()]);
+                await abrirProduto(r.codigo);
+            } catch (e) {
+                toast(e.message, 'erro');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Salvar';
+            }
+        }
+        $('btn-salvar').addEventListener('click', salvarEstoque);
+        $('btn-novo').addEventListener('click', async () => {
+            if (alterado && !(await confirmar('Descartar alterações?', 'Há alterações não salvas. Deseja limpar a ficha mesmo assim?'))) return;
+            limparDados();
+            irParaAba('geral');
+            $('f-produto').focus();
+        });
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); salvarEstoque(); }
+        });
+        window.addEventListener('beforeunload', e => { if (alterado) { e.preventDefault(); e.returnValue = ''; } });
+
+        // ============ MOVIMENTAÇÃO (entradas x saídas, 12 meses) ============
+        function limparGrafico() {
+            if (grafico) { grafico.destroy(); grafico = null; }
+            $('grafico').style.display = 'none';
+            $('grafico-vazio').style.display = '';
+            $('grafico-vazio').textContent = 'Selecione um produto salvo para ver entradas e saídas dos últimos 12 meses.';
+        }
+        async function carregarMovimentacao(produto) {
+            limparGrafico();
+            if (typeof Chart === 'undefined') return;
+            try {
+                const meses = await api('/estoque/movimentacao?produto=' + encodeURIComponent(produto));
+                if (!meses.some(m => m.entrada || m.saida)) {
+                    $('grafico-vazio').textContent = 'Sem entradas ou saídas nos últimos 12 meses.';
+                    return;
+                }
+                // média acumulada só dos meses com movimento (igual ao VB)
+                let somaE = 0, mesesE = 0, somaS = 0, mesesS = 0;
+                const mediaE = [], mediaS = [];
+                meses.forEach(m => {
+                    if (m.entrada) { somaE += m.entrada; mesesE++; }
+                    if (m.saida) { somaS += m.saida; mesesS++; }
+                    mediaE.push(mesesE ? +(somaE / mesesE).toFixed(2) : null);
+                    mediaS.push(mesesS ? +(somaS / mesesS).toFixed(2) : null);
+                });
+                const rotulos = meses.map(m => {
+                    const [a, mm] = m.mes.split('-');
+                    return new Date(a, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                });
+                $('grafico').style.display = '';
+                $('grafico-vazio').style.display = 'none';
+                grafico = new Chart($('grafico'), {
+                    data: {
+                        labels: rotulos,
+                        datasets: [
+                            { type: 'bar', label: 'Entrada', data: meses.map(m => m.entrada), backgroundColor: 'rgba(40,167,69,.75)', borderRadius: 4 },
+                            { type: 'bar', label: 'Saída', data: meses.map(m => m.saida), backgroundColor: 'rgba(139,0,0,.75)', borderRadius: 4 },
+                            { type: 'line', label: 'Média entrada', data: mediaE, borderColor: '#28a745', borderWidth: 2, pointRadius: 0, tension: .3 },
+                            { type: 'line', label: 'Média saída', data: mediaS, borderColor: '#8B0000', borderWidth: 2, pointRadius: 0, tension: .3, borderDash: [5, 4] }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                        scales: { y: { beginAtZero: true, grid: { color: '#f1f3f5' } }, x: { grid: { display: false } } }
+                    }
+                });
+            } catch {
+                $('grafico-vazio').textContent = 'Não foi possível carregar a movimentação.';
+            }
+        }
+
+        // ============ INIT ============
+        document.addEventListener('DOMContentLoaded', () => {
+            const auth = getAuth();
+            if (!auth) { window.location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            $('user-name').textContent = auth.user.nome || '';
+            $('user-cargo').textContent = auth.user.cargo || '';
+            $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
+            if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
+                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Estoque 📦</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
+                return;
+            }
+            limparDados();
+            carregarResumo();
+            carregarEstoque();
+            pesquisa.focus();
+        });
+    </script>
+</body>
+</html>
