@@ -1155,11 +1155,19 @@ app.get('/fluxo/resumo', autenticar, somenteInterno, async (req, res) => {
       SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='Recebido', VALOR, 0)) AS recebido,
       SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='A pagar', VALOR, 0)) AS a_pagar,
       SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='A receber', VALOR, 0)) AS a_receber,
-      SUM(IF(DATA < CURDATE() AND SITUACAO='A receber', VALOR, 0)) AS atrasado
+      SUM(IF(DATA < CURDATE() AND SITUACAO='A receber', VALOR, 0)) AS atrasado,
+      -- recebimentos já marcados como Atrasado/Protestado (entradas: tem cliente e não tem fornecedor)
+      SUM(IF(SITUACAO IN ('Atrasado', 'Protestado') AND COALESCE(RAZAO_SOCIAL, '') <> ''
+             AND COALESCE(RAZAO_FABRICANTE, '') = '', VALOR, 0)) AS marcados_atrasado
       FROM fluxo_de_caixa`);
     const v = k => numEstq(r[k]);
+    // saldo idêntico ao VB: desconta só o "a receber" vencido, que já estava somado em a_receber
     const saldo = v('recebido') + v('a_receber') - v('atrasado') - v('pago') - v('a_pagar');
-    res.json({ pago: v('pago'), recebido: v('recebido'), aPagar: v('a_pagar'), aReceber: v('a_receber'), atrasado: v('atrasado'), saldo });
+    res.json({
+      pago: v('pago'), recebido: v('recebido'), aPagar: v('a_pagar'), aReceber: v('a_receber'),
+      atrasado: v('atrasado') + v('marcados_atrasado'),
+      aReceberVencido: v('atrasado'), marcadosAtrasado: v('marcados_atrasado'), saldo
+    });
   } catch (err) {
     console.error('Erro /fluxo/resumo:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -1209,6 +1217,29 @@ app.get('/fluxo/classificacao_sugerida', autenticar, somenteInterno, async (req,
   } catch (err) {
     console.error('Erro /fluxo/classificacao_sugerida:', err.message);
     res.status(500).json({ error: 'Erro ao buscar CF_CV' });
+  }
+});
+
+// Maiores gastos do mês: saídas (com fornecedor) agrupadas por fornecedor ou por categoria
+app.get('/fluxo/gastos', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [ini, fim] = limitesMes(req.query.mes);
+    const porCategoria = req.query.agrupar === 'categoria';
+    const rotulo = porCategoria
+      ? "COALESCE(NULLIF(CONCAT_WS(' › ', NULLIF(c.CLASSE2, ''), NULLIF(c.CLASSE3, '')), ''), 'Sem categoria')"
+      : 'f.RAZAO_FABRICANTE';
+    const [rows] = await pool.execute(
+      `SELECT ${rotulo} AS nome, SUM(f.VALOR) AS total, COUNT(*) AS qtd,
+              SUM(IF(f.SITUACAO = 'Pago', f.VALOR, 0)) AS pago
+       FROM fluxo_de_caixa f
+       ${porCategoria ? 'LEFT JOIN fluxo_de_caixa_classificacao c ON c.id = f.COD_CLASSIFICACAO' : ''}
+       WHERE f.DATA BETWEEN ? AND ? AND COALESCE(f.RAZAO_FABRICANTE, '') <> ''
+       GROUP BY nome ORDER BY total DESC`, [ini, fim]);
+    const itens = rows.map(r => ({ nome: r.nome || '—', total: numEstq(r.total), qtd: Number(r.qtd) || 0, pago: numEstq(r.pago) }));
+    res.json({ total: itens.reduce((s, i) => s + i.total, 0), itens });
+  } catch (err) {
+    console.error('Erro /fluxo/gastos:', err.message);
+    res.status(500).json({ error: 'Erro ao calcular os gastos do mês' });
   }
 });
 
