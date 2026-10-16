@@ -714,6 +714,7 @@ const QUERIES_FILTRO = {
 function resolverAliasesFrente(chave) {
   const c = String(chave || '').toLowerCase();
   if (c.includes('correr')) return ['Porta de Correr', 'Porta de correr', 'Correr'];
+  if (c.includes('bascul')) return ['Porta basculante', 'Porta Basculante', 'Basculante'];
   // giro / abrir / qualquer outra porta → mesma família
   return ['Porta de giro', 'Porta de Giro', 'Porta de Abrir', 'Porta de abrir', 'Giro', 'Abrir'];
 }
@@ -739,6 +740,18 @@ app.get('/catalogos_filtro', autenticar, async (req, res) => {
     res.json(lista);
   } catch (err) {
     console.error(`Erro /catalogos_filtro (${campo}):`, err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+  }
+});
+
+// Tipo nativo do puxador (repo.BuscarDadosProduto → TipoPuxador) — sem expor preços
+app.get('/dados_produto', autenticar, async (req, res) => {
+  try {
+    const dados = await buscarDadosProduto(String(req.query.nome || ''));
+    if (!dados) return res.status(404).json({ error: 'Produto não encontrado' });
+    res.json({ tipoPuxador: dados.tipoPuxador });
+  } catch (err) {
+    console.error('Erro /dados_produto:', err.message);
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
 });

@@ -120,6 +120,16 @@
         .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
         .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
         .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
+        .bf-basculante { background: rgba(111,66,193,.12); color: #6f42c1; }
+        /* ===== FURAÇÕES (pnlFuracoes do VB) ===== */
+        #pnl-furacoes { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 6px; }
+        .linha-furo { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .linha-furo label { width: 64px; text-align: right; font-weight: 600; color: var(--text-light); }
+        .linha-furo input { width: 100px; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit; }
+        .linha-furo input[readonly] { background: #f5f5f5; }
+        .linha-furo .rem { width: 30px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; color: #dc3545; font-weight: 700; cursor: pointer; }
+        .btn-mini.auto-on { background: #90ee90; border-color: #5cb85c; }
+        .btn-mini.ref-on { background: #87cefa; border-color: #3a9ad9; }
         /* ===== VISUALIZAÇÃO (motor fiel ao frmPortasAbrir.vb) ===== */
         #cv-visualizacao {
             width: 100%; max-width: 560px; height: 520px;
@@ -170,6 +180,7 @@
                 <div id="form-item" class="bloqueado">
                     <div class="frentes">
                         <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
+                        <button class="frente-btn" data-frente="Porta basculante">⬆️ Portas Basculantes</button>
                         <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                         <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
                     </div>
@@ -180,7 +191,7 @@
                             <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                             <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
-                            <div class="form-group f-porta">
+                            <div class="form-group f-porta" id="wrap-pares">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
                             </div>
@@ -196,7 +207,7 @@
                         <div class="grid-form">
                             <div class="form-group"><label>Perfil</label><select id="f-perfil"><option value="">Carregando...</option></select></div>
                             <div class="form-group"><label>Acabamento do perfil</label><select id="f-acab"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Cor do perfil</label><select id="f-cor"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Cor do perfil</label><select id="f-cor" disabled><option value="">— escolha o acabamento —</option></select></div>
                         </div>
                     </div>
                     <!-- PUXADOR -->
@@ -204,7 +215,7 @@
                         <h4>🟧 Puxador</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Posição do puxador</label>
+                            <div class="form-group"><label>Posição do puxador (folha 1)</label>
                                 <select id="f-posicao">
                                     <option value="">—</option>
                                     <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
@@ -214,7 +225,12 @@
                                 </select>
                             </div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
+                            <div class="form-group f-pux-extra" style="display:none"><label>Cor do puxador</label><select id="f-cor-pux" disabled><option value="">— escolha o acabamento —</option></select></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
+                            <div class="form-group f-pux-extra" style="display:none">
+                                <label>&nbsp;</label>
+                                <label class="viz-check"><input type="checkbox" id="chk-toda-ext"> Puxador em toda extensão</label>
+                            </div>
                         </div>
                     </div>
                     <!-- REVESTIMENTO + DIVISOR + QUANTIDADES (fiel ao VB) -->
@@ -222,7 +238,7 @@
                         <h4>🟩 Revestimento e divisores</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest" disabled><option value="">— escolha o revestimento —</option></select></div>
                             <div class="form-group"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
                             <div class="form-group"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
@@ -251,13 +267,21 @@
                         <h4>🖥️ Visualização em tempo real</h4>
                         <canvas id="cv-visualizacao"></canvas>
                         <div class="viz-linha">
-                            <button class="btn-mini" id="btn-modo-pux">🎯 Posicionar puxador</button>
-                            <label class="viz-check"><input type="checkbox" id="chk-toda-ext"> Toda extensão</label>
-                            <button class="btn-mini" id="btn-furo">＋ Furo (clique)</button>
-                            <button class="btn-mini" id="btn-dividir">Dividir igualmente</button>
-                            <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
+                            <button class="btn-mini" id="btn-modo-pux">🎯 Configurar posição do puxador</button>
                         </div>
                         <div class="viz-status" id="viz-status"></div>
+                    </div>
+                    <!-- 🔩 FURAÇÕES (fiel ao frmPortasAbrir.vb — região 5) -->
+                    <div class="secao-item secao-furos">
+                        <h4>🔩 Furações</h4>
+                        <div class="viz-linha">
+                            <button class="btn-mini" id="btn-adicionar-furo">＋ Adicionar furo</button>
+                            <button class="btn-mini" id="btn-dividir">⚖️ Dividir igual</button>
+                            <button class="btn-mini" id="btn-referencia-furos">↕️ Referência: TOPO → BASE</button>
+                            <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
+                        </div>
+                        <div id="pnl-furacoes"></div>
+                        <div class="viz-status" id="furos-resumo"></div>
                     </div>
                     <!-- VALORES -->
                     <div class="secao-item">
@@ -343,6 +367,18 @@
         let frenteAtual = 'Porta de giro';
         let itens = [];
         let editandoIndex = -1;
+        // Estado do frmPortasAbrir.vb (memória do projeto na RAM)
+        const FRASE_REF_FUROS = '(Furos medidos de BAIXO para CIMA)';
+        let coresGrupos = {};              // repo.List_Cores agrupada por Tipo
+        let modoPuxador = false;           // chkConfigPux (zonas fantasmas)
+        let isModoAutomatico = false;      // btnDividirIgual
+        let isReferenciaInvertida = false; // btnReferenciaFuros
+        let isCarregandoEdicao = false;    // trava dos handlers durante a edição
+        let tipoPuxadorAtual = '';         // Var_Loc.tipo_puxador
+        let posicoesFolhas = [''];         // PosicaoPuxador de CADA folha
+        let furosLista = [];               // ListaFuros (mesma lista em todas as folhas)
+        let ladosFuros = ['Esquerdo'];     // PosicaoFuros de cada folha
+        const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
         // ✅ CORREÇÃO ④: estado do desconto do cliente vindo do backend
         let descontoJaAplicado = false; // true = tabela FIXO com desconto no item → trava o campo da tela
         // ============ TRAVA DE CLIENTE (à prova de bala: por selectedIndex) ============
@@ -363,6 +399,7 @@
                 document.getElementById('calc-status').textContent = '';
                 atualizarTotalItem();
             } else {
+                reaplicarTravasCores();
                 calcularPrecoAutomatico();
             }
         }
@@ -383,11 +420,9 @@
             atualizarTotais();
         }
         // ============ QTD EFETIVA (✅ CORREÇÃO ③: Par de Portas fatura 2 folhas) ============
+        // No VB o txtQtd é o mestre da quantidade; o chkPares só escreve 2/1 nele
         function qtdEfetiva() {
-            const qtd = parseInt(document.getElementById('f-qtd').value) || 1;
-            const ehPar = document.getElementById('chk-pares')?.checked || false;
-            // No VB (SincronizarMemoriaPortas) o par cria 2 folhas faturadas
-            return ehPar ? Math.max(2, qtd) : qtd;
+            return Math.max(1, parseInt(document.getElementById('f-qtd').value) || 1);
         }
         // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
         function atualizarTotalItem() {
@@ -403,6 +438,8 @@
                 btn.classList.add('active');
                 frenteAtual = btn.dataset.frente;
                 document.getElementById('frente-atual').textContent = frenteAtual;
+                posicoesFolhas = posicoesFolhas.map(() => '');
+                document.getElementById('f-posicao').value = '';
                 aplicarVisibilidadeCampos();
                 carregarPerfis();
                 calcularPrecoAutomatico();
@@ -410,6 +447,13 @@
         });
         function aplicarVisibilidadeCampos() {
             const ehPorta = frenteAtual !== 'Serralheria';
+            // Porta basculante: chkPares invisível (frmPortasAbrir_Load)
+            const wrapPares = document.getElementById('wrap-pares');
+            if (ehBasculante() && document.getElementById('chk-pares').checked) {
+                document.getElementById('chk-pares').checked = false;
+                document.getElementById('f-qtd').value = 1;
+            }
+            document.querySelectorAll('.secao-furos').forEach(el => el.style.display = ehPortaComFuros() ? '' : 'none');
             const ehCorrer = frenteAtual === 'Porta de Correr';
             const ehSerr = frenteAtual === 'Serralheria';
             document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
@@ -417,7 +461,10 @@
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+            if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() ? '' : 'none';
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
+            garantirFolhas();
+            sincronizarFurosComMemoria();
         }
         // ============ COMBOS ============
         function popularLista(id, lista, msgVazio) {
@@ -447,12 +494,11 @@
         }
         async function carregarCatalogosIniciais() {
             try {
-                const [cat, coresGrupos] = await Promise.all([
+                const [cat, cores] = await Promise.all([
                     fetchAutenticado(`${API_BASE}/catalogos`),
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
-                popularCores('f-cor', coresGrupos);
-                popularCores('f-cor-revest', coresGrupos);
+                coresGrupos = cores || {};
                 popularCores('f-cor-serr', coresGrupos);
                 popularLista('f-produto', cat.produtos_serr);
                 popularLista('f-sistema', cat.sistemas);
@@ -481,31 +527,151 @@
                 popularLista('f-revest', [], '— escolha o perfil —');
                 popularLista('f-divisor', [], '— escolha o perfil —');
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
-                alternarCamposPuxador('');
-                return;
+            } else {
+                // cmbPerfil_SelectedIndexChanged: acabamentos, puxadores, divisores e revestimentos do perfil
+                const [acabs, puxs, revs, divs] = await Promise.all([
+                    catalogoFiltro('acabamentos', perfil),
+                    catalogoFiltro('puxadores', perfil),
+                    catalogoFiltro('revestimentos', perfil),
+                    catalogoFiltro('divisores', perfil)
+                ]);
+                popularLista('f-acab', acabs, '(nenhum acabamento para este perfil)');
+                popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
+                popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
+                popularLista('f-divisor', divs, '(nenhum divisor para este perfil)');
+                popularLista('f-acab-pux', [], '— escolha o puxador —');
             }
-            // ✅ CORREÇÃO ①: divisores entram na mesma cascata do perfil
-            const [acabs, puxs, revs, divs] = await Promise.all([
-                catalogoFiltro('acabamentos', perfil),
-                catalogoFiltro('puxadores', perfil),
-                catalogoFiltro('revestimentos', perfil),
-                catalogoFiltro('divisores', perfil)
-            ]);
-            popularLista('f-acab', acabs, '(nenhum acabamento para este perfil)');
-            popularLista('f-puxador', puxs, '(nenhum puxador para este perfil)');
-            popularLista('f-revest', revs, '(nenhum revestimento para este perfil)');
-            popularLista('f-divisor', divs, '(nenhum divisor para este perfil)');
-            popularLista('f-acab-pux', [], '— escolha o puxador —');
+            filtrarCores('f-cor', '');
+            filtrarCores('f-cor-pux', '');
+            filtrarCores('f-cor-revest', '');
+            tipoPuxadorAtual = '';
             alternarCamposPuxador('');
         }
         async function carregarDependentesPuxador(puxador) {
             if (!puxador) {
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
+                filtrarCores('f-cor-pux', '');
+                tipoPuxadorAtual = '';
                 alternarCamposPuxador('');
                 return;
             }
-            popularLista('f-acab-pux', await catalogoFiltro('acabamentos', puxador), '(nenhum acabamento para este puxador)');
+            // repo.BuscarDadosProduto → TipoPuxador + repo.CarregarAcabamentosPuxador
+            const [acabs, tipo] = await Promise.all([
+                catalogoFiltro('acabamentos', puxador),
+                buscarTipoPuxador(puxador)
+            ]);
+            popularLista('f-acab-pux', acabs, '(nenhum acabamento para este puxador)');
+            filtrarCores('f-cor-pux', '');
+            tipoPuxadorAtual = tipo;
             alternarCamposPuxador(puxador);
+        }
+        async function buscarTipoPuxador(nome) {
+            try {
+                const d = await fetchAutenticado(`${API_BASE}/dados_produto?nome=${encodeURIComponent(nome)}`);
+                return d.tipoPuxador || '';
+            } catch { return ''; }
+        }
+        // ============ CORES POR ACABAMENTO (filtro "metálic" / "sólid" do VB) ============
+        const semAcento = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        function coresDoTipo(prefixo) {
+            const chave = Object.keys(coresGrupos).find(k => semAcento(k).startsWith(prefixo));
+            return chave ? coresGrupos[chave] : [];
+        }
+        // Sem cor para o acabamento → combo de cor vazio e desabilitado (igual ao VB)
+        function filtrarCores(idCor, termoAcabamento) {
+            const sel = document.getElementById(idCor);
+            if (!sel) return false;
+            const termo = semAcento(termoAcabamento);
+            let lista = [];
+            if (termo.includes('metalic')) lista = coresDoTipo('metal');
+            else if (termo.includes('solid')) lista = coresDoTipo('solid');
+            if (lista.length === 0) {
+                sel.innerHTML = '<option value="">— sem cor para este acabamento —</option>';
+                sel.disabled = true;
+                return false;
+            }
+            popularLista(idCor, lista);
+            sel.disabled = false;
+            return true;
+        }
+        function reaplicarTravasCores() {
+            ['f-cor', 'f-cor-pux', 'f-cor-revest'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (sel) sel.disabled = ![...sel.options].some(o => o.value);
+            });
+        }
+        // SelecionarComboPorTexto: se o texto salvo não está na lista, entra mesmo assim (escudo da edição)
+        function selecionarComboPorTexto(id, texto) {
+            const sel = document.getElementById(id);
+            if (!sel || !texto) return false;
+            if (![...sel.options].some(o => o.value === texto)) {
+                const op = document.createElement('option');
+                op.value = op.textContent = texto;
+                sel.appendChild(op);
+            }
+            sel.value = texto;
+            sel.disabled = false;
+            return true;
+        }
+        // Herança (cmbX.Text = cmbY.Text): só seleciona se o item existir na lista
+        function selecionarSeExistir(id, texto) {
+            const sel = document.getElementById(id);
+            if (!sel || !texto || ![...sel.options].some(o => o.value === texto)) return false;
+            sel.value = texto;
+            return true;
+        }
+        // ============ HANDLERS DOS COMBOS (região 4 do VB) ============
+        function aoMudarAcabPerfil() {
+            filtrarCores('f-cor', val('f-acab'));
+            // puxador selecionado herda o acabamento do perfil
+            if (val('f-puxador') && selecionarSeExistir('f-acab-pux', val('f-acab'))) aoMudarAcabPuxador();
+            calcularPrecoAutomatico();
+        }
+        function aoMudarAcabPuxador() {
+            const temCor = filtrarCores('f-cor-pux', val('f-acab-pux'));
+            // herdar cor do perfil só na operação manual
+            if (temCor && !isCarregandoEdicao) selecionarSeExistir('f-cor-pux', val('f-cor'));
+            calcularPrecoAutomatico();
+        }
+        function aoMudarRevestimento() {
+            filtrarCores('f-cor-revest', val('f-revest'));
+            calcularPrecoAutomatico();
+        }
+        async function aoMudarPerfil() {
+            await carregarDependentesPerfil(val('f-perfil'));
+            posicoesFolhas = posicoesFolhas.map(() => '');
+            document.getElementById('f-posicao').value = '';
+            document.getElementById('chk-toda-ext').checked = false;
+            atualizarTravaTamanhoPuxador();
+            sincronizarFurosComMemoria();
+            desenharVisualizacao();
+            calcularPrecoAutomatico();
+        }
+        async function aoMudarPuxador() {
+            const pux = val('f-puxador');
+            await carregarDependentesPuxador(pux);
+            const tam = document.getElementById('f-tamanho-pux');
+            // troca manual: limpa posição, toda extensão e tamanho
+            posicoesFolhas = posicoesFolhas.map(() => '');
+            document.getElementById('f-posicao').value = '';
+            document.getElementById('chk-toda-ext').checked = false;
+            tam.readOnly = false;
+            tam.value = '';
+            if (pux) {
+                // herda acabamento/cor do perfil só na troca manual
+                selecionarSeExistir('f-acab-pux', val('f-acab'));
+                if (filtrarCores('f-cor-pux', val('f-acab-pux'))) selecionarSeExistir('f-cor-pux', val('f-cor'));
+                garantirFolhas();
+                aplicarEspelhamentoPuxadorNaMemoria();
+                sincronizarFurosComMemoria();
+                definirModoPuxador(true); // chkConfigPux.Checked = True → escolha nos fantasmas
+            } else {
+                definirModoPuxador(false);
+                sincronizarFurosComMemoria();
+            }
+            atualizarTravaTamanhoPuxador();
+            desenharVisualizacao();
+            calcularPrecoAutomatico();
         }
         async function carregarMateriais(produto) {
             if (!produto) {
@@ -560,7 +726,8 @@
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
-                            posicaoPuxador: g('f-posicao'),
+                            tipoPuxador: tipoPuxadorAtual,
+                            posicaoPuxador: posicaoParaCalculo(),
                             tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
                             divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
@@ -592,9 +759,19 @@
         // ============================================================
         // 🖥️ MOTOR DE DESENHO GRÁFICO — fiel ao frmPortasAbrir.vb
         // ============================================================
-        let furos = [];
-        let modoPuxador = false;
-        let modoFuro = false;
+        function ehBasculante() { return frenteAtual === 'Porta basculante'; }
+        function ehPortaComFuros() { return frenteAtual === 'Porta de giro' || ehBasculante(); }
+        function paresAtivo() { return !ehBasculante() && (document.getElementById('chk-pares')?.checked || false); }
+        function qtdFolhasAtual() { return qtdEfetiva(); }
+        // InverterLado (furos): Esquerdo ↔ Direito / Superior ↔ Inferior
+        function inverterLado(lado) {
+            const u = String(lado || '').toUpperCase();
+            if (u.includes('ESQUERD')) return 'Direito';
+            if (u.includes('DIREIT')) return 'Esquerdo';
+            if (u.includes('SUPERIOR')) return 'Inferior';
+            if (u.includes('INFERIOR')) return 'Superior';
+            return lado;
+        }
         function inverterLadoPux(pos) {
             return pos.replace('Esquerda', '«E»').replace('Direita', 'Esquerda').replace('«E»', 'Direita');
         }
@@ -604,17 +781,186 @@
             if (pos.includes('Base Total')) return pos;
             return inverterLadoPux(pos);
         }
+        // SincronizarMemoriaPortas: uma folha por unidade de txtQtd (novas folhas clonam a folha 1)
+        function garantirFolhas() {
+            const n = qtdFolhasAtual();
+            while (posicoesFolhas.length < n) posicoesFolhas.push(posicoesFolhas[0] || '');
+            posicoesFolhas.length = n;
+            while (ladosFuros.length < n) ladosFuros.push(ladosFuros[0] || 'Esquerdo');
+            ladosFuros.length = n;
+        }
+        // AplicarEspelhamentoPuxadorNaMemoria: no par, as folhas pares espelham a folha 1
+        function aplicarEspelhamentoPuxadorNaMemoria() {
+            garantirFolhas();
+            if (!paresAtivo()) return;
+            const base = posicoesFolhas[0] || '';
+            posicoesFolhas = posicoesFolhas.map((_, i) => i % 2 === 0 ? base : posicaoEspelhada(base));
+        }
+        // Posição escolhida para UMA folha. Par → espelha nas demais; solto → autonomia da folha
+        function definirPosicaoPuxador(idx, pos) {
+            garantirFolhas();
+            posicoesFolhas[idx] = pos;
+            if (paresAtivo()) {
+                const paridade = idx % 2;
+                posicoesFolhas = posicoesFolhas.map((_, i) => i % 2 === paridade ? pos : posicaoEspelhada(pos));
+            }
+            const sel = document.getElementById('f-posicao');
+            if (posicoesFolhas[0]) selecionarComboPorTexto('f-posicao', posicoesFolhas[0]); else sel.value = '';
+            sincronizarFurosComMemoria();
+            atualizarTravaTamanhoPuxador();
+            desenharVisualizacao();
+            calcularPrecoAutomatico();
+        }
+        function puxadorEhTotal() {
+            return (document.getElementById('chk-toda-ext')?.checked || false) ||
+                   String(posicoesFolhas[0] || '').toUpperCase().includes('TOTAL');
+        }
+        // SincronizarNomenclaturaPuxador: "toda extensão" vira posição Total para o motor
+        function posicaoParaCalculo() {
+            const pos = posicoesFolhas[0] || '';
+            if (!pos || !document.getElementById('chk-toda-ext')?.checked || pos.toUpperCase().includes('TOTAL')) return pos;
+            const u = pos.toUpperCase();
+            if (u.startsWith('TOPO')) return 'Topo Total';
+            if (u.startsWith('BASE')) return 'Base Total';
+            return u.includes('ESQUERD') ? 'Lateral Esquerda Total' : 'Lateral Direita Total';
+        }
+        function ladoDoPuxador(pos) {
+            const u = String(pos || '').toUpperCase();
+            return (u.includes('TOPO') || u.includes('BASE')) ? (parseFloat(val('f-largura')) || 0) : (parseFloat(val('f-altura')) || 0);
+        }
+        // AtualizarTravaTamanhoPuxador: puxador total = tamanho do lado inteiro, campo travado
+        function atualizarTravaTamanhoPuxador() {
+            const inp = document.getElementById('f-tamanho-pux');
+            if (!inp) return;
+            if (val('f-puxador') && puxadorEhTotal()) {
+                const lado = ladoDoPuxador(posicoesFolhas[0]);
+                inp.value = lado > 0 ? lado : '';
+                inp.readOnly = true;
+            } else if (inp.readOnly) {
+                inp.readOnly = false;
+                inp.value = '';
+            }
+        }
+        // chkConfigPux: ligar limpa as posições para forçar nova escolha nos fantasmas
+        function definirModoPuxador(ativo) {
+            modoPuxador = ativo;
+            if (ativo) {
+                posicoesFolhas = posicoesFolhas.map(() => '');
+                document.getElementById('f-posicao').value = '';
+                sincronizarFurosComMemoria();
+                calcularPrecoAutomatico();
+            }
+            document.getElementById('btn-modo-pux').classList.toggle('ativo', ativo);
+            document.getElementById('cv-visualizacao').classList.toggle('modo-pux', ativo);
+            document.getElementById('viz-status').textContent = ativo
+                ? (paresAtivo() ? '💡 Clique na borda da folha onde o puxador entra — a outra folha do par é espelhada'
+                                : '💡 Clique na borda de cada folha onde o puxador entra')
+                : '';
+            desenharVisualizacao();
+        }
+
+        // ============ FURAÇÕES (região 5 do VB) ============
+        function obterInputsFuro() { return [...document.querySelectorAll('#pnl-furacoes input')]; }
+        // Basculante: furos correm ao longo da largura (Superior/Inferior); giro: ao longo da altura
+        function obterTamanhoReferencia() { return parseFloat(val(ehBasculante() ? 'f-largura' : 'f-altura')) || 0; }
+        function reorganizarNomesLabels() {
+            document.querySelectorAll('#pnl-furacoes .linha-furo label').forEach((l, i) => l.textContent = `Furo ${i + 1}:`);
+        }
+        function criarLinhaNaTela(valor) {
+            const linha = document.createElement('div');
+            linha.className = 'linha-furo';
+            linha.innerHTML = '<label></label><input type="number" min="0" step="1"><span>mm</span>' +
+                              '<button type="button" class="rem" title="Remover furo">X</button>';
+            const inp = linha.querySelector('input');
+            if (valor != null) inp.value = valor;
+            // Leave: só reordena quando sai da caixa
+            inp.addEventListener('blur', reordenarFurosManuais);
+            linha.querySelector('.rem').addEventListener('click', () => {
+                linha.remove();
+                reorganizarNomesLabels();
+                if (isModoAutomatico) recalcularFurosAutomaticos();
+                sincronizarFurosComMemoria();
+                desenharVisualizacao();
+            });
+            document.getElementById('pnl-furacoes').appendChild(linha);
+            reorganizarNomesLabels();
+            return inp;
+        }
+        // 1º furo a 100mm, último a (tamanho − 100mm), intervalos iguais, mm inteiros
+        function recalcularFurosAutomaticos() {
+            if (!isModoAutomatico) return;
+            const tamanho = obterTamanhoReferencia();
+            if (tamanho <= 250) { alert('O tamanho da porta está pequeno demais!'); return; }
+            const caixas = obterInputsFuro();
+            const qtd = caixas.length;
+            if (qtd === 0) return;
+            caixas.forEach(c => c.readOnly = true);
+            if (qtd === 1) {
+                caixas[0].value = Math.round(tamanho / 2);
+            } else {
+                const primeiroFuro = 100, ultimoFuro = tamanho - 100;
+                const gap = (ultimoFuro - primeiroFuro) / (qtd - 1);
+                caixas.forEach((c, i) => c.value = Math.round(primeiroFuro + gap * i));
+            }
+        }
+        function reordenarFurosManuais() {
+            if (isModoAutomatico) return;
+            const caixas = obterInputsFuro();
+            const valores = caixas.map(c => parseFloat(c.value)).filter(v => !isNaN(v)).sort((a, b) => a - b);
+            caixas.forEach((c, i) => c.value = i < valores.length ? valores[i] : '');
+            sincronizarFurosComMemoria();
+            desenharVisualizacao();
+        }
+        function definirAutomatico(ativo) {
+            isModoAutomatico = ativo;
+            document.getElementById('btn-dividir').classList.toggle('auto-on', ativo);
+            if (!ativo) obterInputsFuro().forEach(c => c.readOnly = false);
+        }
+        function atualizarBotaoReferencia() {
+            const btn = document.getElementById('btn-referencia-furos');
+            btn.classList.toggle('ref-on', isReferenciaInvertida);
+            btn.textContent = isReferenciaInvertida ? '↕️ Referência: BASE → TOPO' : '↕️ Referência: TOPO → BASE';
+        }
+        // SincronizarFurosComMemoria: a tela é a fonte única; mesma lista em todas as folhas
+        function sincronizarFurosComMemoria() {
+            if (isCarregandoEdicao) return;
+            const lidos = obterInputsFuro().map(c => parseFloat(c.value)).filter(v => !isNaN(v));
+            furosLista = [...new Set(lidos)];
+            garantirFolhas();
+            const n = posicoesFolhas.length;
+            const ehLateral = l => /ESQUERD|DIREIT/i.test(l || '');
+            const ladoOpostoPux = pos => {
+                const u = String(pos || '').toUpperCase();
+                return u.includes('ESQUERD') ? 'Direito' : u.includes('DIREIT') ? 'Esquerdo' : '';
+            };
+            let ladoBase;
+            if (ehBasculante()) {
+                // eixo VERTICAL: "Superior" (normal) ou "Inferior" (invertida); nunca Esquerdo/Direito
+                ladoBase = semAcento(val('f-perfil')).includes('invertid') ? 'Inferior' : 'Superior';
+            } else {
+                ladoBase = ladoOpostoPux(posicoesFolhas[0]) || (ehLateral(ladosFuros[0]) ? ladosFuros[0] : 'Esquerdo');
+            }
+            ladosFuros = posicoesFolhas.map((pos, i) => {
+                if (ehBasculante()) return ladoBase;                                   // igual em todas as folhas
+                if (paresAtivo() && n > 1) return i % 2 === 0 ? ladoBase : inverterLado(ladoBase); // par: paridade
+                // autônomo: dobradiça no lado oposto ao puxador da própria folha
+                return ladoOpostoPux(pos) || (ehLateral(ladosFuros[i]) ? ladosFuros[i] : 'Esquerdo');
+            });
+            const resumo = document.getElementById('furos-resumo');
+            if (resumo) resumo.textContent = furosLista.length
+                ? `${furosLista.length} furo(s) — lado: ${ladosFuros.map((l, i) => n > 1 ? `F${i + 1} ${l}` : l).join(' · ')}`
+                : '';
+        }
+
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
             if (!cv) return;
-            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-            const altura = parseFloat(g('f-altura')) || 0;
-            const largura = parseFloat(g('f-largura')) || 0;
-            const qtdDivH = parseInt(g('f-div-h')) || 0;
-            const qtdDivV = parseInt(g('f-div-v')) || 0;
-            const puxador = g('f-puxador');
-            const posicao = g('f-posicao');
-            const ehPar = document.getElementById('chk-pares')?.checked || false;
+            const altura = parseFloat(val('f-altura')) || 0;
+            const largura = parseFloat(val('f-largura')) || 0;
+            const qtdDivH = parseInt(val('f-div-h')) || 0;
+            const qtdDivV = parseInt(val('f-div-v')) || 0;
+            const puxador = val('f-puxador');
+            const ehPar = paresAtivo();
             const ctx = cv.getContext('2d');
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
@@ -624,20 +970,21 @@
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
                 return;
             }
-            // Qtd define as folhas — Par de Portas força 2 (✅ CORREÇÃO ③: mesma regra do faturamento)
-            const qtdFolhas = Math.min(ehPar ? 2 : Math.max(1, parseInt(document.getElementById('f-qtd').value) || 1), 4);
+            garantirFolhas();
+            const qtdFolhas = Math.min(posicoesFolhas.length, 4);
             const gap = 30, margemCota = 90;
             const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
             const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
             const dh = altura * esc;
             const oy = (H - dh) / 2;
             const px = mm => mm * esc;
-            cv._esc = esc; cv._oy = oy;
+            const ox0 = (W - larguraTotal * esc) / 2;
+            cv._esc = esc; cv._oy = oy; cv._ox0 = ox0;
             cv._qtdFolhas = qtdFolhas;   // cache p/ o clique identificar a folha certa
+            const todaExt = document.getElementById('chk-toda-ext')?.checked;
             for (let f = 0; f < qtdFolhas; f++) {
-                // folhas pares (2ª, 4ª) espelham o puxador — regra de par do VB
-                const ehFolhaEspelhada = (f % 2) === 1;
-                const ox = (W - larguraTotal * esc) / 2 + px(f * (largura + gap));
+                const ehFolhaEspelhada = ehPar && (f % 2) === 1;
+                const ox = ox0 + px(f * (largura + gap));
                 const X = mm => ox + px(mm);
                 const Y = mm => oy + px(mm);
                 // vidro + moldura
@@ -655,48 +1002,60 @@
                     const y = Y(altura * i / (qtdDivH + 1));
                     ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
                 }
-                const posEfetiva = (ehFolhaEspelhada ? posicaoEspelhada(posicao) : posicao || '').toUpperCase();
+                // puxador da PRÓPRIA folha
+                const posEfetiva = String(posicoesFolhas[f] || '').toUpperCase();
                 if (puxador && posEfetiva) {
-                    const todaExt = document.getElementById('chk-toda-ext')?.checked;
-                    const horizontal = posEfetiva.includes('TOPO') || posEfetiva.includes('BASE');
+                    const horizontal = posEfetiva.startsWith('TOPO') || posEfetiva.startsWith('BASE');
                     const lado = horizontal ? largura : altura;
-                    const tamPux = todaExt ? lado : (parseFloat(g('f-tamanho-pux')) || lado * 0.5);
                     const marg = 30;
+                    const ehTotal = todaExt || posEfetiva.includes('TOTAL');
+                    const tamPux = ehTotal ? lado : (parseFloat(val('f-tamanho-pux')) || lado * 0.5);
+                    const tamDesenho = Math.min(tamPux, lado - marg * 2);
                     ctx.lineWidth = 10; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
                     ctx.beginPath();
                     let cotaX = X(largura / 2), cotaY = Y(altura) + 40;
-                    if (posEfetiva.includes('ESQUERDA')) {
-                        const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
-                        ctx.moveTo(X(marg), yIni); ctx.lineTo(X(marg), yIni + px(tamPux));
-                        cotaX = X(marg) - 14; cotaY = yIni + px(tamPux) / 2;
-                    } else if (posEfetiva.includes('DIREITA')) {
-                        const yIni = posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamPux);
-                        ctx.moveTo(X(largura - marg), yIni); ctx.lineTo(X(largura - marg), yIni + px(tamPux));
-                        cotaX = X(largura - marg) + 14; cotaY = yIni + px(tamPux) / 2;
-                    } else if (posEfetiva.includes('TOPO')) {
-                        const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
-                        ctx.moveTo(xIni, Y(marg)); ctx.lineTo(xIni + px(tamPux), Y(marg));
-                        cotaX = xIni + px(tamPux) / 2; cotaY = Y(marg) - 12;
-                    } else if (posEfetiva.includes('BASE')) {
-                        const xIni = posEfetiva.includes('ESQUERDA') ? X(marg) : X(largura - marg - tamPux);
-                        ctx.moveTo(xIni, Y(altura - marg)); ctx.lineTo(xIni + px(tamPux), Y(altura - marg));
-                        cotaX = xIni + px(tamPux) / 2; cotaY = Y(altura - marg) + 20;
+                    if (horizontal) {
+                        const yLinha = posEfetiva.startsWith('TOPO') ? Y(marg) : Y(altura - marg);
+                        const xIni = ehTotal ? X(marg) : posEfetiva.includes('ESQUERD') ? X(marg) : X(largura - marg - tamDesenho);
+                        ctx.moveTo(xIni, yLinha); ctx.lineTo(xIni + px(tamDesenho), yLinha);
+                        cotaX = xIni + px(tamDesenho) / 2;
+                        cotaY = posEfetiva.startsWith('TOPO') ? yLinha - 12 : yLinha + 20;
+                    } else {
+                        const xLinha = posEfetiva.includes('ESQUERD') ? X(marg) : X(largura - marg);
+                        const yIni = ehTotal ? Y(marg) : posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamDesenho);
+                        ctx.moveTo(xLinha, yIni); ctx.lineTo(xLinha, yIni + px(tamDesenho));
+                        cotaX = posEfetiva.includes('ESQUERD') ? xLinha + 40 : xLinha - 40;
+                        cotaY = yIni + px(tamDesenho) / 2;
                     }
                     ctx.stroke();
                     ctx.font = '16px Segoe UI'; ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
                     ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
                 }
-                // furos (folhas pares espelham no eixo X)
-                ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 3;
-                furos.forEach(fu => {
-                    const fx = ehFolhaEspelhada ? (largura - fu.x) : fu.x;
-                    const cx = X(Math.min(Math.max(fx, 0), largura));
-                    const cy = Y(Math.min(Math.max(fu.y, 0), altura));
-                    ctx.beginPath();
-                    ctx.moveTo(cx - 9, cy); ctx.lineTo(cx + 9, cy);
-                    ctx.moveTo(cx, cy - 9); ctx.lineTo(cx, cy + 9);
-                    ctx.stroke();
-                });
+                // furos: mesma lista em todas as folhas, no lado de cada uma (sem espelhar as medidas)
+                if (ehPortaComFuros()) {
+                    const ladoF = String(ladosFuros[f] || '').toUpperCase();
+                    const recuo = 22;
+                    ctx.strokeStyle = '#dc3545'; ctx.fillStyle = '#dc3545'; ctx.lineWidth = 3;
+                    ctx.font = '14px Segoe UI';
+                    furosLista.forEach(m => {
+                        let cx, cy;
+                        if (ladoF.startsWith('SUPERIOR') || ladoF.startsWith('INFERIOR')) {
+                            if (m < 0 || m > largura) return;
+                            cx = X(m);
+                            cy = ladoF.startsWith('SUPERIOR') ? Y(recuo) : Y(altura - recuo);
+                            ctx.textAlign = 'center';
+                            ctx.fillText(`${m}`, cx, ladoF.startsWith('SUPERIOR') ? cy + 26 : cy - 16);
+                        } else {
+                            if (m < 0 || m > altura) return;
+                            cy = isReferenciaInvertida ? Y(altura - m) : Y(m);
+                            const dir = ladoF.startsWith('DIREIT');
+                            cx = dir ? X(largura - recuo) : X(recuo);
+                            ctx.textAlign = dir ? 'right' : 'left';
+                            ctx.fillText(`${m}`, dir ? cx - 14 : cx + 14, cy + 5);
+                        }
+                        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
+                    });
+                }
                 // cotas SEMPRE visíveis + rótulo da folha
                 ctx.font = '17px Segoe UI'; ctx.fillStyle = '#6c757d';
                 ctx.textAlign = 'center';
@@ -710,164 +1069,200 @@
                     ctx.font = '15px Segoe UI'; ctx.fillStyle = '#8B0000';
                     ctx.fillText(ehFolhaEspelhada ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, X(largura / 2), Y(0) - 12);
                 }
-            }
-            // zonas fantasma do puxador no modo de posicionamento
-            if (modoPuxador) {
-                const ox0 = (W - larguraTotal * esc) / 2;
-                const X0 = mm => ox0 + px(mm);
-                ctx.font = '15px Segoe UI'; ctx.textAlign = 'center';
-                ctx.fillStyle = 'rgba(139,0,0,.10)';
-                ctx.fillRect(X0(0) - 26, oy, 26, dh);
-                ctx.fillStyle = '#8B0000'; ctx.fillText('ESQ', X0(0) - 13, oy + dh / 2);
-                ctx.fillStyle = 'rgba(139,0,0,.10)';
-                ctx.fillRect(X0(larguraTotal), oy, 26, dh);
-                ctx.fillStyle = '#8B0000'; ctx.fillText('DIR', X0(larguraTotal) + 13, oy + dh / 2);
-                ctx.fillStyle = 'rgba(139,0,0,.10)';
-                ctx.fillRect(X0(0), oy - 26, larguraTotal * esc, 26);
-                ctx.fillStyle = '#8B0000'; ctx.fillText('TOPO', ox0 + px(larguraTotal) / 2, oy - 10);
-                ctx.fillStyle = 'rgba(139,0,0,.10)';
-                ctx.fillRect(X0(0), oy + dh, larguraTotal * esc, 26);
-                ctx.fillStyle = '#8B0000'; ctx.fillText('BASE', ox0 + px(larguraTotal) / 2, oy + dh + 18);
+                // zonas fantasmas do puxador (uma por borda de cada folha)
+                if (modoPuxador && puxador) {
+                    const z = 26;
+                    ctx.fillStyle = 'rgba(139,0,0,.12)';
+                    ctx.fillRect(X(0), Y(0), z, dh);
+                    ctx.fillRect(X(largura) - z, Y(0), z, dh);
+                    ctx.fillRect(X(0), Y(0), px(largura), z);
+                    ctx.fillRect(X(0), Y(altura) - z, px(largura), z);
+                    ctx.fillStyle = '#8B0000'; ctx.font = '14px Segoe UI'; ctx.textAlign = 'center';
+                    ctx.fillText('ESQ', X(0) + z / 2, oy + dh / 2);
+                    ctx.fillText('DIR', X(largura) - z / 2, oy + dh / 2);
+                    ctx.fillText('TOPO', X(largura / 2), Y(0) + 18);
+                    ctx.fillText('BASE', X(largura / 2), Y(altura) - 8);
+                }
             }
         }
-        // clique no canvas: furo ou posicionamento do puxador (sincronizado com o desenho)
+        // clique no canvas: escolha da posição do puxador na folha clicada (modo fantasma)
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
+            if (!modoPuxador || !val('f-puxador')) return;
             const cv = document.getElementById('cv-visualizacao');
-            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-            const altura = parseFloat(g('f-altura')) || 0;
-            const largura = parseFloat(g('f-largura')) || 0;
+            const altura = parseFloat(val('f-altura')) || 0;
+            const largura = parseFloat(val('f-largura')) || 0;
             if (!altura || !largura) return;
             const rect = cv.getBoundingClientRect();
-            const esc = cv._esc || 1, oy = cv._oy || 0;
+            const esc = cv._esc || 1, oy = cv._oy || 0, ox0 = cv._ox0 || 0;
             const qtdFolhas = cv._qtdFolhas || 1;
             const gap = 30;
-            const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
-            const ox0 = (rect.width * 2 - larguraTotal * esc) / 2;
-            const cx = (e.clientX - rect.left) * 2;
-            const cy = (e.clientY - rect.top) * 2;
-            // identifica em qual folha o usuário clicou
-            let folha = 0;
+            const cx = (e.clientX - rect.left) * (cv.width / rect.width);
+            const cy = (e.clientY - rect.top) * (cv.height / rect.height);
+            let folha = -1;
             for (let f = 0; f < qtdFolhas; f++) {
                 const ox = ox0 + (f * (largura + gap)) * esc;
                 if (cx >= ox && cx <= ox + largura * esc) { folha = f; break; }
             }
+            if (folha < 0) return;
             const ox = ox0 + (folha * (largura + gap)) * esc;
             const mmX = (cx - ox) / esc;
             const mmY = (cy - oy) / esc;
-            const status = document.getElementById('viz-status');
-            if (modoFuro) {
-                furos.push({ x: Math.round(Math.min(Math.max(mmX, 0), largura)),
-                             y: Math.round(Math.min(Math.max(mmY, 0), altura)) });
-                modoFuro = false;
-                document.getElementById('btn-furo').classList.remove('ativo');
-                status.textContent = `Furo marcado em X=${mmX.toFixed(0)}, Y=${mmY.toFixed(0)} mm (folha ${folha + 1})`;
-            } else if (modoPuxador) {
-                const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
-                const min = Math.min(dEsq, dDir, dTopo, dBase);
-                const metade = (folha % 2) === 1; // folhas pares do desenho são espelhadas
-                let nova = '';
-                if (min === dEsq) {
-                    nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
-                } else if (min === dDir) {
-                    nova = mmY < altura / 2 ? 'Lateral Direita Superior' : 'Lateral Direita Inferior';
-                } else if (min === dTopo) {
-                    nova = mmX < largura / 2 ? 'Topo Esquerda' : 'Topo Direita';
-                } else {
-                    nova = 'Base Total';
-                }
-                if (metade) nova = posicaoEspelhada(nova);
-                const sel = document.getElementById('f-posicao');
-                if ([...sel.options].some(o => o.value === nova)) {
-                    sel.value = nova;
-                    sel.dispatchEvent(new Event('change'));
-                    status.textContent = `Puxador posicionado: ${nova}${metade ? ' (folha espelhada)' : ''}`;
-                } else status.textContent = `Posição '${nova}' indisponível — selecione manualmente.`;
+            const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
+            const min = Math.min(dEsq, dDir, dTopo, dBase);
+            let nova;
+            if (min === dEsq) nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
+            else if (min === dDir) nova = mmY < altura / 2 ? 'Lateral Direita Superior' : 'Lateral Direita Inferior';
+            else if (min === dTopo) nova = mmX < largura / 2 ? 'Topo Esquerda' : 'Topo Direita';
+            else nova = 'Base Total';
+            definirPosicaoPuxador(folha, nova);
+            garantirFolhas();
+            const faltam = posicoesFolhas.slice(0, qtdFolhas).filter(p => !p).length;
+            document.getElementById('viz-status').textContent = `Folha ${folha + 1}: ${nova}` +
+                (faltam ? ` — falta posicionar ${faltam} folha(s)` : '');
+            if (!faltam) {
                 modoPuxador = false;
                 cv.classList.remove('modo-pux');
                 document.getElementById('btn-modo-pux').classList.remove('ativo');
+                desenharVisualizacao();
             }
-            desenharVisualizacao();
         });
         // ============ FORMULÁRIO ============
+        function descreverPosicoes() {
+            const lista = posicoesFolhas.slice(0, qtdFolhasAtual());
+            if (!lista.some(Boolean)) return '';
+            if (new Set(lista).size === 1) return ` (${lista[0]})`;
+            return ' (' + lista.map((p, i) => `F${i + 1}: ${p || '-'}`).join(' / ') + ')';
+        }
         function coletarForm() {
-            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+            const g = val;
+            const ehSerr = frenteAtual === 'Serralheria';
+            if (!ehSerr) sincronizarFurosComMemoria();
+            const todaExt = document.getElementById('chk-toda-ext')?.checked || false;
             let desc = '';
-            if (frenteAtual === 'Serralheria') {
+            if (ehSerr) {
                 desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
                        ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm`;
             } else {
-                desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}` +
-                       ` | Puxador: ${g('f-puxador') || '-'} ${g('f-posicao') ? '(' + g('f-posicao') + ')' : ''}${g('f-tamanho-pux') ? ' ' + g('f-tamanho-pux') + 'mm' : ''}` +
-                       ` | Revest: ${g('f-revest') || '-'}` +
+                const pux = g('f-puxador');
+                desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}`.trimEnd() +
+                       ` | Puxador: ${pux || '-'}` +
+                       (pux ? `${g('f-acab-pux') ? ' ' + g('f-acab-pux') : ''}${g('f-cor-pux') ? ' ' + g('f-cor-pux') : ''}` +
+                              descreverPosicoes() +
+                              (todaExt ? ' toda extensão' : (g('f-tamanho-pux') ? ` ${g('f-tamanho-pux')}mm` : '')) : '') +
+                       ` | Revest: ${g('f-revest') || '-'}${g('f-cor-revest') ? ' ' + g('f-cor-revest') : ''}` +
                        ` | Divisor: ${g('f-divisor') || '-'} (${g('f-div-h') || 0}H/${g('f-div-v') || 0}V)` +
+                       (ehPortaComFuros() && furosLista.length
+                           ? ` | Furos: ${furosLista.join(', ')} mm (${[...new Set(ladosFuros)].join('/')})` : '') +
                        (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '') +
                        (g('f-percentuais') ? ` | Pct linha: ${g('f-percentuais')}` : '');
             }
             return {
                 frente: frenteAtual,
-                qtd: qtdEfetiva(),                                                        // ✅ CORREÇÃO ③
-                altura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
-                largura: frenteAtual === 'Serralheria' ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
+                qtd: qtdEfetiva(),
+                altura: ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
+                largura: ehSerr ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
                 soldas: parseInt(g('f-soldas')) || 0,
-                furos: frenteAtual !== 'Serralheria' ? furos.map(f => ({ x: f.x, y: f.y })) : [],
+                furos: ehPortaComFuros()
+                    ? { lista: [...furosLista], lados: [...ladosFuros], referenciaInvertida: isReferenciaInvertida }
+                    : { lista: [], lados: [], referenciaInvertida: false },
                 detalhes: {
                     perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'),
-                    puxador: g('f-puxador'), posicao: g('f-posicao'),
-                    acabPux: g('f-acab-pux'), tamanhoPux: g('f-tamanho-pux'),
+                    puxador: g('f-puxador'), tipoPuxador: tipoPuxadorAtual,
+                    posicao: posicoesFolhas[0] || '', posicoesFolhas: [...posicoesFolhas],
+                    acabPux: g('f-acab-pux'), corPux: g('f-cor-pux'), tamanhoPux: g('f-tamanho-pux'),
                     revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
-                    divisor: g('f-divisor'),                                              // ✅ CORREÇÃO ①
+                    divisor: g('f-divisor'),
                     divH: parseInt(g('f-div-h')) || 0, divV: parseInt(g('f-div-v')) || 0,
-                    pares: document.getElementById('chk-pares')?.checked || false,
-                    todaExt: document.getElementById('chk-toda-ext')?.checked || false,
+                    pares: paresAtivo(),
+                    todaExt,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     produto: g('f-produto'), material: g('f-material'),
                     acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
-                    percentuais: g('f-percentuais')                                       // ✅ CORREÇÃO ②
+                    percentuais: g('f-percentuais')
                 },
                 valor: parseFloat(g('f-valor').replace(',', '.')) || 0,
                 obs: g('f-obs'),
                 descricao: desc
             };
         }
+        // Fluxo de edição do VB: captura antecipada → cadeias de combos → escudo final
         async function preencherForm(item) {
             const d = item.detalhes || {};
-            if (item.frente !== 'Serralheria') {
-                await carregarPerfis();
-                if (d.perfil) {
-                    await carregarDependentesPerfil(d.perfil);
-                    if (d.puxador) await carregarDependentesPuxador(d.puxador);
-                } else {
-                    await carregarDependentesPerfil('');
-                }
-            } else {
-                if (d.produto) {
-                    await carregarMateriais(d.produto);
-                    if (d.material) await carregarAcabSerr(d.material);
-                } else {
-                    await carregarMateriais('');
-                }
-            }
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
             const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
-            set('f-qtd', item.qtd); set('f-altura', item.altura); set('f-largura', item.largura);
-            set('f-valor', item.valor); set('f-obs', item.obs);
-            set('f-perfil', d.perfil); set('f-acab', d.acabamento); set('f-cor', d.cor);
-            set('f-puxador', d.puxador); set('f-posicao', d.posicao);
-            set('f-acab-pux', d.acabPux); set('f-tamanho-pux', d.tamanhoPux);
-            set('f-revest', d.revestimento); set('f-cor-revest', d.corRevest);
-            set('f-divisor', d.divisor);                                                  // ✅ CORREÇÃO ①
-            set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
-            setChk('chk-pares', d.pares); setChk('chk-toda-ext', d.todaExt);
-            set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
-            set('f-produto', d.produto); set('f-material', d.material);
-            set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
-            set('f-percentuais', d.percentuais);                                          // ✅ CORREÇÃO ②
-            set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
-            furos = (item.furos || []).map(f => ({ x: f.x, y: f.y }));
-            alternarCamposPuxador(d.puxador);
+            isCarregandoEdicao = true;
+            try {
+                set('f-qtd', item.qtd);
+                set('f-altura', item.altura); set('f-largura', item.largura);
+                setChk('chk-pares', d.pares);
+                if (item.frente !== 'Serralheria') {
+                    // CADEIA 1: PERFIL → dependências com o perfil correto
+                    await carregarPerfis();
+                    selecionarComboPorTexto('f-perfil', d.perfil);
+                    await carregarDependentesPerfil(d.perfil || '');
+                    selecionarComboPorTexto('f-acab', d.acabamento);
+                    filtrarCores('f-cor', d.acabamento);
+                    selecionarComboPorTexto('f-cor', d.cor);
+                    // CADEIA 2: PUXADOR → acabamento → cor
+                    selecionarComboPorTexto('f-puxador', d.puxador);
+                    if (d.puxador) await carregarDependentesPuxador(d.puxador);
+                    if (d.tipoPuxador) tipoPuxadorAtual = d.tipoPuxador;
+                    selecionarComboPorTexto('f-acab-pux', d.acabPux);
+                    filtrarCores('f-cor-pux', d.acabPux);
+                    selecionarComboPorTexto('f-cor-pux', d.corPux);
+                    // CADEIA 3: REVESTIMENTO → cor
+                    selecionarComboPorTexto('f-revest', d.revestimento);
+                    filtrarCores('f-cor-revest', d.revestimento);
+                    selecionarComboPorTexto('f-cor-revest', d.corRevest);
+                    // CADEIA 4: DIVISOR
+                    selecionarComboPorTexto('f-divisor', d.divisor);
+                } else {
+                    if (d.produto) {
+                        await carregarMateriais(d.produto);
+                        if (d.material) await carregarAcabSerr(d.material);
+                    } else {
+                        await carregarMateriais('');
+                    }
+                }
+                set('f-valor', item.valor);
+                set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
+                setChk('chk-toda-ext', d.todaExt);
+                const tam = document.getElementById('f-tamanho-pux');
+                tam.value = d.tamanhoPux || '';
+                tam.readOnly = !!(d.puxador && (d.todaExt || String(d.posicao || '').toUpperCase().includes('TOTAL')));
+                set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
+                set('f-produto', d.produto); set('f-material', d.material);
+                set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
+                set('f-percentuais', d.percentuais);
+                set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
+                // posição do puxador de CADA folha (fiel ao salvo, sem espelhar)
+                posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
+                    ? [...d.posicoesFolhas] : [d.posicao || ''];
+                garantirFolhas();
+                if (posicoesFolhas[0]) selecionarComboPorTexto('f-posicao', posicoesFolhas[0]); else set('f-posicao', '');
+                // furos: TODA a lista salva vira linha na tela (sem descartar medidas repetidas)
+                const fu = item.furos && !Array.isArray(item.furos) ? item.furos : { lista: [], lados: [] };
+                document.getElementById('pnl-furacoes').innerHTML = '';
+                definirAutomatico(false);
+                (fu.lista || []).forEach(m => criarLinhaNaTela(m));
+                furosLista = [...(fu.lista || [])];
+                ladosFuros = (fu.lados || []).length ? [...fu.lados] : ['Esquerdo'];
+                garantirFolhas();
+                isReferenciaInvertida = !!fu.referenciaInvertida;
+                atualizarBotaoReferencia();
+                modoPuxador = false;
+                document.getElementById('btn-modo-pux').classList.remove('ativo');
+                document.getElementById('cv-visualizacao').classList.remove('modo-pux');
+                alternarCamposPuxador(d.puxador);
+            } finally {
+                isCarregandoEdicao = false;
+            }
+            // escudo final da observação
+            set('f-obs', item.obs);
             atualizarTotalItem();
             desenharVisualizacao();
+            calcularPrecoAutomatico();
         }
         function limparForm() {
             document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
@@ -876,9 +1271,23 @@
             document.getElementById('f-qtd').value = 1;
             document.getElementById('chk-pares').checked = false;
             document.getElementById('chk-toda-ext').checked = false;
+            document.getElementById('f-tamanho-pux').readOnly = false;
+            filtrarCores('f-cor', ''); filtrarCores('f-cor-pux', ''); filtrarCores('f-cor-revest', '');
+            tipoPuxadorAtual = '';
+            posicoesFolhas = [''];
+            ladosFuros = ['Esquerdo'];
+            furosLista = [];
+            document.getElementById('pnl-furacoes').innerHTML = '';
+            definirAutomatico(false);
+            isReferenciaInvertida = false;
+            atualizarBotaoReferencia();
+            modoPuxador = false;
+            document.getElementById('btn-modo-pux').classList.remove('ativo');
+            document.getElementById('cv-visualizacao').classList.remove('modo-pux');
+            document.getElementById('viz-status').textContent = '';
             atualizarTotalItem();
             alternarCamposPuxador('');
-            furos = [];
+            sincronizarFurosComMemoria();
             desenharVisualizacao();
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
@@ -901,7 +1310,7 @@
                 : itens.map((it, i) => `
                     <tr>
                         <td><b>${i + 1}</b></td>
-                        <td><span class="badge-frente ${it.frente === 'Porta de giro' ? 'bf-abrir' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
+                        <td><span class="badge-frente ${it.frente === 'Porta de giro' ? 'bf-abrir' : it.frente === 'Porta basculante' ? 'bf-basculante' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
                         <td>${escapeHtml(it.descricao)}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
@@ -980,68 +1389,106 @@
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
-        document.getElementById('f-qtd').addEventListener('input', () => { atualizarTotalItem(); desenharVisualizacao(); });
         document.getElementById('sel-cliente').addEventListener('change', () => {
             descontoJaAplicado = false; // recém selecionado: reavalia após o 1º cálculo
             atualizarTravaDesconto();
             atualizarBloqueioCliente();
         });
-        document.getElementById('chk-pares').addEventListener('change', () => {
-            atualizarTotalItem();       // ✅ par muda a qtd faturada → recalcula
-            calcularPrecoAutomatico();
+        // txtQtd_TextChanged: alimenta as folhas na memória, recalcula e redesenha
+        document.getElementById('f-qtd').addEventListener('input', () => {
+            if (isCarregandoEdicao) return;
+            garantirFolhas();
+            aplicarEspelhamentoPuxadorNaMemoria();
+            sincronizarFurosComMemoria();
+            atualizarTotalItem();
+            desenharVisualizacao();
         });
-        // Motor: recalcula ao mudar qualquer campo relevante
-        ['f-perfil','f-acab','f-cor','f-puxador','f-posicao','f-acab-pux','f-tamanho-pux',
-         'f-revest','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
+        // chkPares_CheckedChanged: escreve 2/1 no Qtd, espelha puxador e furos
+        document.getElementById('chk-pares').addEventListener('change', () => {
+            if (isCarregandoEdicao) return;
+            document.getElementById('f-qtd').value = document.getElementById('chk-pares').checked ? 2 : 1;
+            garantirFolhas();
+            aplicarEspelhamentoPuxadorNaMemoria();
+            sincronizarFurosComMemoria();
+            atualizarTotalItem();
+            calcularPrecoAutomatico();
+            desenharVisualizacao();
+        });
+        // Motor: recalcula ao mudar campos sem handler próprio
+        ['f-cor','f-cor-pux','f-tamanho-pux','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
          'f-percentuais',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
-        // Cascatas: recarregam os combos dependentes
-        document.getElementById('f-perfil').addEventListener('change', e => carregarDependentesPerfil(e.target.value));
-        document.getElementById('f-puxador').addEventListener('change', e => carregarDependentesPuxador(e.target.value));
+        // Cascatas e regras dos combos (região 4 do VB)
+        document.getElementById('f-perfil').addEventListener('change', aoMudarPerfil);
+        document.getElementById('f-acab').addEventListener('change', aoMudarAcabPerfil);
+        document.getElementById('f-puxador').addEventListener('change', aoMudarPuxador);
+        document.getElementById('f-acab-pux').addEventListener('change', aoMudarAcabPuxador);
+        document.getElementById('f-revest').addEventListener('change', aoMudarRevestimento);
+        document.getElementById('f-posicao').addEventListener('change', e => definirPosicaoPuxador(0, e.target.value));
+        document.getElementById('chk-toda-ext').addEventListener('change', () => {
+            atualizarTravaTamanhoPuxador();
+            desenharVisualizacao();
+            calcularPrecoAutomatico();
+        });
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
-        // Visualização: controles e gatilhos de redesenho
-        document.getElementById('btn-modo-pux')?.addEventListener('click', () => {
-            modoPuxador = true; modoFuro = false;
-            document.getElementById('btn-modo-pux').classList.add('ativo');
-            document.getElementById('btn-furo').classList.remove('ativo');
-            document.getElementById('viz-status').textContent = '💡 Clique na borda da porta onde o puxador entra';
-            document.getElementById('cv-visualizacao').classList.add('modo-pux');
-            desenharVisualizacao(); // desenha as zonas fantasma
-        });
-        document.getElementById('btn-furo')?.addEventListener('click', () => {
-            modoFuro = true; modoPuxador = false;
-            document.getElementById('btn-furo').classList.add('ativo');
-            document.getElementById('btn-modo-pux').classList.remove('ativo');
-            document.getElementById('viz-status').textContent = '💡 Clique no canvas onde entra o furo';
-            document.getElementById('cv-visualizacao').classList.remove('modo-pux');
-        });
-        // Furos automáticos do VB: 1º em 100mm, último em (altura − 100mm), distribuídos igualmente
-        document.getElementById('btn-dividir')?.addEventListener('click', () => {
-            const altura = parseFloat(document.getElementById('f-altura').value) || 0;
-            const n = parseInt(prompt('Dividir em quantos furos na lateral esquerda?')) || 0;
-            if (n > 0 && altura > 200) {
-                furos = [];
-                const inicio = 100, fim = altura - 100;
-                for (let i = 0; i < n; i++) {
-                    furos.push({ x: 60, y: Math.round(inicio + (fim - inicio) * i / (n - 1 || 1)) });
-                }
-                document.getElementById('viz-status').textContent = `✅ ${n} furos automáticos (100mm a ${fim}mm)`;
+        // Medidas: furos automáticos, trava do puxador total e redesenho
+        ['f-altura', 'f-largura'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('change', () => {
+                recalcularFurosAutomaticos();
+                sincronizarFurosComMemoria();
+                atualizarTravaTamanhoPuxador();
                 desenharVisualizacao();
-            } else if (n > 0) {
-                alert('Altura mínima de 200mm para dividir furos automaticamente.');
-            }
+            });
+            el.addEventListener('input', desenharVisualizacao);
         });
-        document.getElementById('btn-limpar-furos')?.addEventListener('click', () => {
-            furos = []; desenharVisualizacao(); document.getElementById('viz-status').textContent = '';
-        });
-        ['chk-toda-ext', 'chk-pares'].forEach(id =>
-            document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
-        ['f-altura', 'f-largura', 'f-div-h', 'f-div-v', 'f-puxador', 'f-posicao', 'f-tamanho-pux'].forEach(id =>
-            document.getElementById(id)?.addEventListener('change', desenharVisualizacao));
-        ['f-altura', 'f-largura'].forEach(id =>
+        ['f-div-h', 'f-div-v', 'f-tamanho-pux'].forEach(id =>
             document.getElementById(id)?.addEventListener('input', desenharVisualizacao));
+        // chkConfigPux → botão de configurar a posição do puxador
+        document.getElementById('btn-modo-pux').addEventListener('click', () => {
+            if (!val('f-puxador')) { document.getElementById('viz-status').textContent = 'Escolha um puxador primeiro.'; return; }
+            definirModoPuxador(!modoPuxador);
+        });
+        // Furações (região 5 do VB)
+        document.getElementById('btn-adicionar-furo').addEventListener('click', () => {
+            const novo = criarLinhaNaTela();
+            if (isModoAutomatico) {
+                recalcularFurosAutomaticos();
+                sincronizarFurosComMemoria();
+            } else {
+                novo.focus();
+            }
+            desenharVisualizacao();
+        });
+        document.getElementById('btn-dividir').addEventListener('click', () => {
+            definirAutomatico(!isModoAutomatico);
+            if (isModoAutomatico) {
+                // ativou com a tela vazia → 2 furos por padrão
+                if (obterInputsFuro().length === 0) { criarLinhaNaTela(); criarLinhaNaTela(); }
+                recalcularFurosAutomaticos();
+                sincronizarFurosComMemoria();
+            }
+            desenharVisualizacao();
+        });
+        document.getElementById('btn-limpar-furos').addEventListener('click', () => {
+            document.getElementById('pnl-furacoes').innerHTML = '';
+            sincronizarFurosComMemoria();
+            desenharVisualizacao();
+        });
+        // btnReferenciaFuros: alterna Topo/Base e escreve na observação para a fábrica
+        document.getElementById('btn-referencia-furos').addEventListener('click', () => {
+            isReferenciaInvertida = !isReferenciaInvertida;
+            const obs = document.getElementById('f-obs');
+            if (isReferenciaInvertida) {
+                if (!obs.value.includes(FRASE_REF_FUROS)) obs.value = (obs.value + ' ' + FRASE_REF_FUROS).trim();
+            } else {
+                obs.value = obs.value.replace(FRASE_REF_FUROS, '').trim();
+            }
+            atualizarBotaoReferencia();
+            desenharVisualizacao();
+        });
         // Redesenho após troca de frente (o layout precisa recalcular antes de medir o canvas)
         document.querySelectorAll('.frente-btn').forEach(btn =>
             btn.addEventListener('click', () => setTimeout(desenharVisualizacao, 120)));
