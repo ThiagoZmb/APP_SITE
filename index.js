@@ -981,10 +981,8 @@ app.get('/produtos/opcoes', autenticar, somenteInterno, async (req, res) => {
 // txt_Codigo_TextChanged: ficha do produto + o que ele tem permitido
 app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) => {
   try {
-    const [rows] = await pool.execute(
-      `SELECT CODIGO, MODELO, CLASSE, TIPO_PUXADOR, DESCONTO_VIDRO, DESC_PERF_PUX, VALOR_CHEIO, VALOR_FIXO,
-              OBSERVACAO, COMPLEMENTOS, CLASSE_ACABAMENTOS, SITUACAO, (IMAGEM IS NOT NULL) AS TEM_IMAGEM
-       FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1`, [req.params.codigo]);
+    // SELECT * como no VB: colunas ausentes na tabela não derrubam a ficha
+    const [rows] = await pool.execute('SELECT * FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!rows.length) return res.status(404).json({ error: 'Produto não encontrado' });
     const r = rows[0];
     const modelo = r.MODELO || '';
@@ -994,7 +992,7 @@ app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) =
       descontoVidro: numEstq(r.DESCONTO_VIDRO), descPerfPux: numEstq(r.DESC_PERF_PUX),
       valorCheio: numEstq(r.VALOR_CHEIO), valorFixo: numEstq(r.VALOR_FIXO),
       observacao: r.OBSERVACAO || '', complementos: r.COMPLEMENTOS || '', classeAcabamento: r.CLASSE_ACABAMENTOS || '',
-      situacao: r.SITUACAO || '', temImagem: !!Number(r.TEM_IMAGEM),
+      situacao: r.SITUACAO || '', temImagem: r.IMAGEM != null && r.IMAGEM.length > 0,
       permitidos: {
         tiposProduto: await permitidos('SELECT TIPO_PRODUTO AS v FROM perfis_permitidos WHERE MODELO = ? ORDER BY TIPO_PRODUTO'),
         acabamentos: await permitidos('SELECT ACABAMENTO AS v FROM acabamentos_permitidos WHERE MODELO = ? ORDER BY ACABAMENTO'),
@@ -1004,8 +1002,8 @@ app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) =
       }
     });
   } catch (err) {
-    console.error('Erro /produtos/item:', err.message);
-    res.status(500).json({ error: 'Erro de servidor' });
+    console.error('Erro /produtos/item:', err.code, err.message);
+    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
 });
 
@@ -1016,6 +1014,7 @@ app.get('/produtos/imagem/:codigo', autenticar, somenteInterno, async (req, res)
     if (!rows.length || !rows[0].IMAGEM) return res.status(404).json({ error: 'Sem imagem' });
     res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'no-store').send(rows[0].IMAGEM);
   } catch (err) {
+    if (err.code === 'ER_BAD_FIELD_ERROR') return res.status(404).json({ error: 'Sem imagem' });
     console.error('Erro /produtos/imagem:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
   }
@@ -1029,6 +1028,7 @@ app.put('/produtos/imagem/:codigo', autenticar, somenteInterno,
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro PUT /produtos/imagem:', err.message);
+    if (err.code === 'ER_BAD_FIELD_ERROR') return res.status(400).json({ error: 'A tabela cadastro_de_produtos não tem a coluna IMAGEM.' });
     res.status(500).json({ error: 'Erro ao salvar a imagem' });
   }
 });

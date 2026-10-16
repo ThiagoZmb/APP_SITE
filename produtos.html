@@ -465,7 +465,7 @@
             if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             if (comoBlob && res.ok) return res.blob();
             const dados = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(dados.error || `Erro HTTP: ${res.status}`);
+            if (!res.ok) throw new Error((dados.error || `Erro HTTP: ${res.status}`) + (dados.detalhe ? ` (${dados.detalhe})` : ''));
             return dados;
         }
 
