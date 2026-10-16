@@ -1095,11 +1095,12 @@ app.post('/produtos/salvar', autenticar, somenteInterno, async (req, res) => {
 // ============================================================
 const SITUACOES_FLUXO = ['Recebido', 'A Receber', 'Pago', 'A Pagar', 'Faturado', 'Protestado', 'Atrasado'];
 const COLUNAS_FLUXO = `ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, RAZAO_SOCIAL, RAZAO_FABRICANTE, PEDIDO, PDV, PRE_NOTA_FISCAL,
-  NOTA_FISCAL, FORMA_PGTO, BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL`;
+  NOTA_FISCAL, FORMA_PGTO, BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL, COD_CLASSIFICACAO`;
 const linhaFluxo = r => ({
   id: r.ID, data: r.DATA, cliente: r.RAZAO_SOCIAL || '', fornecedor: r.RAZAO_FABRICANTE || '', pedido: r.PEDIDO ?? '',
   pdv: r.PDV ?? '', preNota: r.PRE_NOTA_FISCAL ?? '', notaFiscal: r.NOTA_FISCAL ?? '', formaPgto: r.FORMA_PGTO || '',
-  banco: r.BANCO || '', situacao: r.SITUACAO || '', valor: numEstq(r.VALOR), observacao: r.OBSERVACAO_GERAL || ''
+  banco: r.BANCO || '', situacao: r.SITUACAO || '', valor: numEstq(r.VALOR), observacao: r.OBSERVACAO_GERAL || '',
+  codClassificacao: r.COD_CLASSIFICACAO == null ? null : Number(r.COD_CLASSIFICACAO)
 });
 function limitesMes(ym) {
   const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
@@ -1175,8 +1176,40 @@ app.get('/fluxo/opcoes', autenticar, somenteInterno, async (req, res) => {
     formas: await lista("SELECT DISTINCT FORMA_PGTO AS v FROM fluxo_de_caixa WHERE FORMA_PGTO <> '' ORDER BY FORMA_PGTO"),
     bancos: await lista("SELECT DISTINCT BANCO AS v FROM fluxo_de_caixa WHERE BANCO <> '' ORDER BY BANCO"),
     clientes: await lista('SELECT RAZAO_SOCIAL AS v FROM cadastro_clientes ORDER BY RAZAO_SOCIAL'),
-    fornecedores: await lista("SELECT DISTINCT RAZAO_FABRICANTE AS v FROM fluxo_de_caixa WHERE RAZAO_FABRICANTE <> '' ORDER BY RAZAO_FABRICANTE")
+    fornecedores: await lista(`SELECT RAZAO_FABRICANTE AS v FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE <> ''
+                               UNION SELECT DISTINCT RAZAO_FABRICANTE FROM fluxo_de_caixa WHERE RAZAO_FABRICANTE <> '' ORDER BY v`)
   });
+});
+
+// Árvore de categorias (fluxo_de_caixa_classificacao: TIPO > CLASSE1 > CLASSE2 > CLASSE3)
+app.get('/fluxo/classificacoes', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, TIPO, CLASSE1, CLASSE2, CLASSE3 FROM fluxo_de_caixa_classificacao ORDER BY TIPO, CLASSE1, CLASSE2, CLASSE3');
+    res.json(rows.map(r => ({ id: Number(r.id), tipo: r.TIPO || '', classe1: r.CLASSE1 || '', classe2: r.CLASSE2 || '', classe3: r.CLASSE3 || '' })));
+  } catch (err) {
+    console.error('Erro /fluxo/classificacoes:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar as categorias' });
+  }
+});
+
+// BuscarClassificacaoFornecedor / BuscarClassificacaoCliente
+// fornecedor com CF_CV → categoria travada nela; cliente cadastrado → categoria 1; senão o usuário escolhe
+app.get('/fluxo/classificacao_sugerida', autenticar, somenteInterno, async (req, res) => {
+  const nome = txtEstq(req.query.nome);
+  if (!nome) return res.json({ id: null, travado: false });
+  try {
+    if (req.query.movimento === 'Saída') {
+      const [r] = await pool.execute('SELECT CF_CV FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE = ? LIMIT 1', [nome]);
+      const v = r.length ? String(r[0].CF_CV ?? '').trim() : '';
+      return res.json(v && Number(v) > 0 ? { id: Number(v), travado: true } : { id: null, travado: false });
+    }
+    const [r] = await pool.execute('SELECT CODIGO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [nome]);
+    res.json(r.length ? { id: 1, travado: true } : { id: null, travado: false });
+  } catch (err) {
+    console.error('Erro /fluxo/classificacao_sugerida:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar CF_CV' });
+  }
 });
 
 // Histórico: recebido x pago dos últimos 12 meses
@@ -1200,40 +1233,43 @@ app.get('/fluxo/historico', autenticar, somenteInterno, async (req, res) => {
   }
 });
 
-// Salvar movimento: INSERT se o ID não existe, senão UPDATE
+// SalvarToolStripMenuItem_Click: mesmas validações; INSERT ... ON DUPLICATE KEY UPDATE pelo ID
 app.post('/fluxo/salvar', autenticar, somenteInterno, async (req, res) => {
   const b = req.body || {};
   const erro = msg => res.status(400).json({ error: msg });
-  const entrada = b.movimento === 'Entrada';
-  if (!['Entrada', 'Saída'].includes(b.movimento)) return erro('Escolha se o movimento é Entrada ou Saída!');
-  const nome = txtEstq(b.nome);
-  if (!nome) return erro(entrada ? 'Favor escolher o cliente!' : 'Favor escolher o fornecedor!');
   const formaPgto = txtEstq(b.formaPgto, 100);
   if (!formaPgto) return erro('Favor escolher uma forma de pagamento!');
   const data = String(b.data || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(new Date(data + 'T00:00:00'))) return erro('Favor inserir uma data válida!');
-  const situacao = txtEstq(b.situacao, 50);
-  if (!SITUACOES_FLUXO.includes(situacao)) return erro('Favor escolher a situação do pagamento!');
   const valor = numEstq(b.valor);
-  if (!(valor > 0)) return erro('Favor inserir um valor maior que 0!');
-  const dados = [data, entrada ? nome : '', entrada ? '' : nome, txtEstq(b.pedido, 50), txtEstq(b.pdv, 50), txtEstq(b.preNota, 50),
-    txtEstq(b.notaFiscal, 50), formaPgto, txtEstq(b.banco, 100), situacao, valor, txtEstq(b.observacao, 2000)];
+  if (valor === 0) return erro('Favor inserir um valor!');
+  const situacao = txtEstq(b.situacao, 50);
+  if (!situacao) return erro('Favor escolher a situação desse registro!');
+  const classificacao = parseInt(b.codClassificacao, 10);
+  if (!(classificacao > 0)) return erro('Favor escolher uma categoria!');
+  const nome = txtEstq(b.nome) || null;
+  const fabricante = b.movimento === 'Saída' ? nome : null;
+  const social = b.movimento === 'Entrada' ? nome : null;
   try {
-    const id = parseInt(b.id, 10) || 0;
-    const [ex] = id ? await pool.execute('SELECT ID FROM fluxo_de_caixa WHERE ID = ? LIMIT 1', [id]) : [[]];
-    if (ex.length) {
-      await pool.execute(
-        `UPDATE fluxo_de_caixa SET DATA=?, RAZAO_SOCIAL=?, RAZAO_FABRICANTE=?, PEDIDO=?, PDV=?, PRE_NOTA_FISCAL=?, NOTA_FISCAL=?,
-         FORMA_PGTO=?, BANCO=?, SITUACAO=?, VALOR=?, OBSERVACAO_GERAL=? WHERE ID=?`, [...dados, id]);
-      return res.json({ ok: true, id, mensagem: 'Registro atualizado com sucesso!' });
+    let id = parseInt(b.id, 10) || 0;
+    if (!id) {
+      const [[mx]] = await pool.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa');
+      id = (parseInt(mx.m, 10) || 0) + 1;   // Contar_Registros
     }
-    const [r] = await pool.execute(
-      `INSERT INTO fluxo_de_caixa (DATA, RAZAO_SOCIAL, RAZAO_FABRICANTE, PEDIDO, PDV, PRE_NOTA_FISCAL, NOTA_FISCAL, FORMA_PGTO,
-       BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, dados);
-    res.json({ ok: true, id: r.insertId, mensagem: 'Registro inserido com sucesso!' });
+    await pool.execute(
+      `INSERT INTO fluxo_de_caixa (ID, DATA, RAZAO_FABRICANTE, RAZAO_SOCIAL, PEDIDO, PDV, PRE_NOTA_FISCAL, NOTA_FISCAL, FORMA_PGTO,
+         BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL, COD_CLASSIFICACAO)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE DATA=VALUES(DATA), RAZAO_FABRICANTE=VALUES(RAZAO_FABRICANTE), RAZAO_SOCIAL=VALUES(RAZAO_SOCIAL),
+         PEDIDO=VALUES(PEDIDO), PDV=VALUES(PDV), PRE_NOTA_FISCAL=VALUES(PRE_NOTA_FISCAL), NOTA_FISCAL=VALUES(NOTA_FISCAL),
+         FORMA_PGTO=VALUES(FORMA_PGTO), BANCO=VALUES(BANCO), SITUACAO=VALUES(SITUACAO), VALOR=VALUES(VALOR),
+         OBSERVACAO_GERAL=VALUES(OBSERVACAO_GERAL), COD_CLASSIFICACAO=VALUES(COD_CLASSIFICACAO)`,
+      [id, data, fabricante, social, txtEstq(b.pedido, 50), txtEstq(b.pdv, 50), txtEstq(b.preNota, 50), txtEstq(b.notaFiscal, 50),
+       formaPgto, txtEstq(b.banco, 100), situacao, valor, txtEstq(b.observacao, 2000), classificacao]);
+    res.json({ ok: true, id, mensagem: 'Registro salvo com sucesso!' });
   } catch (err) {
     console.error('Erro /fluxo/salvar:', err.message);
-    res.status(500).json({ error: 'Erro ao salvar o movimento.' });
+    res.status(500).json({ error: 'Erro ao salvar no fluxo de caixa.' });
   }
 });
 

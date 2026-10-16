@@ -257,7 +257,7 @@
         }
         .ferr-select:focus { outline: none; border-color: var(--primary-color); }
         .barra-ferramentas .busca { flex: 1; min-width: 220px; margin: 0; }
-        .barra-ferramentas .btn-primary { margin-left: auto; }
+        .barra-ferramentas #btn-relatorio { margin-left: auto; }
 
         .tabela-wrap { max-height: 600px; }
         th.sel, td.sel { width: 38px; text-align: center; }
@@ -327,6 +327,12 @@
         .valor-grande input { font-size: 22px; font-weight: 700; padding: 12px 14px; }
         .link-hoje { float: right; font-size: 12px; font-weight: 700; color: var(--primary-color); cursor: pointer; text-transform: none; letter-spacing: 0; }
         .gaveta .acoes { padding: 16px 24px; }
+        .categoria { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; background: var(--secondary-color); }
+        .categoria .grid-form { gap: 10px; }
+        .categoria select:disabled { background: #eef1f4; color: var(--text-dark); cursor: not-allowed; }
+        .cat-status { font-size: 12px; font-weight: 600; margin-top: 10px; color: var(--text-light); }
+        .cat-status.travado { color: #0f6674; }
+        .cat-status.livre { color: #b8620b; }
 
         @media (max-width: 768px) {
             .barra-ferramentas .btn-primary { margin-left: 0; width: 100%; justify-content: center; }
@@ -405,6 +411,7 @@
                     </select>
                     <select class="ferr-select" id="filtro-situacao" aria-label="Situação no mês"><option value="">Todas as situações</option></select>
                     <div class="busca"><input type="search" id="pesquisa" placeholder="Pedido, NF, cliente, fornecedor, valor... (Enter)" autocomplete="off"></div>
+                    <button class="btn btn-secondary btn-mini" id="btn-relatorio" title="Exporta o mês exibido (sem Caixa Econômica Federal e XP)">📊 Relatório do mês</button>
                     <button class="btn btn-primary" id="btn-novo">＋ Novo movimento</button>
                 </div>
                 <div class="tabela-wrap">
@@ -478,6 +485,18 @@
                 <div class="form-group"><label for="f-prenota">Pré-nota</label><input id="f-prenota"></div>
                 <div class="form-group"><label for="f-nf">Nota fiscal</label><input id="f-nf"></div>
                 <div class="form-group full"><label for="f-obs">Observação</label><textarea id="f-obs" maxlength="2000"></textarea></div>
+                <div class="form-group full">
+                    <label>Categoria</label>
+                    <div class="categoria">
+                        <div class="grid-form">
+                            <select id="cat-tipo" aria-label="Tipo"></select>
+                            <select id="cat-c1" aria-label="Classe 1"></select>
+                            <select id="cat-c2" aria-label="Classe 2"></select>
+                            <select id="cat-c3" aria-label="Classe 3"></select>
+                        </div>
+                        <div class="cat-status" id="cat-status">Informe o cliente ou fornecedor.</div>
+                    </div>
+                </div>
             </div>
             <datalist id="lista-nomes"></datalist><datalist id="lista-formas"></datalist><datalist id="lista-bancos"></datalist>
         </form>
@@ -574,6 +593,9 @@
         let movimento = '';
         let alterado = false;
         let grafico = null;
+        let classificacoes = [];          // fluxo_de_caixa_classificacao
+        let idClassificacao = null;       // ID_CLASSIFICACAO
+        let buscaClassif = 0;
         const mesISO = () => `${mesRef.getFullYear()}-${String(mesRef.getMonth() + 1).padStart(2, '0')}`;
         const ehEntrada = it => !it.fornecedor && !!it.cliente;   // RAZAO_FABRICANTE preenchido = Saída
         const ehAberto = s => ['a receber', 'a pagar'].includes(String(s).toLowerCase());
@@ -719,6 +741,28 @@
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         });
 
+        // ExportarDadosFiltrados: mês escolhido, sem os bancos Caixa Econômica Federal e XP
+        const BANCOS_FORA_RELATORIO = ['Caixa Econômica Federal', 'Xp Investimentos S.A'];
+        $('btn-relatorio').addEventListener('click', async () => {
+            try {
+                const linhas = (await api(`/fluxo?modo=mes&mes=${mesISO()}`))
+                    .filter(it => !BANCOS_FORA_RELATORIO.includes(it.banco))
+                    .sort((a, b) => a.data.localeCompare(b.data));
+                if (!linhas.length) { toast('Nenhum movimento neste mês para exportar.', 'info'); return; }
+                const cab = ['DATA', 'RAZAO_FABRICANTE', 'RAZAO_SOCIAL', 'PRE_NOTA_FISCAL', 'NOTA_FISCAL', 'FORMA_PGTO', 'BANCO', 'SITUACAO', 'VALOR', 'OBSERVACAO_GERAL'];
+                const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                const corpo = linhas.map(it => [dataBR(it.data), it.fornecedor, it.cliente, it.preNota, it.notaFiscal, it.formaPgto,
+                    it.banco, it.situacao, paraCampo(it.valor), it.observacao].map(cel).join(';'));
+                const blob = new Blob(['\ufeff' + [cab.map(cel).join(';'), ...corpo].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `Exportacao_FluxoCaixa_${mesISO()}.csv`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                toast(`${linhas.length} movimento(s) exportado(s)`, 'ok');
+            } catch (e) { toast('Erro ao exportar dados: ' + e.message, 'erro'); }
+        });
+
         // ============ FILTROS ============
         $('modo').addEventListener('change', () => {
             $('pesquisa').value = '';
@@ -764,6 +808,62 @@
             } catch (e) { toast('Erro ao carregar as listas: ' + e.message, 'erro'); }
         }
 
+        // ============ CATEGORIA (TreeView1: TIPO > CLASSE1 > CLASSE2 > CLASSE3) ============
+        const NIVEIS = [['cat-tipo', 'tipo', 'Tipo'], ['cat-c1', 'classe1', 'Classe 1'], ['cat-c2', 'classe2', 'Classe 2'], ['cat-c3', 'classe3', 'Classe 3']];
+        async function carregarClassificacoes() {
+            try { classificacoes = await api('/fluxo/classificacoes'); }
+            catch (e) { classificacoes = []; toast(e.message, 'erro'); }
+        }
+        // preenche os 4 níveis a partir dos valores escolhidos até o nível "ate"
+        function montarCategoria(escolhas) {
+            let filtradas = classificacoes;
+            NIVEIS.forEach(([id, campo, rotulo], i) => {
+                const valores = [...new Set(filtradas.map(c => c[campo]))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+                const sel = $(id);
+                sel.innerHTML = `<option value="">${rotulo}</option>` + valores.map(v => `<option>${escapeHtml(v)}</option>`).join('');
+                const escolhido = escolhas[i] && valores.includes(escolhas[i]) ? escolhas[i] : '';
+                sel.value = escolhido;
+                filtradas = escolhido ? filtradas.filter(c => c[campo] === escolhido) : [];
+            });
+            const folha = escolhas.length === 4 && filtradas.length ? filtradas[0] : null;
+            idClassificacao = folha ? folha.id : null;   // BuscarIdNoMySQL: só o 4º nível vale
+        }
+        function caminhoDe(id) {
+            const c = classificacoes.find(x => x.id === Number(id));
+            return c ? [c.tipo, c.classe1, c.classe2, c.classe3] : [];
+        }
+        function definirCategoria(id, travado, motivo) {
+            montarCategoria(caminhoDe(id));
+            if (id && !idClassificacao) idClassificacao = Number(id);   // id fora da árvore: mantém o valor
+            NIVEIS.forEach(([sid]) => $(sid).disabled = travado);
+            const st = $('cat-status');
+            st.className = 'cat-status ' + (travado ? 'travado' : 'livre');
+            st.textContent = motivo;
+        }
+        NIVEIS.forEach(([id], i) => $(id).addEventListener('change', () => {
+            montarCategoria(NIVEIS.slice(0, i + 1).map(([sid]) => $(sid).value));
+            marcarAlterado();
+        }));
+        // cmb_Entrada_SelectedIndexChanged → BuscarClassificacaoFornecedor / BuscarClassificacaoCliente
+        async function sugerirCategoria(manterAtual) {
+            const nome = $('f-nome').value.trim();
+            const atual = idClassificacao;
+            if (!movimento || !nome) {
+                definirCategoria(manterAtual ? atual : null, true, 'Informe o cliente ou fornecedor.');
+                return;
+            }
+            const minha = ++buscaClassif;
+            try {
+                const r = await api(`/fluxo/classificacao_sugerida?movimento=${encodeURIComponent(movimento)}&nome=${encodeURIComponent(nome)}`);
+                if (minha !== buscaClassif) return;
+                if (r.travado) definirCategoria(r.id, true, movimento === 'Saída' ? '🔒 Definida pelo cadastro do fornecedor (CF/CV).' : '🔒 Cliente cadastrado: categoria de venda.');
+                else definirCategoria(manterAtual ? atual : null, false, 'Sem categoria automática — escolha os 4 níveis.');
+            } catch (e) {
+                definirCategoria(manterAtual ? atual : null, false, 'Não foi possível buscar a categoria automática — escolha manualmente.');
+            }
+        }
+        $('f-nome').addEventListener('change', () => sugerirCategoria(false));
+
         // ============ GAVETA (formulário do movimento) ============
         function definirMovimento(mov, manterSituacao) {
             movimento = mov;
@@ -780,7 +880,7 @@
             }
         }
         document.querySelectorAll('.tipo-mov button').forEach(b => b.addEventListener('click', () => {
-            if (b.dataset.mov !== movimento) { definirMovimento(b.dataset.mov, false); marcarAlterado(); }
+            if (b.dataset.mov !== movimento) { definirMovimento(b.dataset.mov, false); marcarAlterado(); sugerirCategoria(false); }
         }));
         function marcarAlterado(sim = true) { alterado = sim; $('alteracoes').classList.toggle('visivel', sim); }
         $('form').addEventListener('input', () => marcarAlterado());
@@ -810,6 +910,7 @@
             document.querySelectorAll('.tipo-mov button').forEach(b => b.classList.remove('on'));
             $('f-situacao').innerHTML = '<option value="">— escolha o tipo —</option>';
             $('l-nome').textContent = 'Cliente / Fornecedor';
+            definirCategoria(null, true, 'Informe o cliente ou fornecedor.');   // TreeView1.Enabled = False
             $('g-titulo').textContent = 'Novo movimento';
             $('g-sub').textContent = `Código ${opcoes.proximoId}`;
             marcarAlterado(false);
@@ -830,6 +931,8 @@
             $('f-valor').value = moeda(it.valor);
             $('g-titulo').textContent = 'Editar movimento';
             $('g-sub').textContent = `Código ${it.id} · ${dataBR(it.data)}`;
+            definirCategoria(it.codClassificacao, true, 'Verificando categoria...');
+            sugerirCategoria(true);
             marcarAlterado(false);
             abrirGaveta();
         }
@@ -851,13 +954,14 @@
                 pedido: $('f-pedido').value.trim(), pdv: $('f-pdv').value.trim(), preNota: $('f-prenota').value.trim(),
                 notaFiscal: $('f-nf').value.trim(), valor: lerNumero($('f-valor').value), observacao: $('f-obs').value.trim()
             };
+            d.codClassificacao = idClassificacao;
             const falha = (msg, campo) => { toast(msg, 'erro'); if (campo) $(campo).focus(); };
-            if (!movimento) return falha('Escolha se o movimento é Entrada ou Saída!');
-            if (!d.nome) return falha(movimento === 'Entrada' ? 'Favor escolher o cliente!' : 'Favor escolher o fornecedor!', 'f-nome');
+            // mesma ordem de validação do SalvarToolStripMenuItem_Click
             if (!d.formaPgto) return falha('Favor escolher uma forma de pagamento!', 'f-forma');
             if (!d.data) return falha('Favor inserir uma data válida!', 'f-data');
-            if (!d.situacao) return falha('Favor escolher a situação do pagamento!', 'f-situacao');
-            if (!(d.valor > 0)) return falha('Favor inserir um valor maior que 0!', 'f-valor');
+            if (d.valor === 0) return falha('Favor inserir um valor!', 'f-valor');
+            if (!d.situacao) return falha('Favor escolher a situação desse registro!', 'f-situacao');
+            if (!d.codClassificacao) return falha('Favor escolher uma categoria!', 'cat-tipo');
             const btn = $('btn-salvar');
             btn.disabled = true;
             btn.textContent = 'Salvando...';
@@ -866,6 +970,10 @@
                 toast(r.mensagem, 'ok');
                 fecharGaveta(true);
                 carregarOpcoes();
+                mesRef = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                $('modo').value = 'mes';
+                $('filtro-situacao').value = '';
+                $('pesquisa').value = '';
                 await carregarDados();
             } catch (e) {
                 toast(e.message, 'erro');
@@ -922,6 +1030,7 @@
                 return;
             }
             carregarOpcoes();
+            carregarClassificacoes();
             carregarDados();
             carregarHistorico();
         });
