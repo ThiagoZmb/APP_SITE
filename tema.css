@@ -567,3 +567,21 @@ body .table-container { padding: 20px 22px !important; }
 body .table-header { margin-bottom: 14px !important; }
 body .grade { gap: 18px !important; margin-bottom: 18px !important; }
 body .painel-head { padding-top: 18px !important; }
+
+/* ranking em modo compacto: uma linha por item (usado na página de clientes) */
+.rk-compacto .rk-topo { padding-top: 14px; }
+.rk-compacto .rk-corpo { padding: 6px 24px 12px; gap: 24px; grid-template-columns: minmax(0, 1fr) 190px; }
+.rk-compacto .rk-lista li {
+    grid-template-columns: 22px minmax(0, 1.25fr) minmax(0, 1fr) 118px 190px;
+    grid-template-areas: "pos nome barra val info"; gap: 0 12px; padding: 5px 10px;
+}
+.rk-compacto .rk-pos { grid-area: pos; grid-row: auto; width: 22px; height: 22px; border-radius: 7px; font-size: 11px; }
+.rk-compacto .rk-nome { grid-area: nome; font-size: 13.5px; }
+.rk-compacto .rk-barra { grid-area: barra; }
+.rk-compacto .rk-val { grid-area: val; font-size: 13.5px; }
+.rk-compacto .rk-info { grid-area: info; }
+.rk-compacto .rk-rosca { height: 190px; }
+.rk-compacto .rk-centro b { font-size: 16px; }
+@media (max-width: 1200px) {
+    .rk-compacto .rk-lista li { grid-template-columns: 22px minmax(0, 1fr) 118px; grid-template-areas: "pos nome val" "pos barra info"; padding: 5px 10px; gap: 2px 12px; }
+}
