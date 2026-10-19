@@ -99,6 +99,103 @@
             .table-container { padding: 20px; overflow-x: auto; }
             .clients-table { min-width: 900px; }
         }
+
+        /* ===== FICHA DO CLIENTE (frm_Clientes) ===== */
+        .cf-fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
+        .cf-fundo.aberta { opacity: 1; pointer-events: auto; }
+        .cf {
+            position: fixed; top: 0; right: 0; bottom: 0; width: min(1080px, 100vw); background: #f4f4f7; z-index: 41;
+            transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
+            box-shadow: -20px 0 50px -20px rgba(20,16,28,.35); border-radius: 20px 0 0 20px; overflow: hidden;
+        }
+        .cf.aberta { transform: none; }
+        .cf-topo { background: var(--gradient-primary); color: #fff; padding: 18px 24px 0; }
+        .cf-linha1 { display: flex; align-items: center; gap: 14px; }
+        .cf-avatar { width: 48px; height: 48px; border-radius: 14px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; flex-shrink: 0; }
+        .cf-nome { flex: 1; min-width: 0; }
+        .cf-nome h3 { font-size: 20px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cf-nome small { font-size: 13px; opacity: .8; font-weight: 600; }
+        .cf-fechar { border: none; background: rgba(255,255,255,.15); color: #fff; width: 38px; height: 38px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+        .cf-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 12px; }
+        .cf-chip { border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .cf-chip:hover { background: rgba(255,255,255,.2); }
+        .cf-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
+        .cf-chip.ok .dot { background: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,.25); }
+        .cf-chip.nao .dot { background: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,.25); }
+        .cf-chip.info { cursor: default; }
+        .cf-abas { display: flex; gap: 4px; margin-top: 4px; }
+        .cf-aba { border: none; background: transparent; color: rgba(255,255,255,.75); padding: 10px 16px; font-size: 14px; font-weight: 700; border-radius: 10px 10px 0 0; cursor: pointer; }
+        .cf-aba:hover { color: #fff; background: rgba(255,255,255,.08); }
+        .cf-aba.ativa { background: #f4f4f7; color: var(--primary-color); }
+        .cf-corpo { flex: 1; overflow-y: auto; padding: 18px 24px 24px; }
+        .cf-pag { display: none; }
+        .cf-pag.ativa { display: block; }
+        .cf-acoes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 24px; background: #fff; border-top: 1px solid var(--border-color); }
+        .cf-acoes .alteracoes { font-size: 12px; color: #d98a00; font-weight: 700; margin-left: auto; display: none; }
+        .cf-acoes .alteracoes.visivel { display: block; }
+        .cf-bloco { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px 6px; margin-bottom: 14px; }
+        .cf-bloco h4 { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--primary-color); margin-bottom: 12px; }
+        .cf-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+        .cf-grid .form-group { margin-bottom: 10px; }
+        .s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; }
+        .s6 { grid-column: span 6; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+        .cf .form-group label { display: block; }
+        .cf .form-group label .req { color: var(--primary-color); }
+        .cf .form-group input, .cf .form-group select, .cf .form-group textarea { width: 100%; }
+        .cf .form-group textarea { min-height: 80px; resize: vertical; }
+        .cf .dica-campo { font-size: 11.5px; color: var(--text-light); margin-top: 4px; }
+        .cf .campo-btn { display: flex; gap: 6px; }
+        .cf .campo-btn input { flex: 1; min-width: 0; }
+        .cf .campo-btn button { flex-shrink: 0; }
+        .cf .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; }
+        .cf .seg button { border: none; background: transparent; padding: 8px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--text-light); cursor: pointer; }
+        .cf .seg button.on { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08); }
+        /* financeiro do cliente */
+        .cf-fin-topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .cf-fin-topo .sel-info { font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .cf-fin-topo .sel-info b { color: var(--text-dark); }
+        .cf-tab { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+        .cf-tab-tit { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-weight: 800; font-size: 14px; }
+        .cf-tab-tit small { font-weight: 600; color: var(--text-light); font-size: 12px; }
+        .cf-tab .tabela-wrap { max-height: 260px; overflow: auto; }
+        .cf-tab-rodape { display: flex; justify-content: flex-end; gap: 10px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .cf-tab-rodape b { color: var(--text-dark); font-size: 15px; }
+        .cf-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .cf-res { border-radius: 14px; padding: 14px 16px; background: #fff; border: 1px solid var(--border-color); }
+        .cf-res span { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        .cf-res b { display: block; font-size: 22px; font-weight: 800; margin-top: 4px; letter-spacing: -.02em; }
+        .cf-res.alerta { background: #fff7ea; border-color: #f2c47a; }
+        .cf-res.alerta b { color: #b56a00; }
+        .cf-res.saldo { background: #18151d; border-color: #18151d; }
+        .cf-res.saldo span { color: rgba(255,255,255,.7); }
+        .cf-res.saldo b { color: #fff; }
+        .cf tbody tr { cursor: pointer; }
+        .cf .chk { width: 16px; height: 16px; }
+        .cf .td-valor { text-align: right; font-weight: 700; }
+        .cf .pill { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: #fff; }
+        .cf .pill.alerta { color: #c0392b; border-color: #f5a08a; background: #fff5f3; }
+        .cf .pill.aberto { color: #8a6d00; border-color: #f0d98a; }
+        .cf .pill.ok { color: #1e7e34; border-color: #a3d9b1; }
+        /* histórico */
+        .cf-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .cf-hist-graf { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; height: 300px; }
+        /* modal de valor */
+        .modal input.valor-modal { width: 100%; height: 46px; font-size: 20px; font-weight: 700; padding: 0 14px; margin-bottom: 18px; border: 1px solid var(--border-color); border-radius: 12px; }
+        .btn-novo-cliente { white-space: nowrap; }
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 80; }
+        .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 500; }
+        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: #fff; padding: 26px; max-width: 420px; width: 100%; }
+        .modal h3 { font-size: 18px; margin-bottom: 10px; }
+        .modal p { color: var(--text-light); font-size: 14px; margin-bottom: 18px; }
+        .modal .acoes-modal { display: flex; justify-content: flex-end; gap: 10px; }
+        @media (max-width: 860px) {
+            .cf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .cf-grid > * { grid-column: span 2 !important; }
+            .cf-resumo, .cf-kpis { grid-template-columns: 1fr; }
+            .cf { border-radius: 0; }
+        }
     </style>
     <link rel="stylesheet" href="tema.css">
     <script src="layout.js" defer></script>
@@ -143,6 +240,7 @@
                         <div class="search-box">
                             <input type="text" placeholder="Buscar clientes..." id="search-input">
                         </div>
+                        <button type="button" class="btn btn-primary btn-novo-cliente" id="btn-novo-cliente" hidden>＋ Novo cliente</button>
                         <button id="voltar-btn" class="menu-item" style="margin:0; padding:10px 20px; border:1px solid var(--border-color); display:none;">
                             ⬅️ Voltar
                         </button>
@@ -162,6 +260,151 @@
             </section>
         </main>
     </div>
+
+    <!-- ===== FICHA DO CLIENTE (frm_Clientes do VB) ===== -->
+    <div class="cf-fundo" id="cf-fundo"></div>
+    <aside class="cf" id="ficha" aria-label="Ficha do cliente">
+        <div class="cf-topo">
+            <div class="cf-linha1">
+                <div class="cf-avatar" id="cf-avatar">+</div>
+                <div class="cf-nome"><h3 id="cf-titulo">Novo cliente</h3><small id="cf-sub">—</small></div>
+                <button type="button" class="cf-fechar" id="cf-fechar" aria-label="Fechar">✕</button>
+            </div>
+            <div class="cf-chips">
+                <button type="button" class="cf-chip ok" id="cf-situacao" title="Clique para alternar Ativo/Inativo"><span class="dot"></span><span>Ativo</span></button>
+                <button type="button" class="cf-chip ok" id="cf-permissao" title="Permissão no sistema — clique para bloquear/desbloquear"><span class="dot"></span><span>Liberado</span></button>
+                <span class="cf-chip info" id="cf-credito-chip"><span>Crédito: R$ 0,00</span></span>
+            </div>
+            <div class="cf-abas" role="tablist">
+                <button type="button" class="cf-aba ativa" data-pag="cadastro">Cadastro</button>
+                <button type="button" class="cf-aba" data-pag="financeiro">Financeiro</button>
+                <button type="button" class="cf-aba" data-pag="historico">Histórico</button>
+            </div>
+        </div>
+
+        <div class="cf-corpo">
+            <!-- ===== CADASTRO ===== -->
+            <form class="cf-pag ativa" data-pag="cadastro" id="cf-form" autocomplete="off" onsubmit="return false">
+                <div class="cf-bloco">
+                    <h4>Classificação</h4>
+                    <div class="cf-grid">
+                        <div class="form-group s2"><label>Código</label><input id="c-codigo" readonly></div>
+                        <div class="form-group s3"><label>Tipo</label><select id="c-tipo"><option value="">— Selecione —</option><option>Pessoa Física</option><option>Pessoa Jurídica</option></select></div>
+                        <div class="form-group s3"><label>Classe <span class="req">*</span></label><select id="c-classe"></select></div>
+                        <div class="form-group s4"><label>Tipo de medição <span class="req">*</span></label><select id="c-medicao"><option value="">— Selecione —</option><option>Trena</option><option>Metro de Fibra</option></select></div>
+                        <div class="form-group s5"><label>Condição de pagamento</label><input id="c-condicao" list="l-condicoes"></div>
+                        <div class="form-group s7" style="grid-column: span 7"><label>Tipo de desconto</label>
+                            <div class="seg" id="c-tipo-desconto"><button type="button" data-v="Desconto progressivo">Desconto progressivo</button><button type="button" data-v="Desconto fixo">Desconto fixo</button></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cf-bloco">
+                    <h4>Identificação</h4>
+                    <div class="cf-grid">
+                        <div class="form-group s6"><label>Razão social <span class="req">*</span></label><input id="c-razao" maxlength="255" class="titulo"></div>
+                        <div class="form-group s6"><label>Nome fantasia</label><input id="c-fantasia" maxlength="255" class="titulo"></div>
+                        <div class="form-group s4"><label id="l-cnpj">CNPJ/CPF</label><input id="c-cnpj" inputmode="numeric"></div>
+                        <div class="form-group s4"><label>I.E/RG</label><input id="c-ie"></div>
+                    </div>
+                </div>
+                <div class="cf-bloco">
+                    <h4>Endereço</h4>
+                    <div class="cf-grid">
+                        <div class="form-group s3"><label>CEP</label><div class="campo-btn"><input id="c-cep" inputmode="numeric" maxlength="9" placeholder="00000-000"><button type="button" class="btn btn-secondary btn-mini" id="btn-cep" title="Buscar endereço pelo CEP">🔍</button></div></div>
+                        <div class="form-group s6"><label>Endereço</label><input id="c-endereco" class="titulo"></div>
+                        <div class="form-group s3"><label>Número</label><input id="c-numero"></div>
+                        <div class="form-group s2"><label>Estado</label><select id="c-estado"></select></div>
+                        <div class="form-group s5"><label>Cidade</label><input id="c-cidade" list="l-cidades" class="titulo"></div>
+                        <div class="form-group s5"><label>Bairro</label><input id="c-bairro" list="l-bairros" class="titulo"></div>
+                        <div class="form-group s12"><label>Complemento</label><input id="c-complemento"></div>
+                    </div>
+                </div>
+                <div class="cf-bloco">
+                    <h4>Contato</h4>
+                    <div class="cf-grid">
+                        <div class="form-group s4"><label>Telefone <span class="req">*</span></label><input id="c-telefone" inputmode="tel"></div>
+                        <div class="form-group s4"><label>Contato</label><input id="c-contato" class="titulo"></div>
+                        <div class="form-group s4"><label>E-mail</label><input id="c-email" type="email"></div>
+                    </div>
+                </div>
+                <div class="cf-bloco">
+                    <h4>Comercial</h4>
+                    <div class="cf-grid">
+                        <div class="form-group s2"><label>Desconto %</label><input id="c-desconto" inputmode="numeric" class="so-num"><div class="dica-campo">Desconto = 28% · Arquiteto = 16%</div></div>
+                        <div class="form-group s2"><label>Desc. adicional %</label><input id="c-desc-adic" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s4"><label>Representante</label><select id="c-representante"></select></div>
+                        <div class="form-group s2"><label>Comissão %</label><input id="c-comissao" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s2"><label>Crédito</label><input id="c-credito" readonly></div>
+                        <div class="form-group s3"><label>Frete portas</label><input id="c-frete-portas" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s3"><label>Frete metalons</label><input id="c-frete-metalon" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s12"><label>Observações</label><textarea id="c-obs" maxlength="2000"></textarea></div>
+                    </div>
+                </div>
+                <datalist id="l-condicoes"></datalist><datalist id="l-cidades"></datalist><datalist id="l-bairros"></datalist>
+            </form>
+
+            <!-- ===== FINANCEIRO ===== -->
+            <div class="cf-pag" data-pag="financeiro">
+                <div class="cf-fin-topo">
+                    <div class="seg" id="cf-filtro"><button type="button" class="on" data-v="0">Em aberto</button><button type="button" data-v="1">Todos</button></div>
+                    <span class="sel-info" id="cf-sel-info">Marque os pedidos e clique em <b>Receber</b>.</span>
+                </div>
+                <div class="cf-tab">
+                    <div class="cf-tab-tit">Pedidos <small>controle de pedidos · clique na linha para abrir o PDF</small></div>
+                    <div class="tabela-wrap">
+                        <table><thead><tr><th></th><th>Número</th><th>Cliente final</th><th>Data</th><th>Entrega</th><th class="num">Valor</th><th>Observações</th><th>Situação</th><th>Financeiro</th></tr></thead>
+                        <tbody id="cf-pedidos"></tbody></table>
+                    </div>
+                    <div class="cf-tab-rodape">Pedidos a receber: <b id="cf-rec-pedidos">R$ 0,00</b></div>
+                </div>
+                <div class="cf-tab">
+                    <div class="cf-tab-tit">Financeiro <small>fluxo de caixa · clique na linha para abrir o registro</small></div>
+                    <div class="tabela-wrap">
+                        <table><thead><tr><th>Código</th><th>Vencimento</th><th>Pedido</th><th>NF-e</th><th class="num">Valor</th><th>Observações</th><th>Situação</th></tr></thead>
+                        <tbody id="cf-fluxo"></tbody></table>
+                    </div>
+                    <div class="cf-tab-rodape">Valor a receber: <b id="cf-rec-fluxo">R$ 0,00</b></div>
+                </div>
+                <div class="cf-resumo">
+                    <div class="cf-res" id="cf-res-atrasado"><span>Atrasado</span><b id="cf-atrasado">R$ 0,00</b></div>
+                    <div class="cf-res"><span>Crédito</span><b id="cf-credito">R$ 0,00</b></div>
+                    <div class="cf-res saldo"><span>Saldo devedor</span><b id="cf-saldo">R$ 0,00</b></div>
+                </div>
+            </div>
+
+            <!-- ===== HISTÓRICO ===== -->
+            <div class="cf-pag" data-pag="historico">
+                <div class="cf-kpis">
+                    <div class="cf-res"><span>Comprado em 6 meses</span><b id="cf-h-total">—</b></div>
+                    <div class="cf-res"><span>Pedidos</span><b id="cf-h-qtd">—</b></div>
+                    <div class="cf-res"><span>Ticket médio</span><b id="cf-h-ticket">—</b></div>
+                </div>
+                <div class="cf-hist-graf"><canvas id="cf-grafico"></canvas></div>
+                <p class="dica" style="margin-top:10px">Pedidos por mês nos últimos 180 dias. <a href="#" id="cf-link-graficos" style="color:var(--primary-color);font-weight:700">Ver Orçamentos x Pedidos deste cliente →</a></p>
+            </div>
+        </div>
+
+        <div class="cf-acoes">
+            <button type="button" class="btn btn-primary" id="cf-salvar">💾 Salvar</button>
+            <button type="button" class="btn btn-secondary" id="cf-credito-btn">＋ Crédito</button>
+            <button type="button" class="btn btn-secondary" id="cf-receber">💵 Receber</button>
+            <span class="alteracoes" id="cf-alteracoes">● alterações não salvas</span>
+        </div>
+    </aside>
+
+    <!-- confirmação e valor -->
+    <div class="modal-fundo" id="modal">
+        <div class="modal">
+            <h3 id="modal-titulo">Confirmar</h3>
+            <p id="modal-texto"></p>
+            <input class="valor-modal" id="modal-valor" inputmode="decimal" placeholder="0,00" hidden>
+            <div class="acoes-modal">
+                <button class="btn btn-secondary" id="modal-nao">Não</button>
+                <button class="btn btn-primary" id="modal-sim">Sim</button>
+            </div>
+        </div>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -205,6 +448,7 @@
             // Linha clicável → abre gráfico do cliente (?cliente=RAZAO_SOCIAL)
             document.querySelectorAll('#clients-tbody tr[data-razao]').forEach(row => {
                 row.addEventListener('click', () => {
+                    if (interno) return abrirFicha(row.dataset.codigo);
                     const razao = encodeURIComponent(row.dataset.razao);
                     window.location.href = `graficos_pedidos.html?cliente=${razao}`;
                 });
@@ -218,6 +462,7 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
                 const clientes = await fetchAutenticado(`${API_BASE}/dados_clientes`);
+                clientesCache = clientes;
                 clearTimeout(timeoutId);
 
                 // Cards de resumo
@@ -231,7 +476,7 @@
                 tbody.innerHTML = clientes.length === 0
                     ? '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum cliente cadastrado</td></tr>'
                     : clientes.map(c => `
-                        <tr data-razao="${escapeHtml(c.razaoSocial)}">
+                        <tr data-razao="${escapeHtml(c.razaoSocial)}" data-codigo="${escapeHtml(c.codigo)}">
                             <td class="client-code">${escapeHtml(c.codigo)}</td>
                             <td><b>${escapeHtml(c.razaoSocial)}</b></td>
                             <td>${escapeHtml(c.fantasia || '-')}</td>
@@ -272,7 +517,11 @@
                 info: (it, m, pct) => `${pct} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)}${it.ultimo ? ' · últ. ' + it.ultimo : ''}`,
                 carregar: () => fetchAutenticado(`${API_BASE}/ranking_clientes`),
                 // mesmo comportamento da tabela: abre o gráfico de Orçamentos x Pedidos do cliente
-                aoClicar: it => { window.location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(it.nome)}`; }
+                aoClicar: it => {
+                    const c = interno && clientesCache.find(x => x.razaoSocial === it.nome);
+                    if (c) abrirFicha(c.codigo);
+                    else window.location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(it.nome)}`;
+                }
             });
         }
         document.addEventListener('DOMContentLoaded', () => carregarRankingClientes());
@@ -294,6 +543,375 @@
                 btn.addEventListener('click', () => history.back());
             }
             loadClientes();
+        });
+
+        // =====================================================================
+        // FICHA DO CLIENTE — fiel ao frm_Clientes.vb (somente equipe interna)
+        // =====================================================================
+        let clientesCache = [];
+        const interno = !String(getAuth()?.user?.cargo || '').toLowerCase().includes('representante');
+        const $ = id => document.getElementById(id);
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const lerNumero = t => { const x = String(t ?? '').replace(/[R$\s]/g, ''); const n = parseFloat(x.includes(',') ? x.replace(/\./g, '').replace(',', '.') : x); return isFinite(n) ? n : 0; };
+        const paraCampo = v => String(Math.round((Number(v) || 0) * 100) / 100).replace('.', ',');
+        const dataBR = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
+        let opcoesCliente = null, fichaAtual = null, alterado = false, situacao = 'Ativo', tipoDesconto = '', filtroTodos = '0', graficoHist = null, finDados = null;
+
+        async function api(caminho, opts = {}) {
+            const res = await fetch(API_BASE + caminho, { ...opts, headers: { 'Authorization': 'Bearer ' + getToken(), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((d.error || `Erro HTTP: ${res.status}`) + (d.detalhe ? ` (${d.detalhe})` : ''));
+            return d;
+        }
+        function toast(msg, tipo = 'info') {
+            const el = document.createElement('div');
+            el.className = `toast ${tipo}`; el.textContent = msg;
+            $('toasts').appendChild(el); setTimeout(() => el.remove(), 4200);
+        }
+        // confirmação (Sim/Não) ou pedido de valor (InputBox do VB)
+        function confirmar(titulo, texto, pedirValor = false) {
+            return new Promise(resolve => {
+                const m = $('modal'), sim = $('modal-sim'), nao = $('modal-nao'), inp = $('modal-valor');
+                $('modal-titulo').textContent = titulo; $('modal-texto').textContent = texto;
+                inp.hidden = !pedirValor; inp.value = '';
+                sim.textContent = pedirValor ? 'Confirmar' : 'Sim'; nao.textContent = pedirValor ? 'Cancelar' : 'Não';
+                m.classList.add('aberto');
+                const fechar = r => { m.classList.remove('aberto'); sim.onclick = nao.onclick = inp.onkeydown = null; resolve(r); };
+                sim.onclick = () => fechar(pedirValor ? lerNumero(inp.value) : true);
+                nao.onclick = () => fechar(pedirValor ? null : false);
+                inp.onkeydown = e => { if (e.key === 'Enter') sim.click(); };
+                (pedirValor ? inp : sim).focus();
+            });
+        }
+
+        // ConverteMaiuscula: primeira letra de cada palavra maiúscula (conectivos em minúsculo)
+        const CONECTIVOS = new Set(['da', 'de', 'do', 'das', 'dos', 'e', 'em', 'na', 'no']);
+        const titulo = t => String(t || '').trim().replace(/\s+/g, ' ').toLowerCase()
+            .split(' ').map((p, i) => (i > 0 && CONECTIVOS.has(p)) ? p : p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+        document.querySelectorAll('#cf-form input.titulo').forEach(inp => inp.addEventListener('blur', () => { if (inp.value) inp.value = titulo(inp.value); }));
+        document.querySelectorAll('#cf-form input.so-num').forEach(inp => inp.addEventListener('keypress', e => { if (e.key.length === 1 && !/[0-9]/.test(e.key)) e.preventDefault(); }));
+        document.querySelectorAll('#cf-form input.dec').forEach(inp => {
+            inp.addEventListener('keypress', e => { if (e.key.length === 1 && !/[0-9,]/.test(e.key)) e.preventDefault(); });
+            inp.addEventListener('blur', () => { if (!inp.value.trim()) inp.value = '0'; });
+        });
+        $('c-desconto').addEventListener('blur', () => { const v = $('c-desconto').value.trim(); $('c-desconto').value = v ? String(parseInt(v, 10) || 0) : '0'; });
+
+        // CPF/CNPJ conforme o Tipo (máscara do VB)
+        function formatarDoc() {
+            const d = $('c-cnpj').value.replace(/\D/g, '');
+            const tipo = $('c-tipo').value;
+            if (tipo === 'Pessoa Física' && d.length === 11) $('c-cnpj').value = d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            if (tipo === 'Pessoa Jurídica' && d.length === 14) $('c-cnpj').value = d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        }
+        $('c-tipo').addEventListener('change', () => {
+            $('l-cnpj').textContent = $('c-tipo').value === 'Pessoa Física' ? 'CPF' : $('c-tipo').value === 'Pessoa Jurídica' ? 'CNPJ' : 'CNPJ/CPF';
+            formatarDoc();
+        });
+        $('c-cnpj').addEventListener('blur', formatarDoc);
+        $('c-cep').addEventListener('input', () => { const d = $('c-cep').value.replace(/\D/g, '').slice(0, 8); $('c-cep').value = d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d; });
+
+        // ---------- combos ----------
+        function preencherSelect(id, lista, primeiro = '— Selecione —') {
+            $(id).innerHTML = `<option value="">${primeiro}</option>` + lista.map(v => `<option>${escapeHtml(v)}</option>`).join('');
+        }
+        function garantir(id, v) {
+            const sel = $(id);
+            if (v && ![...sel.options].some(o => o.value === v)) sel.add(new Option(v, v));
+            sel.value = v || '';
+        }
+        async function carregarOpcoesCliente() {
+            if (opcoesCliente) return opcoesCliente;
+            opcoesCliente = await api('/clientes/opcoes');
+            preencherSelect('c-classe', opcoesCliente.classes);
+            preencherSelect('c-estado', opcoesCliente.estados, '—');
+            preencherSelect('c-representante', opcoesCliente.representantes, 'Nenhum');
+            $('l-condicoes').innerHTML = opcoesCliente.condicoes.map(c => `<option value="${escapeHtml(c)}">`).join('');
+            return opcoesCliente;
+        }
+        // cascata Estado → Cidade → Bairro
+        async function carregarCidades(estado) {
+            $('l-cidades').innerHTML = '';
+            if (!estado) return;
+            const l = await api('/clientes/cidades?estado=' + encodeURIComponent(estado)).catch(() => []);
+            $('l-cidades').innerHTML = l.map(c => `<option value="${escapeHtml(c)}">`).join('');
+        }
+        async function carregarBairros(cidade) {
+            $('l-bairros').innerHTML = '';
+            if (!cidade) return;
+            const l = await api('/clientes/bairros?cidade=' + encodeURIComponent(cidade)).catch(() => []);
+            $('l-bairros').innerHTML = l.map(b => `<option value="${escapeHtml(b)}">`).join('');
+        }
+        $('c-estado').addEventListener('change', () => { carregarCidades($('c-estado').value); $('l-bairros').innerHTML = ''; });
+        $('c-cidade').addEventListener('change', () => carregarBairros($('c-cidade').value));
+        $('c-representante').addEventListener('change', async () => {
+            const rep = $('c-representante').value;
+            if (!rep) return;
+            const r = await api('/clientes/comissao?representante=' + encodeURIComponent(rep)).catch(() => ({}));
+            if (r.comissao != null) $('c-comissao').value = paraCampo(r.comissao);
+        });
+        // btn_Pesquisa_CEP (ViaCEP)
+        $('btn-cep').addEventListener('click', async () => {
+            const cep = $('c-cep').value.replace(/\D/g, '');
+            if (cep.length !== 8) return toast('Informe um CEP com 8 números.', 'erro');
+            try {
+                const r = await (await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json();
+                if (r.erro) return toast('CEP não encontrado!', 'erro');
+                $('c-endereco').value = titulo(r.logradouro || '');
+                garantir('c-estado', r.uf || '');
+                await carregarCidades(r.uf);
+                $('c-cidade').value = r.localidade || '';
+                await carregarBairros(r.localidade);
+                $('c-bairro').value = r.bairro || '';
+                marcarAlterado();
+                $('c-numero').focus();
+            } catch { toast('Não foi possível consultar o CEP agora.', 'erro'); }
+        });
+
+        // ---------- chips do topo ----------
+        function mostrarSituacao() {
+            const chip = $('cf-situacao');
+            chip.className = 'cf-chip ' + (situacao === 'Ativo' ? 'ok' : 'nao');
+            chip.lastElementChild.textContent = situacao;
+        }
+        function mostrarPermissao(p) {
+            const chip = $('cf-permissao');
+            chip.hidden = !fichaAtual;
+            chip.className = 'cf-chip ' + (p === 'Bloqueado' ? 'nao' : 'ok');
+            chip.lastElementChild.textContent = p === 'Bloqueado' ? 'Bloqueado no sistema' : 'Liberado no sistema';
+        }
+        function mostrarCredito(v) {
+            $('c-credito').value = moeda(v);
+            $('cf-credito-chip').firstElementChild.textContent = 'Crédito: ' + moeda(v);
+        }
+        $('cf-situacao').addEventListener('click', () => { situacao = situacao === 'Ativo' ? 'Inativo' : 'Ativo'; mostrarSituacao(); marcarAlterado(); });
+        document.querySelectorAll('#c-tipo-desconto button').forEach(b => b.addEventListener('click', () => {
+            tipoDesconto = b.dataset.v;
+            document.querySelectorAll('#c-tipo-desconto button').forEach(x => x.classList.toggle('on', x === b));
+            marcarAlterado();
+        }));
+        // btn_Bloquear: Bloqueado ↔ Liberado
+        $('cf-permissao').addEventListener('click', async () => {
+            if (!fichaAtual) return toast('Selecione um cliente primeiro!', 'info');
+            try { const r = await api('/clientes/permissao', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo }) }); fichaAtual.permissao = r.permissao; mostrarPermissao(r.permissao); toast(`Cliente ${r.permissao === 'Bloqueado' ? 'bloqueado' : 'liberado'} no sistema`, 'ok'); }
+            catch (e) { toast(e.message, 'erro'); }
+        });
+
+        // ---------- abrir / limpar ----------
+        const CAMPOS = { 'c-codigo': 'codigo', 'c-tipo': 'tipo', 'c-razao': 'razaoSocial', 'c-fantasia': 'fantasia', 'c-cnpj': 'cnpjCpf', 'c-ie': 'ieRg',
+            'c-cep': 'cep', 'c-endereco': 'endereco', 'c-numero': 'numero', 'c-cidade': 'cidade', 'c-bairro': 'bairro', 'c-complemento': 'complemento',
+            'c-telefone': 'telefone', 'c-contato': 'contato', 'c-email': 'email', 'c-condicao': 'condicao', 'c-obs': 'observacao' };
+        function marcarAlterado(sim = true) { alterado = sim; $('cf-alteracoes').classList.toggle('visivel', sim); }
+        $('cf-form').addEventListener('input', () => marcarAlterado());
+        $('cf-form').addEventListener('change', () => marcarAlterado());
+        function abrirPainel() { $('ficha').classList.add('aberta'); $('cf-fundo').classList.add('aberta'); }
+        async function fecharFicha(forcar) {
+            if (!forcar && alterado && !(await confirmar('Descartar alterações?', 'O cadastro tem alterações não salvas. Deseja fechar mesmo assim?'))) return;
+            $('ficha').classList.remove('aberta'); $('cf-fundo').classList.remove('aberta'); marcarAlterado(false);
+        }
+        $('cf-fechar').addEventListener('click', () => fecharFicha());
+        $('cf-fundo').addEventListener('click', () => fecharFicha());
+        function irAba(nome) {
+            document.querySelectorAll('.cf-aba').forEach(a => a.classList.toggle('ativa', a.dataset.pag === nome));
+            document.querySelectorAll('.cf-pag').forEach(p => p.classList.toggle('ativa', p.dataset.pag === nome));
+            if (nome === 'financeiro' && fichaAtual && !finDados) carregarFinanceiro();
+            if (nome === 'historico' && fichaAtual) carregarHistorico();
+        }
+        document.querySelectorAll('.cf-aba').forEach(a => a.addEventListener('click', () => irAba(a.dataset.pag)));
+
+        function preencherFicha(c) {
+            Object.entries(CAMPOS).forEach(([id, k]) => { if ($(id).tagName !== 'SELECT') $(id).value = c[k] ?? ''; });
+            garantir('c-tipo', c.tipo); garantir('c-classe', c.classe); garantir('c-medicao', c.medicao);
+            garantir('c-estado', c.estado); garantir('c-representante', c.representante === 'Nenhum' ? '' : c.representante);
+            $('l-cnpj').textContent = c.tipo === 'Pessoa Física' ? 'CPF' : c.tipo === 'Pessoa Jurídica' ? 'CNPJ' : 'CNPJ/CPF';
+            $('c-desconto').value = String(Math.round(c.desconto || 0));
+            $('c-desc-adic').value = paraCampo(c.descontoAdicional); $('c-comissao').value = paraCampo(c.comissao);
+            $('c-frete-portas').value = paraCampo(c.fretePortas); $('c-frete-metalon').value = paraCampo(c.freteMetalon);
+            mostrarCredito(c.credito || 0);
+            situacao = c.situacao === 'Inativo' ? 'Inativo' : 'Ativo'; mostrarSituacao();
+            tipoDesconto = c.tipoDesconto || '';
+            document.querySelectorAll('#c-tipo-desconto button').forEach(x => x.classList.toggle('on', x.dataset.v === tipoDesconto));
+            mostrarPermissao(c.permissao);
+            const nome = c.razaoSocial || 'Novo cliente';
+            $('cf-titulo').textContent = nome;
+            $('cf-avatar').textContent = c.razaoSocial ? nome.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() : '+';
+            $('cf-sub').textContent = c.razaoSocial ? `Código ${c.codigo}${c.classe ? ' · ' + c.classe : ''}${c.cidade ? ' · ' + c.cidade + '/' + c.estado : ''}` : `Código ${c.codigo} · novo cadastro`;
+            ['cf-credito-btn', 'cf-receber'].forEach(id => $(id).disabled = !c.razaoSocial);
+        }
+        async function abrirFicha(codigo) {
+            if (!interno) return;
+            if ($('ficha').classList.contains('aberta') && alterado && !(await confirmar('Descartar alterações?', 'O cadastro atual tem alterações não salvas. Deseja descartá-las?'))) return;
+            try {
+                const op = await carregarOpcoesCliente();
+                finDados = null;
+                if (codigo) {
+                    fichaAtual = await api('/clientes/item/' + encodeURIComponent(codigo));
+                    preencherFicha(fichaAtual);
+                    carregarCidades(fichaAtual.estado); carregarBairros(fichaAtual.cidade);
+                } else {
+                    fichaAtual = null;
+                    preencherFicha({ codigo: op.proximoCodigo, situacao: 'Ativo', desconto: 0, descontoAdicional: 0, comissao: 0, fretePortas: 0, freteMetalon: 0, credito: 0 });
+                }
+                marcarAlterado(false);
+                irAba('cadastro');
+                abrirPainel();
+                if (!codigo) $('c-razao').focus();
+                else carregarFinanceiro();
+            } catch (e) { toast('Erro ao carregar o cliente: ' + e.message, 'erro'); }
+        }
+        $('btn-novo-cliente').addEventListener('click', () => abrirFicha(null));
+
+        // ---------- salvar ----------
+        async function salvarCliente() {
+            const d = { situacao, tipoDesconto };
+            Object.entries(CAMPOS).forEach(([id, k]) => d[k] = $(id).value.trim());
+            Object.assign(d, { tipo: $('c-tipo').value, classe: $('c-classe').value, medicao: $('c-medicao').value, estado: $('c-estado').value,
+                representante: $('c-representante').value, desconto: lerNumero($('c-desconto').value), descontoAdicional: lerNumero($('c-desc-adic').value),
+                comissao: lerNumero($('c-comissao').value), fretePortas: lerNumero($('c-frete-portas').value), freteMetalon: lerNumero($('c-frete-metalon').value) });
+            d.razaoSocial = titulo(d.razaoSocial);
+            const falha = (msg, id) => { toast(msg, 'erro'); irAba('cadastro'); $(id).focus(); };
+            if (!d.razaoSocial) return falha('Favor inserir a Razão Social!', 'c-razao');
+            if (!d.classe) return falha('Favor escolher a Classe do cliente!', 'c-classe');
+            if (!d.medicao) return falha('Favor escolher o Tipo de Medição!', 'c-medicao');
+            if (!d.telefone) return falha('Favor inserir o Telefone!', 'c-telefone');
+            const btn = $('cf-salvar'); btn.disabled = true; btn.textContent = 'Salvando...';
+            try {
+                const r = await api('/clientes/salvar', { method: 'POST', body: JSON.stringify(d) });
+                toast(r.mensagem, 'ok');
+                marcarAlterado(false);
+                opcoesCliente = null;
+                fichaAtual = await api('/clientes/item/' + r.codigo);
+                preencherFicha(fichaAtual);
+                loadClientes();
+            } catch (e) { toast(e.message, 'erro'); }
+            finally { btn.disabled = false; btn.textContent = '💾 Salvar'; }
+        }
+        $('cf-salvar').addEventListener('click', salvarCliente);
+
+        // ---------- crédito (btn_Crédito) ----------
+        $('cf-credito-btn').addEventListener('click', async () => {
+            if (!fichaAtual) return toast('Favor escolher um cliente!', 'info');
+            const atual = fichaAtual.credito || 0;
+            const valor = await confirmar(atual ? 'Acrescentar crédito' : 'Inserir crédito',
+                atual ? `Este cliente já possui um crédito de ${moeda(atual)}. O novo valor será acrescentado ao crédito existente.` : 'Insira o valor do crédito:', true);
+            if (valor == null) return;
+            if (!(valor > 0)) return toast('Nenhum valor foi adicionado!', 'info');
+            try {
+                const r = await api('/clientes/credito', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo, valor }) });
+                fichaAtual.credito = r.credito; mostrarCredito(r.credito);
+                toast(`Crédito atualizado: ${moeda(r.credito)}`, 'ok');
+                carregarFinanceiro();
+            } catch (e) { toast(e.message, 'erro'); }
+        });
+
+        // ---------- financeiro ----------
+        function pillFin(s) {
+            const n = String(s || '').toLowerCase();
+            return n.includes('atrasad') || n.includes('protest') ? 'alerta' : n.includes('receber') ? 'aberto' : n.includes('recebid') ? 'ok' : '';
+        }
+        async function carregarFinanceiro() {
+            if (!fichaAtual) return;
+            $('cf-pedidos').innerHTML = $('cf-fluxo').innerHTML = '<tr><td colspan="9" class="vazio">Carregando...</td></tr>';
+            try { finDados = await api(`/clientes/financeiro/${fichaAtual.codigo}?todos=${filtroTodos}`); }
+            catch (e) { $('cf-pedidos').innerHTML = `<tr><td colspan="9" class="vazio">⚠️ ${escapeHtml(e.message)}</td></tr>`; $('cf-fluxo').innerHTML = ''; return; }
+            const { pedidos, fluxo, resumo } = finDados;
+            $('cf-pedidos').innerHTML = pedidos.map(p => `
+                <tr data-num="${p.numero}">
+                    <td><input type="checkbox" class="chk" data-num="${p.numero}" aria-label="Selecionar pedido"></td>
+                    <td><b style="color:var(--primary-color)">${escapeHtml(p.numero)}</b></td><td>${escapeHtml(p.clienteFinal || '-')}</td>
+                    <td>${dataBR(p.data)}</td><td>${escapeHtml(p.entrega || '-')}</td><td class="td-valor">${moeda(p.valor)}</td>
+                    <td>${escapeHtml(p.observacao || '-')}</td><td>${escapeHtml(p.situacao)}</td>
+                    <td><span class="pill ${pillFin(p.financeiro)}">${escapeHtml(p.financeiro || '-')}</span></td>
+                </tr>`).join('') || '<tr><td colspan="9" class="vazio">Nenhum pedido em aberto</td></tr>';
+            $('cf-fluxo').innerHTML = fluxo.map(f => `
+                <tr data-id="${f.id}">
+                    <td>${escapeHtml(f.id)}</td><td>${dataBR(f.data)}</td><td>${escapeHtml(f.pedido || '-')}</td><td>${escapeHtml(f.notaFiscal || '-')}</td>
+                    <td class="td-valor">${moeda(f.valor)}</td><td>${escapeHtml(f.observacao || '-')}</td>
+                    <td><span class="pill ${pillFin(f.situacao)}">${escapeHtml(f.situacao)}</span></td>
+                </tr>`).join('') || '<tr><td colspan="7" class="vazio">Nenhum lançamento em aberto</td></tr>';
+            $('cf-rec-pedidos').textContent = moeda(resumo.receberPedidos);
+            $('cf-rec-fluxo').textContent = moeda(resumo.receberFluxo);
+            $('cf-atrasado').textContent = moeda(resumo.atrasado);
+            $('cf-res-atrasado').classList.toggle('alerta', resumo.atrasado > 0);
+            $('cf-credito').textContent = moeda(resumo.credito);
+            $('cf-saldo').textContent = moeda(resumo.saldoDevedor);
+            mostrarCredito(resumo.credito);
+            atualizarSelecao();
+        }
+        function pedidosMarcados() { return [...document.querySelectorAll('#cf-pedidos .chk:checked')].map(c => Number(c.dataset.num)); }
+        function atualizarSelecao() {
+            const nums = pedidosMarcados();
+            const soma = (finDados?.pedidos || []).filter(p => nums.includes(Number(p.numero))).reduce((s, p) => s + p.valor, 0);
+            $('cf-sel-info').innerHTML = nums.length ? `<b>${nums.length}</b> pedido(s) marcado(s) · <b>${moeda(soma)}</b>` : 'Marque os pedidos e clique em <b>Receber</b>.';
+        }
+        $('cf-pedidos').addEventListener('change', e => { if (e.target.classList.contains('chk')) atualizarSelecao(); });
+        // clicar no pedido abre o PDF (AbrirPedidoPDF)
+        $('cf-pedidos').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-num]');
+            if (!tr || e.target.closest('input')) return;
+            window.open(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.num)}&tipo=Pedido&token=${encodeURIComponent(getToken())}`, '_blank');
+        });
+        // clicar no lançamento abre o registro no fluxo de caixa (AbrirRegistro)
+        $('cf-fluxo').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-id]');
+            if (tr) window.location.href = `financeiro.html?abrir=${encodeURIComponent(tr.dataset.id)}`;
+        });
+        document.querySelectorAll('#cf-filtro button').forEach(b => b.addEventListener('click', () => {
+            filtroTodos = b.dataset.v;
+            document.querySelectorAll('#cf-filtro button').forEach(x => x.classList.toggle('on', x === b));
+            carregarFinanceiro();
+        }));
+
+        // ---------- receber (btn_Recebimento) ----------
+        $('cf-receber').addEventListener('click', async () => {
+            if (!fichaAtual) return toast('Não existe nenhum cliente selecionado!', 'info');
+            if (!finDados) { irAba('financeiro'); await carregarFinanceiro(); }
+            irAba('financeiro');
+            const nums = pedidosMarcados();
+            const soma = finDados.pedidos.filter(p => nums.includes(Number(p.numero))).reduce((s, p) => s + p.valor, 0);
+            if (!soma) return toast('Não existe valor selecionado! Marque os pedidos a receber.', 'info');
+            const credito = finDados.resumo.credito || 0;
+            const zerarCredito = credito !== 0 && await confirmar('Crédito do cliente', `O cliente tem ${moeda(credito)} de crédito, que será descontado do recebimento. Deseja eliminar o crédito do cliente?`);
+            const marcarRecebido = await confirmar('Pedidos', "Deseja atualizar para 'Recebido' na tabela de PEDIDOS?");
+            try {
+                await api('/clientes/receber', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo, pedidos: nums, zerarCredito, marcarRecebido }) });
+            } catch (e) { return toast(e.message, 'erro'); }
+            // abre o fluxo de caixa com a entrada já preenchida (como o VB faz com o frm_Fluxo_Caixa)
+            const q = new URLSearchParams({ novo: 'entrada', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido' });
+            window.location.href = 'financeiro.html?' + q;
+        });
+
+        // ---------- histórico (Carrega_Grafico) ----------
+        function garantirChart() {
+            if (window.Chart) return Promise.resolve();
+            return new Promise((ok, erro) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; sc.onload = ok; sc.onerror = erro; document.head.appendChild(sc); });
+        }
+        async function carregarHistorico() {
+            $('cf-link-graficos').href = 'graficos_pedidos.html?cliente=' + encodeURIComponent(fichaAtual.razaoSocial);
+            try {
+                const meses = await api('/clientes/historico/' + fichaAtual.codigo);
+                const total = meses.reduce((s, m) => s + m.total, 0), qtd = meses.reduce((s, m) => s + m.qtd, 0);
+                $('cf-h-total').textContent = moeda(total); $('cf-h-qtd').textContent = qtd; $('cf-h-ticket').textContent = qtd ? moeda(total / qtd) : '—';
+                await garantirChart();
+                if (graficoHist) graficoHist.destroy();
+                graficoHist = new Chart($('cf-grafico'), {
+                    type: 'bar',
+                    data: { labels: meses.map(m => { const [a, mm] = m.mes.split('-'); return new Date(a, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); }),
+                            datasets: [{ label: 'Pedidos', data: meses.map(m => m.total), backgroundColor: '#1f9d55', borderRadius: 6, maxBarThickness: 54 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${moeda(c.raw)} · ${meses[c.dataIndex].qtd} pedido(s)` } } },
+                               scales: { y: { beginAtZero: true, ticks: { callback: v => moeda(v).replace(',00', '') } }, x: { grid: { display: false } } } }
+                });
+            } catch (e) { toast('Erro ao carregar o histórico: ' + e.message, 'erro'); }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && $('ficha').classList.contains('aberta') && !$('modal').classList.contains('aberto')) fecharFicha();
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && $('ficha').classList.contains('aberta')) { e.preventDefault(); salvarCliente(); }
+        });
+        window.addEventListener('beforeunload', e => { if (alterado) { e.preventDefault(); e.returnValue = ''; } });
+        document.addEventListener('DOMContentLoaded', () => {
+            $('btn-novo-cliente').hidden = !interno;
+            if (interno) $('welcome-subtitle').textContent = 'Clique em um cliente para abrir a ficha com cadastro, financeiro e histórico.';
         });
     </script>
 </body>

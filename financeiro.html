@@ -1197,7 +1197,7 @@
         $('gaveta-fundo').addEventListener('click', () => fecharGaveta());
 
         // NovoMovimento: próximo ID e campos limpos
-        $('btn-novo').addEventListener('click', async () => {
+        async function novoMovimento() {
             await carregarOpcoes();
             $('f-id').value = '';
             ['f-nome', 'f-forma', 'f-banco', 'f-pedido', 'f-pdv', 'f-prenota', 'f-nf', 'f-obs'].forEach(id => $(id).value = '');
@@ -1212,7 +1212,8 @@
             $('g-sub').textContent = `Código ${opcoes.proximoId}`;
             marcarAlterado(false);
             abrirGaveta();
-        });
+        }
+        $('btn-novo').addEventListener('click', novoMovimento);
         // txt_Código_TextChanged: carrega a linha clicada no formulário
         function abrirMovimento(it) {
             if (!it) return;
@@ -1288,6 +1289,31 @@
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && $('gaveta').classList.contains('aberta')) { e.preventDefault(); salvarMovimento(); }
         });
 
+        // ============ ATALHOS VINDOS DA FICHA DO CLIENTE ============
+        // ?abrir=ID → abre o lançamento; ?novo=entrada&nome=&valor=&pedido=&situacao= → entrada já preenchida (btn_Recebimento do VB)
+        async function abrirPelaUrl() {
+            const q = new URLSearchParams(location.search);
+            if (!q.has('abrir') && !q.has('novo')) return;
+            history.replaceState(null, '', location.pathname);
+            if (q.get('abrir')) {
+                try {
+                    const [it] = await api('/fluxo?id=' + encodeURIComponent(q.get('abrir')));
+                    if (it) abrirMovimento(it); else toast('Registro não encontrado.', 'erro');
+                } catch (e) { toast(e.message, 'erro'); }
+                return;
+            }
+            await novoMovimento();
+            definirMovimento('Entrada', false);
+            $('f-nome').value = q.get('nome') || '';
+            $('f-valor').value = moeda(lerNumero(q.get('valor')));
+            $('f-pedido').value = q.get('pedido') || '';
+            const sit = q.get('situacao');
+            if (sit && [...$('f-situacao').options].some(o => o.value === sit)) $('f-situacao').value = sit;
+            await sugerirCategoria(false);   // cliente cadastrado → categoria 1, como o VB faz no recebimento
+            marcarAlterado();
+            $('f-data').focus();
+        }
+
         // ============ HISTÓRICO ============
         async function carregarHistorico() {
             if (typeof Chart === 'undefined') return;
@@ -1327,9 +1353,10 @@
                 return;
             }
             carregarOpcoes();
-            carregarClassificacoes();
+            const prontos = carregarClassificacoes();
             carregarDados();
             carregarHistorico();
+            prontos.then(() => abrirPelaUrl());
         });
     </script>
 </body>

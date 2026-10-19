@@ -257,6 +257,223 @@ app.get('/ranking_clientes', autenticar, async (req, res) => {
   }
 });
 
+// ================= CADASTRO DE CLIENTES — fiel ao frm_Clientes.vb (equipe interna) =================
+const CLASSES_CLIENTE = ['Arquiteto', 'Cliente Final', 'Esquadria', 'Loja Planejados', 'Marcenaria', 'Marmoraria', 'Representante', 'Vidraçaria'];
+const listaSimples = async (sql, params = []) => {
+  try { const [r] = await pool.execute(sql, params); return r.map(x => x.v).filter(v => v != null && String(v).trim() !== ''); }
+  catch { return []; }
+};
+async function razaoDoCodigo(codigo) {
+  const [r] = await pool.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
+  return r.length ? r[0].RAZAO_SOCIAL : null;
+}
+
+// Combos do cadastro + próximo código (Contar_Registros)
+app.get('/clientes/opcoes', autenticar, somenteInterno, async (req, res) => {
+  const [[mx]] = await pool.execute('SELECT MAX(CODIGO) AS m FROM cadastro_clientes').catch(() => [[{ m: 0 }]]);
+  res.json({
+    proximoCodigo: (parseInt(mx.m, 10) || 0) + 1,
+    classes: CLASSES_CLIENTE,
+    estados: await listaSimples('SELECT DISTINCT ESTADO AS v FROM cidades ORDER BY ESTADO'),
+    representantes: await listaSimples('SELECT REPRESENTANTE AS v FROM representantes ORDER BY REPRESENTANTE'),
+    condicoes: await listaSimples("SELECT DISTINCT CONDICAO AS v FROM cadastro_clientes WHERE CONDICAO <> '' ORDER BY CONDICAO")
+  });
+});
+// Cascata Estado → Cidade → Bairro
+app.get('/clientes/cidades', autenticar, somenteInterno, async (req, res) => {
+  res.json(await listaSimples('SELECT CIDADE AS v FROM cidades WHERE ESTADO = ? ORDER BY CIDADE ASC', [txtEstq(req.query.estado, 10)]));
+});
+app.get('/clientes/bairros', autenticar, somenteInterno, async (req, res) => {
+  res.json(await listaSimples('SELECT BAIRRO AS v FROM bairros WHERE CIDADE = ? ORDER BY BAIRRO ASC', [txtEstq(req.query.cidade, 120)]));
+});
+// cmb_Representante_SelectedIndexChanged: comissão do representante
+app.get('/clientes/comissao', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [r] = await pool.execute('SELECT COMISSAO FROM representantes WHERE REPRESENTANTE = ? LIMIT 1', [txtEstq(req.query.representante)]);
+    res.json({ comissao: r.length ? numEstq(r[0].COMISSAO) : null });
+  } catch { res.json({ comissao: null }); }
+});
+
+// cmb_Cliente_SelectedIndexChanged: ficha completa
+app.get('/clientes/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT * FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
+    if (!rows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const r = rows[0];
+    const t = k => (r[k] == null ? '' : String(r[k]));
+    res.json({
+      codigo: r.CODIGO, tipo: t('TIPO'), razaoSocial: t('RAZAO_SOCIAL'), fantasia: t('FANTASIA'), cnpjCpf: t('CNPJ_CPF'), ieRg: t('IE_RG'),
+      endereco: t('ENDERECO'), numero: t('NUMERO'), cep: t('CEP'), bairro: t('BAIRRO'), cidade: t('CIDADE'), estado: t('ESTADO'),
+      complemento: t('COMPLEMENTO'), telefone: t('TELEFONE'), contato: t('CONTATO'), email: t('EMAIL'), classe: t('CLASSE'),
+      desconto: numEstq(r.DESCONTO), descontoAdicional: numEstq(r.DESCONTO_ADICIONAL), condicao: t('CONDICAO'), medicao: t('MEDICAO'),
+      credito: numEstq(r.CREDITO), observacao: t('OBSERVACAO'), comissao: numEstq(r.COMISSAO), representante: t('REPRESENTANTE'),
+      fretePortas: numEstq(r.FRETE_PORTAS), freteMetalon: numEstq(r.FRETE_METALON),
+      tipoDesconto: t('TIPO_DESCONTO'), situacao: t('SITUACAO'), permissao: t('PERMISSAO')
+    });
+  } catch (err) {
+    console.error('Erro /clientes/item:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar o cliente', detalhe: err.code || err.message });
+  }
+});
+
+// Salvar: INSERT se o código não existe, senão UPDATE (campos * obrigatórios da tela)
+app.post('/clientes/salvar', autenticar, somenteInterno, async (req, res) => {
+  const b = req.body || {};
+  const erro = msg => res.status(400).json({ error: msg });
+  const d = {
+    razao: txtEstq(b.razaoSocial), classe: txtEstq(b.classe, 60), medicao: txtEstq(b.medicao, 60), telefone: txtEstq(b.telefone, 60)
+  };
+  if (!d.razao) return erro('Favor inserir a Razão Social!');
+  if (!d.classe) return erro('Favor escolher a Classe do cliente!');
+  if (!d.medicao) return erro('Favor escolher o Tipo de Medição!');
+  if (!d.telefone) return erro('Favor inserir o Telefone!');
+  const codigo = parseInt(b.codigo, 10) || 0;
+  if (!codigo) return erro('Código do cliente inválido.');
+  try {
+    // Razão Social identifica o cliente nos pedidos e no fluxo de caixa: não pode repetir
+    const [dup] = await pool.execute('SELECT CODIGO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? AND CODIGO <> ? LIMIT 1', [d.razao, codigo]);
+    if (dup.length) return erro('Já existe outro cliente com esta Razão Social!');
+    const campos = {
+      TIPO: txtEstq(b.tipo, 30), RAZAO_SOCIAL: d.razao, FANTASIA: txtEstq(b.fantasia), CNPJ_CPF: txtEstq(b.cnpjCpf, 30), IE_RG: txtEstq(b.ieRg, 30),
+      ENDERECO: txtEstq(b.endereco), NUMERO: txtEstq(b.numero, 20), CEP: txtEstq(b.cep, 12), BAIRRO: txtEstq(b.bairro, 120),
+      CIDADE: txtEstq(b.cidade, 120), ESTADO: txtEstq(b.estado, 4), COMPLEMENTO: txtEstq(b.complemento, 500), TELEFONE: d.telefone,
+      CONTATO: txtEstq(b.contato, 120), EMAIL: txtEstq(b.email, 160), CLASSE: d.classe, DESCONTO: numEstq(b.desconto),
+      DESCONTO_ADICIONAL: numEstq(b.descontoAdicional), CONDICAO: txtEstq(b.condicao, 120), MEDICAO: d.medicao,
+      OBSERVACAO: txtEstq(b.observacao, 2000), COMISSAO: numEstq(b.comissao), REPRESENTANTE: txtEstq(b.representante, 120),
+      FRETE_PORTAS: numEstq(b.fretePortas), FRETE_METALON: numEstq(b.freteMetalon),
+      TIPO_DESCONTO: ['Desconto progressivo', 'Desconto fixo'].includes(b.tipoDesconto) ? b.tipoDesconto : '',
+      SITUACAO: b.situacao === 'Inativo' ? 'Inativo' : 'Ativo'
+    };
+    const cols = Object.keys(campos), vals = Object.values(campos);
+    const [ex] = await pool.execute('SELECT CODIGO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
+    if (ex.length) {
+      await pool.execute(`UPDATE cadastro_clientes SET ${cols.map(c => c + ' = ?').join(', ')} WHERE CODIGO = ?`, [...vals, codigo]);
+      return res.json({ ok: true, codigo, mensagem: 'Cliente atualizado com sucesso!' });
+    }
+    await pool.execute(
+      `INSERT INTO cadastro_clientes (CODIGO, ${cols.join(', ')}, CREDITO, PERMISSAO) VALUES (?, ${cols.map(() => '?').join(', ')}, 0, 'Liberado')`,
+      [codigo, ...vals]);
+    res.json({ ok: true, codigo, mensagem: 'Cliente cadastrado com sucesso!' });
+  } catch (err) {
+    console.error('Erro /clientes/salvar:', err.code, err.message);
+    res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.', detalhe: err.code || err.message });
+  }
+});
+
+// btn_Crédito: soma o valor ao crédito existente
+app.post('/clientes/credito', autenticar, somenteInterno, async (req, res) => {
+  const codigo = parseInt(req.body?.codigo, 10) || 0;
+  const valor = numEstq(req.body?.valor);
+  if (!codigo) return res.status(400).json({ error: 'Favor escolher um cliente!' });
+  if (!(valor > 0)) return res.status(400).json({ error: 'Nenhum valor foi adicionado!' });
+  try {
+    await pool.execute('UPDATE cadastro_clientes SET CREDITO = COALESCE(CREDITO, 0) + ? WHERE CODIGO = ?', [valor, codigo]);
+    const [[r]] = await pool.execute('SELECT CREDITO FROM cadastro_clientes WHERE CODIGO = ?', [codigo]);
+    res.json({ ok: true, credito: numEstq(r?.CREDITO) });
+  } catch (err) {
+    console.error('Erro /clientes/credito:', err.message);
+    res.status(500).json({ error: 'Erro ao registrar o crédito' });
+  }
+});
+
+// btn_Bloquear: alterna Bloqueado / Liberado
+app.post('/clientes/permissao', autenticar, somenteInterno, async (req, res) => {
+  const codigo = parseInt(req.body?.codigo, 10) || 0;
+  try {
+    const [[r]] = await pool.execute('SELECT PERMISSAO FROM cadastro_clientes WHERE CODIGO = ?', [codigo]);
+    if (!r) return res.status(404).json({ error: 'Selecione um cliente primeiro!' });
+    const nova = String(r.PERMISSAO) === 'Bloqueado' ? 'Liberado' : 'Bloqueado';
+    await pool.execute('UPDATE cadastro_clientes SET PERMISSAO = ? WHERE CODIGO = ?', [nova, codigo]);
+    res.json({ ok: true, permissao: nova });
+  } catch (err) {
+    console.error('Erro /clientes/permissao:', err.message);
+    res.status(500).json({ error: 'Erro ao alterar a permissão' });
+  }
+});
+
+// Aba Financeiro: pedidos e fluxo de caixa (em aberto ou todos) + Carregar_Resumo
+app.get('/clientes/financeiro/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const razao = await razaoDoCodigo(req.params.codigo);
+    if (!razao) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const todos = req.query.todos === '1';
+    const [pedidos] = await pool.execute(
+      `SELECT NUMERO, CLIENTE_FINAL, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, CAST(DATA_PRONTO AS CHAR) AS DATA_PRONTO, TOTAL, OBS_GERAL, SITUACAO, FINANCEIRO
+       FROM ped_orc WHERE RAZAO_SOCIAL = ? AND TIPO = 'Pedido'
+       ${todos ? '' : "AND SITUACAO IN ('Em Produção', 'Pronto', 'Entregue', 'Retirado') AND FINANCEIRO IN ('A Receber', 'Atrasado', 'Protestado')"}
+       ORDER BY NUMERO DESC`, [razao]);
+    const [fluxo] = await pool.execute(
+      `SELECT ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, PEDIDO, NOTA_FISCAL, VALOR, OBSERVACAO_GERAL, SITUACAO
+       FROM fluxo_de_caixa WHERE RAZAO_SOCIAL = ? ${todos ? '' : "AND SITUACAO IN ('A Receber', 'Atrasado', 'Protestado')"}
+       ORDER BY DATA DESC`, [razao]);
+    const [[res1]] = await pool.execute(
+      `SELECT SUM(IF(SITUACAO IN ('A Receber', 'Atrasado', 'Protestado'), VALOR, 0)) AS receber,
+              SUM(IF(SITUACAO IN ('Atrasado', 'Protestado'), VALOR, 0)) AS atrasado
+       FROM fluxo_de_caixa WHERE RAZAO_SOCIAL = ?`, [razao]);
+    const [[res2]] = await pool.execute(
+      `SELECT SUM(IF(SITUACAO <> 'Cancelado' AND FINANCEIRO IN ('A Receber', 'Atrasado'), TOTAL, 0)) AS receber
+       FROM ped_orc WHERE RAZAO_SOCIAL = ? AND TIPO = 'Pedido'`, [razao]);
+    const [[cli]] = await pool.execute('SELECT CREDITO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [razao]);
+    const receberFluxo = numEstq(res1.receber), receberPedidos = numEstq(res2.receber), credito = numEstq(cli?.CREDITO);
+    res.json({
+      pedidos: pedidos.map(p => ({ numero: p.NUMERO, clienteFinal: p.CLIENTE_FINAL || '', data: p.DATA, entrega: dataBRSegura(p.DATA_PRONTO),
+        valor: numEstq(p.TOTAL), observacao: p.OBS_GERAL || '', situacao: p.SITUACAO || '', financeiro: p.FINANCEIRO || '' })),
+      fluxo: fluxo.map(f => ({ id: f.ID, data: f.DATA, pedido: f.PEDIDO ?? '', notaFiscal: f.NOTA_FISCAL ?? '', valor: numEstq(f.VALOR),
+        observacao: f.OBSERVACAO_GERAL || '', situacao: f.SITUACAO || '' })),
+      resumo: { receberFluxo, receberPedidos, credito, atrasado: numEstq(res1.atrasado), saldoDevedor: receberFluxo + receberPedidos - credito }
+    });
+  } catch (err) {
+    console.error('Erro /clientes/financeiro:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar o financeiro do cliente', detalhe: err.code || err.message });
+  }
+});
+
+// btn_Recebimento: zera o crédito (opcional) e marca os pedidos como Recebido (opcional)
+app.post('/clientes/receber', autenticar, somenteInterno, async (req, res) => {
+  const b = req.body || {};
+  const codigo = parseInt(b.codigo, 10) || 0;
+  const pedidos = (Array.isArray(b.pedidos) ? b.pedidos : []).map(n => parseInt(n, 10)).filter(n => n > 0).slice(0, 300);
+  try {
+    const razao = await razaoDoCodigo(codigo);
+    if (!razao) return res.status(404).json({ error: 'Não existe nenhum cliente selecionado!' });
+    if (b.zerarCredito) await pool.execute('UPDATE cadastro_clientes SET CREDITO = 0 WHERE CODIGO = ?', [codigo]);
+    let marcados = 0;
+    if (b.marcarRecebido && pedidos.length) {
+      const [r] = await pool.execute(
+        `UPDATE ped_orc SET FINANCEIRO = 'Recebido' WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND NUMERO IN (${pedidos.map(() => '?').join(',')})`,
+        [razao, ...pedidos]);
+      marcados = r.affectedRows;
+    }
+    res.json({ ok: true, marcados });
+  } catch (err) {
+    console.error('Erro /clientes/receber:', err.message);
+    res.status(500).json({ error: 'Erro ao registrar o recebimento' });
+  }
+});
+
+// Aba Histórico (Carrega_Grafico): pedidos por mês nos últimos 180 dias
+app.get('/clientes/historico/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const razao = await razaoDoCodigo(req.params.codigo);
+    if (!razao) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const [rows] = await pool.execute(
+      `SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(TOTAL) AS total, COUNT(*) AS qtd FROM ped_orc
+       WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 180 DAY), '%Y-%m-01')
+       GROUP BY DATE_FORMAT(DATA, '%Y-%m')`, [razao]);
+    const porMes = Object.fromEntries(rows.map(r => [r.mes, r]));
+    const ini = new Date(); ini.setDate(ini.getDate() - 180);
+    const meses = [];
+    for (let m = new Date(ini.getFullYear(), ini.getMonth(), 1); m <= new Date(); m.setMonth(m.getMonth() + 1)) {
+      const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+      meses.push({ mes: k, total: numEstq(porMes[k]?.total), qtd: Number(porMes[k]?.qtd) || 0 });
+    }
+    res.json(meses);
+  } catch (err) {
+    console.error('Erro /clientes/historico:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar o histórico' });
+  }
+});
+
 // ================= GRÁFICO: ORÇAMENTOS x PEDIDOS (últimos 6 meses) =================
 app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
   try {
@@ -1179,7 +1396,9 @@ app.get('/fluxo', autenticar, somenteInterno, async (req, res) => {
     const [ini, fim] = limitesMes(req.query.mes);
     const busca = txtEstq(req.query.busca, 100);
     const situacao = txtEstq(req.query.situacao, 50);
-    if (busca) {
+    if (parseInt(req.query.id, 10) > 0) {
+      where.push('ID = ?'); params.push(parseInt(req.query.id, 10));   // abrir um registro específico
+    } else if (busca) {
       const campos = ['PEDIDO', 'PDV', 'PRE_NOTA_FISCAL', 'NOTA_FISCAL', 'VALOR', 'BANCO', 'SITUACAO', 'RAZAO_FABRICANTE',
                       'RAZAO_SOCIAL', 'FORMA_PGTO', 'OBSERVACAO_GERAL'];
       where.push('(' + campos.map(c => `CAST(${c} AS CHAR) LIKE ?`).join(' OR ') + ')');
