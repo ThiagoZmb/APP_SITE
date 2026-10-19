@@ -102,6 +102,7 @@
     </style>
     <link rel="stylesheet" href="tema.css">
     <script src="layout.js" defer></script>
+    <script src="ranking.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -131,6 +132,9 @@
                     <div class="card-value" id="clientes-ativos">0</div>
                 </div>
             </section>
+            <!-- Ranking: clientes que mais compraram nos últimos 12 meses -->
+            <section class="painel" id="ranking-clientes"></section>
+
             <section class="table-container">
                 <div class="loading-overlay" id="table-loading" style="display:none;"><div class="loading-spinner"></div></div>
                 <div class="table-header">
@@ -255,6 +259,23 @@
             });
         });
 
+        // ================= CLIENTES QUE MAIS COMPRARAM (12 meses) =================
+        function carregarRankingClientes() {
+            const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            Ranking.montar(document.getElementById('ranking-clientes'), {
+                titulo: 'Clientes que mais compraram — últimos 12 meses',
+                subtitulo: (total, m) => m.id === 'valor' ? `Total em pedidos: <b>${moeda(total)}</b>` : `Total: <b>${total.toLocaleString('pt-BR')} pedidos</b>`,
+                metricas: [
+                    { id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda },
+                    { id: 'pedidos', rotulo: 'Por nº de pedidos', valor: it => it.pedidos, formatar: n => `${n} pedido${n === 1 ? '' : 's'}` }
+                ],
+                info: (it, m, pct) => `${pct} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)}${it.ultimo ? ' · últ. ' + it.ultimo : ''}`,
+                carregar: () => fetchAutenticado(`${API_BASE}/ranking_clientes`),
+                // mesmo comportamento da tabela: abre o gráfico de Orçamentos x Pedidos do cliente
+                aoClicar: it => { window.location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(it.nome)}`; }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => carregarRankingClientes());
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) {

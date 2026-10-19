@@ -84,6 +84,7 @@
     </style>
     <link rel="stylesheet" href="tema.css">
     <script src="layout.js" defer></script>
+    <script src="ranking.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -119,6 +120,9 @@
                     <div class="card-value" id="taxa-conversao">0%</div>
                 </div>
             </section>
+
+            <!-- Ranking: tipos de produto mais vendidos nos últimos 12 meses -->
+            <section class="painel" id="ranking-produtos"></section>
 
             <section class="chart-card">
                 <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Orçamentos x Pedidos por Mês</h3>
@@ -352,7 +356,24 @@
                     'Orçamentos x Pedidos deste cliente — últimos 6 meses';
             }
             loadGrafico();
+            carregarRankingProdutos(clienteDaURL);
         });
+
+        // ================= TIPOS DE PRODUTO MAIS VENDIDOS (12 meses) =================
+        function carregarRankingProdutos(cliente) {
+            const un = n => `${Math.round(n).toLocaleString('pt-BR')} un.`;
+            Ranking.montar(document.getElementById('ranking-produtos'), {
+                titulo: 'Tipos de produto mais vendidos — últimos 12 meses',
+                subtitulo: (total, m) => (cliente ? 'Pedidos deste cliente · ' : 'Itens de pedidos · ') +
+                    (m.id === 'valor' ? `Total vendido: <b>${formatCurrency(total)}</b>` : `Total: <b>${un(total)}</b>`),
+                metricas: [
+                    { id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: formatCurrency },
+                    { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: un }
+                ],
+                info: (it, m, pct) => `${pct} · ${m.id === 'valor' ? un(it.qtd) : formatCurrency(it.valor)} · ${it.pedidos} pedido(s)`,
+                carregar: () => fetchAutenticado(`${API_BASE}/ranking_produtos${cliente ? '?cliente=' + encodeURIComponent(cliente) : ''}`)
+            });
+        }
     </script>
 </body>
 </html>

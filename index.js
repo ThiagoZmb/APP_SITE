@@ -112,6 +112,18 @@ app.get('/auth/verify', autenticar, (req, res) => {
   res.json({ valid: true, user: { nome: req.user.nome, cargo: req.user.cargo } });
 });
 
+// Datas de pronto/entrega: a coluna pode ser DATE/DATETIME ou texto "dd/mm/aaaa" (herança do VB).
+// DATE_FORMAT em texto "dd/mm/aaaa" gera datas absurdas, então normalizamos aqui.
+function dataBRSegura(v) {
+  const t = String(v ?? '').trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+  if (m) return m[1] === '0000' ? '' : `${m[3]}/${m[2]}/${m[1]}`;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t);
+  if (m) return `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
+  return '';
+}
+const comDatasSeguras = rows => rows.map(r => ({ ...r, prontoEm: dataBRSegura(r.prontoEm), dataEntrega: dataBRSegura(r.dataEntrega) }));
+
 // ================= LISTA ÚNICA (Pedido ou Orçamento) =================
 app.get('/dados_lista', autenticar, async (req, res) => {
   try {
@@ -121,17 +133,17 @@ app.get('/dados_lista', autenticar, async (req, res) => {
       SELECT 
         p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
         DATE_FORMAT(p.DATA, '%d/%m/%Y') as data,
-        DATE_FORMAT(p.DATA_PRONTO, '%d/%m/%Y') as prontoEm,
+        CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
         p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao,
         p.FINANCEIRO as financeiro,
-        DATE_FORMAT(p.DATA_ENTREGA, '%d/%m/%Y') as dataEntrega
+        CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
       FROM ped_orc p
       ${estado ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
       WHERE p.TIPO = ? ${estado ? 'AND c.ESTADO = ?' : ''}
       ORDER BY p.NUMERO DESC`;
     const params = estado ? [tipo, estado] : [tipo];
     const [rows] = await pool.execute(sql, params);
-    res.json(rows);
+    res.json(comDatasSeguras(rows));
   } catch (err) {
     console.error('Erro /dados_lista:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -146,11 +158,11 @@ app.get('/dados_pedidos', autenticar, async (req, res) => {
       : `WHERE p.TIPO='Pedido'`;
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
-             DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, DATE_FORMAT(p.DATA_PRONTO, '%d/%m/%Y') as prontoEm,
+             DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
-             DATE_FORMAT(p.DATA_ENTREGA, '%d/%m/%Y') as dataEntrega
+             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
       FROM ped_orc p ${where} ORDER BY NUMERO DESC`);
-    res.json(rows);
+    res.json(comDatasSeguras(rows));
   } catch (err) {
     console.error('Erro /dados_pedidos:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -161,13 +173,13 @@ app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
-             DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, DATE_FORMAT(p.DATA_PRONTO, '%d/%m/%Y') as prontoEm,
+             DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
-             DATE_FORMAT(p.DATA_ENTREGA, '%d/%m/%Y') as dataEntrega
+             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
       FROM ped_orc p
       INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL
       WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido' ORDER BY p.DATA DESC`);
-    res.json(rows);
+    res.json(comDatasSeguras(rows));
   } catch (err) {
     console.error('Erro /dados_pedidos_rj:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -194,6 +206,53 @@ app.get('/dados_clientes', autenticar, async (req, res) => {
   } catch (err) {
     console.error('Erro /dados_clientes:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
+// ================= RANKINGS DOS ÚLTIMOS 12 MESES (só pedidos) =================
+// filtro comum: pedidos dos últimos 12 meses; representante vê só o RJ; opcional por cliente
+function filtroPedidos12m(req) {
+  const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
+  const cliente = !ehRepresentante(req) && req.query.cliente ? String(req.query.cliente) : null;
+  const where = ["p.TIPO = 'Pedido'", 'p.DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)'];
+  const params = [];
+  if (estado) { where.push('c.ESTADO = ?'); params.push(estado); }
+  if (cliente) { where.push('p.RAZAO_SOCIAL = ?'); params.push(cliente); }
+  return { join: estado ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : '', where: where.join(' AND '), params };
+}
+
+// Tipos de produto mais vendidos (itens dos pedidos)
+app.get('/ranking_produtos', autenticar, async (req, res) => {
+  try {
+    const f = filtroPedidos12m(req);
+    const [rows] = await pool.execute(
+      `SELECT COALESCE(NULLIF(TRIM(i.TIPO_PRODUTO), ''), 'Sem tipo') AS nome,
+              SUM(i.TOTAL) AS valor, SUM(i.QTD) AS qtd, COUNT(DISTINCT p.NUMERO) AS pedidos
+       FROM ped_orc_lista_itens i
+       INNER JOIN ped_orc p ON p.NUMERO = i.NUMERO AND p.TIPO = i.TIPO
+       ${f.join}
+       WHERE ${f.where}
+       GROUP BY nome`, f.params);
+    res.json(rows.map(r => ({ nome: r.nome, valor: numEstq(r.valor), qtd: numEstq(r.qtd), pedidos: Number(r.pedidos) || 0 })));
+  } catch (err) {
+    console.error('Erro /ranking_produtos:', err.message);
+    res.status(500).json({ error: 'Erro ao calcular os produtos mais vendidos', detalhe: err.code || err.message });
+  }
+});
+
+// Clientes que mais compraram
+app.get('/ranking_clientes', autenticar, async (req, res) => {
+  try {
+    const f = filtroPedidos12m(req);
+    const [rows] = await pool.execute(
+      `SELECT p.RAZAO_SOCIAL AS nome, SUM(p.TOTAL) AS valor, COUNT(*) AS pedidos, MAX(p.DATA) AS ultimo
+       FROM ped_orc p ${f.join}
+       WHERE ${f.where}
+       GROUP BY p.RAZAO_SOCIAL`, f.params);
+    res.json(rows.map(r => ({ nome: r.nome || '—', valor: numEstq(r.valor), pedidos: Number(r.pedidos) || 0, ultimo: dataBRSegura(r.ultimo) })));
+  } catch (err) {
+    console.error('Erro /ranking_clientes:', err.message);
+    res.status(500).json({ error: 'Erro ao calcular os clientes que mais compraram', detalhe: err.code || err.message });
   }
 });
 
