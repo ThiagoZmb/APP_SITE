@@ -235,16 +235,6 @@
         <main>
             <h1 class="welcome-title">Clientes</h1>
             <p class="welcome-subtitle" id="welcome-subtitle">Clique em um cliente para abrir o gráfico de Orçamentos x Pedidos dele</p>
-            <section class="cards-container">
-                <div class="card">
-                    <div class="card-title">Clientes Cadastrados</div>
-                    <div class="card-value" id="total-clientes">0</div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Ativos</div>
-                    <div class="card-value" id="clientes-ativos">0</div>
-                </div>
-            </section>
             <!-- Ranking: clientes que mais compraram nos últimos 12 meses -->
             <section class="painel" id="ranking-clientes"></section>
 
@@ -396,7 +386,7 @@
                     <div class="cf-res"><span>Ticket médio</span><b id="cf-h-ticket">—</b></div>
                 </div>
                 <div class="cf-hist-graf"><canvas id="cf-grafico"></canvas></div>
-                <p class="dica" style="margin-top:10px">Pedidos por mês nos últimos 180 dias. <a href="#" id="cf-link-graficos" style="color:var(--primary-color);font-weight:700">Ver Orçamentos x Pedidos deste cliente →</a></p>
+                <p class="dica" style="margin-top:10px">Pedidos por mês nos últimos 180 dias. <a href="#" id="cf-link-graficos" style="color:var(--primary-color);font-weight:700">Ver pedidos e orçamentos deste cliente →</a></p>
             </div>
         </div>
 
@@ -467,7 +457,7 @@
                 row.addEventListener('click', () => {
                     if (interno) return selecionarLinha(row);
                     const razao = encodeURIComponent(row.dataset.razao);
-                    window.location.href = `graficos_pedidos.html?cliente=${razao}`;
+                    window.location.href = `painel_inicial.html?cliente=${razao}`;
                 });
                 row.addEventListener('dblclick', () => { if (interno) abrirFicha(row.dataset.codigo); });
             });
@@ -483,11 +473,6 @@
                 clientesCache = clientes;
                 clearTimeout(timeoutId);
 
-                // Cards de resumo
-                document.getElementById('total-clientes').textContent = clientes.length;
-                const ativos = clientes.filter(c =>
-                    String(c.situacao || '').toLowerCase().includes('ativo')).length;
-                document.getElementById('clientes-ativos').textContent = ativos;
 
                 // Tabela com data-razao em cada linha
                 const tbody = document.getElementById('clients-tbody');
@@ -538,7 +523,7 @@
                 aoClicar: it => {
                     const c = interno && clientesCache.find(x => x.razaoSocial === it.nome);
                     if (c) window.location.href = `cliente_analise.html?codigo=${encodeURIComponent(c.codigo)}`;
-                    else window.location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(it.nome)}`;
+                    else window.location.href = `painel_inicial.html?cliente=${encodeURIComponent(it.nome)}`;
                 }
             });
         }
@@ -905,7 +890,7 @@
             return new Promise((ok, erro) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; sc.onload = ok; sc.onerror = erro; document.head.appendChild(sc); });
         }
         async function carregarHistorico() {
-            $('cf-link-graficos').href = 'graficos_pedidos.html?cliente=' + encodeURIComponent(fichaAtual.razaoSocial);
+            $('cf-link-graficos').href = 'painel_inicial.html?cliente=' + encodeURIComponent(fichaAtual.razaoSocial);
             try {
                 const meses = await api('/clientes/historico/' + fichaAtual.codigo);
                 const total = meses.reduce((s, m) => s + m.total, 0), qtd = meses.reduce((s, m) => s + m.qtd, 0);
@@ -942,7 +927,7 @@
                     item('historico', '📈', 'Histórico de compras') +
                     '<div class="ctx-sep"></div>' +
                     item('analise', '📊', 'Análise do cliente (pedidos e orçamentos)') : '') +
-                item('graficos', '📉', 'Orçamentos x Pedidos') +
+                item('graficos', '📉', 'Pedidos e orçamentos do cliente') +
                 '<div class="ctx-sep"></div>' +
                 item('copiar-nome', '📋', 'Copiar razão social') +
                 (c.cnpjCpf ? item('copiar-doc', '🪪', 'Copiar CNPJ/CPF') : '') +
@@ -970,7 +955,7 @@
             if (acao === 'financeiro') return abrirFicha(c.codigo, 'financeiro');
             if (acao === 'historico') return abrirFicha(c.codigo, 'historico');
             if (acao === 'analise') return void (location.href = `cliente_analise.html?codigo=${encodeURIComponent(c.codigo)}`);
-            if (acao === 'graficos') return void (location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(c.razaoSocial)}`);
+            if (acao === 'graficos') return void (location.href = `painel_inicial.html?cliente=${encodeURIComponent(c.razaoSocial)}`);
             if (acao === 'novo') return abrirFicha(null);
             const texto = acao === 'copiar-doc' ? c.cnpjCpf : c.razaoSocial;
             try { await navigator.clipboard.writeText(texto); toast('Copiado: ' + texto, 'ok'); } catch { toast('Não foi possível copiar', 'erro'); }

@@ -347,7 +347,7 @@
                     <div class="hero-acoes">
                         <a class="btn btn-primary btn-mini" id="a-cadastro" href="#">📇 Abrir cadastro</a>
                         <a class="btn btn-secondary btn-mini" id="a-financeiro" href="#">💰 Financeiro do cliente</a>
-                        <a class="btn btn-secondary btn-mini" id="a-graficos" href="#">📉 Orçamentos x Pedidos</a>
+                        <a class="btn btn-secondary btn-mini" id="a-graficos" href="#">📋 Pedidos e orçamentos</a>
                         <a class="btn btn-secondary btn-mini" href="orcamentos.html">🧾 Novo orçamento</a>
                     </div>
                 </section>
@@ -653,7 +653,7 @@
             $('score-fatores').innerHTML = `<b>Como a nota foi calculada:</b> ${sd.fatores.length ? sd.fatores.map(esc).join(' · ') : 'nenhum ponto de atenção'}`;
             $('a-cadastro').href = `clientes.html?abrir=${c.codigo}`;
             $('a-financeiro').href = `clientes.html?abrir=${c.codigo}&aba=financeiro`;
-            $('a-graficos').href = `graficos_pedidos.html?cliente=${encodeURIComponent(c.razaoSocial)}`;
+            $('a-graficos').href = `painel_inicial.html?cliente=${encodeURIComponent(c.razaoSocial)}`;
 
             const icone = { pos: '↑', alerta: '!', risco: '!', info: 'i' };
             $('insights').innerHTML = lt.ins.map(i => `<li class="${i.tipo}"><span class="ic">${icone[i.tipo]}</span><span>${i.texto}</span></li>`).join('');

@@ -21,10 +21,9 @@
         { secao: 'Visão geral' },
         { href: 'inicio.html', texto: 'Início', icone: 'inicio' },
         { secao: 'Comercial' },
-        { href: 'painel_inicial.html', texto: 'Pedidos/Orçamentos', icone: 'pedidos' },
+        { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo' },
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
-        { href: 'graficos_pedidos.html', texto: 'Orçamentos x Pedidos', icone: 'graficos' },
         { secao: 'Gestão', interno: true },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque', interno: true },
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos', interno: true },
@@ -43,7 +42,7 @@
         const header = container.querySelector(':scope > header');
         const a = auth();
         const representante = String(a?.user?.cargo || '').toLowerCase().includes('representante');
-        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html' };   // subpáginas acendem o item do menu de origem
+        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html' };   // subpáginas acendem o item do menu de origem
         const arquivo = (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
         const atual = PAGINA_PAI[arquivo] || arquivo;
 

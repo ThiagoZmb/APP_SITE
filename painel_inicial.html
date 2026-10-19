@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elegance Dashboard - Pedidos/Orçamentos</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Elegance Dashboard - Pedidos e Orçamentos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
@@ -23,551 +22,713 @@
             --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
             --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             --success-color: #28a745;
-            --warning-color: #ffc107;
+            --warning-color: #e0a800;
             --danger-color: #dc3545;
-            --info-color: #17a2b8;
+            /* cores do Grifar_Estoque do VB */
+            --row-inativo: #e2e3e5;
+            --row-minimo: #ffe4c4;
+            --row-falta: #ffb59a;
         }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); overflow-x: hidden; min-height: 100vh; padding: 20px; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
         .container {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            grid-template-rows: 80px 1fr;
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
             grid-template-areas: "header header" "sidebar main";
-            min-height: calc(100vh - 40px);
-            background: var(--white);
-            border-radius: 20px;
-            box-shadow: var(--shadow-heavy);
-            overflow: hidden;
+            min-height: calc(100vh - 40px); background: var(--white);
+            border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
         }
         header {
-            grid-area: header;
-            background: var(--gradient-primary);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 40px;
-            box-shadow: var(--shadow-medium);
+            grid-area: header; background: var(--gradient-primary); color: white;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium);
         }
         .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
         .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
-        .header-right { display: flex; align-items: center; gap: 20px; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
         .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: linear-gradient(135deg, #ff6b6b, #ffa500);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 600; font-size: 16px;
+            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
         }
         .user-info { display: flex; flex-direction: column; line-height: 1.2; }
         .user-cargo { font-size: 11px; opacity: 0.8; }
-        .sidebar { grid-area: sidebar; background: var(--white); padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
         .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
         .menu-item {
-            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; cursor: pointer;
-            transition: all 0.3s ease; display: flex; align-items: center; gap: 12px;
-            font-weight: 500; color: var(--text-dark);
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
+            font-weight: 500; color: var(--text-dark); text-decoration: none; transition: all .3s ease;
         }
         .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
         .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
-        .sidebar a.menu-item { text-decoration: none; color: var(--text-dark); }
-        .sidebar a.menu-item.active { color: white; }
-        main { grid-area: main; padding: 40px; overflow-y: auto; animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .welcome-section { margin-bottom: 40px; }
-        .welcome-title { font-size: 36px; margin-bottom: 8px; color: var(--text-dark); font-weight: 700; }
-        .welcome-subtitle { font-size: 16px; color: var(--text-light); }
-        .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 50px; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; animation: fadeIn .5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+        kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+
+        /* ===== CARDS DE RESUMO ===== */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .card {
-            background: var(--gradient-card); border-radius: 20px; padding: 30px;
-            box-shadow: var(--shadow-light); position: relative; overflow: hidden; border: 1px solid var(--border-color);
+            background: var(--gradient-card); border-radius: 20px; padding: 22px 24px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden; cursor: default; transition: transform .25s ease, box-shadow .25s ease;
         }
         .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
-        .card:hover { transform: translateY(-10px); box-shadow: var(--shadow-heavy); }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-        .card-title { font-size: 16px; font-weight: 600; color: var(--text-light); text-transform: uppercase; }
-        .card-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--primary-color); }
-        .card-value { font-size: 42px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; line-height: 1; }
-        .card-change { font-size: 14px; font-weight: 500; }
-        .card-change.positive { color: var(--success-color); }
-        .card-change.negative { color: var(--danger-color); }
-        .table-container {
-            background: var(--white); border-radius: 20px; padding: 30px;
-            box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; overflow: hidden;
+        .card.clicavel { cursor: pointer; }
+        .card.clicavel:hover { transform: translateY(-4px); box-shadow: var(--shadow-medium); }
+        .card.ativo-filtro { outline: 2px solid var(--primary-color); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; }
+        .card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .card-value { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .card-sub { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+        .card.minimo .card-icon { background: var(--row-minimo); }
+        .card.falta .card-icon { background: var(--row-falta); }
+
+        /* ===== LAYOUT LISTA + FICHA ===== */
+        .workspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .painel {
+            background: var(--white); border-radius: 20px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden;
         }
-        .table-container::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
-        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
-        .table-title { font-size: 24px; color: var(--text-dark); font-weight: 600; display: flex; align-items: center; gap: 10px; }
-        .search-filter-container { display: flex; gap: 15px; }
-        .search-box { position: relative; }
-        .search-box input {
-            padding: 12px 15px 12px 40px; border: 1px solid var(--border-color); border-radius: 12px;
-            width: 250px; font-size: 14px; background-color: var(--secondary-color);
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 24px 24px 0; }
+        .painel-titulo { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .painel-titulo .contagem { font-size: 13px; font-weight: 600; color: var(--primary-color); background: var(--primary-light); padding: 3px 10px; border-radius: 20px; }
+
+        .busca { position: relative; margin-bottom: 14px; }
+        .busca input {
+            width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
+            font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
         }
-        .search-box input:focus { outline: none; border-color: var(--primary-color); }
-        .search-box::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-size: 16px; }
-        .filter-btn {
-            padding: 12px 20px; background: var(--primary-light); color: var(--primary-color);
-            border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500;
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: #fffbe6; }
+        .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
+        .chip {
+            padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--white);
+            font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer; transition: all .2s ease;
         }
-        .filter-btn:hover { background: var(--primary-color); color: white; }
-        /* ✅ Alternância Pedidos / Orçamentos */
-        .tipo-toggle {
-            display: flex;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            width: fit-content;
+        .chip:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .chip.ativo { background: var(--gradient-primary); color: white; border-color: transparent; }
+
+        .tabela-wrap { max-height: 620px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            position: sticky; top: 0; z-index: 1; background: var(--secondary-color); padding: 12px; text-align: left;
+            font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px;
+            border-bottom: 2px solid var(--border-color); white-space: nowrap;
         }
-        .toggle-btn {
-            padding: 10px 22px;
-            border: none;
-            background: var(--secondary-color);
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            color: var(--text-light);
-            transition: all 0.2s ease;
-            font-family: inherit;
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr { cursor: pointer; transition: background .15s ease; }
+        tbody tr:hover { background: var(--primary-light); }
+        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
+        tbody tr.minimo { background: var(--row-minimo); }
+        tbody tr.falta { background: var(--row-falta); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        .prod-nome { font-weight: 600; }
+        .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .cod { color: var(--text-light); font-size: 13px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+        .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
+        .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
+        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
+        .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
+        .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+        .legenda .l-min::before { background: var(--row-minimo); }
+        .legenda .l-fal::before { background: var(--row-falta); }
+        .legenda .l-ina::before { background: var(--row-inativo); }
+
+        /* ===== FICHA DO PRODUTO ===== */
+        .ficha { position: sticky; top: 0; }
+        .ficha-topo { padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .ficha-nome { font-size: 20px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+        .ficha-cod { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+        .switch-situacao { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+        .switch-situacao button {
+            border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
         }
-        .toggle-btn.active { background: var(--gradient-primary); color: white; }
-        .toggle-btn:hover:not(.active) { background: var(--primary-light); color: var(--primary-color); }
-        .orders-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .orders-table th {
-            background: var(--secondary-color); padding: 15px 12px; text-align: left; font-weight: 600;
-            border-bottom: 2px solid var(--border-color); font-size: 14px; position: sticky; top: 0; z-index: 10;
+        .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
+        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+
+        .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
+        .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+        .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
+        .estoque-status { font-size: 13px; font-weight: 700; }
+        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
+        .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
+        .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
+
+        .abas { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+        .aba {
+            border: none; background: none; padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--text-light);
+            border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
         }
-        .orders-table td { padding: 15px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        .orders-table tbody tr { transition: background 0.2s ease; cursor: pointer; }
-        .orders-table tbody tr:hover { background: var(--primary-light); }
-        .financial-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-        .financial-a-receber { background-color: rgba(220,53,69,.1); color: var(--danger-color); }
-        .financial-recebido { background-color: rgba(40,167,69,.1); color: var(--success-color); }
-        .order-number { font-weight: 600; color: var(--primary-color); }
-        .client-name { font-weight: 500; }
-        .price-value { font-weight: 600; color: var(--primary-color); }
-        .date-cell { font-size: 13px; color: var(--text-light); }
-        .obs-cell { font-size: 12px; color: var(--text-light); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
-        .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
-        .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
-        .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
-        .chart-container { height: 200px; position: relative; }
-        .loading-overlay {
-            position: absolute; inset: 0; background: rgba(255,255,255,.8);
-            display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 20px;
+        .aba.ativa { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .aba-conteudo { display: none; padding: 20px 24px; }
+        .aba-conteudo.ativa { display: block; }
+        .grid-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px;
+            font-size: 14px; background: var(--white); transition: border-color .15s ease;
         }
-        .loading-spinner {
-            width: 50px; height: 50px; border: 5px solid rgba(139,0,0,.2);
-            border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;
+        .form-group textarea { resize: vertical; min-height: 90px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .form-group input[readonly] { background: #eef1f4; color: var(--text-light); }
+        .form-group.full { grid-column: 1 / -1; }
+        .campo-com-botao { display: flex; gap: 8px; }
+        .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
+        .sufixo { position: relative; }
+        .sufixo input { padding-right: 34px; }
+        .sufixo::after { content: attr(data-sufixo); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .dica { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+        .valor-calc { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--primary-light); display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .valor-calc b { font-size: 18px; color: var(--primary-color); font-variant-numeric: tabular-nums; }
+        .grafico-box { height: 260px; }
+        .grafico-vazio { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 14px; }
+
+        .acoes { display: flex; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--secondary-color); }
-        ::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 3px; }
-        @media (max-width: 1024px) { .charts-container { grid-template-columns: 1fr; } }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini { padding: 10px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+        .alteracoes { font-size: 12px; color: var(--warning-color); font-weight: 700; align-self: center; margin-left: auto; display: none; }
+        .alteracoes.visivel { display: block; }
+
+        /* ===== TOAST + MODAL ===== */
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast {
+            min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500;
+            box-shadow: var(--shadow-heavy); animation: entra .25s ease-out;
+        }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+        @keyframes entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: var(--white); border-radius: 18px; padding: 26px; max-width: 420px; width: 100%; box-shadow: var(--shadow-heavy); }
+        .modal h3 { font-size: 18px; margin-bottom: 10px; }
+        .modal p { color: var(--text-light); font-size: 14px; margin-bottom: 20px; }
+        .modal .acoes-modal { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 1200px) {
+            .workspace { grid-template-columns: 1fr; }
+            .ficha { position: static; }
+        }
         @media (max-width: 768px) {
-            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
             .sidebar { display: none; }
-            main { padding: 20px; }
-            .table-container { padding: 20px; overflow-x: auto; }
-            .orders-table { min-width: 800px; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .grid-form { grid-template-columns: 1fr; }
+            .col-forn { display: none; }
         }
+
+        /* ===== PEDIDOS E ORÇAMENTOS ===== */
+        .filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; padding: 12px 14px; background: #fff; border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-light); }
+        .filtros label { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        .filtros select, .filtros input { padding: 9px 12px; border: 1px solid var(--border-strong, #d9d9e3); border-radius: 10px; font-size: 14px; background: #fff; min-height: 40px; }
+        .filtros input { min-width: 260px; }
+        .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
+        .filtro-cliente.ativo { display: inline-flex; }
+        .filtro-cliente button { border: none; background: none; color: inherit; font-weight: 800; cursor: pointer; font-size: 14px; }
+
+        .bloco-tit { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); margin: 4px 0 10px; }
+        .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .kpi { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
+        .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k, #a3213a); }
+        .kpi > span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        .kpi b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+        .kpi small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .up { color: #1f9d55 !important; font-weight: 800; }
+        .down { color: #d22f42 !important; font-weight: 800; }
+        .neutro { color: var(--text-light); font-weight: 800; }
+
+        .duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+        .larga { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; align-items: stretch; }
+        .larga .graf { height: 330px; }
+        .larga .insights { max-height: 340px; overflow-y: auto; }
+        .painel .cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 18px 22px 6px; flex-wrap: wrap; }
+        .painel .cab h3 { font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
+        .painel .cab small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .graf { position: relative; height: 250px; padding: 6px 18px 16px; }
+        .graf.baixo { height: 220px; }
+
+        .insights { list-style: none; padding: 6px 22px 18px; display: flex; flex-direction: column; gap: 8px; }
+        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 12px; background: var(--surface-2, #f9f9fb); border: 1px solid var(--border-color); }
+        .insights li .ic { width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; }
+        .insights li.pos .ic { background: #1f9d55; }
+        .insights li.alerta .ic { background: #e59a0b; }
+        .insights li.risco .ic { background: #d22f42; }
+        .insights li.info .ic { background: #2f6fdb; }
+
+        .operacao { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 22px 18px; }
+        .op { padding: 10px 14px; border-left: 1px solid var(--border-color); min-width: 0; }
+        .op:first-child { border-left: none; padding-left: 0; }
+        .op span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        .op b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .op small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .op.alerta b { color: #d22f42; }
+
+        /* lista */
+        .lista-topo { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 18px 22px 12px; }
+        .lista-topo h3 { font-size: 16px; font-weight: 800; margin-right: auto; }
+        .lista-topo .busca { margin: 0; min-width: 240px; }
+        .chips-sit { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 22px 12px; }
+        .chips-sit:empty { display: none; }
+        .tabela-wrap { max-height: 520px; }
+        #orders-tbody tr { cursor: pointer; }
+        td.num, th.num { text-align: right; }
+        .st { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: #fff; white-space: nowrap; }
+        .st.producao { color: #2160c4; border-color: #b6cdf4; background: #f2f6fe; }
+        .st.pronto { color: #a86d00; border-color: #f2d48a; background: #fffaf0; }
+        .st.entregue { color: #127a3f; border-color: #a3d9b1; background: #f1faf3; }
+        .st.retirado { color: #0f7f7f; border-color: #9fdcdc; background: #f0fbfb; }
+        .st.cancelado { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
+        .st.fin-aberto { color: #a86d00; border-color: #f2d48a; }
+        .st.fin-atraso { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
+        .st.fin-ok { color: #127a3f; border-color: #a3d9b1; }
+        .rodape-l { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 22px 14px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .rodape-l b { color: var(--text-dark); }
+        #carregando { padding: 60px 0; text-align: center; color: var(--text-light); font-weight: 600; }
+
+        @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .operacao { grid-template-columns: 1fr 1fr !important; } .op { border-left: none; padding-left: 0; } }
+        @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
     </style>
     <link rel="stylesheet" href="tema.css">
     <script src="layout.js" defer></script>
+    <script src="ranking.js" defer></script>
 </head>
 <body>
     <div class="container">
         <header>
             <div class="logo" id="user-empresa"></div>
-            <div class="header-right">
-                <div class="user-profile">
-                    <div class="user-avatar" id="user-avatar">E</div>
-                    <div class="user-info">
-                        <span id="user-name">Usuário</span>
-                        <span class="user-cargo" id="user-cargo"></span>
-                    </div>
-                </div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info"><span id="user-name">Usuário</span><span class="user-cargo" id="user-cargo"></span></div>
             </div>
-        </header>   
-        <div class="sidebar">
-            <div class="menu-title">Menu Principal</div>
-            <a class="menu-item" href="inicio.html">🏠 Início</a>
-            <a class="menu-item active" href="painel_inicial.html">📋 Pedidos/Orçamentos</a>
-            <a class="menu-item" href="clientes.html">👥 Clientes</a>
-            <a class="menu-item" href="orcamentos.html">🏢 Orçamentos</a>
-            <a class="menu-item" href="estoque.html">📦 Estoque</a>
-            <a class="menu-item" href="produtos.html">🏷️ Produtos</a>
-            <a class="menu-item" href="financeiro.html">💰 Financeiro</a>
-        </div>
+        </header>
+        <nav class="sidebar"></nav>
         <main>
-            <section class="welcome-section">
-                <h1 class="welcome-title">Pedidos/Orçamentos</h1>
-                <p class="welcome-subtitle">Acompanhe a situação dos seus pedidos e orçamentos.</p>
+            <h1 class="welcome-title" id="titulo">Pedidos e Orçamentos</h1>
+            <p class="welcome-subtitle" id="subtitulo">Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.</p>
+
+            <!-- ===== FILTROS ===== -->
+            <section class="filtros">
+                <label for="periodo">Período</label>
+                <select id="periodo">
+                    <option value="mes">Este mês</option>
+                    <option value="mes-ant">Mês passado</option>
+                    <option value="3">Últimos 3 meses</option>
+                    <option value="6" selected>Últimos 6 meses</option>
+                    <option value="12">Últimos 12 meses</option>
+                    <option value="ano">Este ano</option>
+                    <option value="tudo">Todo o histórico</option>
+                </select>
+                <label for="f-cliente">Cliente</label>
+                <input id="f-cliente" list="l-clientes" placeholder="Todos os clientes (digite para filtrar)">
+                <datalist id="l-clientes"></datalist>
+                <span class="filtro-cliente" id="chip-cliente"><span id="chip-cliente-txt"></span><button type="button" id="limpar-cliente" title="Remover filtro">✕</button></span>
+                <span class="periodo-txt" id="periodo-txt"></span>
             </section>
-            <section class="cards-container">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title" id="card1-title">Pedidos Hoje</h3>
-                        <div class="card-icon">📦</div>
+
+            <div id="carregando">Carregando pedidos e orçamentos...</div>
+            <div id="conteudo" hidden>
+                <!-- ===== RESULTADO DO PERÍODO ===== -->
+                <div class="bloco-tit">Resultado do período</div>
+                <section class="kpis" id="kpis-periodo"></section>
+
+                <!-- ===== EVOLUÇÃO + LEITURA ===== -->
+                <section class="larga">
+                    <div class="painel">
+                        <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small>valores e % de fechamento · últimos 12 meses</small></div>
+                        <div class="graf"><canvas id="g-mensal"></canvas></div>
                     </div>
-                    <div class="card-value" id="today-orders">0</div>
-                    <div class="card-change" id="today-change">Carregando...</div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title" id="card2-title">Em Produção</h3>
-                        <div class="card-icon">⚙️</div>
+                    <div class="painel">
+                        <div class="cab"><h3>Leitura rápida</h3><small>o que os números estão dizendo</small></div>
+                        <ul class="insights" id="insights"></ul>
                     </div>
-                    <div class="card-value" id="production-orders">0</div>
-                    <div class="card-change" id="production-change">Carregando...</div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title" id="card3-title">Prontos</h3>
-                        <div class="card-icon">✅</div>
+                </section>
+
+                <!-- ===== OPERAÇÃO AGORA ===== -->
+                <section class="painel" style="margin-bottom:18px">
+                    <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
+                    <div class="operacao" id="operacao"></div>
+                </section>
+
+                <section class="duas">
+                    <div class="painel">
+                        <div class="cab"><h3>Situação dos pedidos</h3><small id="status-sub">no período</small></div>
+                        <div class="graf baixo"><canvas id="g-status"></canvas></div>
                     </div>
-                    <div class="card-value" id="ready-orders">0</div>
-                    <div class="card-change" id="ready-change">Carregando...</div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title" id="card4-title">Faturamento</h3>
-                        <div class="card-icon">💰</div>
+                    <div class="painel">
+                        <div class="cab"><h3>Movimento diário</h3><small>pedidos e orçamentos emitidos · últimos 14 dias</small></div>
+                        <div class="graf baixo"><canvas id="g-diario"></canvas></div>
                     </div>
-                    <div class="card-value" id="revenue">R$ 0,00</div>
-                    <div class="card-change" id="revenue-change">Carregando...</div>
-                </div>
-            </section>
-            <section class="charts-container">
-                <div class="chart-card">
-                    <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Status</h3>
-                    <div class="chart-container"><canvas id="status-chart"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <h3 class="chart-title"><i class="fas fa-chart-line"></i> Pedidos por Dia (Últimos 7 dias)</h3>
-                    <div class="chart-container"><canvas id="orders-chart"></canvas></div>
-                </div>
-            </section>
-            <section class="table-container">
-                <div class="loading-overlay" id="table-loading">
-                    <div class="loading-spinner"></div>
-                </div>
-                <div class="table-header">
-                    <h2 class="table-title" id="table-title"><i class="fas fa-clipboard-list"></i> Lista de Pedidos</h2>
-                    <div class="tipo-toggle">
-                        <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
-                        <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
-                    </div>
-                    <div class="search-filter-container">
-                        <div class="search-box">
-                            <input type="text" placeholder="Buscar..." id="search-input">
+                </section>
+
+                <!-- ===== O QUE VENDE / QUEM COMPRA ===== -->
+                <section class="painel" id="ranking-produtos"></section>
+                <section class="painel" id="ranking-clientes"></section>
+
+                <!-- ===== LISTA ===== -->
+                <section class="painel">
+                    <div class="lista-topo">
+                        <h3 id="lista-titulo">Lista de pedidos</h3>
+                        <div class="tipo-toggle">
+                            <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
+                            <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
                         </div>
-                        <button class="filter-btn" id="refresh-btn">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>Atualizar</span>
-                        </button>
+                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar número, cliente, observação..."></div>
+                        <button class="btn btn-secondary btn-mini" id="refresh-btn">↻ Atualizar</button>
                     </div>
-                </div>
-                <div id="table-content" style="max-height: 500px; overflow-y: auto;">
-                    <table class="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Número</th><th>Cliente</th><th>Cliente Final</th><th>Data</th><th>Pronto em</th>
-                                <th>Valor</th><th>Observação</th><th>Situação</th><th>Financeiro</th><th>Data Entrega</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-tbody"></tbody>
-                    </table>
-                </div>
-            </section>
+                    <div class="chips-sit" id="chips-sit"></div>
+                    <div class="tabela-wrap">
+                        <table>
+                            <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num">Valor</th><th>Observação</th><th>Situação</th><th>Financeiro</th><th>Entrega</th></tr></thead>
+                            <tbody id="orders-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="rodape-l"><span id="lista-qtd"></span><span>Clique numa linha para abrir o PDF · Total <b id="lista-total">R$ 0,00</b></span></div>
+                </section>
+            </div>
         </main>
     </div>
+
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
-        let statusChartInstance = null;
-        let ordersChartInstance = null;
-        let tipoAtual = 'Pedido'; // ✅ tipo da lista em exibição
+        const $ = id => document.getElementById(id);
+        const COR = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', ambar: '#f2a516', roxo: '#7b4fd6', turquesa: '#14a3a3', rosa: '#e0527e', cinza: '#94a3b8', vermelho: '#d22f42' };
 
-        // ================= SESSÃO (formato novo: 'auth' com token) =================
         function getAuth() {
+            try { const a = JSON.parse(localStorage.getItem('auth') || 'null'); return a && a.token && a.user && Date.now() <= (a.exp || 0) ? a : null; }
+            catch { return null; }
+        }
+        const getToken = () => getAuth()?.token || '';
+        async function api(caminho) {
+            const res = await fetch(API_BASE + caminho, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+            if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || `Erro HTTP: ${res.status}`);
+            return d;
+        }
+        const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const moedaK = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
+        const pct = (v, c = 0) => isFinite(v) ? (v * 100).toFixed(c).replace('.', ',') + '%' : '—';
+        const num = v => (Number(v) || 0).toLocaleString('pt-BR');
+        const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+        const deBR = s => { const p = String(s || '').split('/'); return p.length === 3 && +p[2] >= 1900 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
+        const DIA = 86400000;
+        const hoje = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+        const variacao = (a, b) => b > 0 ? (a - b) / b : (a > 0 ? Infinity : 0);
+        function seta(v) {
+            if (!isFinite(v)) return '<span class="up">novo</span>';
+            if (Math.abs(v) < 0.005) return '<span class="neutro">estável</span>';
+            return `<span class="${v > 0 ? 'up' : 'down'}">${v > 0 ? '▲' : '▼'} ${pct(Math.abs(v))}</span>`;
+        }
+        // situações (mesmas regras usadas no resto do sistema)
+        const sit = s => { const n = norm(s);
+            return n.includes('cancel') ? 'cancelado' : n.includes('produ') ? 'producao' : (n.includes('pronto') || n.includes('finaliz') || n.includes('conclu') || n === 'ok') ? 'pronto'
+                : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : 'outro'; };
+        const finClasse = f => { const n = norm(f); return n.includes('atras') || n.includes('protest') ? 'fin-atraso' : n.includes('receber') ? 'fin-aberto' : n.includes('recebid') ? 'fin-ok' : ''; };
+
+        // ================= ESTADO =================
+        let pedidos = [], orcamentos = [];
+        let tipoLista = 'Pedido', filtroSit = '', cliente = '';
+        const graficos = {};
+
+        // ================= PERÍODO (e o período anterior equivalente, para comparar) =================
+        function janela() {
+            const v = $('periodo').value, a = hoje.getFullYear(), m = hoje.getMonth();
+            const fim = new Date(hoje.getTime() + DIA - 1);
+            if (v === 'mes') return { ini: new Date(a, m, 1), fim, iniAnt: new Date(a, m - 1, 1),
+                fimAnt: new Date(a, m - 1, Math.min(hoje.getDate(), new Date(a, m, 0).getDate()), 23, 59), nome: 'este mês', ref: 'mesmo ponto do mês passado' };
+            if (v === 'mes-ant') return { ini: new Date(a, m - 1, 1), fim: new Date(a, m, 0, 23, 59), iniAnt: new Date(a, m - 2, 1), fimAnt: new Date(a, m - 1, 0, 23, 59), nome: 'mês passado', ref: 'mês anterior' };
+            if (v === 'ano') return { ini: new Date(a, 0, 1), fim, iniAnt: new Date(a - 1, 0, 1), fimAnt: new Date(a - 1, m, hoje.getDate(), 23, 59), nome: 'este ano', ref: 'mesmo período do ano passado' };
+            if (v === 'tudo') return { ini: new Date(1900, 0, 1), fim, iniAnt: null, fimAnt: null, nome: 'todo o histórico', ref: '' };
+            const n = +v, ini = new Date(a, m - n + 1, 1);
+            return { ini, fim, iniAnt: new Date(a, m - 2 * n + 1, 1), fimAnt: new Date(ini.getTime() - 1), nome: `últimos ${n} meses`, ref: `${n} meses anteriores` };
+        }
+        const doCliente = l => cliente ? l.filter(x => x.cliente === cliente) : l;
+        const entre = (l, a, b) => a ? l.filter(x => x.dt && x.dt >= a && x.dt <= b) : [];
+        const soma = l => l.reduce((s, x) => s + x.v, 0);
+
+        // ================= CARGA =================
+        async function carregar() {
+            $('carregando').hidden = false; $('conteudo').hidden = true;
             try {
-                const auth = JSON.parse(localStorage.getItem('auth') || 'null');
-                if (!auth || !auth.token || !auth.user) return null;
-                if (Date.now() > (auth.exp || 0)) { localStorage.removeItem('auth'); return null; }
-                return auth;
-            } catch { return null; }
+                const [p, o] = await Promise.all([api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=' + encodeURIComponent('Orçamento'))]);
+                const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
+                pedidos = p.map(prep); orcamentos = o.map(prep);
+                const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+                $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
+                $('carregando').hidden = true; $('conteudo').hidden = false;
+                renderTudo();
+            } catch (e) { $('carregando').textContent = '⚠️ Erro ao carregar: ' + e.message; }
         }
 
-        function getToken() {
-            const auth = getAuth();
-            return auth ? auth.token : '';
+        function renderTudo() {
+            const j = janela();
+            $('periodo-txt').textContent = j.ini.getFullYear() > 1900 ? `${j.ini.toLocaleDateString('pt-BR')} a ${(j.fim < hoje ? j.fim : hoje).toLocaleDateString('pt-BR')}` : 'todo o histórico';
+            $('chip-cliente').classList.toggle('ativo', !!cliente);
+            $('chip-cliente-txt').textContent = cliente ? 'Cliente: ' + cliente : '';
+            $('titulo').textContent = cliente || 'Pedidos e Orçamentos';
+            $('subtitulo').textContent = cliente ? 'Pedidos e orçamentos deste cliente — vendas, conversão, produção e mix de produtos.'
+                : 'Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.';
+            renderPeriodo(j);
+            renderMensal();
+            renderOperacao();
+            renderInsights();
+            renderStatus(j);
+            renderDiario();
+            renderRankings(j);
+            renderLista();
         }
 
-        // Guard: sem sessão válida → volta pro login
-        function exigirSessao() {
-            const auth = getAuth();
-            if (!auth) { window.location.href = LOGIN_URL; return null; }
-            return auth.user;
+        // ================= RESULTADO DO PERÍODO =================
+        let resumo = null;
+        function renderPeriodo(j) {
+            const P = doCliente(pedidos), O = doCliente(orcamentos);
+            const validos = l => l.filter(x => x.s !== 'cancelado');
+            const p = validos(entre(P, j.ini, j.fim)), pa = validos(entre(P, j.iniAnt, j.fimAnt));
+            const o = entre(O, j.ini, j.fim), oa = entre(O, j.iniAnt, j.fimAnt);
+            const r = { fat: soma(p), fatA: soma(pa), qtd: p.length, qtdA: pa.length, orc: soma(o), orcA: soma(oa), oqtd: o.length,
+                canc: entre(P, j.ini, j.fim).filter(x => x.s === 'cancelado'), clientes: new Set(p.map(x => x.cliente)).size, p, j };
+            r.ticket = r.qtd ? r.fat / r.qtd : 0; r.ticketA = r.qtdA ? r.fatA / r.qtdA : 0;
+            r.conv = r.orc > 0 ? r.fat / r.orc : null; r.convA = r.orcA > 0 ? r.fatA / r.orcA : null;
+            const ref = j.iniAnt ? ` vs ${j.ref}` : '';
+            const vc = r.conv != null && r.convA != null ? r.conv - r.convA : null;
+            const kp = [
+                ['Pedidos fechados', moeda(r.fat), `${j.iniAnt ? seta(variacao(r.fat, r.fatA)) : ''} ${num(r.qtd)} pedido(s)${ref}`, COR.vinho],
+                ['Orçamentos emitidos', moeda(r.orc), `${j.iniAnt ? seta(variacao(r.orc, r.orcA)) : ''} ${num(r.oqtd)} orçamento(s)`, COR.azul],
+                ['Conversão (valor)', r.conv != null ? pct(r.conv) : '—', vc != null ? (Math.abs(vc) < .005 ? '<span class="neutro">estável</span>' : `<span class="${vc > 0 ? 'up' : 'down'}">${vc > 0 ? '▲' : '▼'} ${Math.abs(vc * 100).toFixed(0)} p.p.</span>`) + ref : 'pedidos ÷ orçamentos', COR.verde],
+                ['Ticket médio', moeda(r.ticket), `${j.iniAnt ? seta(variacao(r.ticket, r.ticketA)) : ''} por pedido`, COR.roxo]
+            ];
+            if (!cliente) kp.push(['Clientes compradores', num(r.clientes), 'compraram no período', COR.turquesa]);
+            $('kpis-periodo').innerHTML = kp.map(([t, v, s, c]) => `<div class="kpi" style="--k:${c}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
+            $('kpis-periodo').style.gridTemplateColumns = `repeat(${kp.length}, minmax(0, 1fr))`;
+            resumo = r;
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
-        }
-
-        
-        function formatCurrency(v) {
-            return parseFloat(v || 0).toLocaleString('pt-BR', {
-            style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2
-            });
-        
-        }
-        function normalizar(texto) {
-            return String(texto || '')
-                .trim().toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        }
-
-        // ✅ Fetch com Bearer + redirecionamento em 401
-        async function fetchAutenticado(url) {
-            const res = await fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + getToken() }
-            });
-            if (res.status === 401) {
-                localStorage.removeItem('auth');
-                window.location.href = LOGIN_URL;
-                throw new Error('Sessão expirada');
+        // ================= EVOLUÇÃO MENSAL (Orçamentos x Pedidos + % de fechamento) =================
+        let serie = [];
+        function renderMensal() {
+            const P = doCliente(pedidos).filter(x => x.s !== 'cancelado'), O = doCliente(orcamentos);
+            serie = [];
+            for (let i = 11; i >= 0; i--) {
+                const m = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1), f = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59);
+                const pm = entre(P, m, f), ped = soma(pm), orc = soma(entre(O, m, f));
+                serie.push({ rotulo: m.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''), ped, orc, conv: orc > 0 ? Math.round(ped / orc * 100) : null, qtd: pm.length });
             }
-            if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
-            return res.json();
+            graficos.mensal?.destroy();
+            graficos.mensal = new Chart($('g-mensal'), {
+                data: { labels: serie.map(s => s.rotulo), datasets: [
+                    { type: 'bar', label: 'Orçamentos', data: serie.map(s => s.orc), backgroundColor: COR.azul, borderRadius: 4, yAxisID: 'y', order: 2, maxBarThickness: 30 },
+                    { type: 'bar', label: 'Pedidos', data: serie.map(s => s.ped), backgroundColor: COR.vinho, borderRadius: 4, yAxisID: 'y', order: 2, maxBarThickness: 30 },
+                    { type: 'line', label: '% fechamento', data: serie.map(s => s.conv == null ? null : Math.min(s.conv, 150)), borderColor: COR.verde, backgroundColor: COR.verde, borderWidth: 2.5, pointRadius: 3, tension: .3, yAxisID: 'y2', order: 1, spanGaps: true }
+                ] },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } },
+                        tooltip: { callbacks: { label: c => c.dataset.yAxisID === 'y2' ? `% fechamento: ${serie[c.dataIndex].conv ?? '—'}%` : `${c.dataset.label}: ${moeda(c.raw)}`, afterBody: it => `${serie[it[0].dataIndex].qtd} pedido(s)` } } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => moedaK(v) } }, y2: { position: 'right', beginAtZero: true, suggestedMax: 100, max: serie.some(s => s.conv > 100) ? 150 : undefined, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } } }
+            });
         }
 
-        async function loadPedidos() {
-            try {
-                document.getElementById('table-loading').style.display = 'flex';
-                document.querySelectorAll('.card-change').forEach(el => {
-                    el.textContent = 'Carregando...';
-                    el.className = 'card-change';
-                });
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000);
-                const url = `${API_BASE}/dados_lista?tipo=${encodeURIComponent(tipoAtual)}`;
-                const pedidos = await fetchAutenticado(url);
-                clearTimeout(timeoutId);
-                updateSummaryCards(pedidos);
-                renderCharts(pedidos);
-                renderTabela(pedidos);
-                document.getElementById('table-title').innerHTML =
-                    `<i class="fas fa-clipboard-list"></i> Lista de ${tipoAtual === 'Pedido' ? 'Pedidos' : 'Orçamentos'}`;
-                document.getElementById('table-loading').style.display = 'none';
-            } catch (err) {
-                console.error('Erro ao carregar lista:', err);
-                document.getElementById('table-loading').style.display = 'none';
-                document.querySelectorAll('.card-change').forEach(el => {
-                    el.textContent = 'Erro ao carregar dados';
-                    el.className = 'card-change negative';
-                });
-                document.getElementById('orders-tbody').innerHTML = `
-                    <tr><td colspan="10" style="text-align:center;padding:30px;color:var(--danger-color)">
-                        Erro ao carregar dados: ${escapeHtml(err.message || 'Verifique a conexão')}
-                    </td></tr>`;
+        // ================= OPERAÇÃO AGORA =================
+        let operacao = null;
+        function renderOperacao() {
+            const P = doCliente(pedidos);
+            const hojeBR = hoje.toLocaleDateString('pt-BR');
+            const prod = P.filter(x => x.s === 'producao'), pronto = P.filter(x => x.s === 'pronto');
+            const finalizado = x => ['entregue', 'retirado', 'cancelado'].includes(x.s);
+            const previsto = x => deBR(x.dataEntrega) || deBR(x.prontoEm);
+            const atrasadas = P.filter(x => !finalizado(x) && previsto(x) && previsto(x) < hoje);
+            const prontoParado = pronto.filter(x => deBR(x.prontoEm) && (hoje - deBR(x.prontoEm)) / DIA > 7);
+            const aReceber = P.filter(x => x.s !== 'cancelado' && /receber|atras|protest/.test(norm(x.financeiro)));
+            const atrasoFin = aReceber.filter(x => /atras|protest/.test(norm(x.financeiro)));
+            const hojeP = P.filter(x => x.data === hojeBR), hojeO = doCliente(orcamentos).filter(x => x.data === hojeBR);
+            operacao = { prod, pronto, atrasadas, prontoParado, aReceber, atrasoFin };
+            const op = [
+                ['Hoje', `${hojeP.length} / ${hojeO.length}`, `pedidos / orçamentos · ${moeda(soma(hojeP))}`],
+                ['Em produção', num(prod.length), moeda(soma(prod))],
+                ['Prontos aguardando', num(pronto.length), `${moeda(soma(pronto))}${prontoParado.length ? ` · ${prontoParado.length} há +7 dias` : ''}`],
+                ['Entregas atrasadas', num(atrasadas.length), atrasadas.length ? moeda(soma(atrasadas)) : 'nenhuma', atrasadas.length > 0],
+                ['A receber (pedidos)', moeda(soma(aReceber)), atrasoFin.length ? `<span class="down">${moeda(soma(atrasoFin))} em atraso</span>` : `${aReceber.length} pedido(s)`]
+            ];
+            $('operacao').innerHTML = op.map(([t, v, s, al]) => `<div class="op${al ? ' alerta' : ''}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
+        }
+
+        // ================= LEITURA RÁPIDA =================
+        function renderInsights() {
+            const r = resumo, o = operacao, j = r.j, ins = [];
+            const add = (tipo, texto) => ins.push(`<li class="${tipo}"><span class="ic">${{ pos: '↑', alerta: '!', risco: '!', info: 'i' }[tipo]}</span><span>${texto}</span></li>`);
+            if (j.iniAnt) {
+                const v = variacao(r.fat, r.fatA);
+                if (r.fat === 0) add('risco', `Nenhum pedido fechado em ${j.nome}.`);
+                else if (!isFinite(v)) add('pos', `${moeda(r.fat)} em pedidos em ${j.nome} (sem base de comparação).`);
+                else if (v >= .05) add('pos', `Vendas <b>${pct(v)} acima</b> dos ${j.ref}: ${moeda(r.fat)} contra ${moeda(r.fatA)}.`.replace('dos mesmo', 'do mesmo').replace('dos mês', 'do mês'));
+                else if (v <= -.05) add('risco', `Vendas <b>${pct(-v)} abaixo</b> dos ${j.ref}: ${moeda(r.fat)} contra ${moeda(r.fatA)}.`.replace('dos mesmo', 'do mesmo').replace('dos mês', 'do mês'));
+                else add('info', `Vendas estáveis em relação ao período anterior (${moeda(r.fat)}).`);
+                if (r.conv != null && r.convA != null && Math.abs(r.conv - r.convA) >= .05)
+                    add(r.conv > r.convA ? 'pos' : 'alerta', `Conversão de orçamentos ${r.conv > r.convA ? 'melhorou' : 'piorou'}: <b>${pct(r.conv)}</b> (antes ${pct(r.convA)}).`);
+                const vo = variacao(r.orc, r.orcA);
+                if (isFinite(vo) && vo <= -.2) add('alerta', `Entrada de orçamentos caiu ${pct(-vo)} — menos demanda chegando, o que tende a reduzir os pedidos dos próximos meses.`);
+                else if (isFinite(vo) && vo >= .2) add('pos', `Entrada de orçamentos subiu ${pct(vo)} — boa demanda para converter nas próximas semanas.`);
             }
-        }
-
-        function renderTabela(pedidos) {
-            const tbody = document.getElementById('orders-tbody');
-            tbody.innerHTML = '';
-            if (pedidos.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-light)">Nenhum registro encontrado</td></tr>`;
-                return;
+            const melhor = [...serie].sort((a, b) => b.ped - a.ped)[0];
+            if (melhor && melhor.ped > 0) add('info', `Melhor mês dos últimos 12: <b>${melhor.rotulo}</b> com ${moeda(melhor.ped)} em pedidos.`);
+            if (o.atrasadas.length) add('risco', `<b>${o.atrasadas.length} pedido(s) com entrega atrasada</b> (${moeda(soma(o.atrasadas))}) — priorizar na produção/expedição.`);
+            if (o.prontoParado.length) add('alerta', `${o.prontoParado.length} pedido(s) prontos há mais de 7 dias sem entrega/retirada (${moeda(soma(o.prontoParado))}) — contatar os clientes.`);
+            if (o.atrasoFin.length) add('risco', `${moeda(soma(o.atrasoFin))} em pedidos com financeiro atrasado/protestado.`);
+            if (!cliente && r.p.length) {
+                const porCli = {}; r.p.forEach(x => porCli[x.cliente] = (porCli[x.cliente] || 0) + x.v);
+                const top5 = Object.values(porCli).sort((a, b) => b - a).slice(0, 5).reduce((s, v) => s + v, 0);
+                const conc = top5 / r.fat;
+                add(conc >= .5 ? 'alerta' : 'info', `Os 5 maiores clientes concentram <b>${pct(conc)}</b> das vendas do período${conc >= .5 ? ' — dependência alta de poucos clientes' : ''}.`);
             }
-            pedidos.forEach(pedido => {
-                const row = document.createElement('tr');
-                const situacaoNorm = normalizar(pedido.situacao);
-
-                if (situacaoNorm === 'em producao') row.style.backgroundColor = 'rgba(255, 255, 0, 0.1)';
-                if (situacaoNorm.includes('cancelad')) row.style.backgroundColor = 'rgba(255, 165, 0, 0.18)';
-
-                let badgeStyle = 'padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;';
-                if (situacaoNorm.includes('producao')) badgeStyle += 'background:rgba(23,162,184,.1);color:#17a2b8;';
-                if (situacaoNorm.includes('pronto') || situacaoNorm === 'ok') badgeStyle += 'background:rgba(255,193,7,.1);color:#ffc107;';
-                if (situacaoNorm.includes('entregue')) badgeStyle += 'background:rgba(40,167,69,.1);color:#28a745;';
-                if (situacaoNorm.includes('cancelad')) badgeStyle += 'background:rgba(255,165,0,.25);color:#c96a00;font-weight:700;';
-
-                const financeiroNorm = normalizar(pedido.financeiro);
-
-                row.dataset.numero = pedido.numero;
-
-                row.innerHTML = `
-                    <td class="order-number">${escapeHtml(pedido.numero)}</td>
-                    <td class="client-name">${escapeHtml(pedido.cliente)}</td>
-                    <td>${escapeHtml(pedido.clienteFinal || '-')}</td>
-                    <td class="date-cell">${escapeHtml(pedido.data)}</td>
-                    <td class="date-cell">${escapeHtml(pedido.prontoEm || '-')}</td>
-                    <td class="price-value">${formatCurrency(pedido.valor)}</td>
-                    <td class="obs-cell" title="${escapeHtml(pedido.observacao || '')}">${escapeHtml(pedido.observacao || '-')}</td>
-                    <td><span style="${badgeStyle}">${escapeHtml(pedido.situacao || '-')}</span></td>
-                    <td><span class="financial-badge ${financeiroNorm.includes('receber') ? 'financial-a-receber' : 'financial-recebido'}">${escapeHtml(pedido.financeiro || '-')}</span></td>
-                    <td class="date-cell">${escapeHtml(pedido.dataEntrega || '-')}</td>
-                `;
-                tbody.appendChild(row);
-            });
-
-            // ✅ Clique na linha — abre o PDF do tipo ATIVO, com token na URL
-            document.querySelectorAll('#orders-tbody tr[data-numero]').forEach(r => {
-                r.addEventListener('click', () => {
-                    const numero = encodeURIComponent(r.dataset.numero);
-                    const url = `${API_BASE}/dados_pdf?numero=${numero}&tipo=${encodeURIComponent(tipoAtual)}&token=${encodeURIComponent(getToken())}`;
-                    window.open(url, '_blank');
-                });
-            });
+            if (r.canc.length) add('alerta', `${r.canc.length} pedido(s) cancelado(s) no período (${moeda(soma(r.canc))}).`);
+            if (!ins.length) add('info', 'Sem alertas no momento.');
+            $('insights').innerHTML = ins.join('');
         }
 
-        function updateSummaryCards(pedidos) {
-            const ehOrcamento = tipoAtual === 'Orçamento';
-            document.getElementById('card1-title').textContent = ehOrcamento ? 'Orçamentos Hoje' : 'Pedidos Hoje';
-            document.getElementById('card2-title').textContent = ehOrcamento ? 'Em Aberto' : 'Em Produção';
-            document.getElementById('card3-title').textContent = ehOrcamento ? 'Fechados' : 'Prontos';
-
-            const hoje = new Date();
-            const hojeFmt = `${hoje.getDate().toString().padStart(2,'0')}/${(hoje.getMonth()+1).toString().padStart(2,'0')}/${hoje.getFullYear()}`;
-            const hojeQtd = pedidos.filter(p => p.data === hojeFmt).length;
-            document.getElementById('today-orders').textContent = hojeQtd;
-            const hojeInfo = document.getElementById('today-change');
-            hojeInfo.textContent = hojeQtd > 0 ? `+${hojeQtd} novos hoje` : 'Sem novos hoje';
-            hojeInfo.className = hojeQtd > 0 ? 'card-change positive' : 'card-change';
-
-            const emProducao = pedidos.filter(p => normalizar(p.situacao).includes('produ')).length;
-            document.getElementById('production-orders').textContent = emProducao;
-            document.getElementById('production-change').textContent = ehOrcamento ? 'Em aberto' : 'Em Produção';
-
-            const prontos = pedidos.filter(p => {
-                const s = normalizar(p.situacao);
-                return s.includes('pronto') || s.includes('finalizado') ||
-                       s.includes('conclu') || s === 'ok' || s === 'done';
-            }).length;
-            document.getElementById('ready-orders').textContent = prontos;
-            document.getElementById('ready-change').textContent = ehOrcamento ? 'Fechados' : 'Prontos';
-
-            const mes = hoje.getMonth() + 1, ano = hoje.getFullYear();
-            const doMes = pedidos.filter(p => {
-                if (!p.data) return false;
-                const p_ = p.data.split('/');
-                return p_.length === 3 && parseInt(p_[1]) === mes && parseInt(p_[2]) === ano;
-            });
-            const total = doMes.reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
-            document.getElementById('revenue').textContent = formatCurrency(total);
-            document.getElementById('revenue-change').textContent = 'Total do mês';
-        }
-
-        function renderCharts(pedidos) {
-            if (statusChartInstance) statusChartInstance.destroy();
-            if (ordersChartInstance) ordersChartInstance.destroy();
-
-            const statusCtx = document.getElementById('status-chart').getContext('2d');
-            const statusCounts = {
-                'Em Produção': pedidos.filter(p => normalizar(p.situacao) === 'em producao').length,
-                'Pronto': pedidos.filter(p => normalizar(p.situacao) === 'pronto').length,
-                'Entregue': pedidos.filter(p => normalizar(p.situacao) === 'entregue').length,
-                'Outros': pedidos.filter(p => {
-                    const s = normalizar(p.situacao);
-                    return s !== 'em producao' && s !== 'pronto' && s !== 'entregue';
-                }).length
-            };
-            statusChartInstance = new Chart(statusCtx, {
+        // ================= SITUAÇÃO E MOVIMENTO DIÁRIO =================
+        const COR_SIT = { producao: COR.azul, pronto: COR.ambar, entregue: COR.verde, retirado: COR.turquesa, cancelado: COR.vermelho, outro: COR.cinza };
+        const NOME_SIT = { producao: 'Em produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado', cancelado: 'Cancelado', outro: 'Outros' };
+        function renderStatus(j) {
+            const cont = {};
+            entre(doCliente(pedidos), j.ini, j.fim).forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
+            const chaves = Object.keys(NOME_SIT).filter(k => cont[k]);
+            $('status-sub').textContent = `pedidos de ${j.nome}`;
+            graficos.status?.destroy();
+            graficos.status = new Chart($('g-status'), {
                 type: 'doughnut',
-                data: {
-                    labels: Object.keys(statusCounts),
-                    datasets: [{
-                        data: Object.values(statusCounts),
-                        backgroundColor: [
-                            '#2f6fdb', '#f2a516', '#1f9d55', '#94a3b8'   // produção, pronto, entregue, outros
-                        ],
-                        borderColor: '#fff', borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, boxWidth: 8 } },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw || 0;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                                    return `${context.label}: ${value} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    }
-                }
+                data: { labels: chaves.map(k => NOME_SIT[k]), datasets: [{ data: chaves.map(k => cont[k]), backgroundColor: chaves.map(k => COR_SIT[k]), borderColor: '#fff', borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } },
+                    tooltip: { callbacks: { label: c => { const t = c.dataset.data.reduce((a, b) => a + b, 0); return `${c.label}: ${c.raw} (${pct(c.raw / t)})`; } } } } }
             });
-
-            const ordersCtx = document.getElementById('orders-chart').getContext('2d');
-            const dates = [], ordersData = [];
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                const fullDate = `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
-                dates.push(`${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}`);
-                ordersData.push(pedidos.filter(p => p.data === fullDate).length);
-            }
-            ordersChartInstance = new Chart(ordersCtx, {
+        }
+        function renderDiario() {
+            const dias = [];
+            for (let i = 13; i >= 0; i--) dias.push(new Date(hoje.getTime() - i * DIA).toLocaleDateString('pt-BR'));
+            const P = doCliente(pedidos), O = doCliente(orcamentos);
+            graficos.diario?.destroy();
+            graficos.diario = new Chart($('g-diario'), {
                 type: 'bar',
-                data: {
-                    labels: dates,
-                    datasets: [{ label: tipoAtual === 'Orçamento' ? 'Orçamentos' : 'Pedidos', data: ordersData, backgroundColor: '#a3213a', borderRadius: 5, maxBarThickness: 46 }]
+                data: { labels: dias.map(d => d.slice(0, 5)), datasets: [
+                    { label: 'Pedidos', data: dias.map(d => P.filter(x => x.data === d).length), backgroundColor: COR.vinho, borderRadius: 4, maxBarThickness: 22 },
+                    { label: 'Orçamentos', data: dias.map(d => O.filter(x => x.data === d).length), backgroundColor: COR.azul, borderRadius: 4, maxBarThickness: 22 }
+                ] },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } }
+            });
+        }
+
+        // ================= RANKINGS (o que vende / quem compra) =================
+        function renderRankings(j) {
+            Ranking.montar($('ranking-produtos'), {
+                titulo: 'Tipos de produto mais vendidos — últimos 12 meses',
+                subtitulo: (t, m) => (cliente ? 'Pedidos deste cliente · ' : 'Itens de pedidos · ') + (m.id === 'valor' ? `Total vendido: <b>${moeda(t)}</b>` : `Total: <b>${num(Math.round(t))} un.</b>`),
+                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda }, { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: n => `${num(Math.round(n))} un.` }],
+                info: (it, m, p) => `${p} · ${m.id === 'valor' ? num(Math.round(it.qtd)) + ' un.' : moeda(it.valor)} · ${it.pedidos} pedido(s)`,
+                carregar: () => api('/ranking_produtos' + (cliente ? '?cliente=' + encodeURIComponent(cliente) : ''))
+            });
+            const el = $('ranking-clientes');
+            el.hidden = !!cliente;
+            if (cliente) return;
+            Ranking.montar(el, {
+                titulo: `Clientes que mais compraram — ${j.nome}`,
+                subtitulo: (t, m) => m.id === 'valor' ? `Total em pedidos: <b>${moeda(t)}</b> · clique num cliente para filtrar a página` : `Total: <b>${num(t)} pedidos</b>`,
+                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda }, { id: 'pedidos', rotulo: 'Por nº de pedidos', valor: it => it.pedidos, formatar: n => `${n} pedido${n === 1 ? '' : 's'}` }],
+                info: (it, m, p) => `${p} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)} · ticket ${moeda(it.valor / it.pedidos)}`,
+                carregar: async () => {
+                    const g = {};
+                    resumo.p.forEach(x => { (g[x.cliente] ||= { nome: x.cliente, valor: 0, pedidos: 0 }); g[x.cliente].valor += x.v; g[x.cliente].pedidos++; });
+                    return Object.values(g);
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Quantidade' } },
-                        x: { title: { display: true, text: 'Data' } }
-                    }
-                }
+                aoClicar: it => aplicarCliente(it.nome)
             });
         }
 
-        function setupControles() {
-            document.getElementById('search-input').addEventListener('input', function() {
-                const term = this.value.toLowerCase();
-                document.querySelectorAll('#orders-tbody tr').forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
-                });
-            });
-            document.getElementById('refresh-btn').addEventListener('click', loadPedidos);
-
-            // ✅ Toggle: alterna o tipo e recarrega tudo
-            document.querySelectorAll('.toggle-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (btn.dataset.tipo === tipoAtual) return;
-                    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    tipoAtual = btn.dataset.tipo;
-                    loadPedidos();
-                });
-            });
+        // ================= LISTA =================
+        function renderLista() {
+            const j = janela();
+            const base = entre(doCliente(tipoLista === 'Pedido' ? pedidos : orcamentos), j.ini, j.fim);
+            const cont = {}; base.forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
+            $('chips-sit').innerHTML = tipoLista === 'Pedido'
+                ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
+                    .map(([k, t]) => `<button class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}">${t}</button>`).join('') : '';
+            const termo = norm($('search-input').value);
+            const lista = base.filter(x => (tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit) &&
+                (!termo || norm(`${x.numero} ${x.cliente} ${x.clienteFinal} ${x.observacao} ${x.situacao}`).includes(termo)));
+            $('lista-titulo').textContent = `Lista de ${tipoLista === 'Pedido' ? 'pedidos' : 'orçamentos'}`;
+            $('lista-qtd').textContent = `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
+            $('lista-total').textContent = moeda(soma(lista));
+            const MAX = 500;
+            $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
+                <tr data-numero="${esc(x.numero)}">
+                    <td class="order-number">${esc(x.numero)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
+                    <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num"><b>${moeda(x.v)}</b></td>
+                    <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
+                    <td><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}</td>
+                </tr>`).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
+                || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
+        $('orders-tbody').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-numero]');
+            if (tr) window.open(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}&token=${encodeURIComponent(getToken())}`, '_blank');
+        });
+        $('chips-sit').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filtroSit = b.dataset.sit; renderLista(); });
+        document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
+            tipoLista = b.dataset.tipo; filtroSit = '';
+            document.querySelectorAll('.toggle-btn').forEach(x => x.classList.toggle('active', x === b));
+            renderLista();
+        }));
+        $('search-input').addEventListener('input', renderLista);
+        $('refresh-btn').addEventListener('click', carregar);
 
-        function carregarDadosUsuario() {
-            const user = exigirSessao();
-            if (!user) return;
-            document.getElementById('user-empresa').textContent = user.empresa || 'Elegance';
-            document.getElementById('user-name').textContent = user.nome || 'Usuário';
-            document.getElementById('user-cargo').textContent = user.cargo || '';
-            document.getElementById('user-avatar').textContent = (user.nome || 'E').charAt(0).toUpperCase();
+        // ================= FILTROS =================
+        function aplicarCliente(nome) {
+            cliente = nome || '';
+            $('f-cliente').value = cliente;
+            const url = new URL(location.href);
+            if (cliente) url.searchParams.set('cliente', cliente); else url.searchParams.delete('cliente');
+            history.replaceState(null, '', url);
+            renderTudo();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        $('periodo').addEventListener('change', renderTudo);
+        $('f-cliente').addEventListener('change', () => {
+            const v = $('f-cliente').value.trim();
+            if (!v || [...$('l-clientes').options].some(o => o.value === v)) aplicarCliente(v);
+        });
+        $('limpar-cliente').addEventListener('click', () => aplicarCliente(''));
 
         document.addEventListener('DOMContentLoaded', () => {
-            carregarDadosUsuario();
-            setupControles();
-            loadPedidos();
+            const auth = getAuth();
+            if (!auth) { location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            $('user-name').textContent = auth.user.nome || '';
+            $('user-cargo').textContent = auth.user.cargo || '';
+            $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
+            cliente = new URLSearchParams(location.search).get('cliente') || '';
+            $('f-cliente').value = cliente;
+            carregar();
         });
     </script>
 </body>
