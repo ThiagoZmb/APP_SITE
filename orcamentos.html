@@ -121,6 +121,8 @@
         .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
         .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
         .bf-basculante { background: rgba(111,66,193,.12); color: #6f42c1; }
+        .bf-gaveta { background: rgba(224,82,126,.12); color: #c23b66; }
+        .bf-avulso { background: rgba(47,111,219,.12); color: #2f6fdb; }
         /* ===== FURAÇÕES (pnlFuracoes do VB) ===== */
         #pnl-furacoes { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 6px; }
         .linha-furo { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -200,8 +202,10 @@
                     <div class="frentes">
                         <button class="frente-btn active" data-frente="Porta de giro">🚪 Portas de Giro</button>
                         <button class="frente-btn" data-frente="Porta basculante">⬆️ Portas Basculantes</button>
+                        <button class="frente-btn" data-frente="Frente de gaveta">🗄️ Frente de Gaveta</button>
                         <button class="frente-btn" data-frente="Porta de Correr">↔️ Portas de Correr</button>
                         <button class="frente-btn" data-frente="Serralheria">🔧 Serralheria</button>
+                        <button class="frente-btn" data-frente="Avulso">📦 Serviço / Perfil / Puxador / Revestimento / Trilhos</button>
                     </div>
                     <div class="item-layout">
                     <div class="item-dados">
@@ -275,6 +279,24 @@
                             <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
                             <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
                             <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                        </div>
+                    </div>
+                    <!-- ITEM AVULSO (frmServicos: Serviço, Perfil, Puxador, Revestimento, Trilhos) -->
+                    <div class="secao-item secao-avulso" style="display:none">
+                        <h4>📦 Item avulso</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Tipo de produto</label>
+                                <select id="f-av-cat">
+                                    <option value="">— Selecione —</option>
+                                    <option>Serviço</option><option>Perfil</option><option>Puxador</option>
+                                    <option>Revestimento</option><option>Trilhos</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Produto</label><select id="f-av-produto"><option value="">— escolha o tipo —</option></select></div>
+                            <div class="form-group av-acab" style="display:none"><label>Acabamento</label><select id="f-av-acab"><option value="">— escolha o produto —</option></select></div>
+                            <div class="form-group av-cor" style="display:none"><label>Cor</label><select id="f-av-cor" disabled><option value="">— escolha o acabamento —</option></select></div>
+                            <div class="form-group av-alt" style="display:none"><label id="lbl-av-alt">Tamanho (mm)</label><input type="number" id="f-av-alt" min="0" placeholder="0"></div>
+                            <div class="form-group av-larg" style="display:none"><label>Largura (mm)</label><input type="number" id="f-av-larg" min="0" placeholder="0"></div>
                         </div>
                     </div>
                     <!-- CORRER -->
@@ -462,10 +484,11 @@
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                if (editandoIndex >= 0) limparForm(); // trocar de frente cancela a edição em andamento
                 document.querySelectorAll('.frente-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 frenteAtual = btn.dataset.frente;
-                document.getElementById('frente-atual').textContent = frenteAtual;
+                document.getElementById('frente-atual').textContent = rotuloFrente(frenteAtual);
                 posicoesFolhas = posicoesFolhas.map(() => '');
                 document.getElementById('f-posicao').value = '';
                 aplicarVisibilidadeCampos();
@@ -473,8 +496,10 @@
                 calcularPrecoAutomatico();
             });
         });
+        const rotuloFrente = f => f === 'Avulso' ? 'Item avulso' : f;
         function aplicarVisibilidadeCampos() {
-            const ehPorta = frenteAtual !== 'Serralheria';
+            const ehAvulso = frenteAtual === 'Avulso';
+            const ehPorta = frenteAtual !== 'Serralheria' && !ehAvulso;
             // Porta basculante: chkPares invisível (frmPortasAbrir_Load)
             const wrapPares = document.getElementById('wrap-pares');
             if (ehBasculante() && document.getElementById('chk-pares').checked) {
@@ -482,7 +507,11 @@
                 document.getElementById('f-qtd').value = 1;
             }
             document.querySelectorAll('.secao-furos').forEach(el => el.style.display = ehPortaComFuros() ? '' : 'none');
-            document.querySelector('.item-layout')?.classList.toggle('sem-visual', frenteAtual === 'Serralheria');
+            document.querySelector('.item-layout')?.classList.toggle('sem-visual', !ehPorta);
+            // AplicarRegrasUsinagem: frente de gaveta não tem furação — limpa o que houver
+            if (frenteAtual === 'Frente de gaveta') document.getElementById('pnl-furacoes').innerHTML = '';
+            document.querySelectorAll('.secao-avulso').forEach(el => el.style.display = ehAvulso ? '' : 'none');
+            atualizarCamposAvulso();
             const ehCorrer = frenteAtual === 'Porta de Correr';
             const ehSerr = frenteAtual === 'Serralheria';
             document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
@@ -491,7 +520,7 @@
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
-            alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
+            alternarCamposPuxador(!ehPorta ? '' : (document.getElementById('f-puxador')?.value || ''));
             if (ehCorrer && document.getElementById('chk-pares').checked) document.getElementById('chk-pares').checked = false;
             garantirFolhas();
             sincronizarFurosComMemoria();
@@ -537,11 +566,11 @@
         }
         // ============ CASCATAS (fiel ao RepositorioProdutos.vb) ============
         function alternarCamposPuxador(puxador) {
-            const mostrar = !!puxador && frenteAtual !== 'Serralheria';
+            const mostrar = !!puxador && frenteAtual !== 'Serralheria' && frenteAtual !== 'Avulso';
             document.querySelectorAll('.f-pux-extra').forEach(el => el.style.display = mostrar ? '' : 'none');
         }
         async function carregarPerfis() {
-            if (frenteAtual === 'Serralheria') return;
+            if (frenteAtual === 'Serralheria' || frenteAtual === 'Avulso') return;
             const lista = await catalogoFiltro('perfis', frenteAtual);
             popularLista('f-perfil', lista);
             popularLista('f-acab', [], '— escolha o perfil —');
@@ -626,7 +655,7 @@
             return true;
         }
         function reaplicarTravasCores() {
-            ['f-cor', 'f-cor-pux', 'f-cor-revest'].forEach(id => {
+            ['f-cor', 'f-cor-pux', 'f-cor-revest', 'f-av-cor'].forEach(id => {
                 const sel = document.getElementById(id);
                 if (sel) sel.disabled = ![...sel.options].some(o => o.value);
             });
@@ -719,9 +748,54 @@
             }
             popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
         }
+        // ============ ITENS AVULSOS (frmServicos + MotorFinanceiro.CalcularValorVendaAvulsa) ============
+        // Perfil/Puxador/Trilhos = metro linear (tamanho); Revestimento = m² (altura × largura); Serviço = por unidade
+        const AV_LINEAR = ['Perfil', 'Puxador', 'Trilhos'];
+        function atualizarCamposAvulso() {
+            const cat = val('f-av-cat');
+            const mostra = (cls, on) => document.querySelectorAll('.' + cls).forEach(el => el.style.display = on ? '' : 'none');
+            mostra('av-acab', AV_LINEAR.includes(cat));
+            mostra('av-cor', AV_LINEAR.includes(cat) || cat === 'Revestimento');
+            mostra('av-alt', AV_LINEAR.includes(cat) || cat === 'Revestimento');
+            mostra('av-larg', cat === 'Revestimento');
+            const lbl = document.getElementById('lbl-av-alt');
+            if (lbl) lbl.textContent = cat === 'Revestimento' ? 'Altura (mm)' : 'Tamanho (mm)';
+        }
+        async function aoMudarCategoriaAvulso() {
+            const cat = val('f-av-cat');
+            atualizarCamposAvulso();
+            document.getElementById('f-av-alt').value = '';
+            document.getElementById('f-av-larg').value = '';
+            popularLista('f-av-produto', cat ? await catalogoFiltro('avulsos', cat) : [],
+                cat ? '(nenhum produto ativo neste tipo)' : '— escolha o tipo —');
+            popularLista('f-av-acab', [], '— escolha o produto —');
+            filtrarCores('f-av-cor', '');
+            calcularPrecoAutomatico();
+        }
+        async function aoMudarProdutoAvulso() {
+            const cat = val('f-av-cat'), prod = val('f-av-produto');
+            if (AV_LINEAR.includes(cat)) {
+                popularLista('f-av-acab', prod ? await catalogoFiltro('acabamentos', prod) : [],
+                    prod ? '(nenhum acabamento para este produto)' : '— escolha o produto —');
+                filtrarCores('f-av-cor', '');
+            } else if (cat === 'Revestimento') {
+                filtrarCores('f-av-cor', prod); // cor do revestimento pelo nome (Metálico/Sólido), como nas portas
+            }
+            calcularPrecoAutomatico();
+        }
+        function aoMudarAcabAvulso() { filtrarCores('f-av-cor', val('f-av-acab')); calcularPrecoAutomatico(); }
+        // descrição: "Tipo: Produto | medida | acabamento - COR" (o VB lê produto e medidas nessa ordem)
+        function descricaoAvulso() {
+            const cat = val('f-av-cat'), alt = val('f-av-alt') || 0, larg = val('f-av-larg') || 0;
+            const med = cat === 'Revestimento' ? `${alt} x ${larg} mm` : AV_LINEAR.includes(cat) ? `${alt} mm` : '';
+            const extra = [AV_LINEAR.includes(cat) ? val('f-av-acab') : '', val('f-av-cor') ? 'COR: ' + val('f-av-cor') : ''].filter(Boolean).join(' - ');
+            return `${cat}: ${val('f-av-produto')}` + (med ? ` | ${med}` : '') + (extra ? ` | ${extra}` : '') +
+                   (val('f-percentuais') ? ` | Pct linha: ${val('f-percentuais')}` : '');
+        }
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         async function calcularPrecoAutomatico() {
+            clearTimeout(timerPreco); // descarta cálculo pendente de um estado anterior do formulário
             if (!temClienteSelecionado()) return;
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -743,6 +817,23 @@
                             soldas: g('f-soldas'),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
+            } else if (frenteAtual === 'Avulso') {
+                const cat = g('f-av-cat');
+                const alt = parseFloat(g('f-av-alt')) || 0, larg = parseFloat(g('f-av-larg')) || 0;
+                const faltaMedida = (AV_LINEAR.includes(cat) && !alt) || (cat === 'Revestimento' && (!alt || !larg));
+                if (!cat || !g('f-av-produto') || faltaMedida) {
+                    document.getElementById('f-valor').value = '';
+                    atualizarTotalItem();
+                    status.textContent = '';
+                    return;
+                }
+                payload = { frente: 'Avulso',
+                            cliente: clienteNome, clienteCodigo,
+                            categoria: cat, produto: g('f-av-produto'),
+                            acabamento: AV_LINEAR.includes(cat) ? g('f-av-acab') : '',
+                            altura: alt, largura: larg,
+                            qtd: qtdEfetiva(),
+                            percentuais: g('f-percentuais') };
             } else {
                 if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) {
                     document.getElementById('f-valor').value = '';
@@ -1297,10 +1388,13 @@
         function coletarForm() {
             const g = val;
             const ehSerr = frenteAtual === 'Serralheria';
-            if (!ehSerr) sincronizarFurosComMemoria();
+            const ehAv = frenteAtual === 'Avulso';
+            if (!ehSerr && !ehAv) sincronizarFurosComMemoria();
             const todaExt = document.getElementById('chk-toda-ext')?.checked || false;
             let desc = '';
-            if (ehSerr) {
+            if (ehAv) {
+                desc = descricaoAvulso();
+            } else if (ehSerr) {
                 desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
                        ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm`;
             } else {
@@ -1320,8 +1414,8 @@
             return {
                 frente: frenteAtual,
                 qtd: qtdEfetiva(),
-                altura: ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
-                largura: ehSerr ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
+                altura: ehAv ? (parseFloat(g('f-av-alt')) || 0) : ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
+                largura: ehAv ? (parseFloat(g('f-av-larg')) || 0) : ehSerr ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
                 soldas: parseInt(g('f-soldas')) || 0,
                 furos: ehPortaComFuros()
@@ -1340,7 +1434,10 @@
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     produto: g('f-produto'), material: g('f-material'),
                     acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
-                    percentuais: g('f-percentuais')
+                    percentuais: g('f-percentuais'),
+                    // venda avulsa (ItemVendaAvulsa)
+                    categoria: ehAv ? g('f-av-cat') : '', avProduto: ehAv ? g('f-av-produto') : '',
+                    avAcab: ehAv ? g('f-av-acab') : '', avCor: ehAv ? g('f-av-cor') : ''
                 },
                 valor: parseFloat(g('f-valor').replace(',', '.')) || 0,
                 obs: g('f-obs'),
@@ -1357,7 +1454,18 @@
                 set('f-qtd', item.qtd);
                 set('f-altura', item.altura); set('f-largura', item.largura);
                 setChk('chk-pares', d.pares);
-                if (item.frente !== 'Serralheria') {
+                if (item.frente === 'Avulso') {
+                    set('f-av-cat', d.categoria);
+                    await aoMudarCategoriaAvulso();
+                    selecionarComboPorTexto('f-av-produto', d.avProduto);
+                    await aoMudarProdutoAvulso();
+                    if (d.categoria !== 'Revestimento') {
+                        selecionarComboPorTexto('f-av-acab', d.avAcab);
+                        filtrarCores('f-av-cor', d.avAcab);
+                    }
+                    selecionarComboPorTexto('f-av-cor', d.avCor);
+                    set('f-av-alt', item.altura || ''); set('f-av-larg', item.largura || '');
+                } else if (item.frente !== 'Serralheria') {
                     // CADEIA 1: PERFIL → dependências com o perfil correto
                     await carregarPerfis();
                     selecionarComboPorTexto('f-perfil', d.perfil);
@@ -1428,6 +1536,7 @@
             calcularPrecoAutomatico();
         }
         function limparForm() {
+            const catAvulso = val('f-av-cat');
             document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
                 if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
@@ -1455,6 +1564,9 @@
             desenharVisualizacao();
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
+            filtrarCores('f-av-cor', '');
+            if (catAvulso) { document.getElementById('f-av-cat').value = catAvulso; aoMudarCategoriaAvulso(); }
+            else atualizarCamposAvulso();
             document.getElementById('calc-status').textContent = '';
         }
         // ============ LISTA DE ITENS ============
@@ -1467,6 +1579,8 @@
             renderItens();
             limparForm();
         }
+        const BADGE_FRENTE = { 'Porta de giro': 'bf-abrir', 'Porta basculante': 'bf-basculante', 'Frente de gaveta': 'bf-gaveta',
+                               'Porta de Correr': 'bf-correr', 'Serralheria': 'bf-serralheria', 'Avulso': 'bf-avulso' };
         function renderItens() {
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
@@ -1474,7 +1588,7 @@
                 : itens.map((it, i) => `
                     <tr>
                         <td><b>${i + 1}</b></td>
-                        <td><span class="badge-frente ${it.frente === 'Porta de giro' ? 'bf-abrir' : it.frente === 'Porta basculante' ? 'bf-basculante' : it.frente === 'Porta de Correr' ? 'bf-correr' : 'bf-serralheria'}">${escapeHtml(it.frente)}</span></td>
+                        <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
                         <td>${escapeHtml(it.descricao)}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
@@ -1493,7 +1607,7 @@
                 b.classList.toggle('active', b.dataset.frente === it.frente);
             });
             frenteAtual = it.frente;
-            document.getElementById('frente-atual').textContent = it.frente;
+            document.getElementById('frente-atual').textContent = rotuloFrente(it.frente);
             aplicarVisibilidadeCampos();
             preencherForm(it);
             editandoIndex = i;
@@ -1611,6 +1725,10 @@
         // txtTamPuxador_Leave → AplicarRegrasDeInterface (mínimo, máximo e limite do embutido)
         document.getElementById('f-tamanho-pux').addEventListener('change', aposMudarPosicao);
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
+        document.getElementById('f-av-cat').addEventListener('change', aoMudarCategoriaAvulso);
+        document.getElementById('f-av-produto').addEventListener('change', aoMudarProdutoAvulso);
+        document.getElementById('f-av-acab').addEventListener('change', aoMudarAcabAvulso);
+        ['f-av-cor', 'f-av-alt', 'f-av-larg'].forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
         // Medidas: furos automáticos, trava do puxador total e redesenho
         ['f-altura', 'f-largura'].forEach(id => {

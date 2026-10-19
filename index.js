@@ -936,6 +936,31 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
       });
     }
 
+    // ============ VENDA AVULSA (MotorFinanceiro.CalcularValorVendaAvulsa) ============
+    if (b.frente === 'Avulso') {
+      const categoria = String(b.categoria || '');
+      const dados = await buscarDadosProduto(b.produto);
+      if (!dados) return res.status(400).json({ error: `Produto '${b.produto}' não encontrado ou sem preços.` });
+      let base = precoBase(dados, isFixo);
+      // Serviço e Acessório usam o valor fixo quando ele existe
+      if ((categoria === 'Serviço' || categoria === 'Acessório') && dados.valorFixo > 0) base = dados.valorFixo;
+      const precoAcab = comAcab(base, await taxaAcabamento(b.acabamento));
+      let unit = 0;
+      if (['Perfil', 'Trilhos', 'Puxador'].includes(categoria)) unit = precoAcab * (alturaS(b) / 1000);
+      else if (categoria === 'Revestimento') unit = precoAcab * (alturaS(b) / 1000) * (largS(b) / 1000);
+      else if (categoria === 'Serviço' || categoria === 'Acessório') unit = precoAcab;
+      else return res.status(400).json({ error: 'Categoria inválida' });
+      // desconto do cliente só na tabela FIXO (na tabela CHEIO o desconto é no fechamento)
+      if (isFixo && descontoCliente > 0) unit *= (100 - descontoCliente) / 100;
+      unit = aplicarPercentuais(unit, b.percentuais);
+      const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
+      return res.json({
+        unitario: Math.round(unit * 100) / 100,
+        total: Math.round(unit * qtd * 100) / 100,
+        ...(b.debug ? { diag } : {})
+      });
+    }
+
     // ============ FRENTE PORTAS (MotorFinanceiro.CalcularValorVendaPorta) ============
     const altura = parseFloat(b.altura) || 0;
     const largura = parseFloat(b.largura) || 0;
@@ -1060,12 +1085,35 @@ function resolverAliasesFrente(chave) {
   const c = String(chave || '').toLowerCase();
   if (c.includes('correr')) return ['Porta de Correr', 'Porta de correr', 'Correr'];
   if (c.includes('bascul')) return ['Porta basculante', 'Porta Basculante', 'Basculante'];
+  if (c.includes('gaveta')) return ['Frente de gaveta', 'Frente de Gaveta', 'Gaveta'];
   // giro / abrir / qualquer outra porta → mesma família
   return ['Porta de giro', 'Porta de Giro', 'Porta de Abrir', 'Porta de abrir', 'Giro', 'Abrir'];
 }
 
+// Itens de venda avulsa (frmServicos): categoria do pedido → CLASSE do cadastro_de_produtos
+const CLASSES_AVULSO = {
+  'Perfil': ['Perfil', 'Perfil Composto'],
+  'Puxador': ['Puxador'],
+  'Revestimento': ['Revestimento'],
+  'Trilhos': ['Trilhos'],
+  'Serviço': ['Serviço', 'Serviços', 'Servico', 'Servicos'],
+  'Acessório': ['Acessórios', 'Acessório']
+};
 app.get('/catalogos_filtro', autenticar, async (req, res) => {
   const { campo, chave } = req.query;
+  if (campo === 'avulsos') {
+    const classes = CLASSES_AVULSO[chave];
+    if (!classes) return res.status(400).json({ error: 'Categoria inválida' });
+    try {
+      const [rows] = await pool.execute(
+        `SELECT DISTINCT MODELO AS nome FROM cadastro_de_produtos
+         WHERE SITUACAO = 'Ativo' AND CLASSE IN (${classes.map(() => '?').join(',')}) ORDER BY MODELO`, classes);
+      return res.json(rows.map(r => r.nome).filter(n => n));
+    } catch (err) {
+      console.error('Erro /catalogos_filtro (avulsos):', err.message);
+      return res.status(500).json({ error: 'Erro de servidor' });
+    }
+  }
   const sql = QUERIES_FILTRO[campo];
   if (!sql) return res.status(400).json({ error: 'Campo inválido' });
   try {
