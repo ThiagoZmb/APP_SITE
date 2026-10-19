@@ -580,10 +580,17 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
        FROM ped_orc WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
     const cab = cabs[0];
+    // representante só abre PDF de cliente do RJ (mesma regra das listas)
+    if (ehRepresentante(req)) {
+      const [est] = await pool.execute(
+        'SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [cab.RAZAO_SOCIAL]);
+      if (!est.length || String(est[0].ESTADO || '').toUpperCase() !== 'RJ')
+        return res.status(403).json({ error: 'Acesso restrito' });
+    }
     const [itens] = await pool.execute(
       `SELECT * FROM ped_orc_lista_itens WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
     const [v4] = await pool.execute(
-      `SELECT * FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
+      `SELECT * FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
     const [serr] = await pool.execute(
       `SELECT * FROM ped_orc_serralheria WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     const [comps] = await pool.execute(
@@ -591,7 +598,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
     const [compSerr] = await pool.execute(
       `SELECT * FROM ped_orc_serralheria_complementos WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     const [furos] = await pool.execute(
-      `SELECT * FROM furacao_pedidos_orcamentos WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
+      `SELECT * FROM furacao_pedidos_orcamentos WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo]);
 
     const agrupar = (rows, col) => {
       const m = {};

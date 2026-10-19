@@ -241,8 +241,10 @@
                                     <option value="">—</option>
                                     <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
                                     <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
-                                    <option>Topo Esquerda</option><option>Topo Direita</option>
-                                    <option>Base Total</option><option>Topo Total</option>
+                                    <option>Lateral Esquerda Centro</option><option>Lateral Direita Centro</option>
+                                    <option>Topo Esquerda</option><option>Topo Centro</option><option>Topo Direita</option>
+                                    <option>Base Esquerda</option><option>Base Centro</option><option>Base Direita</option>
+                                    <option>Topo Total</option><option>Base Total</option>
                                 </select>
                             </div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
@@ -755,7 +757,7 @@
                             tipoPuxador: tipoPuxadorAtual,
                             posicaoPuxador: posicaoParaCalculo(),
                             tamanhoPuxador: g('f-tamanho-pux'),
-                            revestimento: g('f-revest'), acabRevest: g('f-cor-revest'),
+                            revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
                             divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
                             qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0,
                             percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
@@ -1141,7 +1143,7 @@
             if (min === dEsq) nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
             else if (min === dDir) nova = mmY < altura / 2 ? 'Lateral Direita Superior' : 'Lateral Direita Inferior';
             else if (min === dTopo) nova = mmX < largura / 2 ? 'Topo Esquerda' : 'Topo Direita';
-            else nova = 'Base Total';
+            else nova = mmX < largura / 2 ? 'Base Esquerda' : 'Base Direita';
             definirPosicaoPuxador(folha, nova);
             garantirFolhas();
             const faltam = posicoesFolhas.slice(0, qtdFolhas).filter(p => !p).length;
