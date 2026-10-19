@@ -952,7 +952,8 @@ app.post('/calcular_preco', autenticar, async (req, res) => {
 
     const temPux = !!dadosPux;
     const posPux = String(b.posicaoPuxador || '').toUpperCase();
-    const tipoPux = String(dadosPux?.tipoPuxador || b.tipoPuxador || '').toUpperCase();
+    // VB usa porta.TipoPuxador (já com " Total" quando toda extensão); o cadastro é o reserva
+    const tipoPux = String(b.tipoPuxador || dadosPux?.tipoPuxador || '').toUpperCase();
     const qtdPux = posPux ? posPux.split(',').filter(p => p.trim()).length : 0;
     const isSobreposto = tipoPux.includes('SOBREPOSTO');
     const isEmbutido = tipoPux.includes('EMBUTIDO');

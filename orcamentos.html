@@ -236,7 +236,7 @@
                         <h4>🟧 Puxador</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Posição do puxador (folha 1)</label>
+                            <div class="form-group" id="wrap-posicao"><label>Posição do puxador (folha 1)</label>
                                 <select id="f-posicao">
                                     <option value="">—</option>
                                     <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
@@ -427,6 +427,7 @@
                 atualizarTotalItem();
             } else {
                 reaplicarTravasCores();
+                aplicarRegrasPuxador();
                 calcularPrecoAutomatico();
             }
         }
@@ -489,10 +490,12 @@
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
-            if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() ? '' : 'none';
+            if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
             alternarCamposPuxador(ehSerr ? '' : (document.getElementById('f-puxador')?.value || ''));
+            if (ehCorrer && document.getElementById('chk-pares').checked) document.getElementById('chk-pares').checked = false;
             garantirFolhas();
             sincronizarFurosComMemoria();
+            aplicarRegrasPuxador();
         }
         // ============ COMBOS ============
         function popularLista(id, lista, msgVazio) {
@@ -670,34 +673,33 @@
             posicoesFolhas = posicoesFolhas.map(() => '');
             document.getElementById('f-posicao').value = '';
             document.getElementById('chk-toda-ext').checked = false;
-            atualizarTravaTamanhoPuxador();
+            if (modoPuxador) { modoPuxador = false; atualizarVisualModoPux(); }
             sincronizarFurosComMemoria();
+            aplicarRegrasPuxador();
             desenharVisualizacao();
             calcularPrecoAutomatico();
         }
+        // cmbPuxador_SelectedIndexChanged (troca manual): limpa posição, toda extensão e tamanho,
+        // herda acabamento/cor do perfil e liga a escolha nos fantasmas
         async function aoMudarPuxador() {
             const pux = val('f-puxador');
             await carregarDependentesPuxador(pux);
-            const tam = document.getElementById('f-tamanho-pux');
-            // troca manual: limpa posição, toda extensão e tamanho
             posicoesFolhas = posicoesFolhas.map(() => '');
-            document.getElementById('f-posicao').value = '';
             document.getElementById('chk-toda-ext').checked = false;
-            tam.readOnly = false;
-            tam.value = '';
+            document.getElementById('f-tamanho-pux').value = 0;
             if (pux) {
-                // herda acabamento/cor do perfil só na troca manual
                 selecionarSeExistir('f-acab-pux', val('f-acab'));
                 if (filtrarCores('f-cor-pux', val('f-acab-pux'))) selecionarSeExistir('f-cor-pux', val('f-cor'));
                 garantirFolhas();
-                aplicarEspelhamentoPuxadorNaMemoria();
+                aplicarRegrasPuxador();          // total de fábrica marca "toda extensão"; tamanho vai para o padrão
+                sincronizarNomenclaturaPuxador();
                 sincronizarFurosComMemoria();
-                definirModoPuxador(true); // chkConfigPux.Checked = True → escolha nos fantasmas
+                definirModoPuxador(true);        // chkConfigPux.Checked = True
             } else {
                 definirModoPuxador(false);
                 sincronizarFurosComMemoria();
+                aplicarRegrasPuxador();
             }
-            atualizarTravaTamanhoPuxador();
             desenharVisualizacao();
             calcularPrecoAutomatico();
         }
@@ -754,7 +756,7 @@
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
-                            tipoPuxador: tipoPuxadorAtual,
+                            tipoPuxador: tipoPuxadorDaPorta(),
                             posicaoPuxador: posicaoParaCalculo(),
                             tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
@@ -789,7 +791,7 @@
         // ============================================================
         function ehBasculante() { return frenteAtual === 'Porta basculante'; }
         function ehPortaComFuros() { return frenteAtual === 'Porta de giro' || ehBasculante(); }
-        function paresAtivo() { return !ehBasculante() && (document.getElementById('chk-pares')?.checked || false); }
+        function paresAtivo() { return !ehBasculante() && !ehCorrer() && (document.getElementById('chk-pares')?.checked || false); }
         function qtdFolhasAtual() { return qtdEfetiva(); }
         // InverterLado (furos): Esquerdo ↔ Direito / Superior ↔ Inferior
         function inverterLado(lado) {
@@ -800,19 +802,167 @@
             if (u.includes('INFERIOR')) return 'Superior';
             return lado;
         }
+        // ============================================================
+        // 🟧 MOTOR DO PUXADOR — fiel ao frmPortasAbrir.vb / frmPortasCorrer.vb
+        // Tipo nativo (cadastro_de_produtos.TIPO_PUXADOR): Sobreposto, Embutido ou Total.
+        // "Sobreposto Total" = sobreposto com "toda extensão" marcada (SincronizarNomenclaturaPuxador).
+        // ============================================================
+        const PUX_TAM_PADRAO = 150;   // AtualizarTravaTamanhoPuxador: medida inicial quando o campo está vazio
+        const PUX_TAM_MIN = 80;       // mínimo físico (usinar e pôr a mão)
+        const PUX_EMBUTIDO_MAX = 400; // limite de usinagem do embutido (frmPortasCorrer: 400 mm)
+        const properCase = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+        const listaPos = p => String(p || '').split(',').map(s => s.trim()).filter(Boolean);
+        function ehCorrer() { return frenteAtual === 'Porta de Correr'; }
+        function temPuxador() { return !!val('f-puxador'); }
+        function tipoNativo() { return temPuxador() ? String(tipoPuxadorAtual || '').toUpperCase() : ''; }
+        function nativoTotal() { return tipoNativo().includes('TOTAL'); }
+        function nativoEmbutido() { return tipoNativo().includes('EMBUTIDO'); }
+        function nativoSobreposto() { return tipoNativo().includes('SOBREPOSTO'); }
+        function todaExtensao() { return document.getElementById('chk-toda-ext')?.checked || false; }
+
+        // InverterLadoPuxador: troca Esquerda ↔ Direita ("Topo Total"/"Base Total" ficam iguais)
         function inverterLadoPux(pos) {
-            return pos.replace('Esquerda', '«E»').replace('Direita', 'Esquerda').replace('«E»', 'Direita');
+            if (!pos) return pos;
+            return properCase(pos.trim().toUpperCase()
+                .replace(/DIREITA/g, '#TMP#').replace(/ESQUERDA/g, 'DIREITA').replace(/#TMP#/g, 'ESQUERDA'));
         }
-        function posicaoEspelhada(pos) {
-            if (!pos) return '';
-            if (pos.includes('Topo Total')) return pos;
-            if (pos.includes('Base Total')) return pos;
-            return inverterLadoPux(pos);
+        const posicaoEspelhada = inverterLadoPux;
+
+        // SincronizarNomenclaturaPuxador (posição): nome comercial; "toda extensão" vira Total
+        function normalizarPosicao(pos, forcarTotal) {
+            if (!pos || !String(pos).trim()) return '';
+            const u = String(pos).trim().toUpperCase();
+            const total = forcarTotal || u.includes('TOTAL');
+            if (u.includes('TOPO') || u.includes('BASE')) {
+                const p = u.includes('TOPO') ? 'Topo' : 'Base';
+                return total ? `${p} Total` : u.includes('ESQUERD') ? `${p} Esquerda` : u.includes('DIREIT') ? `${p} Direita` : `${p} Centro`;
+            }
+            if (u.includes('ESQUERD') || u.includes('DIREIT')) {
+                const p = u.includes('ESQUERD') ? 'Lateral Esquerda' : 'Lateral Direita';
+                return total ? `${p} Total` : u.includes('SUPERIOR') ? `${p} Superior` : u.includes('INFERIOR') ? `${p} Inferior` : `${p} Centro`;
+            }
+            return String(pos).trim();
         }
-        // SincronizarMemoriaPortas: uma folha por unidade de txtQtd (novas folhas clonam a folha 1)
+        function sincronizarNomenclaturaPuxador() {
+            if (ehCorrer()) return; // no correr só o TIPO muda; o "toda extensão" converte as posições no próprio handler
+            posicoesFolhas = posicoesFolhas.map(p => normalizarPosicao(p, todaExtensao()));
+        }
+        // TIPO_PUXADOR gravado na porta (PCP): base sem "Total" + " Total" quando toda extensão
+        function tipoPuxadorDaPorta() {
+            if (!temPuxador()) return '';
+            const base = properCase(String(tipoPuxadorAtual || '').replace(/total/ig, '').trim()) || (ehCorrer() ? 'Sobreposto' : '');
+            if (todaExtensao()) return base ? `${base} Total` : 'Total';
+            return base;
+        }
+
+        // Lado dos furos da folha (Paint: ladoAtualFuro). Giro = Esquerda/Direita; basculante = Topo/Base
+        function ladoFuroDaFolha(f, ignorarPuxador) {
+            const lado = String(ladosFuros[f] || '').toUpperCase();
+            const pos = ignorarPuxador ? '' : String(posicoesFolhas[f] || '').toUpperCase();
+            if (!ehBasculante()) {
+                let l = lado.startsWith('DIR') ? 'Direita' : 'Esquerda';
+                if (pos.startsWith('LATERAL')) { if (pos.includes('ESQUERD')) l = 'Direita'; if (pos.includes('DIREIT')) l = 'Esquerda'; }
+                return l;
+            }
+            let l = (lado.startsWith('INF') || lado.startsWith('BASE') || lado.startsWith('BAIXO')) ? 'Base' : 'Topo';
+            if (pos.startsWith('TOPO')) l = 'Base';
+            if (pos.startsWith('BASE')) l = 'Topo';
+            return l;
+        }
+        // o puxador nunca pode ir no lado da dobradiça (o VB esconde esses fantasmas)
+        function ladoBloqueadoPorFuros(f, ignorarPuxador) {
+            if (!ehPortaComFuros() || !furosLista.length) return '';
+            return ladoFuroDaFolha(f, ignorarPuxador);
+        }
+        function puxadorTotalNaFolha(f) {
+            return todaExtensao() || nativoTotal() || listaPos(posicoesFolhas[f]).some(p => p.toUpperCase().includes('TOTAL'));
+        }
+        // Posições que o tipo do puxador permite (fantasmas do Paint)
+        function posicoesPermitidas(f, ignorarPuxador) {
+            if (!temPuxador()) return [];
+            const total = puxadorTotalNaFolha(f);
+            const lados = {
+                Esquerda: total ? ['Lateral Esquerda Total'] : ['Lateral Esquerda Superior', 'Lateral Esquerda Centro', 'Lateral Esquerda Inferior'],
+                Direita: total ? ['Lateral Direita Total'] : ['Lateral Direita Superior', 'Lateral Direita Centro', 'Lateral Direita Inferior'],
+                Topo: total ? ['Topo Total'] : ['Topo Esquerda', 'Topo Centro', 'Topo Direita'],
+                Base: total ? ['Base Total'] : ['Base Esquerda', 'Base Centro', 'Base Direita']
+            };
+            if (ehCorrer()) { delete lados.Topo; delete lados.Base; } // porta de correr: só laterais
+            const bloq = ladoBloqueadoPorFuros(f, ignorarPuxador);
+            return Object.entries(lados).filter(([l]) => l !== bloq).flatMap(([, v]) => v);
+        }
+        function atualizarOpcoesPosicao() {
+            const sel = document.getElementById('f-posicao');
+            if (!sel) return;
+            const wrap = document.getElementById('wrap-posicao');
+            if (wrap) wrap.style.display = ehCorrer() ? 'none' : '';
+            const atual = posicoesFolhas[0] || '';
+            const nomes = posicoesPermitidas(0, true);
+            if (atual && !nomes.includes(atual)) nomes.push(atual);
+            sel.innerHTML = `<option value="">${temPuxador() ? '— clique no desenho ou escolha —' : '— escolha o puxador —'}</option>` +
+                nomes.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+            sel.value = atual;
+            sel.disabled = !temPuxador() || !temClienteSelecionado();
+        }
+
+        // AplicarRegrasDeInterface: trava do "toda extensão" pelo tipo nativo + trava do tamanho
+        function aplicarRegrasPuxador() {
+            const chk = document.getElementById('chk-toda-ext');
+            const tem = temPuxador();
+            if (!tem) { chk.checked = false; chk.disabled = true; }
+            else if (nativoTotal()) { chk.checked = true; chk.disabled = true; }        // total de fábrica: marcado e travado
+            else if (nativoEmbutido()) { chk.checked = false; chk.disabled = true; }    // embutido nunca vira toda extensão
+            else if (nativoSobreposto() || tipoNativo().includes('EXTENS')) chk.disabled = false;
+            else { chk.checked = false; chk.disabled = true; }
+            chk.title = !tem ? 'Escolha um puxador' : nativoTotal() ? 'Puxador Total: sempre em toda a extensão'
+                      : nativoEmbutido() ? 'Puxador embutido não pode ser em toda a extensão' : '';
+            const btn = document.getElementById('btn-modo-pux');
+            btn.disabled = !tem;
+            if (!tem && modoPuxador) definirModoPuxador(false);
+            atualizarOpcoesPosicao();
+            return atualizarTravaTamanhoPuxador();
+        }
+        // referência física do tamanho: basculante e Topo/Base = largura; laterais = altura
+        function referenciaTamanhoPux() {
+            const pos = String(posicoesFolhas[0] || '').toUpperCase();
+            const alt = parseFloat(val('f-altura')) || 0, larg = parseFloat(val('f-largura')) || 0;
+            let ref = (ehBasculante() || pos.includes('TOPO') || pos.includes('BASE')) ? larg : alt;
+            if (ref <= 0) ref = ehBasculante() ? 1000 : 2000;
+            return ref;
+        }
+        // AtualizarTravaTamanhoPuxador — devolve um aviso quando a medida digitada foi ajustada
+        function atualizarTravaTamanhoPuxador() {
+            const inp = document.getElementById('f-tamanho-pux');
+            if (!inp) return '';
+            if (!temPuxador()) { inp.value = 0; inp.readOnly = true; return ''; }
+            const ref = referenciaTamanhoPux();
+            const total = nativoTotal() || todaExtensao() ||
+                          (!ehCorrer() && String(posicoesFolhas[0] || '').toUpperCase().includes('TOTAL'));
+            if (total) { inp.value = Math.round(ref); inp.readOnly = true; return ''; }  // total = lado inteiro, travado
+            if (ehCorrer() && nativoEmbutido()) { inp.value = 0; inp.readOnly = true; return ''; } // frmPortasCorrer
+            inp.readOnly = false;
+            if (isCarregandoEdicao) return '';
+            const digitado = parseFloat(String(inp.value).replace(',', '.'));
+            if (ehCorrer()) { // frmPortasCorrer.AplicarRegrasDeInterface: só corrige o mínimo
+                if (digitado > 0 && digitado < PUX_TAM_MIN) { inp.value = PUX_TAM_MIN; return `Medida ajustada para ${PUX_TAM_MIN} mm (mínimo para usinar e pôr a mão).`; }
+                return '';
+            }
+            let t = digitado > 0 ? digitado : PUX_TAM_PADRAO, motivo = '';
+            if (t < PUX_TAM_MIN) { t = PUX_TAM_MIN; motivo = `mínimo de ${PUX_TAM_MIN} mm`; }
+            if (nativoEmbutido() && t > PUX_EMBUTIDO_MAX) { t = PUX_EMBUTIDO_MAX; motivo = `embutido vai até ${PUX_EMBUTIDO_MAX} mm`; }
+            if (t > ref) { t = ref; motivo = `não pode passar do tamanho da porta (${Math.round(ref)} mm)`; }
+            t = Math.round(t);
+            inp.value = t;
+            return digitado > 0 && motivo ? `Medida ajustada para ${t} mm — ${motivo}.` : '';
+        }
+
+        // SincronizarMemoriaPortas: uma folha por unidade de Qtd; a nova folha clona a 1 (as pares invertidas)
         function garantirFolhas() {
             const n = qtdFolhasAtual();
-            while (posicoesFolhas.length < n) posicoesFolhas.push(posicoesFolhas[0] || '');
+            while (posicoesFolhas.length < n) {
+                const i = posicoesFolhas.length, p0 = posicoesFolhas[0] || '';
+                posicoesFolhas.push(ehCorrer() ? '' : (i % 2 === 1 && p0 ? inverterLadoPux(p0) : p0));
+            }
             posicoesFolhas.length = n;
             while (ladosFuros.length < n) ladosFuros.push(ladosFuros[0] || 'Esquerdo');
             ladosFuros.length = n;
@@ -821,69 +971,62 @@
         function aplicarEspelhamentoPuxadorNaMemoria() {
             garantirFolhas();
             if (!paresAtivo()) return;
-            const base = posicoesFolhas[0] || '';
-            posicoesFolhas = posicoesFolhas.map((_, i) => i % 2 === 0 ? base : posicaoEspelhada(base));
+            const base = properCase(posicoesFolhas[0] || '');
+            if (!base) return;
+            posicoesFolhas = posicoesFolhas.map((_, i) => i % 2 === 0 ? base : inverterLadoPux(base));
         }
-        // Posição escolhida para UMA folha. Par → espelha nas demais; solto → autonomia da folha
-        function definirPosicaoPuxador(idx, pos) {
-            garantirFolhas();
-            posicoesFolhas[idx] = pos;
-            if (paresAtivo()) {
-                const paridade = idx % 2;
-                posicoesFolhas = posicoesFolhas.map((_, i) => i % 2 === paridade ? pos : posicaoEspelhada(pos));
-            }
-            const sel = document.getElementById('f-posicao');
-            if (posicoesFolhas[0]) selecionarComboPorTexto('f-posicao', posicoesFolhas[0]); else sel.value = '';
+        // depois de qualquer mudança de posição: nomenclatura → regras → espelho → furos → preço
+        function aposMudarPosicao() {
+            sincronizarNomenclaturaPuxador();
+            const aviso = aplicarRegrasPuxador();
+            aplicarEspelhamentoPuxadorNaMemoria();
             sincronizarFurosComMemoria();
-            atualizarTravaTamanhoPuxador();
+            atualizarOpcoesPosicao();
             desenharVisualizacao();
             calcularPrecoAutomatico();
+            if (aviso) document.getElementById('calc-status').textContent = '⚠️ ' + aviso;
         }
-        function puxadorEhTotal() {
-            return (document.getElementById('chk-toda-ext')?.checked || false) ||
-                   String(posicoesFolhas[0] || '').toUpperCase().includes('TOTAL');
+        // picDesenho_MouseClick (giro/basculante): grava na folha clicada; no par espelha nas outras
+        function definirPosicaoPuxador(idx, pos) {
+            garantirFolhas();
+            pos = properCase(pos);
+            if (paresAtivo()) posicoesFolhas = posicoesFolhas.map((p, i) => i % 2 === idx % 2 ? pos : inverterLadoPux(pos));
+            else posicoesFolhas[idx] = pos;
+            const faltam = posicoesFolhas.filter(p => !p).length;
+            if (modoPuxador && !faltam) { modoPuxador = false; atualizarVisualModoPux(); } // configuração termina sozinha
+            aposMudarPosicao();
+            return faltam;
         }
-        // SincronizarNomenclaturaPuxador: "toda extensão" vira posição Total para o motor
-        function posicaoParaCalculo() {
-            const pos = posicoesFolhas[0] || '';
-            if (!pos || !document.getElementById('chk-toda-ext')?.checked || pos.toUpperCase().includes('TOTAL')) return pos;
-            const u = pos.toUpperCase();
-            if (u.startsWith('TOPO')) return 'Topo Total';
-            if (u.startsWith('BASE')) return 'Base Total';
-            return u.includes('ESQUERD') ? 'Lateral Esquerda Total' : 'Lateral Direita Total';
+        // picDesenho_MouseClick (correr): liga/desliga a posição; no máximo 2 puxadores por folha
+        function alternarPuxadorCorrer(idx, nome) {
+            garantirFolhas();
+            const lista = listaPos(posicoesFolhas[idx]).map(s => s.toUpperCase());
+            const alvo = nome.toUpperCase();
+            if (lista.includes(alvo)) lista.splice(lista.indexOf(alvo), 1);
+            else if (lista.length < 2) lista.push(alvo);
+            else { alert('Limite atingido: o sistema permite no máximo 2 puxadores por porta.'); return; }
+            posicoesFolhas[idx] = lista.join(', ');
+            aposMudarPosicao();
         }
-        function ladoDoPuxador(pos) {
-            const u = String(pos || '').toUpperCase();
-            return (u.includes('TOPO') || u.includes('BASE')) ? (parseFloat(val('f-largura')) || 0) : (parseFloat(val('f-altura')) || 0);
-        }
-        // AtualizarTravaTamanhoPuxador: puxador total = tamanho do lado inteiro, campo travado
-        function atualizarTravaTamanhoPuxador() {
-            const inp = document.getElementById('f-tamanho-pux');
-            if (!inp) return;
-            if (val('f-puxador') && puxadorEhTotal()) {
-                const lado = ladoDoPuxador(posicoesFolhas[0]);
-                inp.value = lado > 0 ? lado : '';
-                inp.readOnly = true;
-            } else if (inp.readOnly) {
-                inp.readOnly = false;
-                inp.value = '';
-            }
+        function posicaoParaCalculo() { return posicoesFolhas[0] || ''; }
+        function atualizarVisualModoPux() {
+            document.getElementById('btn-modo-pux').classList.toggle('ativo', modoPuxador);
+            document.getElementById('cv-visualizacao').classList.toggle('modo-pux', modoPuxador);
+            document.getElementById('viz-status').textContent = !modoPuxador ? ''
+                : ehCorrer() ? '💡 Clique nas laterais de cada folha (até 2 puxadores por folha; clique de novo para remover)'
+                : paresAtivo() ? '💡 Clique numa das posições em laranja — a outra folha do par é espelhada'
+                : '💡 Clique numa das posições em laranja de cada folha';
         }
         // chkConfigPux: ligar limpa as posições para forçar nova escolha nos fantasmas
         function definirModoPuxador(ativo) {
-            modoPuxador = ativo;
-            if (ativo) {
+            modoPuxador = ativo && temPuxador();
+            if (modoPuxador) {
                 posicoesFolhas = posicoesFolhas.map(() => '');
-                document.getElementById('f-posicao').value = '';
                 sincronizarFurosComMemoria();
+                aplicarRegrasPuxador();
                 calcularPrecoAutomatico();
             }
-            document.getElementById('btn-modo-pux').classList.toggle('ativo', ativo);
-            document.getElementById('cv-visualizacao').classList.toggle('modo-pux', ativo);
-            document.getElementById('viz-status').textContent = ativo
-                ? (paresAtivo() ? '💡 Clique na borda da folha onde o puxador entra — a outra folha do par é espelhada'
-                                : '💡 Clique na borda de cada folha onde o puxador entra')
-                : '';
+            atualizarVisualModoPux();
             desenharVisualizacao();
         }
 
@@ -978,10 +1121,12 @@
             if (resumo) resumo.textContent = furosLista.length
                 ? `${furosLista.length} furo(s) — lado: ${ladosFuros.map((l, i) => n > 1 ? `F${i + 1} ${l}` : l).join(' · ')}`
                 : '';
+            atualizarOpcoesPosicao();
         }
 
         // textos do desenho maiores: o canvas é desenhado em 2× e exibido numa coluna estreita
         const fonte = (px, peso = 600) => `${peso} ${Math.round(px * 1.6)}px 'Plus Jakarta Sans', 'Segoe UI', sans-serif`;
+        // picDesenho_Paint — perfil, vidro, divisores, puxador + fantasmas e furos (geometria do VB)
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
             if (!cv) return;
@@ -989,12 +1134,12 @@
             const largura = parseFloat(val('f-largura')) || 0;
             const qtdDivH = parseInt(val('f-div-h')) || 0;
             const qtdDivV = parseInt(val('f-div-v')) || 0;
-            const puxador = val('f-puxador');
             const ehPar = paresAtivo();
             const ctx = cv.getContext('2d');
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
+            cv._zonas = [];
             if (altura <= 0 || largura <= 0) {
                 ctx.font = fonte(26); ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
@@ -1002,159 +1147,145 @@
             }
             garantirFolhas();
             const qtdFolhas = Math.min(posicoesFolhas.length, 4);
-            const gap = 30, margemCota = 90;
-            const larguraTotal = largura * qtdFolhas + gap * (qtdFolhas - 1);
-            const esc = Math.min((W - margemCota * 2) / larguraTotal, (H - margemCota * 2) / altura);
-            const dh = altura * esc;
-            const oy = (H - dh) / 2;
-            const px = mm => mm * esc;
-            const ox0 = (W - larguraTotal * esc) / 2;
-            cv._esc = esc; cv._oy = oy; cv._ox0 = ox0;
-            cv._qtdFolhas = qtdFolhas;   // cache p/ o clique identificar a folha certa
-            const todaExt = document.getElementById('chk-toda-ext')?.checked;
+            const gapMm = qtdFolhas > 1 ? 150 : 0, margem = 100;
+            const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
+            const esc = Math.min((W - margem * 2) / larguraTotal, (H - margem * 2) / altura);
+            const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc;
+            const oy = (H - altPx) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            const perfilPx = Math.max(45 * esc, 8);
+            const configAtivo = modoPuxador && temPuxador();
+            const tamDigitado = parseFloat(val('f-tamanho-pux'));
+            const tamReal = tamDigitado > 0 ? tamDigitado : 120;
+            // espessura do puxador pelo tipo (embutido mais fino e por dentro; sobreposto mais grosso e saliente)
+            const emb = nativoEmbutido(), sob = nativoSobreposto() || !tipoNativo();
+            let esp = emb ? Math.max(2.5 * esc, perfilPx * .28) : sob ? Math.max(4 * esc, perfilPx * .36) : Math.max(3.5 * esc, perfilPx * .34);
+            esp = Math.max(Math.min(esp, perfilPx * .55), 8);
             for (let f = 0; f < qtdFolhas; f++) {
-                const ehFolhaEspelhada = ehPar && (f % 2) === 1;
-                const ox = ox0 + px(f * (largura + gap));
-                const X = mm => ox + px(mm);
-                const Y = mm => oy + px(mm);
-                // vidro + moldura
-                ctx.fillStyle = 'rgba(173,216,230,.22)';
-                ctx.fillRect(X(0), Y(0), px(largura), dh);
-                ctx.lineWidth = 12; ctx.strokeStyle = '#5a6b7b';
-                ctx.strokeRect(X(0), Y(0), px(largura), dh);
-                // divisores verticais e horizontais
-                ctx.lineWidth = 7; ctx.strokeStyle = '#5a6b7b';
-                for (let i = 1; i <= qtdDivV; i++) {
-                    const x = X(largura * i / (qtdDivV + 1));
-                    ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, Y(altura)); ctx.stroke();
+                const ox = ox0 + f * (largPx + gapPx);
+                // perfil + vidro
+                ctx.fillStyle = '#c3c8cd'; ctx.fillRect(ox, oy, largPx, altPx);
+                ctx.lineWidth = 2; ctx.strokeStyle = '#2b2f33'; ctx.strokeRect(ox, oy, largPx, altPx);
+                const gx = ox + perfilPx, gy = oy + perfilPx, gw = largPx - perfilPx * 2, gh = altPx - perfilPx * 2;
+                ctx.fillStyle = '#eaf4fb'; ctx.fillRect(gx, gy, gw, gh);
+                ctx.strokeStyle = '#8a9399'; ctx.strokeRect(gx, gy, gw, gh);
+                // divisores (espessura de 15 mm)
+                const espDiv = Math.max(15 * esc, 3);
+                ctx.fillStyle = '#c3c8cd'; ctx.strokeStyle = '#6b7178'; ctx.lineWidth = 1.5;
+                for (let d = 1; d <= qtdDivH; d++) {
+                    const y = gy + gh / (qtdDivH + 1) * d - espDiv / 2;
+                    ctx.fillRect(gx, y, gw, espDiv); ctx.strokeRect(gx, y, gw, espDiv);
                 }
-                for (let i = 1; i <= qtdDivH; i++) {
-                    const y = Y(altura * i / (qtdDivH + 1));
-                    ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(largura), y); ctx.stroke();
+                for (let d = 1; d <= qtdDivV; d++) {
+                    const x = gx + gw / (qtdDivV + 1) * d - espDiv / 2;
+                    ctx.fillRect(x, gy, espDiv, gh); ctx.strokeRect(x, gy, espDiv, gh);
                 }
-                // puxador da PRÓPRIA folha
-                const posEfetiva = String(posicoesFolhas[f] || '').toUpperCase();
-                if (puxador && posEfetiva) {
-                    const horizontal = posEfetiva.startsWith('TOPO') || posEfetiva.startsWith('BASE');
-                    const lado = horizontal ? largura : altura;
-                    const marg = 30;
-                    const ehTotal = todaExt || posEfetiva.includes('TOTAL');
-                    const tamPux = ehTotal ? lado : (parseFloat(val('f-tamanho-pux')) || lado * 0.5);
-                    const tamDesenho = Math.min(tamPux, lado - marg * 2);
-                    ctx.lineWidth = 10; ctx.strokeStyle = '#8B0000'; ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    let cotaX = X(largura / 2), cotaY = Y(altura) + 40;
-                    if (horizontal) {
-                        const yLinha = posEfetiva.startsWith('TOPO') ? Y(marg) : Y(altura - marg);
-                        const xIni = ehTotal ? X(marg) : posEfetiva.includes('ESQUERD') ? X(marg) : X(largura - marg - tamDesenho);
-                        ctx.moveTo(xIni, yLinha); ctx.lineTo(xIni + px(tamDesenho), yLinha);
-                        cotaX = xIni + px(tamDesenho) / 2;
-                        cotaY = posEfetiva.startsWith('TOPO') ? yLinha - 12 : yLinha + 20;
-                    } else {
-                        const xLinha = posEfetiva.includes('ESQUERD') ? X(marg) : X(largura - marg);
-                        const yIni = ehTotal ? Y(marg) : posEfetiva.includes('SUPERIOR') ? Y(marg) : Y(altura - marg - tamDesenho);
-                        ctx.moveTo(xLinha, yIni); ctx.lineTo(xLinha, yIni + px(tamDesenho));
-                        cotaX = posEfetiva.includes('ESQUERD') ? xLinha + 40 : xLinha - 40;
-                        cotaY = yIni + px(tamDesenho) / 2;
-                    }
-                    ctx.stroke();
-                    ctx.font = fonte(16); ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
-                    ctx.fillText(`${tamPux} mm`, cotaX, cotaY);
-                }
-                // furos: mesma lista em todas as folhas, no lado de cada uma (sem espelhar as medidas)
-                if (ehPortaComFuros()) {
-                    const ladoF = String(ladosFuros[f] || '').toUpperCase();
-                    const recuo = 22;
-                    ctx.strokeStyle = '#dc3545'; ctx.fillStyle = '#dc3545'; ctx.lineWidth = 3;
-                    ctx.font = fonte(14);
-                    furosLista.forEach(m => {
-                        let cx, cy;
-                        if (ladoF.startsWith('SUPERIOR') || ladoF.startsWith('INFERIOR')) {
-                            if (m < 0 || m > largura) return;
-                            cx = X(m);
-                            cy = ladoF.startsWith('SUPERIOR') ? Y(recuo) : Y(altura - recuo);
-                            ctx.textAlign = 'center';
-                            ctx.fillText(`${m}`, cx, ladoF.startsWith('SUPERIOR') ? cy + 26 : cy - 16);
-                        } else {
-                            if (m < 0 || m > altura) return;
-                            cy = isReferenciaInvertida ? Y(altura - m) : Y(m);
-                            const dir = ladoF.startsWith('DIREIT');
-                            cx = dir ? X(largura - recuo) : X(recuo);
-                            ctx.textAlign = dir ? 'right' : 'left';
-                            ctx.fillText(`${m}`, dir ? cx - 14 : cx + 14, cy + 5);
+                // puxador: um sólido na posição escolhida + fantasmas no modo de configuração
+                let topoExtra = 0;
+                if (temPuxador()) {
+                    const total = puxadorTotalNaFolha(f);
+                    const recuo = (emb || total) ? 0 : esp / 2;
+                    topoExtra = recuo;
+                    const comp = (tamMm, ladoMm, ladoPx) => {
+                        if (total || tamMm >= ladoMm) return ladoPx;
+                        return Math.min(Math.max(tamMm * esc, Math.max(28 * esc, ladoPx * .1)), ladoPx);
+                    };
+                    const compV = comp(tamReal, altura, altPx), compH = comp(tamReal, largura, largPx);
+                    const geo = nome => {
+                        const u = nome.toUpperCase();
+                        if (u.startsWith('LATERAL')) {
+                            const x = u.includes('ESQUERD') ? ox - recuo : ox + largPx - esp + recuo;
+                            if (u.includes('TOTAL')) return [x, oy, esp, altPx];
+                            const y = u.includes('SUPERIOR') ? oy : u.includes('INFERIOR') ? oy + altPx - compV : oy + (altPx - compV) / 2;
+                            return [x, y, esp, compV];
                         }
-                        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
+                        const y = u.startsWith('TOPO') ? oy - recuo : oy + altPx - esp + recuo;
+                        if (u.includes('TOTAL')) return [ox, y, largPx, esp];
+                        const x = u.includes('ESQUERD') ? ox : u.includes('DIREIT') ? ox + largPx - compH : ox + (largPx - compH) / 2;
+                        return [x, y, compH, esp];
+                    };
+                    const escolhidos = listaPos(posicoesFolhas[f]).map(p => normalizarPosicao(p, false).toUpperCase());
+                    const nomes = posicoesPermitidas(f);
+                    escolhidos.forEach(n => { if (!nomes.some(x => x.toUpperCase() === n)) nomes.push(properCase(n)); });
+                    const mostraFantasma = configAtivo && (!ehCorrer() || escolhidos.length < 2);
+                    nomes.forEach(nome => {
+                        const r = geo(nome);
+                        if (escolhidos.includes(nome.toUpperCase())) {
+                            ctx.fillStyle = '#ff8c00'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+                        } else if (mostraFantasma) {
+                            ctx.fillStyle = 'rgba(255,165,0,.35)'; ctx.strokeStyle = 'rgba(255,140,0,.8)'; ctx.lineWidth = 1.5;
+                        } else return;
+                        ctx.fillRect(...r); ctx.strokeRect(...r);
+                        if (configAtivo) cv._zonas.push({ r, nome, folha: f });
                     });
                 }
-                // cotas SEMPRE visíveis + rótulo da folha
-                ctx.font = fonte(17); ctx.fillStyle = '#6c757d';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${largura} mm`, X(largura / 2), Y(altura) + 38);
-                ctx.save();
-                ctx.translate(ox - 22, oy + dh / 2);
-                ctx.rotate(-Math.PI / 2);
-                ctx.fillText(`${altura} mm`, 0, 0);
-                ctx.restore();
-                if (qtdFolhas > 1) {
-                    ctx.font = fonte(15); ctx.fillStyle = '#8B0000';
-                    ctx.fillText(ehFolhaEspelhada ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, X(largura / 2), Y(0) - 12);
+                // furos: mesma lista em todas as folhas, no lado de cada uma (centro do perfil)
+                if (ehPortaComFuros() && furosLista.length) {
+                    const lado = ladoFuroDaFolha(f);
+                    const raio = Math.max(35 * esc, 12) / 2;
+                    ctx.font = fonte(14); ctx.lineWidth = 2;
+                    furosLista.forEach(m => {
+                        let cx, cy;
+                        if (lado === 'Topo' || lado === 'Base') {
+                            if (m < 0 || m > largura) return;
+                            cx = ox + m * esc;
+                            cy = lado === 'Topo' ? oy + perfilPx / 2 : oy + altPx - perfilPx / 2;
+                            ctx.textAlign = 'center';
+                        } else {
+                            if (m < 0 || m > altura) return;
+                            cy = oy + (isReferenciaInvertida ? altura - m : m) * esc;
+                            cx = lado === 'Direita' ? ox + largPx - perfilPx / 2 : ox + perfilPx / 2;
+                        }
+                        ctx.fillStyle = '#f5f5f5'; ctx.strokeStyle = '#2f4f4f';
+                        ctx.beginPath(); ctx.arc(cx, cy, raio, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                        ctx.fillStyle = '#8b0000';
+                        if (lado === 'Topo') ctx.fillText(`${m}`, cx, cy + raio + 26);
+                        else if (lado === 'Base') ctx.fillText(`${m}`, cx, cy - raio - 10);
+                        else if (lado === 'Direita') { ctx.textAlign = 'right'; ctx.fillText(`${m}`, cx - raio - 8, cy + 8); }
+                        else { ctx.textAlign = 'left'; ctx.fillText(`${m}`, cx + raio + 8, cy + 8); }
+                    });
                 }
-                // zonas fantasmas do puxador (uma por borda de cada folha)
-                if (modoPuxador && puxador) {
-                    const z = 26;
-                    ctx.fillStyle = 'rgba(139,0,0,.12)';
-                    ctx.fillRect(X(0), Y(0), z, dh);
-                    ctx.fillRect(X(largura) - z, Y(0), z, dh);
-                    ctx.fillRect(X(0), Y(0), px(largura), z);
-                    ctx.fillRect(X(0), Y(altura) - z, px(largura), z);
-                    ctx.fillStyle = '#8B0000'; ctx.font = fonte(14); ctx.textAlign = 'center';
-                    ctx.fillText('ESQ', X(0) + z / 2, oy + dh / 2);
-                    ctx.fillText('DIR', X(largura) - z / 2, oy + dh / 2);
-                    ctx.fillText('TOPO', X(largura / 2), Y(0) + 18);
-                    ctx.fillText('BASE', X(largura / 2), Y(altura) - 8);
+                // cotas + rótulo da folha
+                ctx.font = fonte(17); ctx.fillStyle = '#6c757d'; ctx.textAlign = 'center';
+                ctx.fillText(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 40);
+                if (f === 0) {
+                    ctx.save();
+                    ctx.translate(ox - topoExtra - 24, oy + altPx / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText(`${altura} mm`, 0, 0);
+                    ctx.restore();
+                }
+                if (qtdFolhas > 1) {
+                    ctx.font = fonte(15); ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
+                    ctx.fillText(ehPar && f % 2 === 1 ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, ox + largPx / 2, oy - topoExtra - 14);
                 }
             }
         }
-        // clique no canvas: escolha da posição do puxador na folha clicada (modo fantasma)
+        // picDesenho_MouseClick: escolha da posição clicando num fantasma
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
-            if (!modoPuxador || !val('f-puxador')) return;
+            if (!modoPuxador || !temPuxador()) return;
             const cv = document.getElementById('cv-visualizacao');
-            const altura = parseFloat(val('f-altura')) || 0;
-            const largura = parseFloat(val('f-largura')) || 0;
-            if (!altura || !largura) return;
             const rect = cv.getBoundingClientRect();
-            const esc = cv._esc || 1, oy = cv._oy || 0, ox0 = cv._ox0 || 0;
-            const qtdFolhas = cv._qtdFolhas || 1;
-            const gap = 30;
             const cx = (e.clientX - rect.left) * (cv.width / rect.width);
             const cy = (e.clientY - rect.top) * (cv.height / rect.height);
-            let folha = -1;
-            for (let f = 0; f < qtdFolhas; f++) {
-                const ox = ox0 + (f * (largura + gap)) * esc;
-                if (cx >= ox && cx <= ox + largura * esc) { folha = f; break; }
+            const zonas = cv._zonas || [];
+            const dentro = (z, tol) => cx >= z.r[0] - tol && cx <= z.r[0] + z.r[2] + tol && cy >= z.r[1] - tol && cy <= z.r[1] + z.r[3] + tol;
+            const alvo = zonas.find(z => dentro(z, 0)) || zonas.find(z => dentro(z, 12)); // folga para dedo/mouse
+            const status = document.getElementById('viz-status');
+            if (ehCorrer()) {
+                if (alvo) {
+                    alternarPuxadorCorrer(alvo.folha, alvo.nome);
+                    status.textContent = `Folha ${alvo.folha + 1}: ${posicoesFolhas[alvo.folha] || 'sem puxador'}`;
+                }
+                return;
             }
-            if (folha < 0) return;
-            const ox = ox0 + (folha * (largura + gap)) * esc;
-            const mmX = (cx - ox) / esc;
-            const mmY = (cy - oy) / esc;
-            const dEsq = mmX, dDir = largura - mmX, dTopo = mmY, dBase = altura - mmY;
-            const min = Math.min(dEsq, dDir, dTopo, dBase);
-            let nova;
-            if (min === dEsq) nova = mmY < altura / 2 ? 'Lateral Esquerda Superior' : 'Lateral Esquerda Inferior';
-            else if (min === dDir) nova = mmY < altura / 2 ? 'Lateral Direita Superior' : 'Lateral Direita Inferior';
-            else if (min === dTopo) nova = mmX < largura / 2 ? 'Topo Esquerda' : 'Topo Direita';
-            else nova = mmX < largura / 2 ? 'Base Esquerda' : 'Base Direita';
-            definirPosicaoPuxador(folha, nova);
-            garantirFolhas();
-            const faltam = posicoesFolhas.slice(0, qtdFolhas).filter(p => !p).length;
-            document.getElementById('viz-status').textContent = `Folha ${folha + 1}: ${nova}` +
-                (faltam ? ` — falta posicionar ${faltam} folha(s)` : '');
-            if (!faltam) {
-                modoPuxador = false;
-                cv.classList.remove('modo-pux');
-                document.getElementById('btn-modo-pux').classList.remove('ativo');
-                desenharVisualizacao();
+            if (!alvo) {
+                // VB: clique fora dos fantasmas com a configuração ligada limpa as posições
+                if (posicoesFolhas.some(Boolean)) { posicoesFolhas = posicoesFolhas.map(() => ''); aposMudarPosicao(); }
+                atualizarVisualModoPux();
+                return;
             }
+            const faltam = definirPosicaoPuxador(alvo.folha, alvo.nome);
+            status.textContent = `Folha ${alvo.folha + 1}: ${posicoesFolhas[alvo.folha]}` + (faltam ? ` — falta posicionar ${faltam} folha(s)` : '');
         });
         // ============ FORMULÁRIO ============
         function descreverPosicoes() {
@@ -1198,7 +1329,7 @@
                     : { lista: [], lados: [], referenciaInvertida: false },
                 detalhes: {
                     perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'),
-                    puxador: g('f-puxador'), tipoPuxador: tipoPuxadorAtual,
+                    puxador: g('f-puxador'), tipoPuxador: tipoPuxadorDaPorta(), tipoPuxadorNativo: tipoPuxadorAtual,
                     posicao: posicoesFolhas[0] || '', posicoesFolhas: [...posicoesFolhas],
                     acabPux: g('f-acab-pux'), corPux: g('f-cor-pux'), tamanhoPux: g('f-tamanho-pux'),
                     revestimento: g('f-revest'), corRevest: g('f-cor-revest'),
@@ -1237,7 +1368,7 @@
                     // CADEIA 2: PUXADOR → acabamento → cor
                     selecionarComboPorTexto('f-puxador', d.puxador);
                     if (d.puxador) await carregarDependentesPuxador(d.puxador);
-                    if (d.tipoPuxador) tipoPuxadorAtual = d.tipoPuxador;
+                    if (!tipoPuxadorAtual) tipoPuxadorAtual = d.tipoPuxadorNativo || String(d.tipoPuxador || '').replace(/\s*total$/i, '');
                     selecionarComboPorTexto('f-acab-pux', d.acabPux);
                     filtrarCores('f-cor-pux', d.acabPux);
                     selecionarComboPorTexto('f-cor-pux', d.corPux);
@@ -1260,7 +1391,6 @@
                 setChk('chk-toda-ext', d.todaExt);
                 const tam = document.getElementById('f-tamanho-pux');
                 tam.value = d.tamanhoPux || '';
-                tam.readOnly = !!(d.puxador && (d.todaExt || String(d.posicao || '').toUpperCase().includes('TOTAL')));
                 set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
                 set('f-produto', d.produto); set('f-material', d.material);
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
@@ -1270,7 +1400,10 @@
                 posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
                     ? [...d.posicoesFolhas] : [d.posicao || ''];
                 garantirFolhas();
-                if (posicoesFolhas[0]) selecionarComboPorTexto('f-posicao', posicoesFolhas[0]); else set('f-posicao', '');
+                // edição: toda extensão vem do salvo; as regras do tipo nativo valem por cima (sem mexer no tamanho salvo)
+                if (String(d.tipoPuxador || '').toUpperCase().includes('TOTAL') || posicoesFolhas.some(p => /total/i.test(p)))
+                    setChk('chk-toda-ext', true);
+                aplicarRegrasPuxador();
                 // furos: TODA a lista salva vira linha na tela (sem descartar medidas repetidas)
                 const fu = item.furos && !Array.isArray(item.furos) ? item.furos : { lista: [], lados: [] };
                 document.getElementById('pnl-furacoes').innerHTML = '';
@@ -1318,6 +1451,7 @@
             atualizarTotalItem();
             alternarCamposPuxador('');
             sincronizarFurosComMemoria();
+            aplicarRegrasPuxador();
             desenharVisualizacao();
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
@@ -1445,7 +1579,7 @@
             desenharVisualizacao();
         });
         // Motor: recalcula ao mudar campos sem handler próprio
-        ['f-cor','f-cor-pux','f-tamanho-pux','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
+        ['f-cor','f-cor-pux','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
          'f-percentuais',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
@@ -1456,11 +1590,26 @@
         document.getElementById('f-acab-pux').addEventListener('change', aoMudarAcabPuxador);
         document.getElementById('f-revest').addEventListener('change', aoMudarRevestimento);
         document.getElementById('f-posicao').addEventListener('change', e => definirPosicaoPuxador(0, e.target.value));
+        // chkPuxadorTodaExtensao_CheckedChanged
         document.getElementById('chk-toda-ext').addEventListener('change', () => {
-            atualizarTravaTamanhoPuxador();
-            desenharVisualizacao();
-            calcularPrecoAutomatico();
+            const marcado = todaExtensao();
+            if (ehCorrer()) {
+                // frmPortasCorrer: cada lado escolhido vira "Total" (marcado) ou "Centro" (desmarcado)
+                posicoesFolhas = posicoesFolhas.map(p => {
+                    const u = String(p).toUpperCase(), l = [];
+                    if (u.includes('ESQUERD')) l.push(marcado ? 'Lateral Esquerda Total' : 'Lateral Esquerda Centro');
+                    if (u.includes('DIREIT')) l.push(marcado ? 'Lateral Direita Total' : 'Lateral Direita Centro');
+                    return l.join(', ');
+                });
+            } else if (!marcado) {
+                // ao desmarcar, a posição Total volta ao Centro do mesmo lado (ver observação no relatório)
+                posicoesFolhas = posicoesFolhas.map(p => p ? normalizarPosicao(p.replace(/\s*total\s*/i, ' ').trim(), false) : p);
+            }
+            if (!marcado) document.getElementById('f-tamanho-pux').value = 0; // volta para o padrão de 150 mm
+            aposMudarPosicao();
         });
+        // txtTamPuxador_Leave → AplicarRegrasDeInterface (mínimo, máximo e limite do embutido)
+        document.getElementById('f-tamanho-pux').addEventListener('change', aposMudarPosicao);
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
         // Medidas: furos automáticos, trava do puxador total e redesenho
@@ -1469,8 +1618,10 @@
             el.addEventListener('change', () => {
                 recalcularFurosAutomaticos();
                 sincronizarFurosComMemoria();
-                atualizarTravaTamanhoPuxador();
+                const aviso = aplicarRegrasPuxador();
                 desenharVisualizacao();
+                calcularPrecoAutomatico();
+                if (aviso) document.getElementById('calc-status').textContent = '⚠️ ' + aviso;
             });
             el.addEventListener('input', desenharVisualizacao);
         });
