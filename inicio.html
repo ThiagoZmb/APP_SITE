@@ -290,7 +290,7 @@
         .fin-item.saldo span, .fin-item.saldo b { color: white; }
         .fin-item.saldo span { opacity: .85; }
 
-        .grafico-box { height: 300px; padding: 0 24px 24px; }
+        .grafico-box { height: 230px; padding: 0 24px 18px; }
         .so-interno[hidden], .menu-item[hidden] { display: none !important; }
 
         @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
@@ -443,12 +443,14 @@
         const moedaCurta = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
         const normalizar = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
         // datas do /dados_lista vêm como dd/mm/aaaa
-        const paraData = br => { const p = String(br || '').split('/'); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
+        // ano < 1900 = data vazia (o VB grava 01/01/0001 quando não há data)
+        const paraData = br => { const p = String(br || '').split('/'); return p.length === 3 && +p[2] >= 1900 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
         const ehDoMes = (br, ref) => { const d = paraData(br); return d && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear(); };
         // mesmas regras de situação do painel de Pedidos/Orçamentos
         const emProducao = s => normalizar(s).includes('produ');
         const pronto = s => { const n = normalizar(s); return n.includes('pronto') || n.includes('finalizado') || n.includes('conclu') || n === 'ok' || n === 'done'; };
-        const entregue = s => normalizar(s).includes('entregue');
+        // pedido que já saiu da fábrica (ou foi cancelado) não entra em "Entregas da semana"
+        const entregue = s => { const n = normalizar(s); return n.includes('entregue') || n.includes('retirad') || n.includes('cancel'); };
         function classeStatus(s) {
             if (pronto(s)) return 'pronto';
             if (emProducao(s)) return 'producao';
@@ -494,21 +496,26 @@
                     <div class="dir">${moeda(p.valor)}<small><span class="status ${classeStatus(p.situacao)}">${escapeHtml(p.situacao || '—')}</span></small></div>
                 </li>`).join('') || '<li class="vazio">Nenhum pedido ainda</li>';
 
-            // entregas atrasadas + próximos 7 dias, de pedidos ainda não entregues
+            // entregas atrasadas + próximos 7 dias, de pedidos ainda não entregues/retirados.
+            // Data usada: entrega; sem ela, a previsão "pronto em".
             const zero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
             const limite = new Date(zero); limite.setDate(limite.getDate() + 7);
             const entregas = pedidos
-                .filter(p => !entregue(p.situacao) && paraData(p.dataEntrega) && paraData(p.dataEntrega) <= limite)
-                .map(p => ({ ...p, quando: paraData(p.dataEntrega) }))
+                .filter(p => !entregue(p.situacao))
+                .map(p => {
+                    const porEntrega = paraData(p.dataEntrega);
+                    return { ...p, quando: porEntrega || paraData(p.prontoEm), rotulo: porEntrega ? 'Entrega' : 'Pronto em', dataTxt: porEntrega ? p.dataEntrega : p.prontoEm };
+                })
+                .filter(p => p.quando && p.quando <= limite)
                 .sort((a, b) => a.quando - b.quando)
                 .slice(0, 8);
             $('entregas').innerHTML = entregas.map(p => {
-                const atrasado = p.quando < zero;
                 const dias = Math.round((p.quando - zero) / 86400000);
-                const quando = atrasado ? `atrasado ${-dias} dia(s)` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
+                const atrasado = dias < 0;
+                const quando = atrasado ? `atrasado ${-dias} dia${dias === -1 ? '' : 's'}` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
                 return `<li>
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
-                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>Entrega ${escapeHtml(p.dataEntrega)}</small></div>
+                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${p.rotulo} ${escapeHtml(p.dataTxt)}</small></div>
                     <div class="dir"><span class="status ${atrasado ? 'atraso' : classeStatus(p.situacao)}">${quando}</span><small>${escapeHtml(p.situacao || '')}</small></div>
                 </li>`;
             }).join('') || '<li class="vazio">Nenhuma entrega prevista para os próximos 7 dias 🎉</li>';
@@ -556,8 +563,8 @@
                     data: {
                         labels: dados.map(d => d.mes),
                         datasets: [
-                            { label: 'Orçamentos', data: dados.map(d => d.orcamentos), backgroundColor: 'rgba(108,117,125,.45)', borderRadius: 5 },
-                            { label: 'Pedidos', data: dados.map(d => d.pedidos), backgroundColor: 'rgba(139,0,0,.8)', borderRadius: 5 }
+                            { label: 'Orçamentos', data: dados.map(d => d.orcamentos), backgroundColor: '#2f6fdb', borderRadius: 5, maxBarThickness: 42 },
+                            { label: 'Pedidos', data: dados.map(d => d.pedidos), backgroundColor: '#a3213a', borderRadius: 5, maxBarThickness: 42 }
                         ]
                     },
                     options: {

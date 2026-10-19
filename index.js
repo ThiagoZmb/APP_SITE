@@ -117,9 +117,10 @@ app.get('/auth/verify', autenticar, (req, res) => {
 function dataBRSegura(v) {
   const t = String(v ?? '').trim();
   let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
-  if (m) return m[1] === '0000' ? '' : `${m[3]}/${m[2]}/${m[1]}`;
+  // ano < 1900 = data vazia (o VB grava 01/01/0001, o DateTime.MinValue do .NET)
+  if (m) return Number(m[1]) < 1900 ? '' : `${m[3]}/${m[2]}/${m[1]}`;
   m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t);
-  if (m) return `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
+  if (m) return Number(m[3]) < 1900 ? '' : `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
   return '';
 }
 const comDatasSeguras = rows => rows.map(r => ({ ...r, prontoEm: dataBRSegura(r.prontoEm), dataEntrega: dataBRSegura(r.dataEntrega) }));

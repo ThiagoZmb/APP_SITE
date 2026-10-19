@@ -302,7 +302,7 @@
         .rodape-lista b { color: var(--text-dark); }
 
         .painel + .painel { margin-top: 24px; }
-        .grafico-box { height: 280px; padding: 0 24px 24px; }
+        .grafico-box { height: 220px; padding: 0 24px 18px; }
 
         /* ===== GAVETA DO MOVIMENTO ===== */
         .gaveta-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
@@ -378,7 +378,7 @@
         .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; }
         .seg button { border: none; background: transparent; padding: 7px 14px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--text-light); cursor: pointer; }
         .seg button.on { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
-        .gastos-corpo { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, 1fr); gap: 24px; padding: 18px 24px 24px; align-items: center; }
+        .gastos-corpo { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 28px; padding: 12px 24px 18px; align-items: center; }
         .ranking { list-style: none; display: flex; flex-direction: column; gap: 4px; }
         .ranking li { display: grid; grid-template-columns: 26px minmax(0, 1fr) 215px; gap: 4px 12px; align-items: center; padding: 8px 10px; border-radius: 10px; cursor: pointer; transition: background .15s ease; }
         .ranking li:hover { background: var(--surface-2, #f9f9fb); }
@@ -390,7 +390,7 @@
         .ranking .barra-g span { display: block; height: 100%; border-radius: 4px; }
         .ranking .info { font-size: 11.5px; color: var(--text-light); text-align: right; white-space: nowrap; }
         .ranking .vazio-g { cursor: default; display: block; text-align: center; color: var(--text-light); padding: 30px 0; }
-        .rosca { position: relative; height: 260px; }
+        .rosca { position: relative; height: 210px; }
         .rosca-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
         .rosca-centro small { font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .06em; }
         .rosca-centro b { font-size: 18px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -464,7 +464,7 @@
                 </div>
             </section>
 
-            <section class="painel" id="painel-gastos" style="margin-bottom:24px">
+            <section class="painel" id="painel-gastos" style="margin-bottom:18px">
                 <div class="gastos-topo">
                     <div>
                         <div class="painel-titulo">Maiores gastos — <span id="gastos-mes">—</span></div>
@@ -688,7 +688,7 @@
         let grafico = null;
         let graficoGastos = null;
         let agruparGastos = 'fornecedor';
-        const CORES_GASTOS = ['#9b1b30', '#c2435a', '#e27d8f', '#6e0f20', '#4a4553', '#8d8796', '#cfcbd6'];
+        const CORES_GASTOS = ['#a3213a', '#2f6fdb', '#1f9d55', '#f2a516', '#7b4fd6', '#14a3a3', '#e0527e', '#94a3b8'];
         let classificacoes = [];          // fluxo_de_caixa_classificacao
         let idClassificacao = null;       // ID_CLASSIFICACAO
         let buscaClassif = 0;
@@ -724,7 +724,7 @@
             $('ranking').classList.toggle('so-leitura', agruparGastos !== 'fornecedor');
             $('ranking').innerHTML = top.length ? top.map((it, i) => {
                 const pct = r.total ? it.total / r.total * 100 : 0;
-                const cor = CORES_GASTOS[Math.min(i, 6)];
+                const cor = CORES_GASTOS[Math.min(i, CORES_GASTOS.length - 1)];
                 return `<li data-nome="${escapeHtml(it.nome)}"${agruparGastos === 'fornecedor' ? ` title="Filtrar a tabela por ${escapeHtml(it.nome)}"` : ''}>
                     <span class="pos" style="background:${cor}">${i + 1}</span>
                     <span class="nome">${escapeHtml(it.nome)}</span>
@@ -744,7 +744,7 @@
             if (graficoGastos) graficoGastos.destroy();
             graficoGastos = new Chart($('grafico-gastos'), {
                 type: 'doughnut',
-                data: { labels: rotulos, datasets: [{ data: valores, backgroundColor: CORES_GASTOS.slice(0, valores.length), borderColor: '#fff', borderWidth: 3, hoverOffset: 8 }] },
+                data: { labels: rotulos, datasets: [{ data: valores, backgroundColor: [...CORES_GASTOS.slice(0, fatias.length), ...(outros > 0 ? ['#d5d9e0'] : [])], borderColor: '#fff', borderWidth: 3, hoverOffset: 8 }] },
                 options: {
                     responsive: true, maintainAspectRatio: false, cutout: '68%',
                     plugins: {

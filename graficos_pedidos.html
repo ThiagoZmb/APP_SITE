@@ -57,7 +57,7 @@
         }
         .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
         .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
-        .chart-container { height: 420px; position: relative; }
+        .chart-container { height: 260px; position: relative; }
         .cards-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 40px; }
         .card {
             background: var(--white); border-radius: 20px; padding: 30px; border: 1px solid var(--border-color);
@@ -128,7 +128,7 @@
                 <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Orçamentos x Pedidos por Mês</h3>
                 <div class="loading-overlay" id="chart-loading"><div class="loading-spinner"></div></div>
                 <!-- ✅ BLINDAGEM 1: altura inline — o gráfico nunca renderiza com altura 0 -->
-                <div class="chart-container" style="position:relative;height:420px;">
+                <div class="chart-container" style="position:relative;height:260px;">
                     <canvas id="grafico-comparativo"></canvas>
                 </div>
             </section>
@@ -136,7 +136,7 @@
             <!-- Gráfico de LINHA — proporção de fechamento mês a mês -->
             <section class="chart-card">
                 <h3 class="chart-title"><i class="fas fa-chart-line"></i> Proporção de Fechamento por Mês</h3>
-                <div class="chart-container" style="position:relative;height:420px;">
+                <div class="chart-container" style="position:relative;height:260px;">
                     <canvas id="grafico-conversao"></canvas>
                 </div>
             </section>
@@ -242,13 +242,13 @@
                             {
                                 label: 'Orçamentos',
                                 data: orcamentos,
-                                backgroundColor: 'rgba(255, 165, 0, 0.8)',
+                                backgroundColor: '#2f6fdb',
                                 borderRadius: 5
                             },
                             {
                                 label: 'Pedidos',
                                 data: pedidos,
-                                backgroundColor: 'rgba(0, 128, 0, 0.8)',
+                                backgroundColor: '#a3213a',
                                 borderRadius: 5
                             }
                         ]
@@ -257,7 +257,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { position: 'top', labels: { padding: 20, usePointStyle: true } },
+                            legend: { position: 'top', labels: { padding: 12, usePointStyle: true, boxWidth: 8 } },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
@@ -296,11 +296,11 @@
                         datasets: [{
                             label: '% Fechamento (Pedidos / Orçamentos)',
                             data: taxaMes,
-                            borderColor: '#8B0000',
-                            backgroundColor: 'rgba(139,0,0,.12)',
+                            borderColor: '#1f9d55',
+                            backgroundColor: 'rgba(31,157,85,.12)',
                             borderWidth: 3,
                             pointRadius: 5,
-                            pointBackgroundColor: '#8B0000',
+                            pointBackgroundColor: '#1f9d55',
                             tension: 0.35,
                             fill: true
                         }]

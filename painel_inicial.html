@@ -152,7 +152,7 @@
         .chart-card { background: var(--white); border-radius: 20px; padding: 25px; box-shadow: var(--shadow-light); border: 1px solid var(--border-color); position: relative; }
         .chart-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
         .chart-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
-        .chart-container { height: 250px; position: relative; }
+        .chart-container { height: 200px; position: relative; }
         .loading-overlay {
             position: absolute; inset: 0; background: rgba(255,255,255,.8);
             display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 20px;
@@ -485,16 +485,15 @@
                     datasets: [{
                         data: Object.values(statusCounts),
                         backgroundColor: [
-                            'rgba(23,162,184,.7)', 'rgba(255,193,7,.7)',
-                            'rgba(40,167,69,.7)', 'rgba(108,117,125,.7)'
+                            '#2f6fdb', '#f2a516', '#1f9d55', '#94a3b8'   // produção, pronto, entregue, outros
                         ],
-                        borderWidth: 0
+                        borderColor: '#fff', borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } },
+                        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, boxWidth: 8 } },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
@@ -522,7 +521,7 @@
                 type: 'bar',
                 data: {
                     labels: dates,
-                    datasets: [{ label: tipoAtual === 'Orçamento' ? 'Orçamentos' : 'Pedidos', data: ordersData, backgroundColor: 'rgba(139,0,0,.7)', borderRadius: 5 }]
+                    datasets: [{ label: tipoAtual === 'Orçamento' ? 'Orçamentos' : 'Pedidos', data: ordersData, backgroundColor: '#a3213a', borderRadius: 5, maxBarThickness: 46 }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,

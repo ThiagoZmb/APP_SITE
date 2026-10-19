@@ -11,7 +11,9 @@
 // })
 // ==========================================================================
 (function () {
-    const CORES = ['#9b1b30', '#c2435a', '#e27d8f', '#6e0f20', '#4a4553', '#8d8796', '#cfcbd6'];
+    // cores bem distintas entre si (vinho da marca primeiro); "Outros" sempre em cinza claro
+    const CORES = ['#a3213a', '#2f6fdb', '#1f9d55', '#f2a516', '#7b4fd6', '#14a3a3', '#e0527e', '#94a3b8'];
+    const COR_OUTROS = '#d5d9e0';
     const TOP_LISTA = 8, TOP_ROSCA = 6;
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const pctBR = n => n.toFixed(1).replace('.', ',') + '%';
@@ -79,7 +81,7 @@
             const valores = [...fatias.map(x => x.v), ...(outros > 0 ? [outros] : [])];
             grafico = new Chart(alvo.querySelector('canvas'), {
                 type: 'doughnut',
-                data: { labels: rotulos, datasets: [{ data: valores, backgroundColor: CORES.slice(0, valores.length), borderColor: '#fff', borderWidth: 3, hoverOffset: 8 }] },
+                data: { labels: rotulos, datasets: [{ data: valores, backgroundColor: [...CORES.slice(0, fatias.length), ...(outros > 0 ? [COR_OUTROS] : [])], borderColor: '#fff', borderWidth: 3, hoverOffset: 8 }] },
                 options: {
                     responsive: true, maintainAspectRatio: false, cutout: '68%',
                     plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}: ${metrica.formatar(c.raw)} (${pctBR(c.raw / total * 100)})` } } }
