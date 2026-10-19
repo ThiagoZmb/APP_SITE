@@ -106,6 +106,29 @@
         });
     }
 
+    // Abre um PDF do backend sem token na URL: baixa com o cabeçalho Authorization e mostra numa aba nova.
+    // A aba é aberta já no clique (depois de um await o navegador bloquearia o pop-up).
+    window.abrirPdfAutenticado = async function (url) {
+        const aba = window.open('', '_blank');
+        const aviso = t => { if (aba) aba.document.body.innerHTML = `<p style="font:15px sans-serif;padding:24px;color:#444">${esc(t)}</p>`; };
+        aviso('Gerando PDF…');
+        try {
+            const r = await fetch(url, { headers: { Authorization: 'Bearer ' + (auth()?.token || '') } });
+            if (r.status === 401) {
+                if (aba) aba.close();
+                localStorage.removeItem('auth');
+                location.href = LOGIN_URL;
+                return;
+            }
+            if (!r.ok) throw new Error(r.status === 404 ? 'Pedido não encontrado.' : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
+            const link = URL.createObjectURL(await r.blob());
+            if (aba) aba.location.href = link; else location.href = link;
+            setTimeout(() => URL.revokeObjectURL(link), 120000);
+        } catch (e) {
+            if (aba) aviso('Não foi possível gerar o PDF: ' + e.message); else alert('Não foi possível gerar o PDF: ' + e.message);
+        }
+    };
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
     else montar();
 })();

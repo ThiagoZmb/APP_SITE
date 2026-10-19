@@ -24,6 +24,8 @@
         if (!chartPromessa) chartPromessa = new Promise((ok, erro) => {
             const s = document.createElement('script');
             s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+            s.integrity = 'sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4'; // arquivo adulterado no CDN não roda
+            s.crossOrigin = 'anonymous';
             s.onload = ok; s.onerror = erro;
             document.head.appendChild(s);
         });

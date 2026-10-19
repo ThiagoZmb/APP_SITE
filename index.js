@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 const PDFDocument = require('pdfkit');
 
 const app = express();
+// Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
+// valeria para todos os usuários juntos. TRUST_PROXY_HOPS permite ajustar sem mudar código.
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 const PORT = process.env.PORT || 3000;
 
 // ================= VALIDAÇÃO DE AMBIENTE =================
@@ -62,7 +65,7 @@ function gerarToken(usuario) {
 }
 function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Não autenticado' });
   try {
     req.user = jwt.verify(token, JWT_SECRET, { issuer: 'elegance-api' });
@@ -92,6 +95,7 @@ app.post('/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
     const user = rows[0];
+    console.log(`[login] ip=${req.ip} saltos_proxy=${String(req.headers['x-forwarded-for'] || '').split(',').filter(Boolean).length}`);
     const senhaOk = await bcrypt.compare(password, user.SENHA);
     if (!senhaOk) {
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
@@ -766,9 +770,11 @@ app.post('/admin/definir_senha', async (req, res) => {
   }
 });
 
-// ================= MIGRAÇÃO DE SENHAS (rodar UMA VEZ, depois remover) =================
-app.get('/migrar_senhas', async (req, res) => {
-  const chave = req.query.key;
+// ================= MIGRAÇÃO DE SENHAS =================
+// Converte para bcrypt as senhas ainda em texto puro (ex.: usuário criado pelo VB).
+// POST com a chave no cabeçalho x-admin-key — nunca na URL.
+app.post('/migrar_senhas', async (req, res) => {
+  const chave = req.headers['x-admin-key'];
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
     return res.status(403).json({ error: 'Acesso negado' });
   }

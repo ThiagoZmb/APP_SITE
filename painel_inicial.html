@@ -2,9 +2,10 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elegance Dashboard - Pedidos e Orçamentos</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
@@ -309,8 +310,8 @@
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610191414">
-    <script src="layout.js?v=202610191414" defer></script>
-    <script src="ranking.js?v=202610191414" defer></script>
+    <script src="layout.js?v=202610201000" defer></script>
+    <script src="ranking.js?v=202610201000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -691,7 +692,7 @@
         }
         $('orders-tbody').addEventListener('click', e => {
             const tr = e.target.closest('tr[data-numero]');
-            if (tr) window.open(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}&token=${encodeURIComponent(getToken())}`, '_blank');
+            if (tr) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
         $('chips-sit').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filtroSit = b.dataset.sit; renderLista(); });
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
