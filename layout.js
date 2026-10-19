@@ -43,7 +43,9 @@
         const header = container.querySelector(':scope > header');
         const a = auth();
         const representante = String(a?.user?.cargo || '').toLowerCase().includes('representante');
-        const atual = (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
+        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html' };   // subpáginas acendem o item do menu de origem
+        const arquivo = (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
+        const atual = PAGINA_PAI[arquivo] || arquivo;
 
         // ----- menu lateral -----
         if (nav) {

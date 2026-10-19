@@ -182,6 +182,22 @@
         /* modal de valor */
         .modal input.valor-modal { width: 100%; height: 46px; font-size: 20px; font-weight: 700; padding: 0 14px; margin-bottom: 18px; border: 1px solid var(--border-color); border-radius: 12px; }
         .btn-novo-cliente { white-space: nowrap; }
+        .clients-table tbody tr.sel-linha { background: rgba(155,27,48,.08) !important; box-shadow: inset 3px 0 0 var(--primary-color); }
+        .ctx-menu {
+            position: fixed; z-index: 75; min-width: 260px; padding: 6px; border-radius: 14px; background: rgba(255,255,255,.98);
+            border: 1px solid var(--border-color); box-shadow: 0 18px 40px -12px rgba(20,16,28,.28), 0 4px 12px -4px rgba(20,16,28,.12);
+            opacity: 0; transform: scale(.97); transform-origin: top left; pointer-events: none; transition: opacity .12s ease, transform .12s ease;
+        }
+        .ctx-menu.aberto { opacity: 1; transform: none; pointer-events: auto; }
+        .ctx-cab { padding: 8px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--border-color); }
+        .ctx-cab b { display: block; font-size: 13px; font-weight: 800; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ctx-cab small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--text-dark); cursor: pointer; text-align: left; }
+        .ctx-item:hover, .ctx-item:focus-visible { background: rgba(155,27,48,.08); color: var(--primary-color); outline: none; }
+        .ctx-item .ic { width: 18px; text-align: center; flex-shrink: 0; }
+        .ctx-item .atalho { margin-left: auto; font-size: 11.5px; color: var(--text-light); font-weight: 600; }
+        .ctx-item.destaque { color: var(--primary-color); font-weight: 800; }
+        .ctx-sep { height: 1px; background: var(--border-color); margin: 5px 6px; }
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 80; }
         .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 500; }
         .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
@@ -404,6 +420,7 @@
             </div>
         </div>
     </div>
+    <div class="ctx-menu" id="ctx-menu" role="menu" aria-label="Ações do cliente"></div>
     <div id="toasts" aria-live="polite"></div>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
@@ -448,10 +465,11 @@
             // Linha clicável → abre gráfico do cliente (?cliente=RAZAO_SOCIAL)
             document.querySelectorAll('#clients-tbody tr[data-razao]').forEach(row => {
                 row.addEventListener('click', () => {
-                    if (interno) return abrirFicha(row.dataset.codigo);
+                    if (interno) return selecionarLinha(row);
                     const razao = encodeURIComponent(row.dataset.razao);
                     window.location.href = `graficos_pedidos.html?cliente=${razao}`;
                 });
+                row.addEventListener('dblclick', () => { if (interno) abrirFicha(row.dataset.codigo); });
             });
         }
 
@@ -519,7 +537,7 @@
                 // mesmo comportamento da tabela: abre o gráfico de Orçamentos x Pedidos do cliente
                 aoClicar: it => {
                     const c = interno && clientesCache.find(x => x.razaoSocial === it.nome);
-                    if (c) abrirFicha(c.codigo);
+                    if (c) window.location.href = `cliente_analise.html?codigo=${encodeURIComponent(c.codigo)}`;
                     else window.location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(it.nome)}`;
                 }
             });
@@ -738,7 +756,7 @@
             $('cf-sub').textContent = c.razaoSocial ? `Código ${c.codigo}${c.classe ? ' · ' + c.classe : ''}${c.cidade ? ' · ' + c.cidade + '/' + c.estado : ''}` : `Código ${c.codigo} · novo cadastro`;
             ['cf-credito-btn', 'cf-receber'].forEach(id => $(id).disabled = !c.razaoSocial);
         }
-        async function abrirFicha(codigo) {
+        async function abrirFicha(codigo, aba = 'cadastro') {
             if (!interno) return;
             if ($('ficha').classList.contains('aberta') && alterado && !(await confirmar('Descartar alterações?', 'O cadastro atual tem alterações não salvas. Deseja descartá-las?'))) return;
             try {
@@ -753,10 +771,10 @@
                     preencherFicha({ codigo: op.proximoCodigo, situacao: 'Ativo', desconto: 0, descontoAdicional: 0, comissao: 0, fretePortas: 0, freteMetalon: 0, credito: 0 });
                 }
                 marcarAlterado(false);
-                irAba('cadastro');
+                irAba(codigo ? aba : 'cadastro');
                 abrirPainel();
                 if (!codigo) $('c-razao').focus();
-                else carregarFinanceiro();
+                else if (aba !== 'financeiro') carregarFinanceiro();
             } catch (e) { toast('Erro ao carregar o cliente: ' + e.message, 'erro'); }
         }
         $('btn-novo-cliente').addEventListener('click', () => abrirFicha(null));
@@ -904,6 +922,73 @@
             } catch (e) { toast('Erro ao carregar o histórico: ' + e.message, 'erro'); }
         }
 
+        // ---------- linha selecionada + menu do botão direito (ContextMenuStrip) ----------
+        let linhaSel = null;
+        function selecionarLinha(tr) {
+            document.querySelectorAll('#clients-tbody tr.sel-linha').forEach(x => x.classList.remove('sel-linha'));
+            linhaSel = tr; if (tr) tr.classList.add('sel-linha');
+        }
+        const menu = $('ctx-menu');
+        let ctxCliente = null;
+        function fecharMenu() { menu.classList.remove('aberto'); }
+        function abrirMenu(x, y, tr) {
+            const c = clientesCache.find(k => String(k.codigo) === String(tr.dataset.codigo)) || { codigo: tr.dataset.codigo, razaoSocial: tr.dataset.razao };
+            ctxCliente = c;
+            const item = (acao, ic, texto, extra = '', atalho = '') => `<button class="ctx-item ${extra}" role="menuitem" data-acao="${acao}"><span class="ic">${ic}</span>${texto}${atalho ? `<span class="atalho">${atalho}</span>` : ''}</button>`;
+            menu.innerHTML = `
+                <div class="ctx-cab"><b>${escapeHtml(c.razaoSocial)}</b><small>Código ${escapeHtml(c.codigo)}${c.cidade ? ' · ' + escapeHtml(c.cidade) + '/' + escapeHtml(c.estado || '') : ''}</small></div>` +
+                (interno ? item('cadastro', '📇', 'Abrir cadastro completo', 'destaque', 'Enter') +
+                    item('financeiro', '💰', 'Financeiro do cliente') +
+                    item('historico', '📈', 'Histórico de compras') +
+                    '<div class="ctx-sep"></div>' +
+                    item('analise', '📊', 'Análise do cliente (pedidos e orçamentos)') : '') +
+                item('graficos', '📉', 'Orçamentos x Pedidos') +
+                '<div class="ctx-sep"></div>' +
+                item('copiar-nome', '📋', 'Copiar razão social') +
+                (c.cnpjCpf ? item('copiar-doc', '🪪', 'Copiar CNPJ/CPF') : '') +
+                (interno ? '<div class="ctx-sep"></div>' + item('novo', '＋', 'Novo cliente') : '');
+            menu.classList.add('aberto');
+            menu.style.left = '0px'; menu.style.top = '0px';
+            const r = menu.getBoundingClientRect();
+            menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+            menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+            menu.querySelector('.ctx-item')?.focus();
+        }
+        $('clients-tbody').addEventListener('contextmenu', e => {
+            const tr = e.target.closest('tr[data-codigo]');
+            if (!tr) return;
+            e.preventDefault();
+            selecionarLinha(tr);
+            abrirMenu(e.clientX, e.clientY, tr);
+        });
+        menu.addEventListener('click', async e => {
+            const b = e.target.closest('.ctx-item');
+            if (!b) return;
+            const c = ctxCliente; fecharMenu();
+            const acao = b.dataset.acao;
+            if (acao === 'cadastro') return abrirFicha(c.codigo, 'cadastro');
+            if (acao === 'financeiro') return abrirFicha(c.codigo, 'financeiro');
+            if (acao === 'historico') return abrirFicha(c.codigo, 'historico');
+            if (acao === 'analise') return void (location.href = `cliente_analise.html?codigo=${encodeURIComponent(c.codigo)}`);
+            if (acao === 'graficos') return void (location.href = `graficos_pedidos.html?cliente=${encodeURIComponent(c.razaoSocial)}`);
+            if (acao === 'novo') return abrirFicha(null);
+            const texto = acao === 'copiar-doc' ? c.cnpjCpf : c.razaoSocial;
+            try { await navigator.clipboard.writeText(texto); toast('Copiado: ' + texto, 'ok'); } catch { toast('Não foi possível copiar', 'erro'); }
+        });
+        menu.addEventListener('keydown', e => {
+            const itens = [...menu.querySelectorAll('.ctx-item')], i = itens.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); itens[(i + (e.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length].focus(); }
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecharMenu(); }
+        });
+        document.addEventListener('mousedown', e => { if (menu.classList.contains('aberto') && !menu.contains(e.target)) fecharMenu(); });
+        window.addEventListener('scroll', fecharMenu, true);
+        window.addEventListener('resize', fecharMenu);
+        // Enter na linha selecionada abre o cadastro
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && interno && linhaSel && !$('ficha').classList.contains('aberta') && !menu.classList.contains('aberto')
+                && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) abrirFicha(linhaSel.dataset.codigo);
+        });
+
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape' && $('ficha').classList.contains('aberta') && !$('modal').classList.contains('aberto')) fecharFicha();
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && $('ficha').classList.contains('aberta')) { e.preventDefault(); salvarCliente(); }
@@ -911,7 +996,10 @@
         window.addEventListener('beforeunload', e => { if (alterado) { e.preventDefault(); e.returnValue = ''; } });
         document.addEventListener('DOMContentLoaded', () => {
             $('btn-novo-cliente').hidden = !interno;
-            if (interno) $('welcome-subtitle').textContent = 'Clique em um cliente para abrir a ficha com cadastro, financeiro e histórico.';
+            if (interno) $('welcome-subtitle').textContent = 'Clique com o botão direito em um cliente para abrir o cadastro, o financeiro ou a análise completa. Duplo clique abre o cadastro.';
+            // atalho vindo da página de análise: ?abrir=CODIGO[&aba=financeiro]
+            const q = new URLSearchParams(location.search);
+            if (interno && q.get('abrir')) { const aba = q.get('aba') || 'cadastro'; history.replaceState(null, '', location.pathname); abrirFicha(q.get('abrir'), aba); }
         });
     </script>
 </body>

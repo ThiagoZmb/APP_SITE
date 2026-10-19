@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Análise do Cliente</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --primary-dark: #600000;
+            --secondary-color: #f8f9fa;
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            --success-color: #28a745;
+            --warning-color: #e0a800;
+            --danger-color: #dc3545;
+            /* cores do Grifar_Estoque do VB */
+            --row-inativo: #e2e3e5;
+            --row-minimo: #ffe4c4;
+            --row-falta: #ffb59a;
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white);
+            border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header {
+            grid-area: header; background: var(--gradient-primary); color: white;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium);
+        }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar {
+            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
+        }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item {
+            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
+            font-weight: 500; color: var(--text-dark); text-decoration: none; transition: all .3s ease;
+        }
+        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; animation: fadeIn .5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+        kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+
+        /* ===== CARDS DE RESUMO ===== */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card {
+            background: var(--gradient-card); border-radius: 20px; padding: 22px 24px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden; cursor: default; transition: transform .25s ease, box-shadow .25s ease;
+        }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .card.clicavel { cursor: pointer; }
+        .card.clicavel:hover { transform: translateY(-4px); box-shadow: var(--shadow-medium); }
+        .card.ativo-filtro { outline: 2px solid var(--primary-color); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; }
+        .card-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .card-value { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+        .card-sub { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+        .card.minimo .card-icon { background: var(--row-minimo); }
+        .card.falta .card-icon { background: var(--row-falta); }
+
+        /* ===== LAYOUT LISTA + FICHA ===== */
+        .workspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .painel {
+            background: var(--white); border-radius: 20px; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-light); position: relative; overflow: hidden;
+        }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 24px 24px 0; }
+        .painel-titulo { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .painel-titulo .contagem { font-size: 13px; font-weight: 600; color: var(--primary-color); background: var(--primary-light); padding: 3px 10px; border-radius: 20px; }
+
+        .busca { position: relative; margin-bottom: 14px; }
+        .busca input {
+            width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
+            font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
+        }
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: #fffbe6; }
+        .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
+        .chip {
+            padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--white);
+            font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer; transition: all .2s ease;
+        }
+        .chip:hover { color: var(--primary-color); border-color: var(--primary-color); }
+        .chip.ativo { background: var(--gradient-primary); color: white; border-color: transparent; }
+
+        .tabela-wrap { max-height: 620px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            position: sticky; top: 0; z-index: 1; background: var(--secondary-color); padding: 12px; text-align: left;
+            font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px;
+            border-bottom: 2px solid var(--border-color); white-space: nowrap;
+        }
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr { cursor: pointer; transition: background .15s ease; }
+        tbody tr:hover { background: var(--primary-light); }
+        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
+        tbody tr.minimo { background: var(--row-minimo); }
+        tbody tr.falta { background: var(--row-falta); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        .prod-nome { font-weight: 600; }
+        .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .cod { color: var(--text-light); font-size: 13px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+        .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
+        .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
+        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
+        .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
+        .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+        .legenda .l-min::before { background: var(--row-minimo); }
+        .legenda .l-fal::before { background: var(--row-falta); }
+        .legenda .l-ina::before { background: var(--row-inativo); }
+
+        /* ===== FICHA DO PRODUTO ===== */
+        .ficha { position: sticky; top: 0; }
+        .ficha-topo { padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .ficha-nome { font-size: 20px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+        .ficha-cod { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+        .switch-situacao { display: flex; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+        .switch-situacao button {
+            border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
+        }
+        .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
+        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+
+        .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
+        .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+        .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
+        .estoque-status { font-size: 13px; font-weight: 700; }
+        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
+        .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
+        .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
+
+        .abas { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
+        .aba {
+            border: none; background: none; padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--text-light);
+            border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
+        }
+        .aba.ativa { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .aba-conteudo { display: none; padding: 20px 24px; }
+        .aba-conteudo.ativa { display: block; }
+        .grid-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px;
+            font-size: 14px; background: var(--white); transition: border-color .15s ease;
+        }
+        .form-group textarea { resize: vertical; min-height: 90px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .form-group input[readonly] { background: #eef1f4; color: var(--text-light); }
+        .form-group.full { grid-column: 1 / -1; }
+        .campo-com-botao { display: flex; gap: 8px; }
+        .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
+        .sufixo { position: relative; }
+        .sufixo input { padding-right: 34px; }
+        .sufixo::after { content: attr(data-sufixo); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .dica { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+        .valor-calc { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--primary-light); display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .valor-calc b { font-size: 18px; color: var(--primary-color); font-variant-numeric: tabular-nums; }
+        .grafico-box { height: 260px; }
+        .grafico-vazio { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 14px; }
+
+        .acoes { display: flex; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+        .btn {
+            padding: 12px 22px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s ease;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini { padding: 10px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+        .alteracoes { font-size: 12px; color: var(--warning-color); font-weight: 700; align-self: center; margin-left: auto; display: none; }
+        .alteracoes.visivel { display: block; }
+
+        /* ===== TOAST + MODAL ===== */
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast {
+            min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500;
+            box-shadow: var(--shadow-heavy); animation: entra .25s ease-out;
+        }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+        @keyframes entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: var(--white); border-radius: 18px; padding: 26px; max-width: 420px; width: 100%; box-shadow: var(--shadow-heavy); }
+        .modal h3 { font-size: 18px; margin-bottom: 10px; }
+        .modal p { color: var(--text-light); font-size: 14px; margin-bottom: 20px; }
+        .modal .acoes-modal { display: flex; justify-content: flex-end; gap: 10px; }
+
+        @media (max-width: 1200px) {
+            .workspace { grid-template-columns: 1fr; }
+            .ficha { position: static; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .grid-form { grid-template-columns: 1fr; }
+            .col-forn { display: none; }
+        }
+
+        /* ===== ANÁLISE DO CLIENTE ===== */
+        .voltar { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-light); text-decoration: none; margin-bottom: 12px; }
+        .voltar:hover { color: var(--primary-color); }
+        .hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 250px; gap: 22px; padding: 22px 24px; margin-bottom: 18px; align-items: center; }
+        .hero-id { display: flex; gap: 16px; align-items: center; min-width: 0; }
+        .hero-avatar { width: 60px; height: 60px; border-radius: 18px; background: var(--gradient-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; flex-shrink: 0; box-shadow: 0 10px 22px -10px rgba(155,27,48,.7); }
+        .hero-nome { min-width: 0; }
+        .hero-nome h1 { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+        .hero-nome .sub { font-size: 13px; color: var(--text-light); font-weight: 600; margin-top: 3px; }
+        .chips-h { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .chip-h { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2, #f6f6f9); border: 1px solid var(--border-color); color: var(--text-mid, #4a4553); }
+        .chip-h.ok { color: #127a3f; border-color: #a3d9b1; background: #f1faf3; }
+        .chip-h.nao { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
+        .hero-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; font-size: 13px; }
+        .hero-meta span { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-light); }
+        .hero-meta b { font-weight: 700; color: var(--text-dark); }
+        .score { display: flex; gap: 14px; align-items: center; justify-content: flex-end; }
+        .score svg { width: 96px; height: 96px; flex-shrink: 0; }
+        .score .lbl small { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-light); }
+        .score .lbl b { display: block; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+        .score .lbl em { font-style: normal; font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .hero-acoes a { text-decoration: none !important; }
+        .hero-acoes { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--border-color); }
+
+        .duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+        .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+        .larga { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+        .painel .cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 18px 22px 6px; }
+        .painel .cab h3 { font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
+        .painel .cab small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .graf { position: relative; height: 240px; padding: 6px 18px 16px; }
+        .graf.baixo { height: 200px; }
+
+        .insights { list-style: none; padding: 6px 22px 18px; display: flex; flex-direction: column; gap: 8px; }
+        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, #f9f9fb); border: 1px solid var(--border-color); }
+        .insights li .ic { width: 24px; height: 24px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; }
+        .insights li.pos .ic { background: #1f9d55; }
+        .insights li.alerta .ic { background: #e59a0b; }
+        .insights li.risco .ic { background: #d22f42; }
+        .insights li.info .ic { background: #2f6fdb; }
+        .insights li b { font-weight: 800; }
+        .acoes-sug li .ic { background: var(--primary-color) !important; }
+
+        .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .kpi { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-light); }
+        .kpi > span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        .kpi b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kpi small { font-size: 12px; color: var(--text-light); font-weight: 600; }
+        .up { color: #1f9d55 !important; font-weight: 800; }
+        .down { color: #d22f42 !important; font-weight: 800; }
+        .neutro { color: var(--text-light); font-weight: 800; }
+
+        .tabela-wrap { max-height: 330px; }
+        .tabela-wrap td.num, .tabela-wrap th.num { text-align: right; }
+        .pill-s { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: #fff; }
+        .rodape-p { padding: 10px 22px 14px; font-size: 12.5px; color: var(--text-light); font-weight: 600; border-top: 1px solid var(--border-color); }
+        .rodape-p b { color: var(--text-dark); }
+        #carregando { padding: 60px 0; text-align: center; color: var(--text-light); font-weight: 600; }
+
+        @media (max-width: 1200px) {
+            .hero { grid-template-columns: 1fr 1fr; }
+            .score { justify-content: flex-start; }
+            .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tres { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 860px) {
+            .hero, .duas, .tres, .larga { grid-template-columns: 1fr; }
+            .hero-meta { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css">
+    <script src="layout.js" defer></script>
+    <script src="ranking.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info"><span id="user-name">Usuário</span><span class="user-cargo" id="user-cargo"></span></div>
+            </div>
+        </header>
+        <nav class="sidebar"></nav>
+        <main>
+            <a class="voltar" href="clientes.html">← Voltar para clientes</a>
+            <div id="carregando">Montando a análise do cliente...</div>
+            <div id="conteudo" hidden>
+                <!-- ===== CABEÇALHO + SAÚDE ===== -->
+                <section class="painel hero">
+                    <div class="hero-id">
+                        <div class="hero-avatar" id="h-avatar">—</div>
+                        <div class="hero-nome">
+                            <h1 id="h-nome">—</h1>
+                            <div class="sub" id="h-sub">—</div>
+                            <div class="chips-h" id="h-chips"></div>
+                        </div>
+                    </div>
+                    <div class="hero-meta" id="h-meta"></div>
+                    <div class="score">
+                        <svg viewBox="0 0 100 100" aria-hidden="true">
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="#ececf2" stroke-width="10"/>
+                            <circle id="score-arco" cx="50" cy="50" r="42" fill="none" stroke="#1f9d55" stroke-width="10" stroke-linecap="round"
+                                    stroke-dasharray="0 264" transform="rotate(-90 50 50)"/>
+                            <text id="score-num" x="50" y="56" text-anchor="middle" font-size="24" font-weight="800" fill="#18151d">—</text>
+                        </svg>
+                        <div class="lbl"><small>Saúde do cliente</small><b id="score-rotulo">—</b><em id="score-desc">—</em></div>
+                    </div>
+                    <div class="hero-acoes">
+                        <a class="btn btn-primary btn-mini" id="a-cadastro" href="#">📇 Abrir cadastro</a>
+                        <a class="btn btn-secondary btn-mini" id="a-financeiro" href="#">💰 Financeiro do cliente</a>
+                        <a class="btn btn-secondary btn-mini" id="a-graficos" href="#">📉 Orçamentos x Pedidos</a>
+                        <a class="btn btn-secondary btn-mini" href="orcamentos.html">🧾 Novo orçamento</a>
+                    </div>
+                </section>
+
+                <!-- ===== LEITURA RÁPIDA + AÇÕES ===== -->
+                <section class="duas">
+                    <div class="painel">
+                        <div class="cab"><h3>Leitura rápida</h3><small>o que está acontecendo com este cliente</small></div>
+                        <ul class="insights" id="insights"></ul>
+                    </div>
+                    <div class="painel">
+                        <div class="cab"><h3>Ações sugeridas</h3><small>próximos passos recomendados</small></div>
+                        <ul class="insights acoes-sug" id="acoes"></ul>
+                        <div class="rodape-p" id="score-fatores"></div>
+                    </div>
+                </section>
+
+                <!-- ===== INDICADORES ===== -->
+                <section class="kpis" id="kpis"></section>
+
+                <!-- ===== FATURAMENTO + FUNIL ===== -->
+                <section class="larga">
+                    <div class="painel">
+                        <div class="cab"><h3>Faturamento mês a mês</h3><small>pedidos, orçamentos e média móvel de 3 meses · 24 meses</small></div>
+                        <div class="graf"><canvas id="g-mensal"></canvas></div>
+                    </div>
+                    <div class="painel">
+                        <div class="cab"><h3>Funil dos últimos 12 meses</h3><small>orçado → pedido → recebido</small></div>
+                        <div class="graf"><canvas id="g-funil"></canvas></div>
+                    </div>
+                </section>
+
+                <!-- ===== MIX DE PRODUTOS ===== -->
+                <section class="painel" id="mix"></section>
+
+                <!-- ===== RECEBÍVEIS / STATUS / PRAZO ===== -->
+                <section class="tres">
+                    <div class="painel">
+                        <div class="cab"><h3>Recebíveis por atraso</h3><small id="aging-sub">em aberto no fluxo de caixa</small></div>
+                        <div class="graf baixo"><canvas id="g-aging"></canvas></div>
+                    </div>
+                    <div class="painel">
+                        <div class="cab"><h3>Situação dos pedidos</h3><small>últimos 12 meses</small></div>
+                        <div class="graf baixo"><canvas id="g-status"></canvas></div>
+                    </div>
+                    <div class="painel">
+                        <div class="cab"><h3>Prazo de produção</h3><small>dias do pedido até o "pronto em"</small></div>
+                        <div class="graf baixo"><canvas id="g-prazo"></canvas></div>
+                    </div>
+                </section>
+
+                <!-- ===== LISTAS ===== -->
+                <section class="duas">
+                    <div class="painel">
+                        <div class="cab"><h3>Maiores pedidos</h3><small>últimos 12 meses</small></div>
+                        <div class="tabela-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Cliente final</th><th>Situação</th><th class="num">Valor</th></tr></thead><tbody id="t-maiores"></tbody></table></div>
+                    </div>
+                    <div class="painel">
+                        <div class="cab"><h3>Oportunidades em aberto</h3><small>orçamentos dos últimos 60 dias</small></div>
+                        <div class="tabela-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Cliente final</th><th>Idade</th><th class="num">Valor</th></tr></thead><tbody id="t-oport"></tbody></table></div>
+                        <div class="rodape-p" id="oport-rodape"></div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        const $ = id => document.getElementById(id);
+        const CORES = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', ambar: '#f2a516', roxo: '#7b4fd6', turquesa: '#14a3a3', rosa: '#e0527e', cinza: '#94a3b8' };
+
+        function getAuth() {
+            try {
+                const a = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!a || !a.token || !a.user || Date.now() > (a.exp || 0)) return null;
+                return a;
+            } catch { return null; }
+        }
+        async function api(caminho) {
+            const res = await fetch(API_BASE + caminho, { headers: { 'Authorization': 'Bearer ' + (getAuth()?.token || '') } });
+            if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((d.error || `Erro HTTP: ${res.status}`) + (d.detalhe ? ` (${d.detalhe})` : ''));
+            return d;
+        }
+        const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const moedaK = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
+        const pct = (v, casas = 0) => isFinite(v) ? (v * 100).toFixed(casas).replace('.', ',') + '%' : '—';
+        const num = v => (Number(v) || 0).toLocaleString('pt-BR');
+        const ISO = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const deISO = s => { const [a, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(a, m - 1, d); };
+        const deBR = s => { const p = String(s || '').split('/'); return p.length === 3 && +p[2] >= 1900 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
+        const BR = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+        const DIA = 86400000;
+        const hoje = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+        const diasEntre = (a, b) => Math.round((b - a) / DIA);
+        const variacao = (atual, ant) => ant > 0 ? (atual - ant) / ant : (atual > 0 ? Infinity : 0);
+        function seta(v, inverter = false) {
+            if (!isFinite(v)) return '<span class="up">novo</span>';
+            if (Math.abs(v) < 0.005) return '<span class="neutro">estável</span>';
+            const bom = inverter ? v < 0 : v > 0;
+            return `<span class="${bom ? 'up' : 'down'}">${v > 0 ? '▲' : '▼'} ${pct(Math.abs(v))}</span>`;
+        }
+        const mediana = l => { if (!l.length) return null; const s = [...l].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+        const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+        // ================= CÁLCULO DOS INDICADORES =================
+        function analisar(d) {
+            const docs = d.documentos.map(x => ({ ...x, dt: deISO(x.data) }));
+            const cancelado = x => norm(x.situacao).includes('cancel');
+            const ped = docs.filter(x => x.tipo === 'Pedido');
+            const pedValidos = ped.filter(x => !cancelado(x));
+            const orc = docs.filter(x => x.tipo === 'Orçamento');
+            const ini12 = new Date(hoje.getTime() - 365 * DIA), ini24 = new Date(hoje.getTime() - 730 * DIA);
+            const em12 = x => x.dt >= ini12, emAnt = x => x.dt >= ini24 && x.dt < ini12;
+            const soma = l => l.reduce((s, x) => s + x.valor, 0);
+
+            const p12 = pedValidos.filter(em12), pAnt = pedValidos.filter(emAnt);
+            const o12 = orc.filter(em12), oAnt = orc.filter(emAnt);
+            const r = {
+                fat12: soma(p12), fatAnt: soma(pAnt), qtd12: p12.length, qtdAnt: pAnt.length,
+                orc12: soma(o12), orcAnt: soma(oAnt), orcQtd12: o12.length,
+                canc12: ped.filter(em12).filter(cancelado)
+            };
+            r.ticket12 = r.qtd12 ? r.fat12 / r.qtd12 : 0;
+            r.ticketAnt = r.qtdAnt ? r.fatAnt / r.qtdAnt : 0;
+            r.conv12 = r.orc12 > 0 ? r.fat12 / r.orc12 : null;
+            r.convAnt = r.orcAnt > 0 ? r.fatAnt / r.orcAnt : null;
+            r.convEmpresa = d.empresa.orcamentos12m > 0 ? d.empresa.pedidos12m / d.empresa.orcamentos12m : null;
+            r.share = d.empresa.pedidos12m > 0 ? r.fat12 / d.empresa.pedidos12m : 0;
+
+            // recência e ciclo de compra (mediana dos intervalos entre dias com pedido, 24 meses)
+            const diasCompra = [...new Set(pedValidos.filter(x => x.dt >= ini24).map(x => x.data))].sort().map(deISO);
+            r.ultimo = pedValidos.length ? pedValidos.reduce((m, x) => x.dt > m ? x.dt : m, pedValidos[0].dt) : null;
+            r.diasSemComprar = r.ultimo ? diasEntre(r.ultimo, hoje) : null;
+            const intervalos = diasCompra.slice(1).map((dt, i) => diasEntre(diasCompra[i], dt)).filter(n => n > 0);
+            r.ciclo = mediana(intervalos);
+            r.proxima = r.ultimo && r.ciclo ? new Date(r.ultimo.getTime() + r.ciclo * DIA) : null;
+
+            // prazo de produção (pedido → pronto em)
+            const prazos = ped.map(x => ({ ...x, pr: deBR(x.pronto) })).filter(x => x.pr && x.pr >= x.dt).map(x => ({ dt: x.dt, dias: diasEntre(x.dt, x.pr) })).filter(x => x.dias <= 180);
+            r.prazo12 = mediana(prazos.filter(em12).map(x => x.dias));
+            r.prazoAnt = mediana(prazos.filter(emAnt).map(x => x.dias));
+            r.prazos = prazos;
+
+            // recebíveis: aging pelo vencimento
+            const faixas = [['A vencer', 0], ['1–30 dias', 0], ['31–60 dias', 0], ['61–90 dias', 0], ['+90 dias', 0]];
+            let vencido = 0, maiorAtraso = 0;
+            d.receber.forEach(x => {
+                const atraso = diasEntre(deISO(x.vencimento), hoje);
+                const marcado = /atrasad|protest/i.test(x.situacao);
+                const a = atraso > 0 ? atraso : (marcado ? 1 : 0);
+                if (a > 0) { vencido += x.valor; maiorAtraso = Math.max(maiorAtraso, a); }
+                const i = a <= 0 ? 0 : a <= 30 ? 1 : a <= 60 ? 2 : a <= 90 ? 3 : 4;
+                faixas[i][1] += x.valor;
+            });
+            r.aging = faixas;
+            r.aberto = d.receber.reduce((s, x) => s + x.valor, 0);
+            r.vencido = vencido;
+            r.maiorAtraso = maiorAtraso;
+            r.pedidosAReceber = pedValidos.filter(x => /a receber|atrasad/i.test(x.financeiro)).reduce((s, x) => s + x.valor, 0);
+            r.saldoDevedor = r.aberto + r.pedidosAReceber - (d.cliente.credito || 0);
+
+            // série mensal 24 meses
+            r.meses = [];
+            for (let i = 23; i >= 0; i--) {
+                const m = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+                const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+                const doMes = l => l.filter(x => x.data.slice(0, 7) === k);
+                r.meses.push({ k, rotulo: m.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''),
+                    ped: soma(doMes(pedValidos)), orc: soma(doMes(orc)), qtd: doMes(pedValidos).length });
+            }
+            r.meses.forEach((m, i) => { const j = r.meses.slice(Math.max(0, i - 2), i + 1); m.media = j.reduce((s, x) => s + x.ped, 0) / j.length; });
+            const ult3 = r.meses.slice(-3).reduce((s, m) => s + m.ped, 0), ant3 = r.meses.slice(-6, -3).reduce((s, m) => s + m.ped, 0);
+            r.tendencia3m = variacao(ult3, ant3);
+            r.ult3 = ult3; r.ant3 = ant3;
+
+            // situação dos pedidos (12 meses)
+            const st = {};
+            ped.filter(em12).forEach(x => { const k = x.situacao || 'Sem situação'; st[k] = (st[k] || 0) + 1; });
+            r.status = Object.entries(st).sort((a, b) => b[1] - a[1]);
+
+            r.maiores = [...p12].sort((a, b) => b.valor - a.valor).slice(0, 8);
+            const ini60 = new Date(hoje.getTime() - 60 * DIA);
+            r.oportunidades = orc.filter(x => x.dt >= ini60 && !cancelado(x)).sort((a, b) => b.valor - a.valor);
+            return r;
+        }
+
+        // ================= SAÚDE (0–100) =================
+        function saude(r, d) {
+            let s = 100; const fatores = [];
+            const tira = (pts, motivo) => { s -= pts; fatores.push(`−${pts} ${motivo}`); };
+            const da = (pts, motivo) => { s += pts; fatores.push(`+${pts} ${motivo}`); };
+            if (r.diasSemComprar == null) tira(40, 'sem pedidos no período');
+            else if (r.ciclo && r.diasSemComprar > r.ciclo * 3) tira(30, 'muito tempo sem comprar');
+            else if (r.ciclo && r.diasSemComprar > r.ciclo * 1.5) tira(15, 'compra atrasada em relação ao ciclo');
+            else if (!r.ciclo && r.diasSemComprar > 120) tira(20, 'mais de 120 dias sem comprar');
+            const v = variacao(r.fat12, r.fatAnt);
+            if (isFinite(v)) { if (v <= -0.3) tira(20, 'faturamento caiu mais de 30%'); else if (v <= -0.1) tira(10, 'faturamento em queda'); else if (v >= 0.1) da(5, 'faturamento crescendo'); }
+            if (r.maiorAtraso > 60) tira(25, 'recebível vencido há mais de 60 dias');
+            else if (r.maiorAtraso > 30) tira(15, 'recebível vencido há mais de 30 dias');
+            else if (r.vencido > 0) tira(8, 'tem valores vencidos');
+            if (r.conv12 != null && r.convEmpresa && r.conv12 < r.convEmpresa * 0.6) tira(10, 'converte bem menos orçamentos que a média');
+            if (d.cliente.permissao === 'Bloqueado') tira(10, 'bloqueado no sistema');
+            if (r.canc12.length >= 3) tira(5, `${r.canc12.length} pedidos cancelados`);
+            s = Math.max(0, Math.min(100, Math.round(s)));
+            const [rotulo, cor, desc] = s >= 80 ? ['Saudável', CORES.verde, 'relacionamento em dia'] : s >= 60 ? ['Atenção', CORES.ambar, 'acompanhar de perto']
+                : s >= 40 ? ['Em risco', '#e8711a', 'agir nas próximas semanas'] : ['Crítico', '#d22f42', 'ação imediata'];
+            return { s, rotulo, cor, desc, fatores };
+        }
+
+        // ================= LEITURA RÁPIDA + AÇÕES =================
+        function leitura(r, d) {
+            const ins = [], acoes = [];
+            const add = (tipo, texto) => ins.push({ tipo, texto });
+            const v = variacao(r.fat12, r.fatAnt);
+            if (r.fat12 === 0) add('risco', 'Nenhum pedido nos últimos 12 meses.');
+            else if (!isFinite(v)) add('pos', `Cliente novo no período: <b>${moeda(r.fat12)}</b> em ${r.qtd12} pedido(s) nos últimos 12 meses.`);
+            else if (v >= 0.1) add('pos', `Comprou <b>${pct(v)} a mais</b> que nos 12 meses anteriores (${moeda(r.fat12)} contra ${moeda(r.fatAnt)}).`);
+            else if (v <= -0.1) add('risco', `Comprou <b>${pct(-v)} a menos</b> que nos 12 meses anteriores (${moeda(r.fat12)} contra ${moeda(r.fatAnt)}).`);
+            else add('info', `Faturamento estável: ${moeda(r.fat12)} nos últimos 12 meses (${pct(v)} de variação).`);
+
+            if (isFinite(r.tendencia3m) && r.ant3 > 0 && Math.abs(r.tendencia3m) >= 0.2)
+                add(r.tendencia3m > 0 ? 'pos' : 'alerta', `Últimos 3 meses ${r.tendencia3m > 0 ? 'acelerando' : 'desacelerando'}: ${moeda(r.ult3)} contra ${moeda(r.ant3)} no trimestre anterior (${r.tendencia3m > 0 ? '+' : '−'}${pct(Math.abs(r.tendencia3m))}).`);
+
+            if (r.diasSemComprar != null && r.ciclo) {
+                if (r.diasSemComprar > r.ciclo * 1.5) {
+                    add('risco', `Está há <b>${r.diasSemComprar} dias sem comprar</b>, mas costuma comprar a cada ~${Math.round(r.ciclo)} dias. Sinal de perda de cliente.`);
+                    acoes.push(`Ligar para ${esc(d.cliente.contato || 'o contato')} e entender por que parou de comprar — oferecer condição especial para reativar.`);
+                } else if (r.proxima && r.proxima >= hoje) add('info', `Ritmo normal: compra a cada ~${Math.round(r.ciclo)} dias. Próxima compra esperada por volta de <b>${r.proxima.toLocaleDateString('pt-BR')}</b>.`);
+                else add('alerta', `Já passou da data esperada de recompra (ciclo de ~${Math.round(r.ciclo)} dias; última compra há ${r.diasSemComprar} dias).`);
+            } else if (r.diasSemComprar != null && r.diasSemComprar > 90) add('alerta', `Última compra há ${r.diasSemComprar} dias.`);
+
+            const vt = variacao(r.ticket12, r.ticketAnt);
+            if (isFinite(vt) && r.ticketAnt > 0 && Math.abs(vt) >= 0.15)
+                add(vt > 0 ? 'pos' : 'alerta', `Ticket médio ${vt > 0 ? 'subiu' : 'caiu'} ${pct(Math.abs(vt))}: ${moeda(r.ticket12)} por pedido (antes ${moeda(r.ticketAnt)}).`);
+
+            if (r.conv12 != null && r.convEmpresa) {
+                const rel = r.conv12 / r.convEmpresa;
+                if (rel >= 1.2) add('pos', `Converte <b>${pct(r.conv12)}</b> do valor orçado em pedido — acima da média da empresa (${pct(r.convEmpresa)}).`);
+                else if (rel <= 0.7) {
+                    add('alerta', `Converte só <b>${pct(r.conv12)}</b> do valor orçado (média da empresa: ${pct(r.convEmpresa)}). Pode estar cotando com concorrentes.`);
+                    acoes.push('Revisar preço/desconto dos últimos orçamentos e fazer follow-up dos que não fecharam.');
+                } else add('info', `Conversão de orçamentos em linha com a empresa: ${pct(r.conv12)} (média ${pct(r.convEmpresa)}).`);
+            }
+
+            if (r.vencido > 0) {
+                add(r.maiorAtraso > 30 ? 'risco' : 'alerta', `<b>${moeda(r.vencido)} vencidos</b> no fluxo de caixa — o mais antigo há ${r.maiorAtraso} dia(s).`);
+                if (r.maiorAtraso > 60 && d.cliente.permissao !== 'Bloqueado') acoes.push('Avaliar bloqueio de novos pedidos até a regularização dos valores vencidos há mais de 60 dias.');
+                else acoes.push('Acionar cobrança dos valores vencidos antes de liberar novos pedidos a prazo.');
+            } else if (r.aberto > 0) add('pos', `Pagamentos em dia: ${moeda(r.aberto)} a receber, nada vencido.`);
+
+            if (r.share > 0) add('info', `Representa <b>${pct(r.share, 1)}</b> do faturamento da empresa nos últimos 12 meses${d.empresa.posicao ? ` — <b>${d.empresa.posicao}º</b> maior cliente de ${d.empresa.clientesAtivos12m}` : ''}.`);
+            if (d.empresa.posicao && d.empresa.posicao <= 10 && r.diasSemComprar > (r.ciclo || 60)) acoes.push('Cliente top 10 esfriando: agendar visita comercial ainda este mês.');
+
+            const oport = r.oportunidades.reduce((s, x) => s + x.valor, 0);
+            if (oport > 0) {
+                add('info', `<b>${moeda(oport)}</b> em ${r.oportunidades.length} orçamento(s) dos últimos 60 dias ainda podem virar pedido.`);
+                acoes.push(`Fazer follow-up dos orçamentos recentes (${moeda(oport)} em jogo) — começar pelos maiores.`);
+            }
+            if (r.canc12.length) add('alerta', `${r.canc12.length} pedido(s) cancelado(s) em 12 meses (${moeda(r.canc12.reduce((s, x) => s + x.valor, 0))}).`);
+            if (r.prazo12 != null && r.prazoAnt != null && r.prazo12 > r.prazoAnt * 1.25 && r.prazo12 - r.prazoAnt >= 3)
+                add('alerta', `Prazo de produção piorou: ${Math.round(r.prazo12)} dias (antes ${Math.round(r.prazoAnt)}). Pode afetar a satisfação.`);
+            if ((d.cliente.credito || 0) > 0) add('info', `Possui ${moeda(d.cliente.credito)} de crédito a ser abatido.`);
+            if (isFinite(v) && v >= 0.25 && r.vencido === 0) acoes.push('Cliente em crescimento e adimplente: considerar melhorar condição comercial para ampliar o volume.');
+            if (!acoes.length) acoes.push('Manter o relacionamento: cliente sem alertas no momento.');
+            return { ins, acoes };
+        }
+
+        // ================= RENDERIZAÇÃO =================
+        const graficos = [];
+        const novoGrafico = (id, cfg) => graficos.push(new Chart($(id), cfg));
+        const baseOpts = (extra = {}) => ({ responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } } }, ...extra });
+
+        function render(d) {
+            const c = d.cliente, r = analisar(d), sd = saude(r, d), lt = leitura(r, d);
+            document.title = `Elegance - Análise: ${c.razaoSocial}`;
+            $('h-avatar').textContent = c.razaoSocial.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+            $('h-nome').textContent = c.razaoSocial;
+            $('h-sub').textContent = [c.fantasia, c.classe, c.cidade && `${c.cidade}/${c.estado}`].filter(Boolean).join(' · ');
+            $('h-chips').innerHTML = [
+                `<span class="chip-h ${c.situacao === 'Inativo' ? 'nao' : 'ok'}">${esc(c.situacao || 'Ativo')}</span>`,
+                `<span class="chip-h ${c.permissao === 'Bloqueado' ? 'nao' : 'ok'}">${c.permissao === 'Bloqueado' ? 'Bloqueado no sistema' : 'Liberado no sistema'}</span>`,
+                c.tipoDesconto ? `<span class="chip-h">${esc(c.tipoDesconto)} ${c.desconto ? c.desconto + '%' : ''}</span>` : '',
+                c.condicao ? `<span class="chip-h">${esc(c.condicao)}</span>` : ''
+            ].join('');
+            const anosCliente = c.primeiroPedido ? (hoje - deISO(c.primeiroPedido)) / (365 * DIA) : 0;
+            $('h-meta').innerHTML = `
+                <div><span>Cliente desde</span><b>${c.primeiroPedido ? BR(c.primeiroPedido) : '—'}</b>${anosCliente >= 1 ? ` <small>(${anosCliente.toFixed(1).replace('.', ',')} anos)</small>` : ''}</div>
+                <div><span>Última compra</span><b>${r.ultimo ? r.ultimo.toLocaleDateString('pt-BR') : '—'}</b>${r.diasSemComprar != null ? ` <small>(há ${r.diasSemComprar} dias)</small>` : ''}</div>
+                <div><span>Total histórico</span><b>${moeda(c.totalVida)}</b> <small>(${num(c.pedidosVida)} pedidos)</small></div>
+                <div><span>Representante</span><b>${esc(c.representante || 'Nenhum')}</b></div>`;
+            const circ = 2 * Math.PI * 42;
+            $('score-arco').setAttribute('stroke-dasharray', `${(sd.s / 100) * circ} ${circ}`);
+            $('score-arco').setAttribute('stroke', sd.cor);
+            $('score-num').textContent = sd.s;
+            $('score-rotulo').textContent = sd.rotulo; $('score-rotulo').style.color = sd.cor;
+            $('score-desc').textContent = sd.desc;
+            $('score-fatores').innerHTML = `<b>Como a nota foi calculada:</b> ${sd.fatores.length ? sd.fatores.map(esc).join(' · ') : 'nenhum ponto de atenção'}`;
+            $('a-cadastro').href = `clientes.html?abrir=${c.codigo}`;
+            $('a-financeiro').href = `clientes.html?abrir=${c.codigo}&aba=financeiro`;
+            $('a-graficos').href = `graficos_pedidos.html?cliente=${encodeURIComponent(c.razaoSocial)}`;
+
+            const icone = { pos: '↑', alerta: '!', risco: '!', info: 'i' };
+            $('insights').innerHTML = lt.ins.map(i => `<li class="${i.tipo}"><span class="ic">${icone[i.tipo]}</span><span>${i.texto}</span></li>`).join('');
+            $('acoes').innerHTML = lt.acoes.map((a, i) => `<li><span class="ic">${i + 1}</span><span>${a}</span></li>`).join('');
+
+            // indicadores
+            const vc = r.conv12 != null && r.convAnt != null ? r.conv12 - r.convAnt : null;
+            const kp = [
+                ['Faturamento 12 meses', moeda(r.fat12), `${seta(variacao(r.fat12, r.fatAnt))} vs 12 meses anteriores`],
+                ['Pedidos 12 meses', num(r.qtd12), `${seta(variacao(r.qtd12, r.qtdAnt))} · antes ${num(r.qtdAnt)}`],
+                ['Ticket médio', moeda(r.ticket12), `${seta(variacao(r.ticket12, r.ticketAnt))} · antes ${moeda(r.ticketAnt)}`],
+                ['Conversão orçamentos', r.conv12 != null ? pct(r.conv12) : '—', `empresa ${r.convEmpresa != null ? pct(r.convEmpresa) : '—'}${vc != null ? ` · ${Math.abs(vc) < 0.005 ? '<span class="neutro">estável</span>' : `${vc > 0 ? '<span class="up">▲' : '<span class="down">▼'} ${Math.abs(vc * 100).toFixed(0)} p.p.</span>`}` : ''}`],
+                ['Dias sem comprar', r.diasSemComprar != null ? num(r.diasSemComprar) : '—', r.ciclo ? `ciclo habitual: ~${Math.round(r.ciclo)} dias` : 'ciclo ainda não definido'],
+                ['Participação', pct(r.share, 1), d.empresa.posicao ? `${d.empresa.posicao}º maior cliente em 12 meses` : 'do faturamento da empresa'],
+                ['Em aberto', moeda(r.aberto + r.pedidosAReceber), r.vencido > 0 ? `<span class="down">${moeda(r.vencido)} vencido</span>` : '<span class="up">nada vencido</span>'],
+                ['Prazo de produção', r.prazo12 != null ? `${Math.round(r.prazo12)} dias` : '—', r.prazoAnt != null && r.prazo12 != null ? `${seta(variacao(r.prazo12, r.prazoAnt), true)} · antes ${Math.round(r.prazoAnt)} dias` : 'mediana dos pedidos']
+            ];
+            $('kpis').innerHTML = kp.map(([t, v, s]) => `<div class="kpi"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
+
+            // faturamento mensal
+            novoGrafico('g-mensal', {
+                data: { labels: r.meses.map(m => m.rotulo), datasets: [
+                    { type: 'bar', label: 'Pedidos', data: r.meses.map(m => m.ped), backgroundColor: CORES.vinho, borderRadius: 4, order: 2 },
+                    { type: 'bar', label: 'Orçamentos', data: r.meses.map(m => m.orc), backgroundColor: 'rgba(47,111,219,.35)', borderRadius: 4, order: 3 },
+                    { type: 'line', label: 'Média móvel 3m (pedidos)', data: r.meses.map(m => m.media), borderColor: CORES.verde, borderWidth: 2.5, pointRadius: 0, tension: .35, order: 1 }
+                ] },
+                options: baseOpts({ plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } },
+                    tooltip: { callbacks: { label: x => `${x.dataset.label}: ${moeda(x.raw)}`, afterBody: it => `${r.meses[it[0].dataIndex].qtd} pedido(s)` } } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => moedaK(v) } }, x: { grid: { display: false } } } })
+            });
+            // funil
+            novoGrafico('g-funil', {
+                type: 'bar',
+                data: { labels: ['Orçado', 'Virou pedido', 'Recebido'], datasets: [{ data: [r.orc12, r.fat12, d.recebido12m.total], backgroundColor: [CORES.azul, CORES.vinho, CORES.verde], borderRadius: 6, maxBarThickness: 46 }] },
+                options: baseOpts({ indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => {
+                    const base = r.orc12 || 1; return `${moeda(x.raw)}${x.dataIndex ? ` (${pct(x.raw / base)} do orçado)` : ''}`; } } } },
+                    scales: { x: { beginAtZero: true, ticks: { callback: v => moedaK(v) } }, y: { grid: { display: false } } } })
+            });
+            // aging
+            $('aging-sub').textContent = `${moeda(r.aberto)} em aberto no fluxo de caixa`;
+            novoGrafico('g-aging', {
+                type: 'bar',
+                data: { labels: r.aging.map(a => a[0]), datasets: [{ data: r.aging.map(a => a[1]), backgroundColor: [CORES.verde, CORES.ambar, '#e8711a', '#d22f42', '#8b0f22'], borderRadius: 6, maxBarThickness: 40 }] },
+                options: baseOpts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => moeda(x.raw) } } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => moedaK(v) } }, x: { grid: { display: false } } } })
+            });
+            // situação dos pedidos
+            const corSt = s => { const n = norm(s); return n.includes('produ') ? CORES.azul : n.includes('pronto') ? CORES.ambar : n.includes('entreg') ? CORES.verde
+                : n.includes('retir') ? CORES.turquesa : n.includes('cancel') ? '#d22f42' : CORES.cinza; };
+            novoGrafico('g-status', {
+                type: 'doughnut',
+                data: { labels: r.status.map(s => s[0]), datasets: [{ data: r.status.map(s => s[1]), backgroundColor: r.status.map(s => corSt(s[0])), borderColor: '#fff', borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } } } }
+            });
+            // prazo de produção por mês (mediana)
+            const prazoMes = r.meses.slice(-12).map(m => mediana(r.prazos.filter(x => ISO(x.dt).slice(0, 7) === m.k).map(x => x.dias)));
+            novoGrafico('g-prazo', {
+                type: 'line',
+                data: { labels: r.meses.slice(-12).map(m => m.rotulo), datasets: [{ label: 'Dias', data: prazoMes, borderColor: CORES.roxo, backgroundColor: 'rgba(123,79,214,.12)', fill: true, tension: .3, spanGaps: true, pointRadius: 3 }] },
+                options: baseOpts({ plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + 'd' } }, x: { grid: { display: false } } } })
+            });
+
+            // listas
+            $('t-maiores').innerHTML = r.maiores.map(x => `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
+                <td><span class="pill-s">${esc(x.situacao)}</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`).join('') || '<tr><td colspan="5" class="vazio">Nenhum pedido em 12 meses</td></tr>';
+            $('t-oport').innerHTML = r.oportunidades.slice(0, 12).map(x => { const idade = diasEntre(x.dt, hoje);
+                return `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
+                <td><span class="pill-s" style="${idade > 30 ? 'color:#b56a00;border-color:#f2c47a' : ''}">${idade} dia(s)</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`; }).join('')
+                || '<tr><td colspan="5" class="vazio">Nenhum orçamento nos últimos 60 dias</td></tr>';
+            const totOport = r.oportunidades.reduce((s, x) => s + x.valor, 0);
+            $('oport-rodape').innerHTML = `Total em aberto: <b>${moeda(totOport)}</b>${r.conv12 != null ? ` · com a conversão atual (${pct(r.conv12)}), a expectativa é de <b>${moeda(totOport * Math.min(1, r.conv12))}</b> em pedidos` : ''}`;
+
+            // mix de produtos (mesmo componente dos outros rankings)
+            Ranking.montar($('mix'), {
+                titulo: 'Mix de produtos — últimos 12 meses',
+                subtitulo: (total, m) => m.id === 'valor' ? `O que este cliente compra · total <b>${moeda(total)}</b>` : `Total: <b>${num(Math.round(total))} un.</b>`,
+                metricas: [
+                    { id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda },
+                    { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: n => `${num(Math.round(n))} un.` }
+                ],
+                info: (it, m, p) => `${p} · ${m.id === 'valor' ? num(Math.round(it.qtd)) + ' un.' : moeda(it.valor)} · ${it.pedidos} pedido(s)`,
+                carregar: () => api('/ranking_produtos?cliente=' + encodeURIComponent(c.razaoSocial))
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const auth = getAuth();
+            if (!auth) { location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            $('user-name').textContent = auth.user.nome || '';
+            $('user-cargo').textContent = auth.user.cargo || '';
+            $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
+            const codigo = new URLSearchParams(location.search).get('codigo');
+            if (!codigo) { $('carregando').textContent = 'Nenhum cliente informado. Volte para a lista e escolha um cliente.'; return; }
+            if (String(auth.user.cargo || '').toLowerCase().includes('representante')) { $('carregando').textContent = 'Acesso restrito à equipe interna.'; return; }
+            try {
+                const d = await api('/clientes/analise/' + encodeURIComponent(codigo));
+                $('carregando').hidden = true;
+                $('conteudo').hidden = false;
+                render(d);
+            } catch (e) {
+                $('carregando').textContent = '⚠️ ' + e.message;
+            }
+        });
+    </script>
+</body>
+</html>

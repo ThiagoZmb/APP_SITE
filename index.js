@@ -451,6 +451,66 @@ app.post('/clientes/receber', autenticar, somenteInterno, async (req, res) => {
   }
 });
 
+// ================= ANÁLISE DO CLIENTE (visão de diretoria) =================
+// Junta, num só pedido, tudo que a página de análise precisa; os indicadores são calculados na tela.
+app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res) => {
+  try {
+    const [cliRows] = await pool.execute('SELECT * FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
+    if (!cliRows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const c = cliRows[0];
+    const razao = c.RAZAO_SOCIAL;
+    const t = k => (c[k] == null ? '' : String(c[k]));
+
+    // pedidos e orçamentos dos últimos 36 meses (base para tendência, ciclo de compra, prazo e conversão)
+    const [docs] = await pool.execute(
+      `SELECT NUMERO, TIPO, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, CAST(DATA_PRONTO AS CHAR) AS DATA_PRONTO, TOTAL, SITUACAO, FINANCEIRO, CLIENTE_FINAL
+       FROM ped_orc WHERE RAZAO_SOCIAL = ? AND DATA >= DATE_SUB(CURDATE(), INTERVAL 36 MONTH)
+       ORDER BY DATA DESC, NUMERO DESC LIMIT 3000`, [razao]);
+    const [[desde]] = await pool.execute(
+      `SELECT DATE_FORMAT(MIN(DATA), '%Y-%m-%d') AS primeiro, COUNT(*) AS qtd, SUM(TOTAL) AS total
+       FROM ped_orc WHERE RAZAO_SOCIAL = ? AND TIPO = 'Pedido'`, [razao]);
+
+    // contexto da empresa nos últimos 12 meses: faturamento total, conversão média e posição do cliente
+    const [[emp]] = await pool.execute(
+      `SELECT SUM(IF(TIPO = 'Pedido', TOTAL, 0)) AS pedidos, SUM(IF(TIPO = 'Orçamento', TOTAL, 0)) AS orcamentos,
+              COUNT(DISTINCT IF(TIPO = 'Pedido', RAZAO_SOCIAL, NULL)) AS clientes
+       FROM ped_orc WHERE DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`);
+    const [[rank]] = await pool.execute(
+      `SELECT COUNT(*) + 1 AS posicao FROM (
+         SELECT RAZAO_SOCIAL, SUM(TOTAL) AS t FROM ped_orc
+         WHERE TIPO = 'Pedido' AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY RAZAO_SOCIAL
+       ) x WHERE x.t > (SELECT COALESCE(SUM(TOTAL), 0) FROM ped_orc
+                        WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH))`, [razao]);
+
+    // recebíveis em aberto (para aging) e recebimentos dos últimos 12 meses (pontualidade)
+    const [receber] = await pool.execute(
+      `SELECT ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, VALOR, SITUACAO, PEDIDO FROM fluxo_de_caixa
+       WHERE RAZAO_SOCIAL = ? AND SITUACAO IN ('A Receber', 'Atrasado', 'Protestado') ORDER BY DATA`, [razao]);
+    const [[recebido]] = await pool.execute(
+      `SELECT SUM(VALOR) AS total, COUNT(*) AS qtd FROM fluxo_de_caixa
+       WHERE RAZAO_SOCIAL = ? AND SITUACAO = 'Recebido' AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`, [razao]);
+
+    res.json({
+      cliente: {
+        codigo: c.CODIGO, razaoSocial: razao, fantasia: t('FANTASIA'), classe: t('CLASSE'), cidade: t('CIDADE'), estado: t('ESTADO'),
+        situacao: t('SITUACAO'), permissao: t('PERMISSAO'), representante: t('REPRESENTANTE'), desconto: numEstq(c.DESCONTO),
+        tipoDesconto: t('TIPO_DESCONTO'), condicao: t('CONDICAO'), credito: numEstq(c.CREDITO), telefone: t('TELEFONE'), contato: t('CONTATO'),
+        primeiroPedido: desde.primeiro || '', pedidosVida: Number(desde.qtd) || 0, totalVida: numEstq(desde.total)
+      },
+      documentos: docs.map(d => ({
+        numero: d.NUMERO, tipo: d.TIPO, data: d.DATA, pronto: dataBRSegura(d.DATA_PRONTO), valor: numEstq(d.TOTAL),
+        situacao: d.SITUACAO || '', financeiro: d.FINANCEIRO || '', clienteFinal: d.CLIENTE_FINAL || ''
+      })),
+      empresa: { pedidos12m: numEstq(emp.pedidos), orcamentos12m: numEstq(emp.orcamentos), clientesAtivos12m: Number(emp.clientes) || 0, posicao: Number(rank.posicao) || null },
+      receber: receber.map(r => ({ id: r.ID, vencimento: r.DATA, valor: numEstq(r.VALOR), situacao: r.SITUACAO, pedido: r.PEDIDO ?? '' })),
+      recebido12m: { total: numEstq(recebido.total), qtd: Number(recebido.qtd) || 0 }
+    });
+  } catch (err) {
+    console.error('Erro /clientes/analise:', err.code, err.message);
+    res.status(500).json({ error: 'Erro ao montar a análise do cliente', detalhe: err.code || err.message });
+  }
+});
+
 // Aba Histórico (Carrega_Grafico): pedidos por mês nos últimos 180 dias
 app.get('/clientes/historico/:codigo', autenticar, somenteInterno, async (req, res) => {
   try {
