@@ -198,6 +198,59 @@
         html body .form-group .viz-check { white-space: nowrap; }
         html body .obs-item { grid-column: span 2; }
         @media (max-width: 700px) { html body .obs-item { grid-column: 1 / -1; } }
+        .nota-pct { font-size: 12px; font-weight: 600; color: #b26a00; margin-top: 6px; }
+        .nota-pct:empty { display: none; }
+        /* linhas com porcentagem (ColorirLinhasComPorcentagem: laranja claro) */
+        html body tbody tr.com-pct td { background: rgba(255, 200, 124, .38); }
+        html body tbody tr.com-pct:hover td { background: rgba(255, 200, 124, .55); }
+        .col-pct { white-space: nowrap; font-weight: 700; color: #b26a00; }
+        .col-acoes { white-space: nowrap; }
+        /* ===== FICHA "ALTERAÇÃO DE VALORES" (mesmo padrão da ficha de clientes) ===== */
+        .avl-fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
+        .avl-fundo.aberta { opacity: 1; pointer-events: auto; }
+        .avl { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); background: #f4f4f7; z-index: 41;
+               transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
+               box-shadow: -20px 0 50px -20px rgba(20,16,28,.35); border-radius: 20px 0 0 20px; overflow: hidden; }
+        .avl.aberta { transform: none; }
+        .avl-topo { background: var(--gradient-primary); color: #fff; padding: 18px 22px 16px; }
+        .avl-linha1 { display: flex; align-items: center; gap: 12px; }
+        .avl-icone { width: 44px; height: 44px; border-radius: 13px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .avl-nome { flex: 1; min-width: 0; }
+        .avl-nome h3 { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+        .avl-nome small { font-size: 13px; opacity: .85; font-weight: 600; }
+        .avl-fechar { border: none; background: rgba(255,255,255,.15); color: #fff; width: 36px; height: 36px; border-radius: 10px; font-size: 17px; cursor: pointer; flex-shrink: 0; }
+        .avl-desc { font-size: 12px; opacity: .8; margin-top: 10px; line-height: 1.4; max-height: 50px; overflow: hidden; }
+        .avl-corpo { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .avl-bloco { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; }
+        .avl-ref { display: grid; grid-template-columns: 1.3fr .5fr 1fr; gap: 10px; }
+        .avl-ref small { display: block; font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; }
+        .avl-ref b { font-size: 15px; font-variant-numeric: tabular-nums; }
+        .avl-final { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 16px; cursor: pointer; }
+        .avl-final input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--primary-color); }
+        .avl-final b { display: block; font-size: 14px; }
+        .avl-final small { display: block; font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .avl-pct-linha { display: flex; align-items: center; justify-content: center; gap: 18px; transition: opacity .15s ease; }
+        .avl-pct-linha.desligado { opacity: .35; }
+        .avl-btn { width: 68px; height: 68px; border-radius: 50%; border: none; color: #fff; font-size: 38px; font-weight: 800; line-height: 1; cursor: pointer;
+                   box-shadow: 0 8px 18px -8px rgba(0,0,0,.45); transition: transform .12s ease; }
+        .avl-btn:hover:not(:disabled) { transform: scale(1.06); }
+        .avl-btn:disabled { cursor: not-allowed; }
+        .avl-btn.menos { background: #e5484d; }
+        .avl-btn.mais { background: #2f9e44; }
+        .avl-pct-campo { text-align: center; }
+        .avl-pct-campo label { display: block; font-size: 12px; font-weight: 700; color: var(--text-mid, #555); margin-bottom: 4px; }
+        html body .avl-pct-campo input { width: 110px; text-align: center; font-size: 20px !important; font-weight: 800; padding: 6px 8px !important; border: 1px solid var(--border-strong, #ccc); border-radius: 10px; }
+        .avl-sessao { text-align: center; font-size: 13px; font-weight: 700; color: var(--primary-color); margin-top: 10px; min-height: 18px; }
+        .avl-valores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+        html body .avl-valores input { font-size: 18px !important; font-weight: 800 !important; text-align: right; min-height: 42px !important; }
+        html body .avl-valores input:not([readonly]) { background: #fff8e6 !important; border-color: #f2a516 !important; color: var(--text-dark) !important; }
+        .avl-dif { grid-column: 1 / -1; font-size: 12.5px; font-weight: 700; }
+        .avl-dif:empty { display: none; }
+        .avl-dif.sobe { color: #2f9e44; } .avl-dif.desce { color: #e5484d; }
+        .avl-hist { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-light); }
+        .avl-hist b { color: #b26a00; }
+        .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
+        html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
     <script src="layout.js?v=202610191414" defer></script>
 </head>
@@ -350,12 +403,9 @@
                         <div class="grid-form">
                             <div class="form-group"><label>Valor unitário</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                             <div class="form-group"><label title="Unitário × quantidade">Total do item</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
-                            <div class="form-group">
-                                <label title="Opcional. Ex.: +10%;-5%">Percentuais da linha</label>
-                                <input type="text" id="f-percentuais" placeholder="+10%;-5%">
-                            </div>
                             <div class="form-group obs-item"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
                         </div>
+                        <div class="nota-pct" id="nota-pct"></div>
                     </div>
                     <div class="acoes-linha">
                         <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
@@ -397,7 +447,7 @@
                         <thead>
                             <tr>
                                 <th>#</th><th>Frente</th><th>Descrição</th><th>Qtd</th>
-                                <th>Unitário</th><th>Total</th><th>Obs</th><th></th>
+                                <th>Unitário</th><th>Total</th><th>Porcentagem</th><th>Obs</th><th></th>
                             </tr>
                         </thead>
                         <tbody id="itens-tbody">
@@ -421,6 +471,47 @@
             </section>
         </main>
     </div>
+    <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
+    <div class="avl-fundo" id="avl-fundo"></div>
+    <aside class="avl" id="avl" aria-label="Alteração de valores">
+        <div class="avl-topo">
+            <div class="avl-linha1">
+                <div class="avl-icone">💲</div>
+                <div class="avl-nome"><h3>Alteração de valores</h3><small id="avl-titulo">—</small></div>
+                <button type="button" class="avl-fechar" id="avl-fechar" aria-label="Fechar">✕</button>
+            </div>
+            <div class="avl-desc" id="avl-sub"></div>
+        </div>
+        <div class="avl-corpo">
+            <div class="avl-bloco avl-ref">
+                <div><small>Valor original (sem %)</small><b id="avl-base">—</b></div>
+                <div><small>Qtd</small><b id="avl-qtd">—</b></div>
+                <div><small>Alteração atual</small><b id="avl-hist-atual">—</b></div>
+            </div>
+            <label class="avl-final"><input type="checkbox" id="avl-final"> <span><b>Valor final</b><small>Digite o valor unitário final da peça; a diferença vira um percentual sobre o valor original e substitui as alterações anteriores</small></span></label>
+            <div class="avl-bloco">
+                <div class="avl-pct-linha">
+                    <button type="button" class="avl-btn menos" id="avl-menos" title="Descontar a porcentagem">−</button>
+                    <div class="avl-pct-campo">
+                        <label for="avl-pct">Porcentagem %</label>
+                        <input type="number" id="avl-pct" min="0" step="0.01" placeholder="0">
+                    </div>
+                    <button type="button" class="avl-btn mais" id="avl-mais" title="Acrescentar a porcentagem">+</button>
+                </div>
+                <div class="avl-sessao" id="avl-sessao"></div>
+            </div>
+            <div class="avl-bloco avl-valores">
+                <div class="form-group"><label for="avl-unit">Unitário</label><input type="text" id="avl-unit" readonly></div>
+                <div class="form-group"><label for="avl-total">Total</label><input type="text" id="avl-total" readonly tabindex="-1"></div>
+                <div class="avl-dif" id="avl-dif"></div>
+                <div class="avl-hist">Porcentagem gravada na linha: <b id="avl-hist-novo">—</b></div>
+            </div>
+        </div>
+        <div class="avl-acoes">
+            <button type="button" class="btn btn-secondary" id="avl-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="avl-ok">OK</button>
+        </div>
+    </aside>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -836,7 +927,7 @@
             const med = cat === 'Revestimento' ? `${alt} x ${larg} mm` : AV_LINEAR.includes(cat) ? `${alt} mm` : '';
             const extra = [AV_LINEAR.includes(cat) ? val('f-av-acab') : '', val('f-av-cor') ? 'COR: ' + val('f-av-cor') : ''].filter(Boolean).join(' - ');
             return `${cat}: ${val('f-av-produto')}` + (med ? ` | ${med}` : '') + (extra ? ` | ${extra}` : '') +
-                   (val('f-percentuais') ? ` | Pct linha: ${val('f-percentuais')}` : '');
+                   '';
         }
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
@@ -862,7 +953,7 @@
                             altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
                             soldas: g('f-soldas'),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
-                            percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
+                            percentuais: '' };
             } else if (frenteAtual === 'Avulso') {
                 const cat = g('f-av-cat');
                 const alt = parseFloat(g('f-av-alt')) || 0, larg = parseFloat(g('f-av-larg')) || 0;
@@ -879,7 +970,7 @@
                             acabamento: AV_LINEAR.includes(cat) ? g('f-av-acab') : '',
                             altura: alt, largura: larg,
                             qtd: qtdEfetiva(),
-                            percentuais: g('f-percentuais') };
+                            percentuais: '' };
             } else {
                 if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) {
                     document.getElementById('f-valor').value = '';
@@ -899,7 +990,7 @@
                             revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
                             divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
                             qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0,
-                            percentuais: g('f-percentuais') };                        // ✅ CORREÇÃO ②
+                            percentuais: '' };
             }
             clearTimeout(timerPreco);
             status.textContent = 'Calculando...';
@@ -1455,7 +1546,7 @@
                        (ehPortaComFuros() && furosLista.length
                            ? ` | Furos: ${furosLista.join(', ')} mm (${[...new Set(ladosFuros)].join('/')})` : '') +
                        (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '') +
-                       (g('f-percentuais') ? ` | Pct linha: ${g('f-percentuais')}` : '');
+                       '';
             }
             return {
                 frente: frenteAtual,
@@ -1480,7 +1571,6 @@
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     produto: g('f-produto'), material: g('f-material'),
                     acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
-                    percentuais: g('f-percentuais'),
                     // venda avulsa (ItemVendaAvulsa)
                     categoria: ehAv ? g('f-av-cat') : '', avProduto: ehAv ? g('f-av-produto') : '',
                     avAcab: ehAv ? g('f-av-acab') : '', avCor: ehAv ? g('f-av-cor') : ''
@@ -1548,7 +1638,6 @@
                 set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
                 set('f-produto', d.produto); set('f-material', d.material);
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
-                set('f-percentuais', d.percentuais);
                 set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
                 // posição do puxador de CADA folha (fiel ao salvo, sem espelhar)
                 posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
@@ -1610,6 +1699,7 @@
             desenharVisualizacao();
             editandoIndex = -1;
             document.getElementById('btn-adicionar').textContent = '➕ Adicionar item';
+            document.getElementById('nota-pct').textContent = '';
             filtrarCores('f-av-cor', '');
             if (catAvulso) { document.getElementById('f-av-cat').value = catAvulso; aoMudarCategoriaAvulso(); }
             else atualizarCamposAvulso();
@@ -1620,6 +1710,10 @@
             if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
+            // o motor devolve a BASE (sem %); na edição o histórico de % do item é reaplicado sobre a base nova
+            item.valorBase = item.valor;
+            item.historico = editandoIndex >= 0 ? (itens[editandoIndex].historico || '') : '';
+            item.valor = Math.round(aplicarHistorico(item.valorBase, item.historico) * 100) / 100;
             if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
             else itens.push(item);
             renderItens();
@@ -1630,18 +1724,20 @@
         function renderItens() {
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
-                ? '<tr><td colspan="8" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>'
+                ? '<tr><td colspan="9" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>'
                 : itens.map((it, i) => `
-                    <tr>
+                    <tr class="${it.historico ? 'com-pct' : ''}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
                         <td>${escapeHtml(it.descricao)}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
+                        <td class="col-pct">${escapeHtml(textoHistorico(it.historico) || '-')}</td>
                         <td class="item-desc">${escapeHtml(it.obs || '-')}</td>
-                        <td>
-                            <button class="btn-mini" onclick="editarItem(${i})">✏️</button>
+                        <td class="col-acoes">
+                            <button class="btn-mini" title="Alterar valores" onclick="abrirAlterarValor(${i})">💲</button>
+                            <button class="btn-mini" title="Editar item" onclick="editarItem(${i})">✏️</button>
                             <button class="btn-mini excluir" onclick="removerItem(${i})">🗑️</button>
                         </td>
                     </tr>`).join('');
@@ -1658,6 +1754,8 @@
             preencherForm(it);
             editandoIndex = i;
             document.getElementById('btn-adicionar').textContent = '💾 Atualizar item';
+            document.getElementById('nota-pct').textContent = it.historico
+                ? `Este item tem alteração de valor na lista (${textoHistorico(it.historico)}). Ela será reaplicada sobre o valor recalculado ao atualizar.` : '';
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         function removerItem(i) {
@@ -1673,6 +1771,112 @@
             document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('tot-geral').textContent = formatCurrency(total);
         }
+        // ============ MOTOR PERCENTUAL (Module MotorPercentual do VB) ============
+        // ModoComposto = False (regra do VB): % sempre sobre a BASE → 100 com "+100;+10" = 210 (composto daria 220)
+        const PCT_MODO_COMPOSTO = false;
+        function partesHistorico(h) {
+            return String(h || '').split(';').map(t => t.trim()).filter(Boolean).map(t => {
+                const sinal = t.startsWith('-') ? -1 : 1;
+                const n = parseFloat(t.replace(/[+\-\s%]/g, '').replace(',', '.'));
+                return isNaN(n) ? null : sinal * n;
+            }).filter(n => n !== null);
+        }
+        function fatorHistorico(h) {
+            const ps = partesHistorico(h);
+            return PCT_MODO_COMPOSTO ? ps.reduce((f, p) => f * (1 + p / 100), 1) : 1 + ps.reduce((s, p) => s + p, 0) / 100;
+        }
+        const aplicarHistorico = (base, h) => base * fatorHistorico(h);
+        const textoHistorico = h => partesHistorico(h).map(p => (p > 0 ? '+' : '') + String(p).replace('.', ',') + '%').join('; ');
+        const numBR = v => parseFloat(String(v ?? '').replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.'));
+
+        // ============ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ============
+        // Duas formas: (1) − / + porcentagem sobre a base (1 operação por abertura; a nova substitui a anterior)
+        //              (2) "Valor final": digita o unitário → vira um % sobre a base e substitui o histórico
+        let altv = null; // { idx, base, qtd, historico, sessao }
+        const $av = id => document.getElementById(id);
+        function abrirAlterarValor(i) {
+            const it = itens[i];
+            const hist = it.historico || '';
+            // item sem base guardada: reconstrói a base dividindo pelo fator do histórico
+            const base = it.valorBase > 0 ? it.valorBase : Math.round(it.valor / (fatorHistorico(hist) || 1) * 100) / 100;
+            altv = { idx: i, base, qtd: it.qtd, historico: hist, sessao: '' };
+            $av('avl-titulo').textContent = `Item ${i + 1} — ${it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente}`;
+            $av('avl-sub').textContent = it.descricao;
+            $av('avl-base').textContent = formatCurrency(base);
+            $av('avl-qtd').textContent = it.qtd;
+            $av('avl-hist-atual').textContent = textoHistorico(hist) || 'nenhuma';
+            $av('avl-pct').value = '';
+            $av('avl-final').checked = false;
+            aplicarModoFinal();
+            atualizarTelaAltv();
+            $av('avl').scrollLeft = 0;
+            $av('avl-fundo').classList.add('aberta'); $av('avl').classList.add('aberta');
+            // foco só depois de a ficha entrar, e sem rolar (senão o navegador desloca o conteúdo para fora)
+            setTimeout(() => focarAltv('avl-pct'), 280);
+        }
+        function focarAltv(id, selecionar) {
+            const el = $av(id);
+            el.focus({ preventScroll: true });
+            if (selecionar) el.select();
+            $av('avl').scrollLeft = 0;
+        }
+        function historicoExibicao() {
+            if (!altv.sessao) return altv.historico;
+            return altv.historico ? altv.historico + ';' + altv.sessao : altv.sessao;
+        }
+        // AtualizarTela: prévia ao vivo
+        function atualizarTelaAltv() {
+            const hist = historicoExibicao();
+            const unit = Math.round(aplicarHistorico(altv.base, hist) * 100) / 100;
+            if (!$av('avl-final').checked || document.activeElement !== $av('avl-unit')) $av('avl-unit').value = unit.toFixed(2).replace('.', ',');
+            $av('avl-total').value = formatCurrency(unit * altv.qtd);
+            $av('avl-hist-novo').textContent = textoHistorico(hist) || 'nenhuma (valor original)';
+            $av('avl-sessao').textContent = altv.sessao ? `Operação desta vez: ${textoHistorico(altv.sessao)}` : '';
+            const dif = unit - altv.base;
+            $av('avl-dif').textContent = Math.abs(dif) < 0.005 ? '' : `${dif > 0 ? '▲' : '▼'} ${formatCurrency(Math.abs(dif))} por unidade em relação ao valor original`;
+            $av('avl-dif').className = 'avl-dif ' + (dif > 0 ? 'sobe' : 'desce');
+        }
+        function adicionarOperacao(acrescimo) {
+            const pct = parseFloat(String($av('avl-pct').value).replace(',', '.'));
+            if (!(pct > 0)) { focarAltv('avl-pct'); return; }
+            altv.sessao = (acrescimo ? '+' : '-') + pct;
+            atualizarTelaAltv();
+            focarAltv('avl-pct');
+        }
+        // chk_Final: libera o unitário e trava porcentagem/botões
+        function aplicarModoFinal() {
+            const fixo = $av('avl-final').checked;
+            $av('avl-unit').readOnly = !fixo;
+            ['avl-pct', 'avl-menos', 'avl-mais'].forEach(id => $av(id).disabled = fixo);
+            document.querySelector('.avl-pct-linha').classList.toggle('desligado', fixo);
+            if (fixo) focarAltv('avl-unit', true);
+        }
+        // txt_unitario_Leave (modo fixo): % total sobre a BASE; apaga as porcentagens anteriores
+        function aplicarValorFinal() {
+            if (!altv || !$av('avl-final').checked || !(altv.base > 0)) return;
+            const novo = numBR($av('avl-unit').value);
+            if (!(novo >= 0)) { alert('Valor inválido. Digite apenas números.'); atualizarTelaAltv(); return; }
+            const dif = Math.round(((novo / altv.base) - 1) * 100 * 10000) / 10000;
+            altv.historico = '';
+            altv.sessao = dif === 0 ? '' : (dif > 0 ? '+' : '-') + Math.abs(dif);
+            atualizarTelaAltv();
+        }
+        // btn_OK: acumula a operação no histórico e atualiza a linha
+        function confirmarAlterarValor() {
+            if (document.activeElement === $av('avl-unit')) aplicarValorFinal();
+            const it = itens[altv.idx];
+            const hist = historicoExibicao();
+            it.valorBase = altv.base;
+            it.historico = hist;
+            it.valor = Math.round(aplicarHistorico(altv.base, hist) * 100) / 100;
+            fecharAlterarValor();
+            renderItens();
+        }
+        function fecharAlterarValor() {
+            $av('avl-fundo').classList.remove('aberta'); $av('avl').classList.remove('aberta');
+            altv = null;
+        }
+
         // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
         function salvarOrcamento() {
             if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
@@ -1740,7 +1944,6 @@
         });
         // Motor: recalcula ao mudar campos sem handler próprio
         ['f-cor','f-cor-pux','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
-         'f-percentuais',
          'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas e regras dos combos (região 4 do VB)
@@ -1772,6 +1975,18 @@
         document.getElementById('f-tamanho-pux').addEventListener('change', aposMudarPosicao);
         document.getElementById('f-produto').addEventListener('change', e => carregarMateriais(e.target.value));
         document.getElementById('f-av-cat').addEventListener('change', aoMudarCategoriaAvulso);
+        // tela Alteração de valores
+        $av('avl-menos').addEventListener('click', () => adicionarOperacao(false));
+        $av('avl-mais').addEventListener('click', () => adicionarOperacao(true));
+        $av('avl-final').addEventListener('change', aplicarModoFinal);
+        $av('avl-unit').addEventListener('change', aplicarValorFinal);
+        // Enter só aplica o valor digitado (a confirmação é no OK)
+        $av('avl-unit').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); aplicarValorFinal(); focarAltv('avl-unit', true); } });
+        $av('avl-ok').addEventListener('click', confirmarAlterarValor);
+        $av('avl-cancelar').addEventListener('click', fecharAlterarValor);
+        $av('avl-fechar').addEventListener('click', fecharAlterarValor);
+        $av('avl-fundo').addEventListener('click', fecharAlterarValor);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && altv) fecharAlterarValor(); });
         document.getElementById('f-av-produto').addEventListener('change', aoMudarProdutoAvulso);
         document.getElementById('f-av-acab').addEventListener('change', aoMudarAcabAvulso);
         ['f-av-cor', 'f-av-alt', 'f-av-larg'].forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
