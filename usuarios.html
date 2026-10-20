@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Usuários e permissões</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --secondary-color: #f8f9fa;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --ok: #1f9d55; --erro: #d22f42; --aviso: #b26a00;
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px);
+            background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; }
+        .logo { font-size: 28px; font-weight: 700; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; text-decoration: none; color: var(--text-dark); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 30px; margin-bottom: 6px; color: var(--text-dark); }
+        .welcome-subtitle { font-size: 15px; color: var(--text-light); margin-bottom: 22px; }
+        [hidden] { display: none !important; }
+
+        /* ===== sem acesso ===== */
+        #sem-acesso { text-align: center; padding: 70px 20px; color: var(--text-light); }
+        #sem-acesso h2 { color: var(--text-dark); margin-bottom: 8px; }
+        #sem-acesso a { display: inline-block; margin-top: 18px; color: var(--primary-color); font-weight: 700; }
+
+        /* ===== abas ===== */
+        .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; margin-bottom: 18px; flex-wrap: wrap; }
+        .aba { border: none; background: transparent; padding: 8px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--text-light); cursor: pointer; }
+        .aba.on { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
+
+        /* ===== painéis e tabelas ===== */
+        .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow-light); }
+        .barra { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+        .barra input[type=search], .barra input[type=text] { padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 10px; min-width: 240px; font-size: 14px; }
+        .btn { border: none; border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .btn-primario { background: var(--gradient-primary); color: #fff; }
+        .btn-secundario { background: #fff; color: var(--text-dark); border: 1px solid var(--border-color); }
+        .tabela { width: 100%; border-collapse: collapse; }
+        .tabela th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 9px 10px; border-bottom: 2px solid var(--border-color); }
+        .tabela td { padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: middle; }
+        .tabela tbody tr[data-codigo] { cursor: pointer; }
+        .tabela tbody tr[data-codigo]:hover { background: var(--primary-light); }
+        .vazio { text-align: center; color: var(--text-light); padding: 30px 0; }
+        .selo { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .selo.ok { background: rgba(31,157,85,.12); color: var(--ok); }
+        .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
+        .selo.aviso { background: rgba(178,106,0,.12); color: var(--aviso); }
+        .selo.neutro { background: #f1f1f5; color: var(--text-light); }
+        .rolagem { overflow-x: auto; }
+
+        /* ===== toasts ===== */
+        #toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 90; max-width: min(420px, calc(100vw - 36px)); }
+        .toast { color: #fff; padding: 12px 16px; border-radius: 12px; font-size: 14px; }
+
+        /* ===== ficha lateral (padrão da ficha de clientes) ===== */
+        .fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
+        .fundo.aberta { opacity: 1; pointer-events: auto; }
+        .gaveta { position: fixed; top: 0; right: 0; bottom: 0; width: min(920px, 100vw); background: #f4f4f7; z-index: 41;
+            transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
+            box-shadow: -20px 0 50px -20px rgba(20,16,28,.35); border-radius: 20px 0 0 20px; overflow: hidden; }
+        .gaveta.aberta { transform: none; }
+        .g-topo { background: var(--gradient-primary); color: #fff; padding: 16px 22px; display: flex; align-items: center; gap: 12px; }
+        .g-topo h3 { font-size: 19px; font-weight: 800; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .g-topo small { display: block; font-size: 12.5px; opacity: .85; font-weight: 600; }
+        .g-fechar { border: none; background: rgba(255,255,255,.15); color: #fff; width: 36px; height: 36px; border-radius: 10px; font-size: 17px; cursor: pointer; flex-shrink: 0; }
+        .g-corpo { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .g-acoes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
+        .g-acoes .espaco { flex: 1; }
+        .bloco { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; }
+        .bloco h4 { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--primary-color); margin-bottom: 10px; }
+        .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; }
+        .campo label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 4px; }
+        .campo input, .campo select { width: 100%; }
+        .dica { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+        .chk { display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .chk input { width: 17px; height: 17px; accent-color: var(--primary-color); }
+        #f-estados { display: flex; flex-wrap: wrap; gap: 6px; }
+        #f-estados button { border: 1px solid var(--border-color); background: #fff; border-radius: 8px; padding: 5px 8px; font-size: 12.5px; font-weight: 700; color: var(--text-light); cursor: pointer; min-width: 40px; }
+        #f-estados button.on { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+
+        /* ===== grade de permissões ===== */
+        #grade-permissoes table { width: 100%; border-collapse: collapse; }
+        #grade-permissoes th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 6px 8px; border-bottom: 2px solid var(--border-color); }
+        #grade-permissoes td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 13.5px; vertical-align: middle; }
+        #grade-permissoes tr.area td { background: #f6f5f9; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); }
+        #grade-permissoes tr.critica td:first-child b { color: var(--primary-color); }
+        #grade-permissoes td.do-perfil { text-align: center; color: var(--text-light); width: 70px; }
+        #grade-permissoes td.resultado { font-weight: 800; width: 80px; text-align: center; }
+        #grade-permissoes td.resultado.sim { color: var(--ok); }
+        #grade-permissoes td.resultado.nao { color: var(--erro); }
+        .tri { display: inline-flex; border: 1px solid var(--border-color); border-radius: 9px; overflow: hidden; }
+        .tri button { border: none; background: #fff; padding: 5px 9px; font-size: 12px; font-weight: 700; color: var(--text-light); cursor: pointer; }
+        .tri button + button { border-left: 1px solid var(--border-color); }
+        .tri button.on[data-estado="herdar"] { background: #e9e8ee; color: var(--text-dark); }
+        .tri button.on[data-estado="liberar"] { background: var(--ok); color: #fff; }
+        .tri button.on[data-estado="bloquear"] { background: var(--erro); color: #fff; }
+        .legenda { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+
+        /* ===== perfis ===== */
+        #lista-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .cartao { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; cursor: pointer; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+        .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(139,0,0,.45); }
+        .cartao.desativado { opacity: .65; }
+        .cartao b { font-size: 15px; display: block; }
+        .cartao p { font-size: 13px; color: var(--text-light); margin: 4px 0 10px; min-height: 18px; }
+        .cartao .rodape { display: flex; gap: 6px; flex-wrap: wrap; }
+        #p-permissoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 18px; }
+        #p-permissoes fieldset { border: none; }
+        #p-permissoes legend { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); margin-bottom: 6px; }
+        #p-permissoes label { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; padding: 3px 0; cursor: pointer; }
+        #p-permissoes input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--primary-color); flex-shrink: 0; }
+
+        /* ===== modal ===== */
+        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: rgba(21,17,26,.45); }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: #fff; border-radius: 18px; padding: 20px 22px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px; }
+        .modal h3 { font-size: 18px; }
+        .modal .acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+
+        @media (max-width: 768px) {
+            .gaveta { border-radius: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            main { padding: 18px 16px; }
+            .barra input[type=search], .barra input[type=text] { min-width: 0; width: 100%; }
+            .tabela { min-width: 640px; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610201600">
+    <script src="layout.js?v=202610201600" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile"><span id="user-name"></span></div>
+        </header>
+        <nav></nav>
+        <main>
+            <h1 class="welcome-title">Usuários e permissões</h1>
+            <p class="welcome-subtitle">Quem acessa o sistema web, com qual perfil, em quais estados e com quais exceções</p>
+
+            <section id="sem-acesso" hidden>
+                <h2>Sem acesso</h2>
+                <p>Somente administradores podem gerenciar usuários e permissões.</p>
+                <a href="inicio.html">Ir para o início</a>
+            </section>
+
+            <div id="conteudo" hidden>
+                <div class="abas" role="tablist">
+                    <button type="button" class="aba on" data-aba="usuarios">Usuários</button>
+                    <button type="button" class="aba" data-aba="perfis">Perfis</button>
+                    <button type="button" class="aba" data-aba="auditoria">Auditoria</button>
+                </div>
+
+                <section class="painel" id="painel-usuarios">
+                    <div class="barra">
+                        <input type="search" id="busca" placeholder="Buscar por nome, cargo ou perfil" autocomplete="off">
+                        <button type="button" class="btn btn-primario" id="btn-novo">+ Novo usuário</button>
+                    </div>
+                    <div class="rolagem">
+                        <table class="tabela" id="lista-usuarios">
+                            <thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th>Estados</th><th>Situação</th><th></th></tr></thead>
+                            <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="painel" id="painel-perfis" hidden>
+                    <div class="barra">
+                        <span class="dica">Mudar um perfil vale na hora para todos os usuários dele. Perfis não são excluídos, só desativados.</span>
+                        <button type="button" class="btn btn-primario" id="btn-novo-perfil">+ Novo perfil</button>
+                    </div>
+                    <div id="lista-perfis"><p class="vazio">Carregando...</p></div>
+                </section>
+                <section class="painel" id="painel-auditoria" hidden>
+                    <div class="barra">
+                        <input type="text" id="aud-filtro" placeholder="Filtrar por nome (quem fez ou quem recebeu)" autocomplete="off">
+                        <span class="dica">Últimas 200 alterações de acesso</span>
+                    </div>
+                    <div class="rolagem">
+                        <table class="tabela" id="lista-auditoria">
+                            <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Em quem</th><th>Detalhe</th></tr></thead>
+                            <tbody><tr><td colspan="5" class="vazio">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <!-- ===== FICHA DO USUÁRIO ===== -->
+    <div class="fundo" id="ficha-fundo"></div>
+    <aside class="gaveta" id="ficha" aria-label="Ficha do usuário">
+        <div class="g-topo">
+            <h3><span id="f-titulo">Usuário</span><small id="f-sub"></small></h3>
+            <button type="button" class="g-fechar" id="btn-fechar" aria-label="Fechar">✕</button>
+        </div>
+        <div class="g-corpo">
+            <div class="bloco">
+                <h4>Dados</h4>
+                <div class="campos">
+                    <div class="campo form-group"><label for="f-nome">Nome de login</label><input id="f-nome" maxlength="190" autocomplete="off"></div>
+                    <div class="campo form-group" id="campo-senha"><label for="f-senha">Senha inicial</label><input type="password" id="f-senha" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div>
+                    <div class="campo form-group"><label for="f-cargo">Cargo</label><select id="f-cargo"></select></div>
+                    <div class="campo form-group"><label for="f-empresa">Empresa</label><select id="f-empresa"></select></div>
+                </div>
+            </div>
+            <div class="bloco">
+                <h4>Acesso à web</h4>
+                <div class="campos">
+                    <div class="campo form-group"><label for="f-perfil">Perfil</label><select id="f-perfil"></select></div>
+                    <div class="campo"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="f-ativo"> Ativo na web</label></div>
+                </div>
+                <p class="dica">Desativar aqui bloqueia só a web, na hora — o login do VB não muda.</p>
+            </div>
+            <div class="bloco">
+                <h4>Estados que pode ver</h4>
+                <div id="f-estados"></div>
+                <p class="dica" id="f-estados-dica">Nenhum marcado = todos os estados.</p>
+            </div>
+            <div class="bloco" id="bloco-grade" hidden>
+                <h4>Permissões</h4>
+                <p class="legenda"><b>Herdar</b> segue o perfil · <b>Liberar</b> e <b>Bloquear</b> são exceções só deste usuário e vencem o perfil.</p>
+                <div class="rolagem" id="grade-permissoes"></div>
+            </div>
+        </div>
+        <div class="g-acoes">
+            <button type="button" class="btn btn-secundario" id="btn-senha">Redefinir senha</button>
+            <span class="espaco"></span>
+            <button type="button" class="btn btn-secundario" id="btn-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-primario" id="btn-salvar">Salvar</button>
+        </div>
+    </aside>
+
+    <!-- ===== FICHA DO PERFIL ===== -->
+    <div class="fundo" id="ficha-perfil-fundo"></div>
+    <aside class="gaveta" id="ficha-perfil" aria-label="Ficha do perfil">
+        <div class="g-topo">
+            <h3><span id="p-titulo">Perfil</span><small id="p-sub"></small></h3>
+            <button type="button" class="g-fechar" id="p-fechar" aria-label="Fechar">✕</button>
+        </div>
+        <div class="g-corpo">
+            <div class="bloco">
+                <h4>Dados</h4>
+                <div class="campos">
+                    <div class="campo form-group"><label for="p-nome">Nome</label><input id="p-nome" maxlength="60" autocomplete="off"></div>
+                    <div class="campo form-group"><label for="p-descricao">Descrição</label><input id="p-descricao" maxlength="255" autocomplete="off"></div>
+                    <div class="campo"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="p-ativo"> Perfil ativo</label></div>
+                </div>
+            </div>
+            <div class="bloco">
+                <h4>Permissões do perfil</h4>
+                <div id="p-permissoes"></div>
+            </div>
+        </div>
+        <div class="g-acoes">
+            <span class="espaco"></span>
+            <button type="button" class="btn btn-secundario" id="p-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-primario" id="p-salvar">Salvar perfil</button>
+        </div>
+    </aside>
+
+    <!-- ===== MODAL DE SENHA ===== -->
+    <div class="modal-fundo" id="modal-senha">
+        <div class="modal" role="dialog" aria-labelledby="ms-titulo">
+            <h3 id="ms-titulo">Redefinir senha</h3>
+            <div class="campo form-group"><label for="ms-senha">Nova senha</label><input type="password" id="ms-senha" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div>
+            <div class="campo form-group"><label for="ms-confirma">Repita a nova senha</label><input type="password" id="ms-confirma" autocomplete="new-password"></div>
+            <div class="acoes">
+                <button type="button" class="btn btn-secundario" id="ms-cancelar">Cancelar</button>
+                <button type="button" class="btn btn-primario" id="ms-ok">Redefinir</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toasts" aria-live="polite"></div>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        const $ = id => document.getElementById(id);
+        const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const semAcento = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+        function getAuth() {
+            try {
+                const a = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!a || !a.token || Date.now() > (a.exp || 0)) return null;
+                return a;
+            } catch { return null; }
+        }
+        const pode = codigo => (getAuth()?.acesso?.permissoes || []).includes(codigo);
+
+        async function api(caminho, opts = {}) {
+            const res = await fetch(API_BASE + caminho, { ...opts, headers: { 'Authorization': 'Bearer ' + (getAuth()?.token || ''), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || `Erro HTTP: ${res.status}`);
+            return d;
+        }
+        function toast(msg, tipo = 'info') {
+            const el = document.createElement('div');
+            el.className = `toast ${tipo}`; el.textContent = msg;
+            $('toasts').appendChild(el); setTimeout(() => el.remove(), 5200);
+        }
+
+        // ===================== ABAS =====================
+        const carregadores = {};
+        let abaAtual = 'usuarios';
+        function abrirAba(nome) {
+            abaAtual = nome;
+            document.querySelectorAll('.aba').forEach(b => b.classList.toggle('on', b.dataset.aba === nome));
+            ['usuarios', 'perfis', 'auditoria'].forEach(a => { $('painel-' + a).hidden = a !== nome; });
+            if (carregadores[nome]) carregadores[nome]();
+        }
+        document.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => abrirAba(b.dataset.aba)));
+
+        // ===================== LISTA DE USUÁRIOS =====================
+        let usuarios = [];
+        function situacaoDe(u) {
+            if (String(u.situacaoVB || '').toUpperCase() === 'INATIVO') return ['Inativo no VB', 'erro'];
+            if (!u.perfil && !u.ativoWeb) return ['Sem acesso à web', 'neutro'];
+            if (!u.ativoWeb) return ['Inativo na web', 'erro'];
+            return ['Ativo', 'ok'];
+        }
+        function renderUsuarios() {
+            const termo = semAcento($('busca').value.trim());
+            const lista = usuarios.filter(u => !termo || semAcento([u.nome, u.cargo, u.perfil?.nome].join(' ')).includes(termo));
+            const tbody = $('lista-usuarios').querySelector('tbody');
+            if (!lista.length) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">${usuarios.length ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}</td></tr>`; return; }
+            tbody.innerHTML = lista.map(u => {
+                const [sit, cls] = situacaoDe(u);
+                return `<tr data-codigo="${u.codigo}">
+                    <td><b>${esc(u.nome)}</b></td>
+                    <td>${esc(u.cargo || '—')}</td>
+                    <td>${esc(u.perfil?.nome || '—')}</td>
+                    <td>${u.estados.length ? esc(u.estados.join(', ')) : 'Todos'}</td>
+                    <td><span class="selo ${cls}">${sit}</span></td>
+                    <td>${u.qtdExcecoes ? `<span class="selo aviso">${u.qtdExcecoes} ${u.qtdExcecoes === 1 ? 'exceção' : 'exceções'}</span>` : ''}</td>
+                </tr>`;
+            }).join('');
+        }
+        async function carregarUsuarios() {
+            try { usuarios = await api('/admin/usuarios'); renderUsuarios(); }
+            catch (e) { $('lista-usuarios').querySelector('tbody').innerHTML = `<tr><td colspan="6" class="vazio">${esc(e.message)}</td></tr>`; }
+        }
+        carregadores.usuarios = carregarUsuarios;
+        $('busca').addEventListener('input', renderUsuarios);
+
+        // ===================== FICHA DO USUÁRIO =====================
+        const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
+        let catalogo = null, opcoes = null, perfisCache = [];
+        let estadoFicha = null; // { codigo|null, perfilId, estados:Set, ativo, cargo, excecoes: Map<permissao, 'liberar'|'bloquear'> }
+
+        async function garantirCadastros() {
+            if (!catalogo) catalogo = await api('/admin/permissoes');
+            opcoes = await api('/admin/opcoes');
+            perfisCache = await api('/admin/perfis');
+        }
+        const opcao = (valor, texto) => `<option value="${esc(valor)}">${esc(texto)}</option>`;
+        function preencherSelects(cargoAtual, empresaAtual) {
+            const cargos = [...opcoes.cargos];
+            if (cargoAtual && !cargos.includes(cargoAtual)) cargos.push(cargoAtual);
+            $('f-cargo').innerHTML = opcao('', '— Escolha —') + cargos.map(c => opcao(c, c)).join('');
+            const empresas = [...opcoes.empresas];
+            if (empresaAtual && !empresas.includes(empresaAtual)) empresas.push(empresaAtual);
+            $('f-empresa').innerHTML = empresas.map(e => opcao(e, e)).join('');
+            $('f-perfil').innerHTML = opcao('', '— Sem acesso à web —') +
+                opcoes.perfis.map(p => opcao(p.id, p.nome + (p.ativo ? '' : ' (desativado)'))).join('');
+        }
+        function renderEstados() {
+            $('f-estados').innerHTML = UFS.map(uf => `<button type="button" data-uf="${uf}" class="${estadoFicha.estados.has(uf) ? 'on' : ''}">${uf}</button>`).join('');
+            $('f-estados-dica').textContent = estadoFicha.estados.size ? `Vê só: ${[...estadoFicha.estados].sort().join(', ')}.` : 'Nenhum marcado = todos os estados.';
+        }
+        $('f-estados').addEventListener('click', e => {
+            const b = e.target.closest('button[data-uf]');
+            if (!b || !estadoFicha) return;
+            estadoFicha.estados.has(b.dataset.uf) ? estadoFicha.estados.delete(b.dataset.uf) : estadoFicha.estados.add(b.dataset.uf);
+            renderEstados();
+        });
+        $('f-perfil').addEventListener('change', () => {
+            if (!estadoFicha) return;
+            const antes = estadoFicha.perfilId;
+            estadoFicha.perfilId = $('f-perfil').value ? Number($('f-perfil').value) : null;
+            // quem não tinha acesso (ex.: criado pelo VB) ganha "Ativo na web" junto com o primeiro perfil
+            if (antes == null && estadoFicha.perfilId != null && !estadoFicha.ativo) { estadoFicha.ativo = true; $('f-ativo').checked = true; }
+            renderGradeSeExistir();
+        });
+        $('f-ativo').addEventListener('change', () => { if (estadoFicha) { estadoFicha.ativo = $('f-ativo').checked; renderGradeSeExistir(); } });
+        function renderGradeSeExistir() { if (estadoFicha?.codigo) renderGrade(); }
+
+        // ----- grade: herdar / liberar / bloquear -----
+        const CRITICAS = new Set(['valores.ver', 'admin.usuarios']);
+        function permissoesDoPerfil(id) {
+            const p = perfisCache.find(x => x.id === Number(id));
+            return new Set(p && p.ativo ? p.permissoes : []); // perfil desativado não dá nada
+        }
+        function resultadoDe(codigo, doPerfil) {
+            if (!estadoFicha.ativo) return false;
+            const ex = estadoFicha.excecoes.get(codigo);
+            return ex === 'liberar' ? true : ex === 'bloquear' ? false : doPerfil.has(codigo);
+        }
+        function renderGrade() {
+            const doPerfil = permissoesDoPerfil(estadoFicha.perfilId);
+            let area = null, html = '<table><thead><tr><th>Permissão</th><th>Do perfil</th><th>Exceção</th><th>Resultado</th></tr></thead><tbody>';
+            for (const p of catalogo) {
+                if (p.area !== area) { area = p.area; html += `<tr class="area"><td colspan="4">${esc(area)}</td></tr>`; }
+                const ex = estadoFicha.excecoes.get(p.codigo) || 'herdar';
+                const res = resultadoDe(p.codigo, doPerfil);
+                html += `<tr data-perm="${esc(p.codigo)}"${CRITICAS.has(p.codigo) ? ' class="critica"' : ''}>
+                    <td><b>${esc(p.nome)}</b></td>
+                    <td class="do-perfil">${doPerfil.has(p.codigo) ? '✓' : '—'}</td>
+                    <td><span class="tri">${['herdar', 'liberar', 'bloquear'].map(e =>
+                        `<button type="button" data-estado="${e}" class="${ex === e ? 'on' : ''}">${e === 'herdar' ? 'Herdar' : e === 'liberar' ? 'Liberar' : 'Bloquear'}</button>`).join('')}</span></td>
+                    <td class="resultado ${res ? 'sim' : 'nao'}">${res ? 'Sim' : 'Não'}</td>
+                </tr>`;
+            }
+            $('grade-permissoes').innerHTML = html + '</tbody></table>';
+            $('bloco-grade').hidden = false;
+        }
+        $('grade-permissoes').addEventListener('click', e => {
+            const b = e.target.closest('button[data-estado]');
+            if (!b || !estadoFicha) return;
+            const codigo = b.closest('tr[data-perm]').dataset.perm;
+            if (b.dataset.estado === 'herdar') estadoFicha.excecoes.delete(codigo); else estadoFicha.excecoes.set(codigo, b.dataset.estado);
+            renderGrade();
+        });
+
+        function mostrarFicha(aberta) {
+            $('ficha').classList.toggle('aberta', aberta);
+            $('ficha-fundo').classList.toggle('aberta', aberta);
+        }
+        async function abrirFicha(codigo) {
+            try {
+                await garantirCadastros();
+                const u = await api('/admin/usuarios/' + codigo);
+                estadoFicha = {
+                    codigo: u.codigo, perfilId: u.perfil ? u.perfil.id : null, estados: new Set(u.estados || []),
+                    ativo: !!u.ativoWeb, cargo: u.cargo || '', excecoes: new Map((u.excecoes || []).map(e => [e.permissao, e.tipo]))
+                };
+                $('f-titulo').textContent = u.nome;
+                $('f-sub').textContent = u.perfil ? `Perfil ${u.perfil.nome}` : 'Sem acesso à web';
+                $('f-nome').value = u.nome; $('f-nome').readOnly = true;
+                $('campo-senha').hidden = true; $('f-senha').value = '';
+                preencherSelects(u.cargo, u.empresa);
+                $('f-cargo').value = u.cargo || '';
+                $('f-empresa').value = u.empresa || ''; $('f-empresa').disabled = true;
+                $('f-perfil').value = estadoFicha.perfilId ?? '';
+                $('f-ativo').checked = estadoFicha.ativo;
+                $('btn-senha').hidden = false;
+                $('f-ativo').disabled = false;
+                renderEstados();
+                renderGradeSeExistir();
+                mostrarFicha(true);
+            } catch (e) { toast(e.message, 'erro'); }
+        }
+        function fecharFicha() { mostrarFicha(false); estadoFicha = null; }
+
+        // ----- novo usuário: mesma ficha, em modo criação -----
+        async function abrirNovo() {
+            try {
+                await garantirCadastros();
+                estadoFicha = { codigo: null, perfilId: null, estados: new Set(), ativo: true, cargo: '', excecoes: new Map() };
+                $('f-titulo').textContent = 'Novo usuário';
+                $('f-sub').textContent = 'O login vale para a web e para o VB';
+                $('f-nome').value = ''; $('f-nome').readOnly = false;
+                $('campo-senha').hidden = false; $('f-senha').value = '';
+                const empresaAdmin = getAuth()?.user?.empresa || '';
+                preencherSelects('', '');
+                $('f-perfil').options[0].textContent = '— Escolha o perfil —';
+                $('f-cargo').value = '';
+                $('f-empresa').disabled = false;
+                $('f-empresa').value = opcoes.empresas.includes(empresaAdmin) ? empresaAdmin : (opcoes.empresas[0] || '');
+                $('f-perfil').value = '';
+                $('f-ativo').checked = true; $('f-ativo').disabled = true; // usuário novo nasce ativo
+                $('btn-senha').hidden = true;
+                $('bloco-grade').hidden = true;
+                renderEstados();
+                mostrarFicha(true);
+                $('f-nome').focus();
+            } catch (e) { toast(e.message, 'erro'); }
+        }
+        async function criarUsuario() {
+            const nome = $('f-nome').value.trim(), senha = $('f-senha').value;
+            if (!nome) return toast('Informe o nome de login.', 'erro');
+            if (senha.length < 8) return toast('A senha precisa ter pelo menos 8 caracteres.', 'erro');
+            if (!$('f-cargo').value || !estadoFicha.perfilId) return toast('Escolha o cargo e o perfil.', 'erro');
+            const corpo = { nome, senha, cargo: $('f-cargo').value, empresa: $('f-empresa').value, perfilId: estadoFicha.perfilId, estados: estadosTexto() };
+            try {
+                const r = await api('/admin/usuarios', { method: 'POST', body: JSON.stringify(corpo) });
+                toast(`Usuário ${nome} criado. Agora ajuste as exceções, se precisar.`, 'ok');
+                carregarUsuarios();
+                abrirFicha(r.codigo);
+            } catch (e) { toast(e.message, 'erro'); } // ficha continua aberta
+        }
+
+        // ordem estável: estados pela lista de UFs, exceções pela ordem do catálogo
+        const estadosTexto = () => UFS.filter(uf => estadoFicha.estados.has(uf)).join(',');
+        const excecoesLista = () => (catalogo || []).map(p => p.codigo)
+            .filter(c => estadoFicha.excecoes.has(c)).map(c => ({ permissao: c, tipo: estadoFicha.excecoes.get(c) }));
+
+        async function salvarFicha() {
+            if (!estadoFicha) return;
+            if (!estadoFicha.codigo) return criarUsuario();
+            const corpo = { perfilId: estadoFicha.perfilId, estados: estadosTexto(), ativo: estadoFicha.ativo, excecoes: excecoesLista() };
+            // cargo só vai quando mudou: o backend valida contra `cargos` e grava no cliente_usuarios do VB
+            if ($('f-cargo').value !== estadoFicha.cargo) corpo.cargo = $('f-cargo').value;
+            try {
+                await api('/admin/usuarios/' + estadoFicha.codigo, { method: 'PUT', body: JSON.stringify(corpo) });
+                toast('Acesso de ' + $('f-nome').value + ' atualizado.', 'ok');
+                fecharFicha();
+                carregarUsuarios();
+            } catch (e) { toast(e.message, 'erro'); } // a ficha continua aberta com o que foi digitado
+        }
+
+        $('lista-usuarios').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-codigo]');
+            if (tr) abrirFicha(Number(tr.dataset.codigo));
+        });
+        // trava o botão enquanto a chamada roda (duplo clique não cria o usuário duas vezes)
+        function umPorVez(botao, acao) {
+            botao.addEventListener('click', async () => {
+                if (botao.disabled) return;
+                botao.disabled = true;
+                try { await acao(); } finally { botao.disabled = false; }
+            });
+        }
+        umPorVez($('btn-salvar'), salvarFicha);
+        $('btn-novo').addEventListener('click', abrirNovo);
+        $('btn-fechar').addEventListener('click', fecharFicha);
+        $('btn-cancelar').addEventListener('click', fecharFicha);
+        $('ficha-fundo').addEventListener('click', fecharFicha);
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            if ($('modal-senha').classList.contains('aberto')) fecharModalSenha(); else if (estadoFicha) fecharFicha(); else if (perfilAtual) fecharPerfil();
+        });
+
+        // ----- senha -----
+        function fecharModalSenha() { $('modal-senha').classList.remove('aberto'); $('ms-senha').value = ''; $('ms-confirma').value = ''; }
+        $('btn-senha').addEventListener('click', () => {
+            if (!estadoFicha?.codigo) return;
+            $('modal-senha').classList.add('aberto');
+            $('ms-senha').focus();
+        });
+        $('ms-cancelar').addEventListener('click', fecharModalSenha);
+        $('ms-ok').addEventListener('click', async () => {
+            const senha = $('ms-senha').value;
+            if (senha !== $('ms-confirma').value) return toast('As senhas não conferem.', 'erro');
+            if (senha.length < 8) return toast('A senha precisa ter pelo menos 8 caracteres.', 'erro');
+            try {
+                await api(`/admin/usuarios/${estadoFicha.codigo}/senha`, { method: 'POST', body: JSON.stringify({ senha }) });
+                fecharModalSenha();
+                toast('Senha redefinida. Avise o usuário da nova senha.', 'ok');
+            } catch (e) { toast(e.message, 'erro'); }
+        });
+
+        // ===================== PERFIS =====================
+        let perfilAtual = null; // { id|null, qtdUsuarios }
+        async function carregarPerfis() {
+            try {
+                if (!catalogo) catalogo = await api('/admin/permissoes');
+                perfisCache = await api('/admin/perfis');
+                const total = catalogo.length;
+                $('lista-perfis').innerHTML = perfisCache.length ? perfisCache.map(p => `
+                    <div class="cartao${p.ativo ? '' : ' desativado'}" data-id="${p.id}">
+                        <b>${esc(p.nome)}</b>
+                        <p>${esc(p.descricao || '')}</p>
+                        <div class="rodape">
+                            <span class="selo neutro">${p.qtdUsuarios} ${p.qtdUsuarios === 1 ? 'usuário' : 'usuários'}</span>
+                            <span class="selo ${p.permissoes.includes('valores.ver') ? 'aviso' : 'neutro'}">${p.permissoes.length} de ${total} permissões</span>
+                            ${p.ativo ? '' : '<span class="selo erro">Desativado</span>'}
+                        </div>
+                    </div>`).join('') : '<p class="vazio">Nenhum perfil cadastrado</p>';
+            } catch (e) { $('lista-perfis').innerHTML = `<p class="vazio">${esc(e.message)}</p>`; }
+        }
+        carregadores.perfis = carregarPerfis;
+
+        function mostrarFichaPerfil(aberta) {
+            $('ficha-perfil').classList.toggle('aberta', aberta);
+            $('ficha-perfil-fundo').classList.toggle('aberta', aberta);
+        }
+        function abrirPerfil(id) {
+            const p = id ? perfisCache.find(x => x.id === id) : null;
+            perfilAtual = { id: p ? p.id : null, qtdUsuarios: p ? p.qtdUsuarios : 0 };
+            $('p-titulo').textContent = p ? p.nome : 'Novo perfil';
+            $('p-sub').textContent = p ? `${p.qtdUsuarios} ${p.qtdUsuarios === 1 ? 'usuário' : 'usuários'} com este perfil` : '';
+            $('p-nome').value = p ? p.nome : '';
+            $('p-descricao').value = p ? (p.descricao || '') : '';
+            $('p-ativo').checked = p ? p.ativo : true;
+            const marcadas = new Set(p ? p.permissoes : []);
+            const areas = [];
+            for (const c of catalogo) { let a = areas.find(x => x.nome === c.area); if (!a) areas.push(a = { nome: c.area, itens: [] }); a.itens.push(c); }
+            $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(c =>
+                `<label><input type="checkbox" data-perm="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> ${esc(c.nome)}</label>`).join('')}</fieldset>`).join('');
+            mostrarFichaPerfil(true);
+            $('p-nome').focus();
+        }
+        function fecharPerfil() { mostrarFichaPerfil(false); perfilAtual = null; }
+        async function salvarPerfil() {
+            if (!perfilAtual) return;
+            const nome = $('p-nome').value.trim();
+            if (!nome) return toast('Informe o nome do perfil.', 'erro');
+            const marcadas = new Set([...document.querySelectorAll('#p-permissoes input[data-perm]:checked')].map(x => x.dataset.perm));
+            const permissoes = catalogo.map(c => c.codigo).filter(c => marcadas.has(c));
+            const ativo = $('p-ativo').checked;
+            const original = perfisCache.find(x => x.id === perfilAtual.id);
+            if (perfilAtual.id && !ativo && original?.ativo && perfilAtual.qtdUsuarios > 0 &&
+                !confirm(`Este perfil tem ${perfilAtual.qtdUsuarios} usuário(s). Eles perdem as permissões do perfil enquanto ele estiver desativado. Continuar?`)) return;
+            try {
+                if (perfilAtual.id) {
+                    await api('/admin/perfis/' + perfilAtual.id, { method: 'PUT', body: JSON.stringify({ nome, descricao: $('p-descricao').value.trim(), ativo, permissoes }) });
+                    toast(`Perfil ${nome} atualizado. Vale na hora para os usuários dele.`, 'ok');
+                } else {
+                    await api('/admin/perfis', { method: 'POST', body: JSON.stringify({ nome, descricao: $('p-descricao').value.trim(), permissoes }) });
+                    toast(`Perfil ${nome} criado.`, 'ok');
+                }
+                fecharPerfil();
+                await carregarPerfis();
+            } catch (e) { toast(e.message, 'erro'); } // ficha continua aberta
+        }
+        async function abrirPerfilComCatalogo(id) {
+            try { if (!catalogo) catalogo = await api('/admin/permissoes'); } catch (e) { return toast(e.message, 'erro'); }
+            abrirPerfil(id);
+        }
+        $('lista-perfis').addEventListener('click', e => { const c = e.target.closest('[data-id]'); if (c) abrirPerfilComCatalogo(Number(c.dataset.id)); });
+        $('btn-novo-perfil').addEventListener('click', () => abrirPerfilComCatalogo(null));
+        umPorVez($('p-salvar'), salvarPerfil);
+        $('p-fechar').addEventListener('click', fecharPerfil);
+        $('p-cancelar').addEventListener('click', fecharPerfil);
+        $('ficha-perfil-fundo').addEventListener('click', fecharPerfil);
+
+        // ===================== AUDITORIA =====================
+        const ACOES = {
+            usuario_criado: 'Criou usuário', usuario_alterado: 'Alterou acesso', senha_redefinida: 'Redefiniu senha',
+            perfil_criado: 'Criou perfil', perfil_alterado: 'Alterou perfil', migracao_inicial: 'Migração inicial',
+            admin_restaurado: 'Administrador restaurado'
+        };
+        const dataHoraBR = q => { const m = String(q || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : esc(q); };
+        const alvoTexto = a => String(a || '').replace(/^perfil:/, 'Perfil ');
+        // detalhe gravado em JSON pelo backend → resumo legível; chave desconhecida aparece como veio
+        function resumirDetalhe(bruto) {
+            let d;
+            try { d = typeof bruto === 'string' ? JSON.parse(bruto) : bruto; } catch { return String(bruto); }
+            if (!d || typeof d !== 'object') return d == null ? '' : String(d);
+            const nomePerfil = id => (perfisCache.find(p => p.id === Number(id)) || {}).nome || ('#' + id);
+            const partes = [];
+            for (const [k, v] of Object.entries(d)) {
+                if (k === 'codigo' || k === 'porPerfil') continue;
+                if (k === 'perfil_id' || k === 'perfilId') partes.push('Perfil: ' + (v ? nomePerfil(v) : 'nenhum'));
+                else if (k === 'estados') partes.push('Estados: ' + (v ? v : 'todos'));
+                else if (k === 'ativo') partes.push(String(d.permissoes ? 'Perfil' : 'Web') + ': ' + (v ? 'ativo' : 'desativado'));
+                else if (k === 'cargo') { if (v) partes.push('Cargo: ' + v); }
+                else if (k === 'permissoes') partes.push((v || []).length + ' permissões');
+                else if (k === 'excecoes') {
+                    if (!v) continue;
+                    const lib = v.filter(e => e.tipo === 'liberar').map(e => e.permissao), blo = v.filter(e => e.tipo === 'bloquear').map(e => e.permissao);
+                    partes.push(v.length ? [lib.length && 'liberou ' + lib.join(', '), blo.length && 'bloqueou ' + blo.join(', ')].filter(Boolean).join(' · ') : 'sem exceções');
+                }
+                else if (k === 'usuarios') partes.push(v + ' usuário(s)');
+                else if (k === 'adminInicial') { if (v) partes.push('Administrador: ' + v); }
+                else if (k === 'motivo') partes.push(String(v));
+                else partes.push(k + ': ' + (typeof v === 'object' ? JSON.stringify(v) : v));
+            }
+            return partes.join(' · ');
+        }
+        async function carregarAuditoria() {
+            const tbody = $('lista-auditoria').querySelector('tbody');
+            const usuario = $('aud-filtro').value.trim();
+            try {
+                if (!perfisCache.length) perfisCache = await api('/admin/perfis').catch(() => []);
+                const linhas = await api('/admin/auditoria?' + new URLSearchParams({ usuario, limite: '200' }));
+                tbody.innerHTML = linhas.length ? linhas.map(l => {
+                    const completo = l.detalhe == null ? '' : (typeof l.detalhe === 'string' ? l.detalhe : JSON.stringify(l.detalhe));
+                    const resumo = resumirDetalhe(l.detalhe).replace(/\s+/g, ' ');
+                    const curto = resumo.length > 160 ? resumo.slice(0, 157) + '...' : resumo;
+                    return `<tr>
+                        <td style="white-space:nowrap">${dataHoraBR(l.quando)}</td>
+                        <td>${esc(l.quem)}</td>
+                        <td><b>${esc(ACOES[l.acao] || l.acao)}</b></td>
+                        <td>${esc(alvoTexto(l.alvo)) || '—'}</td>
+                        <td class="dica" title="${esc(completo)}">${esc(curto)}</td>
+                    </tr>`;
+                }).join('') : '<tr><td colspan="5" class="vazio">Nenhuma alteração registrada</td></tr>';
+            } catch (e) { tbody.innerHTML = `<tr><td colspan="5" class="vazio">${esc(e.message)}</td></tr>`; }
+        }
+        carregadores.auditoria = carregarAuditoria;
+        $('aud-filtro').addEventListener('keydown', e => { if (e.key === 'Enter') carregarAuditoria(); });
+        $('aud-filtro').addEventListener('change', carregarAuditoria);
+
+        // ===================== INÍCIO =====================
+        let iniciado = false;
+        function iniciar() {
+            const admin = pode('admin.usuarios');
+            $('sem-acesso').hidden = admin;
+            $('conteudo').hidden = !admin;
+            if (admin && !iniciado) { iniciado = true; abrirAba('usuarios'); }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const a = getAuth();
+            if (!a) { window.location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = a.user?.empresa || 'Elegance';
+            $('user-name').textContent = a.user?.nome || '';
+            iniciar();
+        });
+        // o layout.js atualiza as permissões pelo /auth/verify: reavalia se a página pode ser usada
+        document.addEventListener('acesso-atualizado', iniciar);
+    </script>
+</body>
+</html>

@@ -4,6 +4,7 @@
 // ==========================================================================
 (function () {
     const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+    const API = 'https://elegance-backend-hrho.onrender.com';
     const ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const ICONES = {
         inicio: ic('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>'),
@@ -15,7 +16,8 @@
         produtos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
         financeiro: ic('<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19M6.5 15h3"/>'),
         sair: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>'),
-        menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>')
+        menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+        usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>')
     };
     const MENU = [
         { secao: 'Visão geral' },
@@ -27,12 +29,18 @@
         { secao: 'Gestão', interno: true },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque', interno: true },
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos', interno: true },
-        { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro', interno: true }
+        { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro', interno: true },
+        { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios', exige: 'admin.usuarios' }
     ];
 
     function auth() {
         try { return JSON.parse(localStorage.getItem('auth') || 'null'); } catch { return null; }
     }
+    // Permissões do usuário para a tela se montar (quem decide de verdade é o backend)
+    window.Acesso = {
+        atual: () => auth()?.acesso || null,
+        pode: codigo => (auth()?.acesso?.permissoes || []).includes(codigo)
+    };
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     function montar() {
@@ -41,7 +49,6 @@
         const nav = container.querySelector(':scope > nav, :scope > .sidebar');
         const header = container.querySelector(':scope > header');
         const a = auth();
-        const representante = String(a?.user?.cargo || '').toLowerCase().includes('representante');
         const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html' };   // subpáginas acendem o item do menu de origem
         const arquivo = (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
         const atual = PAGINA_PAI[arquivo] || arquivo;
@@ -50,10 +57,23 @@
         if (nav) {
             nav.removeAttribute('style');
             nav.classList.add('sidebar');
+            desenharMenu(nav, atual);
+            const fundo = document.createElement('div');
+            fundo.className = 'sb-fundo';
+            fundo.addEventListener('click', () => document.body.classList.remove('menu-aberto'));
+            container.appendChild(fundo);
+            atualizarAcesso(nav, atual);
+        }
+        montarTopo(container, header, a);
+    }
+
+    function desenharMenu(nav, atual) {
+        const a = auth();
+        const representante = String(a?.user?.cargo || '').toLowerCase().includes('representante');
             nav.innerHTML =
                 `<a class="sb-marca" href="inicio.html"><span class="sb-logo">E</span><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map(m => {
-                    const oculto = m.interno && representante ? ' hidden' : '';
+                    const oculto = (m.interno && representante) || (m.exige && !window.Acesso.pode(m.exige)) ? ' hidden' : '';
                     if (m.secao) return `<div class="sb-secao"${oculto}>${m.secao}</div>`;
                     const ativo = m.href === atual ? ' active' : '';
                     return `<a class="menu-item${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
@@ -63,11 +83,27 @@
                 localStorage.removeItem('auth');
                 location.href = LOGIN_URL;
             });
-            const fundo = document.createElement('div');
-            fundo.className = 'sb-fundo';
-            fundo.addEventListener('click', () => document.body.classList.remove('menu-aberto'));
-            container.appendChild(fundo);
-        }
+    }
+
+    // Atualiza perfil/permissões/estados pelo /auth/verify (sessões antigas e mudanças feitas pelo administrador)
+    async function atualizarAcesso(nav, atual) {
+        const a = auth();
+        if (!a?.token) return;
+        try {
+            const r = await fetch(API + '/auth/verify', { headers: { Authorization: 'Bearer ' + a.token } });
+            if (r.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; return; }
+            if (!r.ok) return;
+            const d = await r.json();
+            const novo = auth();
+            if (!novo || !d.acesso) return;
+            novo.acesso = d.acesso;
+            localStorage.setItem('auth', JSON.stringify(novo));
+            desenharMenu(nav, atual);
+            document.dispatchEvent(new CustomEvent('acesso-atualizado', { detail: d.acesso }));
+        } catch { /* sem rede: mantém o que já tem */ }
+    }
+
+    function montarTopo(container, header, a) {
 
         // ----- topo: botão do menu móvel + avatar -----
         if (header) {

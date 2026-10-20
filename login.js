@@ -50,6 +50,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
       localStorage.setItem('auth', JSON.stringify({
         token: data.token,
         user: data.user,
+        acesso: data.acesso || null, // perfil, permissões e estados (a tela se monta; quem decide é o backend)
         exp: Date.now() + 8 * 60 * 60 * 1000 // 8h, igual ao JWT
       }));
       // Limpa formato antigo (evita conflito com o guard antigo)
