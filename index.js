@@ -6,6 +6,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const PDFDocument = require('pdfkit');
+const { criarAcesso } = require('./seguranca/acesso');
+const { criarRegistro } = require('./seguranca/rotas');
+const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
+const { filtroEstados } = require('./seguranca/acesso');
+const { instalarTabelas, migrarAcessos, garantirAdministrador } = require('./seguranca/instalacao');
+const { registrarAdmin } = require('./rotas/admin');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -15,7 +21,8 @@ const PORT = process.env.PORT || 3000;
 
 // ================= VALIDAÇÃO DE AMBIENTE =================
 const JWT_SECRET = process.env.JWT_SECRET;
-const OBRIGATORIAS = ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'];
+// nos testes automáticos o banco é simulado, então só o JWT_SECRET é obrigatório
+const OBRIGATORIAS = process.env.NODE_ENV === 'test' ? [] : ['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'];
 const faltando = OBRIGATORIAS.filter(k => !process.env[k]);
 if (!JWT_SECRET || faltando.length > 0) {
   console.error('FATAL: variáveis de ambiente ausentes:', [...faltando, ...(JWT_SECRET ? [] : ['JWT_SECRET'])]);
@@ -55,32 +62,103 @@ const loginLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// ================= JWT =================
+// ================= JWT + ACESSO =================
+// O token só identifica o usuário (v: 2). Perfil, permissões, estados e se está
+// ativo vêm do banco a cada requisição (cache de 60 s, limpo pela administração).
+const acesso = criarAcesso({ pool });
+
 function gerarToken(usuario) {
   return jwt.sign(
-    { id: usuario.CODIGO, nome: usuario.NOME, cargo: usuario.CARGO },
+    { id: usuario.CODIGO, nome: usuario.NOME, v: 2 },
     JWT_SECRET,
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
 }
-function autenticar(req, res, next) {
+const resumoAcesso = a => ({ perfil: a.perfil, permissoes: [...a.permissoes], estados: a.estados });
+
+async function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Não autenticado' });
+  let payload;
   try {
-    req.user = jwt.verify(token, JWT_SECRET, { issuer: 'elegance-api' });
-    next();
+    payload = jwt.verify(token, JWT_SECRET, { issuer: 'elegance-api' });
   } catch {
     return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   }
+  if (payload.v !== 2) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+  try {
+    req.acesso = await acesso.carregar(payload.id);
+  } catch (err) {
+    console.error('Erro ao carregar acesso:', err.message);
+    return res.status(500).json({ error: 'Erro de servidor' });
+  }
+  if (!req.acesso || !req.acesso.ativo) return res.status(401).json({ error: 'Sessão encerrada. Faça login novamente.' });
+  req.user = { id: payload.id, nome: req.acesso.nome, cargo: req.acesso.cargo };
+  next();
 }
-// Cargo do TOKEN decide o filtro — o navegador não manda nada
-function ehRepresentante(req) {
-  return String(req.user.cargo || '').toLowerCase().includes('representante');
+const registro = criarRegistro(app, { autenticado: [autenticar, redeDeValores] });
+// Estados (região) do usuário decidem o filtro — o navegador não consegue ampliar.
+// Sem restrição, o ?estado= da tela ainda pode filtrar; com restrição, só os estados dele.
+function condicaoEstado(req, coluna) {
+  const f = filtroEstados(req, coluna);
+  if (f.sql) return f;
+  const pedido = String(req.query?.estado || '').trim().toUpperCase();
+  return pedido ? { sql: `${coluna} = ?`, params: [pedido] } : { sql: '', params: [] };
+}
+// cliente fora dos estados do usuário → 403 (true = bloqueado e resposta já enviada)
+function foraDosEstados(req, res, estadoDoCliente) {
+  const estados = req.acesso?.estados || [];
+  if (!estados.length || estados.includes(String(estadoDoCliente || '').trim().toUpperCase())) return false;
+  res.status(403).json({ error: 'Acesso restrito' });
+  return true;
+}
+const JOIN_CLIENTE = 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL';
+
+// Gravação em cliente: o cliente atual — e, ao salvar, o estado novo — precisam estar nos estados do usuário.
+function clienteNosEstados({ verificarEstadoNovo = false } = {}) {
+  return async (req, res, next) => {
+    if (!(req.acesso?.estados || []).length) return next();
+    try {
+      const codigo = parseInt(req.body?.codigo, 10) || 0;
+      const [r] = codigo ? await pool.execute('SELECT ESTADO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]) : [[]];
+      if (r.length && foraDosEstados(req, res, r[0].ESTADO)) return;
+      if (verificarEstadoNovo && foraDosEstados(req, res, req.body?.estado)) return;
+      next();
+    } catch (err) {
+      console.error('Erro ao conferir o estado do cliente:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  };
+}
+
+// Gravação sem `valores.ver`: os campos de valor vêm do banco, nunca da tela.
+// Registro novo: com `mensagemNovo` é recusado (403); sem ela, os valores entram zerados.
+//   mapa = { campoDoCorpo: 'COLUNA_NO_BANCO' }
+function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
+  const campos = Object.keys(mapa);
+  return async (req, res, next) => {
+    if (podeVerValores(req)) return next();
+    try {
+      const corpo = req.body || {};
+      const id = chave(corpo);
+      const [linhas] = id ? await pool.execute(sql, [id]) : [[]];
+      if (!linhas.length) {
+        if (mensagemNovo) return res.status(403).json({ error: mensagemNovo });
+        req.body = preservarValores(req, corpo, Object.fromEntries(campos.map(c => [c, 0])), campos);
+      } else {
+        req.body = preservarValores(req, corpo, Object.fromEntries(campos.map(c => [c, linhas[0][mapa[c]]])), campos);
+      }
+      next();
+    } catch (err) {
+      console.error('Erro ao preservar valores:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  };
 }
 
 // ================= LOGIN =================
-app.post('/login', loginLimiter, async (req, res) => {
+registro.publica('post', '/login', loginLimiter, async (req, res) => {
   const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   if (!username || !password || username.length > 100 || password.length > 200) {
@@ -100,10 +178,15 @@ app.post('/login', loginLimiter, async (req, res) => {
     if (!senhaOk) {
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
+    const a = await acesso.carregar(user.CODIGO);
+    if (!a || !a.ativo) {
+      return res.status(403).json({ success: false, message: 'Acesso à web não liberado. Fale com o administrador.' });
+    }
     res.json({
       success: true,
       token: gerarToken(user),
-      user: { nome: user.NOME, empresa: user.RAZAO_SOCIAL, cargo: user.CARGO }
+      user: { nome: user.NOME, empresa: user.RAZAO_SOCIAL, cargo: user.CARGO },
+      acesso: resumoAcesso(a)
     });
   } catch (err) {
     console.error('Erro no login:', err.message);
@@ -112,8 +195,8 @@ app.post('/login', loginLimiter, async (req, res) => {
 });
 
 // ================= VERIFICAÇÃO DE SESSÃO =================
-app.get('/auth/verify', autenticar, (req, res) => {
-  res.json({ valid: true, user: { nome: req.user.nome, cargo: req.user.cargo } });
+registro.rota('get', '/auth/verify', [], (req, res) => {
+  res.json({ valid: true, user: { nome: req.user.nome, cargo: req.user.cargo }, acesso: resumoAcesso(req.acesso) });
 });
 
 // Datas de pronto/entrega: a coluna pode ser DATE/DATETIME ou texto "dd/mm/aaaa" (herança do VB).
@@ -130,10 +213,10 @@ function dataBRSegura(v) {
 const comDatasSeguras = rows => rows.map(r => ({ ...r, prontoEm: dataBRSegura(r.prontoEm), dataEntrega: dataBRSegura(r.dataEntrega) }));
 
 // ================= LISTA ÚNICA (Pedido ou Orçamento) =================
-app.get('/dados_lista', autenticar, async (req, res) => {
+registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
   try {
     const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
-    const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
+    const est = condicaoEstado(req, 'c.ESTADO');
     const sql = `
       SELECT 
         p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
@@ -143,12 +226,11 @@ app.get('/dados_lista', autenticar, async (req, res) => {
         p.FINANCEIRO as financeiro,
         CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
       FROM ped_orc p
-      ${estado ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
-      WHERE p.TIPO = ? ${estado ? 'AND c.ESTADO = ?' : ''}
+      ${est.sql ? JOIN_CLIENTE : ''}
+      WHERE p.TIPO = ? ${est.sql ? 'AND ' + est.sql : ''}
       ORDER BY p.NUMERO DESC`;
-    const params = estado ? [tipo, estado] : [tipo];
-    const [rows] = await pool.execute(sql, params);
-    res.json(comDatasSeguras(rows));
+    const [rows] = await pool.execute(sql, [tipo, ...est.params]);
+    res.json(semValores(req, comDatasSeguras(rows), ['valor']));
   } catch (err) {
     console.error('Erro /dados_lista:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -156,25 +238,24 @@ app.get('/dados_lista', autenticar, async (req, res) => {
 });
 
 // Mantidos por compatibilidade
-app.get('/dados_pedidos', autenticar, async (req, res) => {
+registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
   try {
-    const where = ehRepresentante(req)
-      ? `INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido'`
-      : `WHERE p.TIPO='Pedido'`;
+    const est = condicaoEstado(req, 'c.ESTADO');
+    const where = est.sql ? `${JOIN_CLIENTE} WHERE ${est.sql} AND p.TIPO='Pedido'` : `WHERE p.TIPO='Pedido'`;
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
              DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
              CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
-      FROM ped_orc p ${where} ORDER BY NUMERO DESC`);
-    res.json(comDatasSeguras(rows));
+      FROM ped_orc p ${where} ORDER BY NUMERO DESC`, est.params);
+    res.json(semValores(req, comDatasSeguras(rows), ['valor']));
   } catch (err) {
     console.error('Erro /dados_pedidos:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
-app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
+registro.rota('get', '/dados_pedidos_rj', ['pedidos.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
@@ -182,9 +263,10 @@ app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
              CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
       FROM ped_orc p
-      INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL
-      WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido' ORDER BY p.DATA DESC`);
-    res.json(comDatasSeguras(rows));
+      ${JOIN_CLIENTE}
+      WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido' ${filtroEstados(req, 'c.ESTADO').sql ? 'AND ' + filtroEstados(req, 'c.ESTADO').sql : ''}
+      ORDER BY p.DATA DESC`, filtroEstados(req, 'c.ESTADO').params);
+    res.json(semValores(req, comDatasSeguras(rows), ['valor']));
   } catch (err) {
     console.error('Erro /dados_pedidos_rj:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -192,9 +274,9 @@ app.get('/dados_pedidos_rj', autenticar, async (req, res) => {
 });
 
 // ================= CLIENTES =================
-app.get('/dados_clientes', autenticar, async (req, res) => {
+registro.rota('get', '/dados_clientes', [{ algum: ['clientes.ver', 'pedidos.ver', 'orcamentos.criar', 'paineis.ver'] }], async (req, res) => {
   try {
-    const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
+    const est = condicaoEstado(req, 'ESTADO');
     const sql = `
       SELECT CODIGO as codigo, RAZAO_SOCIAL as razaoSocial, FANTASIA as fantasia,
              TIPO as tipo, CNPJ_CPF as cnpjCpf, IE_RG as ieRg,
@@ -204,10 +286,10 @@ app.get('/dados_clientes', autenticar, async (req, res) => {
              CREDITO as credito, DESCONTO as desconto,
              OBSERVACAO as observacao, CONTATO as contato,
              TELEFONE as telefone, EMAIL as email, REPRESENTANTE as representante
-      FROM cadastro_clientes ${estado ? 'WHERE ESTADO = ?' : ''}
+      FROM cadastro_clientes ${est.sql ? 'WHERE ' + est.sql : ''}
       ORDER BY RAZAO_SOCIAL ASC`;
-    const [rows] = await pool.execute(sql, estado ? [estado] : []);
-    res.json(rows);
+    const [rows] = await pool.execute(sql, est.params);
+    res.json(semValores(req, rows, ['credito', 'desconto']));
   } catch (err) {
     console.error('Erro /dados_clientes:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -215,19 +297,19 @@ app.get('/dados_clientes', autenticar, async (req, res) => {
 });
 
 // ================= RANKINGS DOS ÚLTIMOS 12 MESES (só pedidos) =================
-// filtro comum: pedidos dos últimos 12 meses; representante vê só o RJ; opcional por cliente
+// filtro comum: pedidos dos últimos 12 meses, nos estados do usuário; opcional por cliente
 function filtroPedidos12m(req) {
-  const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
-  const cliente = !ehRepresentante(req) && req.query.cliente ? String(req.query.cliente) : null;
+  const est = condicaoEstado(req, 'c.ESTADO');
+  const cliente = req.query.cliente ? String(req.query.cliente) : null;
   const where = ["p.TIPO = 'Pedido'", 'p.DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)'];
   const params = [];
-  if (estado) { where.push('c.ESTADO = ?'); params.push(estado); }
+  if (est.sql) { where.push(est.sql); params.push(...est.params); }
   if (cliente) { where.push('p.RAZAO_SOCIAL = ?'); params.push(cliente); }
-  return { join: estado ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : '', where: where.join(' AND '), params };
+  return { join: est.sql ? JOIN_CLIENTE : '', where: where.join(' AND '), params };
 }
 
 // Tipos de produto mais vendidos (itens dos pedidos)
-app.get('/ranking_produtos', autenticar, async (req, res) => {
+registro.rota('get', '/ranking_produtos', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }], async (req, res) => {
   try {
     const f = filtroPedidos12m(req);
     const [rows] = await pool.execute(
@@ -238,7 +320,7 @@ app.get('/ranking_produtos', autenticar, async (req, res) => {
        ${f.join}
        WHERE ${f.where}
        GROUP BY nome`, f.params);
-    res.json(rows.map(r => ({ nome: r.nome, valor: numEstq(r.valor), qtd: numEstq(r.qtd), pedidos: Number(r.pedidos) || 0 })));
+    res.json(semValores(req, rows.map(r => ({ nome: r.nome, valor: numEstq(r.valor), qtd: numEstq(r.qtd), pedidos: Number(r.pedidos) || 0 })), ['valor']));
   } catch (err) {
     console.error('Erro /ranking_produtos:', err.message);
     res.status(500).json({ error: 'Erro ao calcular os produtos mais vendidos', detalhe: err.code || err.message });
@@ -246,7 +328,7 @@ app.get('/ranking_produtos', autenticar, async (req, res) => {
 });
 
 // Clientes que mais compraram
-app.get('/ranking_clientes', autenticar, async (req, res) => {
+registro.rota('get', '/ranking_clientes', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }], async (req, res) => {
   try {
     const f = filtroPedidos12m(req);
     const [rows] = await pool.execute(
@@ -254,7 +336,7 @@ app.get('/ranking_clientes', autenticar, async (req, res) => {
        FROM ped_orc p ${f.join}
        WHERE ${f.where}
        GROUP BY p.RAZAO_SOCIAL`, f.params);
-    res.json(rows.map(r => ({ nome: r.nome || '—', valor: numEstq(r.valor), pedidos: Number(r.pedidos) || 0, ultimo: dataBRSegura(r.ultimo) })));
+    res.json(semValores(req, rows.map(r => ({ nome: r.nome || '—', valor: numEstq(r.valor), pedidos: Number(r.pedidos) || 0, ultimo: dataBRSegura(r.ultimo) })), ['valor']));
   } catch (err) {
     console.error('Erro /ranking_clientes:', err.message);
     res.status(500).json({ error: 'Erro ao calcular os clientes que mais compraram', detalhe: err.code || err.message });
@@ -271,9 +353,16 @@ async function razaoDoCodigo(codigo) {
   const [r] = await pool.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
   return r.length ? r[0].RAZAO_SOCIAL : null;
 }
+// razão social do cliente, já respondendo 404/403 quando não existe ou está fora dos estados do usuário
+async function razaoPermitida(req, res, codigo) {
+  const [r] = await pool.execute('SELECT RAZAO_SOCIAL, ESTADO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
+  if (!r.length) { res.status(404).json({ error: 'Cliente não encontrado' }); return null; }
+  if (foraDosEstados(req, res, r[0].ESTADO)) return null;
+  return r[0].RAZAO_SOCIAL;
+}
 
 // Combos do cadastro + próximo código (Contar_Registros)
-app.get('/clientes/opcoes', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/opcoes', ['clientes.ver'], async (req, res) => {
   const [[mx]] = await pool.execute('SELECT MAX(CODIGO) AS m FROM cadastro_clientes').catch(() => [[{ m: 0 }]]);
   res.json({
     proximoCodigo: (parseInt(mx.m, 10) || 0) + 1,
@@ -284,28 +373,29 @@ app.get('/clientes/opcoes', autenticar, somenteInterno, async (req, res) => {
   });
 });
 // Cascata Estado → Cidade → Bairro
-app.get('/clientes/cidades', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/cidades', ['clientes.ver'], async (req, res) => {
   res.json(await listaSimples('SELECT CIDADE AS v FROM cidades WHERE ESTADO = ? ORDER BY CIDADE ASC', [txtEstq(req.query.estado, 10)]));
 });
-app.get('/clientes/bairros', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/bairros', ['clientes.ver'], async (req, res) => {
   res.json(await listaSimples('SELECT BAIRRO AS v FROM bairros WHERE CIDADE = ? ORDER BY BAIRRO ASC', [txtEstq(req.query.cidade, 120)]));
 });
 // cmb_Representante_SelectedIndexChanged: comissão do representante
-app.get('/clientes/comissao', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/comissao', ['clientes.ver'], async (req, res) => {
   try {
     const [r] = await pool.execute('SELECT COMISSAO FROM representantes WHERE REPRESENTANTE = ? LIMIT 1', [txtEstq(req.query.representante)]);
-    res.json({ comissao: r.length ? numEstq(r[0].COMISSAO) : null });
+    res.json(semValores(req, { comissao: r.length ? numEstq(r[0].COMISSAO) : null }, ['comissao']));
   } catch { res.json({ comissao: null }); }
 });
 
 // cmb_Cliente_SelectedIndexChanged: ficha completa
-app.get('/clientes/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/item/:codigo', ['clientes.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT * FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!rows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
     const r = rows[0];
+    if (foraDosEstados(req, res, r.ESTADO)) return;
     const t = k => (r[k] == null ? '' : String(r[k]));
-    res.json({
+    res.json(semValores(req, {
       codigo: r.CODIGO, tipo: t('TIPO'), razaoSocial: t('RAZAO_SOCIAL'), fantasia: t('FANTASIA'), cnpjCpf: t('CNPJ_CPF'), ieRg: t('IE_RG'),
       endereco: t('ENDERECO'), numero: t('NUMERO'), cep: t('CEP'), bairro: t('BAIRRO'), cidade: t('CIDADE'), estado: t('ESTADO'),
       complemento: t('COMPLEMENTO'), telefone: t('TELEFONE'), contato: t('CONTATO'), email: t('EMAIL'), classe: t('CLASSE'),
@@ -313,7 +403,7 @@ app.get('/clientes/item/:codigo', autenticar, somenteInterno, async (req, res) =
       credito: numEstq(r.CREDITO), observacao: t('OBSERVACAO'), comissao: numEstq(r.COMISSAO), representante: t('REPRESENTANTE'),
       fretePortas: numEstq(r.FRETE_PORTAS), freteMetalon: numEstq(r.FRETE_METALON),
       tipoDesconto: t('TIPO_DESCONTO'), situacao: t('SITUACAO'), permissao: t('PERMISSAO')
-    });
+    }, ['desconto', 'descontoAdicional', 'credito', 'comissao', 'fretePortas', 'freteMetalon']));
   } catch (err) {
     console.error('Erro /clientes/item:', err.message);
     res.status(500).json({ error: 'Erro ao carregar o cliente', detalhe: err.code || err.message });
@@ -321,7 +411,11 @@ app.get('/clientes/item/:codigo', autenticar, somenteInterno, async (req, res) =
 });
 
 // Salvar: INSERT se o código não existe, senão UPDATE (campos * obrigatórios da tela)
-app.post('/clientes/salvar', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados({ verificarEstadoNovo: true }), preservarDoBanco({
+  sql: 'SELECT DESCONTO, DESCONTO_ADICIONAL, COMISSAO, FRETE_PORTAS, FRETE_METALON FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1',
+  chave: b => parseInt(b.codigo, 10) || 0,
+  mapa: { desconto: 'DESCONTO', descontoAdicional: 'DESCONTO_ADICIONAL', comissao: 'COMISSAO', fretePortas: 'FRETE_PORTAS', freteMetalon: 'FRETE_METALON' }
+}), async (req, res) => {
   const b = req.body || {};
   const erro = msg => res.status(400).json({ error: msg });
   const d = {
@@ -365,7 +459,7 @@ app.post('/clientes/salvar', autenticar, somenteInterno, async (req, res) => {
 });
 
 // btn_Crédito: soma o valor ao crédito existente
-app.post('/clientes/credito', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/clientes/credito', ['clientes.credito', 'valores.ver'], clienteNosEstados(), async (req, res) => {
   const codigo = parseInt(req.body?.codigo, 10) || 0;
   const valor = numEstq(req.body?.valor);
   if (!codigo) return res.status(400).json({ error: 'Favor escolher um cliente!' });
@@ -381,7 +475,7 @@ app.post('/clientes/credito', autenticar, somenteInterno, async (req, res) => {
 });
 
 // btn_Bloquear: alterna Bloqueado / Liberado
-app.post('/clientes/permissao', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/clientes/permissao', ['clientes.permissao'], clienteNosEstados(), async (req, res) => {
   const codigo = parseInt(req.body?.codigo, 10) || 0;
   try {
     const [[r]] = await pool.execute('SELECT PERMISSAO FROM cadastro_clientes WHERE CODIGO = ?', [codigo]);
@@ -396,10 +490,10 @@ app.post('/clientes/permissao', autenticar, somenteInterno, async (req, res) => 
 });
 
 // Aba Financeiro: pedidos e fluxo de caixa (em aberto ou todos) + Carregar_Resumo
-app.get('/clientes/financeiro/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valores.ver'], async (req, res) => {
   try {
-    const razao = await razaoDoCodigo(req.params.codigo);
-    if (!razao) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const razao = await razaoPermitida(req, res, req.params.codigo);
+    if (!razao) return;
     const todos = req.query.todos === '1';
     const [pedidos] = await pool.execute(
       `SELECT NUMERO, CLIENTE_FINAL, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, CAST(DATA_PRONTO AS CHAR) AS DATA_PRONTO, TOTAL, OBS_GERAL, SITUACAO, FINANCEIRO
@@ -433,7 +527,7 @@ app.get('/clientes/financeiro/:codigo', autenticar, somenteInterno, async (req, 
 });
 
 // btn_Recebimento: zera o crédito (opcional) e marca os pedidos como Recebido (opcional)
-app.post('/clientes/receber', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/clientes/receber', ['clientes.receber', 'valores.ver'], clienteNosEstados(), async (req, res) => {
   const b = req.body || {};
   const codigo = parseInt(b.codigo, 10) || 0;
   const pedidos = (Array.isArray(b.pedidos) ? b.pedidos : []).map(n => parseInt(n, 10)).filter(n => n > 0).slice(0, 300);
@@ -457,11 +551,12 @@ app.post('/clientes/receber', autenticar, somenteInterno, async (req, res) => {
 
 // ================= ANÁLISE DO CLIENTE (visão de diretoria) =================
 // Junta, num só pedido, tudo que a página de análise precisa; os indicadores são calculados na tela.
-app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/analise/:codigo', ['clientes.ver'], async (req, res) => {
   try {
     const [cliRows] = await pool.execute('SELECT * FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!cliRows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
     const c = cliRows[0];
+    if (foraDosEstados(req, res, c.ESTADO)) return;
     const razao = c.RAZAO_SOCIAL;
     const t = k => (c[k] == null ? '' : String(c[k]));
 
@@ -475,16 +570,21 @@ app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res
        FROM ped_orc WHERE RAZAO_SOCIAL = ? AND TIPO = 'Pedido'`, [razao]);
 
     // contexto da empresa nos últimos 12 meses: faturamento total, conversão média e posição do cliente
+    // (nos estados do usuário: quem é restrito a uma região não vê o faturamento das outras)
+    const estEmp = filtroEstados(req, 'c.ESTADO');
+    const joinEmp = estEmp.sql ? JOIN_CLIENTE : '';
+    const andEmp = estEmp.sql ? 'AND ' + estEmp.sql : '';
     const [[emp]] = await pool.execute(
-      `SELECT SUM(IF(TIPO = 'Pedido', TOTAL, 0)) AS pedidos, SUM(IF(TIPO = 'Orçamento', TOTAL, 0)) AS orcamentos,
-              COUNT(DISTINCT IF(TIPO = 'Pedido', RAZAO_SOCIAL, NULL)) AS clientes
-       FROM ped_orc WHERE DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`);
+      `SELECT SUM(IF(p.TIPO = 'Pedido', p.TOTAL, 0)) AS pedidos, SUM(IF(p.TIPO = 'Orçamento', p.TOTAL, 0)) AS orcamentos,
+              COUNT(DISTINCT IF(p.TIPO = 'Pedido', p.RAZAO_SOCIAL, NULL)) AS clientes
+       FROM ped_orc p ${joinEmp} WHERE p.DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ${andEmp}`, estEmp.params);
     const [[rank]] = await pool.execute(
       `SELECT COUNT(*) + 1 AS posicao FROM (
-         SELECT RAZAO_SOCIAL, SUM(TOTAL) AS t FROM ped_orc
-         WHERE TIPO = 'Pedido' AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY RAZAO_SOCIAL
+         SELECT p.RAZAO_SOCIAL, SUM(p.TOTAL) AS t FROM ped_orc p ${joinEmp}
+         WHERE p.TIPO = 'Pedido' AND p.DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ${andEmp} GROUP BY p.RAZAO_SOCIAL
        ) x WHERE x.t > (SELECT COALESCE(SUM(TOTAL), 0) FROM ped_orc
-                        WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH))`, [razao]);
+                        WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH))`,
+      [...estEmp.params, razao]);
 
     // recebíveis em aberto (para aging) e recebimentos dos últimos 12 meses (pontualidade)
     const [receber] = await pool.execute(
@@ -494,7 +594,7 @@ app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res
       `SELECT SUM(VALOR) AS total, COUNT(*) AS qtd FROM fluxo_de_caixa
        WHERE RAZAO_SOCIAL = ? AND SITUACAO = 'Recebido' AND DATA >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`, [razao]);
 
-    res.json({
+    res.json(semValores(req, {
       cliente: {
         codigo: c.CODIGO, razaoSocial: razao, fantasia: t('FANTASIA'), classe: t('CLASSE'), cidade: t('CIDADE'), estado: t('ESTADO'),
         situacao: t('SITUACAO'), permissao: t('PERMISSAO'), representante: t('REPRESENTANTE'), desconto: numEstq(c.DESCONTO),
@@ -508,7 +608,7 @@ app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res
       empresa: { pedidos12m: numEstq(emp.pedidos), orcamentos12m: numEstq(emp.orcamentos), clientesAtivos12m: Number(emp.clientes) || 0, posicao: Number(rank.posicao) || null },
       receber: receber.map(r => ({ id: r.ID, vencimento: r.DATA, valor: numEstq(r.VALOR), situacao: r.SITUACAO, pedido: r.PEDIDO ?? '' })),
       recebido12m: { total: numEstq(recebido.total), qtd: Number(recebido.qtd) || 0 }
-    });
+    }, ['desconto', 'credito', 'totalVida', 'valor', 'pedidos12m', 'orcamentos12m', 'receber', 'recebido12m']));
   } catch (err) {
     console.error('Erro /clientes/analise:', err.code, err.message);
     res.status(500).json({ error: 'Erro ao montar a análise do cliente', detalhe: err.code || err.message });
@@ -516,10 +616,10 @@ app.get('/clientes/analise/:codigo', autenticar, somenteInterno, async (req, res
 });
 
 // Aba Histórico (Carrega_Grafico): pedidos por mês nos últimos 180 dias
-app.get('/clientes/historico/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/clientes/historico/:codigo', ['clientes.ver'], async (req, res) => {
   try {
-    const razao = await razaoDoCodigo(req.params.codigo);
-    if (!razao) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const razao = await razaoPermitida(req, res, req.params.codigo);
+    if (!razao) return;
     const [rows] = await pool.execute(
       `SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(TOTAL) AS total, COUNT(*) AS qtd FROM ped_orc
        WHERE TIPO = 'Pedido' AND RAZAO_SOCIAL = ? AND DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 180 DAY), '%Y-%m-01')
@@ -531,7 +631,7 @@ app.get('/clientes/historico/:codigo', autenticar, somenteInterno, async (req, r
       const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
       meses.push({ mes: k, total: numEstq(porMes[k]?.total), qtd: Number(porMes[k]?.qtd) || 0 });
     }
-    res.json(meses);
+    res.json(semValores(req, meses, ['total']));
   } catch (err) {
     console.error('Erro /clientes/historico:', err.message);
     res.status(500).json({ error: 'Erro ao carregar o histórico' });
@@ -539,19 +639,14 @@ app.get('/clientes/historico/:codigo', autenticar, somenteInterno, async (req, r
 });
 
 // ================= GRÁFICO: ORÇAMENTOS x PEDIDOS (últimos 6 meses) =================
-app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
+registro.rota('get', '/dados_compras_orcamentos', [{ algum: ['paineis.ver', 'pedidos.ver'] }, 'valores.ver'], async (req, res) => {
   try {
     const cliente = req.query.cliente;
-    const estado = ehRepresentante(req) ? 'RJ' : (req.query.estado || null);
+    const est = condicaoEstado(req, 'c.ESTADO');
     let filtroExtra = 'WHERE p.DATA >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 6 MONTH), \'%Y-%m-01\')';
-    let params = [];
-    if (cliente && !ehRepresentante(req)) {
-      filtroExtra += ' AND p.RAZAO_SOCIAL = ?';
-      params.push(cliente);
-    } else if (estado) {
-      filtroExtra += ' AND c.ESTADO = ?';
-      params.push(estado);
-    }
+    const params = [];
+    if (est.sql) { filtroExtra += ' AND ' + est.sql; params.push(...est.params); }
+    if (cliente) { filtroExtra += ' AND p.RAZAO_SOCIAL = ?'; params.push(cliente); }
     const sql = `
       SELECT DATE_FORMAT(p.DATA, '%m/%Y') as mes,
              SUM(CASE WHEN p.TIPO = 'Orçamento' THEN p.TOTAL ELSE 0 END) as orcamentos,
@@ -574,7 +669,26 @@ app.get('/dados_compras_orcamentos', autenticar, async (req, res) => {
 });
 
 // ================= PDF =================
-app.get('/dados_pdf', autenticar, async (req, res) => {
+// Colunas do PDF; sem valores, Descrição e Observação ocupam o espaço de Unitário e Total.
+function colunasPdf(verValores, W = 1) {
+  if (!verValores) {
+    return [
+      { label: 'Item',       w: W * 0.07, align: 'center' },
+      { label: 'Qtd',        w: W * 0.07, align: 'center' },
+      { label: 'Descrição',  w: W * 0.55, align: 'left'  },
+      { label: 'Observação', w: W * 0.31, align: 'left'  }
+    ];
+  }
+  return [
+    { label: 'Item',       w: W * 0.07, align: 'center' },
+    { label: 'Qtd',        w: W * 0.07, align: 'center' },
+    { label: 'Descrição',  w: W * 0.46, align: 'left'  },
+    { label: 'Observação', w: W * 0.22, align: 'left'  },
+    { label: 'Unitário',   w: W * 0.09, align: 'right' },
+    { label: 'Total',      w: W * 0.09, align: 'right' }
+  ];
+}
+registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
   const { numero, tipo } = req.query;
   if (!numero || !tipo) return res.status(400).json({ error: 'Informe numero e tipo' });
   try {
@@ -584,13 +698,13 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
        FROM ped_orc WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
     const cab = cabs[0];
-    // representante só abre PDF de cliente do RJ (mesma regra das listas)
-    if (ehRepresentante(req)) {
+    // só abre PDF de cliente dentro dos estados do usuário (mesma regra das listas)
+    if ((req.acesso.estados || []).length) {
       const [est] = await pool.execute(
         'SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [cab.RAZAO_SOCIAL]);
-      if (!est.length || String(est[0].ESTADO || '').toUpperCase() !== 'RJ')
-        return res.status(403).json({ error: 'Acesso restrito' });
+      if (foraDosEstados(req, res, est[0]?.ESTADO)) return;
     }
+    const verValores = podeVerValores(req);
     const [itens] = await pool.execute(
       `SELECT * FROM ped_orc_lista_itens WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
     const [v4] = await pool.execute(
@@ -680,14 +794,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
     }
 
     // TABELA COM GRADE
-    const cols = [
-      { label: 'Item',       w: W * 0.07, align: 'center' },
-      { label: 'Qtd',        w: W * 0.07, align: 'center' },
-      { label: 'Descrição',  w: W * 0.46, align: 'left'  },
-      { label: 'Observação', w: W * 0.22, align: 'left'  },
-      { label: 'Unitário',   w: W * 0.09, align: 'right' },
-      { label: 'Total',      w: W * 0.09, align: 'right' }
-    ];
+    const cols = colunasPdf(verValores, W);
     const fontCel = 7.5, PAD = 4;
     function drawHeader(y0) {
       doc.rect(M, y0, W, 16).stroke();
@@ -720,8 +827,10 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
       doc.text(String(i.QTD || ''), x + 2, y + PAD, { width: cols[1].w - 4, align: 'center', height: rowH, ellipsis: true }); x += cols[1].w;
       doc.text(descTexto, x + 2, y + PAD, { width: cols[2].w - 4, height: rowH, ellipsis: true }); x += cols[2].w;
       doc.text(obsTexto, x + 2, y + PAD, { width: cols[3].w - 4, height: rowH, ellipsis: true }); x += cols[3].w;
-      doc.text(fmtM(i.UNITARIO), x + 2, y + PAD, { width: cols[4].w - 4, align: 'right', height: rowH, ellipsis: true }); x += cols[4].w;
-      doc.text(fmtM(i.TOTAL), x + 2, y + PAD, { width: cols[5].w - 4, align: 'right', height: rowH, ellipsis: true });
+      if (verValores) {
+        doc.text(fmtM(i.UNITARIO), x + 2, y + PAD, { width: cols[4].w - 4, align: 'right', height: rowH, ellipsis: true }); x += cols[4].w;
+        doc.text(fmtM(i.TOTAL), x + 2, y + PAD, { width: cols[5].w - 4, align: 'right', height: rowH, ellipsis: true });
+      }
       doc.moveTo(M, y).lineTo(M + W, y).stroke();
       let gx = M;
       cols.forEach(c => { doc.moveTo(gx, y).lineTo(gx, y + rowH).stroke(); gx += c.w; });
@@ -735,12 +844,14 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
     doc.font('Helvetica-Bold').fontSize(9).text('Observação:', M, doc.y, { width: W, align: 'center' });
     doc.font('Helvetica').fontSize(9).text(String(cab.OBS_GERAL || ''), M, doc.y, { width: W });
 
-    // TOTAIS
-    doc.moveDown(1);
-    doc.font('Helvetica-Bold').fontSize(10);
-    doc.text(`Subtotal: ${fmtM(cab.SUB_TOTAL)}`, { width: W, align: 'right' });
-    doc.text(`Desconto: ${(parseFloat(cab.DESCONTO) || 0).toFixed(2)} %`, { width: W, align: 'right' });
-    doc.text(`TOTAL: ${fmtM(cab.TOTAL)}`, { width: W, align: 'right' });
+    // TOTAIS (só para quem vê valores — sem eles o PDF sai no formato da Guia de Produção)
+    if (verValores) {
+      doc.moveDown(1);
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text(`Subtotal: ${fmtM(cab.SUB_TOTAL)}`, { width: W, align: 'right' });
+      doc.text(`Desconto: ${(parseFloat(cab.DESCONTO) || 0).toFixed(2)} %`, { width: W, align: 'right' });
+      doc.text(`TOTAL: ${fmtM(cab.TOTAL)}`, { width: W, align: 'right' });
+    }
     doc.end();
   } catch (err) {
     console.error('Erro ao gerar PDF:', err.message);
@@ -749,7 +860,7 @@ app.get('/dados_pdf', autenticar, async (req, res) => {
 });
 
 // ================= ADMIN: definir/trocar senha =================
-app.post('/admin/definir_senha', async (req, res) => {
+registro.publica('post', '/admin/definir_senha', async (req, res) => {
   const chave = req.headers['x-admin-key'];
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
     return res.status(403).json({ error: 'Acesso negado' });
@@ -773,7 +884,7 @@ app.post('/admin/definir_senha', async (req, res) => {
 // ================= MIGRAÇÃO DE SENHAS =================
 // Converte para bcrypt as senhas ainda em texto puro (ex.: usuário criado pelo VB).
 // POST com a chave no cabeçalho x-admin-key — nunca na URL.
-app.post('/migrar_senhas', async (req, res) => {
+registro.publica('post', '/migrar_senhas', async (req, res) => {
   const chave = req.headers['x-admin-key'];
   if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
     return res.status(403).json({ error: 'Acesso negado' });
@@ -810,7 +921,7 @@ const TABELAS_CATALOGO = {
   produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
   cores:         ['cores', 'NOME_COR', '']
 };
-app.get('/catalogos', autenticar, async (req, res) => {
+registro.rota('get', '/catalogos', ['orcamentos.criar'], async (req, res) => {
   const saida = {};
   for (const [chave, [tabela, coluna, where]] of Object.entries(TABELAS_CATALOGO)) {
     try {
@@ -873,7 +984,7 @@ function aplicarPercentuais(valor, texto) {
 }
 // (Sem código de navegador no backend)
 
-app.post('/calcular_preco', autenticar, async (req, res) => {
+registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
   const b = req.body || {};
   try {
     // Política comercial do cliente — por CODIGO (preciso) com fallback por nome
@@ -1105,7 +1216,7 @@ const CLASSES_AVULSO = {
   'Serviço': ['Serviço', 'Serviços', 'Servico', 'Servicos'],
   'Acessório': ['Acessórios', 'Acessório']
 };
-app.get('/catalogos_filtro', autenticar, async (req, res) => {
+registro.rota('get', '/catalogos_filtro', ['orcamentos.criar'], async (req, res) => {
   const { campo, chave } = req.query;
   if (campo === 'avulsos') {
     const classes = CLASSES_AVULSO[chave];
@@ -1144,7 +1255,7 @@ app.get('/catalogos_filtro', autenticar, async (req, res) => {
 });
 
 // Tipo nativo do puxador (repo.BuscarDadosProduto → TipoPuxador) — sem expor preços
-app.get('/dados_produto', autenticar, async (req, res) => {
+registro.rota('get', '/dados_produto', ['orcamentos.criar'], async (req, res) => {
   try {
     const dados = await buscarDadosProduto(String(req.query.nome || ''));
     if (!dados) return res.status(404).json({ error: 'Produto não encontrado' });
@@ -1156,7 +1267,7 @@ app.get('/dados_produto', autenticar, async (req, res) => {
 });
 
 // Cores agrupadas pela coluna TIPO (Sólida / Metálica)
-app.get('/cores_por_tipo', autenticar, async (req, res) => {
+registro.rota('get', '/cores_por_tipo', ['orcamentos.criar'], async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT NOME_COR, TIPO FROM cores ORDER BY NOME_COR');
     const grupos = {};
@@ -1174,10 +1285,6 @@ app.get('/cores_por_tipo', autenticar, async (req, res) => {
 // ============================================================
 // ESTOQUE — fiel ao frm_Estoque.vb (somente equipe interna)
 // ============================================================
-function somenteInterno(req, res, next) {
-  if (ehRepresentante(req)) return res.status(403).json({ error: 'Acesso restrito ao estoque.' });
-  next();
-}
 const numEstq = v => {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
   const t = String(v ?? '').trim().replace(/[R$\s]/g, '');
@@ -1188,7 +1295,7 @@ const numEstq = v => {
 const txtEstq = (v, max = 255) => String(v ?? '').trim().slice(0, max);
 
 // Carregar_Estoque + cmb_Filtro: busca por CODIGO/NOME (LIKE) ou por CLASSE
-app.get('/estoque', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/estoque', ['estoque.ver'], async (req, res) => {
   try {
     const busca = txtEstq(req.query.busca, 100);
     const classe = txtEstq(req.query.classe, 100);
@@ -1211,7 +1318,7 @@ app.get('/estoque', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Combos (classes/unidades/fornecedores já usados) + Contar_Valor_Estoque + contadores
-app.get('/estoque/resumo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/estoque/resumo', ['estoque.ver'], async (req, res) => {
   try {
     const [[tot]] = await pool.execute(
       `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
@@ -1223,11 +1330,11 @@ app.get('/estoque/resumo', autenticar, somenteInterno, async (req, res) => {
       const [r] = await pool.execute(`SELECT DISTINCT ${col} AS v FROM estoque WHERE ${col} IS NOT NULL AND ${col} <> '' ORDER BY ${col}`);
       return r.map(x => x.v);
     };
-    res.json({
+    res.json(semValores(req, {
       valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0,
       falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0,
       classes: await distintos('CLASSE'), unidades: await distintos('UNIDADE'), fornecedores: await distintos('FORNECEDOR')
-    });
+    }, ['valorTotal']));
   } catch (err) {
     console.error('Erro /estoque/resumo:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -1235,19 +1342,19 @@ app.get('/estoque/resumo', autenticar, somenteInterno, async (req, res) => {
 });
 
 // txt_codigo_TextChanged: ficha completa do produto
-app.get('/estoque/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/estoque/item/:codigo', ['estoque.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT * FROM estoque WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!rows.length) return res.status(404).json({ error: 'Produto não encontrado' });
     const r = rows[0];
-    res.json({
+    res.json(semValores(req, {
       codigo: r.CODIGO, codBarras: r.CODIGO_BARRA ?? '', fornecedor: r.FORNECEDOR ?? '', codFornecedor: r.COD_FORNECEDOR ?? '',
       prodFornecedor: r.NOME_PRODUTO_FORNECEDOR ?? '', produto: r.NOME_PRODUTO ?? '', classe: r.CLASSE ?? '',
       unidade: r.UNIDADE ?? '', situacao: r.SITUACAO ?? '', qtd: numEstq(r.QTD_ESTOQUE), minimo: numEstq(r.MIN_ESTOQUE),
       frete: numEstq(r.FRETE), ipi: numEstq(r.IPI), perda: numEstq(r.PERDA), valor: numEstq(r.VALOR),
       altura: numEstq(r.ALTURA), largura: numEstq(r.LARGURA), tamanho: numEstq(r.TAMANHO),
       aguardando: r.AGUARDANDO ?? '', observacao: r.OBSERVACAO ?? ''
-    });
+    }, ['valor', 'frete', 'ipi']));
   } catch (err) {
     console.error('Erro /estoque/item:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -1255,7 +1362,12 @@ app.get('/estoque/item/:codigo', autenticar, somenteInterno, async (req, res) =>
 });
 
 // Salvar_Estoque: mesmas validações do VB; INSERT se o código não existe, senão UPDATE
-app.post('/estoque/salvar', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/estoque/salvar', ['estoque.editar'], preservarDoBanco({
+  sql: 'SELECT VALOR, FRETE, IPI FROM estoque WHERE CODIGO = ? LIMIT 1',
+  chave: b => parseInt(b.codigo, 10) || 0,
+  mapa: { valor: 'VALOR', frete: 'FRETE', ipi: 'IPI' },
+  mensagemNovo: 'Cadastrar item novo exige permissão de valores.'
+}), async (req, res) => {
   const b = req.body || {};
   const d = {
     codBarras: txtEstq(b.codBarras, 20), fornecedor: txtEstq(b.fornecedor), codFornecedor: txtEstq(b.codFornecedor, 100),
@@ -1302,7 +1414,7 @@ function digitoEAN13(doze) {
   const soma = [...doze].reduce((s, c, i) => s + Number(c) * (i % 2 ? 3 : 1), 0);
   return String((10 - (soma % 10)) % 10);
 }
-app.post('/estoque/codigo_barras', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/estoque/codigo_barras', ['estoque.editar'], async (req, res) => {
   try {
     const atual = txtEstq(req.body?.atual, 20);
     const produto = txtEstq(req.body?.produto);
@@ -1324,7 +1436,7 @@ app.post('/estoque/codigo_barras', autenticar, somenteInterno, async (req, res) 
 });
 
 // BackgroundWorker2: entradas x saídas dos últimos 12 meses + médias dos meses com movimento
-app.get('/estoque/movimentacao', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/estoque/movimentacao', ['estoque.ver'], async (req, res) => {
   const produto = txtEstq(req.query.produto);
   if (!produto) return res.json([]);
   const porMes = async tabela => {
@@ -1351,7 +1463,7 @@ app.get('/estoque/movimentacao', autenticar, somenteInterno, async (req, res) =>
 // CADASTRO DE PRODUTOS (venda) — fiel ao frm_Cadastro_Produtos.vb
 // ============================================================
 // Carrega_Treenodes: classes → produtos (exceto situação 'Consulta') + próximo código
-app.get('/produtos', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/produtos', ['produtos.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute(
       `SELECT CODIGO, MODELO, CLASSE, SITUACAO FROM cadastro_de_produtos
@@ -1368,7 +1480,7 @@ app.get('/produtos', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Combos: classes existentes, classes de acabamento e acessórios (complementos)
-app.get('/produtos/opcoes', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/produtos/opcoes', ['produtos.ver'], async (req, res) => {
   const lista = async sql => { try { const [r] = await pool.execute(sql); return r.map(x => x.v).filter(Boolean); } catch { return []; } };
   res.json({
     classes: await lista('SELECT DISTINCT CLASSE AS v FROM cadastro_de_produtos ORDER BY CLASSE'),
@@ -1378,7 +1490,7 @@ app.get('/produtos/opcoes', autenticar, somenteInterno, async (req, res) => {
 });
 
 // txt_Codigo_TextChanged: ficha do produto + o que ele tem permitido
-app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/produtos/item/:codigo', ['produtos.ver'], async (req, res) => {
   try {
     // SELECT * como no VB: colunas ausentes na tabela não derrubam a ficha
     const [rows] = await pool.execute('SELECT * FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
@@ -1386,7 +1498,7 @@ app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) =
     const r = rows[0];
     const modelo = r.MODELO || '';
     const permitidos = async sql => { try { const [x] = await pool.execute(sql, [modelo]); return x.map(y => y.v).filter(Boolean); } catch { return []; } };
-    res.json({
+    res.json(semValores(req, {
       codigo: r.CODIGO, modelo, classe: r.CLASSE || '', tipoPuxador: r.TIPO_PUXADOR || '',
       descontoVidro: numEstq(r.DESCONTO_VIDRO), descPerfPux: numEstq(r.DESC_PERF_PUX),
       valorCheio: numEstq(r.VALOR_CHEIO), valorFixo: numEstq(r.VALOR_FIXO),
@@ -1399,7 +1511,7 @@ app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) =
         revestimentos: await permitidos('SELECT REVESTIMENTO_PERMITIDO AS v FROM revestimentos_permitidos WHERE MODELO = ? ORDER BY REVESTIMENTO_PERMITIDO'),
         divisores: await permitidos('SELECT DIVISOR AS v FROM divisores_permitidos WHERE MODELO = ? ORDER BY DIVISOR')
       }
-    });
+    }, ['valorCheio', 'valorFixo']));
   } catch (err) {
     console.error('Erro /produtos/item:', err.code, err.message);
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
@@ -1407,7 +1519,7 @@ app.get('/produtos/item/:codigo', autenticar, somenteInterno, async (req, res) =
 });
 
 // Imagem do produto (coluna IMAGEM, a mesma que o VB lê)
-app.get('/produtos/imagem/:codigo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/produtos/imagem/:codigo', ['produtos.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT IMAGEM FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!rows.length || !rows[0].IMAGEM) return res.status(404).json({ error: 'Sem imagem' });
@@ -1418,8 +1530,7 @@ app.get('/produtos/imagem/:codigo', autenticar, somenteInterno, async (req, res)
     res.status(500).json({ error: 'Erro de servidor' });
   }
 });
-app.put('/produtos/imagem/:codigo', autenticar, somenteInterno,
-  express.raw({ type: ['image/jpeg', 'image/png'], limit: '3mb' }), async (req, res) => {
+registro.rota('put', '/produtos/imagem/:codigo', ['produtos.editar'], express.raw({ type: ['image/jpeg', 'image/png'], limit: '3mb' }), async (req, res) => {
   if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Imagem inválida' });
   try {
     const [r] = await pool.execute('UPDATE cadastro_de_produtos SET IMAGEM = ? WHERE CODIGO = ?', [req.body, req.params.codigo]);
@@ -1433,7 +1544,12 @@ app.put('/produtos/imagem/:codigo', autenticar, somenteInterno,
 });
 
 // Salvar_Registro: mesmas validações; INSERT (sempre Ativo) ou UPDATE pela existência do CODIGO
-app.post('/produtos/salvar', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/produtos/salvar', ['produtos.editar'], preservarDoBanco({
+  sql: 'SELECT VALOR_CHEIO, VALOR_FIXO FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1',
+  chave: b => String(b.codigo ?? '').trim(),
+  mapa: { valorCheio: 'VALOR_CHEIO', valorFixo: 'VALOR_FIXO' },
+  mensagemNovo: 'Cadastrar produto novo exige permissão de valores.'
+}), async (req, res) => {
   const b = req.body || {};
   const erro = msg => res.status(400).json({ error: msg });
   const codigo = String(b.codigo ?? '').trim();
@@ -1511,7 +1627,7 @@ function limitesMes(ym) {
 }
 
 // Carregar_Dados (cmb_pesquisa), meses anterior/próximo, filtro por situação e pesquisa
-app.get('/fluxo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   try {
     const modo = String(req.query.modo || 'mes');
     const where = [], params = [];
@@ -1549,7 +1665,7 @@ app.get('/fluxo', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Carregar_Resumo_Mes (mês atual) — mesmas somas do VB
-app.get('/fluxo/resumo', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/resumo', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   try {
     const [[r]] = await pool.execute(`SELECT
       SUM(IF(MONTH(DATA)=MONTH(NOW()) AND YEAR(DATA)=YEAR(NOW()) AND SITUACAO='Pago', VALOR, 0)) AS pago,
@@ -1576,7 +1692,7 @@ app.get('/fluxo/resumo', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Combos: situações existentes, formas de pagamento, bancos, clientes, fornecedores e próximo ID
-app.get('/fluxo/opcoes', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/opcoes', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   const lista = async sql => { try { const [r] = await pool.execute(sql); return r.map(x => x.v).filter(Boolean); } catch { return []; } };
   const [[mx]] = await pool.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa').catch(() => [[{ m: 0 }]]);
   res.json({
@@ -1591,7 +1707,7 @@ app.get('/fluxo/opcoes', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Árvore de categorias (fluxo_de_caixa_classificacao: TIPO > CLASSE1 > CLASSE2 > CLASSE3)
-app.get('/fluxo/classificacoes', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/classificacoes', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute(
       'SELECT id, TIPO, CLASSE1, CLASSE2, CLASSE3 FROM fluxo_de_caixa_classificacao ORDER BY TIPO, CLASSE1, CLASSE2, CLASSE3');
@@ -1604,7 +1720,7 @@ app.get('/fluxo/classificacoes', autenticar, somenteInterno, async (req, res) =>
 
 // BuscarClassificacaoFornecedor / BuscarClassificacaoCliente
 // fornecedor com CF_CV → categoria travada nela; cliente cadastrado → categoria 1; senão o usuário escolhe
-app.get('/fluxo/classificacao_sugerida', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/classificacao_sugerida', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   const nome = txtEstq(req.query.nome);
   if (!nome) return res.json({ id: null, travado: false });
   try {
@@ -1622,7 +1738,7 @@ app.get('/fluxo/classificacao_sugerida', autenticar, somenteInterno, async (req,
 });
 
 // Maiores gastos do mês: saídas (com fornecedor) agrupadas por fornecedor ou por categoria
-app.get('/fluxo/gastos', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/gastos', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   try {
     const [ini, fim] = limitesMes(req.query.mes);
     const porCategoria = req.query.agrupar === 'categoria';
@@ -1645,7 +1761,7 @@ app.get('/fluxo/gastos', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Histórico: recebido x pago dos últimos 12 meses
-app.get('/fluxo/historico', autenticar, somenteInterno, async (req, res) => {
+registro.rota('get', '/fluxo/historico', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   try {
     const [rows] = await pool.execute(`SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes,
         SUM(IF(SITUACAO = 'Recebido', VALOR, 0)) AS entrada, SUM(IF(SITUACAO = 'Pago', VALOR, 0)) AS saida
@@ -1666,7 +1782,7 @@ app.get('/fluxo/historico', autenticar, somenteInterno, async (req, res) => {
 });
 
 // SalvarToolStripMenuItem_Click: mesmas validações; INSERT ... ON DUPLICATE KEY UPDATE pelo ID
-app.post('/fluxo/salvar', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/fluxo/salvar', ['financeiro.lancar', 'valores.ver'], async (req, res) => {
   const b = req.body || {};
   const erro = msg => res.status(400).json({ error: msg });
   const formaPgto = txtEstq(b.formaPgto, 100);
@@ -1706,7 +1822,7 @@ app.post('/fluxo/salvar', autenticar, somenteInterno, async (req, res) => {
 });
 
 // Menu "Alterar para ..." — aceita vários registros de uma vez
-app.post('/fluxo/situacao', autenticar, somenteInterno, async (req, res) => {
+registro.rota('post', '/fluxo/situacao', ['financeiro.lancar', 'valores.ver'], async (req, res) => {
   const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(n => parseInt(n, 10)).filter(n => n > 0).slice(0, 500);
   const situacao = String(req.body?.situacao || '');
   if (!ids.length) return res.status(400).json({ error: 'Favor escolher um item para ser alterado!' });
@@ -1720,7 +1836,7 @@ app.post('/fluxo/situacao', autenticar, somenteInterno, async (req, res) => {
   }
 });
 
-app.delete('/fluxo/:id', autenticar, somenteInterno, async (req, res) => {
+registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], async (req, res) => {
   try {
     const [r] = await pool.execute('DELETE FROM fluxo_de_caixa WHERE ID = ?', [req.params.id]);
     if (!r.affectedRows) return res.status(404).json({ error: 'Registro não encontrado' });
@@ -1731,6 +1847,26 @@ app.delete('/fluxo/:id', autenticar, somenteInterno, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+// ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
+registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
+
+// ================= SUBIDA =================
+// Ordem: tabelas web_ → migração única dos usuários → todas as rotas precisam
+// estar no registro (senão o servidor não sobe) → escutar a porta.
+async function iniciar() {
+  await instalarTabelas(pool);
+  const m = await migrarAcessos(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
+  if (!m.jaFeita) console.log(`[permissões] migração inicial: ${m.criados} usuário(s) receberam perfil`);
+  await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
+  registro.verificar();
+  app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+}
+
+if (require.main === module) {
+  iniciar().catch(err => {
+    console.error('FATAL na subida:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, pool, acesso, registro, colunasPdf };
