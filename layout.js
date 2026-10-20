@@ -18,7 +18,6 @@
         financeiro: ic('<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19M6.5 15h3"/>'),
         sair: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>'),
         menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
-        movimentacao: ic('<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>'),
         usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>')
     };
     const MENU = [
@@ -30,7 +29,6 @@
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
-        { href: 'movimentacao_estoque.html', texto: 'Movimentação', icone: 'movimentacao' },
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
@@ -135,7 +133,7 @@
         const nav = container.querySelector(':scope > nav, :scope > .sidebar');
         const header = container.querySelector(':scope > header');
         const a = auth();
-        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html' };   // subpáginas acendem o item do menu de origem
+        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html', 'movimentacao_estoque.html': 'estoque.html' };   // subpáginas acendem o item do menu de origem
         const arquivo = arquivoAtual();
         const atual = PAGINA_PAI[arquivo] || arquivo;
         observar();

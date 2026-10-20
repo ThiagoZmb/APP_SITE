@@ -33,11 +33,6 @@
         .welcome-subtitle { font-size: 15px; color: var(--text-light); margin-bottom: 22px; }
         [hidden] { display: none !important; }
 
-        /* ===== abas ===== */
-        .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; margin-bottom: 18px; flex-wrap: wrap; }
-        .aba { border: none; background: transparent; padding: 8px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--text-light); cursor: pointer; }
-        .aba.on { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
-
         /* ===== painéis, campos e tabelas ===== */
         .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow-light); }
         .linha-campos { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
@@ -71,14 +66,11 @@
 
         /* ===== busca de produto ===== */
         .busca { position: relative; }
-        .sugestoes { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); max-height: 280px; overflow-y: auto; }
+        .sugestoes { position: fixed; z-index: 60; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); max-height: 280px; overflow-y: auto; }
         .sugestoes button { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: none; background: #fff; padding: 9px 12px; text-align: left; font-size: 14px; cursor: pointer; }
         .sugestoes button:hover, .sugestoes button.foco { background: var(--primary-light); }
         .sugestoes small { color: var(--text-light); white-space: nowrap; }
 
-        /* ===== saída (duas colunas) ===== */
-        .duas { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 16px; align-items: start; }
-        .duas > * { min-width: 0; } /* sem isto a tabela larga empurra a coluna e a página rola de lado no celular */
 
         /* ===== avisos (acima do modal, que é z-index 70) ===== */
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; max-width: calc(100vw - 48px); }
@@ -97,12 +89,11 @@
         @media (max-width: 768px) {
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 18px 16px; }
-            .duas { grid-template-columns: 1fr; }
             .tabela { min-width: 560px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211800">
-    <script src="layout.js?v=202610211800" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610212000">
+    <script src="layout.js?v=202610212000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -112,15 +103,15 @@
         </header>
         <nav></nav>
         <main>
-            <h1 class="welcome-title">Movimentação de estoque</h1>
-            <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico</p>
-
-            <div class="abas" role="tablist">
-                <button type="button" class="aba" data-aba="entrada" data-perm="estoque.movimentar">Entrada</button>
-                <button type="button" class="aba" data-aba="saida" data-perm="estoque.movimentar">Saída</button>
-                <button type="button" class="aba" data-aba="ajuste" data-perm="estoque.ajustar">Ajuste</button>
-                <button type="button" class="aba" data-aba="historico">Histórico</button>
-            </div>
+            <h1 class="welcome-title">Estoque</h1>
+            <nav class="abas-estoque" aria-label="Estoque">
+                <a class="aba-est" href="estoque.html">Itens do estoque</a>
+                <a class="aba-est" data-aba="entrada" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=entrada">Entrada de nota</a>
+                <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
+                <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
+                <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+            </nav>
+            <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico dos movimentos</p>
 
             <!-- ===== ENTRADA ===== -->
             <section class="painel" id="painel-entrada" hidden>
@@ -149,15 +140,14 @@
 
             <!-- ===== SAÍDA ===== -->
             <section class="painel" id="painel-saida" hidden>
-                <div class="duas">
-                    <div>
-                        <div class="campo busca"><label for="s-busca">Produto</label>
-                            <input type="search" id="s-busca" placeholder="Digite o nome ou código" autocomplete="off">
-                            <div class="sugestoes" id="s-sugestoes" hidden></div>
-                        </div>
-                        <p class="dica" style="margin-top:8px">Escolha os produtos que saem do estoque e informe a quantidade de cada um.</p>
+                <div class="linha-campos">
+                    <div class="campo busca largo"><label for="s-busca">Produto</label>
+                        <input type="search" id="s-busca" placeholder="Digite o nome ou código e escolha na lista" autocomplete="off">
+                        <div class="sugestoes" id="s-sugestoes" hidden></div>
                     </div>
-                    <div>
+                </div>
+                <p class="dica" style="margin:-6px 0 12px">Escolha os produtos que saem do estoque, informe a quantidade de cada um e lance tudo de uma vez.</p>
+                <div>
                         <div class="rolagem">
                             <table class="tabela" id="s-lista">
                                 <thead><tr><th>Produto</th><th class="num">Em estoque</th><th class="num">Saída</th><th></th></tr></thead>
@@ -168,7 +158,6 @@
                             <div class="campo"><label for="s-data">Data</label><input type="date" id="s-data"></div>
                             <button type="button" class="btn btn-primario" id="s-lancar" disabled>Lançar saída</button>
                         </div>
-                    </div>
                 </div>
             </section>
 
@@ -324,10 +313,22 @@
             // fechar (campo vazio, saiu do campo, escolheu) cancela a busca agendada e ignora a que estiver em andamento
             const fechar = () => { clearTimeout(timer); pedido++; lista.hidden = true; lista.innerHTML = ''; itens = []; foco = -1; };
             const escolher = p => { fechar(); input.value = ''; aoEscolher(p); };
+            // a lista fica fixa na tela, logo abaixo do campo: dentro da tabela (que rola) ela seria cortada
+            const posicionar = () => {
+                const r = input.getBoundingClientRect();
+                const cabe = window.innerHeight - r.bottom - 8;
+                // um ancestral com transform/filter (tema) vira a referência do "fixed": desconta a origem dele
+                Object.assign(lista.style, { left: '0px', top: '0px' });
+                const o = lista.getBoundingClientRect();
+                Object.assign(lista.style, { left: (r.left - o.left) + 'px', width: Math.max(r.width, 260) + 'px', top: (r.bottom + 4 - o.top) + 'px', maxHeight: Math.min(280, Math.max(cabe, 120)) + 'px' });
+            };
+            window.addEventListener('scroll', () => { if (!lista.hidden) posicionar(); }, true);
+            window.addEventListener('resize', () => { if (!lista.hidden) posicionar(); });
             const desenhar = () => {
                 lista.innerHTML = itens.length ? itens.map((p, i) => `<button type="button" data-i="${i}" class="${i === foco ? 'foco' : ''}"><span>${esc(p.produto)}</span><small>${num(p.qtd)} ${esc(p.unidade)}</small></button>`).join('')
                     : '<div class="vazio">Nenhum produto encontrado</div>';
                 lista.hidden = false;
+                posicionar();
             };
             input.addEventListener('input', () => {
                 clearTimeout(timer);
@@ -363,11 +364,13 @@
         const abaPermitida = nome => ORDEM_ABAS.includes(nome) && (!PERM_ABA[nome] || pode(PERM_ABA[nome]));
         function abrirAba(nome) {
             if (!abaPermitida(nome)) nome = ORDEM_ABAS.find(abaPermitida);
-            document.querySelectorAll('button.aba').forEach(b => b.classList.toggle('on', b.dataset.aba === nome));
+            document.querySelectorAll('.aba-est[data-aba]').forEach(b => b.classList.toggle('on', b.dataset.aba === nome));
+            history.replaceState(null, '', `${location.pathname}?aba=${nome}`);
             ORDEM_ABAS.forEach(a => { $('painel-' + a).hidden = a !== nome; });
             if (!iniciadas.has(nome) && iniciadores[nome]) { iniciadas.add(nome); iniciadores[nome](); }
         }
-        document.querySelectorAll('button.aba').forEach(b => b.addEventListener('click', () => abrirAba(b.dataset.aba)));
+        // a barra é a mesma do cadastro (links); aqui dentro ela só troca de aba
+        document.querySelectorAll('.aba-est[data-aba]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); abrirAba(b.dataset.aba); }));
 
         // ===================== ENTRADA (nota fiscal) =====================
         // linhasEntrada: [{ item, produto: {codigo,nome,unidade}|null, nomeFabricante, codFabricante, qtdNota, fator, unidadeNota,

@@ -62,8 +62,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
         .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
         .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
-        .link-mov { margin-left: 10px; color: var(--primary-color); font-weight: 700; text-decoration: none; white-space: nowrap; }
-        .link-mov:hover { text-decoration: underline; }
         kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
 
         /* ===== CARDS DE RESUMO ===== */
@@ -239,8 +237,8 @@
             .col-forn { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211800">
-    <script src="layout.js?v=202610211800" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610212000">
+    <script src="layout.js?v=202610212000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -266,8 +264,14 @@
         </nav>
         <main>
             <h1 class="welcome-title">Estoque</h1>
-            <p class="welcome-subtitle">Cadastre, consulte e acompanhe os itens em estoque. Pressione <kbd>F5</kbd> para pesquisar.
-                <a class="link-mov" href="movimentacao_estoque.html">⇄ Movimentar (entrada, saída e ajuste) →</a></p>
+            <nav class="abas-estoque" aria-label="Estoque">
+                <a class="aba-est on" href="estoque.html">Itens do estoque</a>
+                <a class="aba-est" data-aba="entrada" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=entrada">Entrada de nota</a>
+                <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
+                <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
+                <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+            </nav>
+            <p class="welcome-subtitle">Cadastre, consulte e acompanhe os itens em estoque. Pressione <kbd>F5</kbd> para pesquisar.</p>
 
             <!-- ===== RESUMO ===== -->
             <section class="cards">
