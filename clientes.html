@@ -213,9 +213,9 @@
             .cf { border-radius: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
-    <script src="ranking.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
+    <script src="ranking.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -246,7 +246,7 @@
                         <div class="search-box">
                             <input type="text" placeholder="Buscar clientes..." id="search-input">
                         </div>
-                        <button type="button" class="btn btn-primary btn-novo-cliente" id="btn-novo-cliente" hidden>＋ Novo cliente</button>
+                        <button type="button" class="btn btn-primary btn-novo-cliente" id="btn-novo-cliente" data-perm="clientes.editar" hidden>＋ Novo cliente</button>
                         <button id="voltar-btn" class="menu-item" style="margin:0; padding:10px 20px; border:1px solid var(--border-color); display:none;">
                             ⬅️ Voltar
                         </button>
@@ -279,12 +279,12 @@
             <div class="cf-chips">
                 <button type="button" class="cf-chip ok" id="cf-situacao" title="Clique para alternar Ativo/Inativo"><span class="dot"></span><span>Ativo</span></button>
                 <button type="button" class="cf-chip ok" id="cf-permissao" title="Permissão no sistema — clique para bloquear/desbloquear"><span class="dot"></span><span>Liberado</span></button>
-                <span class="cf-chip info" id="cf-credito-chip"><span>Crédito: R$ 0,00</span></span>
+                <span class="cf-chip info" id="cf-credito-chip" data-valor><span>Crédito: R$ 0,00</span></span>
             </div>
             <div class="cf-abas" role="tablist">
                 <button type="button" class="cf-aba ativa" data-pag="cadastro">Cadastro</button>
-                <button type="button" class="cf-aba" data-pag="financeiro">Financeiro</button>
-                <button type="button" class="cf-aba" data-pag="historico">Histórico</button>
+                <button type="button" class="cf-aba" data-pag="financeiro" data-perm="clientes.receber valores.ver">Financeiro</button>
+                <button type="button" class="cf-aba" data-pag="historico" data-valor>Histórico</button>
             </div>
         </div>
 
@@ -336,13 +336,13 @@
                 <div class="cf-bloco">
                     <h4>Comercial</h4>
                     <div class="cf-grid">
-                        <div class="form-group s2"><label>Desconto %</label><input id="c-desconto" inputmode="numeric" class="so-num"><div class="dica-campo">Desconto = 28% · Arquiteto = 16%</div></div>
-                        <div class="form-group s2"><label>Desc. adicional %</label><input id="c-desc-adic" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s2" data-valor><label>Desconto %</label><input id="c-desconto" inputmode="numeric" class="so-num"><div class="dica-campo">Desconto = 28% · Arquiteto = 16%</div></div>
+                        <div class="form-group s2" data-valor><label>Desc. adicional %</label><input id="c-desc-adic" inputmode="decimal" class="dec"></div>
                         <div class="form-group s4"><label>Representante</label><select id="c-representante"></select></div>
-                        <div class="form-group s2"><label>Comissão %</label><input id="c-comissao" inputmode="decimal" class="dec"></div>
-                        <div class="form-group s2"><label>Crédito</label><input id="c-credito" readonly></div>
-                        <div class="form-group s3"><label>Frete portas</label><input id="c-frete-portas" inputmode="decimal" class="dec"></div>
-                        <div class="form-group s3"><label>Frete metalons</label><input id="c-frete-metalon" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s2" data-valor><label>Comissão %</label><input id="c-comissao" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s2" data-valor><label>Crédito</label><input id="c-credito" readonly></div>
+                        <div class="form-group s3" data-valor><label>Frete portas</label><input id="c-frete-portas" inputmode="decimal" class="dec"></div>
+                        <div class="form-group s3" data-valor><label>Frete metalons</label><input id="c-frete-metalon" inputmode="decimal" class="dec"></div>
                         <div class="form-group s12"><label>Observações</label><textarea id="c-obs" maxlength="2000"></textarea></div>
                     </div>
                 </div>
@@ -391,9 +391,9 @@
         </div>
 
         <div class="cf-acoes">
-            <button type="button" class="btn btn-primary" id="cf-salvar">💾 Salvar</button>
-            <button type="button" class="btn btn-secondary" id="cf-credito-btn">＋ Crédito</button>
-            <button type="button" class="btn btn-secondary" id="cf-receber">💵 Receber</button>
+            <button type="button" class="btn btn-primary" id="cf-salvar" data-perm="clientes.editar">💾 Salvar</button>
+            <button type="button" class="btn btn-secondary" id="cf-credito-btn" data-perm="clientes.credito valores.ver">＋ Crédito</button>
+            <button type="button" class="btn btn-secondary" id="cf-receber" data-perm="clientes.receber valores.ver">💵 Receber</button>
             <span class="alteracoes" id="cf-alteracoes">● alterações não salvas</span>
         </div>
     </aside>
@@ -455,11 +455,12 @@
             // Linha clicável → abre gráfico do cliente (?cliente=RAZAO_SOCIAL)
             document.querySelectorAll('#clients-tbody tr[data-razao]').forEach(row => {
                 row.addEventListener('click', () => {
-                    if (interno) return selecionarLinha(row);
+                    if (interno()) return selecionarLinha(row);
+                    if (!Acesso.podePagina('painel_inicial.html')) return;
                     const razao = encodeURIComponent(row.dataset.razao);
                     window.location.href = `painel_inicial.html?cliente=${razao}`;
                 });
-                row.addEventListener('dblclick', () => { if (interno) abrirFicha(row.dataset.codigo); });
+                row.addEventListener('dblclick', () => { if (interno()) abrirFicha(row.dataset.codigo); });
             });
         }
 
@@ -514,20 +515,20 @@
                 titulo: 'Clientes que mais compraram — últimos 12 meses',
                 subtitulo: (total, m) => m.id === 'valor' ? `Total em pedidos: <b>${moeda(total)}</b>` : `Total: <b>${total.toLocaleString('pt-BR')} pedidos</b>`,
                 metricas: [
-                    { id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda },
+                    { id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda, dinheiro: true },
                     { id: 'pedidos', rotulo: 'Por nº de pedidos', valor: it => it.pedidos, formatar: n => `${n} pedido${n === 1 ? '' : 's'}` }
                 ],
-                info: (it, m, pct) => `${pct} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)}${it.ultimo ? ' · últ. ' + it.ultimo : ''}`,
+                info: (it, m, pct) => `${pct}${m.id === 'valor' ? ' · ' + it.pedidos + ' ped.' : Acesso.pode('valores.ver') ? ' · ' + moeda(it.valor) : ''}${it.ultimo ? ' · últ. ' + it.ultimo : ''}`,
                 carregar: () => fetchAutenticado(`${API_BASE}/ranking_clientes`),
                 // mesmo comportamento da tabela: abre o gráfico de Orçamentos x Pedidos do cliente
                 aoClicar: it => {
-                    const c = interno && clientesCache.find(x => x.razaoSocial === it.nome);
+                    const c = Acesso.podePagina('cliente_analise.html') && clientesCache.find(x => x.razaoSocial === it.nome);
                     if (c) window.location.href = `cliente_analise.html?codigo=${encodeURIComponent(c.codigo)}`;
-                    else window.location.href = `painel_inicial.html?cliente=${encodeURIComponent(it.nome)}`;
+                    else if (Acesso.podePagina('painel_inicial.html')) window.location.href = `painel_inicial.html?cliente=${encodeURIComponent(it.nome)}`;
                 }
             });
         }
-        document.addEventListener('DOMContentLoaded', () => carregarRankingClientes());
+        document.addEventListener('DOMContentLoaded', () => { if (Acesso.paginaLiberada()) carregarRankingClientes(); });
         document.addEventListener('DOMContentLoaded', () => {
             const auth = getAuth();
             if (!auth) {
@@ -537,6 +538,7 @@
             }
             document.getElementById('user-empresa').textContent = auth.user.empresa || 'Elegance';
             document.getElementById('user-name').textContent = auth.user.nome || '';
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             // Botão Voltar: aparece se o usuário veio de outra página do sistema
             if (document.referrer &&
                 document.referrer.includes('thiagozmb.github.io') &&
@@ -552,7 +554,10 @@
         // FICHA DO CLIENTE — fiel ao frm_Clientes.vb (somente equipe interna)
         // =====================================================================
         let clientesCache = [];
-        const interno = !String(getAuth()?.user?.cargo || '').toLowerCase().includes('representante');
+        // a ficha abre para quem pode fazer alguma coisa nela; cada parte segue a sua permissão
+        const interno = () => Acesso.pode('clientes.editar') || Acesso.pode('clientes.receber valores.ver')
+            || Acesso.pode('clientes.credito valores.ver') || Acesso.pode('clientes.permissao');
+        const podeFinanceiro = () => Acesso.pode('clientes.receber valores.ver');
         const $ = id => document.getElementById(id);
         const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const lerNumero = t => { const x = String(t ?? '').replace(/[R$\s]/g, ''); const n = parseFloat(x.includes(',') ? x.replace(/\./g, '').replace(',', '.') : x); return isFinite(n) ? n : 0; };
@@ -687,7 +692,7 @@
             $('c-credito').value = moeda(v);
             $('cf-credito-chip').firstElementChild.textContent = 'Crédito: ' + moeda(v);
         }
-        $('cf-situacao').addEventListener('click', () => { situacao = situacao === 'Ativo' ? 'Inativo' : 'Ativo'; mostrarSituacao(); marcarAlterado(); });
+        $('cf-situacao').addEventListener('click', () => { if (!Acesso.pode('clientes.editar')) return; situacao = situacao === 'Ativo' ? 'Inativo' : 'Ativo'; mostrarSituacao(); marcarAlterado(); });
         document.querySelectorAll('#c-tipo-desconto button').forEach(b => b.addEventListener('click', () => {
             tipoDesconto = b.dataset.v;
             document.querySelectorAll('#c-tipo-desconto button').forEach(x => x.classList.toggle('on', x === b));
@@ -695,6 +700,7 @@
         }));
         // btn_Bloquear: Bloqueado ↔ Liberado
         $('cf-permissao').addEventListener('click', async () => {
+            if (!Acesso.pode('clientes.permissao')) return;
             if (!fichaAtual) return toast('Selecione um cliente primeiro!', 'info');
             try { const r = await api('/clientes/permissao', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo }) }); fichaAtual.permissao = r.permissao; mostrarPermissao(r.permissao); toast(`Cliente ${r.permissao === 'Bloqueado' ? 'bloqueado' : 'liberado'} no sistema`, 'ok'); }
             catch (e) { toast(e.message, 'erro'); }
@@ -742,7 +748,8 @@
             ['cf-credito-btn', 'cf-receber'].forEach(id => $(id).disabled = !c.razaoSocial);
         }
         async function abrirFicha(codigo, aba = 'cadastro') {
-            if (!interno) return;
+            if (!interno() || (!codigo && !Acesso.pode('clientes.editar'))) return;
+            if (aba === 'financeiro' && !podeFinanceiro() || aba === 'historico' && !Acesso.pode('valores.ver')) aba = 'cadastro';
             if ($('ficha').classList.contains('aberta') && alterado && !(await confirmar('Descartar alterações?', 'O cadastro atual tem alterações não salvas. Deseja descartá-las?'))) return;
             try {
                 const op = await carregarOpcoesCliente();
@@ -759,13 +766,14 @@
                 irAba(codigo ? aba : 'cadastro');
                 abrirPainel();
                 if (!codigo) $('c-razao').focus();
-                else if (aba !== 'financeiro') carregarFinanceiro();
+                else if (aba !== 'financeiro' && podeFinanceiro()) carregarFinanceiro();
             } catch (e) { toast('Erro ao carregar o cliente: ' + e.message, 'erro'); }
         }
         $('btn-novo-cliente').addEventListener('click', () => abrirFicha(null));
 
         // ---------- salvar ----------
         async function salvarCliente() {
+            if (!Acesso.pode('clientes.editar')) return;
             const d = { situacao, tipoDesconto };
             Object.entries(CAMPOS).forEach(([id, k]) => d[k] = $(id).value.trim());
             Object.assign(d, { tipo: $('c-tipo').value, classe: $('c-classe').value, medicao: $('c-medicao').value, estado: $('c-estado').value,
@@ -920,18 +928,19 @@
             const c = clientesCache.find(k => String(k.codigo) === String(tr.dataset.codigo)) || { codigo: tr.dataset.codigo, razaoSocial: tr.dataset.razao };
             ctxCliente = c;
             const item = (acao, ic, texto, extra = '', atalho = '') => `<button class="ctx-item ${extra}" role="menuitem" data-acao="${acao}"><span class="ic">${ic}</span>${texto}${atalho ? `<span class="atalho">${atalho}</span>` : ''}</button>`;
+            const se = (ok, html) => ok ? html : '';
             menu.innerHTML = `
                 <div class="ctx-cab"><b>${escapeHtml(c.razaoSocial)}</b><small>Código ${escapeHtml(c.codigo)}${c.cidade ? ' · ' + escapeHtml(c.cidade) + '/' + escapeHtml(c.estado || '') : ''}</small></div>` +
-                (interno ? item('cadastro', '📇', 'Abrir cadastro completo', 'destaque', 'Enter') +
-                    item('financeiro', '💰', 'Financeiro do cliente') +
-                    item('historico', '📈', 'Histórico de compras') +
-                    '<div class="ctx-sep"></div>' +
-                    item('analise', '📊', 'Análise do cliente (pedidos e orçamentos)') : '') +
-                item('graficos', '📉', 'Pedidos e orçamentos do cliente') +
+                se(interno(), item('cadastro', '📇', 'Abrir cadastro completo', 'destaque', 'Enter') +
+                    se(podeFinanceiro(), item('financeiro', '💰', 'Financeiro do cliente')) +
+                    se(Acesso.pode('valores.ver'), item('historico', '📈', 'Histórico de compras')) +
+                    '<div class="ctx-sep"></div>') +
+                se(Acesso.podePagina('cliente_analise.html'), item('analise', '📊', 'Análise do cliente (pedidos e orçamentos)')) +
+                se(Acesso.podePagina('painel_inicial.html'), item('graficos', '📉', 'Pedidos e orçamentos do cliente')) +
                 '<div class="ctx-sep"></div>' +
                 item('copiar-nome', '📋', 'Copiar razão social') +
                 (c.cnpjCpf ? item('copiar-doc', '🪪', 'Copiar CNPJ/CPF') : '') +
-                (interno ? '<div class="ctx-sep"></div>' + item('novo', '＋', 'Novo cliente') : '');
+                se(Acesso.pode('clientes.editar'), '<div class="ctx-sep"></div>' + item('novo', '＋', 'Novo cliente'));
             menu.classList.add('aberto');
             menu.style.left = '0px'; menu.style.top = '0px';
             const r = menu.getBoundingClientRect();
@@ -970,7 +979,7 @@
         window.addEventListener('resize', fecharMenu);
         // Enter na linha selecionada abre o cadastro
         document.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && interno && linhaSel && !$('ficha').classList.contains('aberta') && !menu.classList.contains('aberto')
+            if (e.key === 'Enter' && interno() && linhaSel && !$('ficha').classList.contains('aberta') && !menu.classList.contains('aberto')
                 && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) abrirFicha(linhaSel.dataset.codigo);
         });
 
@@ -980,11 +989,14 @@
         });
         window.addEventListener('beforeunload', e => { if (alterado) { e.preventDefault(); e.returnValue = ''; } });
         document.addEventListener('DOMContentLoaded', () => {
-            $('btn-novo-cliente').hidden = !interno;
-            if (interno) $('welcome-subtitle').textContent = 'Clique com o botão direito em um cliente para abrir o cadastro, o financeiro ou a análise completa. Duplo clique abre o cadastro.';
+            if (!Acesso.paginaLiberada()) return;
+            $('btn-novo-cliente').hidden = !Acesso.pode('clientes.editar');
+            // sem clientes.editar o cadastro é só leitura
+            if (!Acesso.pode('clientes.editar')) document.querySelectorAll('#cf-form input, #cf-form select, #cf-form textarea, #cf-form button').forEach(el => el.disabled = true);
+            if (interno()) $('welcome-subtitle').textContent = 'Clique com o botão direito em um cliente para abrir o cadastro, o financeiro ou a análise completa. Duplo clique abre o cadastro.';
             // atalho vindo da página de análise: ?abrir=CODIGO[&aba=financeiro]
             const q = new URLSearchParams(location.search);
-            if (interno && q.get('abrir')) { const aba = q.get('aba') || 'cadastro'; history.replaceState(null, '', location.pathname); abrirFicha(q.get('abrir'), aba); }
+            if (interno() && q.get('abrir')) { const aba = q.get('aba') || 'cadastro'; history.replaceState(null, '', location.pathname); abrirFicha(q.get('abrir'), aba); }
         });
     </script>
 </body>

@@ -292,12 +292,12 @@
         .fin-item.saldo span { opacity: .85; }
 
         .grafico-box { height: 230px; padding: 0 24px 18px; }
-        .so-interno[hidden], .menu-item[hidden] { display: none !important; }
+        #bloco-interno[hidden], .menu-item[hidden] { display: none !important; }
 
         @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -334,9 +334,9 @@
                 <a class="atalho destaque" href="orcamentos.html"><span class="ic">🧾</span>Novo orçamento<small>montar itens e preços</small></a>
                 <a class="atalho" href="painel_inicial.html"><span class="ic">📋</span>Pedidos e Orçamentos<small>vendas, produção e conversão</small></a>
                 <a class="atalho" href="clientes.html"><span class="ic">👥</span>Clientes<small>cadastro e histórico</small></a>
-                <a class="atalho so-interno" href="estoque.html"><span class="ic">📦</span>Estoque<small>itens e alertas</small></a>
-                <a class="atalho so-interno" href="produtos.html"><span class="ic">🏷️</span>Produtos<small>tabela de venda</small></a>
-                <a class="atalho so-interno" href="financeiro.html"><span class="ic">💰</span>Financeiro<small>fluxo de caixa</small></a>
+                <a class="atalho" href="estoque.html"><span class="ic">📦</span>Estoque<small>itens e alertas</small></a>
+                <a class="atalho" href="produtos.html"><span class="ic">🏷️</span>Produtos<small>tabela de venda</small></a>
+                <a class="atalho" href="financeiro.html"><span class="ic">💰</span>Financeiro<small>fluxo de caixa</small></a>
             </section>
 
             <!-- ===== INDICADORES DO MÊS ===== -->
@@ -351,7 +351,7 @@
                     <div class="card-value" id="k-orc-valor">—</div>
                     <div class="card-sub" id="k-orc-sub">—</div>
                 </div>
-                <div class="card">
+                <div class="card" data-valor>
                     <div class="card-header"><span class="card-title">Conversão</span><div class="card-icon">🎯</div></div>
                     <div class="card-value" id="k-conv">—</div>
                     <div class="card-sub">valor em pedidos ÷ valor orçado no mês</div>
@@ -382,8 +382,8 @@
             </section>
 
             <!-- ===== EQUIPE INTERNA: FINANCEIRO + ESTOQUE ===== -->
-            <section class="grade so-interno" id="bloco-interno">
-                <div class="painel">
+            <section class="grade" id="bloco-interno">
+                <div class="painel" data-perm="financeiro.ver valores.ver">
                     <div class="painel-head">
                         <div class="painel-titulo">Financeiro do mês</div>
                         <a class="ver-tudo" href="financeiro.html">Abrir fluxo de caixa →</a>
@@ -394,11 +394,11 @@
                         <div class="fin-item sai"><span>Pago</span><b id="f-pago">—</b></div>
                         <div class="fin-item sai"><span>A pagar</span><b id="f-apagar">—</b></div>
                         <div class="fin-item sai"><span>Atrasado</span><b id="f-atrasado">—</b></div>
-                        <div class="fin-item"><span>Valor em estoque</span><b id="f-estoque">—</b></div>
+                        <div class="fin-item" data-perm="estoque.ver"><span>Valor em estoque</span><b id="f-estoque">—</b></div>
                         <div class="fin-item saldo"><span>Saldo do mês</span><b id="f-saldo">—</b></div>
                     </div>
                 </div>
-                <div class="painel">
+                <div class="painel" data-perm="estoque.ver">
                     <div class="painel-head">
                         <div class="painel-titulo">Alertas de estoque <span class="contagem" id="est-qtd">0</span></div>
                         <a class="ver-tudo" href="estoque.html">Abrir estoque →</a>
@@ -408,7 +408,7 @@
             </section>
 
             <!-- ===== GRÁFICO ===== -->
-            <section class="painel">
+            <section class="painel" data-valor>
                 <div class="painel-head">
                     <div class="painel-titulo">Orçamentos x Pedidos — últimos 6 meses</div>
                     <a class="ver-tudo" href="painel_inicial.html">Ver detalhes →</a>
@@ -476,13 +476,16 @@
             const orcMes = orcamentos.filter(p => ehDoMes(p.data, hoje));
             const vPed = soma(pedMes), vPedAnt = soma(pedAnt), vOrc = soma(orcMes);
 
-            $('k-ped-valor').textContent = moeda(vPed);
-            const delta = vPedAnt > 0 ? (vPed - vPedAnt) / vPedAnt * 100 : null;
-            $('k-ped-sub').innerHTML = `<b>${pedMes.length}</b> pedido(s)` + (delta === null ? '' :
+            // sem valores.ver os cards mostram quantidades e a variação compara quantidades
+            const vv = Acesso.pode('valores.ver');
+            const atual = vv ? vPed : pedMes.length, anterior = vv ? vPedAnt : pedAnt.length;
+            $('k-ped-valor').textContent = vv ? moeda(vPed) : pedMes.length;
+            const delta = anterior > 0 ? (atual - anterior) / anterior * 100 : null;
+            $('k-ped-sub').innerHTML = (vv ? `<b>${pedMes.length}</b> pedido(s)` : 'pedido(s) emitido(s)') + (delta === null ? '' :
                 ` · <span class="delta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(0)}%</span> vs. mês anterior`);
-            $('k-orc-valor').textContent = moeda(vOrc);
-            $('k-orc-sub').innerHTML = `<b>${orcMes.length}</b> orçamento(s) emitido(s)`;
-            $('k-conv').textContent = vOrc > 0 ? `${(vPed / vOrc * 100).toFixed(0)}%` : '—';
+            $('k-orc-valor').textContent = vv ? moeda(vOrc) : orcMes.length;
+            $('k-orc-sub').innerHTML = vv ? `<b>${orcMes.length}</b> orçamento(s) emitido(s)` : 'orçamento(s) emitido(s)';
+            if (vv) $('k-conv').textContent = vOrc > 0 ? `${(vPed / vOrc * 100).toFixed(0)}%` : '—';
 
             const producao = pedidos.filter(p => emProducao(p.situacao));
             const prontos = pedidos.filter(p => pronto(p.situacao));
@@ -494,7 +497,7 @@
                 <li>
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
                     <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${escapeHtml(p.data || '')}${p.clienteFinal ? ' · ' + escapeHtml(p.clienteFinal) : ''}</small></div>
-                    <div class="dir">${moeda(p.valor)}<small><span class="status ${classeStatus(p.situacao)}">${escapeHtml(p.situacao || '—')}</span></small></div>
+                    <div class="dir">${vv ? moeda(p.valor) : ''}<small><span class="status ${classeStatus(p.situacao)}">${escapeHtml(p.situacao || '—')}</span></small></div>
                 </li>`).join('') || '<li class="vazio">Nenhum pedido ainda</li>';
 
             // entregas atrasadas + próximos 7 dias, de pedidos ainda não entregues/retirados.
@@ -524,7 +527,7 @@
 
         // ============ FINANCEIRO + ESTOQUE (equipe interna) ============
         async function carregarInterno() {
-            api('/fluxo/resumo').then(r => {
+            if (Acesso.pode('financeiro.ver valores.ver')) api('/fluxo/resumo').then(r => {
                 $('f-recebido').textContent = moeda(r.recebido);
                 $('f-areceber').textContent = moeda(r.aReceber);
                 $('f-pago').textContent = moeda(r.pago);
@@ -533,9 +536,10 @@
                 $('f-saldo').textContent = moeda(r.saldo);
             }).catch(() => { $('f-saldo').textContent = 'indisponível'; });
 
+            if (!Acesso.pode('estoque.ver')) return;
             try {
                 const [resumo, itens] = await Promise.all([api('/estoque/resumo'), api('/estoque')]);
-                $('f-estoque').textContent = moeda(resumo.valorTotal);
+                if (Acesso.pode('valores.ver')) $('f-estoque').textContent = moeda(resumo.valorTotal);
                 // mesma regra de alerta da página de estoque
                 const alertas = itens
                     .filter(it => it.situacao !== 'Inativo' && (it.qtd <= 0 || (it.minimo > 0 && it.qtd <= it.minimo)))
@@ -556,7 +560,7 @@
 
         // ============ GRÁFICO ============
         async function carregarGrafico() {
-            if (typeof Chart === 'undefined') return;
+            if (typeof Chart === 'undefined' || !Acesso.pode('valores.ver')) return;
             try {
                 const dados = await api('/dados_compras_orcamentos');
                 new Chart($('grafico'), {
@@ -591,14 +595,11 @@
             $('saudacao').textContent = `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nome ? ', ' + nome.split(' ')[0] : ''} 👋`;
             $('hoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-            const representante = String(auth.user.cargo || '').toLowerCase().includes('representante');
-            // representante não acessa estoque, produtos nem financeiro
-            document.querySelectorAll('.so-interno').forEach(el => el.hidden = representante);
-            document.querySelectorAll('.sidebar a[href="estoque.html"], .sidebar a[href="produtos.html"], .sidebar a[href="financeiro.html"]')
-                .forEach(a => a.hidden = representante);
-
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
+            // painéis de financeiro/estoque somem pelo data-perm; o bloco some se nenhum couber
+            $('bloco-interno').hidden = !Acesso.pode('financeiro.ver valores.ver') && !Acesso.pode('estoque.ver');
             carregarComercial();
-            if (!representante) carregarInterno();
+            carregarInterno();
             carregarGrafico();
         });
     </script>

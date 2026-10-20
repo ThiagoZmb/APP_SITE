@@ -1,6 +1,7 @@
 // ==========================================================================
 // ELEGANCE — casca comum das páginas: menu lateral único, avatar e menu móvel.
-// Só mexe na navegação; os scripts de cada página continuam como estão.
+// Também aplica as permissões na tela: menu, "Sem acesso", data-perm e data-valor.
+// Quem decide de verdade é o backend; aqui a tela só deixa de mostrar o que não vale.
 // ==========================================================================
 (function () {
     const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -26,21 +27,99 @@
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo' },
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
-        { secao: 'Gestão', interno: true },
-        { href: 'estoque.html', texto: 'Estoque', icone: 'estoque', interno: true },
-        { href: 'produtos.html', texto: 'Produtos', icone: 'produtos', interno: true },
-        { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro', interno: true },
-        { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios', exige: 'admin.usuarios' }
+        { secao: 'Gestão' },
+        { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
+        { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
+        { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
+        { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
+    // página → permissões exigidas (todas). A ordem é a da "primeira página permitida" depois do login.
+    // Página nova: acrescentar aqui e no MENU.
+    const PAGINAS = {
+        'inicio.html': ['paineis.ver'],
+        'painel_inicial.html': ['pedidos.ver'],
+        'graficos_pedidos.html': ['pedidos.ver'],
+        'clientes.html': ['clientes.ver'],
+        'cliente_analise.html': ['clientes.ver', 'valores.ver'],
+        'estoque.html': ['estoque.ver'],
+        'produtos.html': ['produtos.ver'],
+        'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
+        'financeiro.html': ['financeiro.ver', 'valores.ver'],
+        'usuarios.html': ['admin.usuarios']
+    };
+    window.ACESSO_PAGINAS = PAGINAS;
 
     function auth() {
         try { return JSON.parse(localStorage.getItem('auth') || 'null'); } catch { return null; }
     }
+    const arquivoAtual = () => (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
+    // pode('a') ou pode('a b'): todos os códigos exigidos
+    const pode = codigos => {
+        const tem = auth()?.acesso?.permissoes || [];
+        return String(codigos || '').split(/\s+/).filter(Boolean).every(c => tem.includes(c));
+    };
+    // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona); null = nenhuma
+    const primeiraPaginaDe = acesso => Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
+        && PAGINAS[p].every(c => (acesso?.permissoes || []).includes(c))) || null;
+    const podePagina = arquivo => { const exige = PAGINAS[String(arquivo || '').toLowerCase()]; return !exige || exige.every(c => pode(c)); };
     // Permissões do usuário para a tela se montar (quem decide de verdade é o backend)
     window.Acesso = {
         atual: () => auth()?.acesso || null,
-        pode: codigo => (auth()?.acesso?.permissoes || []).includes(codigo)
+        pode,
+        podePagina,
+        primeiraPagina: () => primeiraPaginaDe(auth()?.acesso),
+        primeiraPaginaDe,
+        paginaLiberada: () => podePagina(arquivoAtual()),
+        aplicar
     };
+
+    // ----- elementos: data-perm="a b", data-valor, data-sem-valor e links para páginas proibidas -----
+    const OCULTO = 'acesso-oculto';
+    function aplicar(raiz = document) {
+        if (!raiz.querySelectorAll) return;
+        const SEL = '[data-perm], [data-valor], [data-sem-valor], a[href]';
+        const els = [...raiz.querySelectorAll(SEL)];
+        if (raiz.matches?.(SEL)) els.push(raiz);
+        const verValores = pode('valores.ver');
+        for (const el of els) {
+            if (el.closest('nav.sidebar')) continue; // o menu se desenha sozinho
+            let ok = true;
+            if (el.hasAttribute('data-perm')) ok = pode(el.getAttribute('data-perm'));
+            if (ok && el.hasAttribute('data-valor')) ok = verValores;
+            if (ok && el.hasAttribute('data-sem-valor')) ok = !verValores; // texto alternativo para quem não vê valores
+            if (ok && el.tagName === 'A') {
+                const alvo = (el.getAttribute('href') || '').split(/[?#]/)[0].split('/').pop().toLowerCase();
+                if (PAGINAS[alvo]) ok = podePagina(alvo);
+            }
+            el.classList.toggle(OCULTO, !ok);
+        }
+    }
+    function observar() {
+        const css = document.createElement('style');
+        css.textContent = `.${OCULTO} { display: none !important; }
+            #sem-acesso-pagina { text-align: center; padding: 80px 20px; color: var(--text-light, #666); }
+            #sem-acesso-pagina h2 { color: var(--text-dark, #222); margin-bottom: 8px; }
+            #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #8B0000); font-weight: 700; }`;
+        document.head.appendChild(css);
+        aplicar();
+        new MutationObserver(lista => {
+            for (const m of lista) for (const n of m.addedNodes) if (n.nodeType === 1) aplicar(n);
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+
+    // ----- página sem permissão: esconde o conteúdo e oferece a primeira página permitida -----
+    function semAcesso() {
+        const main = document.querySelector('main');
+        if (!main || document.getElementById('sem-acesso-pagina')) return;
+        [...main.children].forEach(el => el.classList.add(OCULTO));
+        const destino = window.Acesso.primeiraPagina();
+        const bloco = document.createElement('section');
+        bloco.id = 'sem-acesso-pagina';
+        bloco.innerHTML = '<h2>Sem acesso</h2><p>Seu usuário não tem permissão para esta página.</p>' +
+            (destino ? `<a href="${destino}">Ir para o início</a>` : '<a href="login.html" class="sair">Sair</a>');
+        bloco.querySelector('.sair')?.addEventListener('click', () => localStorage.removeItem('auth'));
+        main.appendChild(bloco);
+    }
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     function montar() {
@@ -50,8 +129,10 @@
         const header = container.querySelector(':scope > header');
         const a = auth();
         const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html' };   // subpáginas acendem o item do menu de origem
-        const arquivo = (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
+        const arquivo = arquivoAtual();
         const atual = PAGINA_PAI[arquivo] || arquivo;
+        observar();
+        if (!podePagina(arquivo)) semAcesso();
 
         // ----- menu lateral -----
         if (nav) {
@@ -68,12 +149,17 @@
     }
 
     function desenharMenu(nav, atual) {
-        const a = auth();
-        const representante = String(a?.user?.cargo || '').toLowerCase().includes('representante');
+            // seção aparece só se tiver ao menos uma página liberada até a próxima seção
+            const visivel = MENU.map(m => m.href ? podePagina(m.href) : null);
+            MENU.forEach((m, i) => {
+                if (!m.secao) return;
+                const fim = MENU.findIndex((x, j) => j > i && x.secao);
+                visivel[i] = visivel.slice(i + 1, fim < 0 ? MENU.length : fim).some(Boolean);
+            });
             nav.innerHTML =
                 `<a class="sb-marca" href="inicio.html"><span class="sb-logo">E</span><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
-                MENU.map(m => {
-                    const oculto = (m.interno && representante) || (m.exige && !window.Acesso.pode(m.exige)) ? ' hidden' : '';
+                MENU.map((m, i) => {
+                    const oculto = visivel[i] ? '' : ' hidden';
                     if (m.secao) return `<div class="sb-secao"${oculto}>${m.secao}</div>`;
                     const ativo = m.href === atual ? ' active' : '';
                     return `<a class="menu-item${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
@@ -95,9 +181,13 @@
             if (!r.ok) return;
             const d = await r.json();
             const novo = auth();
-            if (!novo || !d.acesso) return;
+            if (!novo || !d.acesso || novo.token !== a.token) return;
+            const chave = x => JSON.stringify([[...(x?.permissoes || [])].sort(), [...(x?.estados || [])].sort()]);
+            const mudou = chave(novo.acesso) !== chave(d.acesso);
             novo.acesso = d.acesso;
             localStorage.setItem('auth', JSON.stringify(novo));
+            // a página já se montou com o acesso antigo: recarrega uma vez para refletir o novo
+            if (mudou) { location.reload(); return; }
             desenharMenu(nav, atual);
             document.dispatchEvent(new CustomEvent('acesso-atualizado', { detail: d.acesso }));
         } catch { /* sem rede: mantém o que já tem */ }

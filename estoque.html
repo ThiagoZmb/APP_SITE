@@ -237,8 +237,8 @@
             .col-forn { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -268,7 +268,7 @@
 
             <!-- ===== RESUMO ===== -->
             <section class="cards">
-                <div class="card">
+                <div class="card" data-valor>
                     <div class="card-header"><span class="card-title">Valor total em estoque</span><div class="card-icon">💰</div></div>
                     <div class="card-value" id="c-valor">—</div>
                     <div class="card-sub">Revestimento: tamanho × valor × qtd</div>
@@ -334,7 +334,7 @@
                     <div class="abas" role="tablist">
                         <button class="aba ativa" data-aba="geral">Geral</button>
                         <button class="aba" data-aba="fornecedor">Fornecedor</button>
-                        <button class="aba" data-aba="custos">Estoque e custos</button>
+                        <button class="aba" data-aba="custos">Estoque<span data-valor> e custos</span></button>
                         <button class="aba" data-aba="medidas">Medidas</button>
                         <button class="aba" data-aba="movimento">Movimentação</button>
                     </div>
@@ -350,7 +350,7 @@
                                     <label for="f-barras">Código de barras (EAN-13)</label>
                                     <div class="campo-com-botao">
                                         <input id="f-barras" maxlength="13" inputmode="numeric" placeholder="Gere ou digite">
-                                        <button type="button" class="btn btn-secondary btn-mini" id="btn-barras">🏷️ Gerar código</button>
+                                        <button type="button" class="btn btn-secondary btn-mini" id="btn-barras" data-perm="estoque.editar">🏷️ Gerar código</button>
                                     </div>
                                 </div>
                                 <div class="form-group full"><label for="f-obs">Observação</label><textarea id="f-obs" maxlength="2000"></textarea></div>
@@ -369,12 +369,12 @@
                             <div class="grid-form">
                                 <div class="form-group"><label for="f-qtd">Estoque atual</label><input id="f-qtd" class="num dec" value="0"></div>
                                 <div class="form-group"><label for="f-minimo">Estoque mínimo</label><input id="f-minimo" class="num dec" value="0"></div>
-                                <div class="form-group"><label for="f-valor">Valor de compra</label><input id="f-valor" class="num dec moeda" value="R$ 0,00"></div>
-                                <div class="form-group"><label for="f-frete">Frete</label><div class="sufixo" data-sufixo="%"><input id="f-frete" class="num dec" value="0"></div></div>
-                                <div class="form-group"><label for="f-ipi">IPI</label><div class="sufixo" data-sufixo="%"><input id="f-ipi" class="num dec" value="0"></div></div>
+                                <div class="form-group" data-valor><label for="f-valor">Valor de compra</label><input id="f-valor" class="num dec moeda" value="R$ 0,00"></div>
+                                <div class="form-group" data-valor><label for="f-frete">Frete</label><div class="sufixo" data-sufixo="%"><input id="f-frete" class="num dec" value="0"></div></div>
+                                <div class="form-group" data-valor><label for="f-ipi">IPI</label><div class="sufixo" data-sufixo="%"><input id="f-ipi" class="num dec" value="0"></div></div>
                                 <div class="form-group"><label for="f-perda">Perda</label><div class="sufixo" data-sufixo="%"><input id="f-perda" class="num dec" value="0"></div></div>
                             </div>
-                            <div class="valor-calc"><span>Valor deste item em estoque</span><b id="v-valor-item">R$ 0,00</b></div>
+                            <div class="valor-calc" data-valor><span>Valor deste item em estoque</span><b id="v-valor-item">R$ 0,00</b></div>
                         </div>
                         <div class="aba-conteudo" data-aba="medidas">
                             <div class="grid-form">
@@ -391,8 +391,9 @@
                     </form>
 
                     <div class="acoes">
-                        <button class="btn btn-primary" id="btn-salvar">💾 Salvar</button>
-                        <button class="btn btn-secondary" id="btn-novo">＋ Novo / Limpar</button>
+                        <button class="btn btn-primary" id="btn-salvar" data-perm="estoque.editar">💾 Salvar</button>
+                        <!-- item novo exige valores: o backend recusa cadastrar sem preço -->
+                        <button class="btn btn-secondary" id="btn-novo" data-perm="estoque.editar valores.ver">＋ Novo / Limpar</button>
                         <span class="alteracoes" id="alteracoes">● alterações não salvas</span>
                     </div>
                 </div>
@@ -730,6 +731,7 @@
 
         // ============ SALVAR (Salvar_Estoque) ============
         async function salvarEstoque() {
+            if (!Acesso.pode('estoque.editar')) return;
             const d = {};
             Object.entries(campos).forEach(([k, id]) => {
                 d[k] = NUMERICOS.includes(k) || k === 'valor' ? lerNumero($(id).value) : $(id).value.trim();
@@ -742,7 +744,8 @@
             if (d.fornecedor && !d.prodFornecedor) return falha('Você deve fornecer um nome do produto do fornecedor!', 'fornecedor', 'f-prod-forn');
             if (!d.classe) return falha('Você deve inserir uma classe para este produto!', 'geral', 'f-classe');
             if (!d.unidade) return falha('Você deve inserir um tipo de unidade para este produto!', 'geral', 'f-unidade');
-            if (!(d.valor > 0)) return falha('O valor do produto precisa ser maior que 0!', 'custos', 'f-valor');
+            // sem valores.ver o backend mantém o valor do cadastro
+            if (Acesso.pode('valores.ver') && !(d.valor > 0)) return falha('O valor do produto precisa ser maior que 0!', 'custos', 'f-valor');
             if (d.qtd === 0 && !(await confirmar('Estoque zerado', 'Têm certeza que o estoque atual será 0 ?'))) return;
 
             const btn = $('btn-salvar');
@@ -834,10 +837,9 @@
             $('user-name').textContent = auth.user.nome || '';
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
-            if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
-                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Estoque</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
-                return;
-            }
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
+            // sem estoque.editar a ficha é só consulta
+            if (!Acesso.pode('estoque.editar')) document.querySelectorAll('#form input, #form select, #form textarea, .switch-situacao button').forEach(el => el.disabled = true);
             limparDados();
             carregarResumo();
             carregarEstoque();

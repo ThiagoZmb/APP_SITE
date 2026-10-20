@@ -309,9 +309,9 @@
         @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .operacao { grid-template-columns: 1fr 1fr !important; } .op { border-left: none; padding-left: 0; } }
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
-    <script src="ranking.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
+    <script src="ranking.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -355,7 +355,7 @@
                 <!-- ===== EVOLUÇÃO + LEITURA ===== -->
                 <section class="larga">
                     <div class="painel">
-                        <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small>valores e % de fechamento · últimos 12 meses</small></div>
+                        <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small><span data-valor>valores e % de fechamento</span><span data-sem-valor>quantidade emitida</span> · últimos 12 meses</small></div>
                         <div class="graf"><canvas id="g-mensal"></canvas></div>
                     </div>
                     <div class="painel">
@@ -399,11 +399,11 @@
                     <div class="chips-sit" id="chips-sit"></div>
                     <div class="tabela-wrap">
                         <table>
-                            <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num">Valor</th><th>Observação</th><th>Situação</th><th>Financeiro</th><th>Entrega</th></tr></thead>
+                            <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num" data-valor>Valor</th><th>Observação</th><th>Situação</th><th data-valor>Financeiro</th><th>Entrega</th></tr></thead>
                             <tbody id="orders-tbody"></tbody>
                         </table>
                     </div>
-                    <div class="rodape-l"><span id="lista-qtd"></span><span>Clique numa linha para abrir o PDF · Total <b id="lista-total">R$ 0,00</b></span></div>
+                    <div class="rodape-l"><span id="lista-qtd"></span><span><span data-perm="pedidos.pdf">Clique numa linha para abrir o PDF</span><span data-valor> · Total <b id="lista-total">R$ 0,00</b></span></span></div>
                 </section>
             </div>
         </main>
@@ -514,7 +514,12 @@
             r.conv = r.orc > 0 ? r.fat / r.orc : null; r.convA = r.orcA > 0 ? r.fatA / r.orcA : null;
             const ref = j.iniAnt ? ` vs ${j.ref}` : '';
             const vc = r.conv != null && r.convA != null ? r.conv - r.convA : null;
-            const kp = [
+            // sem valores.ver: só quantidades
+            const kp = !Acesso.pode('valores.ver') ? [
+                ['Pedidos fechados', num(r.qtd), `${j.iniAnt ? seta(variacao(r.qtd, r.qtdA)) : ''} pedido(s)${ref}`, COR.vinho],
+                ['Orçamentos emitidos', num(r.oqtd), `${j.iniAnt ? seta(variacao(r.oqtd, oa.length)) : ''} orçamento(s)`, COR.azul],
+                ['Cancelados', num(r.canc.length), 'pedidos cancelados no período', COR.vermelho]
+            ] : [
                 ['Pedidos fechados', moeda(r.fat), `${j.iniAnt ? seta(variacao(r.fat, r.fatA)) : ''} ${num(r.qtd)} pedido(s)${ref}`, COR.vinho],
                 ['Orçamentos emitidos', moeda(r.orc), `${j.iniAnt ? seta(variacao(r.orc, r.orcA)) : ''} ${num(r.oqtd)} orçamento(s)`, COR.azul],
                 ['Conversão (valor)', r.conv != null ? pct(r.conv) : '—', vc != null ? (Math.abs(vc) < .005 ? '<span class="neutro">estável</span>' : `<span class="${vc > 0 ? 'up' : 'down'}">${vc > 0 ? '▲' : '▼'} ${Math.abs(vc * 100).toFixed(0)} p.p.</span>`) + ref : 'pedidos ÷ orçamentos', COR.verde],
@@ -533,10 +538,23 @@
             serie = [];
             for (let i = 11; i >= 0; i--) {
                 const m = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1), f = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59);
-                const pm = entre(P, m, f), ped = soma(pm), orc = soma(entre(O, m, f));
-                serie.push({ rotulo: m.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''), ped, orc, conv: orc > 0 ? Math.round(ped / orc * 100) : null, qtd: pm.length });
+                const pm = entre(P, m, f), om = entre(O, m, f), ped = soma(pm), orc = soma(om);
+                serie.push({ rotulo: m.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''), ped, orc, conv: orc > 0 ? Math.round(ped / orc * 100) : null, qtd: pm.length, oqtd: om.length });
             }
             graficos.mensal?.destroy();
+            if (!Acesso.pode('valores.ver')) {
+                graficos.mensal = new Chart($('g-mensal'), {
+                    type: 'bar',
+                    data: { labels: serie.map(s => s.rotulo), datasets: [
+                        { label: 'Orçamentos', data: serie.map(s => s.oqtd), backgroundColor: COR.azul, borderRadius: 4, maxBarThickness: 30 },
+                        { label: 'Pedidos', data: serie.map(s => s.qtd), backgroundColor: COR.vinho, borderRadius: 4, maxBarThickness: 30 }
+                    ] },
+                    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0, callback: v => num(v) } }, x: { grid: { display: false } } } }
+                });
+                return;
+            }
             graficos.mensal = new Chart($('g-mensal'), {
                 data: { labels: serie.map(s => s.rotulo), datasets: [
                     { type: 'bar', label: 'Orçamentos', data: serie.map(s => s.orc), backgroundColor: COR.azul, borderRadius: 4, yAxisID: 'y', order: 2, maxBarThickness: 30 },
@@ -564,7 +582,12 @@
             const atrasoFin = aReceber.filter(x => /atras|protest/.test(norm(x.financeiro)));
             const hojeP = P.filter(x => x.data === hojeBR), hojeO = doCliente(orcamentos).filter(x => x.data === hojeBR);
             operacao = { prod, pronto, atrasadas, prontoParado, aReceber, atrasoFin };
-            const op = [
+            const op = !Acesso.pode('valores.ver') ? [
+                ['Hoje', `${hojeP.length} / ${hojeO.length}`, 'pedidos / orçamentos'],
+                ['Em produção', num(prod.length), 'pedido(s)'],
+                ['Prontos aguardando', num(pronto.length), prontoParado.length ? `${prontoParado.length} há +7 dias` : 'pedido(s)'],
+                ['Entregas atrasadas', num(atrasadas.length), atrasadas.length ? 'pedido(s)' : 'nenhuma', atrasadas.length > 0]
+            ] : [
                 ['Hoje', `${hojeP.length} / ${hojeO.length}`, `pedidos / orçamentos · ${moeda(soma(hojeP))}`],
                 ['Em produção', num(prod.length), moeda(soma(prod))],
                 ['Prontos aguardando', num(pronto.length), `${moeda(soma(pronto))}${prontoParado.length ? ` · ${prontoParado.length} há +7 dias` : ''}`],
@@ -578,6 +601,20 @@
         function renderInsights() {
             const r = resumo, o = operacao, j = r.j, ins = [];
             const add = (tipo, texto) => ins.push(`<li class="${tipo}"><span class="ic">${{ pos: '↑', alerta: '!', risco: '!', info: 'i' }[tipo]}</span><span>${texto}</span></li>`);
+            if (!Acesso.pode('valores.ver')) { // só contagens, situação e prazos
+                if (j.iniAnt) {
+                    const v = variacao(r.qtd, r.qtdA);
+                    if (r.qtd === 0) add('risco', `Nenhum pedido fechado em ${j.nome}.`);
+                    else if (isFinite(v) && Math.abs(v) >= .05) add(v > 0 ? 'pos' : 'risco', `${num(r.qtd)} pedido(s) em ${j.nome}: <b>${pct(Math.abs(v))} ${v > 0 ? 'acima' : 'abaixo'}</b> do período anterior (${num(r.qtdA)}).`);
+                    else add('info', `${num(r.qtd)} pedido(s) em ${j.nome}.`);
+                }
+                if (o.atrasadas.length) add('risco', `<b>${o.atrasadas.length} pedido(s) com entrega atrasada</b> — priorizar na produção/expedição.`);
+                if (o.prontoParado.length) add('alerta', `${o.prontoParado.length} pedido(s) prontos há mais de 7 dias sem entrega/retirada — contatar os clientes.`);
+                if (r.canc.length) add('alerta', `${r.canc.length} pedido(s) cancelado(s) no período.`);
+                if (!ins.length) add('info', 'Sem alertas no momento.');
+                $('insights').innerHTML = ins.join('');
+                return;
+            }
             if (j.iniAnt) {
                 const v = variacao(r.fat, r.fatA);
                 if (r.fat === 0) add('risco', `Nenhum pedido fechado em ${j.nome}.`);
@@ -645,8 +682,8 @@
             Ranking.montar($('ranking-produtos'), {
                 titulo: 'Tipos de produto mais vendidos — últimos 12 meses',
                 subtitulo: (t, m) => (cliente ? 'Pedidos deste cliente · ' : 'Itens de pedidos · ') + (m.id === 'valor' ? `Total vendido: <b>${moeda(t)}</b>` : `Total: <b>${num(Math.round(t))} un.</b>`),
-                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda }, { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: n => `${num(Math.round(n))} un.` }],
-                info: (it, m, p) => `${p} · ${m.id === 'valor' ? num(Math.round(it.qtd)) + ' un.' : moeda(it.valor)} · ${it.pedidos} pedido(s)`,
+                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda, dinheiro: true }, { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: n => `${num(Math.round(n))} un.` }],
+                info: (it, m, p) => `${p} · ${m.id === 'valor' ? num(Math.round(it.qtd)) + ' un. · ' : Acesso.pode('valores.ver') ? moeda(it.valor) + ' · ' : ''}${it.pedidos} pedido(s)`,
                 carregar: () => api('/ranking_produtos' + (cliente ? '?cliente=' + encodeURIComponent(cliente) : ''))
             });
             const el = $('ranking-clientes');
@@ -655,8 +692,8 @@
             Ranking.montar(el, {
                 titulo: `Clientes que mais compraram — ${j.nome}`,
                 subtitulo: (t, m) => m.id === 'valor' ? `Total em pedidos: <b>${moeda(t)}</b> · clique num cliente para filtrar a página` : `Total: <b>${num(t)} pedidos</b>`,
-                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda }, { id: 'pedidos', rotulo: 'Por nº de pedidos', valor: it => it.pedidos, formatar: n => `${n} pedido${n === 1 ? '' : 's'}` }],
-                info: (it, m, p) => `${p} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)} · ticket ${moeda(it.valor / it.pedidos)}`,
+                metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda, dinheiro: true }, { id: 'pedidos', rotulo: 'Por nº de pedidos', valor: it => it.pedidos, formatar: n => `${n} pedido${n === 1 ? '' : 's'}` }],
+                info: (it, m, p) => Acesso.pode('valores.ver') ? `${p} · ${m.id === 'valor' ? it.pedidos + ' ped.' : moeda(it.valor)} · ticket ${moeda(it.valor / it.pedidos)}` : p,
                 carregar: async () => {
                     const g = {};
                     resumo.p.forEach(x => { (g[x.cliente] ||= { nome: x.cliente, valor: 0, pedidos: 0 }); g[x.cliente].valor += x.v; g[x.cliente].pedidos++; });
@@ -684,15 +721,15 @@
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
                 <tr data-numero="${esc(x.numero)}">
                     <td class="order-number">${esc(x.numero)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
-                    <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num"><b>${moeda(x.v)}</b></td>
+                    <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
-                    <td><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}</td>
+                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}</td>
                 </tr>`).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
         $('orders-tbody').addEventListener('click', e => {
             const tr = e.target.closest('tr[data-numero]');
-            if (tr) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
+            if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
         $('chips-sit').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filtroSit = b.dataset.sit; renderLista(); });
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
@@ -727,6 +764,7 @@
             $('user-name').textContent = auth.user.nome || '';
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             cliente = new URLSearchParams(location.search).get('cliente') || '';
             $('f-cliente').value = cliente;
             carregar();

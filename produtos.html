@@ -291,8 +291,8 @@
         .perm-chips span { font-size: 13px; padding: 5px 10px; border-radius: 8px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .perm-vazio { font-size: 13px; color: #adb5bd; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -377,7 +377,7 @@
                             <div class="sem-foto"><b>📷</b>Sem foto<br>clique para enviar</div>
                         </div>
                         <input type="file" id="arquivo-foto" accept="image/jpeg,image/png" hidden>
-                        <div class="precos-resumo">
+                        <div class="precos-resumo" data-valor>
                             <div class="preco-box destaque"><span>Valor cheio</span><b id="r-cheio">R$ 0,00</b><small>tabela padrão</small></div>
                             <div class="preco-box"><span>Valor fixo</span><b id="r-fixo">R$ 0,00</b><small>clientes FIXO</small></div>
                         </div>
@@ -406,8 +406,8 @@
                         <div class="aba-conteudo" data-aba="precos">
                             <div class="regra-classe" id="regra-classe"></div>
                             <div class="grid-form">
-                                <div class="form-group"><label for="f-fixo">Valor fixo</label><input id="f-fixo" class="num dec moeda" value="R$ 0,00"></div>
-                                <div class="form-group"><label for="f-cheio">Valor cheio</label><input id="f-cheio" class="num dec moeda" value="R$ 0,00"></div>
+                                <div class="form-group" data-valor><label for="f-fixo">Valor fixo</label><input id="f-fixo" class="num dec moeda" value="R$ 0,00"></div>
+                                <div class="form-group" data-valor><label for="f-cheio">Valor cheio</label><input id="f-cheio" class="num dec moeda" value="R$ 0,00"></div>
                                 <div class="form-group" id="g-desc-vidro"><label for="f-desc-vidro">Desconto do vidro</label><div class="sufixo" data-sufixo="mm"><input id="f-desc-vidro" class="num dec" value="0"></div></div>
                                 <div class="form-group" id="g-desc-pux"><label for="f-desc-pux">Desconto perfil/puxador</label><div class="sufixo" data-sufixo="mm"><input id="f-desc-pux" class="num dec" value="0"></div></div>
                             </div>
@@ -420,8 +420,9 @@
                     </form>
 
                     <div class="acoes">
-                        <button class="btn btn-primary" id="btn-salvar">💾 Salvar</button>
-                        <button class="btn btn-secondary" id="btn-novo">＋ Novo</button>
+                        <button class="btn btn-primary" id="btn-salvar" data-perm="produtos.editar">💾 Salvar</button>
+                        <!-- produto novo exige valores: o backend recusa cadastrar sem preço -->
+                        <button class="btn btn-secondary" id="btn-novo" data-perm="produtos.editar valores.ver">＋ Novo</button>
                         <span class="alteracoes" id="alteracoes">● alterações não salvas</span>
                     </div>
                 </div>
@@ -609,7 +610,7 @@
         const ehClasse = (c, ...nomes) => nomes.includes(c);
         function desligar(grupoId, campoId, desligado, zerar) {
             $(grupoId).classList.toggle('desligado', desligado);
-            $(campoId).disabled = desligado;
+            $(campoId).disabled = desligado || !Acesso.pode('produtos.editar');
             if (desligado && zerar) $(campoId).value = $(campoId).tagName === 'SELECT' ? '' : '0';
         }
         function aplicarRegrasClasse(trocaManual) {
@@ -638,7 +639,8 @@
                 desligar('g-desc-vidro', 'f-desc-vidro', true, true);
                 desligar('g-desc-pux', 'f-desc-pux', true, true);
                 desligar('g-tipo-pux', 'f-tipo-pux', true, true);
-                regra = 'Perfil AC: o valor cheio é calculado automaticamente como valor fixo + 7%.';
+                regra = Acesso.pode('valores.ver') ? 'Perfil AC: o valor cheio é calculado automaticamente como valor fixo + 7%.'
+                    : 'Perfil AC: sem descontos de vidro/puxador e sem tipo de puxador.';
             }
             $('regra-classe').textContent = regra;
             $('regra-classe').classList.toggle('visivel', !!regra);
@@ -725,7 +727,7 @@
                 img.src = URL.createObjectURL(arquivo);
             });
         }
-        $('foto').addEventListener('click', () => $('arquivo-foto').click());
+        $('foto').addEventListener('click', () => { if (Acesso.pode('produtos.editar')) $('arquivo-foto').click(); });
         $('arquivo-foto').addEventListener('change', async e => {
             const arq = e.target.files[0];
             e.target.value = '';
@@ -800,6 +802,7 @@
 
         // ============ SALVAR (Salvar_Registro) ============
         async function salvarRegistro() {
+            if (!Acesso.pode('produtos.editar')) return;
             const d = {
                 codigo: $('f-codigo').value.trim(), modelo: $('f-modelo').value.trim(), classe: $('f-classe').value,
                 tipoPuxador: $('f-tipo-pux').value, classeAcabamento: $('f-classe-acab').value,
@@ -861,9 +864,11 @@
             $('user-name').textContent = auth.user.nome || '';
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
-            if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
-                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Cadastro de Produtos</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
-                return;
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
+            // sem produtos.editar a ficha é só consulta
+            if (!Acesso.pode('produtos.editar')) {
+                document.querySelectorAll('#form input, #form select, #form textarea, .switch-situacao button').forEach(el => el.disabled = true);
+                $('foto').title = '';
             }
             await Promise.all([carregarOpcoes(), carregarProdutos()]);
             limparFicha();

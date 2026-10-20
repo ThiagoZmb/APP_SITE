@@ -35,9 +35,6 @@
         [hidden] { display: none !important; }
 
         /* ===== sem acesso ===== */
-        #sem-acesso { text-align: center; padding: 70px 20px; color: var(--text-light); }
-        #sem-acesso h2 { color: var(--text-dark); margin-bottom: 8px; }
-        #sem-acesso a { display: inline-block; margin-top: 18px; color: var(--primary-color); font-weight: 700; }
 
         /* ===== abas ===== */
         .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; margin-bottom: 18px; flex-wrap: wrap; }
@@ -141,8 +138,8 @@
             .tabela { min-width: 640px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -155,13 +152,7 @@
             <h1 class="welcome-title">Usuários e permissões</h1>
             <p class="welcome-subtitle">Quem acessa o sistema web, com qual perfil, em quais estados e com quais exceções</p>
 
-            <section id="sem-acesso" hidden>
-                <h2>Sem acesso</h2>
-                <p>Somente administradores podem gerenciar usuários e permissões.</p>
-                <a href="inicio.html">Ir para o início</a>
-            </section>
-
-            <div id="conteudo" hidden>
+            <div id="conteudo">
                 <div class="abas" role="tablist">
                     <button type="button" class="aba on" data-aba="usuarios">Usuários</button>
                     <button type="button" class="aba" data-aba="perfis">Perfis</button>
@@ -304,7 +295,7 @@
                 return a;
             } catch { return null; }
         }
-        const pode = codigo => (getAuth()?.acesso?.permissoes || []).includes(codigo);
+        const pode = codigo => window.Acesso.pode(codigo);
 
         async function api(caminho, opts = {}) {
             const res = await fetch(API_BASE + caminho, { ...opts, headers: { 'Authorization': 'Bearer ' + (getAuth()?.token || ''), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
@@ -705,10 +696,7 @@
         // ===================== INÍCIO =====================
         let iniciado = false;
         function iniciar() {
-            const admin = pode('admin.usuarios');
-            $('sem-acesso').hidden = admin;
-            $('conteudo').hidden = !admin;
-            if (admin && !iniciado) { iniciado = true; abrirAba('usuarios'); }
+            if (Acesso.paginaLiberada() && !iniciado) { iniciado = true; abrirAba('usuarios'); }
         }
         document.addEventListener('DOMContentLoaded', () => {
             const a = getAuth();

@@ -426,8 +426,8 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610201600">
-    <script src="layout.js?v=202610201600" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211000">
+    <script src="layout.js?v=202610211000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -1366,10 +1366,7 @@
             $('user-name').textContent = auth.user.nome || '';
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
-            if (String(auth.user.cargo || '').toLowerCase().includes('representante')) {
-                document.querySelector('main').innerHTML = '<h1 class="welcome-title">Fluxo de Caixa</h1><p class="welcome-subtitle">Acesso restrito à equipe interna.</p>';
-                return;
-            }
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             carregarOpcoes();
             const prontos = carregarClassificacoes();
             carregarDados();

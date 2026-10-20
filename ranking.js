@@ -4,7 +4,8 @@
 //
 // Ranking.montar(elemento, {
 //   titulo, subtitulo: total => texto,
-//   metricas: [{ id, rotulo, valor: item => número, formatar: n => texto }],
+//   metricas: [{ id, rotulo, valor: item => número, formatar: n => texto, dinheiro: true|false }],
+//            (métricas com dinheiro: true somem para quem não tem valores.ver)
 //   info: (item, metrica, pct) => texto da linha de baixo,
 //   carregar: async () => [{ nome, ... }],
 //   aoClicar: item => {}            (opcional)
@@ -33,6 +34,8 @@
     }
 
     function montar(alvo, cfg) {
+        const verValores = !window.Acesso || window.Acesso.pode('valores.ver');
+        cfg = { ...cfg, metricas: cfg.metricas.filter(m => verValores || !m.dinheiro) };
         let metrica = cfg.metricas[0];
         let dados = [];
         let grafico = null;
