@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Movimentação de estoque</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root {
+            --primary-color: #8B0000;
+            --primary-light: rgba(139, 0, 0, 0.1);
+            --text-dark: #2c3e50;
+            --text-light: #6c757d;
+            --white: #ffffff;
+            --border-color: #e9ecef;
+            --secondary-color: #f8f9fa;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
+            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --ok: #1f9d55; --erro: #d22f42; --aviso: #b26a00;
+        }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
+            grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px);
+            background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; }
+        .logo { font-size: 28px; font-weight: 700; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 30px; margin-bottom: 6px; color: var(--text-dark); }
+        .welcome-subtitle { font-size: 15px; color: var(--text-light); margin-bottom: 22px; }
+        [hidden] { display: none !important; }
+
+        /* ===== abas ===== */
+        .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: #ececf2; margin-bottom: 18px; flex-wrap: wrap; }
+        .aba { border: none; background: transparent; padding: 8px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--text-light); cursor: pointer; }
+        .aba.on { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
+
+        /* ===== painéis, campos e tabelas ===== */
+        .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow-light); }
+        .linha-campos { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+        .campo { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--text-light); }
+        .campo input, .campo select, .campo textarea { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; color: var(--text-dark); background: #fff; font-weight: 400; }
+        .campo textarea { min-height: 64px; resize: vertical; }
+        .campo.largo { flex: 1 1 260px; }
+        .btn { border: none; border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-primario { background: var(--gradient-primary); color: #fff; }
+        .btn-secundario { background: #fff; color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-mini { padding: 5px 10px; font-size: 12.5px; }
+        .rolagem { overflow-x: auto; }
+        .tabela { width: 100%; border-collapse: collapse; }
+        .tabela th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 9px 10px; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        .tabela td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: middle; }
+        .tabela td.num, .tabela th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .tabela input { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; width: 100%; min-width: 70px; }
+        .tabela input.qtd { width: 90px; text-align: right; }
+        .vazio { text-align: center; color: var(--text-light); padding: 26px 0; }
+        .dica { font-size: 12.5px; color: var(--text-light); }
+        .rodape-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+        .aviso { padding: 10px 14px; border-radius: 12px; background: rgba(178,106,0,.1); color: var(--aviso); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+        .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: #ececf2; color: var(--text-light); }
+        .selo.ok { background: rgba(31,157,85,.12); color: var(--ok); }
+        .selo.aviso { background: rgba(178,106,0,.12); color: var(--aviso); }
+        tr.excede td, tr.pendente td { background: rgba(210,47,66,.06); }
+        tr.pendente td { background: rgba(178,106,0,.08); }
+        .pendencia { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 3px; }
+        tr.excede .s-atual { color: var(--erro); font-weight: 800; }
+
+        /* ===== busca de produto ===== */
+        .busca { position: relative; }
+        .sugestoes { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); max-height: 280px; overflow-y: auto; }
+        .sugestoes button { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: none; background: #fff; padding: 9px 12px; text-align: left; font-size: 14px; cursor: pointer; }
+        .sugestoes button:hover, .sugestoes button.foco { background: var(--primary-light); }
+        .sugestoes small { color: var(--text-light); white-space: nowrap; }
+
+        /* ===== saída (duas colunas) ===== */
+        .duas { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 16px; align-items: start; }
+        .duas > * { min-width: 0; } /* sem isto a tabela larga empurra a coluna e a página rola de lado no celular */
+
+        /* ===== avisos (acima do modal, que é z-index 70) ===== */
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; max-width: calc(100vw - 48px); }
+        .toast { padding: 12px 18px; border-radius: 12px; color: #fff; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-heavy); max-width: 420px; }
+        .toast.ok { background: var(--ok); }
+        .toast.erro { background: var(--erro); }
+        .toast.info { background: var(--text-dark); }
+
+        /* ===== modal ===== */
+        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: rgba(21,17,26,.45); }
+        .modal-fundo.aberto { display: flex; }
+        .modal { background: #fff; border-radius: 18px; padding: 20px 22px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .modal h3 { font-size: 18px; }
+        .modal .acoes { display: flex; gap: 8px; justify-content: flex-end; }
+
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+            main { padding: 18px 16px; }
+            .duas { grid-template-columns: 1fr; }
+            .tabela { min-width: 560px; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610211800">
+    <script src="layout.js?v=202610211800" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile"><span id="user-name"></span></div>
+        </header>
+        <nav></nav>
+        <main>
+            <h1 class="welcome-title">Movimentação de estoque</h1>
+            <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico</p>
+
+            <div class="abas" role="tablist">
+                <button type="button" class="aba" data-aba="entrada" data-perm="estoque.movimentar">Entrada</button>
+                <button type="button" class="aba" data-aba="saida" data-perm="estoque.movimentar">Saída</button>
+                <button type="button" class="aba" data-aba="ajuste" data-perm="estoque.ajustar">Ajuste</button>
+                <button type="button" class="aba" data-aba="historico">Histórico</button>
+            </div>
+
+            <!-- ===== ENTRADA ===== -->
+            <section class="painel" id="painel-entrada" hidden>
+                <div class="aviso" id="e-aviso" hidden></div>
+                <div class="linha-campos">
+                    <div class="campo"><label for="e-numero">Nº da nota</label><input id="e-numero" maxlength="60" autocomplete="off"></div>
+                    <div class="campo"><label for="e-data">Data</label><input type="date" id="e-data"></div>
+                    <div class="campo largo"><label for="e-fornecedor">Fornecedor</label><select id="e-fornecedor"><option value="">— Escolha —</option></select></div>
+                    <label class="btn btn-secundario" for="e-xml" style="align-self:flex-end">📄 Importar XML</label>
+                    <input type="file" id="e-xml" accept=".xml,application/xml,text/xml" hidden>
+                </div>
+                <div class="rolagem">
+                    <table class="tabela" id="e-itens">
+                        <thead><tr><th>#</th><th>Produto do estoque</th><th>Nome no fabricante</th><th class="num">Qtd nota</th><th class="num">Fator</th>
+                            <th class="num">Entra no estoque</th><th class="num" data-valor>Unitário</th><th class="num" data-valor>Total</th><th>Observação</th><th></th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="rodape-acoes">
+                    <button type="button" class="btn btn-secundario" id="e-mais">＋ Item</button>
+                    <span style="flex:1"></span>
+                    <span data-valor>Total da nota: <b id="e-total">R$ 0,00</b></span>
+                    <button type="button" class="btn btn-primario" id="e-conferir" disabled>Conferir e lançar</button>
+                </div>
+            </section>
+
+            <!-- ===== SAÍDA ===== -->
+            <section class="painel" id="painel-saida" hidden>
+                <div class="duas">
+                    <div>
+                        <div class="campo busca"><label for="s-busca">Produto</label>
+                            <input type="search" id="s-busca" placeholder="Digite o nome ou código" autocomplete="off">
+                            <div class="sugestoes" id="s-sugestoes" hidden></div>
+                        </div>
+                        <p class="dica" style="margin-top:8px">Escolha os produtos que saem do estoque e informe a quantidade de cada um.</p>
+                    </div>
+                    <div>
+                        <div class="rolagem">
+                            <table class="tabela" id="s-lista">
+                                <thead><tr><th>Produto</th><th class="num">Em estoque</th><th class="num">Saída</th><th></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="rodape-acoes">
+                            <div class="campo"><label for="s-data">Data</label><input type="date" id="s-data"></div>
+                            <button type="button" class="btn btn-primario" id="s-lancar" disabled>Lançar saída</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== AJUSTE ===== -->
+            <section class="painel" id="painel-ajuste" hidden>
+                <div class="linha-campos">
+                    <div class="campo busca largo"><label for="a-busca">Produto contado</label>
+                        <input type="search" id="a-busca" placeholder="Digite o nome ou código" autocomplete="off">
+                        <div class="sugestoes" id="a-sugestoes" hidden></div>
+                    </div>
+                </div>
+                <p id="a-produto" class="dica">Escolha o produto que foi contado.</p>
+                <div class="linha-campos" style="margin-top:12px">
+                    <div class="campo"><label for="a-contada">Quantidade contada</label><input id="a-contada" inputmode="decimal" autocomplete="off" disabled></div>
+                    <div class="campo"><span>Diferença</span><b id="a-diferenca" style="font-size:18px;color:var(--text-dark)">—</b></div>
+                    <div class="campo largo"><label for="a-motivo">Motivo (obrigatório)</label><input id="a-motivo" maxlength="500" placeholder="Ex.: contagem mensal, avaria, perda" disabled></div>
+                </div>
+                <div class="rodape-acoes"><button type="button" class="btn btn-primario" id="a-ajustar" disabled>Ajustar estoque</button></div>
+            </section>
+
+            <!-- ===== HISTÓRICO ===== -->
+            <section class="painel" id="painel-historico" hidden>
+                <div class="linha-campos">
+                    <div class="campo"><label for="h-de">De</label><input type="date" id="h-de"></div>
+                    <div class="campo"><label for="h-ate">Até</label><input type="date" id="h-ate"></div>
+                    <div class="campo"><label for="h-tipo">Tipo</label>
+                        <select id="h-tipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="ajuste">Ajustes</option><option value="estorno">Estornos</option></select></div>
+                    <div class="campo"><label for="h-produto">Produto</label><input id="h-produto" placeholder="parte do nome"></div>
+                    <div class="campo"><label for="h-nota">Nº da nota</label><input id="h-nota"></div>
+                    <div class="campo"><label for="h-usuario">Usuário</label><input id="h-usuario"></div>
+                    <button type="button" class="btn btn-primario" id="h-buscar">Buscar</button>
+                </div>
+                <div class="rolagem">
+                    <table class="tabela" id="h-lista">
+                        <thead><tr><th>Data</th><th>Tipo</th><th>Referência</th><th class="num">Itens</th><th>Usuário</th><th></th></tr></thead>
+                        <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
+                    </table>
+                </div>
+                <p class="dica" style="margin-top:10px">Clique num movimento para ver os itens. Entradas lançadas pelo VB não têm usuário.</p>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal-fundo" id="modal">
+        <div class="modal" role="dialog" aria-labelledby="modal-titulo">
+            <h3 id="modal-titulo"></h3>
+            <div id="modal-corpo"></div>
+            <div class="acoes">
+                <button type="button" class="btn btn-secundario" id="modal-cancelar">Cancelar</button>
+                <button type="button" class="btn btn-primario" id="modal-ok">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        const $ = id => document.getElementById(id);
+        const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const num = v => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
+        const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        // número digitado no jeito brasileiro: "7,5" → 7.5, "1.200" → 1200, "1.234,5" → 1234.5; "7.5" (sem milhar possível) → 7.5
+        function lerNumero(t) {
+            let s = String(t ?? '').trim();
+            if (!s) return NaN;
+            if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+            else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+            return Number(s);
+        }
+        // valor para dentro de um campo: sem separador de milhar (senão "1.500" voltaria como 1,5) e com todas as casas
+        const numCampo = v => Number.isFinite(v) ? v.toLocaleString('pt-BR', { useGrouping: false, maximumFractionDigits: 10 }) : '';
+        // data local AAAA-MM-DD (o navegador está no Brasil; toISOString daria a data em UTC)
+        const hojeISO = (deslocDias = 0) => { const d = new Date(); d.setDate(d.getDate() + deslocDias); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+        function getAuth() {
+            try {
+                const a = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!a || !a.token || Date.now() > (a.exp || 0)) return null;
+                return a;
+            } catch { return null; }
+        }
+        const pode = codigo => window.Acesso.pode(codigo);
+
+        // opts.bruto: corpo já pronto (ex.: o XML) com o Content-Type em opts.tipo
+        async function api(caminho, opts = {}) {
+            const cabecalhos = { 'Authorization': 'Bearer ' + (getAuth()?.token || '') };
+            let body;
+            if (opts.bruto !== undefined) { body = opts.bruto; cabecalhos['Content-Type'] = opts.tipo; }
+            else if (opts.corpo !== undefined) { body = JSON.stringify(opts.corpo); cabecalhos['Content-Type'] = 'application/json'; }
+            let res;
+            // sem resposta: não dá para saber se o servidor gravou (status 0)
+            try { res = await fetch(API_BASE + caminho, { method: opts.method || (body !== undefined ? 'POST' : 'GET'), headers: cabecalhos, body }); }
+            catch { throw Object.assign(new Error('Sem resposta do servidor.'), { status: 0 }); }
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw Object.assign(new Error(d.error || `Erro HTTP: ${res.status}`), { status: res.status });
+            return d;
+        }
+        function toast(msg, tipo = 'info') {
+            const el = document.createElement('div');
+            el.className = `toast ${tipo}`; el.textContent = msg;
+            $('toasts').appendChild(el); setTimeout(() => el.remove(), 6000);
+        }
+        // Erro ao gravar um lançamento com chave (saída/ajuste). Devolve true quando, na verdade, ele já estava gravado.
+        const MSG_JA_GRAVADO = 'Este lançamento já foi gravado.';
+        function tratarErroLancamento(e, oQue) {
+            if (e.status === 409 && e.message === MSG_JA_GRAVADO) { toast(`Esta ${oQue} já tinha sido gravada (a resposta anterior se perdeu). Confira no histórico.`, 'info'); return true; }
+            if (e.status === 0) toast('Sem resposta do servidor: não dá para saber se foi gravado. Confira o histórico antes de lançar de novo.', 'erro');
+            else toast('Nada foi gravado: ' + e.message, 'erro');
+            return false;
+        }
+        const novaChave = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+        // ===================== MODAL =====================
+        // confirmar → true/false; html já escapado por quem chama
+        function confirmar({ titulo, html, ok = 'Confirmar', cancelar = 'Cancelar' }) {
+            return new Promise(resolve => {
+                $('modal-ok').disabled = false;
+                $('modal-titulo').textContent = titulo;
+                $('modal-corpo').innerHTML = html;
+                $('modal-ok').textContent = ok;
+                $('modal-cancelar').textContent = cancelar;
+                $('modal-cancelar').hidden = !cancelar;
+                $('modal').classList.add('aberto');
+                const fim = valor => { $('modal').classList.remove('aberto'); $('modal-ok').onclick = $('modal-cancelar').onclick = null; resolve(valor); };
+                $('modal-ok').onclick = () => fim(true);
+                $('modal-cancelar').onclick = () => fim(false);
+            });
+        }
+        // resultado "antes → depois" de cada produto, como a tela de confirmação do VB
+        function mostrarResultado(titulo, itens) {
+            return confirmar({ titulo, ok: 'Fechar', cancelar: '', html:
+                `<div class="rolagem"><table class="tabela" id="resultado"><thead><tr><th>Produto</th><th class="num">Antes</th><th class="num">Depois</th></tr></thead><tbody>` +
+                itens.map(i => `<tr><td>${esc(i.produto)}</td><td class="num">${num(i.antes)}</td><td class="num"><b>${num(i.depois)}</b></td></tr>`).join('') +
+                '</tbody></table></div>' });
+        }
+        // botão travado enquanto a ação roda (clique duplo não lança duas vezes)
+        function travarBotao(botao, acao) {
+            botao.addEventListener('click', async () => {
+                if (botao.dataset.ocupado) return;
+                botao.dataset.ocupado = '1';
+                const desabilitado = botao.disabled;
+                botao.disabled = true;
+                try { await acao(); } finally { delete botao.dataset.ocupado; botao.disabled = desabilitado; if (botao._reavaliar) botao._reavaliar(); }
+            });
+        }
+
+        // ===================== BUSCA DE PRODUTO (Entrada, Saída e Ajuste) =====================
+        // espera 250 ms depois de digitar; respostas que chegam fora de ordem são descartadas
+        function criarBuscaProduto(input, lista, aoEscolher) {
+            let timer = null, pedido = 0, itens = [], foco = -1;
+            // fechar (campo vazio, saiu do campo, escolheu) cancela a busca agendada e ignora a que estiver em andamento
+            const fechar = () => { clearTimeout(timer); pedido++; lista.hidden = true; lista.innerHTML = ''; itens = []; foco = -1; };
+            const escolher = p => { fechar(); input.value = ''; aoEscolher(p); };
+            const desenhar = () => {
+                lista.innerHTML = itens.length ? itens.map((p, i) => `<button type="button" data-i="${i}" class="${i === foco ? 'foco' : ''}"><span>${esc(p.produto)}</span><small>${num(p.qtd)} ${esc(p.unidade)}</small></button>`).join('')
+                    : '<div class="vazio">Nenhum produto encontrado</div>';
+                lista.hidden = false;
+            };
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                pedido++; itens = []; foco = -1; // a lista mostrada é de outro texto: não vale mais para o Enter
+                const termo = input.value.trim();
+                if (!termo) return fechar();
+                timer = setTimeout(async () => {
+                    const meu = ++pedido;
+                    try {
+                        const r = await api('/estoque/mov/produtos?busca=' + encodeURIComponent(termo));
+                        if (meu !== pedido || document.activeElement !== input) return;
+                        itens = r; foco = r.length ? 0 : -1; desenhar();
+                    } catch (e) { if (meu === pedido) toast(e.message, 'erro'); }
+                }, 250);
+            });
+            input.addEventListener('keydown', e => {
+                if (lista.hidden || !itens.length) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); foco = Math.min(foco + 1, itens.length - 1); desenhar(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); foco = Math.max(foco - 1, 0); desenhar(); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (itens[foco]) escolher(itens[foco]); }
+                else if (e.key === 'Escape') fechar();
+            });
+            lista.addEventListener('mousedown', e => { const b = e.target.closest('button[data-i]'); if (b) { e.preventDefault(); escolher(itens[Number(b.dataset.i)]); } });
+            input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== input) fechar(); }, 150)); // voltou ao campo: não fecha
+            lista.hidden = true;
+        }
+
+        // ===================== ABAS =====================
+        const ORDEM_ABAS = ['entrada', 'saida', 'ajuste', 'historico'];
+        const PERM_ABA = { entrada: 'estoque.movimentar', saida: 'estoque.movimentar', ajuste: 'estoque.ajustar', historico: '' };
+        const iniciadores = {};
+        const iniciadas = new Set();
+        const abaPermitida = nome => ORDEM_ABAS.includes(nome) && (!PERM_ABA[nome] || pode(PERM_ABA[nome]));
+        function abrirAba(nome) {
+            if (!abaPermitida(nome)) nome = ORDEM_ABAS.find(abaPermitida);
+            document.querySelectorAll('button.aba').forEach(b => b.classList.toggle('on', b.dataset.aba === nome));
+            ORDEM_ABAS.forEach(a => { $('painel-' + a).hidden = a !== nome; });
+            if (!iniciadas.has(nome) && iniciadores[nome]) { iniciadas.add(nome); iniciadores[nome](); }
+        }
+        document.querySelectorAll('button.aba').forEach(b => b.addEventListener('click', () => abrirAba(b.dataset.aba)));
+
+        // ===================== ENTRADA (nota fiscal) =====================
+        // linhasEntrada: [{ item, produto: {codigo,nome,unidade}|null, nomeFabricante, codFabricante, qtdNota, fator, unidadeNota,
+        //                   unitarioNota, totalNota, observacao, origem }]  — a importação do XML preenche a mesma lista
+        let linhasEntrada = [];
+        // avisos que impedem lançar: nota já lançada, fornecedor do XML não achado pelo CNPJ (nome do emitente)
+        const entrada = { notaLancada: false, emitenteSemCadastro: '' };
+        const bloqueioEntrada = () => [entrada.notaLancada ? 'Esta nota já foi lançada.' : '',
+            entrada.emitenteSemCadastro ? `Fornecedor não encontrado pelo CNPJ (${entrada.emitenteSemCadastro}). Escolha na lista.` : ''].filter(Boolean).join(' ');
+        const centavos = n => Math.round(n * 100) / 100;
+        // quantidade que entra no estoque: qtd da nota × fator; só vale inteira (entrada_estoque.QTD é inteiro)
+        function qtdEstoque(l) {
+            if (!Number.isFinite(l.qtdNota) || l.qtdNota <= 0 || !(l.fator > 0)) return null;
+            const v = Math.round(l.qtdNota * l.fator * 10000) / 10000; // 0,7 × 10 = 7, não 7,000000000000001
+            return Number.isInteger(v) && v >= 1 ? v : null;
+        }
+        function pendencia(l) {
+            if (!l.produto) return 'Escolha o produto do estoque.';
+            if (!Number.isFinite(l.qtdNota) || l.qtdNota <= 0) return 'Informe a quantidade.';
+            if (!(l.fator > 0)) return 'Fator inválido.';
+            if (qtdEstoque(l) === null) return 'Resultado com quantidade não inteira — ajuste o fator ou a quantidade.';
+            return '';
+        }
+        const ORIGEM = { ligacao: ['ok', 'ligado'], cadastro: ['', 'do cadastro'] };
+        function renderEntrada() {
+            const tbody = $('e-itens').querySelector('tbody');
+            tbody.innerHTML = linhasEntrada.length ? linhasEntrada.map((l, i) => `
+                <tr data-i="${i}">
+                    <td>${l.item}</td>
+                    <td style="min-width:220px">${l.produto
+                        ? `<b>${esc(l.produto.nome)}</b> ${l.origem && ORIGEM[l.origem] ? `<span class="selo ${ORIGEM[l.origem][0]}">${ORIGEM[l.origem][1]}</span>` : ''}
+                           <button type="button" class="btn btn-secundario btn-mini e-trocar">trocar</button>`
+                        : `<div class="busca"><input class="e-busca" placeholder="Buscar produto" autocomplete="off"><div class="sugestoes" hidden></div></div>`}
+                        <span class="pendencia"></span></td>
+                    <td><input class="e-nome" value="${esc(l.nomeFabricante)}" maxlength="190"></td>
+                    <td class="num"><input class="qtd e-qtd" inputmode="decimal" value="${numCampo(l.qtdNota)}"> <small>${esc(l.unidadeNota)}</small></td>
+                    <td class="num"><input class="qtd e-fator" inputmode="decimal" value="${numCampo(l.fator)}"></td>
+                    <td class="num"><b class="e-qtd-estoque"></b> <small>${esc(l.produto?.unidade || '')}</small></td>
+                    <td class="num" data-valor><input class="qtd e-unitario" inputmode="decimal" value="${numCampo(l.unitarioNota)}"><span class="e-preco"></span></td>
+                    <td class="num e-total-linha" data-valor></td>
+                    <td><input class="e-obs" value="${esc(l.observacao)}" maxlength="2000"></td>
+                    <td><button type="button" class="btn btn-secundario btn-mini e-remover" title="Remover">✕</button></td>
+                </tr>`).join('') : '<tr><td colspan="10" class="vazio">Nenhum item. Use “＋ Item” ou importe o XML da nota.</td></tr>';
+            tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+                const i = Number(tr.dataset.i);
+                const busca = tr.querySelector('input.e-busca');
+                if (busca) criarBuscaProduto(busca, tr.querySelector('.sugestoes'), p => {
+                    Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor }, origem: null });
+                    renderEntrada();
+                    $('e-itens').querySelector(`tr[data-i="${i}"] input.e-qtd`)?.focus();
+                });
+                atualizarLinhaEntrada(i);
+            });
+            atualizarEntrada();
+        }
+        function atualizarLinhaEntrada(i) {
+            const l = linhasEntrada[i], tr = $('e-itens').querySelector(`tr[data-i="${i}"]`);
+            if (!tr) return;
+            const q = qtdEstoque(l), pend = pendencia(l);
+            tr.querySelector('.e-qtd-estoque').textContent = q === null ? '—' : num(q);
+            tr.querySelector('.e-total-linha').textContent = Number.isFinite(l.totalNota) ? moeda(l.totalNota) : '';
+            tr.querySelector('.pendencia').textContent = pend;
+            tr.classList.toggle('pendente', !!pend);
+            avisarPreco(l, tr);
+        }
+        function atualizarEntrada() {
+            $('e-total').textContent = moeda(linhasEntrada.reduce((s, l) => s + (Number.isFinite(l.totalNota) ? l.totalNota : 0), 0));
+            const bloqueio = bloqueioEntrada();
+            $('e-aviso').hidden = !bloqueio;
+            $('e-aviso').textContent = bloqueio;
+            $('e-conferir').disabled = !!bloqueio || !$('e-numero').value.trim() || !$('e-data').value || !$('e-fornecedor').value
+                || !linhasEntrada.length || linhasEntrada.some(l => pendencia(l));
+        }
+        $('e-conferir')._reavaliar = atualizarEntrada;
+        ['e-numero', 'e-data'].forEach(id => $(id).addEventListener('input', atualizarEntrada));
+        $('e-numero').addEventListener('input', () => { entrada.notaLancada = false; atualizarEntrada(); }); // outro número: o aviso do XML não vale mais
+        function aoTrocarFornecedor() { if ($('e-fornecedor').value) entrada.emitenteSemCadastro = ''; }
+        $('e-fornecedor').addEventListener('change', () => { aoTrocarFornecedor(); atualizarEntrada(); });
+        $('e-itens').addEventListener('input', e => {
+            const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+            const i = Number(tr.dataset.i), l = linhasEntrada[i], c = e.target.classList;
+            if (c.contains('e-qtd')) { l.qtdNota = lerNumero(e.target.value); if (Number.isFinite(l.unitarioNota)) l.totalNota = centavos(l.unitarioNota * l.qtdNota); }
+            else if (c.contains('e-fator')) l.fator = lerNumero(e.target.value);
+            else if (c.contains('e-unitario')) { l.unitarioNota = lerNumero(e.target.value); l.totalNota = Number.isFinite(l.unitarioNota) && Number.isFinite(l.qtdNota) ? centavos(l.unitarioNota * l.qtdNota) : NaN; }
+            else if (c.contains('e-nome')) l.nomeFabricante = e.target.value;
+            else if (c.contains('e-obs')) l.observacao = e.target.value;
+            else return;
+            atualizarLinhaEntrada(i); atualizarEntrada();
+        });
+        $('e-itens').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+            const i = Number(tr.dataset.i);
+            if (e.target.closest('.e-remover')) { linhasEntrada.splice(i, 1); linhasEntrada.forEach((l, k) => { if (!l.codFabricante) l.item = k + 1; }); renderEntrada(); }
+            else if (e.target.closest('.e-trocar')) { linhasEntrada[i].produto = null; renderEntrada(); $('e-itens').querySelector(`tr[data-i="${i}"] input.e-busca`)?.focus(); }
+        });
+        const linhaVazia = item => ({ item, produto: null, nomeFabricante: '', codFabricante: '', qtdNota: NaN, fator: 1, unidadeNota: '', unitarioNota: NaN, totalNota: NaN, observacao: '', origem: null });
+        $('e-mais').addEventListener('click', () => {
+            linhasEntrada.push(linhaVazia(linhasEntrada.length + 1));
+            renderEntrada();
+            $('e-itens').querySelector('tr[data-i]:last-child input.e-busca')?.focus();
+        });
+        function limparEntrada() {
+            linhasEntrada = []; entrada.notaLancada = false; entrada.emitenteSemCadastro = '';
+            $('e-numero').value = ''; $('e-fornecedor').value = ''; $('e-data').value = hojeISO(); $('e-xml').value = '';
+            renderEntrada();
+        }
+        // ----- importação do XML da NF-e -----
+        const LIMITE_XML = 1024 * 1024;
+        $('e-xml').addEventListener('change', async () => {
+            const arq = $('e-xml').files[0];
+            $('e-xml').value = '';
+            if (!arq) return;
+            if (arq.size > LIMITE_XML) return toast('Arquivo grande demais (máximo 1 MB).', 'erro');
+            let n;
+            try { n = await api('/estoque/entrada/xml', { bruto: await arq.text(), tipo: 'application/xml' }); }
+            catch (e) { return toast(e.message, 'erro'); }
+            $('e-numero').value = n.numero || '';
+            $('e-data').value = n.data || hojeISO();
+            $('e-fornecedor').value = n.fornecedor || '';
+            entrada.notaLancada = !!n.notaJaLancada;
+            entrada.emitenteSemCadastro = n.fornecedor ? '' : (n.emitente?.nome || 'emitente sem nome');
+            linhasEntrada = (n.itens || []).map(it => ({ item: it.item, produto: it.produto ? { ...it.produto } : null,
+                nomeFabricante: it.nomeFabricante || '', codFabricante: it.codFabricante || '', qtdNota: Number(it.qtdNota), fator: Number(it.fator) || 1,
+                unidadeNota: it.unidadeNota || '', unitarioNota: it.unitarioNota ?? NaN, totalNota: it.totalNota ?? NaN, observacao: it.observacao || '', origem: it.origem }));
+            renderEntrada();
+            buscarValoresCadastro();
+            toast(`Nota ${n.numero} carregada: ${linhasEntrada.length} item(ns). Confira antes de lançar.`, 'ok');
+        });
+        // valor do cadastro dos produtos já ligados pelo XML (só para quem vê valores), uma busca por produto
+        async function buscarValoresCadastro() {
+            if (!pode('valores.ver')) return;
+            const codigos = [...new Set(linhasEntrada.filter(l => l.produto && l.produto.valor === undefined).map(l => l.produto.codigo))];
+            for (const codigo of codigos) {
+                try {
+                    const p = (await api('/estoque/mov/produtos?busca=' + encodeURIComponent(codigo))).find(x => x.codigo === codigo);
+                    if (p) linhasEntrada.forEach((l, i) => { if (l.produto?.codigo === codigo) { l.produto.valor = p.valor; atualizarLinhaEntrada(i); } });
+                } catch { /* o aviso de preço é só uma ajuda */ }
+            }
+        }
+        // ⚠ quando o unitário da nota (por unidade do estoque) difere do valor do cadastro em 1 centavo ou mais
+        function avisarPreco(l, tr) {
+            const alvo = tr.querySelector('.e-preco');
+            const q = qtdEstoque(l);
+            const difere = pode('valores.ver') && l.produto && Number.isFinite(l.produto.valor) && q && Number.isFinite(l.totalNota)
+                && Math.abs(l.totalNota / q - l.produto.valor) >= 0.01;
+            alvo.textContent = difere ? ' ⚠' : '';
+            if (difere) alvo.title = 'Valor no cadastro: ' + moeda(l.produto.valor); else alvo.removeAttribute('title');
+        }
+
+        travarBotao($('e-conferir'), async () => {
+            const forn = $('e-fornecedor').value, numero = $('e-numero').value.trim(), data = $('e-data').value;
+            const lista = linhasEntrada.map(l => `<li>${esc(l.produto.nome)}: <b>${num(qtdEstoque(l))}</b> ${esc(l.produto.unidade)}</li>`).join('');
+            if (!(await confirmar({ titulo: 'Lançar a nota?', ok: 'Lançar', html:
+                `<p>NF <b>${esc(numero)}</b> · ${esc(forn)} · ${esc(data.split('-').reverse().join('/'))}</p><ul style="margin:8px 0 0 18px">${lista}</ul>` }))) return;
+            const verValores = pode('valores.ver');
+            const itens = linhasEntrada.map(l => {
+                const qtd = qtdEstoque(l);
+                const it = { item: l.item, produtoCodigo: l.produto.codigo, qtd, nomeFabricante: l.nomeFabricante.trim(), fator: l.fator, observacao: l.observacao.trim() };
+                if (l.codFabricante) it.codFabricante = l.codFabricante;
+                // valores só para quem pode vê-los; o unitário gravado é por unidade do estoque
+                if (verValores && Number.isFinite(l.totalNota)) { it.total = centavos(l.totalNota); it.unitario = Math.round(l.totalNota / qtd * 10000) / 10000; }
+                return it;
+            });
+            let r;
+            try { r = await api('/estoque/entrada', { corpo: { numero, data, fornecedor: forn, itens } }); }
+            catch (e) { return toast(e.status === 0 ? 'Sem resposta do servidor: não dá para saber se a nota foi gravada. Confira o histórico antes de lançar de novo.' : 'Nada foi gravado: ' + e.message, 'erro'); }
+            limparEntrada();
+            await mostrarResultado('Nota lançada', r.itens);
+        });
+        iniciadores.entrada = async () => {
+            $('e-data').value = hojeISO();
+            renderEntrada();
+            try {
+                const forns = await api('/estoque/mov/fornecedores');
+                $('e-fornecedor').innerHTML = '<option value="">— Escolha —</option>' + forns.map(f => `<option value="${esc(f.razao)}">${esc(f.razao)}</option>`).join('');
+            } catch (e) { toast(e.message, 'erro'); }
+            $('e-numero').focus();
+        };
+
+        // ===================== SAÍDA =====================
+        const saida = { itens: [], chave: novaChave() }; // itens: [{ codigo, produto, unidade, atual, qtd }]
+        function renderSaida() {
+            $('s-lista').querySelector('tbody').innerHTML = saida.itens.length ? saida.itens.map(it => `
+                <tr data-codigo="${it.codigo}">
+                    <td>${esc(it.produto)}</td>
+                    <td class="num s-atual">${num(it.atual)} ${esc(it.unidade)}</td>
+                    <td class="num"><input class="qtd s-qtd" inputmode="numeric" value="${numCampo(it.qtd)}" aria-label="Quantidade de saída de ${esc(it.produto)}"></td>
+                    <td><button type="button" class="btn btn-secundario btn-mini s-remover" title="Remover">✕</button></td>
+                </tr>`).join('') : '<tr><td colspan="4" class="vazio">Nenhum produto na saída</td></tr>';
+            atualizarSaida();
+        }
+        // linha inválida (vazia, não inteira ou acima do estoque) trava o lançamento
+        function atualizarSaida() {
+            let ok = saida.itens.length > 0;
+            for (const it of saida.itens) {
+                const tr = $('s-lista').querySelector(`tr[data-codigo="${it.codigo}"]`);
+                const excede = Number.isInteger(it.qtd) && it.qtd > it.atual;
+                tr?.classList.toggle('excede', excede);
+                if (!Number.isInteger(it.qtd) || it.qtd < 1 || excede) ok = false;
+            }
+            $('s-lancar').disabled = !ok || !$('s-data').value;
+        }
+        $('s-lancar')._reavaliar = atualizarSaida;
+        $('s-lista').addEventListener('input', e => {
+            const tr = e.target.closest('tr[data-codigo]'); if (!tr) return;
+            const it = saida.itens.find(x => String(x.codigo) === tr.dataset.codigo);
+            it.qtd = lerNumero(e.target.value);
+            atualizarSaida();
+        });
+        $('s-lista').addEventListener('click', e => {
+            const b = e.target.closest('.s-remover'); if (!b) return;
+            const codigo = b.closest('tr').dataset.codigo;
+            saida.itens = saida.itens.filter(x => String(x.codigo) !== codigo);
+            renderSaida();
+        });
+        $('s-data').addEventListener('change', atualizarSaida);
+        travarBotao($('s-lancar'), async () => {
+            const lista = saida.itens.map(it => `<li>${esc(it.produto)}: <b>${num(it.qtd)}</b> ${esc(it.unidade)}</li>`).join('');
+            if (!(await confirmar({ titulo: 'Lançar saída?', ok: 'Lançar', html: `<p class="dica">Data ${esc($('s-data').value.split('-').reverse().join('/'))}</p><ul style="margin:8px 0 0 18px">${lista}</ul>` }))) return;
+            let r;
+            try {
+                r = await api('/estoque/saida', { corpo: { chave: saida.chave, data: $('s-data').value, itens: saida.itens.map(it => ({ produtoCodigo: it.codigo, qtd: it.qtd })) } });
+            } catch (e) { if (!tratarErroLancamento(e, 'saída')) return; } // a chave fica: reenviar não lança duas vezes
+            saida.itens = []; saida.chave = novaChave();
+            renderSaida();
+            if (r) await mostrarResultado('Saída lançada', r.itens);
+        });
+        iniciadores.saida = () => {
+            $('s-data').value = hojeISO();
+            criarBuscaProduto($('s-busca'), $('s-sugestoes'), p => {
+                if (!saida.itens.some(x => x.codigo === p.codigo)) { saida.itens.push({ codigo: p.codigo, produto: p.produto, unidade: p.unidade, atual: p.qtd, qtd: NaN }); renderSaida(); }
+                $('s-lista').querySelector(`tr[data-codigo="${p.codigo}"] input.s-qtd`)?.focus();
+            });
+            renderSaida();
+            $('s-busca').focus();
+        };
+
+        // ===================== AJUSTE (inventário) =====================
+        const ajuste = { produto: null, chave: novaChave() };
+        const sinal = n => (n > 0 ? '+' : '−') + num(Math.abs(n));
+        function atualizarAjuste() {
+            const p = ajuste.produto, contada = lerNumero($('a-contada').value), motivo = $('a-motivo').value.trim();
+            const valida = p && Number.isFinite(contada) && contada >= 0;
+            $('a-diferenca').textContent = !valida ? '—' : contada === p.qtd ? 'sem diferença' : sinal(contada - p.qtd);
+            $('a-ajustar').disabled = !(valida && motivo.length >= 3 && motivo.length <= 500);
+        }
+        $('a-ajustar')._reavaliar = atualizarAjuste;
+        $('a-contada').addEventListener('input', atualizarAjuste);
+        $('a-motivo').addEventListener('input', atualizarAjuste);
+        function escolherAjuste(p) {
+            ajuste.produto = p;
+            $('a-produto').innerHTML = p ? `<b>${esc(p.produto)}</b> · no sistema: <b>${num(p.qtd)}</b> ${esc(p.unidade)}` : 'Escolha o produto que foi contado.';
+            $('a-contada').disabled = $('a-motivo').disabled = !p;
+            $('a-contada').value = ''; $('a-motivo').value = '';
+            atualizarAjuste();
+            if (p) $('a-contada').focus();
+        }
+        travarBotao($('a-ajustar'), async () => {
+            const p = ajuste.produto, contada = lerNumero($('a-contada').value), motivo = $('a-motivo').value.trim();
+            if (!(await confirmar({ titulo: 'Ajustar estoque?', ok: 'Ajustar', html:
+                `<p><b>${esc(p.produto)}</b>: ${num(p.qtd)} → <b>${num(contada)}</b> ${esc(p.unidade)} (${esc($('a-diferenca').textContent)})</p><p class="dica">Motivo: ${esc(motivo)}</p>` }))) return;
+            let r;
+            try { r = await api('/estoque/ajuste', { corpo: { chave: ajuste.chave, produtoCodigo: p.codigo, qtdContada: contada, motivo } }); }
+            catch (e) { if (!tratarErroLancamento(e, 'contagem')) return; }
+            ajuste.chave = novaChave();
+            escolherAjuste(null);
+            if (r) await mostrarResultado('Estoque ajustado', r.itens);
+        });
+        iniciadores.ajuste = () => {
+            criarBuscaProduto($('a-busca'), $('a-sugestoes'), escolherAjuste);
+            $('a-busca').focus();
+        };
+
+        // ===================== HISTÓRICO e DESFAZER =====================
+        let historico = [];
+        const TIPO_NOME = { entrada: ['Entrada', 'ok'], saida: ['Saída', 'aviso'], ajuste: ['Ajuste', ''], estorno: ['Estorno', ''] };
+        // 'AAAA-MM-DD HH:MM:SS' → 'dd/mm/aaaa hh:mm' (entrada do VB só tem a data)
+        const dataHora = q => { const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/.exec(String(q || '')); if (!m) return esc(q);
+            return `${m[3]}/${m[2]}/${m[1]}` + (m[4] && !(m[4] === '00' && m[5] === '00') ? ` ${m[4]}:${m[5]}` : ''); };
+        async function carregarHistorico() {
+            const tbody = $('h-lista').querySelector('tbody');
+            const q = new URLSearchParams({ de: $('h-de').value, ate: $('h-ate').value });
+            for (const [k, id] of [['tipo', 'h-tipo'], ['produto', 'h-produto'], ['nota', 'h-nota'], ['usuario', 'h-usuario']]) if ($(id).value.trim()) q.set(k, $(id).value.trim());
+            tbody.innerHTML = '<tr><td colspan="6" class="vazio">Carregando...</td></tr>';
+            try { historico = await api('/estoque/historico?' + q); }
+            catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">${esc(e.message)}</td></tr>`; return; }
+            tbody.innerHTML = historico.length ? historico.map((g, i) => `
+                <tr data-i="${i}" style="cursor:pointer">
+                    <td style="white-space:nowrap">${dataHora(g.quando)}</td>
+                    <td><span class="selo ${TIPO_NOME[g.tipo]?.[1] || ''}">${TIPO_NOME[g.tipo]?.[0] || esc(g.tipo)}</span></td>
+                    <td>${esc(g.referencia)}${g.motivo ? `<small class="pendencia" style="color:var(--text-light)">Motivo: ${esc(g.motivo)}</small>` : ''}</td>
+                    <td class="num">${g.itens.length}</td>
+                    <td>${esc(g.quem) || '—'}</td>
+                    <td>${g.podeDesfazer ? '<button type="button" class="btn btn-secundario btn-mini h-desfazer" data-perm="estoque.desfazer">Desfazer</button>' : ''}</td>
+                </tr>`).join('') : '<tr><td colspan="6" class="vazio">Nenhum movimento no período</td></tr>';
+        }
+        function detalheHistorico(g) {
+            const temAntes = g.itens.some(i => i.antes !== undefined);
+            return `<tr class="detalhe"><td colspan="6"><table class="tabela"><thead><tr><th>Produto</th><th class="num">Qtd</th>${temAntes ? '<th class="num">Antes → depois</th>' : ''}
+                <th class="num" data-valor>Unitário</th><th class="num" data-valor>Total</th></tr></thead><tbody>` +
+                g.itens.map(i => `<tr><td>${esc(i.produto)}</td><td class="num">${num(i.qtd)}</td>${temAntes ? `<td class="num">${num(i.antes)} → ${num(i.depois)}</td>` : ''}
+                    <td class="num" data-valor>${i.unitario !== undefined ? moeda(i.unitario) : ''}</td><td class="num" data-valor>${i.total !== undefined ? moeda(i.total) : ''}</td></tr>`).join('') +
+                '</tbody></table></td></tr>';
+        }
+        async function desfazer(g) {
+            const ehEntrada = g.tipo === 'entrada';
+            const volta = g.itens.map(i => `<li>${esc(i.produto)}: <b>${ehEntrada ? '−' : '+'}${num(i.qtd)}</b></li>`).join('');
+            const pergunta = confirmar({ titulo: ehEntrada ? `Desfazer a entrada da NF ${g.nota}?` : 'Desfazer esta saída?', ok: 'Desfazer', html:
+                `<p class="dica">${esc(ehEntrada ? 'A nota e as linhas da entrada são apagadas e as quantidades saem do estoque:' : 'As quantidades voltam para o estoque:')}</p>
+                 <ul style="margin:8px 0 10px 18px">${volta}</ul>
+                 <div class="campo"><label for="d-motivo">Motivo (obrigatório)</label><input id="d-motivo" maxlength="500" autocomplete="off"></div>` });
+            $('modal-ok').disabled = true; // libera com o motivo preenchido (3 a 500 caracteres)
+            $('d-motivo').addEventListener('input', () => { const m = $('d-motivo').value.trim(); $('modal-ok').disabled = m.length < 3 || m.length > 500; });
+            $('d-motivo').focus();
+            if (!(await pergunta)) return;
+            const texto = $('d-motivo').value.trim(); // o campo continua no modal fechado até a próxima abertura
+            let r;
+            try {
+                r = ehEntrada ? await api('/estoque/entrada/desfazer', { corpo: { numero: g.nota, fornecedor: g.fornecedor, motivo: texto } })
+                    : await api('/estoque/saida/desfazer', { corpo: { data: g.data, usuario: g.usuario, motivo: texto } });
+            } catch (e) { return toast('Nada foi desfeito: ' + e.message, 'erro'); }
+            await mostrarResultado(ehEntrada ? 'Entrada desfeita' : 'Saída desfeita', r.itens);
+            carregarHistorico();
+        }
+        $('h-lista').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+            const g = historico[Number(tr.dataset.i)];
+            if (e.target.closest('.h-desfazer')) return desfazer(g);
+            const aberto = tr.nextElementSibling?.classList.contains('detalhe');
+            $('h-lista').querySelectorAll('tr.detalhe').forEach(d => d.remove());
+            if (!aberto) tr.insertAdjacentHTML('afterend', detalheHistorico(g));
+        });
+        $('h-buscar').addEventListener('click', carregarHistorico);
+        iniciadores.historico = () => {
+            $('h-de').value = hojeISO(-30); $('h-ate').value = hojeISO();
+            carregarHistorico();
+        };
+
+        // ===================== INÍCIO =====================
+        document.addEventListener('DOMContentLoaded', () => {
+            const a = getAuth();
+            if (!a) { window.location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = a.user?.empresa || 'Elegance';
+            $('user-name').textContent = a.user?.nome || '';
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
+            abrirAba(new URLSearchParams(location.search).get('aba') || '');
+        });
+    </script>
+</body>
+</html>

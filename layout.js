@@ -18,6 +18,7 @@
         financeiro: ic('<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19M6.5 15h3"/>'),
         sair: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>'),
         menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+        movimentacao: ic('<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>'),
         usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>')
     };
     const MENU = [
@@ -29,11 +30,12 @@
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
+        { href: 'movimentacao_estoque.html', texto: 'Movimentação', icone: 'movimentacao' },
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
-    // página → permissões exigidas (todas). A ordem é a da "primeira página permitida" depois do login.
+    // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem é a da "primeira página permitida" depois do login.
     // Página nova: acrescentar aqui e no MENU.
     const PAGINAS = {
         'inicio.html': ['paineis.ver'],
@@ -42,6 +44,7 @@
         'clientes.html': ['clientes.ver'],
         'cliente_analise.html': ['clientes.ver', 'valores.ver'],
         'estoque.html': ['estoque.ver'],
+        'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
         'produtos.html': ['produtos.ver'],
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
@@ -58,10 +61,14 @@
         const tem = auth()?.acesso?.permissoes || [];
         return String(codigos || '').split(/\s+/).filter(Boolean).every(c => tem.includes(c));
     };
+    const atendeItem = (item, tem) => typeof item === 'string' ? tem.includes(item) : (item?.algum || []).some(c => tem.includes(c));
     // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona); null = nenhuma
     const primeiraPaginaDe = acesso => Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
-        && PAGINAS[p].every(c => (acesso?.permissoes || []).includes(c))) || null;
-    const podePagina = arquivo => { const exige = PAGINAS[String(arquivo || '').toLowerCase()]; return !exige || exige.every(c => pode(c)); };
+        && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
+    const podePagina = arquivo => {
+        const exige = PAGINAS[String(arquivo || '').toLowerCase()];
+        return !exige || exige.every(item => atendeItem(item, auth()?.acesso?.permissoes || []));
+    };
     // Permissões do usuário para a tela se montar (quem decide de verdade é o backend)
     window.Acesso = {
         atual: () => auth()?.acesso || null,
