@@ -157,7 +157,7 @@
                 visivel[i] = visivel.slice(i + 1, fim < 0 ? MENU.length : fim).some(Boolean);
             });
             nav.innerHTML =
-                `<a class="sb-marca" href="inicio.html"><span class="sb-logo">E</span><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
+                `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}"><span class="sb-logo">E</span><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map((m, i) => {
                     const oculto = visivel[i] ? '' : ' hidden';
                     if (m.secao) return `<div class="sb-secao"${oculto}>${m.secao}</div>`;

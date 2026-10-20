@@ -296,8 +296,8 @@
 
         @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211000">
-    <script src="layout.js?v=202610211000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211500">
+    <script src="layout.js?v=202610211500" defer></script>
 </head>
 <body>
     <div class="container">
@@ -340,7 +340,7 @@
             </section>
 
             <!-- ===== INDICADORES DO MÊS ===== -->
-            <section class="cards">
+            <section class="cards" data-perm="pedidos.ver">
                 <div class="card">
                     <div class="card-header"><span class="card-title">Pedidos no mês</span><div class="card-icon">📦</div></div>
                     <div class="card-value" id="k-ped-valor">—</div>
@@ -364,7 +364,7 @@
             </section>
 
             <!-- ===== LISTAS ===== -->
-            <section class="grade">
+            <section class="grade" data-perm="pedidos.ver">
                 <div class="painel">
                     <div class="painel-head">
                         <div class="painel-titulo">Últimos pedidos</div>
@@ -460,6 +460,7 @@
 
         // ============ PEDIDOS E ORÇAMENTOS ============
         async function carregarComercial() {
+            if (!Acesso.pode('pedidos.ver')) return;
             let pedidos = [], orcamentos = [];
             try {
                 [pedidos, orcamentos] = await Promise.all([api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=Orçamento')]);

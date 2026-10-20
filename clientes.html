@@ -213,9 +213,9 @@
             .cf { border-radius: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211000">
-    <script src="layout.js?v=202610211000" defer></script>
-    <script src="ranking.js?v=202610211000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211500">
+    <script src="layout.js?v=202610211500" defer></script>
+    <script src="ranking.js?v=202610211500" defer></script>
 </head>
 <body>
     <div class="container">
@@ -393,7 +393,7 @@
         <div class="cf-acoes">
             <button type="button" class="btn btn-primary" id="cf-salvar" data-perm="clientes.editar">💾 Salvar</button>
             <button type="button" class="btn btn-secondary" id="cf-credito-btn" data-perm="clientes.credito valores.ver">＋ Crédito</button>
-            <button type="button" class="btn btn-secondary" id="cf-receber" data-perm="clientes.receber valores.ver">💵 Receber</button>
+            <button type="button" class="btn btn-secondary" id="cf-receber" data-perm="clientes.receber valores.ver financeiro.ver financeiro.lancar">💵 Receber</button>
             <span class="alteracoes" id="cf-alteracoes">● alterações não salvas</span>
         </div>
     </aside>
@@ -875,6 +875,8 @@
 
         // ---------- receber (btn_Recebimento) ----------
         $('cf-receber').addEventListener('click', async () => {
+            // o recebimento termina com a entrada no fluxo de caixa: precisa poder lançar lá
+            if (!Acesso.pode('clientes.receber valores.ver financeiro.ver financeiro.lancar')) return;
             if (!fichaAtual) return toast('Não existe nenhum cliente selecionado!', 'info');
             if (!finDados) { irAba('financeiro'); await carregarFinanceiro(); }
             irAba('financeiro');

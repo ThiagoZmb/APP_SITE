@@ -426,8 +426,8 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211000">
-    <script src="layout.js?v=202610211000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610211500">
+    <script src="layout.js?v=202610211500" defer></script>
 </head>
 <body>
     <div class="container">
@@ -522,7 +522,7 @@
                     <select class="ferr-select" id="filtro-situacao" aria-label="Situação no mês"><option value="">Todas as situações</option></select>
                     <div class="busca"><input type="search" id="pesquisa" placeholder="Pedido, NF, cliente, fornecedor, valor... (Enter)" autocomplete="off"></div>
                     <button class="btn btn-secondary btn-mini" id="btn-relatorio" title="Exporta o mês exibido (sem Caixa Econômica Federal e XP)">📊 Relatório do mês</button>
-                    <button class="btn btn-primary" id="btn-novo">＋ Novo movimento</button>
+                    <button class="btn btn-primary" id="btn-novo" data-perm="financeiro.lancar">＋ Novo movimento</button>
                 </div>
                 <div class="tabela-wrap">
                     <table>
@@ -551,7 +551,7 @@
                 <div class="barra-selecao" id="barra-selecao">
                     <span><b id="sel-qtd">0</b> selecionado(s) · Soma <b id="sel-soma">R$ 0,00</b></span>
                     <div class="acoes-sel">
-                        <select id="sel-situacao" aria-label="Alterar situação">
+                        <select id="sel-situacao" aria-label="Alterar situação" data-perm="financeiro.lancar">
                             <option value="">Alterar para...</option>
                             <option>A Receber</option><option>Recebido</option><option>A Pagar</option><option>Pago</option>
                             <option>Faturado</option><option>Protestado</option><option>Atrasado</option>
@@ -611,7 +611,7 @@
             <datalist id="lista-nomes"></datalist><datalist id="lista-formas"></datalist><datalist id="lista-bancos"></datalist>
         </form>
         <div class="acoes">
-            <button class="btn btn-primary" id="btn-salvar">💾 Salvar</button>
+            <button class="btn btn-primary" id="btn-salvar" data-perm="financeiro.lancar">💾 Salvar</button>
             <button class="btn btn-secondary" id="btn-cancelar">Cancelar</button>
             <span class="alteracoes" id="alteracoes">● não salvo</span>
         </div>
@@ -874,6 +874,7 @@
 
         // ============ AÇÕES SOBRE REGISTROS (usadas pela barra de seleção e pelo menu do botão direito) ============
         async function alterarSituacao(ids, situacao) {
+            if (!Acesso.pode('financeiro.lancar')) return;
             if (!ids.length) { toast('Favor escolher um item para ser alterado!', 'info'); return; }
             try {
                 const r = await api('/fluxo/situacao', { method: 'POST', body: JSON.stringify({ ids, situacao }) });
@@ -886,7 +887,7 @@
             } catch (err) { toast(err.message, 'erro'); }
         }
         async function excluirRegistros(ids) {
-            if (!ids.length) return;
+            if (!ids.length || !Acesso.pode('financeiro.excluir')) return;
             if (!(await confirmar('Excluir', ids.length === 1 ? 'Têm certeza que deseja apagar este registro ?' : `Têm certeza que deseja apagar estes ${ids.length} registros ?`))) return;
             let ok = 0;
             for (const id of ids) {
@@ -953,9 +954,9 @@
             menu.innerHTML = `
                 <div class="ctx-cab"><b>${escapeHtml(nome)}</b><small>${um ? `${dataBR(um.data)} · ${escapeHtml(um.situacao || '—')} · ` : ''}${moeda(soma)}</small></div>
                 <button class="ctx-item" role="menuitem" data-acao="editar" ${um ? '' : 'disabled'}><span class="ic">✏️</span>Editar movimento<span class="atalho">Enter</span></button>
-                <button class="ctx-item" role="menuitem" data-acao="novo"><span class="ic">＋</span>Novo movimento</button>
+                <button class="ctx-item" role="menuitem" data-acao="novo" data-perm="financeiro.lancar"><span class="ic">＋</span>Novo movimento</button>
                 <div class="ctx-sep"></div>
-                <div class="ctx-item" role="menuitem" tabindex="0" data-acao="submenu" aria-haspopup="true">
+                <div class="ctx-item" role="menuitem" tabindex="0" data-acao="submenu" aria-haspopup="true" data-perm="financeiro.lancar">
                     <span class="ic">🔄</span>Alterar situação para<span class="seta-sub">▶</span>
                     <div class="ctx-menu ctx-sub" role="menu">${sub}</div>
                 </div>
@@ -964,7 +965,7 @@
                 <button class="ctx-item" role="menuitem" data-acao="copiar"><span class="ic">📋</span>Copiar valor${regs.length > 1 ? ' (soma)' : ''}</button>
                 <button class="ctx-item" role="menuitem" data-acao="excel"><span class="ic">📊</span>Enviar para Excel</button>
                 <div class="ctx-sep"></div>
-                <button class="ctx-item perigo" role="menuitem" data-acao="excluir"><span class="ic">🗑️</span>Excluir registro${regs.length > 1 ? 's' : ''}<span class="atalho">Del</span></button>`;
+                <button class="ctx-item perigo" role="menuitem" data-acao="excluir" data-perm="financeiro.excluir"><span class="ic">🗑️</span>Excluir registro${regs.length > 1 ? 's' : ''}<span class="atalho">Del</span></button>`;
             menu.classList.add('aberto');
             posicionar(menu, x, y);
             document.querySelectorAll('#tbody tr[data-id]').forEach(tr => tr.classList.toggle('ctx-alvo', ids.includes(Number(tr.dataset.id))));
@@ -1216,6 +1217,7 @@
 
         // NovoMovimento: próximo ID e campos limpos
         async function novoMovimento() {
+            if (!Acesso.pode('financeiro.lancar')) return;
             await carregarOpcoes();
             $('f-id').value = '';
             ['f-nome', 'f-forma', 'f-banco', 'f-pedido', 'f-pdv', 'f-prenota', 'f-nf', 'f-obs'].forEach(id => $(id).value = '');
@@ -1264,6 +1266,7 @@
             inp.addEventListener('keypress', e => { if (e.key.length === 1 && !/[0-9\/,]/.test(e.key)) e.preventDefault(); }));
 
         async function salvarMovimento() {
+            if (!Acesso.pode('financeiro.lancar')) return;
             const d = {
                 id: $('f-id').value, movimento, nome: $('f-nome').value.trim(), data: $('f-data').value,
                 situacao: $('f-situacao').value, formaPgto: $('f-forma').value.trim(), banco: $('f-banco').value.trim(),
