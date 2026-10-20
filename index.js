@@ -10,8 +10,9 @@ const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { instalarTabelas, migrarAcessos, garantirAdministrador } = require('./seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
+const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -1849,6 +1850,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 
 // ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
+registrarEstoqueMovimentos({ rota: registro.rota, pool });
 
 // ================= SUBIDA =================
 // Ordem: tabelas web_ → migração única dos usuários → todas as rotas precisam
@@ -1857,6 +1859,7 @@ async function iniciar() {
   await instalarTabelas(pool);
   const m = await migrarAcessos(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   if (!m.jaFeita) console.log(`[permissões] migração inicial: ${m.criados} usuário(s) receberam perfil`);
+  if ((await acrescentarPermissoesEstoque(pool)).feito) console.log('[permissões] estoque.desfazer e estoque.ajustar acrescentadas aos perfis completos');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE NFe [ <!ENTITY x "PERIGO"> ]>
+<NFe>
+  <infNFe>
+    <ide><nNF>55</nNF><dEmi>2026-10-10</dEmi></ide>
+    <emit><CNPJ>12345678000190</CNPJ><xNome>FORNECEDOR TESTE LTDA</xNome></emit>
+    <det nItem="1"><prod><cProd>A</cProd><xProd>ITEM &x;</xProd><uCom>UN</uCom><qCom>1</qCom><vUnCom>1</vUnCom><vProd>1</vProd></prod></det>
+    <total><ICMSTot><vNF>1</vNF></ICMSTot></total>
+  </infNFe>
+</NFe>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe11111111111111111111111111111111111111111111" versao="4.00">
+    <ide><nNF>987</nNF><mod>55</mod><dEmi>2026-10-14</dEmi></ide>
+    <emit><CNPJ>12345678000190</CNPJ><xNome>FORNECEDOR TESTE LTDA</xNome></emit>
+    <det nItem="1"><prod><cProd>PS-01</cProd><xProd>PERFIL SLIM 6M</xProd><uCom>BR</uCom><qCom>2</qCom><vUnCom>12.50</vUnCom><vProd>25.00</vProd></prod><infAdProd>COR PRETA</infAdProd></det>
+    <det nItem="2"><prod><cProd>PAR-100</cProd><xProd>PARAFUSO CX 100</xProd><uCom>CX</uCom><qCom>3</qCom><vUnCom>10.00</vUnCom><vProd>30.00</vProd></prod></det>
+    <det nItem="3"><prod><cProd>NOVO-9</cProd><xProd>ITEM SEM CADASTRO</xProd><uCom>UN</uCom><qCom>1.5</qCom><vUnCom>4.00</vUnCom><vProd>6.00</vProd></prod></det>
+    <total><ICMSTot><vNF>61.00</vNF></ICMSTot></total>
+  </infNFe>
+</NFe>

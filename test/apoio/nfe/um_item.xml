@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe00000000000000000000000000000000000000000000" versao="4.00">
+      <ide><nNF>1234</nNF><mod>55</mod><dhEmi>2026-10-15T09:30:00-03:00</dhEmi></ide>
+      <emit><CNPJ>12.345.678/0001-90</CNPJ><xNome>FORNECEDOR TESTE LTDA</xNome></emit>
+      <det nItem="1">
+        <prod><cProd>PS-01</cProd><xProd>PERFIL SLIM 6M</xProd><uCom>BR</uCom><qCom>10.0000</qCom><vUnCom>12.5000000000</vUnCom><vProd>125.00</vProd></prod>
+      </det>
+      <total><ICMSTot><vNF>125.00</vNF></ICMSTot></total>
+    </infNFe>
+  </NFe>
+  <protNFe versao="4.00"><infProt><cStat>100</cStat></infProt></protNFe>
+</nfeProc>

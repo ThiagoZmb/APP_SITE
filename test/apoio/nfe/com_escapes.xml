@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe><infNFe>
+  <ide><nNF>77</nNF><dEmi>2026-10-10</dEmi></ide>
+  <emit><CNPJ>12345678000190</CNPJ><xNome>A &amp; B LTDA</xNome></emit>
+  <det nItem="1"><prod><cProd>P&amp;1</cProd><xProd>PARAFUSO 1/4&quot; A&#231;O &#xE9;</xProd><uCom>UN</uCom><qCom>1</qCom><vUnCom>1</vUnCom><vProd>1</vProd></prod></det>
+  <total><ICMSTot><vNF>1</vNF></ICMSTot></total>
+</infNFe></NFe>

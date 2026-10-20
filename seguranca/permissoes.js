@@ -16,6 +16,8 @@ const CATALOGO = [
   { codigo: 'estoque.ver', nome: 'Ver estoque', area: 'Estoque' },
   { codigo: 'estoque.editar', nome: 'Cadastrar e editar item, código de barras', area: 'Estoque' },
   { codigo: 'estoque.movimentar', nome: 'Dar entrada e saída', area: 'Estoque' },
+  { codigo: 'estoque.desfazer', nome: 'Desfazer entrada/saída', area: 'Estoque' },
+  { codigo: 'estoque.ajustar', nome: 'Ajustar estoque (inventário)', area: 'Estoque' },
   { codigo: 'produtos.ver', nome: 'Ver cadastro de produtos', area: 'Produtos' },
   { codigo: 'produtos.editar', nome: 'Editar produto e imagem', area: 'Produtos' },
   { codigo: 'financeiro.ver', nome: 'Ver fluxo de caixa (também exige Valores financeiros)', area: 'Financeiro' },

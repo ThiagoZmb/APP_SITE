@@ -4,17 +4,18 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 19 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 19);
-  assert.equal(CODIGOS.size, 19);
-  for (const c of ['valores.ver', 'admin.usuarios', 'estoque.movimentar']) assert.ok(CODIGOS.has(c), c);
+test('catálogo tem 21 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 21);
+  assert.equal(CODIGOS.size, 21);
+  for (const c of ['valores.ver', 'admin.usuarios', 'estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar']) assert.ok(CODIGOS.has(c), c);
 });
 
 test('Interno completo = todas menos admin.usuarios', () => {
   const p = perfil('Interno completo');
-  assert.equal(p.permissoes.length, 18);
+  assert.equal(p.permissoes.length, 20);
+  assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('estoque.ajustar'));
   assert.ok(!p.permissoes.includes('admin.usuarios'));
-  assert.equal(perfil('Administrador').permissoes.length, 19);
+  assert.equal(perfil('Administrador').permissoes.length, 21);
 });
 
 test('Estoquista não tem valores.ver', () => {

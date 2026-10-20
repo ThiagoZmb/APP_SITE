@@ -40,6 +40,46 @@ const TABELAS = [
      alvo VARCHAR(100) NULL,
      detalhe TEXT NULL,
      KEY idx_acao (acao)
+   ) ${OPCOES}`,
+  // ----- movimentação de estoque (as tabelas do VB continuam as mesmas) -----
+  `CREATE TABLE IF NOT EXISTS \`web_estoque_ligacoes\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     fornecedor VARCHAR(190) NOT NULL,
+     cod_fabricante VARCHAR(60) NOT NULL,
+     nome_fabricante VARCHAR(190) NULL,
+     produto_codigo INT NOT NULL,
+     fator DECIMAL(12,4) NOT NULL DEFAULT 1,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL,
+     UNIQUE KEY uq_ligacao (fornecedor, cod_fabricante)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_estoque_lancamentos\` (
+     chave VARCHAR(64) NOT NULL PRIMARY KEY,
+     tipo VARCHAR(20) NOT NULL,
+     quando DATETIME NOT NULL,
+     quem VARCHAR(190) NOT NULL,
+     referencia VARCHAR(190) NULL
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_estoque_estornos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     quando DATETIME NOT NULL,
+     quem VARCHAR(190) NOT NULL,
+     tipo VARCHAR(20) NOT NULL,
+     referencia VARCHAR(255) NOT NULL,
+     motivo VARCHAR(500) NOT NULL,
+     dados LONGTEXT NULL,
+     KEY idx_quando (quando)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_estoque_ajustes\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     quando DATETIME NOT NULL,
+     quem VARCHAR(190) NOT NULL,
+     produto_codigo INT NOT NULL,
+     nome_produto VARCHAR(190) NOT NULL,
+     qtd_antes DOUBLE NOT NULL,
+     qtd_depois DOUBLE NOT NULL,
+     motivo VARCHAR(500) NOT NULL,
+     KEY idx_quando (quando)
    ) ${OPCOES}`
 ];
 
@@ -129,4 +169,31 @@ async function garantirAdministrador(pool, { adminInicial = '' } = {}) {
   return { concedido: true, usuario: u.NOME };
 }
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador };
+// Passo único: as permissões novas do estoque entram nos perfis que já tinham "tudo".
+// O Estoquista não recebe (o administrador libera em Usuários, se quiser).
+const PERMISSOES_ESTOQUE = ['estoque.desfazer', 'estoque.ajustar'];
+async function acrescentarPermissoesEstoque(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_estoque' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of PERMISSOES_ESTOQUE) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_estoque', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque };
