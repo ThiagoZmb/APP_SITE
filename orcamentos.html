@@ -1512,9 +1512,11 @@
             const altura = mp ? mp.altura : vaoA;
             const largura = mp ? mp.largura : vaoL;
             // correr com sistema: folhas desenhadas afastadas (só visual), trilho superior com folga e, se houver, trilho inferior
-            const ehTrilho = (a, lado) => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`) && lado.test(`${a.classe || ''} ${a.nome}`);
-            const trilhoSup = correrSis ? acessoriosItem.find(a => ehTrilho(a, /SUP/i)) : null;
-            const trilhoInf = correrSis ? acessoriosItem.find(a => ehTrilho(a, /INF/i)) : null;
+            // trilhos do sistema: "sup"/"inf" na classe ou no nome (regra do VB); sem indicação, o 1º vai em cima e o 2º embaixo
+            const trilhos = correrSis ? acessoriosItem.filter(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`)) : [];
+            const lado = (a, re) => re.test(`${a.classe || ''} ${a.nome}`);
+            const trilhoSup = trilhos.find(a => lado(a, /SUP/i)) || trilhos.find(a => !lado(a, /INF/i)) || null;
+            const trilhoInf = trilhos.find(a => lado(a, /INF/i)) || trilhos.find(a => a !== trilhoSup && !lado(a, /SUP/i)) || null;
             const TRILHO_MM = 60, FOLGA_MM = 45;
             const extraTopoMm = correrSis ? TRILHO_MM + FOLGA_MM : 0, extraBaseMm = trilhoInf ? TRILHO_MM + FOLGA_MM : 0;
             const qtdDivH = parseInt(val('f-div-h')) || 0;
@@ -1525,7 +1527,7 @@
             if (altura > 0 && largura > 0) {
                 garantirFolhas();
                 const n = Math.min(posicoesFolhas.length, 4);
-                const mmL = largura * n + (correrSis ? 40 : (n > 1 ? 150 : 0)) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
+                const mmL = largura * n + (n > 1 ? Math.max(150, largura * 0.08) : 0) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
                 const cssW = Math.max(300, cv.clientWidth);
                 const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
                 if (Math.abs(cv.getBoundingClientRect().height - alvo) > 2) cv.style.height = alvo + 'px';
@@ -1546,7 +1548,8 @@
             const qtdFolhas = Math.min(posicoesFolhas.length, 4);
             // correr com sistema: folhas sobrepostas pelo transpasse, trilho superior em cima
             // área máxima: só a margem das cotas (laterais para as alturas, topo/base para larguras e trilho)
-            const gapMm = correrSis ? 40 : (qtdFolhas > 1 ? 150 : 0);
+            // SEMPRE afastadas (também com transpasse): cada folha e seus puxadores ficam separados para clicar
+            const gapMm = qtdFolhas > 1 ? Math.max(150, largura * 0.08) : 0;
             const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 70 : 50, mBase = correrSis ? 90 : 60;
             const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
             const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + extraTopoMm + extraBaseMm));
