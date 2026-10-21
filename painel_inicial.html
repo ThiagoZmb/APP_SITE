@@ -308,10 +308,12 @@
 
         @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .operacao { grid-template-columns: 1fr 1fr !important; } .op { border-left: none; padding-left: 0; } }
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
+        .order-number a.editar { margin-left: 6px; text-decoration: none; opacity: .7; }
+        .order-number a.editar:hover, .order-number a.editar:focus { opacity: 1; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610221200">
-    <script src="layout.js?v=202610221200" defer></script>
-    <script src="ranking.js?v=202610221200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610231200">
+    <script src="layout.js?v=202610231200" defer></script>
+    <script src="ranking.js?v=202610231200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -721,7 +723,8 @@
             const MAX = 500;
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
                 <tr data-numero="${esc(x.numero)}">
-                    <td class="order-number">${esc(x.numero)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
+                    <td class="order-number">${esc(x.numero)} <a class="editar" data-perm="orcamentos.criar valores.ver" title="Abrir para editar"
+                        href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}">✏️</a></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
                     <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}</td>
@@ -729,6 +732,7 @@
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
         $('orders-tbody').addEventListener('click', e => {
+            if (e.target.closest('a.editar')) return; // ✏️ abre a tela de orçamento, não o PDF
             const tr = e.target.closest('tr[data-numero]');
             if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });

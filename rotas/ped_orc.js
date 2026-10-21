@@ -6,6 +6,7 @@ const { semValores } = require('../seguranca/valores');
 const { criarLeitor, lerCliente, precoAcessorio, precoComAcessorios, fatorHistorico, ErroPreco } = require('../calculo/precos');
 const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
+const { traduzirDocumento, impressaoDigital } = require('../calculo/leitura_vb');
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 
 const TIPOS = ['Orçamento', 'Pedido'];
@@ -21,6 +22,47 @@ const TABELAS_ITENS = ['ped_orc_lista_itens', 'ped_orc_itens_v4', 'ped_orc_compl
 
 const SEM_CLIENTE = { isFixo: false, desconto: 0 };
 const arred2 = v => Math.round(v * 100) / 100;
+
+// tabelas do documento: nome no banco → chave em Linhas (calculo/leitura_vb.js)
+const TABELAS_DOC = { ped_orc_lista_itens: 'lista', ped_orc_itens_v4: 'itensV4', ped_orc_complementos: 'complementos', furacao_pedidos_orcamentos: 'furacao',
+  ped_orc_serralheria: 'serralheria', ped_orc_serralheria_complementos: 'serralheriaComp' };
+const MSG_SEM_ACESSO = 'Sem acesso a este documento.';
+const MSG_ALTERADO = 'Este documento foi alterado por outra pessoa desde que você abriu. Recarregue para ver a versão atual.';
+// itens abertos que o servidor copia do banco (a tela só diz qual item e o estado)
+const ESTADOS_COPIA = ['intacto', 'so_pct', 'travado'];
+const ehCopia = it => !!it && !!it.origem && ESTADOS_COPIA.includes(it.origem.estado);
+// coluna que guarda o nº do item em cada tabela (Linhas → tabela no banco)
+const COPIA_TABELAS = [['lista', 'ped_orc_lista_itens', 'ITEM'], ['itensV4', 'ped_orc_itens_v4', 'ITEM_PEDIDO'], ['complementos', 'ped_orc_complementos', 'ITEM_PEDIDO'],
+  ['furacao', 'furacao_pedidos_orcamentos', 'ITEM'], ['serralheria', 'ped_orc_serralheria', 'ITEM_PEDIDO'],
+  ['serralheriaComp', 'ped_orc_serralheria_complementos', 'ITEM_PEDIDO'], ['vidros', 'vidros', 'ITEM'], ['perfis', 'perfis', 'ITEM']];
+// usuário com estados (representante) só mexe em clientes desses estados
+const foraDosEstados = (req, estado) => {
+  const estados = req.acesso?.estados || [];
+  return estados.length > 0 && !estados.includes(String(estado || '').trim().toUpperCase());
+};
+
+// Todas as linhas de um documento (Carregar_Pedido_Com_DNA). travar: FOR UPDATE no cabeçalho (dentro de transação).
+async function lerDocumento(db, tipo, numero, { travar = false } = {}) {
+  const [cab] = await db.execute(`SELECT * FROM ped_orc WHERE NUMERO = ? AND TIPO = ?${travar ? ' FOR UPDATE' : ''}`, [numero, tipo]);
+  if (!cab.length) return null;
+  const linhas = { cab: cab[0], vidros: [], perfis: [] };
+  for (const [tabela, chave] of Object.entries(TABELAS_DOC)) [linhas[chave]] = await db.execute(`SELECT * FROM ${tabela} WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo]);
+  // vidros/perfis não têm TIPO: só pertencem ao pedido (spec da parte 1, §5.5)
+  if (tipo === 'Pedido') for (const t of ['vidros', 'perfis']) [linhas[t]] = await db.execute(`SELECT * FROM ${t} WHERE NUMERO = ? ORDER BY id`, [numero]);
+  return linhas;
+}
+
+// sistemas de correr citados nas descrições ("Sist: X") — a tradução precisa do desconto e dos itens de cada um
+async function sistemasDoDocumento(db, linhas) {
+  const sistemas = {};
+  for (const l of linhas.lista) {
+    const m = /Sist:\s*([^|]*?)\s*(\||$)/.exec(String(l.DESCRICAO || ''));
+    if (!m || !m[1] || m[1] === 'Sem sistema' || sistemas[m[1]]) continue;
+    const s = await lerSistemaCorrer(db, m[1], 2);
+    if (s) sistemas[m[1]] = { descontoAltura: s.descontoAltura, itens: s.itens };
+  }
+  return sistemas;
+}
 
 class ErroItem extends Error {
   constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; }
@@ -39,7 +81,17 @@ function validar(b) {
   }
   if (b.modo !== 'novo' && b.modo !== 'atualizar') return 'Modo de gravação inválido.';
   if (b.modo === 'atualizar' && !(Number.isInteger(b.numero) && b.numero > 0)) return 'Número inválido para atualizar.';
+  const copias = b.itens.filter(ehCopia);
+  if (copias.length) {
+    const od = b.origemDocumento;
+    if (b.modo === 'novo' && !(od && od.tipo === b.tipo && Number.isInteger(od.numero) && od.numero > 0)) return 'Documento de origem não informado.';
+    if (typeof b.impressao !== 'string' || !b.impressao) return 'Documento de origem não informado.';
+  }
   for (const [i, it] of b.itens.entries()) {
+    if (ehCopia(it)) {
+      if (!(Number.isInteger(it.origem.item) && it.origem.item > 0)) return `Item ${i + 1}: origem inválida.`;
+      continue;
+    }
     if (!it || typeof it !== 'object' || typeof it.detalhes !== 'object') return 'Item inválido.';
     const q = Number(it.qtd);
     if (!(Number.isInteger(q) && q >= 1 && q <= MAX_QTD_ITEM)) return `Item ${i + 1}: quantidade inválida (1 a ${MAX_QTD_ITEM}).`;
@@ -113,6 +165,38 @@ async function prepararItem(db, leitor, cliente, item, n) {
   }
   r.linha = linhaComercial(item, { folhas, acessorios: preco.acessorios });
   return r;
+}
+
+// Linhas de um item do documento de origem, como estão no banco
+function linhasDoItem(src, origemItem) {
+  const r = {};
+  for (const [chave, , coluna] of COPIA_TABELAS) r[chave] = (src[chave] || []).filter(l => Number(l[coluna]) === origemItem);
+  return r;
+}
+
+// "só %": nova porcentagem sobre o valor original salvo (UNITARIO ÷ fator da % antiga), como o MotorPercentual do VB
+function aplicarSoPct(linhas, historico) {
+  const l0 = linhas.lista[0];
+  const fator = fatorHistorico(historico) / (fatorHistorico(l0.PORCENTAGEM) || 1);
+  const novo = v => arred2((parseFloat(v) || 0) * fator);
+  linhas.lista = linhas.lista.map(l => { const u = novo(l.UNITARIO); return { ...l, PORCENTAGEM: historico, UNITARIO: u, TOTAL: arred2(u * (parseFloat(l.QTD) || 0)) }; });
+  linhas.itensV4 = linhas.itensV4.map(l => { const u = novo(l.UNITARIO); return { ...l, UNITARIO: u, TOTAL: arred2(u * (parseFloat(l.QTD) || 0)) }; });
+  return linhas;
+}
+
+// Copia as linhas de um item para o documento/nº de item de destino (id novo; vidros/perfis só em pedido)
+async function gravarCopia(conn, linhas, { tipo, numero, n, origemItem }) {
+  for (const [chave, tabela, coluna] of COPIA_TABELAS) {
+    if ((chave === 'vidros' || chave === 'perfis') && tipo !== 'Pedido') continue;
+    for (const l of linhas[chave]) {
+      const nova = Object.fromEntries(Object.entries(l).filter(([k]) => k !== 'id' && k !== 'ID'));
+      nova.NUMERO = numero;
+      if ('TIPO' in nova) nova.TIPO = tipo;
+      nova[coluna] = n;
+      if (chave === 'serralheriaComp' && Number(nova.ITEM_SERRALHERIA) === origemItem) nova.ITEM_SERRALHERIA = n;
+      await inserir(conn, tabela, nova);
+    }
+  }
 }
 
 const inserir = (conn, tabela, linha) => conn.execute(
@@ -230,6 +314,45 @@ function registrarPedOrc({ rota, pool }) {
     }
   });
 
+  rota('get', '/ped_orc/buscar', ['pedidos.ver', 'orcamentos.criar'], async (req, res) => {
+    try {
+      const tipo = req.query.tipo === 'Pedido' ? 'Pedido' : 'Orçamento';
+      const q = String(req.query.q || '').trim().slice(0, 100);
+      const estados = req.acesso?.estados || [];
+      const params = [tipo];
+      let filtro = '';
+      if (/^\d+$/.test(q)) { filtro += ' AND p.NUMERO = ?'; params.push(Number(q)); }
+      else if (q) { filtro += ' AND p.RAZAO_SOCIAL LIKE ?'; params.push(`%${q}%`); }
+      if (estados.length) { filtro += ` AND c.ESTADO IN (${estados.map(() => '?').join(',')})`; params.push(...estados); }
+      const [rows] = await pool.execute(
+        `SELECT p.TIPO AS tipo, p.NUMERO AS numero, p.RAZAO_SOCIAL AS cliente, DATE_FORMAT(p.DATA, '%d/%m/%Y') AS data, p.TOTAL AS total
+         FROM ped_orc p ${estados.length ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
+         WHERE p.TIPO = ?${filtro} ORDER BY p.NUMERO DESC LIMIT 20`, params);
+      res.json(semValores(req, rows, ['total']));
+    } catch (err) {
+      console.error('Erro GET /ped_orc/buscar:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  });
+
+  rota('get', '/ped_orc/:tipo/:numero', ['pedidos.ver', 'orcamentos.criar', 'valores.ver'], async (req, res) => {
+    const tipo = req.params.tipo, numero = Number(req.params.numero);
+    if (!TIPOS.includes(tipo) || !(Number.isInteger(numero) && numero > 0)) return res.status(400).json({ error: 'Documento inválido.' });
+    try {
+      const linhas = await lerDocumento(pool, tipo, numero);
+      if (!linhas) return res.status(404).json({ error: `${tipo} nº ${numero} não encontrado.` });
+      const [cli] = await pool.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
+      if (foraDosEstados(req, cli[0]?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
+      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas: await sistemasDoDocumento(pool, linhas) });
+      const p = req.acesso.permissoes;
+      res.json({ cabecalho: { ...cabecalho, clienteCodigo: cli[0]?.CODIGO ?? null }, itens, impressao: impressaoDigital(linhas, tipo),
+        podeEditar: p.has('orcamentos.salvar') && (tipo === 'Orçamento' || p.has('pedidos.criar')) });
+    } catch (err) {
+      console.error('Erro GET /ped_orc/:tipo/:numero:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  });
+
   // Salvar_Ped_Orc_Blindado: novo número ou atualizar, tudo numa transação
   rota('post', '/ped_orc/salvar', ['orcamentos.criar', 'orcamentos.salvar', 'valores.ver'], async (req, res) => {
     const b = req.body || {};
@@ -242,35 +365,59 @@ function registrarPedOrc({ rota, pool }) {
     try {
       cliente = await lerCliente(pool, { clienteCodigo: b.clienteCodigo });
       if (!cliente) return res.status(400).json({ error: 'Favor selecionar um cliente!' });
-      for (let i = 0; i < b.itens.length; i++) preparados.push(await prepararItem(pool, leitor, cliente, b.itens[i], i + 1));
+      if (foraDosEstados(req, cliente.estado)) return res.status(403).json({ error: MSG_SEM_ACESSO });
+      for (let i = 0; i < b.itens.length; i++) {
+        const it = b.itens[i];
+        preparados.push(ehCopia(it)
+          ? { copia: true, item: it, n: i + 1, estado: it.origem.estado, origemItem: it.origem.item, historico: corta(it.historico, 500) }
+          : await prepararItem(pool, leitor, cliente, it, i + 1));
+      }
     } catch (err) {
       if (err instanceof ErroItem) return res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
       console.error('Erro POST /ped_orc/salvar (preparo):', err.message);
       return res.status(500).json({ error: 'Erro de servidor' });
     }
     // o preço que a tela mostrou precisa ser o mesmo que o servidor calcula agora
-    const mudaram = preparados.filter(p => Math.abs(p.valor - (parseFloat(p.item.valorTela) || 0)) > 0.01).map(p => p.n - 1);
+    const mudaram = preparados.filter(p => !p.copia && Math.abs(p.valor - (parseFloat(p.item.valorTela) || 0)) > 0.01).map(p => p.n - 1);
     if (mudaram.length) return res.status(409).json({ erro: 'preco_mudou', itens: mudaram,
       error: 'O preço de um ou mais itens mudou desde o cálculo. Confira e recalcule.' });
 
-    const subTotal = arred2(preparados.reduce((s, p) => s + p.totalItem, 0));
     // cliente com desconto fixo já tem o desconto no preço (a tela trava o desconto geral)
     const descontoPct = cliente.isFixo && cliente.desconto > 0 ? 0 : Math.min(100, Math.max(0, parseFloat(b.descontoPct) || 0));
-    const total = arred2(subTotal * (100 - descontoPct) / 100);
     const tipo = b.tipo;
-    const cab = {
-      RAZAO_SOCIAL: cliente.razaoSocial, CLIENTE_FINAL: corta(b.clienteFinal, 190), DATA: agoraLocal(),
-      DATA_PRONTO: tipo === 'Pedido' ? b.dataEntrega : hojeLocal(), SUB_TOTAL: subTotal, DESCONTO: descontoPct, TOTAL: total,
-      OBS_GERAL: corta(b.obsGeral, 5000), SITUACAO: tipo === 'Pedido' ? b.situacao : 'Aguardando resposta',
-      FINANCEIRO: tipo === 'Pedido' ? b.financeiro : '', REPRESENTANTE: cliente.representante, DATA_ENTREGA: null
-    };
 
     const resultado = await emTransacao(pool, res, 'POST /ped_orc/salvar', async conn => {
+      // documento de origem (atualizar, ou cópia a partir de um aberto): travado, conferido pela impressão digital
+      const src = b.modo === 'atualizar' ? { tipo, numero: b.numero } : b.origemDocumento;
+      let linhasSrc = null;
+      if (src) {
+        linhasSrc = await lerDocumento(conn, src.tipo, src.numero, { travar: true });
+        if (!linhasSrc && b.modo === 'atualizar') throw new ErroUsuario(404, `${tipo} nº ${b.numero} não encontrado. Salve com novo número.`);
+        if (!linhasSrc || (b.impressao && impressaoDigital(linhasSrc, src.tipo) !== b.impressao)) throw new ErroUsuario(409, MSG_ALTERADO, { erro: 'alterado' });
+        // o documento de origem também precisa ser de um cliente dos estados do usuário (cópia ou atualização forjada)
+        if ((req.acesso?.estados || []).length) {
+          const [cli] = await conn.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhasSrc.cab.RAZAO_SOCIAL]);
+          if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
+        }
+      }
+      // itens copiados: linhas lidas ANTES de apagar
+      for (const p of preparados.filter(x => x.copia)) {
+        if (!linhasSrc.lista.some(l => Number(l.ITEM) === p.origemItem)) throw new ErroUsuario(400, `Item ${p.n}: não pertence a este documento.`);
+        p.linhas = linhasDoItem(linhasSrc, p.origemItem);
+        if (p.estado === 'so_pct') aplicarSoPct(p.linhas, p.historico);
+        p.totalItem = arred2(p.linhas.lista.reduce((s, l) => s + (parseFloat(l.TOTAL) || 0), 0));
+      }
+      const subTotal = arred2(preparados.reduce((s, p) => s + p.totalItem, 0));
+      const cab = {
+        RAZAO_SOCIAL: cliente.razaoSocial, CLIENTE_FINAL: corta(b.clienteFinal, 190),
+        DATA: b.modo === 'atualizar' && b.manterData && linhasSrc.cab.DATA ? linhasSrc.cab.DATA : agoraLocal(),
+        DATA_PRONTO: tipo === 'Pedido' ? b.dataEntrega : hojeLocal(), SUB_TOTAL: subTotal, DESCONTO: descontoPct, TOTAL: arred2(subTotal * (100 - descontoPct) / 100),
+        OBS_GERAL: corta(b.obsGeral, 5000), SITUACAO: tipo === 'Pedido' ? b.situacao : 'Aguardando resposta',
+        FINANCEIRO: tipo === 'Pedido' ? b.financeiro : '', REPRESENTANTE: cliente.representante, DATA_ENTREGA: null
+      };
       let numero;
       if (b.modo === 'atualizar') {
         numero = b.numero;
-        const [existe] = await conn.execute('SELECT id FROM ped_orc WHERE NUMERO = ? AND TIPO = ? FOR UPDATE', [numero, tipo]);
-        if (!existe.length) throw new ErroUsuario(404, `${tipo} nº ${numero} não encontrado. Salve com novo número.`);
         const cols = Object.keys(cab);
         await conn.execute(`UPDATE ped_orc SET ${cols.map(c => `${c} = ?`).join(', ')} WHERE NUMERO = ? AND TIPO = ?`, [...cols.map(c => cab[c]), numero, tipo]);
         for (const tabela of TABELAS_ITENS) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
@@ -289,11 +436,14 @@ function registrarPedOrc({ rota, pool }) {
           }
         }
       }
-      for (const p of preparados) await gravarItem(conn, { tipo, numero, medicao: cliente.medicao }, p);
+      for (const p of preparados) {
+        if (p.copia) await gravarCopia(conn, p.linhas, { tipo, numero, n: p.n, origemItem: p.origemItem });
+        else await gravarItem(conn, { tipo, numero, medicao: cliente.medicao }, p);
+      }
       return { numero };
     });
     if (resultado) res.json({ ok: true, tipo, numero: resultado.numero });
   });
 }
 
-module.exports = { registrarPedOrc, lerSistemaCorrer };
+module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento };

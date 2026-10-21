@@ -170,7 +170,22 @@
         .lbl-desemp { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
         #sel-acessorio { max-width: 100%; }
         /* ===== salvar no banco ===== */
-        .ped-numero { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--primary-color, #2563eb); }
+        .tipo-numero { display: flex; gap: 8px; }
+        /* tipo+número e cliente final ocupam 2 colunas da grade no computador (no celular a grade já é 1 coluna) */
+        @media (min-width: 700px) { html body .grid-form > .form-group.dupla { grid-column: span 2; } }
+        .tipo-numero select { flex: 1; min-width: 0; }
+        #ped-numero { width: 110px; flex: none; font-weight: 700; text-align: center; }
+        .faixa-leitura { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 14px; }
+        body.so-leitura #btn-salvar, body.so-leitura #btn-adicionar, body.so-leitura #btn-vazio, body.so-leitura #itens-tbody .col-acoes button { display: none !important; }
+        #itens-tbody tr.travado td { background: #f8fafc; }
+        .cadeado { cursor: help; margin-right: 4px; }
+        .abrir-filtros { display: flex; gap: 8px; margin-bottom: 10px; }
+        .abrir-filtros input { flex: 1; min-width: 0; }
+        .abrir-lista { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow-y: auto; }
+        .abrir-lista li { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+        .abrir-lista li:hover, .abrir-lista li:focus { background: var(--hover-bg, #f1f5f9); outline: none; }
+        .abrir-lista li small { color: var(--text-light); }
+        .dlg-salvar { width: min(460px, calc(100vw - 32px)); }
         .ped-pedido-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
         .ped-pedido-grid label { display: block; font-size: 13px; margin-bottom: 4px; }
         .ped-pedido-grid input, .ped-pedido-grid select { width: 100%; box-sizing: border-box; }
@@ -186,7 +201,7 @@
         .dlg-salvar p { margin: 0 0 16px; color: var(--text-light); }
         .dlg-acoes { display: flex; gap: 10px; flex-wrap: wrap; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610221200">
+    <link rel="stylesheet" href="tema.css?v=202610231200">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -278,7 +293,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202610221200" defer></script>
+    <script src="layout.js?v=202610231200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -302,17 +317,21 @@
             <p class="welcome-subtitle">1. Selecione o cliente &nbsp;→&nbsp; 2. Escolha a frente &nbsp;→&nbsp; 3. Monte os itens — preços calculados pelo motor financeiro</p>
             <!-- ═══════════ ETAPA 1: CLIENTE ═══════════ -->
             <section class="card">
-                <div class="card-title"><span class="etapa">1</span> Cliente <span id="ped-numero" class="ped-numero"></span></div>
+                <div class="card-title"><span class="etapa">1</span> Cliente</div>
+                <div id="faixa-leitura" class="faixa-leitura" style="display:none">🔒 Somente leitura — você pode ver este pedido, mas não alterar.</div>
                 <div class="grid-form">
                     <div class="form-group full">
                         <label for="sel-cliente">Cliente (Razão Social) — define a tabela de preço e o desconto</label>
                         <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
                     </div>
-                    <div class="form-group">
-                        <label for="ped-tipo">Tipo</label>
-                        <select id="ped-tipo"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
+                    <div class="form-group dupla">
+                        <label for="ped-tipo">Tipo e número</label>
+                        <div class="tipo-numero">
+                            <select id="ped-tipo"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
+                            <input type="text" id="ped-numero" readonly placeholder="novo" aria-label="Número" title="Número do orçamento/pedido (definido ao salvar)">
+                        </div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group dupla">
                         <label for="ped-cliente-final">Cliente final</label>
                         <input type="text" id="ped-cliente-final" maxlength="190">
                     </div>
@@ -528,6 +547,7 @@
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
                     <button class="btn btn-secondary" id="btn-novo">📄 Novo</button>
+                    <button class="btn btn-secondary" id="btn-abrir">📂 Abrir</button>
                     <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
                 </div>
                 <div id="msg-salvar" class="msg-salvar" role="status" aria-live="polite"></div>
@@ -543,6 +563,16 @@
             <button type="button" class="btn btn-secondary" id="btn-atualizar" style="display:none">Atualizar</button>
             <button type="button" class="btn btn-secondary" id="btn-dlg-cancelar">Cancelar</button>
         </div>
+    </dialog>
+    <!-- ═══════════ ABRIR (frm_Lista_Pedidos_Orçamentos) ═══════════ -->
+    <dialog id="dlg-abrir" class="dlg-salvar" aria-labelledby="dlg-abrir-titulo">
+        <h3 id="dlg-abrir-titulo">Abrir orçamento ou pedido</h3>
+        <div class="abrir-filtros">
+            <select id="abrir-tipo" aria-label="Tipo"><option value="Orçamento">Orçamentos</option><option value="Pedido">Pedidos</option></select>
+            <input type="search" id="abrir-busca" placeholder="Número ou cliente" aria-label="Buscar">
+        </div>
+        <ul id="abrir-lista" class="abrir-lista"></ul>
+        <div class="dlg-acoes"><button type="button" class="btn btn-secondary" id="btn-abrir-fechar">Fechar</button></div>
     </dialog>
     <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
     <div class="avl-fundo" id="avl-fundo"></div>
@@ -1804,7 +1834,11 @@
             item.valorBase = item.valor;
             item.historico = editandoIndex >= 0 ? (itens[editandoIndex].historico || '') : '';
             item.valor = Math.round(aplicarHistorico(item.valorBase, item.historico) * 100) / 100;
-            if (editandoIndex >= 0) { itens[editandoIndex] = item; editandoIndex = -1; }
+            if (editandoIndex >= 0) {
+                const antigo = itens[editandoIndex];
+                if (antigo.origem) item.origem = { item: antigo.origem.item, estado: 'editado' }; // o servidor recalcula com o preço de hoje
+                itens[editandoIndex] = item; editandoIndex = -1;
+            }
             else itens.push(item);
             renderItens();
             limparForm();
@@ -1815,7 +1849,18 @@
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
                 ? '<tr><td colspan="9" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>'
-                : itens.map((it, i) => `
+                : itens.map((it, i) => it.travado ? `
+                    <tr class="travado">
+                        <td><b>${i + 1}</b></td>
+                        <td><span class="badge-frente bf-serralheria">${escapeHtml(it.frente)}</span></td>
+                        <td><span class="cadeado" title="${escapeHtml('Só o VB edita este item: ' + it.motivo)}">🔒</span>${escapeHtml(it.descricao)}</td>
+                        <td>${it.qtd}</td>
+                        <td>${formatCurrency(it.valor)}</td>
+                        <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
+                        <td class="col-pct">${escapeHtml(textoHistorico(it.historico) || '-')}</td>
+                        <td class="item-desc">${escapeHtml(it.obs || '-')}</td>
+                        <td class="col-acoes"><button class="btn-mini excluir" onclick="removerItem(${i})">🗑️</button></td>
+                    </tr>` : `
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
@@ -1960,6 +2005,7 @@
             it.valorBase = altv.base;
             it.historico = hist;
             it.valor = Math.round(aplicarHistorico(altv.base, hist) * 100) / 100;
+            if (it.origem && it.origem.estado === 'intacto') it.origem = { ...it.origem, estado: 'so_pct' };
             fecharAlterarValor();
             renderItens();
         }
@@ -2077,11 +2123,13 @@
             if (ehCorrer()) atualizarSistemaCorrer(); else calcularPrecoAutomatico();
         }));
         // ============ SALVAR NO BANCO (ModPedOrc.Salvar_Ped_Orc_Blindado / frm_Opcao_Pedido) ============
-        let docSalvo = null; // { tipo, numero } depois da 1ª gravação nesta tela
+        // docAberto: documento salvo/aberto na tela — { tipo, numero, impressao, data, podeEditar }
+        let docAberto = null;
         const $s = id => document.getElementById(id);
         const tipoAtual = () => $s('ped-tipo').value;
+        const hojeISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
         function configurarTipo() {
-            // Pedido só para quem tem "Salvar como pedido"
+            // Pedido só para quem tem "Salvar como pedido" (um pedido aberto só para ver recoloca a opção, travada)
             if (!(window.Acesso && Acesso.pode('pedidos.criar'))) $s('ped-tipo').querySelector('option[value="Pedido"]')?.remove();
             atualizarCamposPedido();
         }
@@ -2093,8 +2141,14 @@
             m.textContent = texto || '';
             m.className = 'msg-salvar' + (tipo ? ' ' + tipo : '');
         }
+        // número ao lado do tipo; com número o tipo fica travado (frm_Pedido2.txt_Numero_TextChanged)
         function mostrarNumero() {
-            $s('ped-numero').textContent = docSalvo ? `${docSalvo.tipo} nº ${docSalvo.numero}` : '';
+            $s('ped-numero').value = docAberto ? String(docAberto.numero) : '';
+            $s('ped-tipo').disabled = !!docAberto;
+        }
+        function aplicarModoLeitura(soLeitura) {
+            document.body.classList.toggle('so-leitura', soLeitura);
+            $s('faixa-leitura').style.display = soLeitura ? '' : 'none';
         }
         // rascunho local: proteção caso a internet caia antes de salvar
         function guardarRascunho() {
@@ -2115,21 +2169,27 @@
                 if (!$s('ped-situacao').value) { alert('Favor escolher uma situação do pedido!'); return; }
                 if (!$s('ped-financeiro').value) { alert('Favor escolher a situação financeira do pedido!'); return; }
             }
-            const podeAtualizar = !!docSalvo && docSalvo.tipo === tipoAtual();
+            const podeAtualizar = !!docAberto && docAberto.tipo === tipoAtual();
             $s('dlg-salvar-titulo').textContent = `Salvar ${tipoAtual().toLowerCase()}`;
             $s('dlg-salvar-texto').textContent = podeAtualizar
-                ? `Gravar por cima do ${docSalvo.tipo.toLowerCase()} nº ${docSalvo.numero} ou criar um com número novo?`
+                ? `Gravar por cima do ${docAberto.tipo.toLowerCase()} nº ${docAberto.numero} ou criar um com número novo?`
                 : `Será criado um ${tipoAtual().toLowerCase()} com número novo.`;
             $s('btn-atualizar').style.display = podeAtualizar ? '' : 'none';
-            if (podeAtualizar) $s('btn-atualizar').textContent = `Atualizar nº ${docSalvo.numero}`;
+            if (podeAtualizar) $s('btn-atualizar').textContent = `Atualizar nº ${docAberto.numero}`;
             $s('dlg-salvar').showModal();
         }
         async function gravar(modo) {
             $s('dlg-salvar').close();
+            // VB: "Deseja alterar a data para hoje?" ao atualizar um documento de outro dia
+            let manterData = true;
+            if (modo === 'atualizar' && docAberto?.data && docAberto.data.slice(0, 10) !== hojeISO())
+                manterData = !confirm('Deseja alterar a data para hoje?');
             guardarRascunho();
             const tipo = tipoAtual();
             const corpo = {
-                modo, tipo, ...(modo === 'atualizar' ? { numero: docSalvo.numero } : {}),
+                modo, tipo, ...(modo === 'atualizar' ? { numero: docAberto.numero, manterData } : {}),
+                ...(docAberto?.impressao ? { impressao: docAberto.impressao } : {}),
+                ...(modo === 'novo' && docAberto?.impressao ? { origemDocumento: { tipo: docAberto.tipo, numero: docAberto.numero } } : {}),
                 clienteCodigo: $s('sel-cliente').value,
                 clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
                 ...(tipo === 'Pedido' ? { dataEntrega: $s('ped-entrega').value, situacao: $s('ped-situacao').value, financeiro: $s('ped-financeiro').value } : {}),
@@ -2137,7 +2197,8 @@
                 totalTela: itens.reduce((t, it) => t + it.qtd * it.valor, 0),
                 itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
                     profundidade: it.profundidade, soldas: it.soldas, furos: it.furos, detalhes: it.detalhes,
-                    acessorios: it.acessorios || [], historico: it.historico || '', obs: it.obs || '', valorTela: it.valor }))
+                    acessorios: it.acessorios || [], historico: it.historico || '', obs: it.obs || '', valorTela: it.valor,
+                    ...(it.origem ? { origem: it.origem } : {}) }))
             };
             let res, json = {};
             try {
@@ -2151,25 +2212,101 @@
             }
             itens.forEach(it => { delete it.precoMudou; });
             if (res.ok && json.ok) {
-                docSalvo = { tipo: json.tipo, numero: json.numero };
-                mostrarNumero();
-                renderItens();
+                // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
+                const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
+                if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
                 mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.`, 'ok');
                 return;
             }
             if (res.status === 409 && json.erro === 'preco_mudou') (json.itens || []).forEach(i => { if (itens[i]) itens[i].precoMudou = true; });
             renderItens();
             mostrarMsgSalvar(json.error || `Erro ao salvar (HTTP ${res.status}).`, 'erro');
+            if (res.status === 409 && json.erro === 'alterado' && docAberto) {
+                const b = document.createElement('button');
+                b.type = 'button'; b.id = 'btn-recarregar'; b.className = 'btn-mini'; b.textContent = '↻ Recarregar';
+                b.addEventListener('click', () => abrirDocumento(docAberto.tipo, docAberto.numero, { confirmar: false }));
+                $s('msg-salvar').append(' ', b);
+            }
         }
-        function novoDocumento() {
-            if (itens.length && !confirm('Começar um novo orçamento/pedido? Os itens da tela serão apagados.')) return;
-            itens = []; docSalvo = null;
+        function limparDocumento() {
+            itens = []; docAberto = null;
             ['ped-cliente-final', 'ped-obs', 'ped-entrega', 'ped-situacao', 'ped-financeiro'].forEach(id => { $s(id).value = ''; });
+            $s('desconto').value = 0;
             $s('ped-tipo').value = 'Orçamento';
-            atualizarCamposPedido();
+            configurarTipo();
+            aplicarModoLeitura(false);
             mostrarNumero();
             mostrarMsgSalvar('');
             renderItens();
+        }
+        function novoDocumento() {
+            if (itens.length && !confirm('Começar um novo orçamento/pedido? Os itens da tela serão apagados.')) return;
+            limparDocumento();
+        }
+        // select com o valor gravado mesmo que ele não esteja na lista (dados antigos do VB)
+        function escolherOpcao(id, valor) {
+            const sel = $s(id);
+            if (valor && ![...sel.options].some(o => o.value === valor)) sel.add(new Option(valor, valor));
+            sel.value = valor || '';
+        }
+        // ============ ABRIR (Carregar_Pedido_Com_DNA) ============
+        async function abrirDocumento(tipo, numero, { confirmar = true, silencioso = false } = {}) {
+            if (confirmar && itens.length && !confirm('Abrir outro documento? Os itens da tela que não foram salvos serão perdidos.')) return false;
+            let res, j = {};
+            try {
+                res = await fetch(`${API_BASE}/ped_orc/${encodeURIComponent(tipo)}/${encodeURIComponent(numero)}`, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return false; }
+                j = await res.json().catch(() => ({}));
+            } catch {
+                if (!silencioso) mostrarMsgSalvar('Sem conexão com o servidor. Tente de novo.', 'erro');
+                return false;
+            }
+            if (!res.ok || !j.cabecalho) { if (!silencioso) mostrarMsgSalvar(j.error || `Erro ao abrir (HTTP ${res.status}).`, 'erro'); return false; }
+            const c = j.cabecalho;
+            limparDocumento();
+            escolherOpcao('sel-cliente', c.clienteCodigo == null ? '' : String(c.clienteCodigo));
+            $s('sel-cliente').dispatchEvent(new Event('change'));
+            escolherOpcao('ped-tipo', c.tipo);
+            $s('ped-cliente-final').value = c.clienteFinal || '';
+            $s('ped-obs').value = c.obsGeral || '';
+            $s('desconto').value = c.descontoPct || 0;
+            if (c.tipo === 'Pedido') {
+                $s('ped-entrega').value = c.dataEntrega || '';
+                escolherOpcao('ped-situacao', c.situacao);
+                escolherOpcao('ped-financeiro', c.financeiro);
+            }
+            itens = j.itens || [];
+            docAberto = { tipo: c.tipo, numero: c.numero, impressao: j.impressao, data: c.data || '', podeEditar: !!j.podeEditar };
+            atualizarCamposPedido();
+            mostrarNumero();
+            aplicarModoLeitura(!j.podeEditar);
+            renderItens();
+            return true;
+        }
+        let timerBuscaAbrir = null;
+        async function buscarParaAbrir() {
+            const lista = $s('abrir-lista');
+            const q = new URLSearchParams({ tipo: $s('abrir-tipo').value, q: $s('abrir-busca').value.trim() });
+            try {
+                const r = await fetchAutenticado(`${API_BASE}/ped_orc/buscar?${q}`);
+                lista.innerHTML = r.length ? r.map(d => `<li tabindex="0" data-tipo="${escapeHtml(d.tipo)}" data-numero="${escapeHtml(d.numero)}">
+                    <b>nº ${escapeHtml(d.numero)}</b> · ${escapeHtml(d.cliente)} <small>· ${escapeHtml(d.data || '')}${d.total != null ? ' · ' + formatCurrency(d.total) : ''}</small></li>`).join('')
+                    : '<li class="vazio">Nada encontrado</li>';
+            } catch {
+                lista.innerHTML = '<li class="vazio">Erro ao buscar</li>';
+            }
+        }
+        function abrirJanelaAbrir() {
+            $s('abrir-tipo').value = tipoAtual() || 'Orçamento';
+            $s('abrir-busca').value = '';
+            $s('dlg-abrir').showModal();
+            buscarParaAbrir();
+        }
+        function escolherParaAbrir(e) {
+            const li = e.target.closest('li[data-numero]');
+            if (!li) return;
+            $s('dlg-abrir').close();
+            abrirDocumento(li.dataset.tipo, li.dataset.numero);
         }
                 // ============ CARREGAMENTO ============
         async function carregarClientes() {
@@ -2195,6 +2332,12 @@
         document.getElementById('btn-atualizar').addEventListener('click', () => gravar('atualizar'));
         document.getElementById('btn-dlg-cancelar').addEventListener('click', () => document.getElementById('dlg-salvar').close());
         document.getElementById('btn-novo').addEventListener('click', novoDocumento);
+        document.getElementById('btn-abrir').addEventListener('click', abrirJanelaAbrir);
+        document.getElementById('btn-abrir-fechar').addEventListener('click', () => document.getElementById('dlg-abrir').close());
+        document.getElementById('abrir-tipo').addEventListener('change', buscarParaAbrir);
+        document.getElementById('abrir-busca').addEventListener('input', () => { clearTimeout(timerBuscaAbrir); timerBuscaAbrir = setTimeout(buscarParaAbrir, 300); });
+        document.getElementById('abrir-lista').addEventListener('click', escolherParaAbrir);
+        document.getElementById('abrir-lista').addEventListener('keydown', e => { if (e.key === 'Enter') escolherParaAbrir(e); });
         document.getElementById('ped-tipo').addEventListener('change', atualizarCamposPedido);
         document.addEventListener('DOMContentLoaded', configurarTipo); // layout.js (defer) já definiu o Acesso
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
@@ -2343,7 +2486,11 @@
             aplicarVisibilidadeCampos();
             renderItens();
             atualizarBloqueioCliente(); // inicia travado até o cliente ser escolhido
-            carregarClientes();
+            carregarClientes().then(() => {
+                // ?abrir=Pedido/123 (botão ✏️ da lista de pedidos)
+                const m = /^(Orçamento|Pedido)\/(\d+)$/.exec(new URLSearchParams(location.search).get('abrir') || '');
+                if (m) abrirDocumento(m[1], m[2], { confirmar: false });
+            });
             carregarCatalogosIniciais();
             carregarPerfis();
             desenharVisualizacao();

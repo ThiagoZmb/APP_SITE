@@ -50,7 +50,7 @@ function criarLeitor(pool) {
 
 // Política comercial do cliente — por CODIGO (preciso) com reserva por nome
 async function lerCliente(pool, { clienteCodigo, cliente } = {}) {
-  const campos = 'SELECT CODIGO, RAZAO_SOCIAL, MEDICAO, TIPO_DESCONTO, DESCONTO, COMISSAO, REPRESENTANTE FROM cadastro_clientes';
+  const campos = 'SELECT CODIGO, RAZAO_SOCIAL, MEDICAO, TIPO_DESCONTO, DESCONTO, COMISSAO, REPRESENTANTE, ESTADO FROM cadastro_clientes';
   let rows = [];
   if (clienteCodigo) [rows] = await pool.execute(`${campos} WHERE CODIGO = ? LIMIT 1`, [clienteCodigo]);
   else if (cliente) [rows] = await pool.execute(`${campos} WHERE TRIM(RAZAO_SOCIAL) = TRIM(?) LIMIT 1`, [cliente]);
@@ -60,6 +60,7 @@ async function lerCliente(pool, { clienteCodigo, cliente } = {}) {
     codigo: c.CODIGO,
     razaoSocial: c.RAZAO_SOCIAL,
     medicao: c.MEDICAO ?? '',
+    estado: String(c.ESTADO ?? '').trim().toUpperCase(),
     isFixo: String(c.TIPO_DESCONTO || '').toUpperCase().includes('FIXO'),
     desconto: parseFloat(c.DESCONTO) || 0,
     // frm_Pedido2.cmb_Cliente_SelectedIndexChanged: sem comissão → "Nenhum"

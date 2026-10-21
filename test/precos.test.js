@@ -50,7 +50,7 @@ test('lerCliente: representante só quando há comissão', async () => {
   const linha = c => [{ CODIGO: 7, RAZAO_SOCIAL: 'CLIENTE X', MEDICAO: 'Vão', TIPO_DESCONTO: 'Desconto fixo', DESCONTO: 12, COMISSAO: c, REPRESENTANTE: 'JOÃO' }];
   let pool = criarPoolFalso([[/FROM cadastro_clientes WHERE CODIGO = \?/, linha('0')]]);
   let c = await lerCliente(pool, { clienteCodigo: 7 });
-  assert.deepEqual(c, { codigo: 7, razaoSocial: 'CLIENTE X', medicao: 'Vão', isFixo: true, desconto: 12, representante: 'Nenhum' });
+  assert.deepEqual(c, { codigo: 7, razaoSocial: 'CLIENTE X', medicao: 'Vão', estado: '', isFixo: true, desconto: 12, representante: 'Nenhum' });
   pool = criarPoolFalso([[/FROM cadastro_clientes WHERE CODIGO = \?/, linha('5')]]);
   assert.equal((await lerCliente(pool, { clienteCodigo: 7 })).representante, 'JOÃO');
   pool = criarPoolFalso([]);

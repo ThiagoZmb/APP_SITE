@@ -16,7 +16,8 @@ const PERFIS = {
   'Vendedor': doPerfil('Vendedor'),
   'Estoquista': doPerfil('Estoquista'),
   'Monta sem valores': ['orcamentos.criar', 'orcamentos.salvar'],
-  'Monta sem salvar': ['orcamentos.criar', 'valores.ver']
+  'Monta sem salvar': ['orcamentos.criar', 'valores.ver'],
+  'Representante SP': doPerfil('Administrador')
 };
 
 const produto = (MODELO, VALOR_CHEIO, VALOR_FIXO = VALOR_CHEIO, DESCONTO_VIDRO = 0, DESC_PERF_PUX = 0, TIPO_PUXADOR = '') =>
@@ -28,7 +29,8 @@ const linhaDe = (sql, params) => Object.fromEntries(colunasDo(sql).map((c, i) =>
 
 function bancoPedOrc() {
   const estado = {
-    clientes: [{ CODIGO: 7, RAZAO_SOCIAL: 'CLIENTE TESTE', MEDICAO: 'Vão', TIPO_DESCONTO: 'Desconto progressivo', DESCONTO: 0, COMISSAO: '5', REPRESENTANTE: 'JOÃO REP' }],
+    clientes: [{ CODIGO: 7, RAZAO_SOCIAL: 'CLIENTE TESTE', MEDICAO: 'Vão', TIPO_DESCONTO: 'Desconto progressivo', DESCONTO: 0, COMISSAO: '5', REPRESENTANTE: 'JOÃO REP', ESTADO: 'RJ' },
+      { CODIGO: 8, RAZAO_SOCIAL: 'LOJA PAULISTA', MEDICAO: '', TIPO_DESCONTO: '', DESCONTO: 0, COMISSAO: '0', REPRESENTANTE: 'MARIA', ESTADO: 'SP' }],
     produtos: [produto('Perfil P', 100, 80, 20), produto('Puxador X', 50, 40, 10, 30, 'Sobreposto'), produto('Vidro V', 200),
       produto('Dobradiça', 20, 10), produto('Fechadura', 30, 25), produto('Trilho Sup', 40, 30), produto('Roldana', 15, 12), produto('Desemp', 60, 50),
       produto('Metalon 20', 30), produto('Serviço corte', 25, 25)],
@@ -46,6 +48,7 @@ function bancoPedOrc() {
   const falhas = {};
   const dupNoCabecalho = { vezes: 0 };
   const transacao = { foto: null };
+  let ultimoId = 1000;
   const TABELA = { ped_orc_lista_itens: 'listaItens', ped_orc_itens_v4: 'itensV4', vidros: 'vidros', perfis: 'perfis',
     furacao_pedidos_orcamentos: 'furacao', ped_orc_complementos: 'complementos', ped_orc_serralheria: 'serralheria',
     ped_orc_serralheria_complementos: 'serralheriaComp', ped_orc: 'pedOrc' };
@@ -82,7 +85,23 @@ function bancoPedOrc() {
         if (dupNoCabecalho.vezes > 0) { dupNoCabecalho.vezes--; estado.pedOrc.push({ TIPO: l.TIPO, NUMERO: l.NUMERO, RAZAO_SOCIAL: 'VB' }); throw duplicado(); }
         if (estado.pedOrc.some(p => p.NUMERO === l.NUMERO && p.TIPO === l.TIPO)) throw duplicado();
       }
-      estado[TABELA[tabela]].push(l); return { affectedRows: 1 }; }],
+      if (l.id === null || l.id === undefined) { delete l.id; l[tabela === 'ped_orc_itens_v4' ? 'ID' : 'id'] = ++ultimoId; }
+      estado[TABELA[tabela]].push(l); return { affectedRows: 1, insertId: ultimoId }; }],
+    // leitura do documento (lerDocumento)
+    [/^SELECT \* FROM (\w+) WHERE NUMERO = \?( AND TIPO = \?)?( ORDER BY id)?( FOR UPDATE)?$/, (sql, [n, t]) => {
+      const lista = estado[TABELA[sql.match(/FROM (\w+)/)[1]]];
+      return lista.filter(x => Number(x.NUMERO) === Number(n) && (t === undefined || x.TIPO === t))
+        .sort((a, b) => (a.id ?? a.ID ?? 0) - (b.id ?? b.ID ?? 0)).map(x => ({ ...x })); }],
+    [/FROM cadastro_clientes WHERE RAZAO_SOCIAL = \?/, (sql, [r]) => estado.clientes.filter(c => c.RAZAO_SOCIAL === r)],
+    // busca (GET /ped_orc/buscar)
+    [/FROM ped_orc p/, (sql, params) => {
+      const [tipo, ...resto] = params;
+      let lista = estado.pedOrc.filter(p => p.TIPO === tipo);
+      if (/p\.NUMERO = \?/.test(sql)) { const n = Number(resto.shift()); lista = lista.filter(p => p.NUMERO === n); }
+      if (/LIKE \?/.test(sql)) { const q = String(resto.shift()).replace(/%/g, '').toLowerCase(); lista = lista.filter(p => String(p.RAZAO_SOCIAL).toLowerCase().includes(q)); }
+      if (/c\.ESTADO IN/.test(sql)) lista = lista.filter(p => resto.includes(estado.clientes.find(c => c.RAZAO_SOCIAL === p.RAZAO_SOCIAL)?.ESTADO));
+      return lista.sort((a, b) => b.NUMERO - a.NUMERO).slice(0, 20)
+        .map(p => ({ tipo: p.TIPO, numero: p.NUMERO, cliente: p.RAZAO_SOCIAL, data: String(p.DATA || '').slice(0, 10), total: p.TOTAL })); }],
     [/^DELETE FROM (\w+) WHERE NUMERO = \?( AND TIPO = \?)?$/, (sql, [n, t]) => {
       const tabela = sql.match(/^DELETE FROM (\w+)/)[1], lista = estado[TABELA[tabela]];
       const fica = lista.filter(x => !(Number(x.NUMERO) === Number(n) && (t === undefined || x.TIPO === t)));
@@ -105,10 +124,10 @@ function bancoPedOrc() {
 const token = (id, nome) => jwt.sign({ id, nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // Sobe o app com o banco simulado; o usuário logado tem o perfil pedido.
-async function prepararPedOrc(t, { perfil = 'Administrador', banco = bancoPedOrc() } = {}) {
+async function prepararPedOrc(t, { perfil = 'Administrador', banco = bancoPedOrc(), estados = perfil === 'Representante SP' ? ['SP'] : [] } = {}) {
   pool.execute = banco.f.execute; pool.getConnection = banco.f.getConnection;
   t.mock.method(acesso, 'carregar', async id => ({ codigo: id, nome: 'Thiago', cargo: '', empresa: 'ELEGANCE', perfil: { id: 1, nome: perfil },
-    estados: [], ativo: true, permissoes: new Set(PERFIS[perfil]) }));
+    estados, ativo: true, permissoes: new Set(PERFIS[perfil]) }));
   t.mock.method(console, 'warn', () => {});
   t.mock.method(console, 'error', () => {});
   const s = await subir(app);

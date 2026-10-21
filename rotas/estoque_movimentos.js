@@ -23,7 +23,7 @@ function validarData(texto) {
 }
 const inteiroPositivo = v => Number.isInteger(v) && v >= 1;
 class ErroUsuario extends Error {
-  constructor(status, msg) { super(msg); this.status = status; }
+  constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; }
 }
 
 const ehDuplicado = err => err?.code === 'ER_DUP_ENTRY' || err?.errno === 1062;
@@ -45,7 +45,7 @@ async function emTransacao(pool, res, rotaNome, trabalho) {
     } catch (err) {
       if (conn) await conn.rollback().catch(() => {});
       if (ehConcorrencia(err) && tentativa < TENTATIVAS) continue;
-      if (err instanceof ErroUsuario) res.status(err.status).json({ error: err.message });
+      if (err instanceof ErroUsuario) res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
       else { console.error(`Erro ${rotaNome}:`, err.message); if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' }); }
       return undefined;
     } finally {
