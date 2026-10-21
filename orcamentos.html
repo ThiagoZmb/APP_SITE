@@ -150,7 +150,7 @@
         .item-visual .secao-item { margin-bottom: 16px; }
         .item-visual #cv-visualizacao { max-width: none; height: 480px; }
         .item-layout.sem-visual { grid-template-columns: minmax(0, 1fr); }
-        .item-layout.sem-visual .item-visual { display: none; }
+        .item-layout.sem-visual .item-visual { position: static; }
         @media (max-width: 1150px) {
             .item-layout { grid-template-columns: minmax(0, 1fr); }
             .item-visual { position: static; }
@@ -160,6 +160,34 @@
             main { padding: 20px; }
             .card { overflow-x: auto; }
         }
+        /* ===== compactação extra: mais itens por tela ===== */
+        html body section.card { padding: 10px 14px !important; margin-bottom: 10px !important; }
+        html body section.card > .card-title { margin-bottom: 6px !important; }
+        html body .secao-item { padding: 6px 10px 6px !important; margin-bottom: 6px !important; }
+        html body .secao-item h4 { margin-bottom: 4px !important; }
+        html body .grid-form { gap: 4px 8px !important; }
+        html body .form-group label, html body .viz-check { font-size: 11px !important; margin-bottom: 2px !important; }
+        html body .form-group input:not([type=checkbox]):not([type=radio]), html body .form-group select, html body #desconto {
+            padding: 3px 8px !important; min-height: 28px !important; height: 28px !important; font-size: 13px !important;
+        }
+        html body .btn { padding: 6px 14px !important; }
+        html body td { padding: 5px 8px !important; }
+        html body th { padding: 6px 8px !important; }
+        html body .viz-linha { margin-top: 4px; }
+        /* observação geral do pedido: destacada */
+        .obs-geral { background: #fff7e6; border: 1px solid #f5b041; border-left: 5px solid #e67e22; border-radius: 10px; padding: 6px 10px 8px; }
+        html body .obs-geral label { color: #a04000 !important; font-weight: 800 !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: .5px; }
+        #ped-obs { background: #fff; min-height: 52px; height: 52px; } /* começa baixa; dá para puxar o canto */
+        /* observação do item (abaixo do desenho) */
+        #f-obs { width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; font-size: 13px; }
+        /* porta de correr: com × sem sistema bem visível */
+        .correr-modo { margin: 2px 0 6px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 2px solid; }
+        .correr-modo.com { background: #e6f2ff; border-color: #0077ff; color: #004a9f; }
+        .correr-modo.sem { background: #fff1e6; border-color: #e8590c; color: #9a3a05; }
+        .correr-modo.pendente { background: #fff9db; border-color: #f2c200; color: #7a5d00; }
+        .correr-modo:empty { display: none; }
+        .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f2ff; color: #004a9f; border: 1px solid #0077ff; }
+        .chip-sistema.sem { background: #fff1e6; color: #9a3a05; border-color: #e8590c; }
         /* ===== acessórios ===== */
         .tab-acess-wrap { overflow-x: auto; }
         .tab-acess { width: 100%; font-size: 13px; }
@@ -217,7 +245,7 @@
         html body .grid-form { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important; gap: 6px 10px !important; }
         html body .form-group label, html body .viz-check { font-size: 11.5px !important; margin-bottom: 3px !important; }
         html body .form-group input:not([type=checkbox]):not([type=radio]), html body .form-group select, html body #desconto {
-            padding: 5px 10px !important; min-height: 32px !important; font-size: 13px !important;
+            padding: 3px 8px !important; min-height: 28px !important; height: 28px !important; font-size: 13px !important;
         }
         html body .form-group select { padding-right: 30px !important; background-position: right 9px center !important; }
         html body .acoes-linha { margin-top: 8px !important; gap: 8px !important; }
@@ -335,8 +363,8 @@
                         <label for="ped-cliente-final">Cliente final</label>
                         <input type="text" id="ped-cliente-final" maxlength="190">
                     </div>
-                    <div class="form-group full">
-                        <label for="ped-obs">Observação geral</label>
+                    <div class="form-group full obs-geral">
+                        <label for="ped-obs">Observação geral do pedido</label>
                         <textarea id="ped-obs" rows="2" maxlength="5000"></textarea>
                     </div>
                     <div class="form-group full" id="ped-campos-pedido" style="display:none">
@@ -363,13 +391,23 @@
                     </div>
                     <div class="item-layout">
                     <div class="item-dados">
+                    <!-- CORRER (antes das medidas: o sistema define se a medida é do vão ou da porta) -->
+                    <div class="secao-item secao-correr" style="display:none">
+                        <h4>↔️ Sistema de correr</h4>
+                        <div id="correr-modo" class="correr-modo" role="status"></div>
+                        <div class="grid-form">
+                            <div class="form-group"><label for="f-sistema">Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label for="f-transpasse">Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+                        </div>
+                        <div class="viz-status" id="correr-portas"></div>
+                    </div>
                     <!-- MEDIDAS -->
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
-                            <div class="form-group f-porta"><label>Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
-                            <div class="form-group f-porta"><label>Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                            <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
+                            <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                             <div class="form-group f-porta" id="wrap-pares">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
@@ -453,15 +491,6 @@
                             <div class="form-group av-larg" style="display:none"><label>Largura (mm)</label><input type="number" id="f-av-larg" min="0" placeholder="0"></div>
                         </div>
                     </div>
-                    <!-- CORRER -->
-                    <div class="secao-item secao-correr" style="display:none">
-                        <h4>↔️ Sistema de correr</h4>
-                        <div class="grid-form">
-                            <div class="form-group"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
-                            <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
-                        </div>
-                        <div class="viz-status" id="correr-portas"></div>
-                    </div>
                     <!-- ACESSÓRIOS (lstvAcessorios do frmPortasAbrir/frmPortasCorrer) -->
                     <div class="secao-item secao-porta" id="quadro-acessorios">
                         <h4>🔧 Acessórios</h4>
@@ -479,11 +508,10 @@
                     </div>
                     <!-- VALORES -->
                     <div class="secao-item">
-                        <h4>💰 Valores e observação</h4>
+                        <h4>💰 Valores</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Valor unitário</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                             <div class="form-group"><label title="Unitário × quantidade">Total do item</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
-                            <div class="form-group obs-item"><label>Observação</label><input id="f-obs" maxlength="500" placeholder="Detalhes do item"></div>
                         </div>
                         <div class="nota-pct" id="nota-pct"></div>
                     </div>
@@ -514,6 +542,11 @@
                         </div>
                         <div id="pnl-furacoes"></div>
                         <div class="viz-status" id="furos-resumo"></div>
+                    </div>
+                    <!-- 📝 OBSERVAÇÃO DO ITEM (abaixo do desenho, em todas as frentes) -->
+                    <div class="secao-item secao-obs-item">
+                        <h4>📝 Observação do item</h4>
+                        <textarea id="f-obs" rows="4" maxlength="500" placeholder="Detalhes deste item (vão para a lista e para o pedido)" aria-label="Observação do item"></textarea>
                     </div>
                     </aside>
                     </div>
@@ -742,6 +775,7 @@
                 document.getElementById('f-qtd').value = 1;
             }
             document.querySelectorAll('.secao-furos').forEach(el => el.style.display = ehPortaComFuros() ? '' : 'none');
+            atualizarModoCorrer();
             document.querySelector('.item-layout')?.classList.toggle('sem-visual', !ehPorta);
             // AplicarRegrasUsinagem: frente de gaveta não tem furação — limpa o que houver
             if (frenteAtual === 'Frente de gaveta') document.getElementById('pnl-furacoes').innerHTML = '';
@@ -1482,12 +1516,22 @@
             const qtdDivV = parseInt(val('f-div-v')) || 0;
             const ehPar = paresAtivo();
             const ctx = cv.getContext('2d');
+            // a área cresce em altura conforme a proporção das portas (até 80% da janela): porta alta e estreita fica grande
+            if (altura > 0 && largura > 0) {
+                garantirFolhas();
+                const n = Math.min(posicoesFolhas.length, 4);
+                const mmL = largura * n + (correrSis ? -transp : (n > 1 ? 150 : 0)) * (n - 1), mmA = altura + (correrSis ? 70 : 0);
+                const cssW = Math.max(300, cv.clientWidth);
+                const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
+                if (Math.abs(cv.getBoundingClientRect().height - alvo) > 2) cv.style.height = alvo + 'px';
+            } else cv.style.height = '';
             const W = cv.width = Math.max(300, cv.clientWidth) * 2;
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
             cv._zonas = [];
-            cv._cotas = []; // textos das cotas (também usados pelos testes)
-            const cota = (t, x, y) => { cv._cotas.push(t); ctx.fillText(t, x, y); };
+            cv._cotas = []; cv._coresCotas = {}; // textos e cores das cotas (também usados pelos testes)
+            const COR_VAO = '#0077ff', COR_PORTA = '#e8590c'; // vão em azul, porta em laranja
+            const cota = (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
             if (altura <= 0 || largura <= 0) {
                 ctx.font = fonte(26); ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
@@ -1496,11 +1540,14 @@
             garantirFolhas();
             const qtdFolhas = Math.min(posicoesFolhas.length, 4);
             // correr com sistema: folhas sobrepostas pelo transpasse, trilho superior em cima
-            const gapMm = correrSis ? -transp : (qtdFolhas > 1 ? 150 : 0), margem = 100, trilhoMm = correrSis ? 70 : 0;
+            // área máxima: só a margem das cotas (laterais para as alturas, topo/base para larguras e trilho)
+            const gapMm = correrSis ? -transp : (qtdFolhas > 1 ? 150 : 0), trilhoMm = correrSis ? 70 : 0;
+            const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 90 : 50, mBase = correrSis ? 80 : 60;
             const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
-            const esc = Math.min((W - margem * 2 - (correrSis ? 120 : 0)) / larguraTotal, (H - margem * 2 - (correrSis ? 60 : 0)) / (altura + trilhoMm));
+            const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + trilhoMm));
             const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc, trilhoPx = trilhoMm * esc;
-            const oy = (H - altPx + trilhoPx + (correrSis ? 40 : 0)) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            const oy = mTopo + trilhoPx + ((H - mTopo - mBase) - (altPx + trilhoPx)) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            cv._caixa = { x: ox0, y: oy - trilhoPx, w: larguraTotal * esc, h: altPx + trilhoPx };
             if (correrSis) {
                 const tw = larguraTotal * esc, ty = oy - trilhoPx;
                 const trilho = acessoriosItem.find(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`) && /SUP/i.test(`${a.classe || ''} ${a.nome}`));
@@ -1508,10 +1555,10 @@
                 ctx.fillStyle = '#5f6670'; ctx.fillRect(ox0, oy - hb - 4, tw, hb);
                 ctx.font = fonte(15); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
                 cota(trilho ? trilho.nome : 'Trilho superior', ox0 + tw / 2, oy - 4 - hb / 2 + 6);
-                ctx.font = fonte(17); ctx.fillStyle = '#8B0000';
-                cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - hb - 18);
-                ctx.save(); ctx.translate(ox0 - 34, ty + (altPx + trilhoPx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0); ctx.restore();
-                ctx.save(); ctx.translate(ox0 + tw + 44, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0); ctx.restore();
+                ctx.font = fonte(19);
+                cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - hb - 18, COR_VAO);
+                ctx.save(); ctx.translate(ox0 - 30, ty + (altPx + trilhoPx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0, COR_VAO); ctx.restore();
+                ctx.save(); ctx.translate(ox0 + tw + 46, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0, COR_PORTA); ctx.restore();
             }
             const perfilPx = Math.max(45 * esc, 8);
             const configAtivo = modoPuxador && temPuxador();
@@ -1606,13 +1653,13 @@
                     });
                 }
                 // cotas + rótulo da folha
-                ctx.font = fonte(17); ctx.fillStyle = '#6c757d'; ctx.textAlign = 'center';
-                cota(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 40 + (correrSis && f % 2 ? 26 : 0));
+                ctx.font = fonte(19); ctx.textAlign = 'center';
+                cota(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 34 + (correrSis && f % 2 ? 26 : 0), COR_PORTA);
                 if (f === 0 && !correrSis) {
                     ctx.save();
                     ctx.translate(ox - topoExtra - 24, oy + altPx / 2);
                     ctx.rotate(-Math.PI / 2);
-                    cota(`${altura} mm`, 0, 0);
+                    cota(`${altura} mm`, 0, 0, COR_PORTA);
                     ctx.restore();
                 }
                 if (qtdFolhas > 1) {
@@ -1812,7 +1859,7 @@
         function limparForm() {
             const catAvulso = val('f-av-cat');
             limparAcessorios();
-            document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
+            document.querySelectorAll('#form-item input, #form-item select, #form-item textarea').forEach(el => {
                 if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
@@ -1865,6 +1912,8 @@
         }
         const BADGE_FRENTE = { 'Porta de giro': 'bf-abrir', 'Porta basculante': 'bf-basculante', 'Frente de gaveta': 'bf-gaveta',
                                'Porta de Correr': 'bf-correr', 'Serralheria': 'bf-serralheria', 'Avulso': 'bf-avulso' };
+        const chipSistema = s => (!s || s === 'Sem sistema')
+            ? '<span class="chip-sistema sem">Sem sistema</span>' : `<span class="chip-sistema">Com sistema: ${escapeHtml(s)}</span>`;
         function renderItens() {
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
@@ -1884,7 +1933,7 @@
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
-                        <td>${escapeHtml(it.descricao)}</td>
+                        <td>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
@@ -2045,7 +2094,25 @@
             const t = parseFloat(val('f-transpasse')) || 0;
             return { altura: Math.round(a - sistemaCorrer.descontoAltura), largura: Math.round(n > 1 ? (l + t * (n - 1)) / n : l), n };
         }
+        // porta de correr: deixa claro se a medida é do VÃO (com sistema) ou de cada PORTA (sem sistema)
+        function atualizarModoCorrer() {
+            const modo = document.getElementById('correr-modo');
+            const lAlt = document.querySelector('label[for="f-altura"]'), lLarg = document.querySelector('label[for="f-largura"]');
+            if (!ehCorrer()) { modo.textContent = ''; modo.className = 'correr-modo'; lAlt.textContent = 'Altura (mm)'; lLarg.textContent = 'Largura (mm)'; return; }
+            const v = val('f-sistema');
+            if (!v) {
+                modo.className = 'correr-modo pendente'; modo.textContent = '⚠️ Escolha o sistema de correr — ou "Sem sistema" para informar a medida de cada porta.';
+            } else if (temSistemaCorrer()) {
+                modo.className = 'correr-modo com'; modo.textContent = '🛤️ COM SISTEMA — informe as medidas do VÃO; as portas e os trilhos são calculados.';
+            } else {
+                modo.className = 'correr-modo sem'; modo.textContent = '🚪 SEM SISTEMA — informe as medidas de cada PORTA; sem trilhos nem itens do sistema.';
+            }
+            const doVao = temSistemaCorrer();
+            lAlt.textContent = doVao ? 'Altura do vão (mm)' : 'Altura da porta (mm)';
+            lLarg.textContent = doVao ? 'Largura do vão (mm)' : 'Largura da porta (mm)';
+        }
         function renderAcessorios() {
+            atualizarModoCorrer();
             document.querySelector('#quadro-acessorios tbody').innerHTML = acessoriosItem.map((a, i) => `
                 <tr data-nome="${escapeHtml(a.nome)}" data-origem="${escapeHtml(a.origem)}">
                     <td>${escapeHtml(a.nome)}</td>
