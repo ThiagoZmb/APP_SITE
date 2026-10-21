@@ -77,7 +77,7 @@ async function reservarChave(conn, { chave, tipo, quem, referencia }) {
 async function travarProdutos(conn, codigos) {
   const unicos = [...new Set(codigos.map(Number))];
   const [linhas] = await conn.execute(
-    `SELECT CODIGO, NOME_PRODUTO, QTD_ESTOQUE, VALOR, CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR
+    `SELECT CODIGO, NOME_PRODUTO, QTD_ESTOQUE, VALOR, CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, COD_FORNECEDOR
      FROM estoque WHERE CODIGO IN (${unicos.map(() => '?').join(', ')}) FOR UPDATE`, unicos);
   return new Map(linhas.map(l => [Number(l.CODIGO), l]));
 }
@@ -197,7 +197,7 @@ function registrarEstoqueMovimentos({ rota, pool }) {
       let todos = null;
       if (resolvidos.some(r => !r.produto)) {
         [todos] = await pool.execute(
-          "SELECT CODIGO, NOME_PRODUTO, UNIDADE, FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' OR (SITUACAO = 'Inativo' AND QTD_ESTOQUE <> 0)");
+          "SELECT CODIGO, NOME_PRODUTO, UNIDADE, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, COD_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' OR (SITUACAO = 'Inativo' AND QTD_ESTOQUE <> 0)");
       }
       const sugerir = (it, iguais) => {
         const pontos = new Map(iguais.map(x => [x.produto.CODIGO, 1])); // nome igual em vários produtos: todos entram, à frente
@@ -210,7 +210,7 @@ function registrarEstoqueMovimentos({ rota, pool }) {
           linhas.set(e.CODIGO, e);
         }
         return [...pontos].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, Math.max(MAX_SUGESTOES, iguais.length))
-          .map(([codigo]) => produto(linhas.get(codigo)));
+          .map(([codigo]) => { const e = linhas.get(codigo); return { ...produto(e), codFornecedor: e.COD_FORNECEDOR || '', fornecedor: e.FORNECEDOR || '' }; });
       };
       const verValores = req.acesso.permissoes.has('valores.ver');
       const itens = nota.itens.map((it, k) => {
@@ -279,6 +279,15 @@ function registrarEstoqueMovimentos({ rota, pool }) {
         const p = produtos.get(codigo);
         resumo.push({ produto: p.NOME_PRODUTO, antes: Number(p.QTD_ESTOQUE) || 0, depois: (Number(p.QTD_ESTOQUE) || 0) + qtd });
       }
+      // fornecedor trocou o código: o item é deste fornecedor e o código da nota é outro → o cadastro passa a ter o novo
+      // (o antigo continua na ligação da web, se o fornecedor voltar a usá-lo)
+      const codigosAtualizados = [];
+      for (const { it, p } of linhas) {
+        const cod = txt(it.codFabricante, 100);
+        if (!cod || p.FORNECEDOR !== fornecedor || p.COD_FORNECEDOR === cod || codigosAtualizados.some(c => c.produto === p.NOME_PRODUTO)) continue;
+        await conn.execute('UPDATE estoque SET COD_FORNECEDOR = ? WHERE CODIGO = ? AND FORNECEDOR = ?', [cod, p.CODIGO, fornecedor]);
+        codigosAtualizados.push({ produto: p.NOME_PRODUTO, de: p.COD_FORNECEDOR || '', para: cod });
+      }
       // ligação "item do fabricante → produto do estoque" para a próxima nota
       for (const { it, p } of linhas) {
         const cod = txt(it.codFabricante, 60);
@@ -291,9 +300,9 @@ function registrarEstoqueMovimentos({ rota, pool }) {
              atualizado_em = VALUES(atualizado_em), atualizado_por = VALUES(atualizado_por)`,
           [fornecedor, cod, txt(it.nomeFabricante, 190), p.CODIGO, fator, agoraLocal(), req.user.nome]);
       }
-      return resumo;
+      return { itens: resumo, codigosAtualizados };
     });
-    if (resultado) res.status(201).json({ itens: resultado });
+    if (resultado) res.status(201).json(resultado);
   });
 
   // ----- saída (frm_Saida_Estoque) -----

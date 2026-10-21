@@ -124,8 +124,10 @@ function bancoEstoque() {
       return e && { cod_fabricante: l.cod_fabricante, nome_fabricante: l.nome_fabricante, fator: l.fator, CODIGO: e.CODIGO, NOME_PRODUTO: e.NOME_PRODUTO, UNIDADE: e.UNIDADE };
     }).filter(Boolean)],
     [/SELECT CODIGO, NOME_PRODUTO, UNIDADE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE FORNECEDOR = \?/, (sql, [forn]) => estoque.filter(e => e.FORNECEDOR === forn)],
-    [/SELECT CODIGO, NOME_PRODUTO, UNIDADE, FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO/, () => estoque.filter(sitOk)],
+    [/SELECT CODIGO, NOME_PRODUTO, UNIDADE, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, COD_FORNECEDOR FROM estoque WHERE SITUACAO/, () => estoque.filter(sitOk)],
     [/SELECT RAZAO_FABRICANTE FROM nf_entrada WHERE NUMERO = \? LIMIT 1/, (sql, [n]) => estado.nfs.filter(x => x.NUMERO === n)],
+    [/UPDATE estoque SET COD_FORNECEDOR = \? WHERE CODIGO = \? AND FORNECEDOR = \?/, (sql, [cod, c, f]) => {
+      const e = estoque.find(x => x.CODIGO === Number(c) && x.FORNECEDOR === f); if (e) e.COD_FORNECEDOR = cod; return { affectedRows: e ? 1 : 0 }; }],
     [/INSERT INTO web_estoque_ligacoes/, (sql, [fornecedor, cod_fabricante, nome_fabricante, produto_codigo, fator, atualizado_em, atualizado_por]) => {
       const l = estado.ligacoes.find(x => x.fornecedor === fornecedor && x.cod_fabricante === cod_fabricante);
       if (l) Object.assign(l, { nome_fabricante, produto_codigo, fator, atualizado_por }); else estado.ligacoes.push({ fornecedor, cod_fabricante, nome_fabricante, produto_codigo, fator, atualizado_por });

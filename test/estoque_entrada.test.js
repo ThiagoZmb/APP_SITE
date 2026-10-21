@@ -47,7 +47,7 @@ test('Estoquista: valores vêm do cadastro, nunca do que a tela mandou', async t
   assert.equal(banco.entradas[0].VALOR_UNITARIO, 12.5);
   assert.equal(banco.entradas[0].VALOR_TOTAL, 37.5);
   assert.equal(banco.nfs[0].VALOR_TOTAL, 37.5);
-  assert.deepEqual(await r.json(), { itens: [{ produto: 'Perfil Slim', antes: 10, depois: 13 }] });
+  assert.deepEqual(await r.json(), { itens: [{ produto: 'Perfil Slim', antes: 10, depois: 13 }], codigosAtualizados: [] });
 });
 
 test('Interno completo: usa os valores da nota', async t => {
@@ -111,4 +111,24 @@ test('falha no meio desfaz tudo', async t => {
 test('só ver o estoque: 403', async t => {
   const { chamar } = await prepararEstoque(t, { perfil: 'Somente ver' });
   assert.equal((await chamar('/estoque/entrada', 'POST', nota())).status, 403);
+});
+
+// ----- código do fornecedor trocado: o cadastro do estoque passa a ter o código novo -----
+test('ligar item do mesmo fornecedor com código novo atualiza COD_FORNECEDOR do cadastro', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  const r = await chamar('/estoque/entrada', 'POST', nota({ itens: [{ item: 1, produtoCodigo: 1, qtd: 2, codFabricante: 'PS-99', nomeFabricante: 'PERFIL SLIM 6M' }] }));
+  assert.equal(r.status, 201, await r.clone().text());
+  assert.equal(banco.estoque[0].COD_FORNECEDOR, 'PS-99');
+  assert.deepEqual((await r.json()).codigosAtualizados, [{ produto: 'Perfil Slim', de: 'PS-01', para: 'PS-99' }]);
+});
+
+test('item de outro fornecedor ou com o mesmo código: cadastro não muda', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  banco.estoque[2].FORNECEDOR = 'OUTRO FORNECEDOR SA';
+  await chamar('/estoque/entrada', 'POST', nota({ itens: [
+    { item: 1, produtoCodigo: 1, qtd: 2, codFabricante: 'PS-01', nomeFabricante: 'PERFIL SLIM 6M' },
+    { item: 2, produtoCodigo: 3, qtd: 5, codFabricante: 'XX-1', nomeFabricante: 'PARAFUSO' }] }));
+  assert.equal(banco.estoque[0].COD_FORNECEDOR, 'PS-01');
+  assert.equal(banco.estoque[2].COD_FORNECEDOR, 'PAR-100');
+  assert.ok(!banco.f.chamadas.some(c => /UPDATE estoque SET COD_FORNECEDOR/.test(c.sql)));
 });

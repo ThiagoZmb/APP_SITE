@@ -100,6 +100,7 @@
         tr.pendente td { background: rgba(178,106,0,.08); }
         /* a célula do produto quebra linha (o tema corta texto com "…" nas tabelas) */
         #e-itens td.e-prod { min-width: 240px; white-space: normal; overflow: visible; text-overflow: clip; }
+        .e-codigo-novo { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 4px; }
         .e-acoes-linha { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pendencia { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 3px; }
         tr.excede .s-atual { color: var(--erro); font-weight: 800; }
@@ -489,6 +490,12 @@
             return '';
         }
         const ORIGEM = { ligacao: ['ok', 'ligado'], cadastro: ['', 'do cadastro'], nome: ['aviso', 'código mudou'], sugestao: ['', 'escolhido'], novo: ['ok', 'cadastrado agora'] };
+        // linha ligada a item deste fornecedor com outro código: ao lançar, o cadastro passa a ter o código da nota
+        const avisoCodigoNovo = l => {
+            const p = l.produto;
+            if (!p || !l.codFabricante || p.fornecedor !== $('e-fornecedor').value || (p.codFornecedor || '') === l.codFabricante) return '';
+            return `<small class="e-codigo-novo">código do fornecedor será atualizado: ${esc(p.codFornecedor || '(vazio)')} → ${esc(l.codFabricante)}</small>`;
+        };
         // selo da origem; "código mudou" mostra o código antigo e o novo ao passar o mouse
         const seloOrigem = l => {
             const o = l.origem && ORIGEM[l.origem]; if (!o) return '';
@@ -502,10 +509,10 @@
                     <td>${l.item}</td>
                     <td class="e-prod">${l.produto
                         ? `<b>${esc(l.produto.nome)}</b> ${seloOrigem(l)}
-                           <button type="button" class="btn btn-secundario btn-mini e-trocar">trocar</button>`
+                           <button type="button" class="btn btn-secundario btn-mini e-trocar">trocar</button>${avisoCodigoNovo(l)}`
                         : `<div class="busca"><input class="e-busca" placeholder="Buscar produto" autocomplete="off"><div class="sugestoes" hidden></div></div>
                            <div class="e-acoes-linha">${(l.sugestoes || []).map(sg => `<button type="button" class="btn btn-secundario btn-mini e-usar" data-codigo="${sg.codigo}" title="Nome parecido com o da nota">Usar: ${esc(sg.nome)}</button>`).join('')}
-                           <button type="button" class="btn btn-secundario btn-mini e-cadastrar" data-perm="estoque.editar valores.ver">＋ Cadastrar</button></div>`}
+                           ${(l.sugestoes || []).length ? '' : '<button type="button" class="btn btn-secundario btn-mini e-cadastrar" data-perm="estoque.editar valores.ver">＋ Cadastrar</button>'}</div>`}
                         <span class="pendencia"></span></td>
                     <td><input class="e-nome" value="${esc(l.nomeFabricante)}" maxlength="190"></td>
                     <td class="num"><input class="qtd e-qtd" inputmode="decimal" value="${numCampo(l.qtdNota)}"> <small>${esc(l.unidadeNota)}</small></td>
@@ -520,7 +527,7 @@
                 const i = Number(tr.dataset.i);
                 const busca = tr.querySelector('input.e-busca');
                 if (busca) criarBuscaProduto(busca, tr.querySelector('.sugestoes'), p => {
-                    Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor }, origem: null });
+                    Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor, codFornecedor: p.codFornecedor, fornecedor: p.fornecedor }, origem: null });
                     renderEntrada();
                     $('e-itens').querySelector(`tr[data-i="${i}"] input.e-qtd`)?.focus();
                 });
@@ -549,7 +556,10 @@
         $('e-conferir')._reavaliar = atualizarEntrada;
         ['e-numero', 'e-data'].forEach(id => $(id).addEventListener('input', atualizarEntrada));
         $('e-numero').addEventListener('input', () => { entrada.notaLancada = false; atualizarEntrada(); }); // outro número: o aviso do XML não vale mais
-        function aoTrocarFornecedor() { if ($('e-fornecedor').value) entrada.emitenteSemCadastro = ''; }
+        function aoTrocarFornecedor() {
+            if ($('e-fornecedor').value) entrada.emitenteSemCadastro = '';
+            if (linhasEntrada.length) renderEntrada(); // o aviso de código novo depende do fornecedor
+        }
         $('e-fornecedor').addEventListener('change', () => { aoTrocarFornecedor(); atualizarEntrada(); });
         $('e-itens').addEventListener('input', e => {
             const tr = e.target.closest('tr[data-i]'); if (!tr) return;
@@ -599,7 +609,8 @@
             $('e-fornecedor').value = n.fornecedor || '';
             entrada.notaLancada = !!n.notaJaLancada;
             entrada.emitenteSemCadastro = n.fornecedor ? '' : (n.emitente?.nome || 'emitente sem nome');
-            linhasEntrada = (n.itens || []).map(it => ({ item: it.item, produto: it.produto ? { ...it.produto } : null,
+            linhasEntrada = (n.itens || []).map(it => ({ item: it.item,
+                produto: it.produto ? { ...it.produto, ...(it.origem === 'nome' ? { codFornecedor: it.codigoAnterior || '', fornecedor: n.fornecedor } : {}) } : null,
                 nomeFabricante: it.nomeFabricante || '', codFabricante: it.codFabricante || '', qtdNota: Number(it.qtdNota), fator: Number(it.fator) || 1,
                 unidadeNota: it.unidadeNota || '', unitarioNota: it.unitarioNota ?? NaN, totalNota: it.totalNota ?? NaN, observacao: it.observacao || '', origem: it.origem,
                 codigoAnterior: it.codigoAnterior || '', sugestoes: it.sugestoes || [] }));
@@ -621,7 +632,33 @@
         // ----- "＋ Cadastrar": item que não existe no estoque, cadastrado sem sair da nota -----
         // Mesma rota e regras do cadastro do Estoque (/estoque/salvar); nasce com estoque 0 (a entrada soma).
         let cadastrosEstoque = null; // classes e unidades já usadas no estoque
+        // Antes de cadastrar: busca ampla no estoque pelas palavras do nome; achando algo, oferece "Usar este"
         async function abrirCadastroItem(i) {
+            const l = linhasEntrada[i];
+            const palavras = [...new Set(String(l.nomeFabricante || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^A-Za-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w)))].slice(0, 2);
+            const candidatos = new Map();
+            try {
+                for (const w of palavras) for (const p of await api('/estoque/mov/produtos?busca=' + encodeURIComponent(w))) if (candidatos.size < 8) candidatos.set(p.codigo, p);
+            } catch (e) { return toast(e.message, 'erro'); }
+            if (!candidatos.size) return formularioCadastro(i);
+            $('modal-titulo').textContent = 'Este item já existe no estoque?';
+            $('modal-corpo').innerHTML = `<p class="dica">Antes de cadastrar, confira se o item já existe: se for um destes, só o código do fornecedor mudou.</p>
+                <div id="c-candidatos" class="e-acoes-linha" style="flex-direction:column;align-items:stretch;margin-top:10px">${[...candidatos.values()].map(p =>
+                    `<button type="button" class="btn btn-secundario" data-codigo="${p.codigo}" style="text-align:left">Usar este: <b>${esc(p.produto)}</b> <small class="dica">${esc(p.fornecedor || '')} ${p.codFornecedor ? '· cód. ' + esc(p.codFornecedor) : ''}</small></button>`).join('')}</div>`;
+            $('modal-ok').textContent = 'Não é nenhum destes, cadastrar novo'; $('modal-cancelar').textContent = 'Cancelar'; $('modal-cancelar').hidden = false; $('modal-ok').disabled = false;
+            $('modal').classList.add('aberto');
+            const fechar = () => { $('modal').classList.remove('aberto'); $('modal-ok').onclick = $('modal-cancelar').onclick = null; };
+            $('modal-cancelar').onclick = fechar;
+            $('modal-ok').onclick = () => { fechar(); formularioCadastro(i); };
+            $('c-candidatos').addEventListener('click', e => {
+                const b = e.target.closest('button[data-codigo]'); if (!b) return;
+                const p = candidatos.get(Number(b.dataset.codigo));
+                Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor, codFornecedor: p.codFornecedor, fornecedor: p.fornecedor }, origem: 'sugestao' });
+                fechar();
+                renderEntrada();
+            });
+        }
+        async function formularioCadastro(i) {
             const l = linhasEntrada[i];
             let codBarras = '';
             try {
@@ -696,6 +733,7 @@
             catch (e) { return toast(e.status === 0 ? 'Sem resposta do servidor: não dá para saber se a nota foi gravada. Confira o histórico antes de lançar de novo.' : 'Nada foi gravado: ' + e.message, 'erro'); }
             limparEntrada();
             listaEntradas.recarregar();
+            if (r.codigosAtualizados?.length) toast('Código do fornecedor atualizado no cadastro: ' + r.codigosAtualizados.map(c => `${c.produto} (${c.de || 'vazio'} → ${c.para})`).join('; '), 'info');
             analisesDesatualizadas = true;
             await mostrarResultado('Nota lançada', r.itens);
         });
