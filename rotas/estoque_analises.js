@@ -74,7 +74,7 @@ function calcularAnalises({ hoje, janela, verValores, itens, saidasPorProduto, s
   const visiveis = classe ? lista.filter(x => x.classe === classe) : lista;
   const saida = visiveis.map(x => {
     const { _ano, _valor, ...resto } = x;
-    return { ...resto, abc: abc.get(x), ...(verValores ? { abcValor: abcValor.get(x), valor: _valor } : {}) };
+    return { ...resto, consumoAno: _ano, abc: abc.get(x), ...(verValores ? { abcValor: abcValor.get(x), valor: _valor } : {}) };
   });
 
   const resumo = {

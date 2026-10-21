@@ -34,6 +34,8 @@ test('consumo, cobertura, data de falta, alerta e tendência', () => {
   const i = porCodigo(r);
   assert.equal(r.diasDados, 90);
   assert.deepEqual([i[1].consumoDia, i[1].diasCobertura, i[1].dataFalta, i[1].prazoDias, i[1].alerta, i[1].tendencia], [2, 45, '2026-12-05', 15, 'ok', 1]);
+  assert.equal(i[1].consumoAno, 700); // consumo dos 12 meses (para o ranking da tela)
+  assert.equal(i[5].consumoAno, 0);
   assert.deepEqual([i[2].diasCobertura, i[2].alerta, i[2].tendencia], [10, 'comprar', null]);
   assert.deepEqual([i[3].alerta, i[3].diasCobertura, i[3].dataFalta], ['falta', null, null]);
   assert.deepEqual([i[4].alerta, i[4].diasCobertura, i[4].dataFalta], ['falta', null, null]);

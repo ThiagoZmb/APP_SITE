@@ -54,6 +54,37 @@
         .tabela input.qtd { width: 90px; text-align: right; }
         .vazio { text-align: center; color: var(--text-light); padding: 26px 0; }
         .dica { font-size: 12.5px; color: var(--text-light); }
+        /* ===== análises ===== */
+        .an-topo { margin-bottom: 14px; }
+        .an-cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .an-bloco h3 { font-size: 16px; margin-bottom: 10px; color: var(--text-dark); }
+        .an-bloco { margin-bottom: 14px; min-width: 0; }
+        .an-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+        .an-grade > * { min-width: 0; margin-bottom: 0; }
+        .an-largo { grid-column: 1 / -1; }
+        .an-grafico { position: relative; height: 260px; }
+        .an-cartao { display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer; font: inherit; padding: 14px 16px; }
+        .an-cartao small { color: var(--text-light); font-weight: 700; font-size: 12.5px; }
+        .an-cartao b { font-size: 26px; color: var(--text-dark); }
+        .an-cartao.erro b { color: var(--erro); } .an-cartao.aviso b { color: var(--aviso); }
+        .an-cartao.on { outline: 2px solid var(--primary-color); }
+        div.an-cartao { cursor: default; }
+        .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
+        .an-rank-linha { display: grid; grid-template-columns: 26px 1fr auto; gap: 4px 10px; align-items: center; padding: 6px 0; }
+        .an-rank-pos { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-light); color: var(--primary-color); font-size: 12px; font-weight: 800; display: grid; place-items: center; }
+        .an-rank-nome { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .an-rank-val { font-size: 13px; color: var(--text-light); white-space: nowrap; }
+        .an-rank-barra { grid-column: 2 / -1; height: 6px; background: #ececf2; border-radius: 4px; overflow: hidden; }
+        .an-rank-barra span { display: block; height: 100%; background: var(--primary-color); border-radius: 4px; }
+        .an-alternar { display: flex; gap: 6px; margin-bottom: 8px; }
+        .an-lista { list-style: none; }
+        .an-lista li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .an-subiram, .an-cairam { margin-bottom: 10px; }
+        .an-bloco h4 { font-size: 13px; color: var(--text-light); margin: 4px 0; }
+        b.sobe { color: var(--ok); } b.cai { color: var(--erro); }
+        .bloco-erro { color: var(--erro); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+        .bloco-hist { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-color); }
+        .bloco-hist h3 { font-size: 16px; margin-bottom: 10px; color: var(--text-dark); }
         .rodape-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
         .aviso { padding: 10px 14px; border-radius: 12px; background: rgba(178,106,0,.1); color: var(--aviso); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
         .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: #ececf2; color: var(--text-light); }
@@ -92,8 +123,9 @@
             .tabela { min-width: 560px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610212000">
-    <script src="layout.js?v=202610212000" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="tema.css?v=202610211300">
+    <script src="layout.js?v=202610211300" defer></script>
 </head>
 <body>
     <div class="container">
@@ -110,6 +142,7 @@
                 <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
                 <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
                 <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+                <a class="aba-est" data-aba="analises" href="movimentacao_estoque.html?aba=analises">Análises</a>
             </nav>
             <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico dos movimentos</p>
 
@@ -136,6 +169,19 @@
                     <span data-valor>Total da nota: <b id="e-total">R$ 0,00</b></span>
                     <button type="button" class="btn btn-primario" id="e-conferir" disabled>Conferir e lançar</button>
                 </div>
+                <div class="bloco-hist" id="e-historico">
+                    <h3>Últimas notas <small class="dica">últimos 30 dias</small></h3>
+                    <div class="linha-campos">
+                        <div class="campo"><label>Produto</label><input class="hb-produto" placeholder="parte do nome" autocomplete="off"></div>
+                        <div class="campo"><label>Nº da nota</label><input class="hb-nota" autocomplete="off"></div><button type="button" class="btn btn-secundario hb-buscar">Buscar</button>
+                    </div>
+                    <div class="rolagem">
+                        <table class="tabela">
+                            <thead><tr><th>Data</th><th>Tipo</th><th>Referência</th><th class="num">Itens</th><th>Usuário</th><th></th></tr></thead>
+                            <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
 
             <!-- ===== SAÍDA ===== -->
@@ -158,6 +204,19 @@
                             <div class="campo"><label for="s-data">Data</label><input type="date" id="s-data"></div>
                             <button type="button" class="btn btn-primario" id="s-lancar" disabled>Lançar saída</button>
                         </div>
+                </div>
+                <div class="bloco-hist" id="s-historico">
+                    <h3>Últimas saídas <small class="dica">últimos 30 dias</small></h3>
+                    <div class="linha-campos">
+                        <div class="campo"><label>Produto</label><input class="hb-produto" placeholder="parte do nome" autocomplete="off"></div>
+                        <button type="button" class="btn btn-secundario hb-buscar">Buscar</button>
+                    </div>
+                    <div class="rolagem">
+                        <table class="tabela">
+                            <thead><tr><th>Data</th><th>Tipo</th><th>Referência</th><th class="num">Itens</th><th>Usuário</th><th></th></tr></thead>
+                            <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -197,6 +256,31 @@
                     </table>
                 </div>
                 <p class="dica" style="margin-top:10px">Clique num movimento para ver os itens. Entradas lançadas pelo VB não têm usuário.</p>
+            </section>
+            <!-- ===== ANÁLISES ===== -->
+            <section id="painel-analises" hidden>
+                <div class="painel linha-campos an-topo">
+                    <div class="campo"><label for="an-janela">Consumo médio dos últimos</label>
+                        <select id="an-janela"><option value="60">60 dias</option><option value="90" selected>90 dias</option><option value="180">180 dias</option></select></div>
+                    <div class="campo"><label for="an-classe">Classe</label><select id="an-classe"><option value="">Todas</option></select></div>
+                    <p class="dica" id="an-base" style="align-self:center"></p>
+                </div>
+                <div class="an-cartoes" id="an-cartoes"></div>
+                <div class="painel an-bloco" id="an-previsao">
+                    <h3>Previsão de falta</h3>
+                    <div class="bloco-erro" hidden></div>
+                    <div class="rolagem"><table class="tabela">
+                        <thead><tr><th>Produto</th><th class="num">Estoque</th><th class="num">Consumo/dia</th><th class="num">Dura (dias)</th><th>Falta em</th><th class="num">Prazo</th><th>Alerta</th><th class="num">Tendência</th></tr></thead>
+                        <tbody><tr><td colspan="8" class="vazio">Carregando...</td></tr></tbody>
+                    </table></div>
+                </div>
+                <div class="an-grade">
+                    <div class="painel an-bloco" id="an-mensal"><h3>Entradas x saídas por mês</h3><div class="bloco-erro" hidden></div><div class="an-grafico"><canvas></canvas></div></div>
+                    <div class="painel an-bloco" id="an-ranking"><h3>Mais consumidos (12 meses)</h3><div class="bloco-erro" hidden></div><div class="an-conteudo"></div></div>
+                    <div class="painel an-bloco" id="an-tendencias"><h3>Tendências</h3><div class="bloco-erro" hidden></div><div class="an-conteudo"></div></div>
+                    <div class="painel an-bloco" id="an-parados"><h3>Itens parados</h3><div class="bloco-erro" hidden></div><div class="an-conteudo"></div></div>
+                    <div class="painel an-bloco an-largo" id="an-sazonalidade"><h3>Sazonalidade das saídas</h3><div class="bloco-erro" hidden></div><div class="an-grafico"><canvas></canvas></div></div>
+                </div>
             </section>
         </main>
     </div>
@@ -357,8 +441,8 @@
         }
 
         // ===================== ABAS =====================
-        const ORDEM_ABAS = ['entrada', 'saida', 'ajuste', 'historico'];
-        const PERM_ABA = { entrada: 'estoque.movimentar', saida: 'estoque.movimentar', ajuste: 'estoque.ajustar', historico: '' };
+        const ORDEM_ABAS = ['entrada', 'saida', 'ajuste', 'historico', 'analises'];
+        const PERM_ABA = { entrada: 'estoque.movimentar', saida: 'estoque.movimentar', ajuste: 'estoque.ajustar', historico: '', analises: '' };
         const iniciadores = {};
         const iniciadas = new Set();
         const abaPermitida = nome => ORDEM_ABAS.includes(nome) && (!PERM_ABA[nome] || pode(PERM_ABA[nome]));
@@ -368,6 +452,7 @@
             history.replaceState(null, '', `${location.pathname}?aba=${nome}`);
             ORDEM_ABAS.forEach(a => { $('painel-' + a).hidden = a !== nome; });
             if (!iniciadas.has(nome) && iniciadores[nome]) { iniciadas.add(nome); iniciadores[nome](); }
+            else if (nome === 'analises' && analisesDesatualizadas) carregarAnalises();
         }
         // a barra é a mesma do cadastro (links); aqui dentro ela só troca de aba
         document.querySelectorAll('.aba-est[data-aba]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); abrirAba(b.dataset.aba); }));
@@ -538,6 +623,8 @@
             try { r = await api('/estoque/entrada', { corpo: { numero, data, fornecedor: forn, itens } }); }
             catch (e) { return toast(e.status === 0 ? 'Sem resposta do servidor: não dá para saber se a nota foi gravada. Confira o histórico antes de lançar de novo.' : 'Nada foi gravado: ' + e.message, 'erro'); }
             limparEntrada();
+            listaEntradas.recarregar();
+            analisesDesatualizadas = true;
             await mostrarResultado('Nota lançada', r.itens);
         });
         iniciadores.entrada = async () => {
@@ -547,6 +634,7 @@
                 const forns = await api('/estoque/mov/fornecedores');
                 $('e-fornecedor').innerHTML = '<option value="">— Escolha —</option>' + forns.map(f => `<option value="${esc(f.razao)}">${esc(f.razao)}</option>`).join('');
             } catch (e) { toast(e.message, 'erro'); }
+            listaEntradas.recarregar();
             $('e-numero').focus();
         };
 
@@ -596,6 +684,8 @@
             } catch (e) { if (!tratarErroLancamento(e, 'saída')) return; } // a chave fica: reenviar não lança duas vezes
             saida.itens = []; saida.chave = novaChave();
             renderSaida();
+            listaSaidas.recarregar();
+            analisesDesatualizadas = true;
             if (r) await mostrarResultado('Saída lançada', r.itens);
         });
         iniciadores.saida = () => {
@@ -605,6 +695,7 @@
                 $('s-lista').querySelector(`tr[data-codigo="${p.codigo}"] input.s-qtd`)?.focus();
             });
             renderSaida();
+            listaSaidas.recarregar();
             $('s-busca').focus();
         };
 
@@ -637,6 +728,7 @@
             catch (e) { if (!tratarErroLancamento(e, 'contagem')) return; }
             ajuste.chave = novaChave();
             escolherAjuste(null);
+            analisesDesatualizadas = true;
             if (r) await mostrarResultado('Estoque ajustado', r.itens);
         });
         iniciadores.ajuste = () => {
@@ -645,19 +737,38 @@
         };
 
         // ===================== HISTÓRICO e DESFAZER =====================
-        let historico = [];
+        const listasHistorico = []; // todas as listas montadas: um estorno recarrega as que já carregaram
         const TIPO_NOME = { entrada: ['Entrada', 'ok'], saida: ['Saída', 'aviso'], ajuste: ['Ajuste', ''], estorno: ['Estorno', ''] };
         // 'AAAA-MM-DD HH:MM:SS' → 'dd/mm/aaaa hh:mm' (entrada do VB só tem a data)
         const dataHora = q => { const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/.exec(String(q || '')); if (!m) return esc(q);
             return `${m[3]}/${m[2]}/${m[1]}` + (m[4] && !(m[4] === '00' && m[5] === '00') ? ` ${m[4]}:${m[5]}` : ''); };
-        async function carregarHistorico() {
-            const tbody = $('h-lista').querySelector('tbody');
-            const q = new URLSearchParams({ de: $('h-de').value, ate: $('h-ate').value });
-            for (const [k, id] of [['tipo', 'h-tipo'], ['produto', 'h-produto'], ['nota', 'h-nota'], ['usuario', 'h-usuario']]) if ($(id).value.trim()) q.set(k, $(id).value.trim());
-            tbody.innerHTML = '<tr><td colspan="6" class="vazio">Carregando...</td></tr>';
-            try { historico = await api('/estoque/historico?' + q); }
-            catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">${esc(e.message)}</td></tr>`; return; }
-            tbody.innerHTML = historico.length ? historico.map((g, i) => `
+        // Lista de movimentos (aba Histórico e blocos "Últimas notas/saídas"): obterFiltros() devolve
+        // { de, ate, tipo?, produto?, nota?, usuario? } no formato da rota /estoque/historico.
+        function criarListaHistorico(tabela, obterFiltros) {
+            const tbody = tabela.querySelector('tbody');
+            const lista = { grupos: [], carregada: false, recarregar };
+            async function recarregar() {
+                lista.carregada = true;
+                const q = new URLSearchParams();
+                for (const [k, v] of Object.entries(obterFiltros())) if (String(v ?? '').trim()) q.set(k, String(v).trim());
+                tbody.innerHTML = '<tr><td colspan="6" class="vazio">Carregando...</td></tr>';
+                try { lista.grupos = await api('/estoque/historico?' + q); }
+                catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">${esc(e.message)}</td></tr>`; return; }
+                tbody.innerHTML = linhasHistorico(lista.grupos);
+            }
+            tabela.addEventListener('click', e => {
+                const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+                const g = lista.grupos[Number(tr.dataset.i)];
+                if (e.target.closest('.h-desfazer')) return desfazer(g);
+                const aberto = tr.nextElementSibling?.classList.contains('detalhe');
+                tabela.querySelectorAll('tr.detalhe').forEach(d => d.remove());
+                if (!aberto) tr.insertAdjacentHTML('afterend', detalheHistorico(g));
+            });
+            listasHistorico.push(lista);
+            return lista;
+        }
+        function linhasHistorico(historico) {
+            return historico.length ? historico.map((g, i) => `
                 <tr data-i="${i}" style="cursor:pointer">
                     <td style="white-space:nowrap">${dataHora(g.quando)}</td>
                     <td><span class="selo ${TIPO_NOME[g.tipo]?.[1] || ''}">${TIPO_NOME[g.tipo]?.[0] || esc(g.tipo)}</span></td>
@@ -693,21 +804,208 @@
                     : await api('/estoque/saida/desfazer', { corpo: { data: g.data, usuario: g.usuario, motivo: texto } });
             } catch (e) { return toast('Nada foi desfeito: ' + e.message, 'erro'); }
             await mostrarResultado(ehEntrada ? 'Entrada desfeita' : 'Saída desfeita', r.itens);
-            carregarHistorico();
+            listasHistorico.filter(l => l.carregada).forEach(l => l.recarregar());
+            analisesDesatualizadas = true;
         }
-        $('h-lista').addEventListener('click', e => {
-            const tr = e.target.closest('tr[data-i]'); if (!tr) return;
-            const g = historico[Number(tr.dataset.i)];
-            if (e.target.closest('.h-desfazer')) return desfazer(g);
-            const aberto = tr.nextElementSibling?.classList.contains('detalhe');
-            $('h-lista').querySelectorAll('tr.detalhe').forEach(d => d.remove());
-            if (!aberto) tr.insertAdjacentHTML('afterend', detalheHistorico(g));
-        });
-        $('h-buscar').addEventListener('click', carregarHistorico);
+        // aba Histórico: todos os tipos, com os filtros dela
+        const listaGeral = criarListaHistorico($('h-lista'), () => ({ de: $('h-de').value, ate: $('h-ate').value, tipo: $('h-tipo').value,
+            produto: $('h-produto').value, nota: $('h-nota').value, usuario: $('h-usuario').value }));
+        $('h-buscar').addEventListener('click', () => listaGeral.recarregar());
         iniciadores.historico = () => {
             $('h-de').value = hojeISO(-30); $('h-ate').value = hojeISO();
-            carregarHistorico();
+            listaGeral.recarregar();
         };
+        // blocos "Últimas notas" (Entrada) e "Últimas saídas" (Saída): 30 dias, só o tipo da aba
+        function blocoHistorico(id, tipo) {
+            const raiz = $(id), campo = c => raiz.querySelector(c)?.value || '';
+            const lista = criarListaHistorico(raiz.querySelector('table'), () => ({ de: hojeISO(-30), ate: hojeISO(), tipo, produto: campo('.hb-produto'), nota: campo('.hb-nota') }));
+            raiz.querySelector('.hb-buscar').addEventListener('click', () => lista.recarregar());
+            raiz.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') lista.recarregar(); }));
+            return lista;
+        }
+        const listaEntradas = blocoHistorico('e-historico', 'entrada');
+        const listaSaidas = blocoHistorico('s-historico', 'saida');
+
+        // ===================== ANÁLISES =====================
+        let analise = null;
+        let analisesDesatualizadas = false; // lançamento ou estorno depois da última carga
+        const classesVistas = new Set(); // as classes do estoque inteiro (a lista não encolhe quando se filtra)
+        function erroBloco(id, msg) { const el = $(id).querySelector('.bloco-erro'); el.hidden = !msg; el.textContent = msg || ''; }
+        let pedidoAnalise = 0; // troca rápida de janela/classe: só a resposta do último pedido é desenhada
+        async function carregarAnalises() {
+            const meu = ++pedidoAnalise;
+            analisesDesatualizadas = false;
+            const q = new URLSearchParams({ janela: $('an-janela').value });
+            if ($('an-classe').value) q.set('classe', $('an-classe').value);
+            let r;
+            try { r = await api('/estoque/analises?' + q); }
+            catch (e) { if (meu !== pedidoAnalise) return; ['an-previsao', 'an-mensal', 'an-ranking', 'an-tendencias', 'an-parados', 'an-sazonalidade'].forEach(id => erroBloco(id, e.message)); return; }
+            if (meu !== pedidoAnalise) return;
+            analise = r;
+            ['an-previsao', 'an-mensal', 'an-ranking', 'an-tendencias', 'an-parados', 'an-sazonalidade'].forEach(id => erroBloco(id, ''));
+            const antes = classesVistas.size;
+            analise.itens.forEach(i => { if (i.classe) classesVistas.add(i.classe); });
+            if (classesVistas.size !== antes) {
+                const atual = $('an-classe').value;
+                $('an-classe').innerHTML = '<option value="">Todas</option>' + [...classesVistas].sort((a, b) => a.localeCompare(b, 'pt-BR')).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+                $('an-classe').value = atual;
+            }
+            $('an-base').textContent = analise.diasDados < 90 ? `Baseado em ${analise.diasDados} dia(s) de saídas registradas.` : '';
+            for (const desenhar of desenhosAnalise) { try { desenhar(analise); } catch (e) { console.error(e); } }
+        }
+        const desenhosAnalise = []; // cada bloco registra a sua função de desenho
+        $('an-janela').addEventListener('change', carregarAnalises);
+        $('an-classe').addEventListener('change', carregarAnalises);
+        iniciadores.analises = carregarAnalises;
+
+        // ----- cartões: clicar filtra a tabela da previsão; clicar de novo limpa -----
+        let filtroAnalise = '';
+        const CARTOES = [['falta', 'Em falta', 'erro'], ['comprar', 'Comprar', 'aviso'], ['atencao', 'Atenção', 'aviso'], ['parados', 'Parados', '']];
+        function desenharCartoes(a) {
+            $('an-cartoes').innerHTML = CARTOES.map(([f, t, c]) => `<button type="button" class="painel an-cartao ${c}${filtroAnalise === f ? ' on' : ''}" data-filtro="${f}">
+                    <small>${t}</small><b>${num(a.resumo[f] || 0)}</b></button>`).join('') +
+                (a.resumo.valorParado !== undefined ? `<div class="painel an-cartao" data-valor><small>Dinheiro parado</small><b>${moeda(a.resumo.valorParado)}</b></div>` : '');
+        }
+        desenhosAnalise.push(desenharCartoes);
+        $('an-cartoes').addEventListener('click', e => {
+            const b = e.target.closest('[data-filtro]'); if (!b || !analise) return;
+            filtroAnalise = filtroAnalise === b.dataset.filtro ? '' : b.dataset.filtro;
+            desenharCartoes(analise); desenharPrevisao(analise);
+        });
+
+        // ----- previsão de falta -----
+        const ALERTA = { falta: ['Em falta', 'erro'], comprar: ['Comprar', 'aviso'], atencao: ['Atenção', 'aviso'], ok: ['OK', 'ok'], sem_consumo: ['Sem consumo', ''], poucos_dados: ['Poucos dados', ''] };
+        const dataBR = d => d ? d.split('-').reverse().join('/') : '—';
+        const pct = t => t === null || t === undefined ? '—' : `${t >= 0 ? '▲' : '▼'} ${num(Math.round(Math.abs(t) * 100))}%`;
+        let redesenhandoPrevisao = false; // o campo de prazo que some no redesenho dispara "blur": não pode gravar
+        function desenharPrevisao(a) {
+            const editar = pode('estoque.editar');
+            const itens = !filtroAnalise ? a.itens : a.itens.filter(i => filtroAnalise === 'parados' ? i.parado : i.alerta === filtroAnalise);
+            redesenhandoPrevisao = true;
+            try { $('an-previsao').querySelector('tbody').innerHTML = itens.length ? itens.map(i => {
+                const [texto, cor] = ALERTA[i.alerta] || [i.alerta, ''];
+                return `<tr data-codigo="${i.codigo}">
+                    <td>${esc(i.produto)}<small class="pendencia" style="color:var(--text-light)">${esc(i.classe)} · ABC ${esc(i.abc)}</small></td>
+                    <td class="num">${num(i.qtd)} <small>${esc(i.unidade)}</small></td>
+                    <td class="num">${num(i.consumoDia)}</td>
+                    <td class="num">${i.diasCobertura === null ? '—' : num(i.diasCobertura)}</td>
+                    <td>${dataBR(i.dataFalta)}</td>
+                    <td class="num">${editar ? `<button type="button" class="btn btn-secundario btn-mini an-prazo" title="Prazo de reposição em dias (clique para alterar)">${i.prazoDias}</button>` : i.prazoDias}</td>
+                    <td><span class="selo ${cor}">${texto}${i.alerta === 'poucos_dados' ? ` (${a.diasDados} dias)` : ''}</span></td>
+                    <td class="num">${pct(i.tendencia)}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="8" class="vazio">Nenhum item</td></tr>'; } finally { redesenhandoPrevisao = false; }
+        }
+        desenhosAnalise.push(desenharPrevisao);
+        // ----- gráficos e listas -----
+        const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const COR = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', cinza: '#c7cbd4', ambar: '#f2a516' };
+        const graficos = {};
+        function desenharGrafico(id, config) {
+            graficos[id]?.destroy();
+            if (typeof Chart === 'undefined') return erroBloco(id, 'Não foi possível carregar os gráficos.');
+            graficos[id] = new Chart($(id).querySelector('canvas'), config);
+        }
+        const opcoesGrafico = extra => ({ responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }, ...extra });
+
+        desenhosAnalise.push(a => {
+            const media = a.mensal.reduce((s, m) => s + m.qtdSaidas, 0) / (a.mensal.length || 1);
+            desenharGrafico('an-mensal', { data: {
+                labels: a.mensal.map(m => `${MESES[+m.mes.slice(5, 7) - 1]}/${m.mes.slice(2, 4)}`),
+                datasets: [
+                    { type: 'bar', label: 'Entradas', data: a.mensal.map(m => m.qtdEntradas), backgroundColor: COR.verde, borderRadius: 4, maxBarThickness: 26 },
+                    { type: 'bar', label: 'Saídas', data: a.mensal.map(m => m.qtdSaidas), backgroundColor: COR.vinho, borderRadius: 4, maxBarThickness: 26 },
+                    { type: 'line', label: 'Média de saídas', data: a.mensal.map(() => Math.round(media * 10) / 10), borderColor: COR.ambar, borderDash: [5, 4], pointRadius: 0, borderWidth: 2 }
+                ] }, options: opcoesGrafico() });
+        });
+
+        // mais consumidos (12 meses): por quantidade; com valores, também por valor
+        let medidaRanking = 'qtd';
+        function desenharRanking(a) {
+            const porValor = medidaRanking === 'valor' && a.itens.some(i => i.valor !== undefined);
+            const medida = i => porValor ? i.consumoAno * (i.valor || 0) : i.consumoAno;
+            const top = a.itens.filter(i => medida(i) > 0).sort((x, y) => medida(y) - medida(x)).slice(0, 10);
+            const maior = top.length ? medida(top[0]) : 1;
+            const alternar = a.itens.some(i => i.valor !== undefined)
+                ? `<div class="an-alternar" data-valor><button type="button" class="btn btn-mini${porValor ? '' : ' ativo'}" data-medida="qtd">Por quantidade</button>
+                   <button type="button" class="btn btn-mini${porValor ? ' ativo' : ''}" data-medida="valor">Por valor</button></div>` : ''; // .ativo = marcação do tema
+            $('an-ranking').querySelector('.an-conteudo').innerHTML = alternar + (top.length ? top.map((i, k) => `
+                <div class="an-rank-linha">
+                    <span class="an-rank-pos">${k + 1}</span><span class="an-rank-nome">${esc(i.produto)}</span>
+                    <span class="an-rank-val">${porValor ? moeda(medida(i)) : `${num(i.consumoAno)} ${esc(i.unidade)}`} · ABC ${esc(porValor ? i.abcValor : i.abc)}</span>
+                    <span class="an-rank-barra"><span style="width:${(medida(i) / maior * 100).toFixed(1)}%"></span></span>
+                </div>`).join('') : '<p class="vazio">Nenhuma saída nos últimos 12 meses</p>');
+        }
+        desenhosAnalise.push(desenharRanking);
+        $('an-ranking').addEventListener('click', e => {
+            const b = e.target.closest('button[data-medida]'); if (!b || !analise) return;
+            medidaRanking = b.dataset.medida; desenharRanking(analise);
+        });
+
+        // tendências: janela atual contra a anterior
+        desenhosAnalise.push(a => {
+            const com = a.itens.filter(i => i.tendencia !== null && i.tendencia !== undefined);
+            const lista = (itens, vazio) => itens.length ? '<ul class="an-lista">' + itens.map(i => `<li><span>${esc(i.produto)}</span><b class="${i.tendencia >= 0 ? 'sobe' : 'cai'}">${pct(i.tendencia)}</b></li>`).join('') + '</ul>' : `<p class="vazio">${vazio}</p>`;
+            $('an-tendencias').querySelector('.an-conteudo').innerHTML =
+                `<div class="an-subiram"><h4>Mais subiram</h4>${lista(com.filter(i => i.tendencia > 0).sort((x, y) => y.tendencia - x.tendencia).slice(0, 5), 'Nenhum item subiu')}</div>
+                 <div class="an-cairam"><h4>Mais caíram</h4>${lista(com.filter(i => i.tendencia < 0).sort((x, y) => x.tendencia - y.tendencia).slice(0, 5), 'Nenhum item caiu')}</div>`;
+        });
+
+        // itens parados (ativos, com estoque, sem saída há 90 dias ou mais)
+        desenhosAnalise.push(a => {
+            const parados = a.itens.filter(i => i.parado);
+            const dias = d => Math.round((Date.parse(a.hoje) - Date.parse(d)) / 864e5);
+            $('an-parados').querySelector('.an-conteudo').innerHTML = parados.length ? '<ul class="an-lista">' + parados.map(i => `
+                <li><span>${esc(i.produto)} <small class="dica">${num(i.qtd)} ${esc(i.unidade)}</small></span>
+                    <span class="dica">${i.ultimaSaida ? `última saída ${dataBR(i.ultimaSaida)} (há ${dias(i.ultimaSaida)} dias)` : 'nunca saiu'}</span>
+                    ${i.valor !== undefined ? `<b data-valor>${moeda(i.qtd * i.valor)}</b>` : ''}</li>`).join('') + '</ul>'
+                : '<p class="vazio">Nenhum item parado</p>';
+        });
+
+        // sazonalidade: média de saídas por mês do ano; picos (índice ≥ 1,2) em destaque
+        desenhosAnalise.push(a => {
+            const caixa = $('an-sazonalidade').querySelector('.an-grafico');
+            let aviso = $('an-sazonalidade').querySelector('.an-sem-dados');
+            if (!a.sazonalidade) {
+                graficos['an-sazonalidade']?.destroy(); delete graficos['an-sazonalidade'];
+                caixa.hidden = true;
+                if (!aviso) { aviso = document.createElement('p'); aviso.className = 'vazio an-sem-dados'; $('an-sazonalidade').appendChild(aviso); }
+                aviso.textContent = 'Ainda não há 12 meses de dados para medir sazonalidade.';
+                return;
+            }
+            caixa.hidden = false; aviso?.remove();
+            desenharGrafico('an-sazonalidade', { type: 'bar', data: { labels: MESES, datasets: [{ label: 'Saídas médias no mês', data: a.sazonalidade.map(m => m.media),
+                backgroundColor: a.sazonalidade.map(m => m.indice >= 1.2 ? COR.vinho : COR.cinza), borderRadius: 4 }] },
+                options: opcoesGrafico({ plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: c => { const i = a.sazonalidade[c.dataIndex].indice; return i === null ? '' : `${num(i)}× a média${i >= 1.2 ? ' (pico)' : ''}`; } } } } }) });
+        });
+
+        // prazo de reposição: clique → campo; Enter/sair grava; Esc cancela
+        $('an-previsao').addEventListener('click', e => {
+            const b = e.target.closest('button.an-prazo'); if (!b) return;
+            const codigo = Number(b.closest('tr').dataset.codigo), anterior = b.textContent.trim();
+            const campo = document.createElement('input');
+            campo.className = 'qtd an-prazo-campo'; campo.inputMode = 'numeric'; campo.value = anterior; campo.style.width = '70px';
+            b.replaceWith(campo); campo.focus(); campo.select();
+            let feito = false;
+            const voltar = () => { if (campo.isConnected) campo.replaceWith(b); };
+            const gravar = async () => {
+                if (feito || redesenhandoPrevisao || !campo.isConnected) return; // sumiu no redesenho: descarta a edição
+                feito = true;
+                const valor = lerNumero(campo.value);
+                if (String(valor) === anterior) return voltar();
+                try { await api('/estoque/analises/prazo/' + codigo, { method: 'PUT', corpo: { prazoDias: valor } }); }
+                catch (err) { toast(err.message, 'erro'); return voltar(); }
+                toast('Prazo de reposição atualizado.', 'ok');
+                carregarAnalises();
+            };
+            campo.addEventListener('keydown', ev => {
+                if (ev.key === 'Enter') { ev.preventDefault(); gravar(); }
+                else if (ev.key === 'Escape') { feito = true; voltar(); }
+            });
+            campo.addEventListener('blur', gravar);
+        });
 
         // ===================== INÍCIO =====================
         document.addEventListener('DOMContentLoaded', () => {
