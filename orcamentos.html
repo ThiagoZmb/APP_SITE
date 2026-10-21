@@ -752,7 +752,7 @@
         // ============ FRENTES ============
         document.querySelectorAll('.frente-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                if (editandoIndex >= 0) limparForm(); // trocar de frente cancela a edição em andamento
+                limparForm(); // trocar de produto começa do zero (como abrir outra tela no VB); o cliente fica
                 document.querySelectorAll('.frente-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 frenteAtual = btn.dataset.frente;
@@ -1539,9 +1539,24 @@
             cv._cotas = []; cv._coresCotas = {}; // textos e cores das cotas (também usados pelos testes)
             const COR_VAO = '#0077ff', COR_PORTA = '#e8590c'; // vão em azul, porta em laranja
             const cota = (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
+            cv._generico = false;
             if (altura <= 0 || largura <= 0) {
-                ctx.font = fonte(26); ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
-                ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
+                // sem medidas: porta genérica do produto (tracejada), só para orientar
+                const [gA, gL, gN] = ehCorrer() ? [2100, 900, 2] : ehBasculante() ? [450, 1000, 1] : frenteAtual === 'Frente de gaveta' ? [250, 600, 1] : [2100, 800, 1];
+                const gGap = 150, gW = gL * gN + gGap * (gN - 1), gEsc = Math.min((W - 160) / gW, (H - 200) / gA);
+                const gx0 = (W - gW * gEsc) / 2, gy = (H - gA * gEsc) / 2 - 20, gPerfil = Math.max(45 * gEsc, 8);
+                cv._generico = true; cv._geo = { folhas: [], trilhoSup: null, trilhoInf: null };
+                ctx.setLineDash([14, 10]); ctx.lineWidth = 3;
+                for (let f = 0; f < gN; f++) {
+                    const x = gx0 + f * (gL + gGap) * gEsc, w = gL * gEsc, h = gA * gEsc;
+                    ctx.fillStyle = '#eef1f4'; ctx.fillRect(x, gy, w, h);
+                    ctx.strokeStyle = '#b8c0c8'; ctx.strokeRect(x, gy, w, h);
+                    ctx.fillStyle = '#f7fafc'; ctx.fillRect(x + gPerfil, gy + gPerfil, w - gPerfil * 2, h - gPerfil * 2);
+                    cv._geo.folhas.push({ x, y: gy, w, h });
+                }
+                ctx.setLineDash([]);
+                ctx.font = fonte(24); ctx.fillStyle = '#8a949e'; ctx.textAlign = 'center';
+                ctx.fillText('Informe altura e largura para desenhar', W / 2, gy + gA * gEsc + 50);
                 return;
             }
             garantirFolhas();
