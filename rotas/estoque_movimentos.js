@@ -97,6 +97,19 @@ function somarPorProduto(linhas) {
 }
 const NAO_ENCONTRADO = 'Movimento não encontrado (talvez já desfeito).';
 
+// nome para comparar: sem acento, maiúsculas, só letras e números separados por um espaço
+const normalizarNome = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+// semelhança entre nomes (Dice das palavras): 1 = mesmas palavras, 0 = nenhuma em comum
+function semelhanca(a, b) {
+  const pa = new Set(normalizarNome(a).split(' ').filter(Boolean)), pb = new Set(normalizarNome(b).split(' ').filter(Boolean));
+  if (!pa.size || !pb.size) return 0;
+  let comuns = 0;
+  for (const p of pa) if (pb.has(p)) comuns++;
+  return (2 * comuns) / (pa.size + pb.size);
+}
+const SEMELHANCA_MINIMA = 0.5;
+const MAX_SUGESTOES = 3;
+
 function registrarEstoqueMovimentos({ rota, pool }) {
   const falha = (res, rotaNome, err) => {
     console.error(`Erro ${rotaNome}:`, err.message);
@@ -150,25 +163,60 @@ function registrarEstoqueMovimentos({ rota, pool }) {
       const achado = nota.emitente.cnpj && forns.find(f => String(f.CNPJ || '').replace(/\D/g, '') === nota.emitente.cnpj);
       const fornecedor = achado ? achado.RAZAO_FABRICANTE : null;
       const [jaLancada] = await pool.execute('SELECT NUMERO FROM nf_entrada WHERE NUMERO = ? LIMIT 1', [nota.numero]);
-      // produto do item: 1º a ligação gravada pela web, 2º o código do fabricante no cadastro do VB
+      // produto do item, nesta ordem: 1º a ligação gravada pela web (código), 2º o código do fabricante no cadastro do VB,
+      // 3º o NOME no fornecedor igual (o fornecedor trocou o código) — só se apontar para um único produto,
+      // 4º sugestões por nome parecido (nunca ligam sozinhas)
       const ligacoes = new Map(), doCadastro = new Map();
+      const porNome = new Map(); // nome normalizado → [{ produto, fator, codigoAnterior }] do mesmo fornecedor
+      const anotarNome = (nome, alvo) => {
+        const k = normalizarNome(nome); if (!k) return;
+        const l = porNome.get(k) || []; if (!l.some(x => x.produto.CODIGO === alvo.produto.CODIGO)) l.push(alvo); porNome.set(k, l);
+      };
       if (fornecedor) {
         const [lig] = await pool.execute(
-          `SELECT l.cod_fabricante, l.fator, e.CODIGO, e.NOME_PRODUTO, e.UNIDADE
+          `SELECT l.cod_fabricante, l.nome_fabricante, l.fator, e.CODIGO, e.NOME_PRODUTO, e.UNIDADE
            FROM web_estoque_ligacoes l JOIN estoque e ON e.CODIGO = l.produto_codigo WHERE l.fornecedor = ?`, [fornecedor]);
-        for (const l of lig) ligacoes.set(l.cod_fabricante, l);
+        for (const l of lig) { ligacoes.set(l.cod_fabricante, l); anotarNome(l.nome_fabricante, { produto: l, fator: Number(l.fator) || 1, codigoAnterior: l.cod_fabricante }); }
         const [cad] = await pool.execute(
-          "SELECT CODIGO, NOME_PRODUTO, UNIDADE, COD_FORNECEDOR FROM estoque WHERE FORNECEDOR = ? AND COD_FORNECEDOR <> ''", [fornecedor]);
-        for (const c of cad) if (!doCadastro.has(c.COD_FORNECEDOR)) doCadastro.set(c.COD_FORNECEDOR, c);
+          'SELECT CODIGO, NOME_PRODUTO, UNIDADE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE FORNECEDOR = ?', [fornecedor]);
+        for (const c of cad) {
+          if (c.COD_FORNECEDOR && !doCadastro.has(c.COD_FORNECEDOR)) doCadastro.set(c.COD_FORNECEDOR, c);
+          anotarNome(c.NOME_PRODUTO_FORNECEDOR, { produto: c, fator: 1, codigoAnterior: c.COD_FORNECEDOR || '' });
+        }
       }
       const produto = l => ({ codigo: l.CODIGO, nome: l.NOME_PRODUTO, unidade: l.UNIDADE || '' });
-      const verValores = req.acesso.permissoes.has('valores.ver');
-      const itens = nota.itens.map(it => {
+      const resolvidos = nota.itens.map(it => {
         const lig = ligacoes.get(it.codFabricante), cad = doCadastro.get(it.codFabricante);
-        const base = lig ? { produto: produto(lig), fator: Number(lig.fator) || 1, origem: 'ligacao' }
-          : cad ? { produto: produto(cad), fator: 1, origem: 'cadastro' } : { produto: null, fator: 1, origem: null };
+        if (lig) return { produto: produto(lig), fator: Number(lig.fator) || 1, origem: 'ligacao' };
+        if (cad) return { produto: produto(cad), fator: 1, origem: 'cadastro' };
+        const iguais = porNome.get(normalizarNome(it.nomeFabricante)) || [];
+        if (iguais.length === 1) return { produto: produto(iguais[0].produto), fator: iguais[0].fator, origem: 'nome', codigoAnterior: iguais[0].codigoAnterior };
+        return { produto: null, fator: 1, origem: null, iguais };
+      });
+      // sugestões: nome no fornecedor (este fornecedor) ou nome Elegance (qualquer um) parecido; só para os que ficaram sem produto
+      let todos = null;
+      if (resolvidos.some(r => !r.produto)) {
+        [todos] = await pool.execute(
+          "SELECT CODIGO, NOME_PRODUTO, UNIDADE, FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' OR (SITUACAO = 'Inativo' AND QTD_ESTOQUE <> 0)");
+      }
+      const sugerir = (it, iguais) => {
+        const pontos = new Map(iguais.map(x => [x.produto.CODIGO, 1])); // nome igual em vários produtos: todos entram, à frente
+        const linhas = new Map(iguais.map(x => [x.produto.CODIGO, x.produto]));
+        for (const e of todos) {
+          const s = Math.max(semelhanca(it.nomeFabricante, e.NOME_PRODUTO),
+            e.FORNECEDOR === fornecedor ? semelhanca(it.nomeFabricante, e.NOME_PRODUTO_FORNECEDOR) : 0);
+          if (s < SEMELHANCA_MINIMA) continue;
+          pontos.set(e.CODIGO, Math.max(pontos.get(e.CODIGO) || 0, s));
+          linhas.set(e.CODIGO, e);
+        }
+        return [...pontos].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, Math.max(MAX_SUGESTOES, iguais.length))
+          .map(([codigo]) => produto(linhas.get(codigo)));
+      };
+      const verValores = req.acesso.permissoes.has('valores.ver');
+      const itens = nota.itens.map((it, k) => {
+        const { iguais, ...base } = resolvidos[k];
         const { unitarioNota, totalNota, ...semValor } = it;
-        return { ...(verValores ? it : semValor), ...base };
+        return { ...(verValores ? it : semValor), ...base, sugestoes: base.produto ? [] : sugerir(it, iguais || []) };
       });
       res.json({ numero: nota.numero, data: nota.data, emitente: nota.emitente, fornecedor, notaJaLancada: jaLancada.length > 0, itens,
         ...(verValores ? { totalNota: nota.totalNota } : {}) });

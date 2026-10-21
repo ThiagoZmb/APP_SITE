@@ -70,3 +70,52 @@ test('só ver o estoque: 403', async t => {
   const { chamar } = await prepararEstoque(t, { perfil: 'Somente ver' });
   assert.equal((await importar(chamar, xml('um_item.xml'))).status, 403);
 });
+
+// ----- código do fabricante trocado: reconhecimento pelo nome -----
+const comCodigo = (cProd, xProd) => xml('um_item.xml').replace('<cProd>PS-01</cProd>', `<cProd>${cProd}</cProd>`)
+  .replace('<xProd>PERFIL SLIM 6M</xProd>', `<xProd>${xProd}</xProd>`);
+
+test('código mudou, nome igual (sem diferença de maiúsculas/pontuação): liga e informa o código antigo', async t => {
+  const { chamar } = await prepararEstoque(t);
+  const it = (await (await importar(chamar, comCodigo('PS-99', 'Perfil  slim - 6M'))).json()).itens[0];
+  assert.deepEqual([it.produto?.codigo, it.origem, it.codigoAnterior], [1, 'nome', 'PS-01']);
+});
+
+test('nome igual pela ligação gravada (código antigo da ligação)', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  banco.ligacoes.push({ fornecedor: FORN, cod_fabricante: 'PAR-OLD', nome_fabricante: 'PARAFUSO CAIXA', produto_codigo: 3, fator: '100.0000' });
+  const it = (await (await importar(chamar, comCodigo('PAR-NEW', 'PARAFUSO CAIXA'))).json()).itens[0];
+  assert.deepEqual([it.produto?.codigo, it.origem, it.codigoAnterior, it.fator], [3, 'nome', 'PAR-OLD', 100]);
+});
+
+test('nome igual em dois produtos: não liga, sugere os dois', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  banco.estoque.push({ ...banco.estoque[0], CODIGO: 9, NOME_PRODUTO: 'Perfil Slim Preto', COD_FORNECEDOR: 'PS-02' });
+  const it = (await (await importar(chamar, comCodigo('PS-99', 'PERFIL SLIM 6M'))).json()).itens[0];
+  assert.equal(it.produto, null);
+  assert.deepEqual(it.sugestoes.map(s => s.codigo).sort(), [1, 9]);
+});
+
+test('nome parecido: só sugere, nunca liga', async t => {
+  const { chamar } = await prepararEstoque(t);
+  const it = (await (await importar(chamar, comCodigo('XYZ', 'PERFIL SLIM 6M PRETO FOSCO'))).json()).itens[0];
+  assert.equal(it.produto, null);
+  assert.equal(it.origem, null);
+  assert.ok(it.sugestoes.some(s => s.codigo === 1 && s.nome === 'Perfil Slim'), JSON.stringify(it.sugestoes));
+  assert.ok(it.sugestoes.length <= 3);
+});
+
+test('nome igual de OUTRO fornecedor não liga sozinho', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  banco.estoque[0].FORNECEDOR = 'OUTRO FORNECEDOR SA';
+  const it = (await (await importar(chamar, comCodigo('PS-99', 'PERFIL SLIM 6M'))).json()).itens[0];
+  assert.equal(it.produto, null);
+  assert.ok(it.sugestoes.some(s => s.codigo === 1));
+});
+
+test('item reconhecido pelo código não traz sugestões', async t => {
+  const { chamar } = await prepararEstoque(t);
+  const it = (await (await importar(chamar, xml('um_item.xml'))).json()).itens[0];
+  assert.equal(it.origem, 'cadastro');
+  assert.deepEqual(it.sugestoes, []);
+});
