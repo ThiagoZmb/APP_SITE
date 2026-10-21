@@ -70,6 +70,10 @@
         .an-cartao.on { outline: 2px solid var(--primary-color); }
         div.an-cartao { cursor: default; }
         .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
+        /* listas longas (estoque grande) rolam dentro do bloco; o cabeçalho da tabela fica fixo */
+        #an-previsao .rolagem { max-height: 480px; overflow: auto; }
+        #an-previsao thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+        #an-parados .an-conteudo { max-height: 360px; overflow-y: auto; }
         .an-rank-linha { display: grid; grid-template-columns: 26px 1fr auto; gap: 4px 10px; align-items: center; padding: 6px 0; }
         .an-rank-pos { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-light); color: var(--primary-color); font-size: 12px; font-weight: 800; display: grid; place-items: center; }
         .an-rank-nome { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -84,6 +88,8 @@
         b.sobe { color: var(--ok); } b.cai { color: var(--erro); }
         .bloco-erro { color: var(--erro); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
         .bloco-hist { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-color); }
+        .bloco-hist .rolagem { max-height: 420px; overflow: auto; }
+        .bloco-hist thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
         .bloco-hist h3 { font-size: 16px; margin-bottom: 10px; color: var(--text-dark); }
         .rodape-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
         .aviso { padding: 10px 14px; border-radius: 12px; background: rgba(178,106,0,.1); color: var(--aviso); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
