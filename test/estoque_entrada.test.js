@@ -132,3 +132,11 @@ test('item de outro fornecedor ou com o mesmo código: cadastro não muda', asyn
   assert.equal(banco.estoque[2].COD_FORNECEDOR, 'PAR-100');
   assert.ok(!banco.f.chamadas.some(c => /UPDATE estoque SET COD_FORNECEDOR/.test(c.sql)));
 });
+
+test('fornecedor gravado no item com outra grafia (maiúsculas/espaço) ainda atualiza o código', async t => {
+  const { banco, chamar } = await prepararEstoque(t);
+  banco.estoque[0].FORNECEDOR = 'fornecedor teste ltda ';
+  banco.regras.unshift([/UPDATE estoque SET COD_FORNECEDOR = \? WHERE CODIGO = \? AND FORNECEDOR = \?/, (sql, [cod, c]) => { banco.estoque.find(x => x.CODIGO === Number(c)).COD_FORNECEDOR = cod; return { affectedRows: 1 }; }]);
+  await chamar('/estoque/entrada', 'POST', nota({ itens: [{ item: 1, produtoCodigo: 1, qtd: 2, codFabricante: 'PS-99', nomeFabricante: 'PERFIL SLIM 6M' }] }));
+  assert.equal(banco.estoque[0].COD_FORNECEDOR, 'PS-99');
+});

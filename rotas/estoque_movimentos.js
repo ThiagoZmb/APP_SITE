@@ -284,7 +284,9 @@ function registrarEstoqueMovimentos({ rota, pool }) {
       const codigosAtualizados = [];
       for (const { it, p } of linhas) {
         const cod = txt(it.codFabricante, 100);
-        if (!cod || p.FORNECEDOR !== fornecedor || p.COD_FORNECEDOR === cod || codigosAtualizados.some(c => c.produto === p.NOME_PRODUTO)) continue;
+        // fornecedor comparado como o MySQL compara (sem diferença de maiúsculas/espaço no fim)
+        const mesmoFornecedor = String(p.FORNECEDOR ?? '').trimEnd().toLowerCase() === fornecedor.trimEnd().toLowerCase();
+        if (!cod || !mesmoFornecedor || p.COD_FORNECEDOR === cod || codigosAtualizados.some(c => c.produto === p.NOME_PRODUTO)) continue;
         await conn.execute('UPDATE estoque SET COD_FORNECEDOR = ? WHERE CODIGO = ? AND FORNECEDOR = ?', [cod, p.CODIGO, fornecedor]);
         codigosAtualizados.push({ produto: p.NOME_PRODUTO, de: p.COD_FORNECEDOR || '', para: cod });
       }

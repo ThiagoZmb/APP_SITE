@@ -101,6 +101,8 @@
         tr.pendente td { background: rgba(178,106,0,.08); }
         /* a célula do produto quebra linha (o tema corta texto com "…" nas tabelas) */
         #e-itens td.e-prod { min-width: 240px; white-space: normal; overflow: visible; text-overflow: clip; }
+        .e-antes { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
+        .e-cod { display: block; margin-top: 3px; }
         .e-codigo-novo { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 4px; }
         .e-acoes-linha { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pendencia { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 3px; }
@@ -494,7 +496,8 @@
         // linha ligada a item deste fornecedor com outro código: ao lançar, o cadastro passa a ter o código da nota
         const avisoCodigoNovo = l => {
             const p = l.produto;
-            if (!p || !l.codFabricante || p.fornecedor !== $('e-fornecedor').value || (p.codFornecedor || '') === l.codFabricante) return '';
+            const mesmo = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+            if (!p || !l.codFabricante || !mesmo(p.fornecedor, $('e-fornecedor').value) || (p.codFornecedor || '') === l.codFabricante) return '';
             return `<small class="e-codigo-novo">código do fornecedor será atualizado: ${esc(p.codFornecedor || '(vazio)')} → ${esc(l.codFabricante)}</small>`;
         };
         // selo da origem; "código mudou" mostra o código antigo e o novo ao passar o mouse
@@ -510,12 +513,14 @@
                     <td>${l.item}</td>
                     <td class="e-prod">${l.produto
                         ? `<b>${esc(l.produto.nome)}</b> ${seloOrigem(l)}
-                           <button type="button" class="btn btn-secundario btn-mini e-trocar">trocar</button>${avisoCodigoNovo(l)}`
-                        : `<div class="busca"><input class="e-busca" placeholder="Buscar produto" autocomplete="off"><div class="sugestoes" hidden></div></div>
+                           <button type="button" class="btn btn-secundario btn-mini e-trocar" title="Escolher outro item do estoque para esta linha">trocar produto</button>${avisoCodigoNovo(l)}`
+                        : `${l.anterior ? `<small class="e-antes">Escolha o novo produto (antes: ${esc(l.anterior.produto.nome)})</small>
+                              <button type="button" class="btn btn-secundario btn-mini e-cancelar-troca">cancelar</button>` : ''}
+                           <div class="busca"><input class="e-busca" placeholder="Buscar produto" autocomplete="off"><div class="sugestoes" hidden></div></div>
                            <div class="e-acoes-linha">${(l.sugestoes || []).map(sg => `<button type="button" class="btn btn-secundario btn-mini e-usar" data-codigo="${sg.codigo}" title="Nome parecido com o da nota">Usar: ${esc(sg.nome)}</button>`).join('')}
-                           ${(l.sugestoes || []).length ? '' : '<button type="button" class="btn btn-secundario btn-mini e-cadastrar" data-perm="estoque.editar valores.ver">＋ Cadastrar</button>'}</div>`}
+                           ${(l.sugestoes || []).length || l.anterior ? '' : '<button type="button" class="btn btn-secundario btn-mini e-cadastrar" data-perm="estoque.editar valores.ver">＋ Cadastrar</button>'}</div>`}
                         <span class="pendencia"></span></td>
-                    <td><input class="e-nome" value="${esc(l.nomeFabricante)}" maxlength="190"></td>
+                    <td><input class="e-nome" value="${esc(l.nomeFabricante)}" maxlength="190">${l.codFabricante ? `<small class="dica e-cod">cód. ${esc(l.codFabricante)}</small>` : ''}</td>
                     <td class="num"><input class="qtd e-qtd" inputmode="decimal" value="${numCampo(l.qtdNota)}"> <small>${esc(l.unidadeNota)}</small></td>
                     <td class="num"><input class="qtd e-fator" inputmode="decimal" value="${numCampo(l.fator)}"></td>
                     <td class="num"><b class="e-qtd-estoque"></b> <small>${esc(l.produto?.unidade || '')}</small></td>
@@ -528,7 +533,7 @@
                 const i = Number(tr.dataset.i);
                 const busca = tr.querySelector('input.e-busca');
                 if (busca) criarBuscaProduto(busca, tr.querySelector('.sugestoes'), p => {
-                    Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor, codFornecedor: p.codFornecedor, fornecedor: p.fornecedor }, origem: null });
+                    Object.assign(linhasEntrada[i], { produto: { codigo: p.codigo, nome: p.produto, unidade: p.unidade, valor: p.valor, codFornecedor: p.codFornecedor, fornecedor: p.fornecedor }, origem: null, anterior: null });
                     renderEntrada();
                     $('e-itens').querySelector(`tr[data-i="${i}"] input.e-qtd`)?.focus();
                 });
@@ -579,10 +584,13 @@
             if (e.target.closest('.e-remover')) { linhasEntrada.splice(i, 1); linhasEntrada.forEach((l, k) => { if (!l.codFabricante) l.item = k + 1; }); renderEntrada(); }
             else if (e.target.closest('.e-usar')) {
                 const sg = (linhasEntrada[i].sugestoes || []).find(x => String(x.codigo) === e.target.closest('.e-usar').dataset.codigo);
-                if (sg) { Object.assign(linhasEntrada[i], { produto: { ...sg }, origem: 'sugestao' }); renderEntrada(); buscarValoresCadastro(); }
+                if (sg) { Object.assign(linhasEntrada[i], { produto: { ...sg }, origem: 'sugestao', anterior: null }); renderEntrada(); buscarValoresCadastro(); }
             }
             else if (e.target.closest('.e-cadastrar')) abrirCadastroItem(i);
-            else if (e.target.closest('.e-trocar')) { linhasEntrada[i].produto = null; renderEntrada(); $('e-itens').querySelector(`tr[data-i="${i}"] input.e-busca`)?.focus(); }
+            else if (e.target.closest('.e-cancelar-troca')) { Object.assign(linhasEntrada[i], linhasEntrada[i].anterior, { anterior: null }); renderEntrada(); }
+            else if (e.target.closest('.e-trocar')) {
+                const l = linhasEntrada[i];
+                l.anterior = { produto: l.produto, origem: l.origem }; l.produto = null; renderEntrada(); $('e-itens').querySelector(`tr[data-i="${i}"] input.e-busca`)?.focus(); }
         });
         const linhaVazia = item => ({ item, produto: null, nomeFabricante: '', codFabricante: '', qtdNota: NaN, fator: 1, unidadeNota: '', unitarioNota: NaN, totalNota: NaN, observacao: '', origem: null });
         $('e-mais').addEventListener('click', () => {
