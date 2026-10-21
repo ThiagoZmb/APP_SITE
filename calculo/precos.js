@@ -99,10 +99,18 @@ function fatorHistorico(h) {
 }
 
 // Acessórios: frm_Acessorios_Portas (MANUAL) e frmPortasCorrer.CarregarItensDoSistemaNaMemoria (SISTEMA)
-function precoAcessorio(dados, cliente, origem) {
+// MotorFinanceiro.CalcularValorAcessorios: tabela FIXO com o desconto do cliente, senão CHEIO (mesma regra p/ manual e sistema)
+function precoAcessorio(dados, cliente) {
   if (!dados) return 0;
-  if (origem === 'SISTEMA DE CORRER') return cliente.isFixo ? dados.valorFixo * (100 - cliente.desconto) / 100 : dados.valorCheio;
-  return cliente.isFixo ? dados.valorFixo : dados.valorCheio;
+  return cliente.isFixo ? dados.valorFixo * (100 - (cliente.desconto || 0)) / 100 : dados.valorCheio;
+}
+
+// Acessório com tamanho (trilho, bandeira) é cobrado por metro: qtd × tamanho/1000 × preço; sem tamanho, qtd × preço
+function valoresAcessorio(dados, cliente, { qtd, tamanho }) {
+  const tabela = precoAcessorio(dados, cliente);
+  const fator = tamanho > 0 ? tamanho / 1000 : 1;
+  const r2 = v => Math.round(v * 100) / 100;
+  return { valorTabela: r2(tabela), valorUnitario: r2(tabela * fator), valorTotal: r2(qtd * fator * tabela) };
 }
 
 async function calcularPrecoItem(b, cliente, leitor) {
@@ -246,12 +254,13 @@ async function precoComAcessorios(entrada, cliente, leitor, acessorios = []) {
   for (const a of acessorios) {
     const dados = await leitor.produto(a.nome);
     if (!dados) throw new ErroPreco(`Acessório '${a.nome}' não encontrado ou sem preços.`);
-    const valorUnitario = Math.round(precoAcessorio(dados, cliente || { isFixo: false, desconto: 0 }, a.origem) * 100) / 100;
-    somaAc += valorUnitario * (parseInt(a.qtd) || 0);
-    precificados.push({ ...a, valorUnitario });
+    const tamanho = parseFloat(a.tamanho) || 0;
+    const v = valoresAcessorio(dados, cliente || { isFixo: false, desconto: 0 }, { qtd: parseInt(a.qtd) || 0, tamanho });
+    somaAc += v.valorTotal;
+    precificados.push({ ...a, tamanho, ...v });
   }
   const base = Math.round((r.total + somaAc) * 100) / 100;
   return { unitario: Math.round(base / qtd * 100) / 100, total: base, acessorios: precificados, diag: r.diag };
 }
 
-module.exports = { precoComAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };
+module.exports = { valoresAcessorio, precoComAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };

@@ -950,6 +950,7 @@ registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], as
     // portas: acessórios somam ao item (frmPortasAbrir: base = portas + acessórios)
     const acessorios = Array.isArray(b.acessorios) && b.frente !== 'Serralheria' && b.frente !== 'Avulso'
       ? b.acessorios.slice(0, 100).filter(a => a && typeof a.nome === 'string').map(a => ({ nome: a.nome, qtd: Math.min(9999, Math.max(1, parseInt(a.qtd) || 1)),
+          tamanho: Math.min(100000, Math.max(0, parseFloat(a.tamanho) || 0)),
           origem: a.origem === 'SISTEMA DE CORRER' ? 'SISTEMA DE CORRER' : 'MANUAL' }))
       : [];
     if (acessorios.length) {

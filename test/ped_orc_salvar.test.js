@@ -161,16 +161,16 @@ test('atualizar número inexistente: 404 sugerindo número novo', async t => {
 });
 
 // correr S1 (desconto 40), vão 2100×1600, 2 folhas, transpasse 50 → folhas 2060×825
-// perfil 2×(2060+825) = 5,77 m × 100 = 577 por folha × 2 = 1154 + Trilho 2×40 + Roldana 4×15 = 1294
+// perfil 2×(2060+825) = 5,77 m × 100 = 577 por folha × 2 = 1154 + Trilho 2 × 40/m × 1,6 m + Roldana 4×15 = 1342
 const correr = (mudar = {}) => ({ frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'S1', transpasse: '50', desempenador: false, posicoesFolhas: ['', ''] },
-  acessorios: [], historico: '', valorTela: 647, ...mudar });
+  acessorios: [], historico: '', valorTela: 671, ...mudar });
 
 test('porta de correr com sistema: vão e porta gravados, itens do sistema nos complementos', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   assert.equal((await salvar(chamar, corpo({ itens: [correr()] }))).status, 200);
   const l = banco.listaItens[0];
-  assert.deepEqual([l.PRODUTO, l.QTD, l.UNITARIO, l.TOTAL], ['Porta de correr', 1, 1294, 1294]);
+  assert.deepEqual([l.PRODUTO, l.QTD, l.UNITARIO, l.TOTAL], ['Porta de correr', 1, 1342, 1342]);
   const v = banco.itensV4[0];
   assert.deepEqual([v.QTD, v.ALTURA, v.LARGURA, v.ALTURA_VAO, v.LARGURA_VAO], [2, 2060, 825, 2100, 1600]);
   assert.deepEqual([l.TIPO_PRODUTO, v.TIPO_PRODUTO], ['Porta de correr', 'Porta de correr']); // frm_Pedido.vb:336 compara com c minúsculo

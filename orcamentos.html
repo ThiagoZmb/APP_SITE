@@ -472,7 +472,7 @@
                         </div>
                         <div class="tab-acess-wrap">
                             <table class="tab-acess">
-                                <thead><tr><th>Acessório</th><th>Qtd</th><th>Tam. (mm)</th><th data-valor>Unitário</th><th></th></tr></thead>
+                                <thead><tr><th>Acessório</th><th>Qtd</th><th>Tam. (mm)</th><th data-valor>Unitário</th><th data-valor>Total</th><th></th></tr></thead>
                                 <tbody></tbody>
                             </table>
                         </div>
@@ -1089,7 +1089,7 @@
                 payload = { frente: frenteAtual,
                             cliente: clienteNome, clienteCodigo,
                             altura: mp ? mp.altura : g('f-altura'), largura: mp ? mp.largura : g('f-largura'),
-                            acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, origem: a.origem })),
+                            acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
@@ -1111,7 +1111,7 @@
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
                     if (Array.isArray(d.acessorios)) {
-                        d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) acessoriosItem[i].valorUnitario = a.valorUnitario; });
+                        d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) Object.assign(acessoriosItem[i], { valorUnitario: a.valorUnitario, valorTotal: a.valorTotal }); });
                         renderAcessorios();
                     }
                     // ✅ CORREÇÃO ④: se o backend já aplicou desconto FIXO do cliente, trava o campo da tela
@@ -1471,8 +1471,13 @@
         function desenharVisualizacao() {
             const cv = document.getElementById('cv-visualizacao');
             if (!cv) return;
-            const altura = parseFloat(val('f-altura')) || 0;
-            const largura = parseFloat(val('f-largura')) || 0;
+            // porta de correr com sistema: a medida digitada é o VÃO; as folhas são desenhadas com a medida da PORTA (frmPortasCorrer)
+            const vaoA = parseFloat(val('f-altura')) || 0, vaoL = parseFloat(val('f-largura')) || 0;
+            const correrSis = ehCorrer() && temSistemaCorrer() && !!sistemaCorrer;
+            const mp = correrSis ? medidasPortasCorrer() : null;
+            const altura = mp ? mp.altura : vaoA;
+            const largura = mp ? mp.largura : vaoL;
+            const transp = correrSis ? (parseFloat(val('f-transpasse')) || 0) : 0;
             const qtdDivH = parseInt(val('f-div-h')) || 0;
             const qtdDivV = parseInt(val('f-div-v')) || 0;
             const ehPar = paresAtivo();
@@ -1481,6 +1486,8 @@
             const H = cv.height = Math.max(300, cv.clientHeight) * 2;
             ctx.clearRect(0, 0, W, H);
             cv._zonas = [];
+            cv._cotas = []; // textos das cotas (também usados pelos testes)
+            const cota = (t, x, y) => { cv._cotas.push(t); ctx.fillText(t, x, y); };
             if (altura <= 0 || largura <= 0) {
                 ctx.font = fonte(26); ctx.fillStyle = '#adb5bd'; ctx.textAlign = 'center';
                 ctx.fillText('Informe altura e largura para visualizar', W / 2, H / 2);
@@ -1488,11 +1495,24 @@
             }
             garantirFolhas();
             const qtdFolhas = Math.min(posicoesFolhas.length, 4);
-            const gapMm = qtdFolhas > 1 ? 150 : 0, margem = 100;
+            // correr com sistema: folhas sobrepostas pelo transpasse, trilho superior em cima
+            const gapMm = correrSis ? -transp : (qtdFolhas > 1 ? 150 : 0), margem = 100, trilhoMm = correrSis ? 70 : 0;
             const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
-            const esc = Math.min((W - margem * 2) / larguraTotal, (H - margem * 2) / altura);
-            const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc;
-            const oy = (H - altPx) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            const esc = Math.min((W - margem * 2 - (correrSis ? 120 : 0)) / larguraTotal, (H - margem * 2 - (correrSis ? 60 : 0)) / (altura + trilhoMm));
+            const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc, trilhoPx = trilhoMm * esc;
+            const oy = (H - altPx + trilhoPx + (correrSis ? 40 : 0)) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            if (correrSis) {
+                const tw = larguraTotal * esc, ty = oy - trilhoPx;
+                const trilho = acessoriosItem.find(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`) && /SUP/i.test(`${a.classe || ''} ${a.nome}`));
+                const hb = Math.max(trilhoPx * 0.8, 30); // altura mínima para o nome caber
+                ctx.fillStyle = '#5f6670'; ctx.fillRect(ox0, oy - hb - 4, tw, hb);
+                ctx.font = fonte(15); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+                cota(trilho ? trilho.nome : 'Trilho superior', ox0 + tw / 2, oy - 4 - hb / 2 + 6);
+                ctx.font = fonte(17); ctx.fillStyle = '#8B0000';
+                cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - hb - 18);
+                ctx.save(); ctx.translate(ox0 - 34, ty + (altPx + trilhoPx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0); ctx.restore();
+                ctx.save(); ctx.translate(ox0 + tw + 44, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0); ctx.restore();
+            }
             const perfilPx = Math.max(45 * esc, 8);
             const configAtivo = modoPuxador && temPuxador();
             const tamDigitado = parseFloat(val('f-tamanho-pux'));
@@ -1587,17 +1607,17 @@
                 }
                 // cotas + rótulo da folha
                 ctx.font = fonte(17); ctx.fillStyle = '#6c757d'; ctx.textAlign = 'center';
-                ctx.fillText(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 40);
-                if (f === 0) {
+                cota(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 40 + (correrSis && f % 2 ? 26 : 0));
+                if (f === 0 && !correrSis) {
                     ctx.save();
                     ctx.translate(ox - topoExtra - 24, oy + altPx / 2);
                     ctx.rotate(-Math.PI / 2);
-                    ctx.fillText(`${altura} mm`, 0, 0);
+                    cota(`${altura} mm`, 0, 0);
                     ctx.restore();
                 }
                 if (qtdFolhas > 1) {
                     ctx.font = fonte(15); ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
-                    ctx.fillText(ehPar && f % 2 === 1 ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, ox + largPx / 2, oy - topoExtra - 14);
+                    ctx.fillText(ehPar && f % 2 === 1 ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, ox + largPx / 2, correrSis ? oy + perfilPx + 26 : oy - topoExtra - 14);
                 }
             }
         }
@@ -2032,11 +2052,13 @@
                     <td><input type="number" class="ac-qtd" min="1" step="1" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? 'readonly title="Quantidade definida pelo sistema"' : ''}></td>
                     <td>${a.tamanho || 0}</td>
                     <td data-valor>${a.valorUnitario != null ? formatCurrency(a.valorUnitario) : '—'}</td>
+                    <td data-valor>${a.valorTotal != null ? formatCurrency(a.valorTotal) : '—'}</td>
                     <td>${a.origem === ORIGEM_SIS ? '' : `<button type="button" class="btn-mini ac-remover" data-i="${i}" title="Remover acessório">🗑️</button>`}</td>
                 </tr>`).join('');
             const c = document.getElementById('correr-portas');
             const m = medidasPortasCorrer();
             c.textContent = ehCorrer() && m.altura && m.largura ? `Portas: ${m.altura} × ${m.largura} mm (${m.n} folhas)` : '';
+            if (ehCorrer()) desenharVisualizacao(); // folhas com a medida da porta e o trilho dependem do sistema carregado
         }
         async function abrirListaAcessorios() {
             const sel = document.getElementById('sel-acessorio');
@@ -2078,7 +2100,8 @@
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/sistema_correr?${q}`);
                 if (meu !== seqSistema) return; // chegou uma resposta mais nova
                 sistemaCorrer = { descontoAltura: r.descontoAltura, temDesempenador: r.temDesempenador };
-                acessoriosItem = [...r.acessorios.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS, valorUnitario: a.valorUnitario })), ...manuais];
+                acessoriosItem = [...r.acessorios.map(a => ({ nome: a.nome, classe: a.classe, qtd: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS,
+                    valorUnitario: a.valorUnitario, valorTotal: a.valorTotal })), ...manuais];
                 lbl.style.display = r.temDesempenador ? '' : 'none';
             } catch {
                 if (meu !== seqSistema) return;
@@ -2103,6 +2126,7 @@
             const a = acessoriosItem[Number(inp.dataset.i)];
             if (!a) return;
             a.qtd = Math.min(9999, Math.max(1, parseInt(inp.value) || 1));
+            a.valorTotal = a.valorUnitario != null ? Math.round(a.valorUnitario * a.qtd * 100) / 100 : null; // o motor confirma em seguida
             renderAcessorios();
             calcularPrecoAutomatico();
         });

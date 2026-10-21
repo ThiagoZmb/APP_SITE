@@ -25,8 +25,8 @@ test('sistema de correr: config pelo nº de folhas, trilho no vão, desempenador
   const r = await chamar('/ped_orc/sistema_correr?nome=S1&folhas=2&larguraVao=1600&desempenador=0&clienteCodigo=7');
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { descontoAltura: 40, temDesempenador: true, acessorios: [
-    { nome: 'Trilho Sup', classe: 'Trilho superior', qtd: 2, tamanho: 1600, valorUnitario: 40 },
-    { nome: 'Roldana', classe: 'Roldana', qtd: 4, tamanho: 0, valorUnitario: 15 }] });
+    { nome: 'Trilho Sup', classe: 'Trilho superior', qtd: 2, tamanho: 1600, valorTabela: 40, valorUnitario: 64, valorTotal: 128 },
+    { nome: 'Roldana', classe: 'Roldana', qtd: 4, tamanho: 0, valorTabela: 15, valorUnitario: 15, valorTotal: 60 }] });
   const c = await (await chamar('/ped_orc/sistema_correr?nome=S1&folhas=3&larguraVao=2400&desempenador=1&clienteCodigo=7')).json();
   assert.deepEqual(c.acessorios.map(a => [a.nome, a.qtd]), [['Trilho Sup', 1], ['Roldana', 6], ['Desemp', 3]]);
 });
@@ -44,5 +44,5 @@ test('/calcular_preco soma os acessórios ao item (base = portas + acessórios; 
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.deepEqual([j.unitario, j.total], [320, 640]);
-  assert.deepEqual(j.acessorios, [{ nome: 'Dobradiça', qtd: 2, origem: 'MANUAL', valorUnitario: 20 }]);
+  assert.deepEqual(j.acessorios, [{ nome: 'Dobradiça', qtd: 2, tamanho: 0, origem: 'MANUAL', valorTabela: 20, valorUnitario: 20, valorTotal: 40 }]);
 });

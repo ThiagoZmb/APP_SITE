@@ -31,12 +31,19 @@ test('perfil inexistente rejeita com ErroPreco', async () => {
     e => e instanceof ErroPreco && e.message === "Perfil 'X' não encontrado ou sem preços.");
 });
 
-test('preço do acessório: manual e do sistema de correr', () => {
+test('preço de tabela do acessório (MotorFinanceiro.CalcularValorAcessorios): fixo com desconto, senão cheio', () => {
   const d = { valorFixo: 10, valorCheio: 20 };
-  assert.equal(precoAcessorio(d, { isFixo: true, desconto: 10 }, 'MANUAL'), 10);
+  assert.equal(precoAcessorio(d, { isFixo: true, desconto: 10 }, 'MANUAL'), 9);
   assert.equal(precoAcessorio(d, { isFixo: true, desconto: 10 }, 'SISTEMA DE CORRER'), 9);
   assert.equal(precoAcessorio(d, { isFixo: false, desconto: 10 }, 'MANUAL'), 20);
-  assert.equal(precoAcessorio(d, { isFixo: false, desconto: 10 }, 'SISTEMA DE CORRER'), 20);
+});
+
+test('acessório com tamanho é cobrado por metro (Trilho Superior 3086: 119,83/m × 0,8 m = 95,86)', async () => {
+  const leitor = leitorFalso({ P: PERFIL, Trilho: { valorFixo: 0, valorCheio: 119.83 }, Kit: { valorFixo: 0, valorCheio: 433.57 } });
+  const r = await require('../calculo/precos').precoComAcessorios({ frente: 'Porta de Correr', altura: 1000, largura: 500, perfil: 'P', qtd: 2 }, semDesconto, leitor,
+    [{ nome: 'Kit', qtd: 2, tamanho: 0, origem: 'SISTEMA DE CORRER' }, { nome: 'Trilho', qtd: 1, tamanho: 800, origem: 'SISTEMA DE CORRER' }]);
+  assert.deepEqual(r.acessorios.map(a => [a.nome, a.valorTabela, a.valorUnitario, a.valorTotal]), [['Kit', 433.57, 433.57, 867.14], ['Trilho', 119.83, 95.86, 95.86]]);
+  assert.equal(r.total, 1563); // portas 2 × 300 + 867,14 + 95,86
 });
 
 test('histórico de % é aditivo (regra do VB)', () => {

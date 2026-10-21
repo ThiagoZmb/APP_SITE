@@ -3,7 +3,7 @@
 // e listas de apoio da tela (acessórios permitidos, itens do sistema de correr).
 // ==========================================================================
 const { semValores } = require('../seguranca/valores');
-const { criarLeitor, lerCliente, precoAcessorio, precoComAcessorios, fatorHistorico, ErroPreco } = require('../calculo/precos');
+const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, fatorHistorico, ErroPreco } = require('../calculo/precos');
 const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const { traduzirDocumento, impressaoDigital } = require('../calculo/leitura_vb');
@@ -260,7 +260,7 @@ async function gravarItem(conn, { tipo, numero, medicao }, p) {
   let k = 1;
   for (const a of p.acessorios) {
     await inserir(conn, 'ped_orc_complementos', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: k++, QTD: a.qtd, COMPLEMENTO: a.nome,
-      TAMANHO: Math.round(a.tamanho || 0), UNITARIO: a.valorUnitario });
+      TAMANHO: Math.round(a.tamanho || 0), UNITARIO: a.valorTabela });
   }
 }
 
@@ -302,12 +302,12 @@ function registrarPedOrc({ rota, pool }) {
       const lista = acessoriosDoSistema(sis.itens, sis.config, {
         larguraVao: parseFloat(req.query.larguraVao) || 0, folhas, incluirDesempenador: req.query.desempenador === '1' });
       const acessorios = [];
-      for (const a of lista) acessorios.push({ ...a, valorUnitario: arred2(precoAcessorio(await leitor.produto(a.nome), cliente, 'SISTEMA DE CORRER')) });
+      for (const a of lista) acessorios.push({ ...a, ...valoresAcessorio(await leitor.produto(a.nome), cliente, a) });
       res.json(semValores(req, {
         descontoAltura: sis.descontoAltura,
         temDesempenador: sis.itens.some(i => i.classe === 'Desempenador'),
         acessorios
-      }, ['valorUnitario']));
+      }, ['valorTabela', 'valorUnitario', 'valorTotal']));
     } catch (err) {
       console.error('Erro GET /ped_orc/sistema_correr:', err.message);
       res.status(500).json({ error: 'Erro de servidor' });

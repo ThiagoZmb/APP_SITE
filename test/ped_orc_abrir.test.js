@@ -77,7 +77,7 @@ test('buscar por número exato e por parte do cliente, no máximo 20, mais recen
 // ---------- salvar documento aberto (Task 3) ----------
 const correr = { frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'S1', transpasse: '50', desempenador: false, posicoesFolhas: ['', ''] },
-  acessorios: [], historico: '', valorTela: 647 };
+  acessorios: [], historico: '', valorTela: 671 };
 const avulso = { frente: 'Avulso', qtd: 2, altura: 3000, largura: 0, obs: '', furos: { lista: [], lados: [] },
   detalhes: { categoria: 'Perfil', avProduto: 'Perfil P', avAcab: '', avCor: '' }, acessorios: [], historico: '', valorTela: 300 };
 const TABELAS = ['pedOrc', 'listaItens', 'itensV4', 'vidros', 'perfis', 'furacao', 'complementos', 'serralheria', 'serralheriaComp'];
