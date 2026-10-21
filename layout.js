@@ -260,6 +260,83 @@
         }
     };
 
+    // ----- indicação de processamento: vale para qualquer página e qualquer botão, sem mexer nas páginas -----
+    // Toda chamada ao servidor (fetch) é contada. Com espera > 0,3 s aparece a barra no topo; o elemento clicado
+    // logo antes do pedido fica "ocupado" (indicador girando, desabilitado) até a resposta; espera > 5 s mostra
+    // o aviso de servidor iniciando (o Render "dorme" e pode levar até 1 minuto para acordar).
+    function iniciarIndicadores() {
+        const ATRASO_BARRA = 300, ATRASO_AVISO = 5000, JANELA_CLIQUE = 400;
+        const css = document.createElement('style');
+        css.textContent = `
+            #carregando-global { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999; overflow: hidden; pointer-events: none; display: none; }
+            #carregando-global.ativo { display: block; }
+            #carregando-global::before { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--primary-color, #8B0000); animation: carregando-barra 1.1s ease-in-out infinite; }
+            @keyframes carregando-barra { from { left: -40%; } to { left: 100%; } }
+            .processando { cursor: progress !important; }
+            button.processando, a.processando { position: relative; opacity: .75; }
+            button.processando::after, a.processando::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -2px;
+                border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: carregando-giro .7s linear infinite; }
+            tr.processando td { opacity: .6; }
+            @keyframes carregando-giro { to { transform: rotate(360deg); } }
+            #aviso-servidor { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9998; background: #2c3e50; color: #fff;
+                padding: 12px 18px; border-radius: 12px; font: 600 14px 'Segoe UI', sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.25); max-width: calc(100vw - 32px); }`;
+        document.head.appendChild(css);
+        const barra = document.createElement('div');
+        barra.id = 'carregando-global';
+        barra.setAttribute('role', 'progressbar'); barra.setAttribute('aria-label', 'Carregando');
+        document.body.appendChild(barra);
+        let aviso = null;
+
+        let emAndamento = 0, timerBarra = null, timerAviso = null;
+        let ultimoClique = null, quandoClique = 0;
+        document.addEventListener('click', e => {
+            ultimoClique = e.target.closest('button, a[href], [role="button"], tr[data-i], tr[data-codigo], tr[data-numero]');
+            quandoClique = Date.now();
+        }, true);
+
+        const ocupados = new Map(); // elemento → { pedidos, desabilitadoAntes }
+        function ocupar(el) {
+            const o = ocupados.get(el) || { pedidos: 0, desabilitadoAntes: el.disabled };
+            o.pedidos++;
+            ocupados.set(el, o);
+            el.classList.add('processando'); el.setAttribute('aria-busy', 'true');
+            if ('disabled' in el) el.disabled = true;
+        }
+        function liberar(el) {
+            const o = ocupados.get(el); if (!o) return;
+            if (--o.pedidos > 0) return;
+            ocupados.delete(el);
+            el.classList.remove('processando'); el.removeAttribute('aria-busy');
+            if ('disabled' in el) el.disabled = o.desabilitadoAntes;
+        }
+        function comecou() {
+            if (emAndamento++ > 0) return;
+            timerBarra = setTimeout(() => barra.classList.add('ativo'), ATRASO_BARRA);
+            timerAviso = setTimeout(() => {
+                aviso = document.createElement('div');
+                aviso.id = 'aviso-servidor'; aviso.setAttribute('role', 'status');
+                aviso.textContent = 'O servidor está iniciando, isso pode levar até 1 minuto…';
+                document.body.appendChild(aviso);
+            }, ATRASO_AVISO);
+        }
+        function terminou() {
+            if (--emAndamento > 0) return;
+            clearTimeout(timerBarra); clearTimeout(timerAviso);
+            barra.classList.remove('ativo');
+            aviso?.remove(); aviso = null;
+        }
+        const fetchOriginal = window.fetch.bind(window);
+        window.fetch = (...args) => {
+            const el = ultimoClique && Date.now() - quandoClique < JANELA_CLIQUE && ultimoClique.isConnected ? ultimoClique : null;
+            comecou();
+            if (el) ocupar(el);
+            const p = fetchOriginal(...args);
+            p.finally(() => { terminou(); if (el) liberar(el); }).catch(() => {});
+            return p;
+        };
+    }
+    iniciarIndicadores();
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
     else montar();
 })();
