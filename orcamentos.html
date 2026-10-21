@@ -1511,7 +1511,12 @@
             const mp = correrSis ? medidasPortasCorrer() : null;
             const altura = mp ? mp.altura : vaoA;
             const largura = mp ? mp.largura : vaoL;
-            const transp = correrSis ? (parseFloat(val('f-transpasse')) || 0) : 0;
+            // correr com sistema: folhas desenhadas afastadas (só visual), trilho superior com folga e, se houver, trilho inferior
+            const ehTrilho = (a, lado) => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`) && lado.test(`${a.classe || ''} ${a.nome}`);
+            const trilhoSup = correrSis ? acessoriosItem.find(a => ehTrilho(a, /SUP/i)) : null;
+            const trilhoInf = correrSis ? acessoriosItem.find(a => ehTrilho(a, /INF/i)) : null;
+            const TRILHO_MM = 60, FOLGA_MM = 45;
+            const extraTopoMm = correrSis ? TRILHO_MM + FOLGA_MM : 0, extraBaseMm = trilhoInf ? TRILHO_MM + FOLGA_MM : 0;
             const qtdDivH = parseInt(val('f-div-h')) || 0;
             const qtdDivV = parseInt(val('f-div-v')) || 0;
             const ehPar = paresAtivo();
@@ -1520,7 +1525,7 @@
             if (altura > 0 && largura > 0) {
                 garantirFolhas();
                 const n = Math.min(posicoesFolhas.length, 4);
-                const mmL = largura * n + (correrSis ? -transp : (n > 1 ? 150 : 0)) * (n - 1), mmA = altura + (correrSis ? 70 : 0);
+                const mmL = largura * n + (correrSis ? 40 : (n > 1 ? 150 : 0)) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
                 const cssW = Math.max(300, cv.clientWidth);
                 const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
                 if (Math.abs(cv.getBoundingClientRect().height - alvo) > 2) cv.style.height = alvo + 'px';
@@ -1541,23 +1546,29 @@
             const qtdFolhas = Math.min(posicoesFolhas.length, 4);
             // correr com sistema: folhas sobrepostas pelo transpasse, trilho superior em cima
             // área máxima: só a margem das cotas (laterais para as alturas, topo/base para larguras e trilho)
-            const gapMm = correrSis ? -transp : (qtdFolhas > 1 ? 150 : 0), trilhoMm = correrSis ? 70 : 0;
-            const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 90 : 50, mBase = correrSis ? 80 : 60;
+            const gapMm = correrSis ? 40 : (qtdFolhas > 1 ? 150 : 0);
+            const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 70 : 50, mBase = correrSis ? 90 : 60;
             const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
-            const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + trilhoMm));
-            const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc, trilhoPx = trilhoMm * esc;
-            const oy = mTopo + trilhoPx + ((H - mTopo - mBase) - (altPx + trilhoPx)) / 2, ox0 = (W - larguraTotal * esc) / 2;
-            cv._caixa = { x: ox0, y: oy - trilhoPx, w: larguraTotal * esc, h: altPx + trilhoPx };
-            if (correrSis) {
-                const tw = larguraTotal * esc, ty = oy - trilhoPx;
-                const trilho = acessoriosItem.find(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`) && /SUP/i.test(`${a.classe || ''} ${a.nome}`));
-                const hb = Math.max(trilhoPx * 0.8, 30); // altura mínima para o nome caber
-                ctx.fillStyle = '#5f6670'; ctx.fillRect(ox0, oy - hb - 4, tw, hb);
+            const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + extraTopoMm + extraBaseMm));
+            const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc;
+            const hb = Math.max(TRILHO_MM * esc, 30), folgaPx = Math.max(FOLGA_MM * esc, 14); // trilho com altura mínima para o nome caber
+            const topoPx = correrSis ? hb + folgaPx : 0, basePx = trilhoInf ? hb + folgaPx : 0;
+            const oy = mTopo + topoPx + ((H - mTopo - mBase) - (altPx + topoPx + basePx)) / 2, ox0 = (W - larguraTotal * esc) / 2;
+            const tw = larguraTotal * esc;
+            cv._caixa = { x: ox0, y: oy - topoPx, w: tw, h: altPx + topoPx + basePx };
+            cv._geo = { folhas: [], trilhoSup: null, trilhoInf: null }; // geometria desenhada (usada pelos testes)
+            const desenharTrilho = (y, a, padrao) => {
+                ctx.fillStyle = '#5f6670'; ctx.fillRect(ox0, y, tw, hb);
                 ctx.font = fonte(15); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-                cota(trilho ? trilho.nome : 'Trilho superior', ox0 + tw / 2, oy - 4 - hb / 2 + 6);
+                cota(a ? a.nome : padrao, ox0 + tw / 2, y + hb / 2 + 6);
+                return { x: ox0, y, w: tw, h: hb };
+            };
+            if (correrSis) {
+                cv._geo.trilhoSup = desenharTrilho(oy - folgaPx - hb, trilhoSup, 'Trilho superior');
+                if (trilhoInf) cv._geo.trilhoInf = desenharTrilho(oy + altPx + folgaPx, trilhoInf, 'Trilho inferior');
                 ctx.font = fonte(19);
-                cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - hb - 18, COR_VAO);
-                ctx.save(); ctx.translate(ox0 - 30, ty + (altPx + trilhoPx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0, COR_VAO); ctx.restore();
+                cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - topoPx - 14, COR_VAO);
+                ctx.save(); ctx.translate(ox0 - 30, oy - topoPx + (altPx + topoPx + basePx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0, COR_VAO); ctx.restore();
                 ctx.save(); ctx.translate(ox0 + tw + 46, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0, COR_PORTA); ctx.restore();
             }
             const perfilPx = Math.max(45 * esc, 8);
@@ -1654,7 +1665,8 @@
                 }
                 // cotas + rótulo da folha
                 ctx.font = fonte(19); ctx.textAlign = 'center';
-                cota(`${largura} mm`, ox + largPx / 2, oy + altPx + topoExtra + 34 + (correrSis && f % 2 ? 26 : 0), COR_PORTA);
+                cota(`${largura} mm`, ox + largPx / 2, oy + altPx + basePx + topoExtra + 34, COR_PORTA);
+                cv._geo.folhas.push({ x: ox, y: oy, w: largPx, h: altPx });
                 if (f === 0 && !correrSis) {
                     ctx.save();
                     ctx.translate(ox - topoExtra - 24, oy + altPx / 2);
