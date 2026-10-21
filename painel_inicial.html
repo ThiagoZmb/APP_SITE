@@ -348,6 +348,27 @@
 
             <div id="carregando">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
+                <!-- ===== LISTA ===== -->
+                <section class="painel" style="margin-bottom:18px">
+                    <div class="lista-topo">
+                        <h3 id="lista-titulo">Lista de pedidos</h3>
+                        <div class="tipo-toggle">
+                            <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
+                            <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
+                        </div>
+                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar número, cliente, observação..."></div>
+                        <button class="btn btn-secondary btn-mini" id="refresh-btn">↻ Atualizar</button>
+                    </div>
+                    <div class="chips-sit" id="chips-sit"></div>
+                    <div class="tabela-wrap">
+                        <table>
+                            <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num" data-valor>Valor</th><th>Observação</th><th>Situação</th><th data-valor>Financeiro</th><th>Entrega</th></tr></thead>
+                            <tbody id="orders-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="rodape-l"><span id="lista-qtd"></span><span><span data-perm="pedidos.pdf">Clique numa linha para abrir o PDF</span><span data-valor> · Total <b id="lista-total">R$ 0,00</b></span></span></div>
+                </section>
+
                 <!-- ===== RESULTADO DO PERÍODO ===== -->
                 <div class="bloco-tit">Resultado do período</div>
                 <section class="kpis" id="kpis-periodo"></section>
@@ -385,26 +406,6 @@
                 <section class="painel" id="ranking-produtos"></section>
                 <section class="painel" id="ranking-clientes"></section>
 
-                <!-- ===== LISTA ===== -->
-                <section class="painel">
-                    <div class="lista-topo">
-                        <h3 id="lista-titulo">Lista de pedidos</h3>
-                        <div class="tipo-toggle">
-                            <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
-                            <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
-                        </div>
-                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar número, cliente, observação..."></div>
-                        <button class="btn btn-secondary btn-mini" id="refresh-btn">↻ Atualizar</button>
-                    </div>
-                    <div class="chips-sit" id="chips-sit"></div>
-                    <div class="tabela-wrap">
-                        <table>
-                            <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num" data-valor>Valor</th><th>Observação</th><th>Situação</th><th data-valor>Financeiro</th><th>Entrega</th></tr></thead>
-                            <tbody id="orders-tbody"></tbody>
-                        </table>
-                    </div>
-                    <div class="rodape-l"><span id="lista-qtd"></span><span><span data-perm="pedidos.pdf">Clique numa linha para abrir o PDF</span><span data-valor> · Total <b id="lista-total">R$ 0,00</b></span></span></div>
-                </section>
             </div>
         </main>
     </div>
