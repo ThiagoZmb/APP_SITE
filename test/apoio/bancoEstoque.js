@@ -20,16 +20,43 @@ const PERFIS = {
 function bancoEstoque() {
   const estoque = [
     { CODIGO: 1, NOME_PRODUTO: 'Perfil Slim', UNIDADE: 'Barra', QTD_ESTOQUE: 10, SITUACAO: 'Ativo', FORNECEDOR: FORN, COD_FORNECEDOR: 'PS-01',
-      CODIGO_BARRA: '7890000000011', NOME_PRODUTO_FORNECEDOR: 'PERFIL SLIM 6M', VALOR: 12.5, AGUARDANDO: 'Sim' },
+      CODIGO_BARRA: '7890000000011', NOME_PRODUTO_FORNECEDOR: 'PERFIL SLIM 6M', VALOR: 12.5, AGUARDANDO: 'Sim', CLASSE: 'Perfil', MIN_ESTOQUE: 2 },
     { CODIGO: 2, NOME_PRODUTO: 'Puxador Total', UNIDADE: 'Peça', QTD_ESTOQUE: 0, SITUACAO: 'Inativo', FORNECEDOR: FORN, COD_FORNECEDOR: 'PT-02',
-      CODIGO_BARRA: '7890000000028', NOME_PRODUTO_FORNECEDOR: 'PUXADOR TOTAL', VALOR: 30, AGUARDANDO: '' },
+      CODIGO_BARRA: '7890000000028', NOME_PRODUTO_FORNECEDOR: 'PUXADOR TOTAL', VALOR: 30, AGUARDANDO: '', CLASSE: 'Puxador', MIN_ESTOQUE: 0 },
     { CODIGO: 3, NOME_PRODUTO: 'Parafuso', UNIDADE: 'Un', QTD_ESTOQUE: 500, SITUACAO: 'Ativo', FORNECEDOR: FORN, COD_FORNECEDOR: 'PAR-100',
-      CODIGO_BARRA: '7890000000035', NOME_PRODUTO_FORNECEDOR: 'PARAFUSO', VALOR: 0.1, AGUARDANDO: '' }
+      CODIGO_BARRA: '7890000000035', NOME_PRODUTO_FORNECEDOR: 'PARAFUSO', VALOR: 0.1, AGUARDANDO: '', CLASSE: 'Acessórios', MIN_ESTOQUE: 50 }
   ];
   const fornecedores = [{ RAZAO_FABRICANTE: FORN, CNPJ: '12.345.678/0001-90' }, { RAZAO_FABRICANTE: 'OUTRO FORNECEDOR SA', CNPJ: '98.765.432/0001-10' }];
-  const estado = { estoque, fornecedores, nfs: [], entradas: [], saidas: [], ligacoes: [], lancamentos: [], estornos: [], ajustes: [], auditoria: [] };
+  const estado = { reposicao: [], estoque, fornecedores, nfs: [], entradas: [], saidas: [], ligacoes: [], lancamentos: [], estornos: [], ajustes: [], auditoria: [] };
   const sitOk = e => /^ativo$/i.test(e.SITUACAO) || (/^inativo$/i.test(e.SITUACAO) && Number(e.QTD_ESTOQUE) !== 0);
+  const soma = (l, f) => l.reduce((t, x) => t + (f(x) ? Number(x.QTD) || 0 : 0), 0);
+  const mesDe = d => String(d).slice(0, 7);
   const regras = [
+    // análises (antes da lista de produtos: o WHERE é parecido)
+    [/SELECT CODIGO, NOME_PRODUTO, CLASSE, UNIDADE, QTD_ESTOQUE, MIN_ESTOQUE, SITUACAO, VALOR FROM estoque/, () => estoque.filter(sitOk)],
+    // JOIN como o MySQL (utf8mb4_unicode_ci): ignora maiúsculas e espaço no fim
+    [/FROM saida_estoque s JOIN estoque e ON e.NOME_PRODUTO = s.NOME_PRODUTO/, (sql, [ini, iniAnt, fimAnt, ini12, desde, ate]) => {
+      const norm = t => String(t ?? '').trimEnd().toLowerCase();
+      return estoque.map(e => {
+        const l = estado.saidas.filter(x => norm(x.NOME_PRODUTO) === norm(e.NOME_PRODUTO) && x.DATA >= desde && x.DATA < ate);
+        return l.length && { CODIGO: e.CODIGO, janela: String(soma(l, x => x.DATA >= ini)), anterior: String(soma(l, x => x.DATA >= iniAnt && x.DATA < fimAnt)),
+          ano: String(soma(l, x => x.DATA >= ini12)), ultima: l.map(x => x.DATA).sort().at(-1) };
+      }).filter(Boolean);
+    }],
+    [/AS mes, SUM\(QTD\) AS qtd FROM saida_estoque WHERE DATA >= \? AND DATA < \? GROUP BY mes/, (sql, [desde, ate]) => {
+      const m = new Map(); estado.saidas.filter(x => x.DATA >= desde && x.DATA < ate).forEach(x => m.set(mesDe(x.DATA), (m.get(mesDe(x.DATA)) || 0) + Number(x.QTD)));
+      return [...m].map(([mes, qtd]) => ({ mes, qtd: String(qtd) })); }],
+    [/AS mes, SUM\(QTD\) AS qtd FROM entrada_estoque WHERE DATA >= \? AND DATA < \? GROUP BY mes/, (sql, [ini, ate]) => {
+      const m = new Map(); estado.entradas.filter(x => x.DATA >= ini && x.DATA < ate).forEach(x => m.set(mesDe(x.DATA), (m.get(mesDe(x.DATA)) || 0) + Number(x.QTD)));
+      return [...m].map(([mes, qtd]) => ({ mes, qtd: String(qtd) })); }],
+    [/SELECT MIN\(DATA\) AS primeira FROM saida_estoque WHERE DATA >= \? AND DATA < \?/, (sql, [desde, ate]) =>
+      [{ primeira: estado.saidas.map(x => x.DATA).filter(d => d >= desde && d < ate).sort()[0] || null }]],
+    [/SELECT produto_codigo, prazo_dias FROM web_estoque_reposicao/, () => estado.reposicao],
+    [/SELECT CODIGO FROM estoque WHERE CODIGO = \? LIMIT 1/, (sql, [c]) => estoque.filter(e => e.CODIGO === Number(c)).map(e => ({ CODIGO: e.CODIGO }))],
+    [/INSERT INTO web_estoque_reposicao \(produto_codigo, prazo_dias, atualizado_em, atualizado_por\)/, (sql, [produto_codigo, prazo_dias, atualizado_em, atualizado_por]) => {
+      const r = estado.reposicao.find(x => x.produto_codigo === produto_codigo);
+      if (r) Object.assign(r, { prazo_dias, atualizado_em, atualizado_por }); else estado.reposicao.push({ produto_codigo, prazo_dias, atualizado_em, atualizado_por });
+      return { affectedRows: 1 }; }],
     // listas
     [/FROM estoque WHERE \(SITUACAO = 'Ativo' OR/, (sql, [like, cod]) => {
       const termo = String(like || '%%').replace(/%/g, '').toLowerCase();

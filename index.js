@@ -13,6 +13,7 @@ const { filtroEstados } = require('./seguranca/acesso');
 const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
+const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -1851,6 +1852,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 // ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
+registrarEstoqueAnalises({ rota: registro.rota, pool });
 
 // ================= SUBIDA =================
 // Ordem: tabelas web_ → migração única dos usuários → todas as rotas precisam

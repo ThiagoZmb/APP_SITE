@@ -80,6 +80,13 @@ const TABELAS = [
      qtd_depois DOUBLE NOT NULL,
      motivo VARCHAR(500) NOT NULL,
      KEY idx_quando (quando)
+   ) ${OPCOES}`,
+  // prazo de reposição por item (análises do estoque); sem linha = 15 dias
+  `CREATE TABLE IF NOT EXISTS \`web_estoque_reposicao\` (
+     produto_codigo INT NOT NULL PRIMARY KEY,
+     prazo_dias INT NOT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL
    ) ${OPCOES}`
 ];
 
