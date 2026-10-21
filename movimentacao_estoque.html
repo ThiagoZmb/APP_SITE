@@ -101,6 +101,8 @@
         tr.pendente td { background: rgba(178,106,0,.08); }
         /* a célula do produto quebra linha (o tema corta texto com "…" nas tabelas) */
         #e-itens td.e-prod { min-width: 240px; white-space: normal; overflow: visible; text-overflow: clip; }
+        /* aviso de preço diferente do cadastro: grande e vermelho, explicação ao passar o mouse */
+        .e-preco { color: var(--erro); font-size: 20px; font-weight: 800; line-height: 1; vertical-align: middle; margin-left: 4px; cursor: help; }
         .e-antes { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
         .e-cod { display: block; margin-top: 3px; }
         .e-codigo-novo { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 4px; }
@@ -719,7 +721,7 @@
             const q = qtdEstoque(l);
             const difere = pode('valores.ver') && l.produto && Number.isFinite(l.produto.valor) && q && Number.isFinite(l.totalNota)
                 && Math.abs(l.totalNota / q - l.produto.valor) >= 0.01;
-            alvo.textContent = difere ? ' ⚠' : '';
+            alvo.textContent = difere ? ' \u26A0\uFE0E' : ''; // FE0E: símbolo de texto (o Windows desenharia como emoji amarelo, ignorando a cor)
             if (difere) alvo.title = 'Valor no cadastro: ' + moeda(l.produto.valor); else alvo.removeAttribute('title');
         }
 
