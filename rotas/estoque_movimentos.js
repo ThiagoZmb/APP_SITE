@@ -526,4 +526,4 @@ function registrarEstoqueMovimentos({ rota, pool }) {
   });
 }
 
-module.exports = { registrarEstoqueMovimentos, validarData, hojeLocal, agoraLocal };
+module.exports = { registrarEstoqueMovimentos, validarData, hojeLocal, agoraLocal, emTransacao, ErroUsuario, ehDuplicado };

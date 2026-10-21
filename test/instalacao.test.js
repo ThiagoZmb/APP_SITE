@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque } = require('../seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc } = require('../seguranca/instalacao');
 
 const NOMES = ['Administrador', 'Interno completo', 'Vendedor', 'Estoquista', 'Representante'];
 
@@ -99,4 +99,31 @@ test('perfil ausente não quebra', async () => {
   const pool = poolPermissoes({ perfis: [{ id: 1, nome: 'Administrador' }] });
   assert.deepEqual(await acrescentarPermissoesEstoque(pool), { feito: true });
   assert.equal(pool.chamadas.filter(c => /INSERT IGNORE/.test(c.sql)).length, 2);
+});
+
+// ----- permissões de salvar orçamento/pedido (passo único) -----
+function poolPedOrc({ jaFeito = false } = {}) {
+  return criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_ped_orc'/, jaFeito ? [{ id: 9 }] : []],
+    [/SELECT DISTINCT perfil_id FROM web_perfil_permissoes WHERE permissao = 'orcamentos.criar'/, [{ perfil_id: 1 }, { perfil_id: 2 }, { perfil_id: 5 }]],
+    [/SELECT id FROM web_perfis WHERE nome = 'Administrador'/, [{ id: 1 }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+}
+
+test('salvar orçamento vai para quem monta orçamento; pedido só para o Administrador', async () => {
+  const pool = poolPedOrc();
+  assert.deepEqual(await acrescentarPermissoesPedOrc(pool), { feito: true });
+  const ins = pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params);
+  assert.deepEqual(ins, [[1, 'orcamentos.salvar'], [2, 'orcamentos.salvar'], [5, 'orcamentos.salvar'], [1, 'pedidos.criar']]);
+  assert.ok(pool.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_ped_orc'));
+  const seq = pool.chamadas.map(c => c.sql);
+  assert.ok(seq.indexOf('BEGIN') >= 0 && seq.indexOf('COMMIT') > seq.indexOf('BEGIN'));
+});
+
+test('permissões de orçamento/pedido já acrescentadas: não faz nada', async () => {
+  const pool = poolPedOrc({ jaFeito: true });
+  assert.deepEqual(await acrescentarPermissoesPedOrc(pool), { feito: false });
+  assert.ok(!pool.chamadas.some(c => /INSERT/.test(c.sql)));
 });

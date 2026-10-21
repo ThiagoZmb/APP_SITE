@@ -203,4 +203,27 @@ async function acrescentarPermissoesEstoque(pool) {
   }
 }
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque };
+// "Salvar orçamento" para todo perfil que já monta orçamento; "Salvar como pedido" só para o Administrador
+async function acrescentarPermissoesPedOrc(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_ped_orc' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [montam] = await conn.execute("SELECT DISTINCT perfil_id FROM web_perfil_permissoes WHERE permissao = 'orcamentos.criar' ORDER BY perfil_id");
+    for (const p of montam) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.perfil_id, 'orcamentos.salvar']);
+    const [admin] = await conn.execute("SELECT id FROM web_perfis WHERE nome = 'Administrador' ORDER BY id");
+    for (const p of admin) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, 'pedidos.criar']);
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_ped_orc', '', JSON.stringify({ salvar: montam.map(p => p.perfil_id), pedido: admin.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc };

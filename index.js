@@ -10,10 +10,12 @@ const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque } = require('./seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
+const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, ErroPreco } = require('./calculo/precos');
+const { registrarPedOrc } = require('./rotas/ped_orc');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -937,227 +939,27 @@ registro.rota('get', '/catalogos', ['orcamentos.criar'], async (req, res) => {
   res.json(saida);
 });
 
-// ============================================================
-// MOTOR FINANCEIRO — PORTAS + SERRALHERIA (fiel ao VB)
-// Colunas confirmadas no VB + DESCRIBE: VALOR_CHEIO, VALOR_FIXO,
-// DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
-// ============================================================
-async function buscarDadosProduto(nome) {
-  if (!nome) return null;
-  const [rows] = await pool.execute(
-    `SELECT CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
-     FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
-  if (!rows.length) return null;
-  return {
-    valorFixo: parseFloat(rows[0].VALOR_FIXO) || 0,
-    valorCheio: parseFloat(rows[0].VALOR_CHEIO) || 0,
-    descontoVidro: parseFloat(rows[0].DESCONTO_VIDRO) || 0,
-    descontoPerfilPux: parseFloat(rows[0].DESC_PERF_PUX) || 0,
-    tipoPuxador: String(rows[0].TIPO_PUXADOR || '')
-  };
-}
-
-async function taxaAcabamento(nome) {
-  if (!nome) return 0;
-  try {
-    const [rows] = await pool.execute(
-      'SELECT VALOR FROM acabamentos WHERE TRIM(ACABAMENTO) = TRIM(?) LIMIT 1', [nome]);
-    return rows.length ? (parseFloat(rows[0].VALOR) || 0) : 0;
-  } catch { return 0; }
-}
-
-// auxiliares
-const precoBase = (d, isFixo) => isFixo ? d.valorFixo : d.valorCheio;
-const comAcab = (base, taxa) => base + base * (taxa / 100);
-const alturaS = b => parseFloat(b.altura) || 0;
-const largS = b => parseFloat(b.largura) || 0;
-const profS = b => parseFloat(b.profundidade) || 0;
-
-function aplicarPercentuais(valor, texto) {
-  let v = valor;
-  for (const parte of String(texto || '').split(';')) {
-    let t = parte.trim(); if (!t) continue;
-    let sinal = '+', num = t;
-    if (t.startsWith('+') || t.startsWith('-')) { sinal = t[0]; num = t.slice(1); }
-    const pct = parseFloat(num.replace(/%/g, '').replace(',', '.'));
-    if (!isNaN(pct)) v = sinal === '+' ? v * (1 + pct / 100) : v * (1 - pct / 100);
-  }
-  return v;
-}
-// (Sem código de navegador no backend)
+// MOTOR FINANCEIRO — calculo/precos.js (o cadastro chega pelo leitor)
+const leitorCadastro = criarLeitor(pool);
+const buscarDadosProduto = nome => leitorCadastro.produto(nome);
 
 registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
   const b = req.body || {};
   try {
-    // Política comercial do cliente — por CODIGO (preciso) com fallback por nome
-    let cli = [];
-    if (b.clienteCodigo) {
-      [cli] = await pool.execute(
-        'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1',
-        [b.clienteCodigo]);
-    } else if (b.cliente) {
-      [cli] = await pool.execute(
-        'SELECT TIPO_DESCONTO, DESCONTO FROM cadastro_clientes WHERE TRIM(RAZAO_SOCIAL) = TRIM(?) LIMIT 1',
-        [b.cliente]);
+    const cliente = await lerCliente(pool, { clienteCodigo: b.clienteCodigo, cliente: b.cliente });
+    // portas: acessórios somam ao item (frmPortasAbrir: base = portas + acessórios)
+    const acessorios = Array.isArray(b.acessorios) && b.frente !== 'Serralheria' && b.frente !== 'Avulso'
+      ? b.acessorios.slice(0, 100).filter(a => a && typeof a.nome === 'string').map(a => ({ nome: a.nome, qtd: Math.min(9999, Math.max(1, parseInt(a.qtd) || 1)),
+          origem: a.origem === 'SISTEMA DE CORRER' ? 'SISTEMA DE CORRER' : 'MANUAL' }))
+      : [];
+    if (acessorios.length) {
+      const r = await precoComAcessorios(b, cliente, leitorCadastro, acessorios);
+      return res.json({ unitario: r.unitario, total: r.total, acessorios: r.acessorios, ...(b.debug ? { diag: r.diag } : {}) });
     }
-    const isFixo = String(cli[0]?.TIPO_DESCONTO || '').toUpperCase().includes('FIXO');
-    const descontoCliente = cli.length ? (parseFloat(cli[0].DESCONTO) || 0) : 0;
-
-    let subtotal = 0; // base ANTES do desconto do cliente
-    let diag = { clienteEncontrado: cli.length > 0, isFixo, descontoCliente };
-
-    // ============ FRENTE SERRALHERIA (MotorPrecificacaoSerralheria.vb) ============
-    if (b.frente === 'Serralheria') {
-      const [prod] = await pool.execute(
-        'SELECT COALESCE(fixo,0) AS fixo FROM serralheria_produtos WHERE TRIM(nome_modelo) = TRIM(?) LIMIT 1',
-        [b.produto || '']);
-      const valorFixoProduto = prod.length ? (parseFloat(prod[0].fixo) || 0) : 0;
-
-      const dadosMat = await buscarDadosProduto(b.material);
-      if (!dadosMat) return res.status(400).json({ error: `Material '${b.material}' não encontrado ou sem preços.` });
-
-      const qtdA = parseFloat(b.qtdAltura) > 0 ? parseFloat(b.qtdAltura) : 1;
-      const qtdL = parseFloat(b.qtdLargura) > 0 ? parseFloat(b.qtdLargura) : 1;
-      const qtdP = parseFloat(b.qtdProfundidade) > 0 ? parseFloat(b.qtdProfundidade) : 1;
-      const metragem = (alturaS(b) / 1000) * qtdA + (largS(b) / 1000) * qtdL + (profS(b) / 1000) * qtdP;
-
-      const material = metragem * precoBase(dadosMat, isFixo);
-      subtotal += material;
-
-      // Solda: produto "Solda" no cadastro (VALOR_FIXO, senão VALOR_CHEIO)
-      try {
-        const [sol] = await pool.execute(
-          `SELECT COALESCE(NULLIF(VALOR_FIXO,0), NULLIF(VALOR_CHEIO,0), 0) AS v
-           FROM cadastro_de_produtos WHERE TRIM(MODELO) = 'Solda' LIMIT 1`);
-        const soldas = parseFloat(b.soldas) || 0;
-        subtotal += (parseFloat(sol[0]?.v) || 0) * soldas;
-      } catch { /* Solda sem cadastro → 0 */ }
-
-      const pctAcab = await taxaAcabamento(b.acabamento);
-      subtotal += material * (pctAcab / 100);
-
-      (Array.isArray(b.complementos) ? b.complementos : []).forEach(c => {
-        subtotal += (parseFloat(c.qtd) || 0) * (parseFloat(c.valorUnit) || 0);
-      });
-
-      subtotal += valorFixoProduto;
-
-      const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
-      let final = subtotal * qtd;
-      if (descontoCliente > 0) final *= (100 - descontoCliente) / 100;
-      final = aplicarPercentuais(final, b.percentuais);
-
-      diag.serralheria = { metragem, precoM: Math.round(material / (metragem || 1) * 100) / 100, valorFixoProduto };
-      return res.json({
-        unitario: Math.round((final / qtd) * 100) / 100,
-        total: Math.round(final * 100) / 100,
-        ...(b.debug ? { diag } : {})
-      });
-    }
-
-    // ============ VENDA AVULSA (MotorFinanceiro.CalcularValorVendaAvulsa) ============
-    if (b.frente === 'Avulso') {
-      const categoria = String(b.categoria || '');
-      const dados = await buscarDadosProduto(b.produto);
-      if (!dados) return res.status(400).json({ error: `Produto '${b.produto}' não encontrado ou sem preços.` });
-      let base = precoBase(dados, isFixo);
-      // Serviço e Acessório usam o valor fixo quando ele existe
-      if ((categoria === 'Serviço' || categoria === 'Acessório') && dados.valorFixo > 0) base = dados.valorFixo;
-      const precoAcab = comAcab(base, await taxaAcabamento(b.acabamento));
-      let unit = 0;
-      if (['Perfil', 'Trilhos', 'Puxador'].includes(categoria)) unit = precoAcab * (alturaS(b) / 1000);
-      else if (categoria === 'Revestimento') unit = precoAcab * (alturaS(b) / 1000) * (largS(b) / 1000);
-      else if (categoria === 'Serviço' || categoria === 'Acessório') unit = precoAcab;
-      else return res.status(400).json({ error: 'Categoria inválida' });
-      // desconto do cliente só na tabela FIXO (na tabela CHEIO o desconto é no fechamento)
-      if (isFixo && descontoCliente > 0) unit *= (100 - descontoCliente) / 100;
-      unit = aplicarPercentuais(unit, b.percentuais);
-      const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
-      return res.json({
-        unitario: Math.round(unit * 100) / 100,
-        total: Math.round(unit * qtd * 100) / 100,
-        ...(b.debug ? { diag } : {})
-      });
-    }
-
-    // ============ FRENTE PORTAS (MotorFinanceiro.CalcularValorVendaPorta) ============
-    const altura = parseFloat(b.altura) || 0;
-    const largura = parseFloat(b.largura) || 0;
-
-    const dadosPerfil = await buscarDadosProduto(b.perfil);
-    if (!dadosPerfil) return res.status(400).json({ error: `Perfil '${b.perfil}' não encontrado ou sem preços.` });
-    const dadosPux = b.puxador ? await buscarDadosProduto(b.puxador) : null;
-    const dadosRev = b.revestimento ? await buscarDadosProduto(b.revestimento) : null;
-    const dadosDiv = b.divisor ? await buscarDadosProduto(b.divisor) : null;
-
-    const taxaPerfil = await taxaAcabamento(b.acabPerfil);
-    const taxaPux = dadosPux ? await taxaAcabamento(b.acabPuxador) : 0;
-    const taxaRev = dadosRev ? await taxaAcabamento(b.acabRevest) : 0;
-
-    const temPux = !!dadosPux;
-    const posPux = String(b.posicaoPuxador || '').toUpperCase();
-    // VB usa porta.TipoPuxador (já com " Total" quando toda extensão); o cadastro é o reserva
-    const tipoPux = String(b.tipoPuxador || dadosPux?.tipoPuxador || '').toUpperCase();
-    const qtdPux = posPux ? posPux.split(',').filter(p => p.trim()).length : 0;
-    const isSobreposto = tipoPux.includes('SOBREPOSTO');
-    const isEmbutido = tipoPux.includes('EMBUTIDO');
-    const isTotal = tipoPux.includes('TOTAL') || posPux.includes('TOTAL');
-
-    // 1. PERFIL (puxador Total desconta o lado dele)
-    const ladoPux = (posPux.includes('TOPO') || posPux.includes('BASE')) ? largura : altura;
-    const ladoOp  = (posPux.includes('TOPO') || posPux.includes('BASE')) ? altura : largura;
-    const perimetro = (temPux && isTotal && !isSobreposto && !isEmbutido)
-      ? 2 * ladoOp + ladoPux * Math.max(0, 2 - qtdPux)
-      : 2 * altura + 2 * largura;
-    const precoMPerfil = comAcab(precoBase(dadosPerfil, isFixo), taxaPerfil);
-    subtotal += (perimetro / 1000) * precoMPerfil;
-
-    // 2. PUXADOR (mínimo R$ 20/un — fiel ao VB)
-    if (dadosPux) {
-      const compUnit = isTotal ? ladoPux : (parseFloat(b.tamanhoPuxador) || 0);
-      const custo = (compUnit * qtdPux / 1000) * comAcab(precoBase(dadosPux, isFixo), taxaPux);
-      subtotal += Math.max(20 * qtdPux, custo);
-    }
-
-    // 3. DIVISORES (qtdDivH = horizontais, qtdDivV = verticais — fiel ao VB)
-    let compDiv = 0;
-    if (dadosDiv) {
-      const largV = Math.max(0, largura - dadosPerfil.descontoVidro);
-      const altV  = Math.max(0, altura - dadosPerfil.descontoVidro);
-      compDiv = (parseInt(b.qtdDivH) || 0) * largV + (parseInt(b.qtdDivV) || 0) * altV;
-      subtotal += (compDiv / 1000) * comAcab(precoBase(dadosDiv, isFixo), taxaPerfil);
-    }
-
-    // 4. REVESTIMENTO (área líquida, com dedução do divisor)
-    if (dadosRev) {
-      let descX = dadosPerfil.descontoVidro, descY = dadosPerfil.descontoVidro;
-      if (temPux && isSobreposto) {
-        if (posPux.includes('TOPO') || posPux.includes('BASE')) descY += dadosPerfil.descontoPerfilPux * qtdPux;
-        else descX += dadosPerfil.descontoPerfilPux * qtdPux;
-      }
-      const area = Math.max(0, (Math.max(0, altura - descY) / 1000) * (Math.max(0, largura - descX) / 1000));
-      const areaDiv = (compDiv / 1000) * 0.015;
-      subtotal += Math.max(0, area - areaDiv) * comAcab(precoBase(dadosRev, isFixo), taxaRev);
-    }
-
-    // 5. Desconto do cliente + percentuais da linha
-    let final = subtotal;
-    if (descontoCliente > 0) final *= (100 - descontoCliente) / 100;
-    final = aplicarPercentuais(final, b.percentuais);
-
-    const qtd = parseFloat(b.qtd) > 0 ? parseFloat(b.qtd) : 1;
-    diag.perfil = {
-      fixo: dadosPerfil.valorFixo, cheio: dadosPerfil.valorCheio,
-      taxaAcab: taxaPerfil, precoM: Math.round(precoMPerfil * 100) / 100
-    };
-    diag.perimetroMm = perimetro;
-
-    res.json({
-      unitario: Math.round(final * 100) / 100,
-      total: Math.round(final * qtd * 100) / 100,
-      ...(b.debug ? { diag } : {})
-    });
+    const r = await calcularPrecoItem(b, cliente, leitorCadastro);
+    res.json({ unitario: r.unitario, total: r.total, ...(b.debug ? { diag: r.diag } : {}) });
   } catch (err) {
+    if (err instanceof ErroPreco) return res.status(400).json({ error: err.message });
     console.error('Erro /calcular_preco:', err.message);
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
   }
@@ -1852,6 +1654,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 // ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
+registrarPedOrc({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
 
 // ================= SUBIDA =================
@@ -1862,6 +1665,7 @@ async function iniciar() {
   const m = await migrarAcessos(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   if (!m.jaFeita) console.log(`[permissões] migração inicial: ${m.criados} usuário(s) receberam perfil`);
   if ((await acrescentarPermissoesEstoque(pool)).feito) console.log('[permissões] estoque.desfazer e estoque.ajustar acrescentadas aos perfis completos');
+  if ((await acrescentarPermissoesPedOrc(pool)).feito) console.log('[permissões] orcamentos.salvar e pedidos.criar acrescentadas');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

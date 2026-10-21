@@ -144,7 +144,7 @@
         .viz-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-light); }
         .viz-status { font-size: 13px; color: var(--primary-color); font-weight: 600; min-height: 18px; margin-top: 6px; }
         /* ===== ETAPA 2 EM DUAS COLUNAS: dados à esquerda, desenho à direita ===== */
-        .item-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, .85fr); gap: 22px; align-items: start; }
+        .item-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr); gap: 22px; align-items: start; }
         .item-dados { min-width: 0; }
         .item-visual { position: sticky; top: 84px; min-width: 0; }
         .item-visual .secao-item { margin-bottom: 16px; }
@@ -154,15 +154,39 @@
         @media (max-width: 1150px) {
             .item-layout { grid-template-columns: minmax(0, 1fr); }
             .item-visual { position: static; }
-            .item-visual #cv-visualizacao { height: 420px; }
         }
         @media (max-width: 768px) {
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
             main { padding: 20px; }
             .card { overflow-x: auto; }
         }
+        /* ===== acessórios ===== */
+        .tab-acess-wrap { overflow-x: auto; }
+        .tab-acess { width: 100%; font-size: 13px; }
+        .tab-acess th, .tab-acess td { padding: 4px 6px; text-align: left; }
+        .tab-acess input.ac-qtd { width: 64px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .tab-acess tr[data-origem="SISTEMA DE CORRER"] td:first-child::after { content: ' · sistema'; color: var(--text-light); font-size: 11px; }
+        .tab-acess tbody:empty::before { content: 'Nenhum acessório'; display: block; padding: 6px; color: var(--text-light); }
+        .lbl-desemp { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
+        #sel-acessorio { max-width: 100%; }
+        /* ===== salvar no banco ===== */
+        .ped-numero { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--primary-color, #2563eb); }
+        .ped-pedido-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+        .ped-pedido-grid label { display: block; font-size: 13px; margin-bottom: 4px; }
+        .ped-pedido-grid input, .ped-pedido-grid select { width: 100%; box-sizing: border-box; }
+        #ped-obs { width: 100%; box-sizing: border-box; resize: vertical; }
+        .msg-salvar { margin-top: 10px; font-size: 14px; }
+        .msg-salvar.erro { color: #b91c1c; }
+        .msg-salvar.ok { color: #15803d; font-weight: 600; }
+        #itens-tbody tr.preco-mudou td { background: #fef2f2; }
+        #itens-tbody tr.preco-mudou td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
+        .dlg-salvar { margin: auto; border: none; border-radius: 12px; padding: 22px; max-width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+        .dlg-salvar::backdrop { background: rgba(15, 23, 42, .45); }
+        .dlg-salvar h3 { margin: 0 0 8px; }
+        .dlg-salvar p { margin: 0 0 16px; color: var(--text-light); }
+        .dlg-acoes { display: flex; gap: 10px; flex-wrap: wrap; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610211500">
+    <link rel="stylesheet" href="tema.css?v=202610221200">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -187,7 +211,8 @@
         html body #bloqueio-msg { padding: 8px 12px; margin-bottom: 10px; }
         html body .item-layout { gap: 14px; }
         html body .item-visual { top: 70px; }
-        html body .item-visual #cv-visualizacao { height: 400px; }
+        html body .item-visual #cv-visualizacao { height: 540px; }
+        @media (max-width: 1150px) { html body .item-visual #cv-visualizacao { height: 460px; } } /* uma coluna (tela menor) */
         html body .viz-linha { margin-top: 8px; gap: 6px; }
         html body #pnl-furacoes { margin: 8px 0 4px; gap: 4px; }
         html body .linha-furo input { padding: 4px 8px; }
@@ -253,7 +278,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202610211500" defer></script>
+    <script src="layout.js?v=202610221200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -277,11 +302,30 @@
             <p class="welcome-subtitle">1. Selecione o cliente &nbsp;→&nbsp; 2. Escolha a frente &nbsp;→&nbsp; 3. Monte os itens — preços calculados pelo motor financeiro</p>
             <!-- ═══════════ ETAPA 1: CLIENTE ═══════════ -->
             <section class="card">
-                <div class="card-title"><span class="etapa">1</span> Cliente</div>
+                <div class="card-title"><span class="etapa">1</span> Cliente <span id="ped-numero" class="ped-numero"></span></div>
                 <div class="grid-form">
                     <div class="form-group full">
                         <label for="sel-cliente">Cliente (Razão Social) — define a tabela de preço e o desconto</label>
                         <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ped-tipo">Tipo</label>
+                        <select id="ped-tipo"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ped-cliente-final">Cliente final</label>
+                        <input type="text" id="ped-cliente-final" maxlength="190">
+                    </div>
+                    <div class="form-group full">
+                        <label for="ped-obs">Observação geral</label>
+                        <textarea id="ped-obs" rows="2" maxlength="5000"></textarea>
+                    </div>
+                    <div class="form-group full" id="ped-campos-pedido" style="display:none">
+                        <div class="ped-pedido-grid">
+                            <div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
+                            <div><label for="ped-situacao">Situação</label><select id="ped-situacao"><option value="">—</option><option>Cancelado</option><option>Em Produção</option><option>Entregue</option><option>Retirado</option></select></div>
+                            <div><label for="ped-financeiro">Financeiro</label><select id="ped-financeiro"><option value="">—</option><option>Recebido</option><option>A Receber</option><option>Atrasado</option><option>Sem custo</option></select></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -397,6 +441,22 @@
                             <div class="form-group"><label>Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
                             <div class="form-group"><label>Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                         </div>
+                        <div class="viz-status" id="correr-portas"></div>
+                    </div>
+                    <!-- ACESSÓRIOS (lstvAcessorios do frmPortasAbrir/frmPortasCorrer) -->
+                    <div class="secao-item secao-porta" id="quadro-acessorios">
+                        <h4>🔧 Acessórios</h4>
+                        <div class="viz-linha">
+                            <button type="button" class="btn-mini" id="btn-add-acessorio">＋ Acessório</button>
+                            <select id="sel-acessorio" style="display:none" aria-label="Escolha o acessório"></select>
+                            <label id="lbl-desempenador" class="lbl-desemp" style="display:none"><input type="checkbox" id="chk-desempenador"> incluir desempenador</label>
+                        </div>
+                        <div class="tab-acess-wrap">
+                            <table class="tab-acess">
+                                <thead><tr><th>Acessório</th><th>Qtd</th><th>Tam. (mm)</th><th data-valor>Unitário</th><th></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
                     </div>
                     <!-- VALORES -->
                     <div class="secao-item">
@@ -466,12 +526,24 @@
                 </div>
                 <div style="font-size:12px;color:var(--text-light);text-align:right;margin-top:6px;" id="desconto-aviso"></div>
                 <div class="acoes-linha">
-                    <button class="btn btn-primary" id="btn-salvar">💾 Salvar orçamento</button>
+                    <button class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
+                    <button class="btn btn-secondary" id="btn-novo">📄 Novo</button>
                     <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
                 </div>
+                <div id="msg-salvar" class="msg-salvar" role="status" aria-live="polite"></div>
             </section>
         </main>
     </div>
+    <!-- ═══════════ SALVAR (frm_Opcao_Pedido) ═══════════ -->
+    <dialog id="dlg-salvar" class="dlg-salvar" aria-labelledby="dlg-salvar-titulo">
+        <h3 id="dlg-salvar-titulo">Salvar</h3>
+        <p id="dlg-salvar-texto"></p>
+        <div class="dlg-acoes">
+            <button type="button" class="btn btn-primary" id="btn-salvar-novo">Salvar com novo número</button>
+            <button type="button" class="btn btn-secondary" id="btn-atualizar" style="display:none">Atualizar</button>
+            <button type="button" class="btn btn-secondary" id="btn-dlg-cancelar">Cancelar</button>
+        </div>
+    </dialog>
     <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
     <div class="avl-fundo" id="avl-fundo"></div>
     <aside class="avl" id="avl" aria-label="Alteração de valores">
@@ -544,6 +616,10 @@
         // ============ ESTADO ============
         let frenteAtual = 'Porta de giro';
         let itens = [];
+        const ORIGEM_SIS = 'SISTEMA DE CORRER';
+        let acessoriosItem = [];  // acessórios do item em montagem: { nome, qtd, tamanho, origem, valorUnitario? }
+        let sistemaCorrer = null; // porta de correr: { descontoAltura, temDesempenador } do sistema escolhido
+        let seqSistema = 0;
         let editandoIndex = -1;
         // Estado do frmPortasAbrir.vb (memória do projeto na RAM)
         const FRASE_REF_FUROS = '(Furos medidos de BAIXO para CIMA)';
@@ -979,9 +1055,11 @@
                     status.textContent = '';
                     return;
                 }
+                const mp = ehCorrer() && temSistemaCorrer() && sistemaCorrer ? medidasPortasCorrer() : null; // correr: preço pela medida da porta
                 payload = { frente: frenteAtual,
                             cliente: clienteNome, clienteCodigo,
-                            altura: g('f-altura'), largura: g('f-largura'),
+                            altura: mp ? mp.altura : g('f-altura'), largura: mp ? mp.largura : g('f-largura'),
+                            acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, origem: a.origem })),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
@@ -1002,6 +1080,10 @@
                         body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+                    if (Array.isArray(d.acessorios)) {
+                        d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) acessoriosItem[i].valorUnitario = a.valorUnitario; });
+                        renderAcessorios();
+                    }
                     // ✅ CORREÇÃO ④: se o backend já aplicou desconto FIXO do cliente, trava o campo da tela
                     descontoJaAplicado = !!(d.diag && d.diag.isFixo && d.diag.descontoCliente > 0);
                     atualizarTravaDesconto();
@@ -1570,12 +1652,14 @@
                     pares: paresAtivo(),
                     todaExt,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
+                    desempenador: document.getElementById('chk-desempenador').checked,
                     produto: g('f-produto'), material: g('f-material'),
                     acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
                     // venda avulsa (ItemVendaAvulsa)
                     categoria: ehAv ? g('f-av-cat') : '', avProduto: ehAv ? g('f-av-produto') : '',
                     avAcab: ehAv ? g('f-av-acab') : '', avCor: ehAv ? g('f-av-cor') : ''
                 },
+                acessorios: ehSerr || ehAv ? [] : acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })),
                 valor: parseFloat(g('f-valor').replace(',', '.')) || 0,
                 obs: g('f-obs'),
                 descricao: desc
@@ -1667,12 +1751,17 @@
             }
             // escudo final da observação
             set('f-obs', item.obs);
+            limparAcessorios();
+            acessoriosItem = (item.acessorios || []).filter(a => a.origem !== ORIGEM_SIS).map(a => ({ ...a }));
+            document.getElementById('chk-desempenador').checked = !!(item.detalhes || {}).desempenador;
+            renderAcessorios();
             atualizarTotalItem();
             desenharVisualizacao();
-            calcularPrecoAutomatico();
+            if (ehCorrer()) atualizarSistemaCorrer(); else calcularPrecoAutomatico();
         }
         function limparForm() {
             const catAvulso = val('f-av-cat');
+            limparAcessorios();
             document.querySelectorAll('#form-item input, #form-item select').forEach(el => {
                 if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
@@ -1727,7 +1816,7 @@
             tbody.innerHTML = itens.length === 0
                 ? '<tr><td colspan="9" style="text-align:center;padding:25px;color:var(--text-light)">Nenhum item adicionado</td></tr>'
                 : itens.map((it, i) => `
-                    <tr class="${it.historico ? 'com-pct' : ''}">
+                    <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
                         <td>${escapeHtml(it.descricao)}</td>
@@ -1737,6 +1826,7 @@
                         <td class="col-pct">${escapeHtml(textoHistorico(it.historico) || '-')}</td>
                         <td class="item-desc">${escapeHtml(it.obs || '-')}</td>
                         <td class="col-acoes">
+                            ${it.precoMudou ? `<button class="btn-mini recalcular" title="O preço mudou: abrir o item para recalcular" onclick="editarItem(${i})">🔄</button>` : ''}
                             <button class="btn-mini" title="Alterar valores" onclick="abrirAlterarValor(${i})">💲</button>
                             <button class="btn-mini" title="Editar item" onclick="editarItem(${i})">✏️</button>
                             <button class="btn-mini excluir" onclick="removerItem(${i})">🗑️</button>
@@ -1878,24 +1968,208 @@
             altv = null;
         }
 
-        // ============ SALVAR (rascunho local — /salvar_orcamento vem depois) ============
+        // ============ ACESSÓRIOS DAS PORTAS (lstvAcessorios) + PORTA DE CORRER POR VÃO ============
+        // Manuais: escolhidos de acessorios_permitidos da frente. Do sistema: vêm do servidor (trilhos no vão,
+        // quantidades da config) e só mudam pelo sistema/medidas/desempenador — o servidor recalcula ao salvar.
+        const temSistemaCorrer = () => { const v = val('f-sistema'); return !!v && v !== 'Sem sistema'; };
+        // frmPortasCorrer: com sistema a medida é o VÃO → porta = vão − desconto; largura com transpasse
+        function medidasPortasCorrer() {
+            const n = qtdEfetiva(), a = parseFloat(val('f-altura')) || 0, l = parseFloat(val('f-largura')) || 0;
+            if (!(ehCorrer() && temSistemaCorrer() && sistemaCorrer)) return { altura: a, largura: l, n };
+            const t = parseFloat(val('f-transpasse')) || 0;
+            return { altura: Math.round(a - sistemaCorrer.descontoAltura), largura: Math.round(n > 1 ? (l + t * (n - 1)) / n : l), n };
+        }
+        function renderAcessorios() {
+            document.querySelector('#quadro-acessorios tbody').innerHTML = acessoriosItem.map((a, i) => `
+                <tr data-nome="${escapeHtml(a.nome)}" data-origem="${escapeHtml(a.origem)}">
+                    <td>${escapeHtml(a.nome)}</td>
+                    <td><input type="number" class="ac-qtd" min="1" step="1" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? 'readonly title="Quantidade definida pelo sistema"' : ''}></td>
+                    <td>${a.tamanho || 0}</td>
+                    <td data-valor>${a.valorUnitario != null ? formatCurrency(a.valorUnitario) : '—'}</td>
+                    <td>${a.origem === ORIGEM_SIS ? '' : `<button type="button" class="btn-mini ac-remover" data-i="${i}" title="Remover acessório">🗑️</button>`}</td>
+                </tr>`).join('');
+            const c = document.getElementById('correr-portas');
+            const m = medidasPortasCorrer();
+            c.textContent = ehCorrer() && m.altura && m.largura ? `Portas: ${m.altura} × ${m.largura} mm (${m.n} folhas)` : '';
+        }
+        async function abrirListaAcessorios() {
+            const sel = document.getElementById('sel-acessorio');
+            try {
+                const lista = await fetchAutenticado(`${API_BASE}/ped_orc/acessorios_permitidos?tipo=${encodeURIComponent(frenteAtual)}&clienteCodigo=${encodeURIComponent(val('sel-cliente'))}`);
+                sel.innerHTML = lista.length
+                    ? '<option value="">— escolha o acessório —</option>' + lista.map(a => `<option value="${escapeHtml(a.nome)}">${escapeHtml(a.nome)}</option>`).join('')
+                    : '<option value="">(nenhum acessório permitido para esta frente)</option>';
+            } catch {
+                sel.innerHTML = '<option value="">Erro ao carregar os acessórios</option>';
+            }
+            sel.style.display = '';
+            sel.focus();
+        }
+        function escolherAcessorio() {
+            const sel = document.getElementById('sel-acessorio');
+            const nome = sel.value;
+            if (!nome) return;
+            const ja = acessoriosItem.find(a => a.nome === nome && a.origem !== ORIGEM_SIS);
+            if (ja) ja.qtd++;
+            else acessoriosItem.push({ nome, qtd: 1, tamanho: 0, origem: 'MANUAL' });
+            sel.value = '';
+            sel.style.display = 'none';
+            renderAcessorios();
+            calcularPrecoAutomatico();
+        }
+        async function atualizarSistemaCorrer() {
+            const meu = ++seqSistema;
+            const manuais = acessoriosItem.filter(a => a.origem !== ORIGEM_SIS);
+            const lbl = document.getElementById('lbl-desempenador');
+            if (!ehCorrer() || !temSistemaCorrer()) {
+                sistemaCorrer = null; acessoriosItem = manuais; lbl.style.display = 'none';
+                renderAcessorios(); calcularPrecoAutomatico();
+                return;
+            }
+            const q = new URLSearchParams({ nome: val('f-sistema'), folhas: qtdEfetiva(), larguraVao: parseFloat(val('f-largura')) || 0,
+                desempenador: document.getElementById('chk-desempenador').checked ? '1' : '0', clienteCodigo: val('sel-cliente') });
+            try {
+                const r = await fetchAutenticado(`${API_BASE}/ped_orc/sistema_correr?${q}`);
+                if (meu !== seqSistema) return; // chegou uma resposta mais nova
+                sistemaCorrer = { descontoAltura: r.descontoAltura, temDesempenador: r.temDesempenador };
+                acessoriosItem = [...r.acessorios.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS, valorUnitario: a.valorUnitario })), ...manuais];
+                lbl.style.display = r.temDesempenador ? '' : 'none';
+            } catch {
+                if (meu !== seqSistema) return;
+                sistemaCorrer = null; acessoriosItem = manuais; lbl.style.display = 'none';
+                document.getElementById('calc-status').textContent = '⚠️ Sistema de correr não encontrado';
+            }
+            renderAcessorios();
+            calcularPrecoAutomatico();
+        }
+        function limparAcessorios() {
+            acessoriosItem = []; sistemaCorrer = null; seqSistema++;
+            document.getElementById('chk-desempenador').checked = false;
+            document.getElementById('lbl-desempenador').style.display = 'none';
+            document.getElementById('sel-acessorio').style.display = 'none';
+            renderAcessorios();
+        }
+        document.getElementById('btn-add-acessorio').addEventListener('click', abrirListaAcessorios);
+        document.getElementById('sel-acessorio').addEventListener('change', escolherAcessorio);
+        document.querySelector('#quadro-acessorios tbody').addEventListener('change', e => {
+            const inp = e.target.closest('input.ac-qtd');
+            if (!inp || inp.readOnly) return;
+            const a = acessoriosItem[Number(inp.dataset.i)];
+            if (!a) return;
+            a.qtd = Math.min(9999, Math.max(1, parseInt(inp.value) || 1));
+            renderAcessorios();
+            calcularPrecoAutomatico();
+        });
+        document.querySelector('#quadro-acessorios tbody').addEventListener('click', e => {
+            const b = e.target.closest('button.ac-remover');
+            if (!b) return;
+            acessoriosItem.splice(Number(b.dataset.i), 1);
+            renderAcessorios();
+            calcularPrecoAutomatico();
+        });
+        ['f-sistema', 'f-transpasse', 'f-largura', 'chk-desempenador'].forEach(id =>
+            document.getElementById(id).addEventListener('change', () => { if (ehCorrer()) atualizarSistemaCorrer(); }));
+        document.getElementById('f-altura').addEventListener('change', renderAcessorios);
+        document.getElementById('f-qtd').addEventListener('input', () => { if (ehCorrer() && temSistemaCorrer()) atualizarSistemaCorrer(); else renderAcessorios(); });
+        // trocar de frente: os acessórios permitidos são outros
+        document.querySelectorAll('.frente-btn').forEach(b => b.addEventListener('click', () => {
+            limparAcessorios();
+            if (ehCorrer()) atualizarSistemaCorrer(); else calcularPrecoAutomatico();
+        }));
+        // ============ SALVAR NO BANCO (ModPedOrc.Salvar_Ped_Orc_Blindado / frm_Opcao_Pedido) ============
+        let docSalvo = null; // { tipo, numero } depois da 1ª gravação nesta tela
+        const $s = id => document.getElementById(id);
+        const tipoAtual = () => $s('ped-tipo').value;
+        function configurarTipo() {
+            // Pedido só para quem tem "Salvar como pedido"
+            if (!(window.Acesso && Acesso.pode('pedidos.criar'))) $s('ped-tipo').querySelector('option[value="Pedido"]')?.remove();
+            atualizarCamposPedido();
+        }
+        function atualizarCamposPedido() {
+            $s('ped-campos-pedido').style.display = tipoAtual() === 'Pedido' ? '' : 'none';
+        }
+        function mostrarMsgSalvar(texto, tipo) {
+            const m = $s('msg-salvar');
+            m.textContent = texto || '';
+            m.className = 'msg-salvar' + (tipo ? ' ' + tipo : '');
+        }
+        function mostrarNumero() {
+            $s('ped-numero').textContent = docSalvo ? `${docSalvo.tipo} nº ${docSalvo.numero}` : '';
+        }
+        // rascunho local: proteção caso a internet caia antes de salvar
+        function guardarRascunho() {
+            try {
+                const sel = $s('sel-cliente');
+                const lista = JSON.parse(localStorage.getItem('rascunhos_orcamento') || '[]');
+                lista.push({ data: new Date().toLocaleString('pt-BR'), cliente: sel.options[sel.selectedIndex]?.text || '', clienteCodigo: sel.value, itens });
+                localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista.slice(-20)));
+            } catch { /* armazenamento cheio ou bloqueado: segue sem rascunho */ }
+        }
+        // mesmas checagens do VB (SalvarPedidoOrçamentoToolStripMenuItem_Click)
         function salvarOrcamento() {
-            if (itens.length === 0) { alert('Adicione ao menos 1 item.'); return; }
-            if (!temClienteSelecionado()) { alert('Selecione o cliente.'); return; }
-            const clienteSel = document.getElementById('sel-cliente');
-            const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
-            const descPct = descontoJaAplicado ? 0 : (parseFloat(document.getElementById('desconto').value) || 0);
-            const rascunho = {
-                data: new Date().toLocaleString('pt-BR'),
-                cliente: clienteSel.options[clienteSel.selectedIndex].text,
-                clienteCodigo: clienteSel.value,
-                itens, desconto: descPct,
-                subtotal, total: subtotal * (1 - descPct / 100)
+            mostrarMsgSalvar('');
+            if (itens.length === 0) { alert('Favor inserir pelomenos 1 item no pedido!'); return; }
+            if (!temClienteSelecionado()) { alert('Favor selecionar um cliente!'); return; }
+            if (tipoAtual() === 'Pedido') {
+                if (!$s('ped-entrega').value) { alert('Favor inserir a data de entrega!'); return; }
+                if (!$s('ped-situacao').value) { alert('Favor escolher uma situação do pedido!'); return; }
+                if (!$s('ped-financeiro').value) { alert('Favor escolher a situação financeira do pedido!'); return; }
+            }
+            const podeAtualizar = !!docSalvo && docSalvo.tipo === tipoAtual();
+            $s('dlg-salvar-titulo').textContent = `Salvar ${tipoAtual().toLowerCase()}`;
+            $s('dlg-salvar-texto').textContent = podeAtualizar
+                ? `Gravar por cima do ${docSalvo.tipo.toLowerCase()} nº ${docSalvo.numero} ou criar um com número novo?`
+                : `Será criado um ${tipoAtual().toLowerCase()} com número novo.`;
+            $s('btn-atualizar').style.display = podeAtualizar ? '' : 'none';
+            if (podeAtualizar) $s('btn-atualizar').textContent = `Atualizar nº ${docSalvo.numero}`;
+            $s('dlg-salvar').showModal();
+        }
+        async function gravar(modo) {
+            $s('dlg-salvar').close();
+            guardarRascunho();
+            const tipo = tipoAtual();
+            const corpo = {
+                modo, tipo, ...(modo === 'atualizar' ? { numero: docSalvo.numero } : {}),
+                clienteCodigo: $s('sel-cliente').value,
+                clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
+                ...(tipo === 'Pedido' ? { dataEntrega: $s('ped-entrega').value, situacao: $s('ped-situacao').value, financeiro: $s('ped-financeiro').value } : {}),
+                descontoPct: descontoJaAplicado ? 0 : (parseFloat($s('desconto').value) || 0),
+                totalTela: itens.reduce((t, it) => t + it.qtd * it.valor, 0),
+                itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
+                    profundidade: it.profundidade, soldas: it.soldas, furos: it.furos, detalhes: it.detalhes,
+                    acessorios: it.acessorios || [], historico: it.historico || '', obs: it.obs || '', valorTela: it.valor }))
             };
-            const lista = JSON.parse(localStorage.getItem('rascunhos_orcamento') || '[]');
-            lista.push(rascunho);
-            localStorage.setItem('rascunhos_orcamento', JSON.stringify(lista));
-            alert('Rascunho salvo localmente!\n\nO salvamento no banco (endpoint /salvar_orcamento) será o próximo passo.');
+            let res, json = {};
+            try {
+                res = await fetch(`${API_BASE}/ped_orc/salvar`, { method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return; }
+                json = await res.json().catch(() => ({}));
+            } catch {
+                mostrarMsgSalvar('Sem conexão com o servidor. Os itens continuam na tela (e num rascunho local); tente de novo.', 'erro');
+                return;
+            }
+            itens.forEach(it => { delete it.precoMudou; });
+            if (res.ok && json.ok) {
+                docSalvo = { tipo: json.tipo, numero: json.numero };
+                mostrarNumero();
+                renderItens();
+                mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.`, 'ok');
+                return;
+            }
+            if (res.status === 409 && json.erro === 'preco_mudou') (json.itens || []).forEach(i => { if (itens[i]) itens[i].precoMudou = true; });
+            renderItens();
+            mostrarMsgSalvar(json.error || `Erro ao salvar (HTTP ${res.status}).`, 'erro');
+        }
+        function novoDocumento() {
+            if (itens.length && !confirm('Começar um novo orçamento/pedido? Os itens da tela serão apagados.')) return;
+            itens = []; docSalvo = null;
+            ['ped-cliente-final', 'ped-obs', 'ped-entrega', 'ped-situacao', 'ped-financeiro'].forEach(id => { $s(id).value = ''; });
+            $s('ped-tipo').value = 'Orçamento';
+            atualizarCamposPedido();
+            mostrarNumero();
+            mostrarMsgSalvar('');
+            renderItens();
         }
                 // ============ CARREGAMENTO ============
         async function carregarClientes() {
@@ -1917,6 +2191,12 @@
             if (itens.length && confirm('Esvaziar a lista de itens?')) { itens = []; renderItens(); }
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
+        document.getElementById('btn-salvar-novo').addEventListener('click', () => gravar('novo'));
+        document.getElementById('btn-atualizar').addEventListener('click', () => gravar('atualizar'));
+        document.getElementById('btn-dlg-cancelar').addEventListener('click', () => document.getElementById('dlg-salvar').close());
+        document.getElementById('btn-novo').addEventListener('click', novoDocumento);
+        document.getElementById('ped-tipo').addEventListener('change', atualizarCamposPedido);
+        document.addEventListener('DOMContentLoaded', configurarTipo); // layout.js (defer) já definiu o Acesso
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('sel-cliente').addEventListener('change', () => {
             descontoJaAplicado = false; // recém selecionado: reavalia após o 1º cálculo
