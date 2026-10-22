@@ -36,6 +36,7 @@ async function adminsAtivos(executor, sobrescrever = {}) {
   const admins = new Set();
   for (const a of acessos) {
     const mod = usuariosMod[a.usuario_codigo] || {};
+    if (mod.excluir) continue;
     const perfilId = mod.perfil_id !== undefined ? mod.perfil_id : a.perfil_id;
     const ativoWeb = mod.ativo !== undefined ? mod.ativo : Number(a.ativo) === 1;
     const pm = perfisMod[perfilId] || {};
@@ -196,6 +197,40 @@ function registrarAdmin({ rota, pool, acesso, bcrypt }) {
     } catch (err) {
       if (conn) await conn.rollback().catch(() => {});
       falha(res, 'PUT /admin/usuarios', err);
+    } finally {
+      if (conn) conn.release();
+    }
+  });
+
+  rota('delete', '/admin/usuarios/:codigo', ADMIN, async (req, res) => {
+    const codigo = parseInt(req.params.codigo, 10) || 0;
+    if (codigo <= 0) return erro(res, 404, 'Usuário não encontrado.');
+    if (codigo === Number(req.user.id)) return erro(res, 409, 'Você não pode excluir sua própria conta.');
+    let conn;
+    try {
+      const [[usuario]] = await pool.execute('SELECT CODIGO, NOME FROM cliente_usuarios WHERE CODIGO = ? LIMIT 1', [codigo]);
+      if (!usuario) return erro(res, 404, 'Usuário não encontrado.');
+
+      const antes = await adminsAtivos(pool);
+      const depois = await adminsAtivos(pool, { usuarios: { [codigo]: { excluir: true } } });
+      if (travaAdmin(res, depois, req.user.id, antes.has(Number(req.user.id)))) return;
+
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      await conn.execute('DELETE FROM web_usuario_excecoes WHERE usuario_codigo = ?', [codigo]);
+      await conn.execute('DELETE FROM web_usuario_acesso WHERE usuario_codigo = ?', [codigo]);
+      const [removido] = await conn.execute('DELETE FROM cliente_usuarios WHERE CODIGO = ?', [codigo]);
+      if (!removido.affectedRows) {
+        await conn.rollback();
+        return erro(res, 404, 'Usuário não encontrado.');
+      }
+      await auditar(conn, { quem: req.user.nome, acao: 'usuario_excluido', alvo: usuario.NOME, detalhe: { codigo } });
+      await conn.commit();
+      acesso.limpar(codigo);
+      res.json({ ok: true });
+    } catch (err) {
+      if (conn) await conn.rollback().catch(() => {});
+      falha(res, 'DELETE /admin/usuarios/:codigo', err);
     } finally {
       if (conn) conn.release();
     }

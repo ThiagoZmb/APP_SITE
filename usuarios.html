@@ -48,6 +48,7 @@
         .btn { border: none; border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
         .btn-primario { background: var(--gradient-primary); color: #fff; }
         .btn-secundario { background: #fff; color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-perigo { color: var(--erro); border-color: rgba(210,47,66,.35); }
         .tabela { width: 100%; border-collapse: collapse; }
         .tabela th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 9px 10px; border-bottom: 2px solid var(--border-color); }
         .tabela td { padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: middle; }
@@ -231,6 +232,7 @@
             </div>
         </div>
         <div class="g-acoes">
+            <button type="button" class="btn btn-secundario btn-perigo" id="btn-excluir" hidden>Excluir usuário</button>
             <button type="button" class="btn btn-secundario" id="btn-senha">Redefinir senha</button>
             <span class="espaco"></span>
             <button type="button" class="btn btn-secundario" id="btn-cancelar">Cancelar</button>
@@ -454,6 +456,7 @@
                 $('f-perfil').value = estadoFicha.perfilId ?? '';
                 $('f-ativo').checked = estadoFicha.ativo;
                 $('btn-senha').hidden = false;
+                $('btn-excluir').hidden = false;
                 $('f-ativo').disabled = false;
                 renderEstados();
                 renderGradeSeExistir();
@@ -480,6 +483,7 @@
                 $('f-perfil').value = '';
                 $('f-ativo').checked = true; $('f-ativo').disabled = true; // usuário novo nasce ativo
                 $('btn-senha').hidden = true;
+                $('btn-excluir').hidden = true;
                 $('bloco-grade').hidden = true;
                 renderEstados();
                 mostrarFicha(true);
@@ -519,6 +523,19 @@
             } catch (e) { toast(e.message, 'erro'); } // a ficha continua aberta com o que foi digitado
         }
 
+        async function excluirUsuario() {
+            if (!estadoFicha?.codigo) return;
+            const { codigo } = estadoFicha;
+            const nome = $('f-nome').value;
+            if (!window.confirm(`Excluir o usuário "${nome}"? Esta ação remove a conta e suas permissões e não pode ser desfeita.`)) return;
+            try {
+                await api(`/admin/usuarios/${codigo}`, { method: 'DELETE' });
+                fecharFicha();
+                await carregarUsuarios();
+                toast(`Usuário ${nome} excluído.`, 'ok');
+            } catch (e) { toast(e.message, 'erro'); }
+        }
+
         $('lista-usuarios').addEventListener('click', e => {
             const tr = e.target.closest('tr[data-codigo]');
             if (tr) abrirFicha(Number(tr.dataset.codigo));
@@ -532,6 +549,7 @@
             });
         }
         umPorVez($('btn-salvar'), salvarFicha);
+        umPorVez($('btn-excluir'), excluirUsuario);
         $('btn-novo').addEventListener('click', abrirNovo);
         $('btn-fechar').addEventListener('click', fecharFicha);
         $('btn-cancelar').addEventListener('click', fecharFicha);

@@ -40,6 +40,12 @@ function bancoComEstado() {
     [/SELECT CODIGO, NOME FROM cliente_usuarios WHERE CODIGO = \?/, (sql, [c]) => usuarios[c] ? [usuarios[c]] : []],
     [/INSERT INTO web_usuario_acesso/, (sql, [c, perfil_id, estados, ativo]) => { acessos[c] = { perfil_id, estados, ativo }; return { affectedRows: 1 }; }],
     [/DELETE FROM web_usuario_excecoes/, (sql, [c]) => { for (let i = excecoes.length - 1; i >= 0; i--) if (excecoes[i].usuario_codigo === Number(c)) excecoes.splice(i, 1); return {}; }],
+    [/DELETE FROM web_usuario_acesso WHERE usuario_codigo = \?/, (sql, [c]) => { delete acessos[c]; return {}; }],
+    [/DELETE FROM cliente_usuarios WHERE CODIGO = \?/, (sql, [c]) => {
+      const existed = !!usuarios[c];
+      delete usuarios[c];
+      return { affectedRows: existed ? 1 : 0 };
+    }],
     [/INSERT INTO web_usuario_excecoes/, (sql, [c, permissao, tipo]) => { excecoes.push({ usuario_codigo: Number(c), permissao, tipo }); return {}; }],
     [/SELECT CARGO FROM cargos WHERE CARGO = \?/, (sql, [c]) => ['Administrador', 'Produção', 'Vendas'].includes(c) ? [{ CARGO: c }] : []],
     [/SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE RAZAO_SOCIAL = \?/, (sql, [r]) => r === 'ELEGANCE' ? [{ RAZAO_SOCIAL: r }] : []],
@@ -66,7 +72,7 @@ async function preparar(t) {
   const s = await subir(app);
   t.after(s.fechar);
   const chamar = (id, caminho, metodo = 'GET', corpo) => fetch(s.url + caminho, {
-    method: metodo, headers: { Authorization: 'Bearer ' + token(id, banco.usuarios[id].NOME), 'Content-Type': 'application/json' },
+    method: metodo, headers: { Authorization: 'Bearer ' + token(id, banco.usuarios[id]?.NOME || 'Removido'), 'Content-Type': 'application/json' },
     body: corpo ? JSON.stringify(corpo) : undefined });
   return { banco, chamar };
 }
@@ -111,6 +117,39 @@ test('desativar usuário derruba a sessão dele na hora', async t => {
   const r = await chamar(1, '/admin/usuarios/2', 'PUT', { ativo: false });
   assert.equal(r.status, 200, await r.clone().text());
   assert.equal((await chamar(2, '/auth/verify')).status, 401);
+});
+
+test('excluir usuário remove dependências e encerra a sessão', async t => {
+  const { banco, chamar } = await preparar(t);
+  banco.excecoes.push({ usuario_codigo: 2, permissao: 'estoque.editar', tipo: 'liberar' });
+  const r = await chamar(1, '/admin/usuarios/2', 'DELETE');
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(await r.json(), { ok: true });
+  assert.equal(banco.usuarios[2], undefined);
+  assert.equal(banco.acessos[2], undefined);
+  assert.deepEqual(banco.excecoes, []);
+  const seq = banco.f.chamadas.map(c => c.sql);
+  const i = n => seq.findIndex(s => n.test(s));
+  assert.ok(i(/^BEGIN$/) < i(/DELETE FROM web_usuario_excecoes/) &&
+    i(/DELETE FROM web_usuario_excecoes/) < i(/DELETE FROM web_usuario_acesso/) &&
+    i(/DELETE FROM web_usuario_acesso/) < i(/DELETE FROM cliente_usuarios/) &&
+    i(/DELETE FROM cliente_usuarios/) < i(/^COMMIT$/));
+  assert.ok(banco.f.chamadas.some(c => /INSERT INTO web_auditoria/.test(c.sql) && c.params.includes('usuario_excluido')));
+  assert.equal((await chamar(2, '/auth/verify')).status, 401);
+});
+
+test('não exclui a própria conta nem deixa o sistema sem administrador', async t => {
+  const { banco, chamar } = await preparar(t);
+  const proprio = await chamar(1, '/admin/usuarios/1', 'DELETE');
+  assert.equal(proprio.status, 409);
+  assert.deepEqual(await proprio.json(), { error: 'Você não pode excluir sua própria conta.' });
+  await chamar(1, '/auth/verify');
+  banco.acessos[1] = { perfil_id: 2, estados: null, ativo: 1 };
+  banco.acessos[2] = { perfil_id: 1, estados: null, ativo: 1 };
+  const semUltimo = await chamar(1, '/admin/usuarios/2', 'DELETE');
+  assert.equal(semUltimo.status, 409);
+  assert.deepEqual(await semUltimo.json(), { error: 'Não é possível deixar o sistema sem nenhum administrador ativo.' });
+  assert.ok(banco.usuarios[2]);
 });
 
 test('não remove o próprio admin (mesmo havendo outro administrador)', async t => {
