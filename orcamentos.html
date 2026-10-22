@@ -188,6 +188,31 @@
         .correr-modo:empty { display: none; }
         .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f2ff; color: #004a9f; border: 1px solid #0077ff; }
         .chip-sistema.sem { background: #fff1e6; color: #9a3a05; border-color: #e8590c; }
+        /* ===== serralheria: medidas em tabela ===== */
+        .medidas-serr { margin-top: 6px; }
+        #tab-medidas-serr { border-collapse: collapse; width: auto; }
+        #tab-medidas-serr th, #tab-medidas-serr td { padding: 3px 8px !important; text-align: left; font-size: 13px; border: none; }
+        #tab-medidas-serr thead th { font-size: 11px; color: var(--text-light); font-weight: 600; }
+        #tab-medidas-serr tbody th { font-weight: 700; color: var(--text-dark); padding-right: 14px !important; }
+        #tab-medidas-serr input { width: 110px; height: 28px; padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        #tab-medidas-serr td.vezes { color: var(--text-light); font-weight: 700; }
+        #tab-medidas-serr td.metros { font-weight: 700; color: #0077ff; min-width: 70px; }
+        #tab-medidas-serr tfoot td { border-top: 1px solid var(--border-color); }
+        #tab-medidas-serr .total-rot { text-align: right !important; color: var(--text-light); }
+        #tab-medidas-serr .metros.total { color: #0b5ed7; }
+        .soldas-linha { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 13px; }
+        .soldas-linha label { font-weight: 700; }
+        .soldas-linha input { width: 90px; height: 28px; padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .dica-serr { margin-top: 4px; font-size: 12px; color: var(--text-light); }
+        .medidas-serr { overflow-x: auto; }
+        #tab-medidas-serr .curto { display: none; }
+        @media (max-width: 560px) { #tab-medidas-serr .curto { display: inline; } #tab-medidas-serr .longo { display: none; } }
+        #f-qtd { max-width: 180px; }
+        @media (max-width: 560px) {
+            #tab-medidas-serr input { width: 58px; padding: 3px 4px; }
+            #tab-medidas-serr th, #tab-medidas-serr td { padding: 3px 4px !important; }
+            #tab-medidas-serr td.metros { min-width: 52px; }
+        }
         /* ===== acessórios ===== */
         .tab-acess-wrap { overflow-x: auto; }
         .tab-acess { width: 100%; font-size: 13px; }
@@ -405,20 +430,30 @@
                     <div class="secao-item">
                         <h4>📐 Medidas e quantidade</h4>
                         <div class="grid-form">
-                            <div class="form-group"><label>Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
+                            <div class="form-group"><label for="f-qtd">Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
                             <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
                             <div class="form-group f-porta" id="wrap-pares">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
                             </div>
-                            <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
-                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-a" title="Barras na altura">Qtd (A)</label><input type="number" id="f-qtd-a" min="1" value="1"></div>
-                            <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
-                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-l" title="Barras na largura">Qtd (L)</label><input type="number" id="f-qtd-l" min="1" value="1"></div>
-                            <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
-                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-p" title="Barras na profundidade">Qtd (P)</label><input type="number" id="f-qtd-p" min="1" value="1"></div>
-                            <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
+                        </div>
+                        <!-- serralheria: cada medida com o seu nº de barras; metros = o que é cobrado (MotorPrecificacaoSerralheria.CalcularMetragem) -->
+                        <div class="f-serr medidas-serr" style="display:none">
+                            <table id="tab-medidas-serr">
+                                <thead><tr><th></th><th><span class="longo">Medida (mm)</span><span class="curto">mm</span></th><th></th><th><span class="longo">Nº de barras</span><span class="curto">barras</span></th><th><span class="longo">= Metros de barra</span><span class="curto">metros</span></th></tr></thead>
+                                <tbody>
+                                    <tr><th scope="row">Altura</th><td><input type="number" id="f-altura-serr" min="0" placeholder="0" aria-label="Altura (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="number" id="f-qtd-a" min="1" value="1" aria-label="Barras na altura"></td><td class="metros" id="m-a">—</td></tr>
+                                    <tr><th scope="row">Largura</th><td><input type="number" id="f-largura-serr" min="0" placeholder="0" aria-label="Largura (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="number" id="f-qtd-l" min="1" value="1" aria-label="Barras na largura"></td><td class="metros" id="m-l">—</td></tr>
+                                    <tr><th scope="row"><span class="longo">Profundidade</span><span class="curto">Prof.</span></th><td><input type="number" id="f-profundidade" min="0" placeholder="0" aria-label="Profundidade (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="number" id="f-qtd-p" min="1" value="1" aria-label="Barras na profundidade"></td><td class="metros" id="m-p">—</td></tr>
+                                </tbody>
+                                <tfoot><tr><td colspan="4" class="total-rot"><span class="longo">Total de barra por peça</span><span class="curto">Total por peça</span></td><td class="metros total" id="m-total">—</td></tr></tfoot>
+                            </table>
+                            <div class="soldas-linha"><label for="f-soldas">Pontos de solda</label><input type="number" id="f-soldas" min="0" value="0"></div>
+                            <div class="dica-serr">💡 Ex.: portão com 2 barras verticais de 1000 mm → Altura 1000 × 2 barras.</div>
                         </div>
                     </div>
                     <!-- PERFIL -->
@@ -806,6 +841,8 @@
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
+            document.querySelector('label[for="f-qtd"]').textContent = ehSerr ? 'Qtd de peças iguais' : 'Qtd';
+            atualizarMetragemSerr();
             if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
             alternarCamposPuxador(!ehPorta ? '' : (document.getElementById('f-puxador')?.value || ''));
             if (ehCorrer && document.getElementById('chk-pares').checked) document.getElementById('chk-pares').checked = false;
@@ -1880,6 +1917,7 @@
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
                 set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
                 set('f-qtd-a', item.qtdAltura || 1); set('f-qtd-l', item.qtdLargura || 1); set('f-qtd-p', item.qtdProfundidade || 1);
+                atualizarMetragemSerr();
                 // posição do puxador de CADA folha (fiel ao salvo, sem espelhar)
                 posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
                     ? [...d.posicoesFolhas] : [d.posicao || ''];
@@ -1926,6 +1964,7 @@
             });
             document.getElementById('f-qtd').value = 1;
             ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
+            atualizarMetragemSerr();
             document.getElementById('f-soldas').value = 0;
             document.getElementById('chk-pares').checked = false;
             document.getElementById('chk-toda-ext').checked = false;
@@ -2149,7 +2188,16 @@
 
         // ============ SERRALHERIA: BARRAS POR EIXO + COMPLEMENTOS (frmSerralheria / frmSelecaoComplementos) ============
         // vazio ou 0 conta como 1 (MotorPrecificacaoSerralheria.CalcularMetragem)
-        const qtdEixo = id => Math.max(1, parseInt(val(id)) || 1);
+        function qtdEixo(id) { return Math.max(1, parseInt(val(id)) || 1); }
+        function metrosBR(m) { return m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m' : '—'; }
+        function atualizarMetragemSerr() {
+            const eixos = [['f-altura-serr', 'f-qtd-a', 'm-a'], ['f-largura-serr', 'f-qtd-l', 'm-l'], ['f-profundidade', 'f-qtd-p', 'm-p']];
+            let total = 0;
+            eixos.forEach(([m, q, alvo]) => { const v = (parseFloat(val(m)) || 0) / 1000 * qtdEixo(q); total += v; document.getElementById(alvo).textContent = metrosBR(v); });
+            document.getElementById('m-total').textContent = metrosBR(total);
+        }
+        ['f-altura-serr', 'f-qtd-a', 'f-largura-serr', 'f-qtd-l', 'f-profundidade', 'f-qtd-p'].forEach(id =>
+            document.getElementById(id).addEventListener('input', atualizarMetragemSerr));
         function renderComplementos() {
             document.querySelector('#quadro-complementos tbody').innerHTML = complementosSerr.map((c, i) => `
                 <tr data-id="${escapeHtml(c.id)}">
