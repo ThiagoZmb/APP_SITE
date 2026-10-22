@@ -1,7 +1,7 @@
 // ============================================================
 // MOTOR FINANCEIRO — PORTAS + SERRALHERIA + AVULSO (fiel ao VB)
-// Colunas confirmadas no VB + DESCRIBE: VALOR_CHEIO, VALOR_FIXO,
-// DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
+// Colunas usadas: VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX.
+// Preço de tabela = VALOR_FIXO para todo cliente (decisão do Thiago, 2026-10-22: o VALOR_CHEIO não é usado na web).
 // O cadastro chega por um "leitor" (criarLeitor) → as contas são testáveis sem banco.
 // ============================================================
 class ErroPreco extends Error {}
@@ -11,12 +11,11 @@ function criarLeitor(pool) {
     async produto(nome) {
       if (!nome) return null;
       const [rows] = await pool.execute(
-        `SELECT CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
+        `SELECT CODIGO, MODELO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
          FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
       if (!rows.length) return null;
       return {
         valorFixo: parseFloat(rows[0].VALOR_FIXO) || 0,
-        valorCheio: parseFloat(rows[0].VALOR_CHEIO) || 0,
         descontoVidro: parseFloat(rows[0].DESCONTO_VIDRO) || 0,
         descontoPerfilPux: parseFloat(rows[0].DESC_PERF_PUX) || 0,
         tipoPuxador: String(rows[0].TIPO_PUXADOR || '')
@@ -45,11 +44,11 @@ function criarLeitor(pool) {
         : await pool.execute(`${campos} WHERE ativo = 1 AND modelo_padrao_id = (SELECT id FROM serralheria_produtos WHERE TRIM(nome_modelo) = TRIM(?) LIMIT 1) ${ordem}`, [produto || '']);
       return rows.map(r => ({ id: Number(r.id), tipo: r.tipo_componente, descricao: r.descricao_componente, unidade: r.unidade_medida, valorUnitario: parseFloat(r.valor_unitario) || 0 }));
     },
-    // Solda: produto "Solda" no cadastro (VALOR_FIXO, senão VALOR_CHEIO)
+    // Solda: produto "Solda" no cadastro (VALOR_FIXO)
     async valorSolda() {
       try {
         const [sol] = await pool.execute(
-          `SELECT COALESCE(NULLIF(VALOR_FIXO,0), NULLIF(VALOR_CHEIO,0), 0) AS v
+          `SELECT COALESCE(VALOR_FIXO, 0) AS v
            FROM cadastro_de_produtos WHERE TRIM(MODELO) = 'Solda' LIMIT 1`);
         return parseFloat(sol[0]?.v) || 0;
       } catch { return 0; } // Solda sem cadastro → 0
@@ -78,7 +77,7 @@ async function lerCliente(pool, { clienteCodigo, cliente } = {}) {
 }
 
 // auxiliares
-const precoBase = (d, isFixo) => isFixo ? d.valorFixo : d.valorCheio;
+const precoBase = d => d.valorFixo; // todo cliente parte do VALOR_FIXO
 const comAcab = (base, taxa) => base + base * (taxa / 100);
 const alturaS = b => parseFloat(b.altura) || 0;
 const largS = b => parseFloat(b.largura) || 0;
@@ -108,10 +107,10 @@ function fatorHistorico(h) {
 }
 
 // Acessórios: frm_Acessorios_Portas (MANUAL) e frmPortasCorrer.CarregarItensDoSistemaNaMemoria (SISTEMA)
-// MotorFinanceiro.CalcularValorAcessorios: tabela FIXO com o desconto do cliente, senão CHEIO (mesma regra p/ manual e sistema)
+// VALOR_FIXO; o desconto do cliente entra no item só para quem é de desconto fixo (mesma regra p/ manual e sistema)
 function precoAcessorio(dados, cliente) {
   if (!dados) return 0;
-  return cliente.isFixo ? dados.valorFixo * (100 - (cliente.desconto || 0)) / 100 : dados.valorCheio;
+  return cliente.isFixo ? dados.valorFixo * (100 - (cliente.desconto || 0)) / 100 : dados.valorFixo;
 }
 
 // Acessório com tamanho (trilho, bandeira) é cobrado por metro: qtd × tamanho/1000 × preço; sem tamanho, qtd × preço
@@ -140,7 +139,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
     const qtdP = parseFloat(b.qtdProfundidade) > 0 ? parseFloat(b.qtdProfundidade) : 1;
     const metragem = (alturaS(b) / 1000) * qtdA + (largS(b) / 1000) * qtdL + (profS(b) / 1000) * qtdP;
 
-    const material = metragem * precoBase(dadosMat, isFixo);
+    const material = metragem * precoBase(dadosMat);
     subtotal += material;
     subtotal += (await leitor.valorSolda()) * (parseFloat(b.soldas) || 0);
     const pctAcab = await leitor.taxaAcabamento(b.acabamento);
@@ -161,16 +160,14 @@ async function calcularPrecoItem(b, cliente, leitor) {
     const categoria = String(b.categoria || '');
     const dados = await leitor.produto(b.produto);
     if (!dados) throw new ErroPreco(`Produto '${b.produto}' não encontrado ou sem preços.`);
-    let base = precoBase(dados, isFixo);
-    // Serviço e Acessório usam o valor fixo quando ele existe
-    if ((categoria === 'Serviço' || categoria === 'Acessório') && dados.valorFixo > 0) base = dados.valorFixo;
+    const base = precoBase(dados);
     const precoAcab = comAcab(base, await leitor.taxaAcabamento(b.acabamento));
     let unit = 0;
     if (['Perfil', 'Trilhos', 'Puxador'].includes(categoria)) unit = precoAcab * (alturaS(b) / 1000);
     else if (categoria === 'Revestimento') unit = precoAcab * (alturaS(b) / 1000) * (largS(b) / 1000);
     else if (categoria === 'Serviço' || categoria === 'Acessório') unit = precoAcab;
     else throw new ErroPreco('Categoria inválida');
-    // desconto do cliente só na tabela FIXO (na tabela CHEIO o desconto é no fechamento)
+    // desconto do cliente no item só para quem é de desconto fixo (os demais: no fechamento)
     if (isFixo && descontoCliente > 0) unit *= (100 - descontoCliente) / 100;
     unit = aplicarPercentuais(unit, b.percentuais);
     return { unitario: Math.round(unit * 100) / 100, total: Math.round(unit * qtd * 100) / 100, diag };
@@ -205,13 +202,13 @@ async function calcularPrecoItem(b, cliente, leitor) {
   const perimetro = (temPux && isTotal && !isSobreposto && !isEmbutido)
     ? 2 * ladoOp + ladoPux * Math.max(0, 2 - qtdPux)
     : 2 * altura + 2 * largura;
-  const precoMPerfil = comAcab(precoBase(dadosPerfil, isFixo), taxaPerfil);
+  const precoMPerfil = comAcab(precoBase(dadosPerfil), taxaPerfil);
   subtotal += (perimetro / 1000) * precoMPerfil;
 
   // 2. PUXADOR (mínimo R$ 20/un — fiel ao VB)
   if (dadosPux) {
     const compUnit = isTotal ? ladoPux : (parseFloat(b.tamanhoPuxador) || 0);
-    const custo = (compUnit * qtdPux / 1000) * comAcab(precoBase(dadosPux, isFixo), taxaPux);
+    const custo = (compUnit * qtdPux / 1000) * comAcab(precoBase(dadosPux), taxaPux);
     subtotal += Math.max(20 * qtdPux, custo);
   }
 
@@ -221,7 +218,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
     const largV = Math.max(0, largura - dadosPerfil.descontoVidro);
     const altV  = Math.max(0, altura - dadosPerfil.descontoVidro);
     compDiv = (parseInt(b.qtdDivH) || 0) * largV + (parseInt(b.qtdDivV) || 0) * altV;
-    subtotal += (compDiv / 1000) * comAcab(precoBase(dadosDiv, isFixo), taxaPerfil);
+    subtotal += (compDiv / 1000) * comAcab(precoBase(dadosDiv), taxaPerfil);
   }
 
   // 4. REVESTIMENTO (área líquida, com dedução do divisor)
@@ -233,7 +230,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
     }
     const area = Math.max(0, (Math.max(0, altura - descY) / 1000) * (Math.max(0, largura - descX) / 1000));
     const areaDiv = (compDiv / 1000) * 0.015;
-    subtotal += Math.max(0, area - areaDiv) * comAcab(precoBase(dadosRev, isFixo), taxaRev);
+    subtotal += Math.max(0, area - areaDiv) * comAcab(precoBase(dadosRev), taxaRev);
   }
 
   // 5. Desconto do cliente + percentuais da linha
@@ -242,7 +239,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
   final = aplicarPercentuais(final, b.percentuais);
 
   diag.perfil = {
-    fixo: dadosPerfil.valorFixo, cheio: dadosPerfil.valorCheio,
+    fixo: dadosPerfil.valorFixo,
     taxaAcab: taxaPerfil, precoM: Math.round(precoMPerfil * 100) / 100
   };
   diag.perimetroMm = perimetro;

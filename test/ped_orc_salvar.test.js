@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { prepararPedOrc, bancoPedOrc } = require('./apoio/bancoPedOrc');
 const { hojeLocal } = require('../rotas/estoque_movimentos');
 
-// Perfil P cheio 100/m (desc. vidro 20) · Vidro V 200/m² · Fechadura 30 · cliente sem desconto
+// Perfil P 100/m (VALOR_FIXO) (desc. vidro 20) · Vidro V 200/m² · Fechadura 30 · cliente sem desconto
 // folha 2000×500: perfil 5 m = 500 + vidro 1,98×0,48 = 0,9504 m² × 200 = 190,08 → 690,08
 // 2 folhas = 1380,16 + Fechadura 30 = 1410,16 → unitário 705,08
 const giro = (mudar = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, largura: 500, profundidade: 0, soldas: 0, obs: '',

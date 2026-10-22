@@ -5,7 +5,7 @@
 // nome de dinheiro que tenha escapado — e avisa no log para corrigirmos a rota.
 // Contagens NÃO podem usar esses nomes: use qtd*/quantidade.
 // ==========================================================================
-const REGEX_VALOR = /valor|pre[cç]o|total|custo|saldo|cr[eé]dito|desconto|unit[aá]rio|comiss[aã]o|pago|receb|faturamento|ticket|fixo|cheio|frete|ipi/i;
+const REGEX_VALOR = /valor|pre[cç]o|total|custo|saldo|cr[eé]dito|desconto|unit[aá]rio|comiss[aã]o|pago|receb|faturamento|ticket|fixo|frete|ipi/i;
 // nomes que casam com a regex mas não são dinheiro (medidas em mm, rótulo da tabela)
 const CAMPOS_TECNICOS = new Set(['descontoVidro', 'descPerfPux', 'DESCONTO_VIDRO', 'DESC_PERF_PUX', 'tipoDesconto', 'TIPO_DESCONTO']);
 

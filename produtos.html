@@ -378,8 +378,7 @@
                         </div>
                         <input type="file" id="arquivo-foto" accept="image/jpeg,image/png" hidden>
                         <div class="precos-resumo" data-valor>
-                            <div class="preco-box destaque"><span>Valor cheio</span><b id="r-cheio">R$ 0,00</b><small>tabela padrão</small></div>
-                            <div class="preco-box"><span>Valor fixo</span><b id="r-fixo">R$ 0,00</b><small>clientes FIXO</small></div>
+                            <div class="preco-box destaque"><span>Valor fixo</span><b id="r-fixo">R$ 0,00</b><small>preço de tabela</small></div>
                         </div>
                     </div>
 
@@ -407,7 +406,6 @@
                             <div class="regra-classe" id="regra-classe"></div>
                             <div class="grid-form">
                                 <div class="form-group" data-valor><label for="f-fixo">Valor fixo</label><input id="f-fixo" class="num dec moeda" value="R$ 0,00"></div>
-                                <div class="form-group" data-valor><label for="f-cheio">Valor cheio</label><input id="f-cheio" class="num dec moeda" value="R$ 0,00"></div>
                                 <div class="form-group" id="g-desc-vidro"><label for="f-desc-vidro">Desconto do vidro</label><div class="sufixo" data-sufixo="mm"><input id="f-desc-vidro" class="num dec" value="0"></div></div>
                                 <div class="form-group" id="g-desc-pux"><label for="f-desc-pux">Desconto perfil/puxador</label><div class="sufixo" data-sufixo="mm"><input id="f-desc-pux" class="num dec" value="0"></div></div>
                             </div>
@@ -449,7 +447,6 @@
         const CLASSES_PADRAO = ['Acessórios', 'Perfil', 'Perfil Composto', 'Perfil AC', 'Puxador', 'Revestimento',
                                 'Sistema de correr', 'Trilhos', 'Produtos prontos', 'Consulta'];
         const CLASSES_ACAB_PADRAO = ['N/D', 'Porcentagem', 'Pintura ML', 'Pintura Aço Carbono'];
-        const ACRESCIMO_PERFIL_AC = 0.07; // txt_valor_fixo_LostFocus: cheio = fixo + 7%
 
         // ============ SESSÃO ============
         function getAuth() {
@@ -639,23 +636,14 @@
                 desligar('g-desc-vidro', 'f-desc-vidro', true, true);
                 desligar('g-desc-pux', 'f-desc-pux', true, true);
                 desligar('g-tipo-pux', 'f-tipo-pux', true, true);
-                regra = Acesso.pode('valores.ver') ? 'Perfil AC: o valor cheio é calculado automaticamente como valor fixo + 7%.'
-                    : 'Perfil AC: sem descontos de vidro/puxador e sem tipo de puxador.';
+                regra = 'Perfil AC: sem descontos de vidro/puxador e sem tipo de puxador.';
             }
             $('regra-classe').textContent = regra;
             $('regra-classe').classList.toggle('visivel', !!regra);
         }
-        $('f-classe').addEventListener('change', () => { aplicarRegrasClasse(true); calcularPerfilAC(); });
+        $('f-classe').addEventListener('change', () => aplicarRegrasClasse(true));
 
-        // txt_valor_fixo_LostFocus: Perfil AC → cheio = fixo + 7%
-        function calcularPerfilAC() {
-            if ($('f-classe').value !== 'Perfil AC') return;
-            const fixo = lerNumero($('f-fixo').value);
-            $('f-cheio').value = moeda(Math.round(fixo * (1 + ACRESCIMO_PERFIL_AC) * 100) / 100);
-            atualizarResumo();
-        }
         function atualizarResumo() {
-            $('r-cheio').textContent = moeda(lerNumero($('f-cheio').value));
             $('r-fixo').textContent = moeda(lerNumero($('f-fixo').value));
         }
 
@@ -669,7 +657,6 @@
             inp.addEventListener('blur', () => {
                 const v = lerNumero(inp.value);
                 inp.value = inp.classList.contains('moeda') ? moeda(v) : paraCampo(v);
-                if (inp.id === 'f-fixo') calcularPerfilAC();
                 atualizarResumo();
             });
         });
@@ -755,7 +742,7 @@
             $('f-codigo').value = codigoNovo ?? proximoCodigo;
             ['f-modelo', 'f-obs', 'f-complementos'].forEach(id => $(id).value = '');
             ['f-classe', 'f-tipo-pux', 'f-classe-acab'].forEach(id => $(id).value = '');
-            $('f-fixo').value = $('f-cheio').value = moeda(0);
+            $('f-fixo').value = moeda(0);
             $('f-desc-vidro').value = $('f-desc-pux').value = '0';
             definirSituacao('');
             selecionado = null;
@@ -781,7 +768,6 @@
                 $('f-complementos').value = p.complementos;
                 $('f-obs').value = p.observacao;
                 $('f-fixo').value = moeda(p.valorFixo);
-                $('f-cheio').value = moeda(p.valorCheio);
                 $('f-desc-vidro').value = paraCampo(p.descontoVidro);
                 $('f-desc-pux').value = paraCampo(p.descPerfPux);
                 definirSituacao(p.situacao === 'Ativo' || p.situacao === 'Inativo' ? p.situacao : '');
@@ -807,7 +793,7 @@
                 codigo: $('f-codigo').value.trim(), modelo: $('f-modelo').value.trim(), classe: $('f-classe').value,
                 tipoPuxador: $('f-tipo-pux').value, classeAcabamento: $('f-classe-acab').value,
                 complementos: $('f-complementos').value.trim(), observacao: $('f-obs').value.trim(),
-                valorFixo: lerNumero($('f-fixo').value), valorCheio: lerNumero($('f-cheio').value),
+                valorFixo: lerNumero($('f-fixo').value),
                 descontoVidro: lerNumero($('f-desc-vidro').value), descPerfPux: lerNumero($('f-desc-pux').value),
                 situacao
             };

@@ -118,11 +118,40 @@ test('estoque/salvar item novo sem valores.ver: 403', async t => {
   assert.deepEqual(await r.json(), { error: 'Cadastrar item novo exige permissão de valores.' });
 });
 
-test('produtos/item sem valores.ver mantém descontoVidro e tira valorCheio', async t => {
+test('produtos/item sem valores.ver mantém descontoVidro e tira o valor', async t => {
   const { chamar } = await preparar(t, [[/FROM cadastro_de_produtos WHERE CODIGO/, [{ CODIGO: 9, MODELO: 'P', DESCONTO_VIDRO: 12, DESC_PERF_PUX: 4, VALOR_CHEIO: 80, VALOR_FIXO: 70 }]]]);
   const d = await (await chamar(4, '/produtos/item/9')).json();
   assert.equal(d.descontoVidro, 12);
   assert.equal(d.descPerfPux, 4);
-  assert.equal(d.valorCheio, undefined);
   assert.equal(d.valorFixo, undefined);
+});
+
+test('produtos/item não devolve VALOR_CHEIO (só o VALOR_FIXO é usado na web)', async t => {
+  const { chamar } = await preparar(t, [[/FROM cadastro_de_produtos WHERE CODIGO/, [{ CODIGO: 9, MODELO: 'P', VALOR_CHEIO: 80, VALOR_FIXO: 70 }]]]);
+  const d = await (await chamar(1, '/produtos/item/9')).json();
+  assert.equal(d.valorFixo, 70);
+  assert.equal('valorCheio' in d, false);
+});
+
+const produtoSalvar = (mudar = {}) => ({ codigo: 9, modelo: 'P', classe: 'Perfis', classeAcabamento: 'Anodizado', valorFixo: 70, descontoVidro: 0, descPerfPux: 0,
+  situacao: 'Ativo', ...mudar });
+
+test('produtos/salvar: editar não mexe no VALOR_CHEIO; não exige valor cheio', async t => {
+  const { f, chamar } = await preparar(t, [[/SELECT COUNT\(\*\) AS n FROM cadastro_de_produtos/, [{ n: 1 }]], [/FROM cadastro_de_produtos WHERE CODIGO/, [{ VALOR_FIXO: 60 }]]]);
+  const r = await chamar(1, '/produtos/salvar', { method: 'POST', body: JSON.stringify(produtoSalvar()) });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  const up = f.chamadas.find(c => /^\s*UPDATE cadastro_de_produtos SET/.test(c.sql));
+  assert.ok(!/VALOR_CHEIO/.test(up.sql), up.sql);
+  assert.ok(up.params.includes(70));
+  assert.ok(f.chamadas.every(c => !/SELECT[^]*VALOR_CHEIO/.test(c.sql)));
+});
+
+test('produtos/salvar: produto novo grava VALOR_CHEIO = VALOR_FIXO (o VB ainda lê a coluna)', async t => {
+  const { f, chamar } = await preparar(t, [[/SELECT COUNT\(\*\) AS n FROM cadastro_de_produtos/, [{ n: 0 }]]]);
+  const r = await chamar(1, '/produtos/salvar', { method: 'POST', body: JSON.stringify(produtoSalvar({ valorFixo: 55.5 })) });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  const ins = f.chamadas.find(c => /^\s*INSERT INTO cadastro_de_produtos/.test(c.sql));
+  const cols = ins.sql.match(/\(([^)]+)\)\s*VALUES/)[1].split(',').map(c => c.trim());
+  assert.equal(ins.params[cols.indexOf('VALOR_CHEIO')], 55.5);
+  assert.equal(ins.params[cols.indexOf('VALOR_FIXO')], 55.5);
 });

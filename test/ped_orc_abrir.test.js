@@ -123,7 +123,7 @@ test('item travado é preservado e renumerado quando o item de cima é excluído
 
 test('só %: nova porcentagem sobre o valor original salvo, sem conferir o cadastro', async t => {
   const { banco, chamar, numero, aberto } = await salvoEAberto(t, { itens: [giro()] });
-  banco.produtos.find(p => p.MODELO === 'Perfil P').VALOR_CHEIO = 999; // cadastro mudou depois
+  banco.produtos.find(p => p.MODELO === 'Perfil P').VALOR_FIXO = 999; // cadastro mudou depois
   const itens = comoTela(aberto);
   itens[0] = { ...itens[0], historico: '+10', valorTela: 775.59, origem: { ...itens[0].origem, estado: 'so_pct' } };
   const r = await salvar(chamar, atualizar(aberto, { itens }));
@@ -136,7 +136,7 @@ test('só %: nova porcentagem sobre o valor original salvo, sem conferir o cadas
 
 test('editado é recalculado com o cadastro de hoje', async t => {
   const { banco, chamar, aberto } = await salvoEAberto(t, { itens: [giro()] });
-  banco.produtos.find(p => p.MODELO === 'Perfil P').VALOR_CHEIO = 200;
+  banco.produtos.find(p => p.MODELO === 'Perfil P').VALOR_FIXO = 200;
   const itens = comoTela(aberto);
   itens[0] = { ...itens[0], origem: { ...itens[0].origem, estado: 'editado' } };
   const r = await salvar(chamar, atualizar(aberto, { itens }));

@@ -1315,7 +1315,7 @@ registro.rota('get', '/produtos/item/:codigo', ['produtos.ver'], async (req, res
     res.json(semValores(req, {
       codigo: r.CODIGO, modelo, classe: r.CLASSE || '', tipoPuxador: r.TIPO_PUXADOR || '',
       descontoVidro: numEstq(r.DESCONTO_VIDRO), descPerfPux: numEstq(r.DESC_PERF_PUX),
-      valorCheio: numEstq(r.VALOR_CHEIO), valorFixo: numEstq(r.VALOR_FIXO),
+      valorFixo: numEstq(r.VALOR_FIXO),
       observacao: r.OBSERVACAO || '', complementos: r.COMPLEMENTOS || '', classeAcabamento: r.CLASSE_ACABAMENTOS || '',
       situacao: r.SITUACAO || '', temImagem: r.IMAGEM != null && r.IMAGEM.length > 0,
       permitidos: {
@@ -1325,7 +1325,7 @@ registro.rota('get', '/produtos/item/:codigo', ['produtos.ver'], async (req, res
         revestimentos: await permitidos('SELECT REVESTIMENTO_PERMITIDO AS v FROM revestimentos_permitidos WHERE MODELO = ? ORDER BY REVESTIMENTO_PERMITIDO'),
         divisores: await permitidos('SELECT DIVISOR AS v FROM divisores_permitidos WHERE MODELO = ? ORDER BY DIVISOR')
       }
-    }, ['valorCheio', 'valorFixo']));
+    }, ['valorFixo']));
   } catch (err) {
     console.error('Erro /produtos/item:', err.code, err.message);
     res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
@@ -1359,9 +1359,9 @@ registro.rota('put', '/produtos/imagem/:codigo', ['produtos.editar'], express.ra
 
 // Salvar_Registro: mesmas validações; INSERT (sempre Ativo) ou UPDATE pela existência do CODIGO
 registro.rota('post', '/produtos/salvar', ['produtos.editar'], preservarDoBanco({
-  sql: 'SELECT VALOR_CHEIO, VALOR_FIXO FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1',
+  sql: 'SELECT VALOR_FIXO FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1',
   chave: b => String(b.codigo ?? '').trim(),
-  mapa: { valorCheio: 'VALOR_CHEIO', valorFixo: 'VALOR_FIXO' },
+  mapa: { valorFixo: 'VALOR_FIXO' },
   mensagemNovo: 'Cadastrar produto novo exige permissão de valores.'
 }), async (req, res) => {
   const b = req.body || {};
@@ -1377,10 +1377,10 @@ registro.rota('post', '/produtos/salvar', ['produtos.editar'], preservarDoBanco(
   if (modelo.length > 255) return erro('Dados muito longos para o campo. Reduza o tamanho do texto.');
   if (classe === 'Puxador' && !tipoPuxador) return erro('Favor escolher o tipo de puxador !');
   if (!classeAcabamento) return erro('Favor inserir a CLASSE do ACABAMENTO');
-  if (String(b.valorCheio ?? '').trim() === '') return erro('Favor inserir o VALOR CHEIO do produto');
   if (String(b.valorFixo ?? '').trim() === '') return erro('Favor inserir o VALOR FIXO do produto');
-  const valorCheio = numEstq(b.valorCheio), valorFixo = numEstq(b.valorFixo);
-  const campos = [modelo, valorCheio, valorFixo, numEstq(b.descontoVidro), vazioParaNull(tipoPuxador), vazioParaNull(classe),
+  // a web só usa o VALOR_FIXO; o VALOR_CHEIO (coluna do VB) não é editado aqui
+  const valorFixo = numEstq(b.valorFixo);
+  const campos = [modelo, valorFixo, numEstq(b.descontoVidro), vazioParaNull(tipoPuxador), vazioParaNull(classe),
     numEstq(b.descPerfPux)];
   const obs = vazioParaNull(txtEstq(b.observacao, 2000));
   const compl = vazioParaNull(txtEstq(b.complementos));
@@ -1393,14 +1393,15 @@ registro.rota('post', '/produtos/salvar', ['produtos.editar'], preservarDoBanco(
     if (existe) {
       const situacao = b.situacao === 'Ativo' ? 'Ativo' : 'Inativo';
       await con.execute(
-        `UPDATE cadastro_de_produtos SET MODELO = ?, VALOR_CHEIO = ?, VALOR_FIXO = ?, DESCONTO_VIDRO = ?, TIPO_PUXADOR = ?,
+        `UPDATE cadastro_de_produtos SET MODELO = ?, VALOR_FIXO = ?, DESCONTO_VIDRO = ?, TIPO_PUXADOR = ?,
          CLASSE = ?, DESC_PERF_PUX = ?, SITUACAO = ?, OBSERVACAO = ?, COMPLEMENTOS = ?, CLASSE_ACABAMENTOS = ? WHERE CODIGO = ?`,
         [...campos, situacao, obs, compl, classeAcabamento, codigo]);
     } else {
+      // produto novo: o VB ainda lê VALOR_CHEIO → grava igual ao VALOR_FIXO para nunca ficar vazio
       await con.execute(
-        `INSERT INTO cadastro_de_produtos (CODIGO, MODELO, VALOR_CHEIO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, CLASSE,
+        `INSERT INTO cadastro_de_produtos (CODIGO, MODELO, VALOR_FIXO, VALOR_CHEIO, DESCONTO_VIDRO, TIPO_PUXADOR, CLASSE,
          DESC_PERF_PUX, SITUACAO, OBSERVACAO, COMPLEMENTOS, CLASSE_ACABAMENTOS) VALUES (?,?,?,?,?,?,?,?,'Ativo',?,?,?)`,
-        [codigo, ...campos, obs, compl, classeAcabamento]);
+        [codigo, modelo, valorFixo, valorFixo, ...campos.slice(2), obs, compl, classeAcabamento]);
     }
     await con.commit();
     res.json({ ok: true, codigo: Number(codigo), mensagem: existe ? 'Registro atualizado com sucesso!' : 'Registro inserido com sucesso!' });

@@ -11,7 +11,7 @@ test('remove valor/total aninhados em listas', () => {
 });
 
 test('campos técnicos sobrevivem', () => {
-  const { dado } = removerValores({ descontoVidro: 5, descPerfPux: 3, tipoDesconto: 'FIXO', valorCheio: 9 });
+  const { dado } = removerValores({ descontoVidro: 5, descPerfPux: 3, tipoDesconto: 'FIXO', valorFixo: 9 });
   assert.deepEqual(dado, { descontoVidro: 5, descPerfPux: 3, tipoDesconto: 'FIXO' });
 });
 
