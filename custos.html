@@ -70,10 +70,52 @@
         .vazio { text-align: center; color: var(--text-light); padding: 18px; }
         .msg { font-size: 13px; margin: 6px 0; }
         .msg.erro { color: var(--falta); }
+        /* ===== FORMAÇÃO DE PREÇO ===== */
+        #prc-parametros { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 8px 0; }
+        #prc-parametros [data-param] { border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; }
+        #prc-parametros .rot { font-size: 11.5px; color: var(--text-light); text-transform: uppercase; letter-spacing: .3px; }
+        #prc-parametros .prc-valor { display: block; font-size: 20px; font-weight: 800; }
+        #prc-parametros .prc-valor.indef { font-size: 14px; color: var(--falta); }
+        #prc-parametros .prc-ref { display: block; font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+        .prc-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        #prc-selo { background: #fff4e0; color: var(--atencao); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+        #prc-soma { font-size: 13px; }
+        #prc-soma.alerta { color: var(--falta); font-weight: 800; }
+        #prc-variacao { width: 70px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        #tab-precos tbody tr { cursor: pointer; }
+        #tab-precos tbody tr:hover td { background: #fafbfc; }
+        #tab-precos tr.conflito td { background: #fdecea; }
+        .seta { color: var(--text-light); margin: 0 3px; }
+        .novo { font-weight: 800; }
+        .var-sobe, .var-desce { color: var(--text-dark); font-weight: 700; }
+        html body #prc-gravar:not(:disabled), html body #dlg-gravar-confirmar, html body #pp-salvar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
+        html body #prc-gravar:disabled { opacity: .5; cursor: default; }
+        .prc-ref-contas { color: var(--primary-color); font-weight: 700; }
+        .origem-material, .origem-classe, .origem-padrao { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
+        .origem-material { background: #e8eefc; color: #2b4c9a; } .origem-classe { background: #f1e8fc; color: #6b2b9a; } .origem-padrao { background: #eef0f2; color: var(--neutro); }
+        .prc-motivo { color: var(--falta); font-size: 12px; }
+        .prc-aviso { display: block; font-size: 11.5px; color: var(--atencao); }
+        .neg { color: var(--falta); font-weight: 700; }
+        #det-preco { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-preco.aberto { display: block; }
+        #det-preco h2 { font-size: 18px; margin-bottom: 4px; }
+        #det-preco h3 { font-size: 12px; text-transform: uppercase; color: var(--primary-color); margin: 14px 0 6px; letter-spacing: .5px; }
+        #dp-passos { padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+        .simulador { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; font-size: 13px; }
+        .simulador b { display: block; font-size: 18px; }
+        #sim-valor { width: 120px; } #dp-margem-propria { width: 190px; }
+        #sim-valor, #dp-margem-propria { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        #dlg-precos-param { width: min(620px, calc(100vw - 32px)); }
+        #dlg-precos-param .grade-param { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; font-size: 13px; }
+        #dlg-precos-param h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; color: var(--primary-color); }
+        #dlg-precos-param table input { width: 100%; padding: 4px 6px; }
+        #dlg-precos-param input[type=checkbox] { width: auto; }
+        .dlg-rolagem { max-height: 50vh; overflow: auto; }
+        #dlg-gravar { width: min(560px, calc(100vw - 32px)); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610241200">
-    <script src="layout.js?v=202610241200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610251200">
+    <script src="layout.js?v=202610251200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -91,10 +133,11 @@
         </nav>
         <main>
             <h1 class="welcome-title">Custos e preços</h1>
-            <p class="welcome-subtitle">Custo real de cada material por unidade de venda, calculado com as notas de compra. Nada aqui altera o cadastro, o estoque ou as notas.</p>
+            <p class="welcome-subtitle">Custo real de cada material por unidade de venda, calculado com as notas de compra, e a formação do preço de venda. Só a aba "Formação de preço" grava algo no cadastro: o VALOR_FIXO, e apenas o que você confirmar.</p>
             <div class="abas" role="tablist">
                 <button type="button" id="aba-btn-custos" class="on" data-aba="custos">Custos dos materiais</button>
                 <button type="button" id="aba-btn-ligacoes" data-aba="ligacoes">Ligações</button>
+                <button type="button" id="aba-btn-precos" data-aba="precos">Formação de preço</button>
             </div>
             <div class="msg erro" id="msg" role="alert"></div>
 
@@ -146,6 +189,44 @@
                     </div>
                 </div>
             </section>
+
+            <!-- ===== FORMAÇÃO DE PREÇO ===== -->
+            <section id="aba-precos" style="display:none">
+                <div class="painel">
+                    <div class="prc-topo">
+                        <span id="prc-selo">Premissas definidas por você</span>
+                        <span id="prc-soma">—</span>
+                        <button type="button" class="btn-mini" id="prc-editar" data-perm="precos.editar">⚙️ Editar premissas</button>
+                    </div>
+                    <div id="prc-parametros">
+                        <div data-param="imposto"><span class="rot">Imposto (Simples)</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="comissao"><span class="rot">Comissão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="encargos"><span class="rot">Outros encargos</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="custoFixo"><span class="rot">Custo fixo</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="desconto"><span class="rot">Desconto padrão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="margem"><span class="rot">Margem padrão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                    </div>
+                </div>
+                <div class="painel">
+                    <div class="filtros">
+                        <input type="search" id="prc-busca" placeholder="Buscar material…" aria-label="Buscar material">
+                        <select id="prc-classe" aria-label="Classe"><option value="">Todas as classes</option></select>
+                        <label><input type="checkbox" id="prc-com-custo"> só com custo</label>
+                        <label>variação acima de <input type="number" id="prc-variacao" min="0" step="1" aria-label="Variação mínima em %"> %</label>
+                        <button type="button" class="btn-mini prim" id="prc-gravar" data-perm="precos.gravar">Gravar selecionados (0)</button>
+                        <span id="prc-fora-filtro" class="prc-ref"></span>
+                        <button type="button" class="btn-mini" id="prc-recarregar" style="display:none">↻ Recarregar</button>
+                    </div>
+                    <div class="tabela-wrap">
+                        <table id="tab-precos">
+                            <thead><tr><th></th><th>Material</th><th class="col-opc">Classe</th><th class="num">Custo</th><th class="num col-opc">Mínimo</th>
+                                <th class="num col-opc">Equilíbrio</th><th class="num col-opc">Alvo</th><th class="num">VALOR_FIXO atual → novo</th><th class="num">Variação</th>
+                                <th class="num col-opc">Margem atual</th><th class="num col-opc">Margem pior cliente</th><th class="col-opc">Margem</th></tr></thead>
+                            <tbody><tr><td colspan="12" class="vazio">Carregando…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -166,6 +247,62 @@
         <div class="tabela-wrap"><table id="det-compras"><thead><tr><th>NF</th><th>Data</th><th>Fornecedor</th><th class="num">Qtd</th>
             <th class="num" data-valor>Valor</th><th class="num" data-valor>Por unid. venda</th><th></th></tr></thead><tbody></tbody></table></div>
     </aside>
+
+    <aside id="det-preco" aria-label="Formação do preço do material">
+        <button type="button" class="fechar" id="dp-fechar" aria-label="Fechar">✕</button>
+        <h2 id="dp-titulo">—</h2>
+        <div id="dp-avisos"></div>
+        <h3>Como o preço foi formado</h3>
+        <ol id="dp-passos"></ol>
+        <h3>Margem própria deste material</h3>
+        <div><input type="text" inputmode="decimal" id="dp-margem-propria" aria-label="Margem própria em %" placeholder="automática"> %
+            <span id="dp-margem-origem" class="prc-ref"></span></div>
+        <h3>Simulador (não grava nada)</h3>
+        <div class="simulador">
+            <label>VALOR_FIXO a testar<br><input type="text" inputmode="decimal" id="sim-valor" aria-label="VALOR_FIXO a testar"></label>
+            <div>Margem com o desconto padrão<b id="sim-margem">—</b></div>
+            <div>Margem no cliente de maior desconto<b id="sim-margem-pior">—</b></div>
+            <div><button type="button" class="btn-mini" id="sim-usar" data-perm="precos.gravar">Usar este valor</button></div>
+        </div>
+        <h3>Histórico de gravações</h3>
+        <div class="tabela-wrap"><table id="dp-historico"><thead><tr><th>Quando</th><th>Quem</th><th class="num">De</th><th class="num">Para</th><th></th></tr></thead><tbody></tbody></table></div>
+    </aside>
+
+    <dialog id="dlg-precos-param" aria-labelledby="dlg-pp-titulo">
+        <h3 id="dlg-pp-titulo">Premissas da formação de preço</h3>
+        <p class="prc-ref">Deixe em branco para "não definido". Aceita vírgula.</p>
+        <div class="grade-param">
+            <label>Imposto (Simples) %<input type="text" inputmode="decimal" id="pp-imposto"></label>
+            <label>Comissão padrão %<input type="text" inputmode="decimal" id="pp-comissao"></label>
+            <label>Custo fixo %<input type="text" inputmode="decimal" id="pp-custo-fixo"></label>
+            <label>Desconto padrão %<input type="text" inputmode="decimal" id="pp-desconto"></label>
+            <label>Margem padrão %<input type="text" inputmode="decimal" id="pp-margem"></label>
+            <label>Referências: últimos (meses)<input type="number" id="pp-meses" min="1" max="36"></label>
+        </div>
+        <h4>Outros encargos sobre a venda</h4>
+        <div class="dlg-rolagem"><table id="pp-encargos"><thead><tr><th>Nome</th><th>%</th><th>Ativo</th><th></th></tr></thead><tbody></tbody></table></div>
+        <button type="button" class="btn-mini" id="pp-enc-novo">+ encargo</button>
+        <h4>Margem por classe (em branco = usa a padrão)</h4>
+        <div class="dlg-rolagem"><table id="pp-margens"><thead><tr><th>Classe</th><th>Margem %</th></tr></thead><tbody></tbody></table></div>
+        <div class="msg erro" id="pp-msg"></div>
+        <button type="button" class="btn-mini prim" id="pp-salvar">Salvar</button>
+        <button type="button" class="btn-mini" id="pp-cancelar">Cancelar</button>
+    </dialog>
+
+    <dialog id="dlg-contas" aria-labelledby="dlg-contas-titulo">
+        <h3 id="dlg-contas-titulo">Referência de custo fixo</h3>
+        <div id="dlg-contas-corpo" class="dlg-rolagem"></div>
+        <button type="button" class="btn-mini" id="dlg-contas-fechar">Fechar</button>
+    </dialog>
+
+    <dialog id="dlg-gravar" aria-labelledby="dlg-gravar-titulo">
+        <h3 id="dlg-gravar-titulo">Gravar VALOR_FIXO no cadastro</h3>
+        <p class="prc-ref">O VB passa a usar estes valores nos próximos pedidos e orçamentos. Pedidos já gravados não mudam. Dá para desfazer pelo histórico do material.</p>
+        <div class="dlg-rolagem"><table id="dlg-gravar-tabela"><thead><tr><th>Material</th><th class="num">Atual → novo</th><th class="num">Variação</th></tr></thead><tbody></tbody></table></div>
+        <div class="msg erro" id="dlg-gravar-msg"></div>
+        <button type="button" class="btn-mini prim" id="dlg-gravar-confirmar">Confirmar</button>
+        <button type="button" class="btn-mini" id="dlg-gravar-cancelar">Cancelar</button>
+    </dialog>
 
     <dialog id="dlg-estoque" aria-labelledby="dlg-estoque-titulo">
         <h3 id="dlg-estoque-titulo">Buscar item no estoque</h3>
@@ -287,7 +424,7 @@
                 $('det-material').classList.add('aberto'); $('det-fundo').classList.add('aberto');
             } catch (e) { mostrarErro('Não foi possível abrir o material: ' + e.message); }
         }
-        function fecharDetalhe() { $('det-material').classList.remove('aberto'); $('det-fundo').classList.remove('aberto'); }
+        function fecharDetalhe() { $('det-material').classList.remove('aberto'); $('det-preco').classList.remove('aberto'); $('det-fundo').classList.remove('aberto'); }
 
         // ============ LIGAÇÕES ============
         let ligacoes = [], buscaPara = null;
@@ -445,7 +582,9 @@
             document.querySelectorAll('.abas button').forEach(b => b.classList.toggle('on', b.dataset.aba === aba));
             $('aba-custos').style.display = aba === 'custos' ? '' : 'none';
             $('aba-ligacoes').style.display = aba === 'ligacoes' ? '' : 'none';
+            $('aba-precos').style.display = aba === 'precos' ? '' : 'none';
             if (aba === 'ligacoes') carregarLigacoes();
+            else if (aba === 'precos') carregarPrecos();
             else if (!dados) carregarMateriais();
         }
 
@@ -488,8 +627,10 @@
             $('user-cargo').textContent = auth.user.cargo || '';
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
-            mostrarAba(new URLSearchParams(location.search).get('aba') === 'ligacoes' ? 'ligacoes' : 'custos');
+            const aba = new URLSearchParams(location.search).get('aba');
+            mostrarAba(['ligacoes', 'precos'].includes(aba) ? aba : 'custos');
         });
     </script>
+    <script src="custos_precos.js?v=202610251200"></script>
 </body>
 </html>

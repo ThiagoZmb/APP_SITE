@@ -11,7 +11,9 @@ const { hojeLocal } = require('../../rotas/estoque_movimentos');
 const PERFIS = {
   'Administrador': PERFIS_INICIAIS.find(p => p.nome === 'Administrador').permissoes,
   'Só ver custos': ['precos.ver', 'valores.ver'],
-  'Sem valores': ['precos.ver']
+  'Sem valores': ['precos.ver'],
+  'Editar preços': ['precos.ver', 'precos.editar', 'valores.ver'],
+  'Gravar preços': ['precos.ver', 'precos.gravar', 'valores.ver']
 };
 // data AAAA-MM-DD de n meses atrás (a partir de hoje em Brasília)
 function mesesAtras(n) {
@@ -49,10 +51,66 @@ function bancoCustos() {
     ],
     configs: [{ material_codigo: 103, unidade_venda: null, sem_compra: 1 }],
     parametros: [],
-    auditoria: []
+    auditoria: [],
+    // formação do VALOR_FIXO
+    clientes: [
+      { COMISSAO: '5', DESCONTO: 28, TIPO_DESCONTO: 'Desconto fixo' }, { COMISSAO: '5%', DESCONTO: 28, TIPO_DESCONTO: 'Desconto fixo' },
+      { COMISSAO: '3', DESCONTO: 40, TIPO_DESCONTO: 'Desconto fixo' }, { COMISSAO: 'abc', DESCONTO: 50, TIPO_DESCONTO: 'Desconto progressivo' },
+      { COMISSAO: null, DESCONTO: 0, TIPO_DESCONTO: '' }
+    ],
+    fluxoGrupos: [
+      { classificacaoId: 1, nome: 'Despesas › Aluguel', COMPORTAMENTO: 'Fixo', ENTRA_DRE: 1, SITUACAO: 'Pago', total: 120000 },
+      { classificacaoId: 2, nome: 'Despesas › Fornecedores', COMPORTAMENTO: 'Variável', ENTRA_DRE: 1, SITUACAO: 'Pago', total: 500000 },
+      { classificacaoId: 3, nome: 'Receitas › Vendas', COMPORTAMENTO: null, ENTRA_DRE: 1, SITUACAO: 'Recebido', total: 1000000 },
+      { classificacaoId: 4, nome: 'Receitas › Empréstimo', COMPORTAMENTO: null, ENTRA_DRE: 0, SITUACAO: 'Recebido', total: 200000 },
+      { classificacaoId: null, nome: null, COMPORTAMENTO: null, ENTRA_DRE: null, SITUACAO: 'Recebido', total: 200000 }
+    ],
+    encargos: [],
+    margens: [],
+    historico: []
   };
+  // premissas da conversa: imposto 8,5 · comissão 5 · custo fixo 20 · desconto 28 · margem 15
+  estado.parametros.push(...[['imposto_pct', '8.5'], ['comissao_pct', '5'], ['custo_fixo_pct', '20'], ['desconto_pct', '28'], ['margem_pct', '15']]
+    .map(([chave, valor]) => ({ chave, valor })));
   let proxId = 100;
   const regras = [
+    // formação do VALOR_FIXO (antes das regras genéricas de cadastro_de_produtos)
+    [/FROM cadastro_clientes/, () => estado.clientes.map(c => ({ ...c }))],
+    [/FROM fluxo_de_caixa f/, () => estado.fluxoGrupos.map(g => ({ ...g }))],
+    [/^SELECT .*FROM web_preco_encargos WHERE id = \?/, (sql, [id]) => estado.encargos.filter(e => e.id === Number(id)).map(e => ({ ...e }))],
+    [/^SELECT .*FROM web_preco_encargos/, () => estado.encargos.map(e => ({ ...e }))],
+    [/INSERT INTO web_preco_encargos/, (sql, [nome, pct, atualizado_em, atualizado_por]) => {
+      const id = ++proxId; estado.encargos.push({ id, nome, pct: String(pct), ativo: 1, atualizado_em, atualizado_por }); return { insertId: id, affectedRows: 1 }; }],
+    [/UPDATE web_preco_encargos SET/, (sql, [nome, pct, ativo, atualizado_em, atualizado_por, id]) => {
+      const e = estado.encargos.find(x => x.id === Number(id)); if (e) Object.assign(e, { nome, pct: String(pct), ativo, atualizado_em, atualizado_por });
+      return { affectedRows: e ? 1 : 0 }; }],
+    [/DELETE FROM web_preco_encargos WHERE id = \?/, (sql, [id]) => {
+      const i = estado.encargos.findIndex(e => e.id === Number(id)); if (i >= 0) estado.encargos.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
+    [/^SELECT .*FROM web_preco_margens/, () => estado.margens.map(m => ({ ...m }))],
+    [/INSERT INTO web_preco_margens/, (sql, [escopo, chave, margem_pct, atualizado_em, atualizado_por]) => {
+      const m = estado.margens.find(x => x.escopo === escopo && x.chave === chave);
+      if (m) Object.assign(m, { margem_pct: String(margem_pct), atualizado_em, atualizado_por });
+      else estado.margens.push({ id: ++proxId, escopo, chave, margem_pct: String(margem_pct), atualizado_em, atualizado_por });
+      return { affectedRows: 1 }; }],
+    [/DELETE FROM web_preco_margens WHERE escopo = \? AND chave = \?/, (sql, [escopo, chave]) => {
+      const i = estado.margens.findIndex(m => m.escopo === escopo && m.chave === chave); if (i >= 0) estado.margens.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
+    [/^SELECT .*FROM web_preco_historico WHERE id = \?/, (sql, [id]) => estado.historico.filter(h => h.id === Number(id)).map(h => ({ ...h }))],
+    [/^SELECT MAX\(id\) AS ultimo FROM web_preco_historico WHERE material_codigo = \? AND desfeito_em IS NULL/, (sql, [c]) => {
+      const ids = estado.historico.filter(h => h.material_codigo === Number(c) && !h.desfeito_em).map(h => h.id);
+      return [{ ultimo: ids.length ? Math.max(...ids) : null }]; }],
+    [/^SELECT .*FROM web_preco_historico WHERE material_codigo = \?/, (sql, [c]) => estado.historico.filter(h => h.material_codigo === Number(c))
+      .sort((a, b) => b.id - a.id).slice(0, 20).map(h => ({ ...h }))],
+    [/INSERT INTO web_preco_historico/, (sql, [lote, material_codigo, valor_anterior, valor_novo, custo, memoria, gravado_em, gravado_por]) => {
+      const id = ++proxId; estado.historico.push({ id, lote, material_codigo, valor_anterior, valor_novo, custo, memoria, gravado_em, gravado_por, desfeito_em: null, desfeito_por: null });
+      return { insertId: id, affectedRows: 1 }; }],
+    [/UPDATE web_preco_historico SET desfeito_em/, (sql, [desfeito_em, desfeito_por, id]) => {
+      const h = estado.historico.find(x => x.id === Number(id)); if (h) Object.assign(h, { desfeito_em, desfeito_por }); return { affectedRows: h ? 1 : 0 }; }],
+    [/FROM cadastro_de_produtos WHERE CODIGO IN \(.*FOR UPDATE/, (sql, cods) => estado.materiais.filter(m => cods.map(Number).includes(m.CODIGO))
+      .map(m => ({ CODIGO: m.CODIGO, VALOR_FIXO: m.VALOR_FIXO }))],
+    [/UPDATE cadastro_de_produtos SET VALOR_FIXO = \? WHERE CODIGO = \?/, (sql, [v, c]) => {
+      const m = estado.materiais.find(x => x.CODIGO === Number(c)); if (m) m.VALOR_FIXO = v; return { affectedRows: m ? 1 : 0 }; }],
+    [/DELETE FROM web_custo_parametros WHERE chave = \?/, (sql, [chave]) => {
+      const i = estado.parametros.findIndex(p => p.chave === chave); if (i >= 0) estado.parametros.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
     [/FROM web_custo_parametros/, () => estado.parametros.map(p => ({ ...p }))],
     [/FROM cadastro_de_produtos WHERE CODIGO = \?/, (sql, [c]) => estado.materiais.filter(m => m.CODIGO === Number(c)).map(m => ({ CODIGO: m.CODIGO }))],
     [/FROM cadastro_de_produtos/, () => estado.materiais.map(m => ({ ...m }))],

@@ -4,9 +4,11 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 25 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 25);
-  assert.equal(CODIGOS.size, 25);
+test('catálogo tem 26 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 26);
+  assert.equal(CODIGOS.size, 26);
+  assert.ok(CODIGOS.has('precos.gravar'));
+  assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
   for (const c of ['valores.ver', 'admin.usuarios', 'estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar', 'orcamentos.salvar', 'pedidos.criar']) assert.ok(CODIGOS.has(c), c);
 });
@@ -14,10 +16,10 @@ test('catálogo tem 25 permissões e códigos únicos', () => {
 test('Interno completo = todas menos admin.usuarios e pedidos.criar', () => {
   const p = perfil('Interno completo');
   assert.equal(p.permissoes.length, 22);
-  assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar'));
+  assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar'));
-  assert.equal(perfil('Administrador').permissoes.length, 25);
+  assert.equal(perfil('Administrador').permissoes.length, 26);
 });
 
 test('Vendedor salva orçamento mas não pedido', () => {

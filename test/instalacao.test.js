@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos } = require('../seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar } = require('../seguranca/instalacao');
 
 const NOMES = ['Administrador', 'Interno completo', 'Vendedor', 'Estoquista', 'Representante'];
 
@@ -24,12 +24,12 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 13 tabelas web_', async () => {
+test('cria as 16 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
   assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao',
-    'web_perfil_permissoes', 'web_perfis', 'web_usuario_acesso', 'web_usuario_excecoes']);
+    'web_perfil_permissoes', 'web_perfis', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_usuario_acesso', 'web_usuario_excecoes']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);
   assert.match(pool.chamadas.find(c => /`web_estoque_lancamentos`/.test(c.sql)).sql, /chave VARCHAR\(64\) NOT NULL PRIMARY KEY/);
@@ -139,4 +139,27 @@ test('preços: ver e editar vão só para o Administrador, uma vez', async () =>
   assert.deepEqual(pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params), [[1, 'precos.ver'], [1, 'precos.editar']]);
   const ja = criarPoolFalso([[/FROM web_auditoria WHERE acao = 'permissoes_precos'/, [{ id: 3 }]]]);
   assert.deepEqual(await acrescentarPermissoesPrecos(ja), { feito: false });
+});
+
+test('preços: gravar vai só para o Administrador, uma vez', async () => {
+  const pool = criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_precos_gravar'/, []],
+    [/SELECT id FROM web_perfis WHERE nome = 'Administrador'/, [{ id: 1 }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+  assert.deepEqual(await acrescentarPermissoesPrecosGravar(pool), { feito: true });
+  assert.deepEqual(pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params), [[1, 'precos.gravar']]);
+  assert.ok(pool.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_precos_gravar'));
+  const ja = criarPoolFalso([[/FROM web_auditoria WHERE acao = 'permissoes_precos_gravar'/, [{ id: 3 }]]]);
+  assert.deepEqual(await acrescentarPermissoesPrecosGravar(ja), { feito: false });
+});
+
+test('tabelas de preço: histórico guarda valor anterior anulável e índice por material', async () => {
+  const pool = criarPoolFalso([]);
+  await instalarTabelas(pool);
+  const hist = pool.chamadas.find(c => /`web_preco_historico`/.test(c.sql)).sql;
+  assert.match(hist, /valor_anterior DOUBLE NULL/);
+  assert.match(hist, /KEY idx_material \(material_codigo, id\)/);
+  assert.match(pool.chamadas.find(c => /`web_preco_margens`/.test(c.sql)).sql, /UNIQUE KEY uk_escopo_chave \(escopo, chave\)/);
 });

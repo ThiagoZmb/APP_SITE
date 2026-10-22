@@ -224,4 +224,4 @@ function registrarCustos({ rota, pool }) {
   });
 }
 
-module.exports = { registrarCustos, inicioDoPeriodo, EDITAR, agoraLocal };
+module.exports = { registrarCustos, inicioDoPeriodo, EDITAR, agoraLocal, carregarBase, lerParametros, custoDo, ativo };

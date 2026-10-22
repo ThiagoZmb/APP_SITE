@@ -103,6 +103,38 @@ const TABELAS = [
      chave VARCHAR(64) NOT NULL PRIMARY KEY,
      valor VARCHAR(190) NOT NULL
    ) ${OPCOES}`,
+  // formação do VALOR_FIXO: encargos extras sobre a venda, margens por classe/material e histórico das gravações
+  `CREATE TABLE IF NOT EXISTS \`web_preco_encargos\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     nome VARCHAR(60) NOT NULL,
+     pct DECIMAL(6,3) NOT NULL,
+     ativo TINYINT(1) NOT NULL DEFAULT 1,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_preco_margens\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     escopo ENUM('classe','material') NOT NULL,
+     chave VARCHAR(190) NOT NULL,
+     margem_pct DECIMAL(6,3) NOT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL,
+     UNIQUE KEY uk_escopo_chave (escopo, chave)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_preco_historico\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     lote CHAR(36) NOT NULL,
+     material_codigo INT NOT NULL,
+     valor_anterior DOUBLE NULL,
+     valor_novo DOUBLE NOT NULL,
+     custo DOUBLE NULL,
+     memoria JSON NULL,
+     gravado_em DATETIME NOT NULL,
+     gravado_por VARCHAR(190) NOT NULL,
+     desfeito_em DATETIME NULL,
+     desfeito_por VARCHAR(190) NULL,
+     KEY idx_material (material_codigo, id)
+   ) ${OPCOES}`,
   // prazo de reposição por item (análises do estoque); sem linha = 15 dias
   `CREATE TABLE IF NOT EXISTS \`web_estoque_reposicao\` (
      produto_codigo INT NOT NULL PRIMARY KEY,
@@ -249,17 +281,18 @@ async function acrescentarPermissoesPedOrc(pool) {
 }
 
 // "Ver custos e preços" e "Editar ligações de custo" para o Administrador (os demais perfis o Thiago libera)
-async function acrescentarPermissoesPrecos(pool) {
-  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_precos' LIMIT 1");
+// passo único: dá permissões novas de preço só ao Administrador (marcador em web_auditoria)
+async function darAoAdministrador(pool, marcador, permissoes) {
+  const [feito] = await pool.execute(`SELECT id FROM web_auditoria WHERE acao = '${marcador}' LIMIT 1`);
   if (feito.length) return { feito: false };
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [admin] = await conn.execute("SELECT id FROM web_perfis WHERE nome = 'Administrador' ORDER BY id");
-    for (const p of admin) for (const permissao of ['precos.ver', 'precos.editar'])
+    for (const p of admin) for (const permissao of permissoes)
       await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
     await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
-      ['sistema', 'permissoes_precos', '', JSON.stringify({ perfis: admin.map(p => p.id) })]);
+      ['sistema', marcador, '', JSON.stringify({ perfis: admin.map(p => p.id) })]);
     await conn.commit();
     return { feito: true };
   } catch (err) {
@@ -270,4 +303,7 @@ async function acrescentarPermissoesPrecos(pool) {
   }
 }
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos };
+const acrescentarPermissoesPrecos = pool => darAoAdministrador(pool, 'permissoes_precos', ['precos.ver', 'precos.editar']);
+const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'permissoes_precos_gravar', ['precos.gravar']);
+
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar };
