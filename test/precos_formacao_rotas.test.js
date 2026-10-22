@@ -264,3 +264,56 @@ test('VALOR_FIXO 0 no cadastro: a lista traz o valor bruto (0) e gravar com esse
   assert.equal((await chamar('/precos/gravar', 'POST', { itens: [{ codigo: 100, valorNovo: p.sugerido, valorEsperado: p.valorFixo }] })).status, 200);
   assert.equal(valorFixo(banco, 100), 33.82);
 });
+
+// ---------- custo fixo calculado com os dados reais ----------
+
+test('custo fixo: cálculo na hora com os dados reais (12 meses)', async t => {
+  const { chamar, banco } = await prepararCustos(t, { perfil: 'Só ver custos' });
+  const r = await chamar('/precos/custo-fixo');
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.deepEqual([j.meses, r4(j.pct), j.despesasMes, j.receitasMes], [12, 10, 10000, 100000]);
+  assert.deepEqual(j.contas, [{ nome: 'Despesas › Aluguel', total: 120000 }]);
+  assert.deepEqual(escritas(banco), []);
+});
+
+test('custo fixo: aplicar grava o percentual calculado no servidor, com auditoria dos números', async t => {
+  const { chamar, banco } = await prepararCustos(t, { perfil: 'Editar preços' });
+  const r = await chamar('/precos/custo-fixo/aplicar', 'POST', { pctVisto: 10 });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).custoFixoPct, 10);
+  assert.equal(parametro(banco, 'custo_fixo_pct'), '10');
+  const a = banco.estado.auditoria.find(x => x[2] === 'preco_custo_fixo_calculado');
+  const det = JSON.parse(a[4]);
+  assert.deepEqual([det.antes, det.depois, det.meses, det.despesasMes, det.receitasMes, det.contas.length], [20, 10, 12, 10000, 100000, 1]);
+  assert.deepEqual(soWeb(banco), []);
+});
+
+test('custo fixo: números mudaram desde que a tela calculou → 409 com o novo cálculo, nada gravado', async t => {
+  const { chamar, banco } = await prepararCustos(t, { perfil: 'Editar preços' });
+  const r = await chamar('/precos/custo-fixo/aplicar', 'POST', { pctVisto: 9.5 });
+  assert.equal(r.status, 409);
+  const j = await r.json();
+  assert.match(j.error, /mudaram/);
+  assert.equal(r4(j.referencia.pct), 10);
+  assert.equal(parametro(banco, 'custo_fixo_pct'), '20');
+  assert.equal((await chamar('/precos/custo-fixo/aplicar', 'POST', {})).status, 400);
+});
+
+test('custo fixo: sem classificação fixa → 409 com o motivo, nada gravado', async t => {
+  const banco = bancoCustos();
+  banco.estado.fluxoGrupos[0].COMPORTAMENTO = null;
+  const { chamar } = await prepararCustos(t, { perfil: 'Editar preços', banco });
+  const r = await chamar('/precos/custo-fixo/aplicar', 'POST', { pctVisto: 10 });
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /nenhuma classificação marcada como fixa/);
+  assert.equal(parametro(banco, 'custo_fixo_pct'), '20');
+});
+
+test('custo fixo: aplicar sem precos.editar → 403; ler sem valores.ver → 403', async t => {
+  const { chamar, banco } = await prepararCustos(t, { perfil: 'Só ver custos' });
+  assert.equal((await chamar('/precos/custo-fixo/aplicar', 'POST', { pctVisto: 10 })).status, 403);
+  assert.deepEqual(escritas(banco), []);
+  const s = await prepararCustos(t, { perfil: 'Sem valores' });
+  assert.equal((await s.chamar('/precos/custo-fixo')).status, 403);
+});

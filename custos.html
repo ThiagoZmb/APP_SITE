@@ -88,9 +88,11 @@
         .seta { color: var(--text-light); margin: 0 3px; }
         .novo { font-weight: 800; }
         .var-sobe, .var-desce { color: var(--text-dark); font-weight: 700; }
-        html body #prc-gravar:not(:disabled), html body #dlg-gravar-confirmar, html body #pp-salvar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
+        html body #prc-gravar:not(:disabled), html body #dlg-gravar-confirmar, html body #pp-salvar, html body #cf-usar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
         html body #prc-gravar:disabled { opacity: .5; cursor: default; }
         .prc-ref-contas { color: var(--primary-color); font-weight: 700; }
+        #prc-calcular-cf { margin-top: 6px; }
+        .cf-conta { font-size: 14px; margin: 6px 0 10px; } .cf-conta b { font-size: 18px; }
         .origem-material, .origem-classe, .origem-padrao { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
         .origem-material { background: #e8eefc; color: #2b4c9a; } .origem-classe { background: #f1e8fc; color: #6b2b9a; } .origem-padrao { background: #eef0f2; color: var(--neutro); }
         .prc-motivo { color: var(--falta); font-size: 12px; }
@@ -202,7 +204,8 @@
                         <div data-param="imposto"><span class="rot">Imposto (Simples)</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
                         <div data-param="comissao"><span class="rot">Comissão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
                         <div data-param="encargos"><span class="rot">Outros encargos</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
-                        <div data-param="custoFixo"><span class="rot">Custo fixo</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
+                        <div data-param="custoFixo"><span class="rot">Custo fixo</span><span class="prc-valor">—</span><span class="prc-ref"></span>
+                            <button type="button" class="btn-mini" id="prc-calcular-cf" data-perm="precos.editar">🧮 Calcular com os dados reais</button></div>
                         <div data-param="desconto"><span class="rot">Desconto padrão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
                         <div data-param="margem"><span class="rot">Margem padrão</span><span class="prc-valor">—</span><span class="prc-ref"></span></div>
                     </div>
@@ -292,6 +295,8 @@
     <dialog id="dlg-contas" aria-labelledby="dlg-contas-titulo">
         <h3 id="dlg-contas-titulo">Referência de custo fixo</h3>
         <div id="dlg-contas-corpo" class="dlg-rolagem"></div>
+        <div class="msg erro" id="cf-msg"></div>
+        <button type="button" class="btn-mini prim" id="cf-usar" style="display:none">Usar</button>
         <button type="button" class="btn-mini" id="dlg-contas-fechar">Fechar</button>
     </dialog>
 
@@ -631,6 +636,6 @@
             mostrarAba(['ligacoes', 'precos'].includes(aba) ? aba : 'custos');
         });
     </script>
-    <script src="custos_precos.js?v=202610251200"></script>
+    <script src="custos_precos.js?v=202610251300"></script>
 </body>
 </html>

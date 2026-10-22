@@ -5,7 +5,7 @@
 // UPDATE cadastro_de_produtos SET VALOR_FIXO, na gravação confirmada e no desfazer.
 // ==========================================================================
 const { semValores } = require('../seguranca/valores');
-const { formarPreco } = require('../calculo/precos_formacao');
+const { formarPreco, arred2 } = require('../calculo/precos_formacao');
 const { referenciaComissao, referenciaDesconto, referenciaCustoFixo } = require('../calculo/precos_referencias');
 const { chaveMySQL } = require('../calculo/nomes');
 const { carregarBase, lerParametros, custoDo, inicioDoPeriodo, ativo } = require('./custos');
@@ -43,6 +43,17 @@ async function lerParametrosPreco(db) {
   return p;
 }
 
+// custo fixo do mercado: despesas fixas pagas ÷ receitas recebidas, média dos últimos `meses` (fluxo de caixa agrupado numa consulta)
+async function custoFixoDoBanco(db, meses) {
+  const [grupos] = await db.execute(
+    `SELECT c.id AS classificacaoId, CONCAT_WS(' › ', NULLIF(c.CLASSE1, ''), NULLIF(c.CLASSE2, ''), NULLIF(c.CLASSE3, '')) AS nome,
+            c.COMPORTAMENTO, c.ENTRA_DRE, f.SITUACAO, SUM(f.VALOR) AS total
+     FROM fluxo_de_caixa f LEFT JOIN fluxo_de_caixa_classificacao c ON c.id = f.COD_CLASSIFICACAO
+     WHERE f.SITUACAO IN ('Pago', 'Recebido') AND f.DATA >= ?
+     GROUP BY c.id, c.CLASSE1, c.CLASSE2, c.CLASSE3, c.COMPORTAMENTO, c.ENTRA_DRE, f.SITUACAO`, [inicioDoPeriodo(meses)]);
+  return referenciaCustoFixo(grupos.map(g => ({ ...g, classificacaoId: g.classificacaoId === null ? null : Number(g.classificacaoId), total: Number(g.total) || 0 })), meses);
+}
+
 // premissas, margens e referências: poucas consultas, nenhuma por material
 async function carregarPrecos(db) {
   const parametros = await lerParametrosPreco(db);
@@ -52,12 +63,6 @@ async function carregarPrecos(db) {
   const [clientes] = await db.execute(
     `SELECT COMISSAO, DESCONTO, TIPO_DESCONTO FROM cadastro_clientes
      WHERE RAZAO_SOCIAL IN (SELECT RAZAO_SOCIAL FROM ped_orc WHERE TIPO = 'Pedido' AND DATA >= ?)`, [desde]);
-  const [grupos] = await db.execute(
-    `SELECT c.id AS classificacaoId, CONCAT_WS(' › ', NULLIF(c.CLASSE1, ''), NULLIF(c.CLASSE2, ''), NULLIF(c.CLASSE3, '')) AS nome,
-            c.COMPORTAMENTO, c.ENTRA_DRE, f.SITUACAO, SUM(f.VALOR) AS total
-     FROM fluxo_de_caixa f LEFT JOIN fluxo_de_caixa_classificacao c ON c.id = f.COD_CLASSIFICACAO
-     WHERE f.SITUACAO IN ('Pago', 'Recebido') AND f.DATA >= ?
-     GROUP BY c.id, c.CLASSE1, c.CLASSE2, c.CLASSE3, c.COMPORTAMENTO, c.ENTRA_DRE, f.SITUACAO`, [desde]);
   const margens = {
     padrao: parametros.margemPct,
     classes: margensRows.filter(m => m.escopo === 'classe').map(m => ({ classe: m.chave, pct: Number(m.margem_pct) })),
@@ -71,8 +76,7 @@ async function carregarPrecos(db) {
     referencias: {
       comissao: referenciaComissao(clientes),
       desconto,
-      custoFixo: referenciaCustoFixo(grupos.map(g => ({ ...g, classificacaoId: g.classificacaoId === null ? null : Number(g.classificacaoId), total: Number(g.total) || 0 })),
-        parametros.referenciaMeses)
+      custoFixo: await custoFixoDoBanco(db, parametros.referenciaMeses)
     },
     descontoMax: desconto.maior
   };
@@ -229,6 +233,32 @@ function registrarPrecosFormacao({ rota, pool }) {
       await auditar(req, 'preco_margem_alterada', `${b.escopo}:${chave}`, { margemPct: b.margemPct });
       res.json({ ok: true });
     } catch (err) { falha(res, 'PUT /precos/margens', err); }
+  });
+
+  // custo fixo calculado na hora com os dados reais (o botão "Calcular com os dados reais")
+  rota('get', '/precos/custo-fixo', LER, async (req, res) => {
+    try {
+      const { referenciaMeses } = await lerParametrosPreco(pool);
+      res.json(semValores(req, { meses: referenciaMeses, ...(await custoFixoDoBanco(pool, referenciaMeses)) }, CAMPOS_VALOR));
+    } catch (err) { falha(res, 'GET /precos/custo-fixo', err); }
+  });
+
+  // recalcula no servidor e grava como premissa; recusa se os números mudaram desde o que a tela mostrou
+  rota('post', '/precos/custo-fixo/aplicar', EDITAR, async (req, res) => {
+    try {
+      const visto = req.body?.pctVisto;
+      if (!(typeof visto === 'number' && Number.isFinite(visto))) return res.status(400).json({ error: 'Percentual calculado não informado.' });
+      const antes = await lerParametrosPreco(pool);
+      const ref = { meses: antes.referenciaMeses, ...(await custoFixoDoBanco(pool, antes.referenciaMeses)) };
+      if (ref.pct === null) return res.status(409).json({ error: `Não dá para calcular: ${ref.motivo}.`, referencia: ref });
+      const pct = arred2(ref.pct);
+      if (!pctValido(pct)) return res.status(409).json({ error: `O custo fixo calculado é ${pct.toLocaleString('pt-BR')}% das receitas — impossível formar preço com ele.`, referencia: ref });
+      if (Math.abs(pct - visto) > TOLERANCIA) return res.status(409).json({ error: 'Os números do fluxo de caixa mudaram desde o cálculo; confira o novo valor.', referencia: ref });
+      await pool.execute('INSERT INTO web_custo_parametros (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', ['custo_fixo_pct', String(pct)]);
+      await auditar(req, 'preco_custo_fixo_calculado', '', { antes: antes.custoFixoPct, depois: pct, meses: ref.meses, despesasMes: ref.despesasMes,
+        receitasMes: ref.receitasMes, receitasSemClassificacao: ref.receitasSemClassificacao, contas: ref.contas });
+      res.json({ ok: true, custoFixoPct: pct });
+    } catch (err) { falha(res, 'POST /precos/custo-fixo/aplicar', err); }
   });
 
   // grava o VALOR_FIXO confirmado na tela; tudo ou nada; recusa se o valor mudou desde a leitura

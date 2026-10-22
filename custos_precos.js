@@ -167,16 +167,54 @@ async function salvarPremissas() {
     } catch (e) { erro(e.message); if (pedidos.length) carregarPrecos(); }
 }
 
-function abrirContas() {
-    const cf = precos.referencias.custoFixo;
+// referência de custo fixo: só ver as contas, ou (calcular = true) recalcular na hora e oferecer "Usar X%"
+let cfCalculado = null;
+const arred2 = v => Math.round(Number((v * 100).toPrecision(15))) / 100;
+function mostrarCustoFixo(cf, meses, calcular) {
+    cfCalculado = calcular ? cf : null;
+    $('dlg-contas-titulo').textContent = calcular ? 'Custo fixo calculado com os dados reais' : 'Referência de custo fixo';
     $('dlg-contas-corpo').innerHTML = (cf.motivo ? `<p class="msg erro">${esc(cf.motivo)}</p>` : '')
-        + `<p class="prc-ref">Despesas pagas com classificação fixa ÷ receitas recebidas (que entram na DRE ou sem classificação), últimos ${precos.parametros.referenciaMeses} meses.
+        + (calcular && cf.pct != null ? `<p class="cf-conta">${moeda(cf.despesasMes)}/mês de despesas fixas ÷ ${moeda(cf.receitasMes)}/mês de faturamento = <b>${pctBR(cf.pct)}</b></p>` : '')
+        + `<p class="prc-ref">Despesas pagas com classificação fixa ÷ receitas recebidas (que entram na DRE ou sem classificação), média dos últimos ${meses} meses.
+           Despesas variáveis (material, comissão, imposto, frete) ficam de fora: já entram no preço como custo e encargos.
            Receitas sem classificação incluídas: ${moeda(cf.receitasSemClassificacao)}.</p>`
         + (cf.contas.length ? `<table><thead><tr><th>Conta fixa</th><th class="num">Total no período</th></tr></thead><tbody>`
             + cf.contas.map(c => `<tr><td>${esc(c.nome)}</td><td class="num">${moeda(c.total)}</td></tr>`).join('') + '</tbody></table>' : '')
         + (cf.comportamentos.length ? `<p class="prc-ref">Comportamentos encontrados: ${cf.comportamentos.map(esc).join(', ')}</p>` : '')
         + (cf.semComportamento.length ? `<p class="prc-ref">Despesas sem comportamento: ${cf.semComportamento.map(esc).join(', ')}</p>` : '');
-    $('dlg-contas').showModal();
+    const usavel = calcular && cf.pct != null && cf.pct < 100;
+    $('cf-usar').style.display = usavel ? '' : 'none';
+    $('cf-usar').disabled = false;
+    if (usavel) $('cf-usar').textContent = `Usar ${pctBR(arred2(cf.pct))} como custo fixo`;
+    if (!$('dlg-contas').open) { $('cf-msg').textContent = ''; $('dlg-contas').showModal(); }
+}
+const abrirContas = () => mostrarCustoFixo(precos.referencias.custoFixo, precos.parametros.referenciaMeses, false);
+
+async function calcularCustoFixo() {
+    try {
+        const r = await api('/precos/custo-fixo');
+        mostrarCustoFixo(r, r.meses, true);
+    } catch (e) { mostrarErro(e.message); }
+}
+
+async function usarCustoFixo() {
+    if (!cfCalculado) return;
+    $('cf-usar').disabled = true;
+    const a = getAuth();
+    try {
+        const res = await fetch(API_BASE + '/precos/custo-fixo/aplicar', { method: 'POST', body: JSON.stringify({ pctVisto: arred2(cfCalculado.pct) }),
+            headers: { 'Authorization': 'Bearer ' + (a ? a.token : ''), 'Content-Type': 'application/json' } });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            // números mudaram (ou não dá para calcular): mostra o cálculo novo para confirmar de novo
+            if (json.referencia) mostrarCustoFixo(json.referencia, json.referencia.meses, true);
+            $('cf-msg').textContent = json.error || `Erro ${res.status}`;
+            $('cf-usar').disabled = false;
+            return;
+        }
+        $('dlg-contas').close();
+        await carregarPrecos();
+    } catch (e) { $('cf-msg').textContent = e.message; $('cf-usar').disabled = false; }
 }
 
 // ---------- detalhe, simulador e histórico ----------
@@ -297,6 +335,8 @@ $('pp-encargos').addEventListener('click', e => {
 });
 $('prc-parametros').addEventListener('click', e => { if (e.target.closest('.prc-ref-contas')) { e.preventDefault(); abrirContas(); } });
 $('dlg-contas-fechar').addEventListener('click', () => $('dlg-contas').close());
+$('prc-calcular-cf').addEventListener('click', calcularCustoFixo);
+$('cf-usar').addEventListener('click', usarCustoFixo);
 ['prc-busca', 'prc-variacao'].forEach(id => $(id).addEventListener('input', renderPrecos));
 ['prc-classe', 'prc-com-custo'].forEach(id => $(id).addEventListener('change', renderPrecos));
 $('tab-precos').addEventListener('change', e => {
