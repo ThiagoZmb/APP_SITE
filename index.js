@@ -14,7 +14,7 @@ const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermis
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
-const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, ErroPreco } = require('./calculo/precos');
+const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
 
 const app = express();
@@ -953,6 +953,12 @@ registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], as
           tamanho: Math.min(100000, Math.max(0, parseFloat(a.tamanho) || 0)),
           origem: a.origem === 'SISTEMA DE CORRER' ? 'SISTEMA DE CORRER' : 'MANUAL' }))
       : [];
+    if (b.frente === 'Serralheria') {
+      const comps = (Array.isArray(b.complementos) ? b.complementos : []).slice(0, 100)
+        .filter(c => c && Number.isInteger(Number(c.id))).map(c => ({ id: Number(c.id), qtd: Math.min(99999, Math.max(0, parseFloat(c.qtd) || 0)) }));
+      const r = await precoSerralheria(b, cliente, leitorCadastro, comps);
+      return res.json({ unitario: r.unitario, total: r.total, complementos: r.complementos, ...(b.debug ? { diag: r.diag } : {}) });
+    }
     if (acessorios.length) {
       const r = await precoComAcessorios(b, cliente, leitorCadastro, acessorios);
       return res.json({ unitario: r.unitario, total: r.total, acessorios: r.acessorios, ...(b.debug ? { diag: r.diag } : {}) });

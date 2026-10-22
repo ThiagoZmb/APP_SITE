@@ -192,7 +192,7 @@
         .tab-acess-wrap { overflow-x: auto; }
         .tab-acess { width: 100%; font-size: 13px; }
         .tab-acess th, .tab-acess td { padding: 4px 6px; text-align: left; }
-        .tab-acess input.ac-qtd { width: 64px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .tab-acess input.cp-qtd, .tab-acess input.ac-qtd { width: 64px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .tab-acess tr[data-origem="SISTEMA DE CORRER"] td:first-child::after { content: ' · sistema'; color: var(--text-light); font-size: 11px; }
         .tab-acess tbody:empty::before { content: 'Nenhum acessório'; display: block; padding: 6px; color: var(--text-light); }
         .lbl-desemp { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
@@ -413,8 +413,11 @@
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
                             </div>
                             <div class="form-group f-serr" style="display:none"><label>Altura (mm)</label><input type="number" id="f-altura-serr" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-a" title="Barras na altura">Qtd (A)</label><input type="number" id="f-qtd-a" min="1" value="1"></div>
                             <div class="form-group f-serr" style="display:none"><label>Largura (mm)</label><input type="number" id="f-largura-serr" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-l" title="Barras na largura">Qtd (L)</label><input type="number" id="f-qtd-l" min="1" value="1"></div>
                             <div class="form-group f-serr" style="display:none"><label>Profundidade (mm)</label><input type="number" id="f-profundidade" placeholder="0"></div>
+                            <div class="form-group f-serr" style="display:none"><label for="f-qtd-p" title="Barras na profundidade">Qtd (P)</label><input type="number" id="f-qtd-p" min="1" value="1"></div>
                             <div class="form-group f-serr" style="display:none"><label>Qtd soldas</label><input type="number" id="f-soldas" min="0" value="0"></div>
                         </div>
                     </div>
@@ -471,6 +474,20 @@
                             <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
                             <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
                             <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                        </div>
+                    </div>
+                    <!-- COMPLEMENTOS DA SERRALHERIA (frmSelecaoComplementos) -->
+                    <div class="secao-item secao-serr" id="quadro-complementos" style="display:none">
+                        <h4>🧩 Complementos</h4>
+                        <div class="viz-linha">
+                            <button type="button" class="btn-mini" id="btn-add-complemento">＋ Complemento</button>
+                            <select id="sel-complemento" style="display:none" aria-label="Escolha o complemento"></select>
+                        </div>
+                        <div class="tab-acess-wrap">
+                            <table class="tab-acess">
+                                <thead><tr><th>Tipo</th><th>Descrição</th><th>Unidade</th><th>Qtd</th><th data-valor>Unitário</th><th data-valor>Total</th><th></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                     <!-- ITEM AVULSO (frmServicos: Serviço, Perfil, Puxador, Revestimento, Trilhos) -->
@@ -681,6 +698,7 @@
         let itens = [];
         const ORIGEM_SIS = 'SISTEMA DE CORRER';
         let acessoriosItem = [];  // acessórios do item em montagem: { nome, qtd, tamanho, origem, valorUnitario? }
+        let complementosSerr = []; // serralheria: { id, tipo, descricao, unidade, qtd, valorUnitario?, valorTotal? }
         let sistemaCorrer = null; // porta de correr: { descontoAltura, temDesempenador } do sistema escolhido
         let seqSistema = 0;
         let editandoIndex = -1;
@@ -1093,6 +1111,8 @@
                             produto: g('f-produto'), material: g('f-material'), acabamento: g('f-acab-serr'),
                             altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
                             soldas: g('f-soldas'),
+                            qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'),
+                            complementos: complementosSerr.map(c => ({ id: c.id, qtd: c.qtd })),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             percentuais: '' };
             } else if (frenteAtual === 'Avulso') {
@@ -1144,6 +1164,10 @@
                         body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+                    if (Array.isArray(d.complementos)) {
+                        d.complementos.forEach((c, i) => { if (complementosSerr[i] && complementosSerr[i].id === c.id) Object.assign(complementosSerr[i], { valorUnitario: c.valorUnitario, valorTotal: c.valorTotal }); });
+                        renderComplementos();
+                    }
                     if (Array.isArray(d.acessorios)) {
                         d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) Object.assign(acessoriosItem[i], { valorUnitario: a.valorUnitario, valorTotal: a.valorTotal }); });
                         renderAcessorios();
@@ -1743,7 +1767,9 @@
                 desc = descricaoAvulso();
             } else if (ehSerr) {
                 desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
-                       ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm`;
+                       ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm` +
+                       ` (barras ${qtdEixo('f-qtd-a')}/${qtdEixo('f-qtd-l')}/${qtdEixo('f-qtd-p')})` +
+                       (complementosSerr.length ? ` + ${complementosSerr.length} complemento(s)` : '');
             } else {
                 const pux = g('f-puxador');
                 desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}`.trimEnd() +
@@ -1765,6 +1791,8 @@
                 largura: ehAv ? (parseFloat(g('f-av-larg')) || 0) : ehSerr ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
                 profundidade: parseFloat(g('f-profundidade')) || 0,
                 soldas: parseInt(g('f-soldas')) || 0,
+                qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'),
+                complementos: ehSerr ? complementosSerr.map(c => ({ id: c.id, tipo: c.tipo, descricao: c.descricao, unidade: c.unidade, qtd: c.qtd })) : [],
                 furos: ehPortaComFuros()
                     ? { lista: [...furosLista], lados: [...ladosFuros], referenciaInvertida: isReferenciaInvertida }
                     : { lista: [], lados: [], referenciaInvertida: false },
@@ -1851,6 +1879,7 @@
                 set('f-produto', d.produto); set('f-material', d.material);
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
                 set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
+                set('f-qtd-a', item.qtdAltura || 1); set('f-qtd-l', item.qtdLargura || 1); set('f-qtd-p', item.qtdProfundidade || 1);
                 // posição do puxador de CADA folha (fiel ao salvo, sem espelhar)
                 posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
                     ? [...d.posicoesFolhas] : [d.posicao || ''];
@@ -1880,6 +1909,8 @@
             set('f-obs', item.obs);
             limparAcessorios();
             acessoriosItem = (item.acessorios || []).filter(a => a.origem !== ORIGEM_SIS).map(a => ({ ...a }));
+            complementosSerr = (item.complementos || []).map(c => ({ ...c }));
+            renderComplementos();
             document.getElementById('chk-desempenador').checked = !!(item.detalhes || {}).desempenador;
             renderAcessorios();
             atualizarTotalItem();
@@ -1889,10 +1920,13 @@
         function limparForm() {
             const catAvulso = val('f-av-cat');
             limparAcessorios();
+            complementosSerr = []; renderComplementos();
             document.querySelectorAll('#form-item input, #form-item select, #form-item textarea').forEach(el => {
                 if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
             document.getElementById('f-qtd').value = 1;
+            ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
+            document.getElementById('f-soldas').value = 0;
             document.getElementById('chk-pares').checked = false;
             document.getElementById('chk-toda-ext').checked = false;
             document.getElementById('f-tamanho-pux').readOnly = false;
@@ -2112,6 +2146,71 @@
             $av('avl-fundo').classList.remove('aberta'); $av('avl').classList.remove('aberta');
             altv = null;
         }
+
+        // ============ SERRALHERIA: BARRAS POR EIXO + COMPLEMENTOS (frmSerralheria / frmSelecaoComplementos) ============
+        // vazio ou 0 conta como 1 (MotorPrecificacaoSerralheria.CalcularMetragem)
+        const qtdEixo = id => Math.max(1, parseInt(val(id)) || 1);
+        function renderComplementos() {
+            document.querySelector('#quadro-complementos tbody').innerHTML = complementosSerr.map((c, i) => `
+                <tr data-id="${escapeHtml(c.id)}">
+                    <td>${escapeHtml(c.tipo)}</td><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.unidade)}</td>
+                    <td><input type="number" class="cp-qtd" min="0.01" step="any" value="${c.qtd}" data-i="${i}"></td>
+                    <td data-valor>${c.valorUnitario != null ? formatCurrency(c.valorUnitario) : '—'}</td>
+                    <td data-valor>${c.valorTotal != null ? formatCurrency(c.valorTotal) : '—'}</td>
+                    <td><button type="button" class="btn-mini cp-remover" data-i="${i}" title="Remover complemento">🗑️</button></td>
+                </tr>`).join('');
+        }
+        async function abrirListaComplementos() {
+            if (!val('f-produto')) { alert('Primeiramente escolha um produto!'); return; } // mensagem do VB
+            const sel = document.getElementById('sel-complemento');
+            try {
+                const lista = await fetchAutenticado(`${API_BASE}/ped_orc/serralheria_componentes?produto=${encodeURIComponent(val('f-produto'))}`);
+                sel._lista = lista;
+                sel.innerHTML = lista.length
+                    ? '<option value="">— escolha o complemento —</option>' + lista.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.tipo)} — ${escapeHtml(c.descricao)} (${escapeHtml(c.unidade)})</option>`).join('')
+                    : '<option value="">(nenhum complemento para este produto)</option>';
+            } catch {
+                sel._lista = []; sel.innerHTML = '<option value="">Erro ao carregar os complementos</option>';
+            }
+            sel.style.display = '';
+            sel.focus();
+        }
+        function escolherComplemento() {
+            const sel = document.getElementById('sel-complemento');
+            const c = (sel._lista || []).find(x => String(x.id) === sel.value);
+            if (!c) return;
+            const ja = complementosSerr.find(x => x.id === c.id);
+            if (ja) ja.qtd += 1;
+            else complementosSerr.push({ id: c.id, tipo: c.tipo, descricao: c.descricao, unidade: c.unidade, qtd: 1, valorUnitario: c.valorUnitario,
+                valorTotal: c.valorUnitario != null ? c.valorUnitario : null });
+            sel.value = ''; sel.style.display = 'none';
+            renderComplementos();
+            calcularPrecoAutomatico();
+        }
+        document.getElementById('btn-add-complemento').addEventListener('click', abrirListaComplementos);
+        document.getElementById('sel-complemento').addEventListener('change', escolherComplemento);
+        document.querySelector('#quadro-complementos tbody').addEventListener('change', e => {
+            const inp = e.target.closest('input.cp-qtd');
+            const c = inp && complementosSerr[Number(inp.dataset.i)];
+            if (!c) return;
+            c.qtd = Math.max(0.01, parseFloat(String(inp.value).replace(',', '.')) || 1);
+            c.valorTotal = c.valorUnitario != null ? Math.round(c.valorUnitario * c.qtd * 100) / 100 : null; // o motor confirma em seguida
+            renderComplementos();
+            calcularPrecoAutomatico();
+        });
+        document.querySelector('#quadro-complementos tbody').addEventListener('click', e => {
+            const b = e.target.closest('button.cp-remover');
+            if (!b) return;
+            complementosSerr.splice(Number(b.dataset.i), 1);
+            renderComplementos();
+            calcularPrecoAutomatico();
+        });
+        // outro produto: os complementos são do modelo anterior
+        document.getElementById('f-produto').addEventListener('change', () => {
+            if (isCarregandoEdicao) return;
+            complementosSerr = []; renderComplementos();
+            document.getElementById('sel-complemento').style.display = 'none';
+        });
 
         // ============ ACESSÓRIOS DAS PORTAS (lstvAcessorios) + PORTA DE CORRER POR VÃO ============
         // Manuais: escolhidos de acessorios_permitidos da frente. Do sistema: vêm do servidor (trilhos no vão,
@@ -2489,7 +2588,7 @@
         });
         // Motor: recalcula ao mudar campos sem handler próprio
         ['f-cor','f-cor-pux','f-cor-revest','f-divisor','f-div-h','f-div-v','f-altura','f-largura',
-         'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas']
+         'f-produto','f-material','f-acab-serr','f-altura-serr','f-largura-serr','f-profundidade','f-soldas','f-qtd-a','f-qtd-l','f-qtd-p']
             .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', calcularPrecoAutomatico); });
         // Cascatas e regras dos combos (região 4 do VB)
         document.getElementById('f-perfil').addEventListener('change', aoMudarPerfil);

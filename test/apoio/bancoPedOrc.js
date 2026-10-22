@@ -41,7 +41,10 @@ function bancoPedOrc() {
       { NOME: 'S1', MODELO: 'Roldana', QTD: 2, MULTIPLICADOR: '', CLASSE: 'Roldana' },
       { NOME: 'S1', MODELO: 'Desemp', QTD: 1, MULTIPLICADOR: '', CLASSE: 'Desempenador' }],
     configSistema: [{ NOME: 'S1', QTD_PORTAS: 2, QTD_TRILHO_SUP: 2, QTD_TRILHO_INF: 1 }],
-    serrProdutos: [{ nome_modelo: 'Grade', fixo: 0 }],
+    serrProdutos: [{ id: 1, nome_modelo: 'Grade', fixo: 0 }, { id: 2, nome_modelo: 'Produto editável', fixo: 0 }],
+    serrComponentes: [{ id: 11, modelo_padrao_id: 1, tipo_componente: 'Fechadura', descricao_componente: 'Fechadura tetra', unidade_medida: 'UN', valor_unitario: 10, ativo: 1 },
+      { id: 12, modelo_padrao_id: 1, tipo_componente: 'Pintura', descricao_componente: 'Pintura eletrostática', unidade_medida: 'M2', valor_unitario: 25.5, ativo: 1 },
+      { id: 13, modelo_padrao_id: 9, tipo_componente: 'Roldana', descricao_componente: 'Roldana de portão', unidade_medida: 'UN', valor_unitario: 40, ativo: 1 }],
     pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: []
   };
   // falhas simuladas: { 'ped_orc': n } → as n próximas gravações nessa tabela falham
@@ -59,6 +62,10 @@ function bancoPedOrc() {
     [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = TRIM\(\?\) AND SITUACAO/, (sql, [m]) => estado.produtos.filter(p => norm(p.MODELO) === norm(m))],
     [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = 'Solda'/, () => []],
     [/FROM acabamentos WHERE/, (sql, [a]) => estado.acabamentos.filter(x => norm(x.ACABAMENTO) === norm(a))],
+    [/FROM serralheria_modelos_componentes/, (sql, [n]) => {
+      const prod = estado.serrProdutos.find(x => norm(x.nome_modelo) === norm(n));
+      return estado.serrComponentes.filter(c => c.ativo && (!/modelo_padrao_id/.test(sql) || (prod && c.modelo_padrao_id === prod.id)))
+        .map(c => ({ ...c })); }],
     [/FROM serralheria_produtos WHERE/, (sql, [n]) => estado.serrProdutos.filter(x => norm(x.nome_modelo) === norm(n))],
     [/FROM acessorios_permitidos WHERE TIPO_PRODUTO = \?/, (sql, [t]) => estado.permitidos.filter(x => x.TIPO_PRODUTO === t)
       .map(x => ({ MODELO: x.MODELO })).sort((a, b) => a.MODELO.localeCompare(b.MODELO))],

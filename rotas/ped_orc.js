@@ -3,7 +3,7 @@
 // e listas de apoio da tela (acessórios permitidos, itens do sistema de correr).
 // ==========================================================================
 const { semValores } = require('../seguranca/valores');
-const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, fatorHistorico, ErroPreco } = require('../calculo/precos');
+const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco } = require('../calculo/precos');
 const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const { traduzirDocumento, impressaoDigital } = require('../calculo/leitura_vb');
@@ -103,7 +103,8 @@ function validar(b) {
 function entradaPreco(item, folhas) {
   const d = item.detalhes || {};
   if (item.frente === 'Serralheria') return { frente: 'Serralheria', produto: d.produto, material: d.material, acabamento: d.acabSerr,
-    altura: item.altura, largura: item.largura, profundidade: item.profundidade, soldas: item.soldas, qtd: item.qtd };
+    altura: item.altura, largura: item.largura, profundidade: item.profundidade, soldas: item.soldas, qtd: item.qtd,
+    qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade };
   if (item.frente === 'Avulso') return { frente: 'Avulso', categoria: d.categoria, produto: d.avProduto,
     acabamento: ['Perfil', 'Trilhos', 'Puxador'].includes(d.categoria) ? d.avAcab : '', altura: item.altura, largura: item.largura, qtd: item.qtd };
   const f = folhas[0] || {};
@@ -143,12 +144,19 @@ async function prepararItem(db, leitor, cliente, item, n) {
     folhas = folhasDoItem(item, { descontoAlturaSistema });
   }
   let preco;
-  try { preco = await precoComAcessorios(entradaPreco(item, folhas), cliente, leitor, acessorios); }
+  const complementosSerr = item.frente === 'Serralheria' ? (Array.isArray(item.complementos) ? item.complementos : []).slice(0, 100)
+    .map(c => ({ id: Number(c && c.id), qtd: Math.min(99999, Math.max(0, parseFloat(c && c.qtd) || 0)) })) : [];
+  try {
+    preco = item.frente === 'Serralheria'
+      ? await precoSerralheria(entradaPreco(item, folhas), cliente, leitor, complementosSerr)
+      : await precoComAcessorios(entradaPreco(item, folhas), cliente, leitor, acessorios);
+  }
   catch (err) { if (err instanceof ErroPreco) throw new ErroItem(422, `Item ${n}: ${err.message}`, { item: n }); throw err; }
   const historico = corta(item.historico, 500);
   const valor = arred2(preco.unitario * fatorHistorico(historico));
   const qtdTela = Math.max(1, parseInt(item.qtd) || 1);
-  const r = { item, n, historico, valor, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios, folhas, grupos: [] };
+  const r = { item, n, historico, valor, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios || [], folhas, grupos: [],
+    fator: fatorHistorico(historico), pecasSerr: preco.pecas, complementosSerr: preco.complementos || [] };
 
   if (ehPorta) {
     for (const f of folhas) f.valorUnitario = valor;
@@ -213,11 +221,21 @@ async function gravarItem(conn, { tipo, numero, medicao }, p) {
     QTD: linha.qtd, DESCRICAO: linha.descricao, UNITARIO: unitLinha, TOTAL: totalItem, OBSERVACAO: nulo(corta(item.obs, 2000)), PORCENTAGEM: p.historico });
 
   if (item.frente === 'Serralheria') {
+    // com complementos, a linha da peça leva só o valor das peças (os complementos vão para a tabela deles)
+    const comps = p.complementosSerr;
+    const qtdEixo = v => Math.max(1, parseInt(v) || 1);
     await inserir(conn, 'ped_orc_serralheria', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: 1, QTD_ITENS: linha.qtd,
       PRODUTO: corta(d.produto, 190), MATERIAL: corta(d.material, 190), ACABAMENTO: corta(d.acabSerr, 190), COR: corta(d.corSerr, 190),
-      QTD_ALTURA: 1, ALTURA: Math.round(parseFloat(item.altura) || 0), QTD_LARGURA: 1, LARGURA: Math.round(parseFloat(item.largura) || 0),
-      QTD_PROFUNDIDADE: 1, PROFUNDIDADE: Math.round(parseFloat(item.profundidade) || 0), QTD_SOLDAS: parseInt(item.soldas) || 0,
-      UNITARIO: valor, TOTAL: totalItem, OBS: corta(item.obs, 2000) });
+      QTD_ALTURA: qtdEixo(item.qtdAltura), ALTURA: Math.round(parseFloat(item.altura) || 0), QTD_LARGURA: qtdEixo(item.qtdLargura), LARGURA: Math.round(parseFloat(item.largura) || 0),
+      QTD_PROFUNDIDADE: qtdEixo(item.qtdProfundidade), PROFUNDIDADE: Math.round(parseFloat(item.profundidade) || 0), QTD_SOLDAS: parseInt(item.soldas) || 0,
+      UNITARIO: comps.length ? arred2(p.pecasSerr / linha.qtd * p.fator) : valor, TOTAL: comps.length ? arred2(p.pecasSerr * p.fator) : totalItem, OBS: corta(item.obs, 2000) });
+    // frmSerralheria.EnviarParaPedido: complementos com a % do item aplicada no valor unitário
+    let sub = 1;
+    for (const c of comps) {
+      const vu = arred2(c.valorUnitario * p.fator);
+      await inserir(conn, 'ped_orc_serralheria_complementos', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM_SERRALHERIA: n, SUB_ITEM: sub++,
+        TIPO_COMPONENTE: corta(c.tipo, 190), DESCRICAO: corta(c.descricao, 190), UNIDADE: corta(c.unidade, 10), QUANTIDADE: c.qtd, VALOR_UNITARIO: vu, VALOR_TOTAL: arred2(vu * c.qtd) });
+    }
     return;
   }
   if (item.frente === 'Avulso') {
@@ -314,6 +332,15 @@ function registrarPedOrc({ rota, pool }) {
     }
   });
 
+  rota('get', '/ped_orc/serralheria_componentes', ['orcamentos.criar'], async (req, res) => {
+    try {
+      res.json(semValores(req, await leitor.componentesSerralheria(String(req.query.produto || '')), ['valorUnitario']));
+    } catch (err) {
+      console.error('Erro GET /ped_orc/serralheria_componentes:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  });
+
   rota('get', '/ped_orc/buscar', ['pedidos.ver', 'orcamentos.criar'], async (req, res) => {
     try {
       const tipo = req.query.tipo === 'Pedido' ? 'Pedido' : 'Orçamento';
@@ -343,7 +370,9 @@ function registrarPedOrc({ rota, pool }) {
       if (!linhas) return res.status(404).json({ error: `${tipo} nº ${numero} não encontrado.` });
       const [cli] = await pool.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
       if (foraDosEstados(req, cli[0]?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
-      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas: await sistemasDoDocumento(pool, linhas) });
+      const componentesSerr = {};
+      for (const s of linhas.serralheria) if (!componentesSerr[s.PRODUTO]) componentesSerr[s.PRODUTO] = await leitor.componentesSerralheria(s.PRODUTO);
+      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas: await sistemasDoDocumento(pool, linhas), componentesSerr });
       const p = req.acesso.permissoes;
       res.json({ cabecalho: { ...cabecalho, clienteCodigo: cli[0]?.CODIGO ?? null }, itens, impressao: impressaoDigital(linhas, tipo),
         podeEditar: p.has('orcamentos.salvar') && (tipo === 'Orçamento' || p.has('pedidos.criar')) });

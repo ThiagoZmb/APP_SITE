@@ -100,13 +100,22 @@ function traduzirPorta(l, linhas, sistemas) {
   return item;
 }
 
-function traduzirSerralheria(l, linhas) {
+function traduzirSerralheria(l, linhas, componentesSerr) {
   const n = Number(l.ITEM);
   const subs = porItem(linhas.serralheria, n);
-  if (subs.length !== 1 || porItem(linhas.serralheriaComp, n).length) throw new Trava('serralheria com vários sub-itens ou complementos');
+  if (subs.length !== 1) throw new Trava('serralheria com várias peças no mesmo item');
   const s = subs[0];
-  if ([s.QTD_ALTURA, s.QTD_LARGURA, s.QTD_PROFUNDIDADE].some(q => num(q) !== 1)) throw new Trava('serralheria com quantidades de barras diferentes de 1');
+  // complementos: a tela trabalha com o id do cadastro; o banco guarda tipo + descrição
+  const doProduto = componentesSerr[s.PRODUTO] || [];
+  const fator = fatorHistorico(txt(l.PORCENTAGEM)) || 1;
+  const complementos = porItem(linhas.serralheriaComp, n).sort((a, b) => num(a.SUB_ITEM) - num(b.SUB_ITEM)).map(c => {
+    const comp = doProduto.find(x => txt(x.tipo) === txt(c.TIPO_COMPONENTE) && txt(x.descricao) === txt(c.DESCRICAO));
+    if (!comp) throw new Trava(`complemento '${txt(c.DESCRICAO)}' não está mais no cadastro do produto`);
+    return { ...comp, qtd: num(c.QUANTIDADE), valorTotal: arred2(num(c.VALOR_UNITARIO) / fator * num(c.QUANTIDADE)) };
+  });
+  const eixo = v => Math.max(1, num(v) || 1);
   return { frente: 'Serralheria', qtd: num(l.QTD), altura: num(s.ALTURA), largura: num(s.LARGURA), profundidade: num(s.PROFUNDIDADE), soldas: num(s.QTD_SOLDAS),
+    qtdAltura: eixo(s.QTD_ALTURA), qtdLargura: eixo(s.QTD_LARGURA), qtdProfundidade: eixo(s.QTD_PROFUNDIDADE), complementos,
     furos: { lista: [], lados: [], referenciaInvertida: false }, acessorios: [],
     detalhes: { ...detalhesVazios(), produto: txt(s.PRODUTO), material: txt(s.MATERIAL), acabSerr: txt(s.ACABAMENTO), corSerr: txt(s.COR) }, obs: txt(s.OBS) };
 }
@@ -120,14 +129,14 @@ function traduzirAvulso(l, linhas) {
     detalhes: { ...detalhesVazios(), categoria: l.TIPO_PRODUTO, avProduto: txt(c.PERFIL), avAcab: txt(c.ACABAMENTO_PERFIL), avCor: txt(c.COR_PERFIL) }, obs: txt(l.OBSERVACAO) };
 }
 
-function traduzirDocumento(linhas, { sistemas = {} } = {}) {
+function traduzirDocumento(linhas, { sistemas = {}, componentesSerr = {} } = {}) {
   const itens = [...linhas.lista].sort((a, b) => num(a.ITEM) - num(b.ITEM)).map(l => {
     const origem = { item: Number(l.ITEM), estado: 'intacto' };
     const historico = txt(l.PORCENTAGEM);
     try {
       let it;
       if (FRENTE_DA_TELA[l.TIPO_PRODUTO]) it = traduzirPorta(l, linhas, sistemas);
-      else if (l.TIPO_PRODUTO === 'Metalons') it = traduzirSerralheria(l, linhas);
+      else if (l.TIPO_PRODUTO === 'Metalons') it = traduzirSerralheria(l, linhas, componentesSerr);
       else if (CATEGORIAS_AVULSO.includes(l.TIPO_PRODUTO)) it = traduzirAvulso(l, linhas);
       else throw new Trava('tipo de produto que só o VB edita');
       // porta de correr: a lista guarda o conjunto (QTD 1); a tela mostra por folha
