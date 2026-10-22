@@ -71,3 +71,63 @@ test('reabrir: serralheria com barras por eixo e complementos abre para editar e
   assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
   assert.deepEqual(['serralheria', 'serralheriaComp', 'listaItens'].map(t => banco[t].map(semId)), antes);
 });
+
+// ---------- conjunto com várias peças (frmSerralheria: lista de itens → uma linha no pedido) ----------
+// peça 1: Metalon 20 — 1000 × 2 + 500 × 3 = 3,5 m × 30 = 105 + 10 soldas × 2 = 125
+// peça 2: Cantoneira — 2000 × 1 = 2 m × 20 = 40 + 20 soldas × 2 = 80 → peças 205 + Fechadura 10 × 2 = 20 → 225
+const pecas = () => [
+  { produto: 'Grade', material: 'Metalon 20', acabSerr: '', corSerr: '', altura: 1000, largura: 500, profundidade: 0, qtdAltura: 2, qtdLargura: 3, qtdProfundidade: 1, soldas: 10 },
+  { produto: 'Grade', material: 'Cantoneira', acabSerr: '', corSerr: 'Preto', altura: 2000, largura: 0, profundidade: 0, qtdAltura: 1, qtdLargura: 1, qtdProfundidade: 1, soldas: 20 }];
+
+test('conjunto: preço soma as peças e os complementos; devolve o valor de cada peça', async t => {
+  const { chamar } = await prepararPedOrc(t);
+  const j = await (await preco(chamar, { pecas: pecas(), complementos: [{ id: 11, qtd: 2 }] })).json();
+  assert.deepEqual([j.unitario, j.total], [225, 225]);
+  assert.deepEqual(j.pecas.map(p => p.total), [125, 80]);
+  const dois = await (await preco(chamar, { pecas: pecas(), complementos: [{ id: 11, qtd: 2 }], qtd: 2 })).json();
+  assert.deepEqual([dois.total, dois.unitario, dois.pecas.map(p => p.total)], [430, 215, [250, 160]]);
+  assert.equal((await preco(chamar, { pecas: [] , produto: '', material: '' })).status, 400);
+});
+
+test('conjunto: grava uma linha no pedido e uma linha por peça (ITEM 1, 2…), e reabre igual', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const item = serr({ pecas: pecas(), valorTela: 225, detalhes: { produto: 'Grade', material: 'Metalon 20', acabSerr: '', corSerr: '' } });
+  const r = await chamar('/ped_orc/salvar', 'POST', corpo({ itens: [item] }));
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.listaItens.length, 1);
+  assert.deepEqual([banco.listaItens[0].PRODUTO, banco.listaItens[0].QTD, banco.listaItens[0].UNITARIO, banco.listaItens[0].TOTAL], ['Grade', 1, 225, 225]);
+  assert.deepEqual(banco.serralheria.map(s => [s.ITEM_PEDIDO, s.ITEM, s.QTD_ITENS, s.PRODUTO, s.MATERIAL, s.COR, s.ALTURA, s.QTD_ALTURA, s.QTD_SOLDAS, s.UNITARIO, s.TOTAL]),
+    [[1, 1, 1, 'Grade', 'Metalon 20', '', 1000, 2, 10, 125, 125], [1, 2, 1, 'Grade', 'Cantoneira', 'Preto', 2000, 1, 20, 80, 80]]);
+  assert.equal(banco.serralheriaComp.length, 1);
+  const { numero } = await r.json();
+  const aberto = await (await chamar(`/ped_orc/${encodeURIComponent('Orçamento')}/${numero}`)).json();
+  const [it] = aberto.itens;
+  assert.equal(it.travado, undefined, it.motivo);
+  assert.deepEqual(it.pecas.map(p => [p.material, p.soldas]), [['Metalon 20', 10], ['Cantoneira', 20]]);
+  assert.equal(it.valor, 225);
+  const semId = x => Object.fromEntries(Object.entries(x).filter(([k]) => !['id', 'ID', 'DATA'].includes(k)));
+  const antes = ['serralheria', 'serralheriaComp', 'listaItens'].map(t => banco[t].map(semId));
+  const r2 = await chamar('/ped_orc/salvar', 'POST', corpo({ modo: 'atualizar', numero, impressao: aberto.impressao, manterData: true,
+    itens: [{ ...it, valorTela: it.valor, origem: { ...it.origem, estado: 'editado' } }] }));
+  assert.equal(r2.status, 200, JSON.stringify(await r2.clone().json()));
+  assert.deepEqual(['serralheria', 'serralheriaComp', 'listaItens'].map(t => banco[t].map(semId)), antes);
+});
+
+test('conjunto: peça sem material é recusada com o nº da peça', async t => {
+  const { chamar } = await prepararPedOrc(t);
+  const ps = pecas(); ps[1].material = '';
+  const r = await chamar('/ped_orc/salvar', 'POST', corpo({ itens: [serr({ pecas: ps })] }));
+  assert.equal(r.status, 422);
+  assert.match((await r.json()).error, /peça 2/i);
+});
+
+test('desconto adicional (variável) vale também para cliente com desconto de tabela FIXO já aplicado nos itens', async t => {
+  const banco = bancoPedOrc();
+  Object.assign(banco.clientes[0], { TIPO_DESCONTO: 'Desconto fixo', DESCONTO: 10 });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  // peça 105 × 0,9 (desconto do cliente) + complemento 20 = 114,5; adicional de 5% no fechamento
+  const r = await chamar('/ped_orc/salvar', 'POST', corpo({ descontoPct: 5, itens: [serr({ valorTela: 114.5 })] }));
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  const cab = banco.pedOrc[0];
+  assert.deepEqual([cab.SUB_TOTAL, cab.DESCONTO, cab.TOTAL], [114.5, 5, 108.78]);
+});

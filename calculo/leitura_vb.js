@@ -102,8 +102,9 @@ function traduzirPorta(l, linhas, sistemas) {
 
 function traduzirSerralheria(l, linhas, componentesSerr) {
   const n = Number(l.ITEM);
-  const subs = porItem(linhas.serralheria, n);
-  if (subs.length !== 1) throw new Trava('serralheria com várias peças no mesmo item');
+  // frmSerralheria.listaItens: uma linha por peça (ITEM 1..n); a 1ª também vai nos campos do item (forma antiga)
+  const subs = porItem(linhas.serralheria, n).sort((a, b) => num(a.ITEM) - num(b.ITEM));
+  if (!subs.length) throw new Trava('serralheria sem peças gravadas');
   const s = subs[0];
   // complementos: a tela trabalha com o id do cadastro; o banco guarda tipo + descrição
   const doProduto = componentesSerr[s.PRODUTO] || [];
@@ -114,7 +115,10 @@ function traduzirSerralheria(l, linhas, componentesSerr) {
     return { ...comp, qtd: num(c.QUANTIDADE), valorTotal: arred2(num(c.VALOR_UNITARIO) / fator * num(c.QUANTIDADE)) };
   });
   const eixo = v => Math.max(1, num(v) || 1);
-  return { frente: 'Serralheria', qtd: num(l.QTD), altura: num(s.ALTURA), largura: num(s.LARGURA), profundidade: num(s.PROFUNDIDADE), soldas: num(s.QTD_SOLDAS),
+  const pecas = subs.map(x => ({ produto: txt(x.PRODUTO), material: txt(x.MATERIAL), acabSerr: txt(x.ACABAMENTO), corSerr: txt(x.COR),
+    altura: num(x.ALTURA), largura: num(x.LARGURA), profundidade: num(x.PROFUNDIDADE), soldas: num(x.QTD_SOLDAS),
+    qtdAltura: eixo(x.QTD_ALTURA), qtdLargura: eixo(x.QTD_LARGURA), qtdProfundidade: eixo(x.QTD_PROFUNDIDADE) }));
+  return { frente: 'Serralheria', qtd: num(l.QTD), pecas, altura: num(s.ALTURA), largura: num(s.LARGURA), profundidade: num(s.PROFUNDIDADE), soldas: num(s.QTD_SOLDAS),
     qtdAltura: eixo(s.QTD_ALTURA), qtdLargura: eixo(s.QTD_LARGURA), qtdProfundidade: eixo(s.QTD_PROFUNDIDADE), complementos,
     furos: { lista: [], lados: [], referenciaInvertida: false }, acessorios: [],
     detalhes: { ...detalhesVazios(), produto: txt(s.PRODUTO), material: txt(s.MATERIAL), acabSerr: txt(s.ACABAMENTO), corSerr: txt(s.COR) }, obs: txt(s.OBS) };

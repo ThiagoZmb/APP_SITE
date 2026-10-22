@@ -188,6 +188,23 @@
         .correr-modo:empty { display: none; }
         .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f2ff; color: #004a9f; border: 1px solid #0077ff; }
         .chip-sistema.sem { background: #fff1e6; color: #9a3a05; border-color: #e8590c; }
+        /* ===== serralheria: peças do conjunto ===== */
+        .acoes-peca { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+        .tab-pecas td { vertical-align: middle; }
+        .tab-pecas tr.editando td { background: #fff7e6; }
+        .tab-pecas .vazio-pecas { text-align: center; color: var(--text-light); padding: 14px; }
+        .resumo-conjunto { display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; font-size: 13.5px; }
+        .resumo-conjunto b { font-size: 15px; }
+        /* celular: cada peça vira um cartão (nada escondido à direita) */
+        @media (max-width: 700px) {
+            .tab-pecas thead { display: none; }
+            .tab-pecas, .tab-pecas tbody { display: block; width: 100%; }
+            .tab-pecas tr[data-peca] { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 2px; border-bottom: 1px solid var(--border-color); }
+            .tab-pecas tr[data-peca] td { border: none; padding: 0; font-size: 13px; }
+            .tab-pecas tr[data-peca] td:nth-child(2) { flex: 1 1 60%; }
+            .tab-pecas tr[data-peca] td:last-child { margin-left: auto; }
+            .resumo-conjunto { justify-content: flex-start; gap: 6px 14px; }
+        }
         /* ===== serralheria: medidas em tabela ===== */
         .medidas-serr { margin-top: 6px; }
         #tab-medidas-serr { border-collapse: collapse; width: auto; }
@@ -426,9 +443,19 @@
                         </div>
                         <div class="viz-status" id="correr-portas"></div>
                     </div>
+                    <!-- SERRALHERIA: produto e material da peça (antes das medidas) -->
+                    <div class="secao-item secao-serr" style="display:none">
+                        <h4>🔧 Serralheria — produto e material</h4>
+                        <div class="grid-form">
+                            <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
+                            <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
+                            <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
+                            <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                        </div>
+                    </div>
                     <!-- MEDIDAS -->
                     <div class="secao-item">
-                        <h4>📐 Medidas e quantidade</h4>
+                        <h4 id="tit-medidas">📐 Medidas e quantidade</h4>
                         <div class="grid-form">
                             <div class="form-group"><label for="f-qtd">Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
                             <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
@@ -454,7 +481,23 @@
                             </table>
                             <div class="soldas-linha"><label for="f-soldas">Pontos de solda</label><input type="number" id="f-soldas" min="0" value="0"></div>
                             <div class="dica-serr">💡 Ex.: portão com 2 barras verticais de 1000 mm → Altura 1000 × 2 barras.</div>
+                            <div class="acoes-peca">
+                                <button type="button" class="btn btn-secondary" id="btn-peca-inserir">➕ Inserir peça na lista</button>
+                                <button type="button" class="btn-mini" id="btn-peca-cancelar" style="display:none">Cancelar edição</button>
+                            </div>
                         </div>
+                    </div>
+                    <!-- PEÇAS DO CONJUNTO (frmSerralheria.listaItens): várias peças → uma linha no orçamento -->
+                    <div class="secao-item secao-serr" id="quadro-pecas" style="display:none">
+                        <h4>🧱 Peças do conjunto</h4>
+                        <p class="dica-serr">Monte o conjunto peça por peça (ex.: metalon 20x20 com 10 soldas, depois cantoneira com 20 soldas). No fim, "Adicionar item" leva o conjunto inteiro para os itens do orçamento.</p>
+                        <div class="tab-acess-wrap">
+                            <table class="tab-acess tab-pecas">
+                                <thead><tr><th>#</th><th>Produto / material</th><th>Acab. / cor</th><th>A × L × P (mm)</th><th>Barras</th><th>Metros</th><th>Soldas</th><th data-valor>Valor</th><th></th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div id="resumo-conjunto" class="resumo-conjunto"></div>
                     </div>
                     <!-- PERFIL -->
                     <div class="secao-item secao-porta">
@@ -499,16 +542,6 @@
                             <div class="form-group"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
                             <div class="form-group"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
-                        </div>
-                    </div>
-                    <!-- SERRALHERIA -->
-                    <div class="secao-item secao-serr" style="display:none">
-                        <h4>🔧 Serralheria — produto e material</h4>
-                        <div class="grid-form">
-                            <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
-                            <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
-                            <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
-                            <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
                         </div>
                     </div>
                     <!-- COMPLEMENTOS DA SERRALHERIA (frmSelecaoComplementos) -->
@@ -623,7 +656,7 @@
                 <div class="totais">
                     <div class="grupo"><div class="rotulo">Subtotal</div><div class="valor" id="tot-subtotal">R$ 0,00</div></div>
                     <div class="grupo">
-                        <div class="rotulo">Desconto % (variável)</div>
+                        <div class="rotulo" id="rot-desconto">Desconto adicional % (variável)</div>
                         <input type="number" id="desconto" min="0" max="100" value="0" style="width:90px;padding:8px;border:1px solid var(--border-color);border-radius:8px;text-align:right;">
                     </div>
                     <div class="grupo"><div class="rotulo">Total</div><div class="valor" id="tot-geral">R$ 0,00</div></div>
@@ -734,6 +767,9 @@
         const ORIGEM_SIS = 'SISTEMA DE CORRER';
         let acessoriosItem = [];  // acessórios do item em montagem: { nome, qtd, tamanho, origem, valorUnitario? }
         let complementosSerr = []; // serralheria: { id, tipo, descricao, unidade, qtd, valorUnitario?, valorTotal? }
+        // serralheria: peças do conjunto (frmSerralheria.listaItens) — cada uma { produto, material, acabSerr, corSerr, altura, largura, profundidade, qtdAltura, qtdLargura, qtdProfundidade, soldas, valor? }
+        let pecasSerr = [];
+        let pecaEditando = -1;
         let sistemaCorrer = null; // porta de correr: { descontoAltura, temDesempenador } do sistema escolhido
         let seqSistema = 0;
         let editandoIndex = -1;
@@ -774,20 +810,13 @@
                 calcularPrecoAutomatico();
             }
         }
-        // ✅ CORREÇÃO ④: trava/destrava o campo "Desconto %" da tela
+        // "Desconto adicional %" (txt_Desconto_Adicional do VB): sempre editável; avisa quando o desconto do cliente já está nos itens
         function atualizarTravaDesconto() {
             const inp = document.getElementById('desconto');
-            const aviso = document.getElementById('desconto-aviso');
-            if (descontoJaAplicado) {
-                inp.value = 0;
-                inp.disabled = true;
-                inp.style.background = '#eef1f4';
-                aviso.textContent = '🔒 Desconto do cliente já aplicado no item (tabela FIXO) — campo travado para evitar desconto em dobro.';
-            } else {
-                inp.disabled = false;
-                inp.style.background = '';
-                aviso.textContent = '';
-            }
+            inp.disabled = false;
+            inp.style.background = '';
+            document.getElementById('desconto-aviso').textContent = descontoJaAplicado
+                ? 'O desconto do cliente (tabela FIXO) já está nos itens; este campo é um desconto adicional sobre o total.' : '';
             atualizarTotais();
         }
         // ============ QTD EFETIVA (✅ CORREÇÃO ③: Par de Portas fatura 2 folhas) ============
@@ -841,7 +870,8 @@
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
             document.querySelectorAll('.f-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.f-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
-            document.querySelector('label[for="f-qtd"]').textContent = ehSerr ? 'Qtd de peças iguais' : 'Qtd';
+            document.querySelector('label[for="f-qtd"]').textContent = ehSerr ? 'Qtd de conjuntos' : 'Qtd';
+            document.getElementById('tit-medidas').textContent = ehSerr ? '📐 Medidas da peça' : '📐 Medidas e quantidade';
             atualizarMetragemSerr();
             if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
             alternarCamposPuxador(!ehPorta ? '' : (document.getElementById('f-puxador')?.value || ''));
@@ -1137,18 +1167,18 @@
             const clienteCodigo = cliente.value || '';
             let payload = null;
             if (frenteAtual === 'Serralheria') {
-                if (!g('f-produto') || !g('f-material')) {
+                // o valor é do CONJUNTO: as peças já inseridas na lista + complementos (as medidas em edição ainda não contam)
+                if (!pecasSerr.length) {
                     document.getElementById('f-valor').value = '';
                     atualizarTotalItem();
+                    renderPecas();
                     status.textContent = '';
                     return;
                 }
                 payload = { frente: 'Serralheria',
                             cliente: clienteNome, clienteCodigo,
-                            produto: g('f-produto'), material: g('f-material'), acabamento: g('f-acab-serr'),
-                            altura: g('f-altura-serr'), largura: g('f-largura-serr'), profundidade: g('f-profundidade'),
-                            soldas: g('f-soldas'),
-                            qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'),
+                            produto: pecasSerr[0].produto,
+                            pecas: pecasSerr.map(pecaParaEnvio),
                             complementos: complementosSerr.map(c => ({ id: c.id, qtd: c.qtd })),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             percentuais: '' };
@@ -1201,6 +1231,10 @@
                         body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
+                    if (frenteAtual === 'Serralheria' && Array.isArray(d.pecas)) {
+                        d.pecas.forEach((pc, i) => { if (pecasSerr[i]) pecasSerr[i].valor = pc.total; });
+                        renderPecas();
+                    }
                     if (Array.isArray(d.complementos)) {
                         d.complementos.forEach((c, i) => { if (complementosSerr[i] && complementosSerr[i].id === c.id) Object.assign(complementosSerr[i], { valorUnitario: c.valorUnitario, valorTotal: c.valorTotal }); });
                         renderComplementos();
@@ -1209,7 +1243,7 @@
                         d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) Object.assign(acessoriosItem[i], { valorUnitario: a.valorUnitario, valorTotal: a.valorTotal }); });
                         renderAcessorios();
                     }
-                    // ✅ CORREÇÃO ④: se o backend já aplicou desconto FIXO do cliente, trava o campo da tela
+                    // desconto do cliente já aplicado nos itens (tabela FIXO): o campo da tela vira desconto ADICIONAL
                     descontoJaAplicado = !!(d.diag && d.diag.isFixo && d.diag.descontoCliente > 0);
                     atualizarTravaDesconto();
                     atualizarTotalItem();
@@ -1803,10 +1837,7 @@
             if (ehAv) {
                 desc = descricaoAvulso();
             } else if (ehSerr) {
-                desc = `${g('f-produto') || 'Produto'} — Material: ${g('f-material') || '-'}, Acab: ${g('f-acab-serr') || '-'}, Cor: ${g('f-cor-serr') || '-'}` +
-                       ` — H=${g('f-altura-serr') || 0} x L=${g('f-largura-serr') || 0} x P=${g('f-profundidade') || 0} mm` +
-                       ` (barras ${qtdEixo('f-qtd-a')}/${qtdEixo('f-qtd-l')}/${qtdEixo('f-qtd-p')})` +
-                       (complementosSerr.length ? ` + ${complementosSerr.length} complemento(s)` : '');
+                desc = descricaoConjuntoSerr();
             } else {
                 const pux = g('f-puxador');
                 desc = `${frenteAtual} — Perfil: ${g('f-perfil') || '-'}, ${g('f-acab') || '-'} ${g('f-cor') || ''}`.trimEnd() +
@@ -1821,14 +1852,17 @@
                        (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '') +
                        '';
             }
+            const p0 = ehSerr ? (pecasSerr[0] || {}) : {};
             return {
                 frente: frenteAtual,
                 qtd: qtdEfetiva(),
-                altura: ehAv ? (parseFloat(g('f-av-alt')) || 0) : ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
-                largura: ehAv ? (parseFloat(g('f-av-larg')) || 0) : ehSerr ? (parseFloat(g('f-largura-serr')) || 0) : (parseFloat(g('f-largura')) || 0),
-                profundidade: parseFloat(g('f-profundidade')) || 0,
-                soldas: parseInt(g('f-soldas')) || 0,
-                qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'),
+                ...(ehSerr ? { pecas: pecasSerr.map(pecaParaEnvio) } : {}),
+                altura: ehSerr ? (p0.altura || 0) : ehAv ? (parseFloat(g('f-av-alt')) || 0) : ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
+                largura: ehAv ? (parseFloat(g('f-av-larg')) || 0) : ehSerr ? (p0.largura || 0) : (parseFloat(g('f-largura')) || 0),
+                profundidade: ehSerr ? (p0.profundidade || 0) : parseFloat(g('f-profundidade')) || 0,
+                soldas: ehSerr ? (p0.soldas || 0) : parseInt(g('f-soldas')) || 0,
+                qtdAltura: ehSerr ? (p0.qtdAltura || 1) : qtdEixo('f-qtd-a'), qtdLargura: ehSerr ? (p0.qtdLargura || 1) : qtdEixo('f-qtd-l'),
+                qtdProfundidade: ehSerr ? (p0.qtdProfundidade || 1) : qtdEixo('f-qtd-p'),
                 complementos: ehSerr ? complementosSerr.map(c => ({ id: c.id, tipo: c.tipo, descricao: c.descricao, unidade: c.unidade, qtd: c.qtd })) : [],
                 furos: ehPortaComFuros()
                     ? { lista: [...furosLista], lados: [...ladosFuros], referenciaInvertida: isReferenciaInvertida }
@@ -1845,8 +1879,9 @@
                     todaExt,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
                     desempenador: document.getElementById('chk-desempenador').checked,
-                    produto: g('f-produto'), material: g('f-material'),
-                    acabSerr: g('f-acab-serr'), corSerr: g('f-cor-serr'),
+                    // serralheria: a 1ª peça vai nos campos do item (descrição e gravação da linha comercial)
+                    produto: ehSerr ? (p0.produto || '') : g('f-produto'), material: ehSerr ? (p0.material || '') : g('f-material'),
+                    acabSerr: ehSerr ? (p0.acabSerr || '') : g('f-acab-serr'), corSerr: ehSerr ? (p0.corSerr || '') : g('f-cor-serr'),
                     // venda avulsa (ItemVendaAvulsa)
                     categoria: ehAv ? g('f-av-cat') : '', avProduto: ehAv ? g('f-av-produto') : '',
                     avAcab: ehAv ? g('f-av-acab') : '', avCor: ehAv ? g('f-av-cor') : ''
@@ -1906,6 +1941,11 @@
                     } else {
                         await carregarMateriais('');
                     }
+                    // o conjunto inteiro volta para a lista; sem `pecas` (forma antiga), o próprio item é a única peça
+                    pecasSerr = (Array.isArray(item.pecas) && item.pecas.length ? item.pecas : [{ produto: d.produto, material: d.material, acabSerr: d.acabSerr,
+                        corSerr: d.corSerr, altura: item.altura, largura: item.largura, profundidade: item.profundidade, soldas: item.soldas,
+                        qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade }]).map(p => ({ ...p }));
+                    pecaEditando = -1;
                 }
                 set('f-valor', item.valor);
                 set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
@@ -1915,8 +1955,11 @@
                 set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
                 set('f-produto', d.produto); set('f-material', d.material);
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
-                set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
-                set('f-qtd-a', item.qtdAltura || 1); set('f-qtd-l', item.qtdLargura || 1); set('f-qtd-p', item.qtdProfundidade || 1);
+                if (item.frente === 'Serralheria') limparMedidasSerr();
+                else {
+                    set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
+                    set('f-qtd-a', item.qtdAltura || 1); set('f-qtd-l', item.qtdLargura || 1); set('f-qtd-p', item.qtdProfundidade || 1);
+                }
                 atualizarMetragemSerr();
                 // posição do puxador de CADA folha (fiel ao salvo, sem espelhar)
                 posicoesFolhas = Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length
@@ -1949,6 +1992,7 @@
             acessoriosItem = (item.acessorios || []).filter(a => a.origem !== ORIGEM_SIS).map(a => ({ ...a }));
             complementosSerr = (item.complementos || []).map(c => ({ ...c }));
             renderComplementos();
+            renderPecas();
             document.getElementById('chk-desempenador').checked = !!(item.detalhes || {}).desempenador;
             renderAcessorios();
             atualizarTotalItem();
@@ -1959,6 +2003,7 @@
             const catAvulso = val('f-av-cat');
             limparAcessorios();
             complementosSerr = []; renderComplementos();
+            pecasSerr = []; pecaEditando = -1; renderPecas();
             document.querySelectorAll('#form-item input, #form-item select, #form-item textarea').forEach(el => {
                 if (el.id !== 'f-qtd' && el.type !== 'checkbox') el.value = '';
             });
@@ -1998,6 +2043,10 @@
         // ============ LISTA DE ITENS ============
         function adicionarItem() {
             if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
+            if (frenteAtual === 'Serralheria') {
+                if (medidasSerrPreenchidas()) { alert('Há uma peça nas medidas que ainda não está na lista. Clique em "Inserir peça na lista" (ou limpe as medidas) antes de adicionar o conjunto.'); return; }
+                if (!pecasSerr.length) { alert('Insira ao menos uma peça na lista do conjunto.'); return; }
+            }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
             // o motor devolve a BASE (sem %); na edição o histórico de % do item é reaplicado sobre a base nova
@@ -2073,8 +2122,7 @@
         }
         function atualizarTotais() {
             const subtotal = itens.reduce((s, it) => s + it.qtd * it.valor, 0);
-            // ✅ CORREÇÃO ④: quando o desconto FIXO já veio no item, o campo fica travado em 0
-            const descPct = descontoJaAplicado ? 0 : (parseFloat(document.getElementById('desconto').value) || 0);
+            const descPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('desconto').value) || 0));
             const total = subtotal * (1 - descPct / 100);
             document.getElementById('tot-subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('tot-geral').textContent = formatCurrency(total);
@@ -2208,6 +2256,95 @@
                     <td><button type="button" class="btn-mini cp-remover" data-i="${i}" title="Remover complemento">🗑️</button></td>
                 </tr>`).join('');
         }
+        // ---- peças do conjunto (frmSerralheria: Inserir / Atualizar / Remover) ----
+        const pecaParaEnvio = p => ({ produto: p.produto, material: p.material, acabSerr: p.acabSerr || '', corSerr: p.corSerr || '',
+            altura: p.altura || 0, largura: p.largura || 0, profundidade: p.profundidade || 0,
+            qtdAltura: p.qtdAltura || 1, qtdLargura: p.qtdLargura || 1, qtdProfundidade: p.qtdProfundidade || 1, soldas: p.soldas || 0 });
+        const metrosPeca = p => ((p.altura || 0) * (p.qtdAltura || 1) + (p.largura || 0) * (p.qtdLargura || 1) + (p.profundidade || 0) * (p.qtdProfundidade || 1)) / 1000;
+        function medidasSerrPreenchidas() {
+            return ['f-altura-serr', 'f-largura-serr', 'f-profundidade', 'f-soldas'].some(id => (parseFloat(val(id)) || 0) > 0);
+        }
+        function limparMedidasSerr() {
+            ['f-altura-serr', 'f-largura-serr', 'f-profundidade'].forEach(id => { document.getElementById(id).value = ''; });
+            ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
+            document.getElementById('f-soldas').value = 0;
+            atualizarMetragemSerr();
+        }
+        function descricaoConjuntoSerr() {
+            const p0 = pecasSerr[0] || {};
+            const nome = p0.produto === 'Produto editável' ? 'Estrutura metálica editável' : (p0.produto || 'Serralheria');
+            const partes = pecasSerr.map(p => `${p.material || '-'}${p.acabSerr ? ' ' + p.acabSerr : ''}${p.corSerr ? ' ' + p.corSerr : ''}` +
+                ` ${p.altura || 0}×${p.largura || 0}×${p.profundidade || 0} mm (barras ${p.qtdAltura || 1}/${p.qtdLargura || 1}/${p.qtdProfundidade || 1})` +
+                (p.soldas ? `, ${p.soldas} soldas` : ''));
+            return `${nome} — ${pecasSerr.length} peça${pecasSerr.length === 1 ? '' : 's'}: ${partes.join('; ')}` +
+                (complementosSerr.length ? ` + ${complementosSerr.length} complemento(s)` : '');
+        }
+        function renderPecas() {
+            const tb = document.querySelector('#quadro-pecas tbody');
+            tb.innerHTML = pecasSerr.length ? pecasSerr.map((p, i) => `
+                <tr data-peca="${i}" class="${i === pecaEditando ? 'editando' : ''}">
+                    <td><b>${i + 1}</b></td>
+                    <td>${escapeHtml(p.produto)}<br><small>${escapeHtml(p.material)}</small></td>
+                    <td>${escapeHtml([p.acabSerr, p.corSerr].filter(Boolean).join(' / ') || '—')}</td>
+                    <td>${p.altura || 0} × ${p.largura || 0} × ${p.profundidade || 0}</td>
+                    <td>${p.qtdAltura || 1}/${p.qtdLargura || 1}/${p.qtdProfundidade || 1}</td>
+                    <td>${metrosBR(metrosPeca(p))}</td>
+                    <td>${p.soldas || 0} soldas</td>
+                    <td data-valor>${p.valor != null ? formatCurrency(p.valor) : '—'}</td>
+                    <td><button type="button" class="btn-mini peca-editar" title="Editar peça">✏️</button>
+                        <button type="button" class="btn-mini peca-remover" title="Remover peça">🗑️</button></td>
+                </tr>`).join('') : '<tr><td colspan="9" class="vazio-pecas">Nenhuma peça ainda: preencha produto, material e medidas e clique em "Inserir peça na lista".</td></tr>';
+            const somaPecas = pecasSerr.reduce((s, p) => s + (p.valor || 0), 0);
+            const somaComp = complementosSerr.reduce((s, c) => s + (c.valorTotal || 0), 0);
+            document.getElementById('resumo-conjunto').innerHTML = pecasSerr.length
+                ? `<span>Peças: <b>${formatCurrency(somaPecas)}</b></span><span>Complementos: <b>${formatCurrency(somaComp)}</b></span><span>Conjunto: <b>${formatCurrency(somaPecas + somaComp)}</b></span>` : '';
+            document.getElementById('btn-peca-inserir').textContent = pecaEditando >= 0 ? `✔ Atualizar peça ${pecaEditando + 1}` : '➕ Inserir peça na lista';
+            document.getElementById('btn-peca-cancelar').style.display = pecaEditando >= 0 ? '' : 'none';
+        }
+        function inserirPecaSerr() {
+            if (!val('f-produto') || !val('f-material')) { alert('Escolha o produto e o material da peça.'); return; }
+            const p = { produto: val('f-produto'), material: val('f-material'), acabSerr: val('f-acab-serr'), corSerr: val('f-cor-serr'),
+                altura: parseFloat(val('f-altura-serr')) || 0, largura: parseFloat(val('f-largura-serr')) || 0, profundidade: parseFloat(val('f-profundidade')) || 0,
+                qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'), soldas: Math.max(0, parseInt(val('f-soldas')) || 0) };
+            if (!(metrosPeca(p) > 0) && !p.soldas) { alert('Informe ao menos uma medida (ou as soldas) da peça.'); return; }
+            if (pecaEditando >= 0) { pecasSerr[pecaEditando] = p; pecaEditando = -1; }
+            else pecasSerr.push(p);
+            limparMedidasSerr(); // produto, material, acabamento e cor continuam para a próxima peça (btnNovo do VB)
+            renderPecas();
+            calcularPrecoAutomatico();
+        }
+        async function editarPecaSerr(i) {
+            const p = pecasSerr[i];
+            if (!p) return;
+            isCarregandoEdicao = true;
+            try {
+                if (val('f-produto') !== p.produto) { selecionarComboPorTexto('f-produto', p.produto); await carregarMateriais(p.produto); }
+                selecionarComboPorTexto('f-material', p.material);
+                await carregarAcabSerr(p.material);
+                selecionarComboPorTexto('f-acab-serr', p.acabSerr);
+                selecionarComboPorTexto('f-cor-serr', p.corSerr);
+                const set = (id, v) => { document.getElementById(id).value = v; };
+                set('f-altura-serr', p.altura || ''); set('f-largura-serr', p.largura || ''); set('f-profundidade', p.profundidade || '');
+                set('f-qtd-a', p.qtdAltura || 1); set('f-qtd-l', p.qtdLargura || 1); set('f-qtd-p', p.qtdProfundidade || 1); set('f-soldas', p.soldas || 0);
+            } finally { isCarregandoEdicao = false; }
+            pecaEditando = i;
+            atualizarMetragemSerr();
+            renderPecas();
+        }
+        document.getElementById('btn-peca-inserir').addEventListener('click', inserirPecaSerr);
+        document.getElementById('btn-peca-cancelar').addEventListener('click', () => { pecaEditando = -1; limparMedidasSerr(); renderPecas(); });
+        document.querySelector('#quadro-pecas tbody').addEventListener('click', e => {
+            const tr = e.target.closest('tr[data-peca]');
+            if (!tr) return;
+            const i = Number(tr.dataset.peca);
+            if (e.target.closest('.peca-editar')) editarPecaSerr(i);
+            else if (e.target.closest('.peca-remover')) {
+                pecasSerr.splice(i, 1);
+                if (pecaEditando === i) { pecaEditando = -1; limparMedidasSerr(); } else if (pecaEditando > i) pecaEditando--;
+                renderPecas();
+                calcularPrecoAutomatico();
+            }
+        });
         async function abrirListaComplementos() {
             if (!val('f-produto')) { alert('Primeiramente escolha um produto!'); return; } // mensagem do VB
             const sel = document.getElementById('sel-complemento');
@@ -2256,6 +2393,7 @@
         // outro produto: os complementos são do modelo anterior
         document.getElementById('f-produto').addEventListener('change', () => {
             if (isCarregandoEdicao) return;
+            if (pecasSerr.length) return; // com peças na lista, os complementos são do conjunto (produto da 1ª peça)
             complementosSerr = []; renderComplementos();
             document.getElementById('sel-complemento').style.display = 'none';
         });
@@ -2461,7 +2599,7 @@
                 clienteCodigo: $s('sel-cliente').value,
                 clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
                 ...(tipo === 'Pedido' ? { dataEntrega: $s('ped-entrega').value, situacao: $s('ped-situacao').value, financeiro: $s('ped-financeiro').value } : {}),
-                descontoPct: descontoJaAplicado ? 0 : (parseFloat($s('desconto').value) || 0),
+                descontoPct: parseFloat($s('desconto').value) || 0,
                 totalTela: itens.reduce((t, it) => t + it.qtd * it.valor, 0),
                 itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
                     profundidade: it.profundidade, soldas: it.soldas, furos: it.furos, detalhes: it.detalhes,

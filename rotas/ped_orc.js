@@ -99,12 +99,23 @@ function validar(b) {
   return null;
 }
 
+// Peças do conjunto de serralheria (frmSerralheria.listaItens); sem `pecas`, o próprio item é a única peça (forma antiga)
+const MAX_PECAS_SERR = 50;
+function pecasDoItem(item) {
+  const d = item.detalhes || {};
+  const lista = Array.isArray(item.pecas) && item.pecas.length ? item.pecas.slice(0, MAX_PECAS_SERR)
+    : [{ produto: d.produto, material: d.material, acabSerr: d.acabSerr, corSerr: d.corSerr, altura: item.altura, largura: item.largura,
+      profundidade: item.profundidade, soldas: item.soldas, qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade }];
+  return lista.map(p => ({ produto: corta(p && p.produto, 190), material: corta(p && p.material, 190), acabSerr: corta(p && p.acabSerr, 190), corSerr: corta(p && p.corSerr, 190),
+    altura: parseFloat(p && p.altura) || 0, largura: parseFloat(p && p.largura) || 0, profundidade: parseFloat(p && p.profundidade) || 0,
+    soldas: Math.max(0, parseInt(p && p.soldas) || 0), qtdAltura: p && p.qtdAltura, qtdLargura: p && p.qtdLargura, qtdProfundidade: p && p.qtdProfundidade }));
+}
+
 // Item da tela → entrada do motor de preço (mesmos campos que a tela manda ao /calcular_preco)
 function entradaPreco(item, folhas) {
   const d = item.detalhes || {};
-  if (item.frente === 'Serralheria') return { frente: 'Serralheria', produto: d.produto, material: d.material, acabamento: d.acabSerr,
-    altura: item.altura, largura: item.largura, profundidade: item.profundidade, soldas: item.soldas, qtd: item.qtd,
-    qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade };
+  if (item.frente === 'Serralheria') return { frente: 'Serralheria', produto: d.produto, qtd: item.qtd,
+    pecas: pecasDoItem(item).map(p => ({ ...p, acabamento: p.acabSerr })) };
   if (item.frente === 'Avulso') return { frente: 'Avulso', categoria: d.categoria, produto: d.avProduto,
     acabamento: ['Perfil', 'Trilhos', 'Puxador'].includes(d.categoria) ? d.avAcab : '', altura: item.altura, largura: item.largura, qtd: item.qtd };
   const f = folhas[0] || {};
@@ -156,7 +167,7 @@ async function prepararItem(db, leitor, cliente, item, n) {
   const valor = arred2(preco.unitario * fatorHistorico(historico));
   const qtdTela = Math.max(1, parseInt(item.qtd) || 1);
   const r = { item, n, historico, valor, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios || [], folhas, grupos: [],
-    fator: fatorHistorico(historico), pecasSerr: preco.pecas, complementosSerr: preco.complementos || [] };
+    fator: fatorHistorico(historico), pecasSerr: preco.pecas, pecasDetalhe: preco.pecasDetalhe || [], complementosSerr: preco.complementos || [] };
 
   if (ehPorta) {
     for (const f of folhas) f.valorUnitario = valor;
@@ -221,14 +232,20 @@ async function gravarItem(conn, { tipo, numero, medicao }, p) {
     QTD: linha.qtd, DESCRICAO: linha.descricao, UNITARIO: unitLinha, TOTAL: totalItem, OBSERVACAO: nulo(corta(item.obs, 2000)), PORCENTAGEM: p.historico });
 
   if (item.frente === 'Serralheria') {
-    // com complementos, a linha da peça leva só o valor das peças (os complementos vão para a tabela deles)
+    // ProcessarSerralheriaNoBanco: uma linha por peça (ITEM 1..n), com o valor da própria peça;
+    // com complementos (ou várias peças), a linha da peça leva só o valor dela (os complementos vão para a tabela deles)
     const comps = p.complementosSerr;
     const qtdEixo = v => Math.max(1, parseInt(v) || 1);
-    await inserir(conn, 'ped_orc_serralheria', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: 1, QTD_ITENS: linha.qtd,
-      PRODUTO: corta(d.produto, 190), MATERIAL: corta(d.material, 190), ACABAMENTO: corta(d.acabSerr, 190), COR: corta(d.corSerr, 190),
-      QTD_ALTURA: qtdEixo(item.qtdAltura), ALTURA: Math.round(parseFloat(item.altura) || 0), QTD_LARGURA: qtdEixo(item.qtdLargura), LARGURA: Math.round(parseFloat(item.largura) || 0),
-      QTD_PROFUNDIDADE: qtdEixo(item.qtdProfundidade), PROFUNDIDADE: Math.round(parseFloat(item.profundidade) || 0), QTD_SOLDAS: parseInt(item.soldas) || 0,
-      UNITARIO: comps.length ? arred2(p.pecasSerr / linha.qtd * p.fator) : valor, TOTAL: comps.length ? arred2(p.pecasSerr * p.fator) : totalItem, OBS: corta(item.obs, 2000) });
+    const pecas = pecasDoItem(item);
+    const valorProprio = !comps.length && pecas.length === 1;
+    for (const [i, pc] of pecas.entries()) {
+      const totalPeca = (p.pecasDetalhe[i] || {}).total || 0;
+      await inserir(conn, 'ped_orc_serralheria', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: i + 1, QTD_ITENS: linha.qtd,
+        PRODUTO: corta(pc.produto, 190), MATERIAL: corta(pc.material, 190), ACABAMENTO: corta(pc.acabSerr, 190), COR: corta(pc.corSerr, 190),
+        QTD_ALTURA: qtdEixo(pc.qtdAltura), ALTURA: Math.round(pc.altura), QTD_LARGURA: qtdEixo(pc.qtdLargura), LARGURA: Math.round(pc.largura),
+        QTD_PROFUNDIDADE: qtdEixo(pc.qtdProfundidade), PROFUNDIDADE: Math.round(pc.profundidade), QTD_SOLDAS: pc.soldas,
+        UNITARIO: valorProprio ? valor : arred2(totalPeca / linha.qtd * p.fator), TOTAL: valorProprio ? totalItem : arred2(totalPeca * p.fator), OBS: corta(item.obs, 2000) });
+    }
     // frmSerralheria.EnviarParaPedido: complementos com a % do item aplicada no valor unitário
     let sub = 1;
     for (const c of comps) {
@@ -412,7 +429,8 @@ function registrarPedOrc({ rota, pool }) {
       error: 'O preço de um ou mais itens mudou desde o cálculo. Confira e recalcule.' });
 
     // cliente com desconto fixo já tem o desconto no preço (a tela trava o desconto geral)
-    const descontoPct = cliente.isFixo && cliente.desconto > 0 ? 0 : Math.min(100, Math.max(0, parseFloat(b.descontoPct) || 0));
+    // desconto adicional (txt_Desconto_Adicional do VB): sempre editável, por cima do desconto do cliente que já está nos itens
+    const descontoPct = Math.min(100, Math.max(0, parseFloat(b.descontoPct) || 0));
     const tipo = b.tipo;
 
     const resultado = await emTransacao(pool, res, 'POST /ped_orc/salvar', async conn => {

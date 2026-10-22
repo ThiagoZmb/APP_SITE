@@ -33,7 +33,7 @@ function bancoPedOrc() {
       { CODIGO: 8, RAZAO_SOCIAL: 'LOJA PAULISTA', MEDICAO: '', TIPO_DESCONTO: '', DESCONTO: 0, COMISSAO: '0', REPRESENTANTE: 'MARIA', ESTADO: 'SP' }],
     produtos: [produto('Perfil P', 100, 80, 20), produto('Puxador X', 50, 40, 10, 30, 'Sobreposto'), produto('Vidro V', 200),
       produto('Dobradiça', 20, 10), produto('Fechadura', 30, 25), produto('Trilho Sup', 40, 30), produto('Roldana', 15, 12), produto('Desemp', 60, 50),
-      produto('Metalon 20', 30), produto('Serviço corte', 25, 25)],
+      produto('Metalon 20', 30), produto('Serviço corte', 25, 25), produto('Cantoneira', 20), produto('Solda', 2, 2)],
     acabamentos: [],
     permitidos: [{ TIPO_PRODUTO: 'Porta de giro', MODELO: 'Fechadura' }, { TIPO_PRODUTO: 'Porta de giro', MODELO: 'Dobradiça' }, { TIPO_PRODUTO: 'Porta basculante', MODELO: 'Dobradiça' }],
     sistemas: [{ NOME: 'S1', DESCONTO_ALTURA: 40 }],
@@ -60,7 +60,7 @@ function bancoPedOrc() {
     // cadastro
     [/FROM cadastro_clientes WHERE CODIGO = \?/, (sql, [c]) => estado.clientes.filter(x => String(x.CODIGO) === String(c))],
     [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = TRIM\(\?\) AND SITUACAO/, (sql, [m]) => estado.produtos.filter(p => norm(p.MODELO) === norm(m))],
-    [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = 'Solda'/, () => []],
+    [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = 'Solda'/, () => estado.produtos.filter(p => p.MODELO === 'Solda').map(p => ({ v: p.VALOR_FIXO || p.VALOR_CHEIO }))],
     [/FROM acabamentos WHERE/, (sql, [a]) => estado.acabamentos.filter(x => norm(x.ACABAMENTO) === norm(a))],
     [/FROM serralheria_modelos_componentes/, (sql, [n]) => {
       const prod = estado.serrProdutos.find(x => norm(x.nome_modelo) === norm(n));

@@ -117,12 +117,17 @@ test('travado traz descrição, quantidade, valor e % para a lista', () => {
     valor: 700, historico: '+5', obs: 'x', origem: { item: 1, estado: 'travado' } });
 });
 
-test('serralheria com 2 sub-itens trava', () => {
+test('serralheria com várias peças no mesmo item vira a lista de peças (frmSerralheria.listaItens)', () => {
   const l = vazio();
   l.lista.push(linha(1, { TIPO_PRODUTO: 'Metalons', PRODUTO: 'Grade', QTD: 1 }));
-  const s = { TIPO: 'Pedido', NUMERO: 123, ITEM_PEDIDO: 1, QTD_ITENS: 1, PRODUTO: 'Grade', MATERIAL: 'M', QTD_ALTURA: 1, QTD_LARGURA: 1, QTD_PROFUNDIDADE: 1 };
-  l.serralheria.push({ ...s, id: 1, ITEM: 1 }, { ...s, id: 2, ITEM: 2 });
-  assert.match(motivo(l), /serralheria/);
+  const s = { TIPO: 'Pedido', NUMERO: 123, ITEM_PEDIDO: 1, QTD_ITENS: 1, PRODUTO: 'Grade', ACABAMENTO: '', COR: '', QTD_ALTURA: 2, QTD_LARGURA: 3, QTD_PROFUNDIDADE: 1, PROFUNDIDADE: 0, OBS: '' };
+  l.serralheria.push({ ...s, id: 2, ITEM: 2, MATERIAL: 'Cantoneira', ALTURA: 2000, LARGURA: 0, QTD_SOLDAS: 20 },
+    { ...s, id: 1, ITEM: 1, MATERIAL: 'Metalon 20', ALTURA: 1000, LARGURA: 500, QTD_SOLDAS: 10 });
+  const [it] = traduzirDocumento(l, { sistemas: {}, componentesSerr: {} }).itens;
+  assert.equal(it.travado, undefined, it.motivo);
+  assert.deepEqual(it.pecas.map(p => [p.material, p.altura, p.largura, p.soldas, p.qtdAltura]), [['Metalon 20', 1000, 500, 10, 2], ['Cantoneira', 2000, 0, 20, 2]]);
+  // a 1ª peça continua nos campos do item (compatibilidade)
+  assert.deepEqual([it.altura, it.detalhes.material, it.detalhes.produto], [1000, 'Metalon 20', 'Grade']);
 });
 
 test('ida e volta: quantidade de puxador gravada diferente das posições trava', () => {

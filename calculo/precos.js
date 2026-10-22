@@ -271,15 +271,34 @@ async function precoComAcessorios(entrada, cliente, leitor, acessorios = []) {
 }
 
 // frmSerralheria: Total Geral = custo das peças (motor, com desconto do cliente) + custo dos complementos (qtd × valor, sem desconto)
+// frmSerralheria: o conjunto é a lista de peças (cada uma com produto, material, medidas e soldas) + complementos;
+// sem `pecas`, a própria entrada é a única peça (forma antiga)
 async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
-  const r = await calcularPrecoItem(entrada, cliente, leitor);
-  if (!complementos.length) return { unitario: r.unitario, total: r.total, pecas: r.total, complementos: [], diag: r.diag };
-  const doProduto = await leitor.componentesSerralheria(entrada.produto);
+  const lista = Array.isArray(entrada.pecas) && entrada.pecas.length ? entrada.pecas : null;
+  let r;
+  if (lista) {
+    const detalhe = [];
+    for (const [i, p] of lista.entries()) {
+      try {
+        const rp = await calcularPrecoItem({ ...p, frente: 'Serralheria', acabamento: p.acabamento ?? p.acabSerr, qtd: entrada.qtd, percentuais: entrada.percentuais }, cliente, leitor);
+        detalhe.push({ unitario: rp.unitario, total: rp.total });
+      } catch (err) { if (err instanceof ErroPreco) throw new ErroPreco(`Peça ${i + 1}: ${err.message}`); throw err; }
+    }
+    const total = Math.round(detalhe.reduce((s, p) => s + p.total, 0) * 100) / 100;
+    const qtdItem = parseFloat(entrada.qtd) > 0 ? parseFloat(entrada.qtd) : 1;
+    r = { unitario: Math.round(total / qtdItem * 100) / 100, total, detalhe, diag: { pecas: detalhe.length } };
+  } else {
+    const rp = await calcularPrecoItem(entrada, cliente, leitor);
+    r = { ...rp, detalhe: [{ unitario: rp.unitario, total: rp.total }] };
+  }
+  const produtoComp = lista ? lista[0].produto : entrada.produto;
+  if (!complementos.length) return { unitario: r.unitario, total: r.total, pecas: r.total, pecasDetalhe: r.detalhe, complementos: [], diag: r.diag };
+  const doProduto = await leitor.componentesSerralheria(produtoComp);
   const precificados = [];
   let soma = 0;
   for (const c of complementos) {
     const comp = doProduto.find(x => x.id === Number(c.id));
-    if (!comp) throw new ErroPreco(`O complemento ${c.id} não pertence ao produto '${entrada.produto}'.`);
+    if (!comp) throw new ErroPreco(`O complemento ${c.id} não pertence ao produto '${produtoComp}'.`);
     const qtd = parseFloat(c.qtd) > 0 ? parseFloat(c.qtd) : 1;
     const valorTotal = Math.round(qtd * comp.valorUnitario * 100) / 100;
     soma += valorTotal;
@@ -287,7 +306,7 @@ async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
   }
   const qtdItem = parseFloat(entrada.qtd) > 0 ? parseFloat(entrada.qtd) : 1;
   const total = Math.round((r.total + soma) * 100) / 100;
-  return { unitario: Math.round(total / qtdItem * 100) / 100, total, pecas: r.total, complementos: precificados, diag: r.diag };
+  return { unitario: Math.round(total / qtdItem * 100) / 100, total, pecas: r.total, pecasDetalhe: r.detalhe, complementos: precificados, diag: r.diag };
 }
 
 module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };
