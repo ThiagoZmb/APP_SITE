@@ -117,7 +117,7 @@ function registrarCustos({ rota, pool }) {
         const c = custoDo(base, m, desde, parametros.divergenciaPct);
         return { codigo: Number(m.CODIGO), modelo: m.MODELO, classe: m.CLASSE || '', unidade: c.unidade, situacao: c.situacao, motivos: c.motivos,
           custo: c.custo, precoMedio: c.precoMedio, ultimaCompra: c.ultimaCompra, qtdCompras: c.qtdCompras, referencia: c.referencia,
-          divergencia: c.divergencia, divergente: c.divergente, informado: c.informado, valorFixo: m.VALOR_FIXO === null ? null : Number(m.VALOR_FIXO), ativo: ativo(m),
+          divergencia: c.divergencia, divergente: c.divergente, informado: c.informado, usaCadastro: c.usaCadastro, valorFixo: m.VALOR_FIXO === null ? null : Number(m.VALOR_FIXO), ativo: ativo(m),
           percentuais: (base.ligPorMaterial.get(Number(m.CODIGO)) || []).map(l => base.itens.get(Number(l.estoque_codigo)))
             .filter(Boolean).map(i => ({ ipi: i.IPI, frete: i.FRETE, perda: i.PERDA })) };
       });

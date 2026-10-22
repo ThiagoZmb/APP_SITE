@@ -50,7 +50,19 @@ function custoDoGrupo({ ligacoes, itens, compras, desde, divergenciaPct, unidade
     const precoConvertido = valor / l.fator;
     validas.push({ ...base, fator: l.fator, precoConvertido, qtdConvertida: qtd * l.fator, custoUnitario: precoConvertido * fatorCusto(l) });
   }
-  if (!validas.length) return { ...vazio, ignoradas, situacao: 'faltando', motivos: ['item nunca comprado'] };
+  if (!validas.length) {
+    // sem nota de compra: se está no estoque, vale o VALOR do cadastro (convertido, com os mesmos %), como custo desatualizado
+    const comValor = ligs.filter(l => Number(l.item.VALOR) > 0);
+    if (!comValor.length) return { ...vazio, ignoradas, situacao: 'faltando', motivos: ['item nunca comprado e sem valor no cadastro do estoque'] };
+    const media = f => comValor.reduce((t, l) => t + f(l), 0) / comValor.length;
+    const precoMedio = media(l => Number(l.item.VALOR) / l.fator);
+    const custo = media(l => Number(l.item.VALOR) / l.fator * fatorCusto(l));
+    const suf = SUFIXO[unidade];
+    const passos = [`Sem nota de compra: valor do cadastro do estoque ${moeda(precoMedio)}${suf}`];
+    if (comValor.length === 1) { const l = comValor[0]; passos.push(`+ IPI ${l.ipi}%`, `+ frete ${l.frete}%`, `÷ (1 − perda ${l.perda}%)`); }
+    passos.push(`= Custo: ${moeda(custo)}${suf}`);
+    return { ...vazio, ignoradas, situacao: 'desatualizado', motivos: [], custo, precoMedio, referencia: custo, divergencia: 0, divergente: false, passos, fonte: 'cadastro' };
+  }
 
   const ultimaCompra = validas.reduce((m, c) => (c.data > m ? c.data : m), '');
   const doPeriodo = validas.filter(c => c.data >= desde);
@@ -76,7 +88,7 @@ function custoDoGrupo({ ligacoes, itens, compras, desde, divergenciaPct, unidade
   passos.push(`= Custo: ${moeda(custo)}${suf}`);
 
   return { situacao, motivos: [], custo, precoMedio, ultimaCompra, qtdCompras: usadas.length, referencia, divergencia,
-    divergente: divergencia !== null && divergencia > divergenciaPct, usadas, ignoradas, passos, unidade };
+    divergente: divergencia !== null && divergencia > divergenciaPct, usadas, ignoradas, passos, unidade, fonte: 'compras' };
 }
 
 const qtdTxt = v => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -97,7 +109,8 @@ function somaDoComponente(ligs, comum) {
     itensSaida.push(item);
     if (!(qtd > 0)) { item.motivos = ['quantidade inválida']; motivos.push(`${prefixo}quantidade inválida`); continue; }
     const r = custoDoGrupo({ ligacoes: [l], ...comum });
-    Object.assign(item, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio, parcela: r.custo === null ? null : r.custo * qtd });
+    Object.assign(item, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio, parcela: r.custo === null ? null : r.custo * qtd,
+      fonte: r.fonte ?? null });
     if (r.custo === null) motivos.push(...r.motivos.map(m => `${prefixo}${m}`));
   }
   const marcar = (lista, it) => lista.map(c => ({ ...c, itemEstoque: it.nome }));
@@ -116,12 +129,12 @@ function somaDoComponente(ligs, comum) {
 function calcularCusto({ material, config, ligacoes, itens, compras, desde, divergenciaPct = 15, componentes = [] }) {
   const unidade = config?.unidadeVenda || unidadeDaClasse(material.CLASSE);
   const vazio = { custo: null, precoMedio: null, ultimaCompra: null, qtdCompras: 0, referencia: null, divergencia: null, divergente: false,
-    usadas: [], ignoradas: [], passos: [], unidade, componentes: [], informado: false };
+    usadas: [], ignoradas: [], passos: [], unidade, componentes: [], informado: false, usaCadastro: false };
   if (config?.semCompra) return { ...vazio, situacao: 'sem_compra', motivos: [] };
   if (!ligacoes.length && !componentes.length) return { ...vazio, situacao: 'faltando', motivos: ['sem ligação confirmada'] };
   const comum = { itens, compras, desde, divergenciaPct, unidade };
   const implicitas = ligacoes.filter(l => l.componente_id === null || l.componente_id === undefined);
-  if (!componentes.length) return { ...custoDoGrupo({ ligacoes: implicitas, ...comum }), componentes: [], informado: false };
+  if (!componentes.length) { const r = custoDoGrupo({ ligacoes: implicitas, ...comum }); return { ...r, componentes: [], informado: false, usaCadastro: r.fonte === 'cadastro' }; }
 
   // ligações sem componente ao lado de componentes: entram como o componente principal (100%)
   const grupos = [...(implicitas.length ? [{ id: null, nome: null, quantidade: 1, ordem: -1 }] : []),
@@ -175,7 +188,7 @@ function calcularCusto({ material, config, ligacoes, itens, compras, desde, dive
   const passos = [...partes.map(linha), `= Custo: ${moeda(custo)}${suf}`];
   return { situacao: partes.some(p => p.situacao === 'desatualizado') ? 'desatualizado' : 'confiavel', motivos: [], custo, precoMedio, ultimaCompra,
     qtdCompras: usadas.length, referencia, divergencia, divergente: partes.some(p => p.r.divergente), usadas, ignoradas, passos, unidade, componentes: saidaComp,
-    informado: partes.some(p => p.custoInformado !== null) };
+    informado: partes.some(p => p.custoInformado !== null), usaCadastro: partes.some(p => (p.itens || []).some(it => it.fonte === 'cadastro')) };
 }
 
 module.exports = { calcularCusto, lerPercentual };

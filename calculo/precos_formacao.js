@@ -54,7 +54,8 @@ function formarPreco({ custoInfo, material, parametros, encargos, margens, desco
   r.D = Number(parametros.descontoPct);
   const c = r.custo;
 
-  if (custoInfo.situacao === 'desatualizado') r.avisos.push(`custo desatualizado (última compra ${custoInfo.ultimaCompra || '—'})`);
+  if (custoInfo.usaCadastro) r.avisos.push('custo pelo valor do cadastro do estoque (sem nota de compra)');
+  else if (custoInfo.situacao === 'desatualizado') r.avisos.push(`custo desatualizado (última compra ${custoInfo.ultimaCompra || '—'})`);
   if (custoInfo.divergente) r.avisos.push('custo diverge do valor do estoque');
 
   r.passos.push(`Custo: ${moeda(c)}`, `Encargos sobre a venda (V): ${pct(r.V)} · custo fixo (F): ${pct(r.F)} · margem (M): ${pct(r.M)} (${margem.origem}) · desconto (D): ${pct(r.D)}`);

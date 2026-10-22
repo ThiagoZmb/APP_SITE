@@ -436,7 +436,7 @@
                 && (filtroSit === 'todos' || (filtroSit === 'divergente' ? m.divergente : m.situacao === filtroSit)));
             $('tab-materiais').querySelector('tbody').innerHTML = lista.length ? lista.map(m => `
                 <tr data-codigo="${m.codigo}">
-                    <td><b>${esc(m.modelo)}</b>${m.ativo ? '' : ' <small>(inativo)</small>'}${m.motivos.map(x => `<span class="motivo">${esc(x)}</span>`).join('')}</td>
+                    <td><b>${esc(m.modelo)}</b>${m.ativo ? '' : ' <small>(inativo)</small>'}${m.motivos.map(x => `<span class="motivo">${esc(x)}</span>`).join('')}${m.usaCadastro ? '<span class="diverge">sem nota de compra: valor do cadastro do estoque</span>' : ''}</td>
                     <td class="col-opc">${esc(m.classe)}</td>
                     <td>${UN[m.unidade] || ''}</td>
                     <td class="num" data-valor><b>${moeda(m.custo)}</b>${m.divergente ? `<span class="diverge">↕️ ${numBR(Math.round(m.divergencia))}% do estoque</span>` : ''}</td>
@@ -490,7 +490,7 @@
                 : `<span class="motivo">item de compra não encontrado (código ${l.estoqueCodigo})</span>`}</div>
             <div class="item-linha"><span class="campo-qtd">qtd <input type="text" inputmode="decimal" class="item-qtd" value="${pctTexto(l.quantidade ?? 1)}" aria-label="Quantidade de ${esc(l.nome || '')}" ${ed}>
                 <span class="item-qtd-rotulo">${un} por 1 ${un} do produto</span></span>
-              <span class="item-custo" data-valor>${calc && calc.custo != null ? `${pctTexto(calc.quantidade)} × ${moeda(calc.custo)} = <b>${moeda(calc.parcela)}</b>`
+              <span class="item-custo" data-valor>${calc && calc.custo != null ? `${pctTexto(calc.quantidade)} × ${moeda(calc.custo)} = <b>${moeda(calc.parcela)}</b>${calc.fonte === 'cadastro' ? '<br><span class="diverge">🕒 valor do cadastro (sem nota de compra)</span>' : ''}`
                 : `<span class="motivo">${esc((calc && calc.motivos || []).join(' · ') || '—')}</span>`}</span>
               <button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação">✕</button></div></div>`;
         function htmlComposicao(d) {

@@ -130,3 +130,10 @@ test('revisão: arred2 meio para cima também acima de 4 (10,075 → 10,08)', ()
   assert.equal(arred2(1234.565), 1234.57);
   assert.equal(arred2(53.2902), 53.29);
 });
+
+test('custo pelo valor do cadastro do estoque (sem nota de compra): calcula, avisa com o motivo certo e não marca para gravar', () => {
+  const r = formar({ custo: { situacao: 'desatualizado', ultimaCompra: null, usaCadastro: true } });
+  assert.equal(r.sugerido, 53.29);
+  assert.equal(r.gravavelPorPadrao, false);
+  assert.deepEqual(r.avisos, ['custo pelo valor do cadastro do estoque (sem nota de compra)']);
+});
