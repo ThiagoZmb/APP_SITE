@@ -100,12 +100,17 @@ const TABELAS = [
      componente_id INT NULL,
      UNIQUE KEY uk_material_estoque (material_codigo, estoque_codigo)
    ) ${OPCOES}`,
-  // composição: material de venda = Σ participação × componente; ligação sem componente = componente principal (100%)
+  // composição: material de venda = Σ quantidade × componente (quantidade na unidade de venda); ligação sem componente = componente principal (1)
+  // participacao_pct: forma antiga (100% = 1); fica só para a conversão das instalações anteriores
   `CREATE TABLE IF NOT EXISTS \`web_custo_componentes\` (
      id INT AUTO_INCREMENT PRIMARY KEY,
      material_codigo INT NOT NULL,
      nome VARCHAR(60) NULL,
      participacao_pct DECIMAL(9,3) NOT NULL DEFAULT 100,
+     quantidade DECIMAL(14,4) NULL,
+     custo_informado DECIMAL(14,4) NULL,
+     informado_em DATETIME NULL,
+     informado_por VARCHAR(190) NULL,
      ordem INT NOT NULL DEFAULT 0,
      atualizado_em DATETIME NULL,
      atualizado_por VARCHAR(190) NULL,
@@ -162,6 +167,17 @@ async function instalarTabelas(pool) {
   const [[c] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_ligacoes' AND COLUMN_NAME = 'componente_id'");
   if (!Number(c?.n)) await pool.execute('ALTER TABLE web_custo_ligacoes ADD COLUMN componente_id INT NULL');
+  // composição passou de participação % para quantidade: acrescenta a coluna e converte o que já existe (100% → 1)
+  const [[q] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_componentes' AND COLUMN_NAME = 'quantidade'");
+  if (!Number(q?.n)) {
+    await pool.execute('ALTER TABLE web_custo_componentes ADD COLUMN quantidade DECIMAL(14,4) NULL');
+    await pool.execute('UPDATE web_custo_componentes SET quantidade = participacao_pct / 100 WHERE quantidade IS NULL');
+  }
+  // custo informado (componente ou produto sem estoque)
+  const [[ci] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_componentes' AND COLUMN_NAME = 'custo_informado'");
+  if (!Number(ci?.n)) await pool.execute('ALTER TABLE web_custo_componentes ADD COLUMN custo_informado DECIMAL(14,4) NULL, ADD COLUMN informado_em DATETIME NULL, ADD COLUMN informado_por VARCHAR(190) NULL');
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo

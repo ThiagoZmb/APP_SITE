@@ -172,5 +172,26 @@ test('composição: coluna componente_id no CREATE e ALTER só quando falta', as
   const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
   await instalarTabelas(com);
   assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
-  assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /participacao_pct DECIMAL\(9,3\) NOT NULL DEFAULT 100/);
+  assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /quantidade DECIMAL\(14,4\) NULL/);
+});
+
+test('composição por quantidade: acrescenta a coluna e converte a participação % já gravada (100% → 1)', async () => {
+  const sem = criarPoolFalso([[/COLUMN_NAME = 'componente_id'/, [{ n: 1 }]], [/COLUMN_NAME = 'quantidade'/, [{ n: 0 }]]]);
+  await instalarTabelas(sem);
+  const sqls = sem.chamadas.map(c => c.sql);
+  assert.ok(sqls.includes('ALTER TABLE web_custo_componentes ADD COLUMN quantidade DECIMAL(14,4) NULL'));
+  assert.ok(sqls.includes('UPDATE web_custo_componentes SET quantidade = participacao_pct / 100 WHERE quantidade IS NULL'));
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(com);
+  assert.ok(!com.chamadas.some(c => /^ALTER|^UPDATE/.test(c.sql)));
+});
+
+test('custo informado: colunas no CREATE e ALTER só quando faltam', async () => {
+  const sem = criarPoolFalso([[/COLUMN_NAME = 'custo_informado'/, [{ n: 0 }]], [/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(sem);
+  assert.ok(sem.chamadas.some(c => c.sql === 'ALTER TABLE web_custo_componentes ADD COLUMN custo_informado DECIMAL(14,4) NULL, ADD COLUMN informado_em DATETIME NULL, ADD COLUMN informado_por VARCHAR(190) NULL'));
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(com);
+  assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /custo_informado DECIMAL\(14,4\) NULL/);
+  assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
 });

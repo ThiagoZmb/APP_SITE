@@ -115,11 +115,13 @@ function bancoCustos() {
     // composição
     [/^SELECT .*FROM web_custo_componentes WHERE id = \?/, (sql, [id]) => estado.componentes.filter(c => c.id === Number(id)).map(c => ({ ...c }))],
     [/^SELECT .*FROM web_custo_componentes/, () => estado.componentes.map(c => ({ ...c }))],
-    [/INSERT INTO web_custo_componentes/, (sql, [material_codigo, nome, participacao_pct, ordem, atualizado_em, atualizado_por]) => {
-      const id = ++proxId; estado.componentes.push({ id, material_codigo, nome, participacao_pct: String(participacao_pct), ordem, atualizado_em, atualizado_por });
+    [/INSERT INTO web_custo_componentes/, (sql, [material_codigo, nome, quantidade, custo_informado, informado_em, informado_por, ordem, atualizado_em, atualizado_por]) => {
+      const id = ++proxId; estado.componentes.push({ id, material_codigo, nome, participacao_pct: '100.000', quantidade: String(quantidade),
+        custo_informado: custo_informado === null ? null : String(custo_informado), informado_em, informado_por, ordem, atualizado_em, atualizado_por });
       return { insertId: id, affectedRows: 1 }; }],
-    [/UPDATE web_custo_componentes SET nome = \?, participacao_pct = \?/, (sql, [nome, participacao_pct, atualizado_em, atualizado_por, id]) => {
-      const c = estado.componentes.find(x => x.id === Number(id)); if (c) Object.assign(c, { nome, participacao_pct: String(participacao_pct), atualizado_em, atualizado_por });
+    [/UPDATE web_custo_componentes SET nome = \?, quantidade = \?/, (sql, [nome, quantidade, custo_informado, informado_em, informado_por, atualizado_em, atualizado_por, id]) => {
+      const c = estado.componentes.find(x => x.id === Number(id)); if (c) Object.assign(c, { nome, quantidade: String(quantidade),
+        custo_informado: custo_informado === null ? null : String(custo_informado), informado_em, informado_por, atualizado_em, atualizado_por });
       return { affectedRows: c ? 1 : 0 }; }],
     [/DELETE FROM web_custo_componentes WHERE id = \?/, (sql, [id]) => {
       const i = estado.componentes.findIndex(c => c.id === Number(id)); if (i >= 0) estado.componentes.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],

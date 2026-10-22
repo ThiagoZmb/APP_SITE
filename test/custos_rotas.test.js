@@ -159,16 +159,16 @@ const escritasDe = banco => banco.f.chamadas.filter(c => /^\s*(INSERT|UPDATE|DEL
 test('composição: o primeiro componente adota as ligações que o material já tinha (custo igual)', async t => {
   const { chamar, banco } = await prepararCustos(t);
   const antes = (await (await chamar('/custos/materiais/100')).json()).custo;
-  const r = await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Perfil lateral', participacaoPct: 100 });
+  const r = await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Perfil lateral', quantidade: 1 });
   assert.equal(r.status, 201);
   const { id } = await r.json();
-  assert.deepEqual(banco.estado.componentes.map(c => [c.material_codigo, c.nome, Number(c.participacao_pct)]), [[100, null, 100], [100, 'Perfil lateral', 100]]);
+  assert.deepEqual(banco.estado.componentes.map(c => [c.material_codigo, c.nome, Number(c.quantidade)]), [[100, null, 1], [100, 'Perfil lateral', 1]]);
   assert.equal(banco.estado.ligacoes.find(l => l.id === 1).componente_id, banco.estado.componentes[0].id);
   const d = await (await chamar('/custos/materiais/100')).json();
   // o componente novo ainda não tem item: material sem custo, com o motivo
   assert.equal(d.situacao, 'faltando');
   assert.deepEqual(d.motivos, ['componente Perfil lateral sem item do estoque']);
-  assert.deepEqual(d.componentes.map(c => [c.nome, c.participacaoPct, c.ligacoes.length]), [[null, 100, 1], ['Perfil lateral', 100, 0]]);
+  assert.deepEqual(d.componentes.map(c => [c.nome, c.quantidade, c.ligacoes.length]), [[null, 1, 1], ['Perfil lateral', 1, 0]]);
   // liga um item ao componente novo e o custo vira a soma
   assert.equal((await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 4, fator: 1, componenteId: id })).status, 201);
   banco.estado.compras.push({ id: 50, NOTA_FISCAL: '700', DATA: banco.estado.compras[0].DATA, FABRICANTE: 'FORN C', NOME_PRODUTO: 'PUXADOR CONCHA', QTD: 10, VALOR_UNITARIO: 15 });
@@ -182,21 +182,21 @@ test('composição: o primeiro componente adota as ligações que o material já
   assert.ok(escritasDe(banco).every(c => /(INTO|UPDATE|FROM)\s+web_/i.test(c.sql)), escritasDe(banco).map(c => c.sql).join('\n'));
 });
 
-test('composição: participação muda o custo; validações', async t => {
+test('composição: quantidade muda o custo; validações', async t => {
   const { chamar, banco } = await prepararCustos(t);
   const { id } = await (await chamar('/custos/componentes', 'POST', { materialCodigo: 100 })).json();
   const principal = banco.estado.componentes[0].id;
   await chamar('/custos/componentes/' + id, 'DELETE');
   const custo100 = (await (await chamar('/custos/materiais/100')).json()).custo;
-  assert.equal((await chamar('/custos/componentes/' + principal, 'PUT', { participacaoPct: 50, nome: 'Perfil' })).status, 200);
+  assert.equal((await chamar('/custos/componentes/' + principal, 'PUT', { quantidade: 0.5, nome: 'Perfil' })).status, 200);
   const d = await (await chamar('/custos/materiais/100')).json();
   assert.equal(Math.round(d.custo * 10000), Math.round(custo100 / 2 * 10000));
-  assert.deepEqual([d.componentes[0].nome, d.componentes[0].participacaoPct], ['Perfil', 50]);
-  for (const corpo of [{ participacaoPct: 0 }, { participacaoPct: 1001 }, { participacaoPct: '1,5' }, { nome: 'x'.repeat(61) }])
+  assert.deepEqual([d.componentes[0].nome, d.componentes[0].quantidade], ['Perfil', 0.5]);
+  for (const corpo of [{ quantidade: 0 }, { quantidade: 10001 }, { quantidade: '1,5' }, { nome: 'x'.repeat(61) }])
     assert.equal((await chamar('/custos/componentes/' + principal, 'PUT', corpo)).status, 400, JSON.stringify(corpo));
-  assert.equal((await chamar('/custos/componentes', 'POST', { materialCodigo: 100, participacaoPct: -1 })).status, 400);
+  assert.equal((await chamar('/custos/componentes', 'POST', { materialCodigo: 100, quantidade: -1 })).status, 400);
   assert.equal((await chamar('/custos/componentes', 'POST', { materialCodigo: 999 })).status, 404);
-  assert.equal((await chamar('/custos/componentes/9999', 'PUT', { participacaoPct: 10 })).status, 404);
+  assert.equal((await chamar('/custos/componentes/9999', 'PUT', { quantidade: 10 })).status, 404);
 });
 
 test('composição: excluir componente leva as ligações; desfazer o último item remove o componente', async t => {
@@ -220,15 +220,54 @@ test('composição: componente de outro material → 400; só ver custos → 403
   assert.equal((await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 4, fator: 1, componenteId: 9999 })).status, 400);
   const v = await prepararCustos(t, { perfil: 'Só ver custos', banco });
   assert.equal((await v.chamar('/custos/componentes', 'POST', { materialCodigo: 100 })).status, 403);
-  assert.equal((await v.chamar('/custos/componentes/' + id, 'PUT', { participacaoPct: 10 })).status, 403);
+  assert.equal((await v.chamar('/custos/componentes/' + id, 'PUT', { quantidade: 10 })).status, 403);
   assert.equal((await v.chamar('/custos/componentes/' + id, 'DELETE')).status, 403);
 });
 
 test('composição: confirmadas trazem os componentes agrupados', async t => {
   const { chamar } = await prepararCustos(t);
-  const { id } = await (await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Puxador', participacaoPct: 200 })).json();
+  const { id } = await (await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Puxador', quantidade: 2 })).json();
   await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 4, fator: 1, componenteId: id });
   const lista = await (await chamar('/custos/ligacoes?situacao=confirmadas')).json();
   const m = lista.find(x => x.codigo === 100);
-  assert.deepEqual(m.componentes.map(c => [c.nome, c.participacaoPct, c.ligacoes.map(l => l.estoqueCodigo)]), [[null, 100, [1]], ['Puxador', 200, [4]]]);
+  assert.deepEqual(m.componentes.map(c => [c.nome, c.quantidade, c.ligacoes.map(l => l.estoqueCodigo)]), [[null, 1, [1]], ['Puxador', 2, [4]]]);
+});
+
+// ---------- custo informado (sem estoque) ----------
+test('custo informado: produto inteiro sem estoque (sai da revisão, entra nas confirmadas)', async t => {
+  const { chamar, banco } = await prepararCustos(t);
+  const r = await chamar('/custos/componentes', 'POST', { materialCodigo: 102, custoInformado: 42.5 });
+  assert.equal(r.status, 201);
+  const c = banco.estado.componentes[0];
+  assert.deepEqual([c.material_codigo, Number(c.quantidade), Number(c.custo_informado), c.informado_por], [102, 1, 42.5, 'Thiago']);
+  assert.ok(c.informado_em);
+  const d = await (await chamar('/custos/materiais/102')).json();
+  assert.deepEqual([d.situacao, d.custo, d.informado], ['confiavel', 42.5, true]);
+  assert.equal(d.componentes[0].custoInformado, 42.5);
+  const lista = await (await chamar('/custos/materiais')).json();
+  assert.equal(lista.materiais.find(m => m.codigo === 102).informado, true);
+  assert.ok(!(await (await chamar('/custos/ligacoes?situacao=revisar')).json()).some(m => m.codigo === 102));
+  assert.ok((await (await chamar('/custos/ligacoes?situacao=confirmadas')).json()).some(m => m.codigo === 102));
+  const p = (await (await chamar('/precos/formacao')).json()).materiais.find(m => m.codigo === 102);
+  assert.equal(p.custo, 42.5);
+  assert.ok(banco.estado.auditoria.some(a => a[2] === 'custo_componente_criado' && JSON.parse(a[4]).custoInformado === 42.5));
+});
+
+test('custo informado: num componente; alterar, limpar; com itens → 409; item em componente informado → 400', async t => {
+  const { chamar, banco } = await prepararCustos(t);
+  const { id } = await (await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Pintura' })).json();
+  const principal = banco.estado.componentes[0].id;
+  assert.equal((await chamar('/custos/componentes/' + id, 'PUT', { custoInformado: 35 })).status, 200);
+  const d = await (await chamar('/custos/materiais/100')).json();
+  assert.equal(d.situacao, 'confiavel');
+  assert.equal(Math.round(d.custo * 10000), Math.round((12.539130434782608 + 35) * 10000));
+  assert.equal((await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 4, fator: 1, componenteId: id })).status, 400);
+  const com = await chamar('/custos/componentes/' + principal, 'PUT', { custoInformado: 10 });
+  assert.equal(com.status, 409);
+  assert.match((await com.json()).error, /itens do estoque/);
+  for (const v of [0, -5, '10', 1000001]) assert.equal((await chamar('/custos/componentes/' + id, 'PUT', { custoInformado: v })).status, 400, String(v));
+  assert.equal((await chamar('/custos/componentes/' + id, 'PUT', { custoInformado: null })).status, 200);
+  const c = banco.estado.componentes.find(x => x.id === id);
+  assert.deepEqual([c.custo_informado, c.informado_em, c.informado_por], [null, null, null]);
+  assert.equal((await (await chamar('/custos/materiais/100')).json()).situacao, 'faltando');
 });
