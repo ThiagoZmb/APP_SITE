@@ -2604,6 +2604,9 @@
                 itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
                     profundidade: it.profundidade, soldas: it.soldas, furos: it.furos, detalhes: it.detalhes,
                     acessorios: it.acessorios || [], historico: it.historico || '', obs: it.obs || '', valorTela: it.valor,
+                    // serralheria: o conjunto inteiro (peças, barras por eixo e complementos) — o servidor recalcula o preço com tudo isso
+                    ...(it.frente === 'Serralheria' ? { pecas: it.pecas || [], complementos: (it.complementos || []).map(c => ({ id: c.id, qtd: c.qtd })),
+                        qtdAltura: it.qtdAltura, qtdLargura: it.qtdLargura, qtdProfundidade: it.qtdProfundidade } : {}),
                     ...(it.origem ? { origem: it.origem } : {}) }))
             };
             let res, json = {};

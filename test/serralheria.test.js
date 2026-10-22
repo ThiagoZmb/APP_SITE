@@ -131,3 +131,21 @@ test('desconto adicional (variável) vale também para cliente com desconto de t
   const cab = banco.pedOrc[0];
   assert.deepEqual([cab.SUB_TOTAL, cab.DESCONTO, cab.TOTAL], [114.5, 5, 108.78]);
 });
+
+test('ponta a ponta: o corpo exatamente como a tela de orçamento envia (2 peças) é gravado', async t => {
+  // capturado do orcamentos.html (testes_ui/orcamento_serralheria): Metalon 20 1000×500 10 soldas + Cantoneira 2000 20 soldas
+  const corpoTela = JSON.parse(JSON.stringify(require('./apoio/corpo_serralheria_tela.json')));
+  // o valor da tela veio do preço simulado do teste de tela; com este banco: 1,5 m × 30 + 10 soldas × 2 = 65; 2 m × 20 + 20 × 2 = 80
+  corpoTela.itens[0].valorTela = 145; corpoTela.totalTela = 145;
+  const { banco, chamar } = await prepararPedOrc(t);
+  // o defeito: sem as peças no corpo o servidor recalcula só a 1ª peça (65 ≠ 145) e recusa com "o preço mudou"
+  const semPecas = JSON.parse(JSON.stringify(corpoTela)); delete semPecas.itens[0].pecas;
+  const recusado = await chamar('/ped_orc/salvar', 'POST', semPecas);
+  assert.equal(recusado.status, 409);
+  assert.equal((await recusado.json()).erro, 'preco_mudou');
+  assert.equal(banco.serralheria.length, 0);
+  const r = await chamar('/ped_orc/salvar', 'POST', corpoTela);
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.deepEqual(banco.serralheria.map(s => [s.ITEM, s.MATERIAL, s.QTD_SOLDAS, s.UNITARIO]), [[1, 'Metalon 20', 10, 65], [2, 'Cantoneira', 20, 80]]);
+  assert.deepEqual([banco.listaItens[0].UNITARIO, banco.listaItens[0].TOTAL], [145, 145]);
+});
