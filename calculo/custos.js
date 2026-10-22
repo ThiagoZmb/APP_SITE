@@ -19,12 +19,10 @@ function lerPercentual(v) {
 const moeda = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 const SUFIXO = { m: '/m', m2: '/m²', un: '/un' };
 
-function calcularCusto({ material, config, ligacoes, itens, compras, desde, divergenciaPct = 15 }) {
-  const unidade = config?.unidadeVenda || unidadeDaClasse(material.CLASSE);
+// custo de um grupo de itens de compra equivalentes (mesmo item de fornecedores diferentes): média ponderada das compras
+function custoDoGrupo({ ligacoes, itens, compras, desde, divergenciaPct, unidade }) {
   const vazio = { custo: null, precoMedio: null, ultimaCompra: null, qtdCompras: 0, referencia: null, divergencia: null, divergente: false,
     usadas: [], ignoradas: [], passos: [], unidade };
-  if (config?.semCompra) return { ...vazio, situacao: 'sem_compra', motivos: [] };
-  if (!ligacoes.length) return { ...vazio, situacao: 'faltando', motivos: ['sem ligação confirmada'] };
 
   // ligações válidas: item existe, fator > 0, percentuais legíveis
   const motivos = [];
@@ -79,6 +77,55 @@ function calcularCusto({ material, config, ligacoes, itens, compras, desde, dive
 
   return { situacao, motivos: [], custo, precoMedio, ultimaCompra, qtdCompras: usadas.length, referencia, divergencia,
     divergente: divergencia !== null && divergencia > divergenciaPct, usadas, ignoradas, passos, unidade };
+}
+
+const pctTxt = v => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + '%';
+
+// Material de venda = Σ participação × componente. Sem componentes cadastrados, as ligações formam um grupo só
+// (o material simples de hoje, resultado idêntico). Um componente sem custo deixa o material sem custo: nunca custo parcial.
+function calcularCusto({ material, config, ligacoes, itens, compras, desde, divergenciaPct = 15, componentes = [] }) {
+  const unidade = config?.unidadeVenda || unidadeDaClasse(material.CLASSE);
+  const vazio = { custo: null, precoMedio: null, ultimaCompra: null, qtdCompras: 0, referencia: null, divergencia: null, divergente: false,
+    usadas: [], ignoradas: [], passos: [], unidade, componentes: [] };
+  if (config?.semCompra) return { ...vazio, situacao: 'sem_compra', motivos: [] };
+  if (!ligacoes.length && !componentes.length) return { ...vazio, situacao: 'faltando', motivos: ['sem ligação confirmada'] };
+  const comum = { itens, compras, desde, divergenciaPct, unidade };
+  const implicitas = ligacoes.filter(l => l.componente_id === null || l.componente_id === undefined);
+  if (!componentes.length) return { ...custoDoGrupo({ ligacoes: implicitas, ...comum }), componentes: [] };
+
+  // ligações sem componente ao lado de componentes: entram como o componente principal (100%)
+  const grupos = [...(implicitas.length ? [{ id: null, nome: null, participacao_pct: 100, ordem: -1 }] : []),
+    ...[...componentes].sort((a, b) => Number(a.ordem) - Number(b.ordem) || Number(a.id) - Number(b.id))];
+  const motivos = [], partes = [];
+  grupos.forEach((g, i) => {
+    const nome = g.nome || `Componente ${i + 1}`;
+    const pct = Number(g.participacao_pct);
+    const ligs = g.id === null ? implicitas : ligacoes.filter(l => Number(l.componente_id) === Number(g.id));
+    const parte = { id: g.id === null ? null : Number(g.id), nome: g.nome ?? null, rotulo: nome, participacaoPct: pct, situacao: 'faltando', motivos: [],
+      custo: null, precoMedio: null, parcela: null, r: null };
+    partes.push(parte);
+    if (!(pct > 0)) { parte.motivos = ['participação inválida']; motivos.push(`${nome}: participação inválida`); return; }
+    if (!ligs.length) { parte.motivos = ['sem item do estoque']; motivos.push(`componente ${nome} sem item do estoque`); return; }
+    const r = custoDoGrupo({ ligacoes: ligs, ...comum });
+    Object.assign(parte, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio,
+      parcela: r.custo === null ? null : r.custo * pct / 100 });
+    if (r.custo === null) motivos.push(...r.motivos.map(m => `${nome}: ${m}`));
+  });
+  const marcar = (lista, p) => lista.map(c => ({ ...c, componente: p.rotulo }));
+  const usadas = partes.flatMap(p => (p.r ? marcar(p.r.usadas, p) : []));
+  const ignoradas = partes.flatMap(p => (p.r ? marcar(p.r.ignoradas, p) : []));
+  const saidaComp = partes.map(({ r, rotulo, ...p }) => p);
+  if (motivos.length) return { ...vazio, situacao: 'faltando', motivos, usadas, ignoradas, componentes: saidaComp };
+
+  const soma = f => partes.reduce((s, p) => s + p.r[f] * p.participacaoPct / 100, 0);
+  const custo = soma('custo'), precoMedio = soma('precoMedio');
+  const referencia = partes.every(p => p.r.referencia !== null) ? soma('referencia') : null;
+  const divergencia = referencia ? Math.abs(custo - referencia) / referencia * 100 : null;
+  const ultimaCompra = partes.map(p => p.r.ultimaCompra).sort()[0];
+  const suf = SUFIXO[unidade];
+  const passos = [...partes.map(p => `${p.rotulo}: ${pctTxt(p.participacaoPct)} × ${moeda(p.custo)}${suf} = ${moeda(p.parcela)}${suf}`), `= Custo: ${moeda(custo)}${suf}`];
+  return { situacao: partes.some(p => p.situacao === 'desatualizado') ? 'desatualizado' : 'confiavel', motivos: [], custo, precoMedio, ultimaCompra,
+    qtdCompras: usadas.length, referencia, divergencia, divergente: partes.some(p => p.r.divergente), usadas, ignoradas, passos, unidade, componentes: saidaComp };
 }
 
 module.exports = { calcularCusto, lerPercentual };

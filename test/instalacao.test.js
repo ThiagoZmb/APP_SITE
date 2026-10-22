@@ -24,11 +24,11 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 16 tabelas web_', async () => {
+test('cria as 17 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao',
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao',
     'web_perfil_permissoes', 'web_perfis', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_usuario_acesso', 'web_usuario_excecoes']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);
@@ -162,4 +162,15 @@ test('tabelas de preço: histórico guarda valor anterior anulável e índice po
   assert.match(hist, /valor_anterior DOUBLE NULL/);
   assert.match(hist, /KEY idx_material \(material_codigo, id\)/);
   assert.match(pool.chamadas.find(c => /`web_preco_margens`/.test(c.sql)).sql, /UNIQUE KEY uk_escopo_chave \(escopo, chave\)/);
+});
+
+test('composição: coluna componente_id no CREATE e ALTER só quando falta', async () => {
+  const sem = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 0 }]]]);
+  await instalarTabelas(sem);
+  assert.match(sem.chamadas.find(c => /`web_custo_ligacoes`/.test(c.sql)).sql, /componente_id INT NULL/);
+  assert.ok(sem.chamadas.some(c => c.sql === 'ALTER TABLE web_custo_ligacoes ADD COLUMN componente_id INT NULL'));
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(com);
+  assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
+  assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /participacao_pct DECIMAL\(9,3\) NOT NULL DEFAULT 100/);
 });

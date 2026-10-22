@@ -102,3 +102,104 @@ test('revisão I1: nomes que só diferem na pontuação são itens diferentes (n
   assert.equal(r.usadas.length, 1);
   assert.equal(r4(r.custo), 11.7554);
 });
+
+// ---------- composição: material = Σ participação × componente ----------
+const limpo = (cod, nome, mudar = {}) => ({ CODIGO: cod, NOME_PRODUTO: nome, UNIDADE: 'Barra', VALOR: 0, IPI: 0, FRETE: 0, PERDA: '', TAMANHO: 6000, ...mudar });
+const comp = (id, nome, pct, ordem = id) => ({ id, nome, participacao_pct: String(pct), ordem });
+const belluno = (mudar = {}) => ({
+  material: { CODIGO: 200, MODELO: 'Belluno', CLASSE: 'Perfis', VALOR_FIXO: 80, SITUACAO: 'Ativo' }, config: null, desde: '2026-04-22', divergenciaPct: 15,
+  componentes: [comp(1, 'A', 100), comp(2, 'B', 100), comp(3, 'C', 200)],
+  ligacoes: [{ id: 1, estoque_codigo: 11, fator: 6, componente_id: 1 }, { id: 2, estoque_codigo: 12, fator: 6, componente_id: 2 }, { id: 3, estoque_codigo: 13, fator: 6, componente_id: 3 }],
+  itens: new Map([[11, limpo(11, 'PERFIL A')], [12, limpo(12, 'PERFIL B')], [13, limpo(13, 'PERFIL C')]]),
+  compras: [compra('2026-08-01', 10, 60, 'PERFIL A'), compra('2026-08-01', 10, 30, 'PERFIL B'), compra('2026-08-01', 10, 18, 'PERFIL C')],
+  ...mudar });
+
+test('composição: Belluno = 100% A (R$ 10/m) + 100% B (R$ 5/m) + 200% C (R$ 3/m) = R$ 21/m', () => {
+  const r = calcularCusto(belluno());
+  assert.equal(r.situacao, 'confiavel');
+  assert.equal(r4(r.custo), 21);
+  assert.equal(r4(r.precoMedio), 21);
+  assert.deepEqual(r.componentes.map(c => [c.id, c.nome, c.participacaoPct, r4(c.custo), r4(c.parcela), c.situacao]),
+    [[1, 'A', 100, 10, 10, 'confiavel'], [2, 'B', 100, 5, 5, 'confiavel'], [3, 'C', 200, 3, 6, 'confiavel']]);
+  assert.ok(r.passos.includes('C: 200% × R$ 3,00/m = R$ 6,00/m'), r.passos.join(' | '));
+  assert.equal(r.passos.at(-1), '= Custo: R$ 21,00/m');
+  assert.equal(r.usadas.length, 3);
+  assert.deepEqual(r.usadas.map(u => u.componente), ['A', 'B', 'C']);
+});
+
+test('composição: Canelado = vidro (chapa → m²) 100% + pintura (m²) 100%', () => {
+  const r = calcularCusto({
+    material: { CODIGO: 201, MODELO: 'Canelado 4mm Pintado Metálico', CLASSE: 'Vidros', VALOR_FIXO: 300, SITUACAO: 'Ativo' }, config: null, desde: '2026-04-22', divergenciaPct: 15,
+    componentes: [comp(1, 'Vidro', 100), comp(2, 'Pintura', 100)],
+    ligacoes: [{ id: 1, estoque_codigo: 21, fator: 7.062, componente_id: 1 }, { id: 2, estoque_codigo: 22, fator: 1, componente_id: 2 }],
+    itens: new Map([[21, limpo(21, 'VIDRO CANELADO 4MM', { UNIDADE: 'Chapa' })], [22, limpo(22, 'PINTURA METALICA M2', { UNIDADE: 'm²' })]]),
+    compras: [compra('2026-08-01', 2, 706.2, 'VIDRO CANELADO 4MM'), compra('2026-08-01', 10, 35, 'PINTURA METALICA M2')] });
+  assert.equal(r.unidade, 'm2');
+  assert.equal(r4(r.custo), 135);
+});
+
+test('composição: componente com 2 fornecedores faz média dentro e soma fora', () => {
+  const b = belluno();
+  b.ligacoes.push({ id: 4, estoque_codigo: 14, fator: 6, componente_id: 1 });
+  b.itens.set(14, limpo(14, 'PERFIL A FORN 2'));
+  b.compras.push(compra('2026-08-02', 10, 72, 'PERFIL A FORN 2')); // R$ 12/m → A = média 11
+  const r = calcularCusto(b);
+  assert.equal(r4(r.componentes[0].custo), 11);
+  assert.equal(r4(r.custo), 22);
+});
+
+test('composição: componente sem compra deixa o material sem custo, com o nome no motivo', () => {
+  const b = belluno({ componentes: [comp(1, 'A', 100), comp(2, 'B', 100), comp(3, 'Pintura', 200)] });
+  b.compras = b.compras.filter(c => c.NOME_PRODUTO !== 'PERFIL C');
+  const r = calcularCusto(b);
+  assert.equal(r.situacao, 'faltando');
+  assert.equal(r.custo, null);
+  assert.deepEqual(r.motivos, ['Pintura: item nunca comprado']);
+  assert.equal(r.componentes[2].situacao, 'faltando');
+  assert.equal(r4(r.componentes[0].custo), 10); // os outros continuam informados no detalhe
+});
+
+test('composição: componente sem item e item excluído do estoque', () => {
+  const b = belluno({ componentes: [comp(1, 'A', 100), comp(2, 'B', 100), comp(3, 'C', 200), comp(4, 'Pintura', 100)] });
+  let r = calcularCusto(b);
+  assert.equal(r.situacao, 'faltando');
+  assert.deepEqual(r.motivos, ['componente Pintura sem item do estoque']);
+  const sumiu = belluno();
+  sumiu.itens.delete(13);
+  r = calcularCusto(sumiu);
+  assert.equal(r.situacao, 'faltando');
+  assert.deepEqual(r.motivos, ['C: item de compra não encontrado (código 13)']);
+});
+
+test('composição: um componente desatualizado → material desatualizado, última compra = a mais antiga', () => {
+  const b = belluno();
+  b.compras = b.compras.map(c => c.NOME_PRODUTO === 'PERFIL B' ? { ...c, DATA: '2026-01-10' } : c);
+  const r = calcularCusto(b);
+  assert.equal(r.situacao, 'desatualizado');
+  assert.equal(r.ultimaCompra, '2026-01-10');
+  assert.equal(r4(r.custo), 21);
+});
+
+test('composição: referência = soma das referências; sem referência em um componente → null', () => {
+  const b = belluno();
+  b.itens.set(11, limpo(11, 'PERFIL A', { VALOR: 60 })); b.itens.set(12, limpo(12, 'PERFIL B', { VALOR: 30 })); b.itens.set(13, limpo(13, 'PERFIL C', { VALOR: 24 }));
+  let r = calcularCusto(b);
+  assert.equal(r4(r.referencia), 10 + 5 + 8); // C: R$ 4/m × 200%
+  assert.equal(r.divergente, true); // C diverge 25%
+  b.itens.set(12, limpo(12, 'PERFIL B', { VALOR: 0 }));
+  r = calcularCusto(b);
+  assert.equal(r.referencia, null);
+});
+
+test('composição: participação inválida vira motivo', () => {
+  const r = calcularCusto(belluno({ componentes: [comp(1, 'A', 100), comp(2, 'B', 0), comp(3, 'C', 200)] }));
+  assert.equal(r.situacao, 'faltando');
+  assert.deepEqual(r.motivos, ['B: participação inválida']);
+});
+
+test('composição: ligações sem componente dão exatamente o resultado de antes', () => {
+  const antes = calcularCusto(base());
+  const depois = calcularCusto(base({ ligacoes: [{ id: 1, estoque_codigo: 1, fator: 6, componente_id: null }], componentes: [] }));
+  assert.deepEqual(depois, antes);
+  assert.deepEqual(antes.componentes, []);
+});

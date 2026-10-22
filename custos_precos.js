@@ -116,13 +116,14 @@ function abrirPremissas() {
     const margemDe = c => precos.margens.classes.find(x => x.classe === c)?.pct;
     const classes = [...new Set([...precos.materiais.map(m => m.classe), ...precos.margens.classes.map(c => c.classe)].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     $('pp-margens').querySelector('tbody').innerHTML = classes.map(c =>
-        `<tr data-classe="${esc(c)}"><td>${esc(c)}</td><td><input type="text" inputmode="decimal" class="marg-pct" value="${v(margemDe(c))}" aria-label="Margem de ${esc(c)}"></td></tr>`).join('');
+        `<tr data-classe="${esc(c)}"><td>${esc(c)}</td><td><span class="campo-pct"><input type="text" inputmode="decimal" class="marg-pct" value="${v(margemDe(c))}"
+            placeholder="${p.margemPct == null ? 'sem padrão' : 'padrão ' + v(p.margemPct)}" aria-label="Margem de ${esc(c)}"> %</span></td></tr>`).join('');
     $('pp-msg').textContent = '';
     $('dlg-precos-param').showModal();
 }
 const linhaEncargo = (e = null) => `<tr ${e ? `data-id="${e.id}"` : 'data-novo'}>
     <td><input type="text" class="enc-nome" maxlength="60" value="${esc(e?.nome || '')}" aria-label="Nome do encargo"></td>
-    <td><input type="text" inputmode="decimal" class="enc-pct" value="${e ? String(e.pct).replace('.', ',') : ''}" aria-label="Percentual do encargo"></td>
+    <td><span class="campo-pct"><input type="text" inputmode="decimal" class="enc-pct" value="${e ? String(e.pct).replace('.', ',') : ''}" aria-label="Percentual do encargo"> %</span></td>
     <td><input type="checkbox" class="enc-ativo" ${!e || e.ativo ? 'checked' : ''} aria-label="Ativo"></td>
     <td><button type="button" class="btn-mini enc-excluir" aria-label="Excluir encargo">✕</button></td></tr>`;
 

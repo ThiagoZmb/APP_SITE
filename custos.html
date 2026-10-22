@@ -112,12 +112,22 @@
         #dlg-precos-param h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; color: var(--primary-color); }
         #dlg-precos-param table input { width: 100%; padding: 4px 6px; }
         #dlg-precos-param input[type=checkbox] { width: auto; }
+        .campo-pct { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
+        .campo-pct input { flex: 1; min-width: 0; }
         .dlg-rolagem { max-height: 50vh; overflow: auto; }
         #dlg-gravar { width: min(560px, calc(100vw - 32px)); }
+        .componente { border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+        .comp-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+        .comp-topo .comp-nome { flex: 1; min-width: 120px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; font-weight: 700; }
+        .comp-topo .comp-pct { width: 70px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .comp-custo { font-size: 12.5px; color: var(--text-light); }
+        .comp-item { font-size: 13px; margin: 2px 0; }
+        .lig-componente { margin-top: 6px; color: var(--primary-color); font-size: 12.5px; }
+        .campo-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251200">
-    <script src="layout.js?v=202610251200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610251500">
+    <script src="layout.js?v=202610251500" defer></script>
 </head>
 <body>
     <div class="container">
@@ -275,17 +285,17 @@
         <h3 id="dlg-pp-titulo">Premissas da formação de preço</h3>
         <p class="prc-ref">Deixe em branco para "não definido". Aceita vírgula.</p>
         <div class="grade-param">
-            <label>Imposto (Simples) %<input type="text" inputmode="decimal" id="pp-imposto"></label>
-            <label>Comissão padrão %<input type="text" inputmode="decimal" id="pp-comissao"></label>
-            <label>Custo fixo %<input type="text" inputmode="decimal" id="pp-custo-fixo"></label>
-            <label>Desconto padrão %<input type="text" inputmode="decimal" id="pp-desconto"></label>
-            <label>Margem padrão %<input type="text" inputmode="decimal" id="pp-margem"></label>
+            <label>Imposto (Simples)<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-imposto"> %</span></label>
+            <label>Comissão padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-comissao"> %</span></label>
+            <label>Custo fixo<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-custo-fixo"> %</span></label>
+            <label>Desconto padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-desconto"> %</span></label>
+            <label>Margem padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-margem"> %</span></label>
             <label>Referências: últimos (meses)<input type="number" id="pp-meses" min="1" max="36"></label>
         </div>
         <h4>Outros encargos sobre a venda</h4>
         <div class="dlg-rolagem"><table id="pp-encargos"><thead><tr><th>Nome</th><th>%</th><th>Ativo</th><th></th></tr></thead><tbody></tbody></table></div>
         <button type="button" class="btn-mini" id="pp-enc-novo">+ encargo</button>
-        <h4>Margem por classe (em branco = usa a padrão)</h4>
+        <h4>Margem por classe (vazio = usa a margem padrão)</h4>
         <div class="dlg-rolagem"><table id="pp-margens"><thead><tr><th>Classe</th><th>Margem %</th></tr></thead><tbody></tbody></table></div>
         <div class="msg erro" id="pp-msg"></div>
         <button type="button" class="btn-mini prim" id="pp-salvar">Salvar</button>
@@ -417,9 +427,7 @@
                 if (d.divergente) alertas.push(`custo e VALOR do estoque divergem (referência ${moeda(d.referencia)})`);
                 $('det-alertas').innerHTML = alertas.map(a => `<span class="motivo">⚠️ ${esc(a)}</span>`).join('');
                 $('det-passos').innerHTML = (d.passos || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li>Sem cálculo: veja os alertas.</li>';
-                $('det-ligacoes').innerHTML = d.ligacoes.length ? d.ligacoes.map(l => l.existe
-                    ? `<div>• <b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}</div>`
-                    : `<div class="motivo">• item de compra não encontrado (código ${l.estoqueCodigo})</div>`).join('') : '<div>Nenhum item ligado. Use a aba "Ligações".</div>';
+                $('det-ligacoes').innerHTML = htmlComposicao(d);
                 $('det-unidade').value = d.unidade || ''; // unidade em uso (da classe ou a corrigida)
                 const linhaCompra = (c, ignorada) => `<tr class="${ignorada ? 'ignorada' : ''}"><td>${esc(c.nf)}</td><td>${dataBR(c.data)}</td><td>${esc(c.fornecedor)}</td>
                     <td class="num">${numBR(c.qtd)}</td><td class="num" data-valor>${moeda(c.valor)}</td><td class="num" data-valor>${ignorada ? '—' : moeda(c.precoConvertido)}</td>
@@ -429,6 +437,66 @@
                 $('det-material').classList.add('aberto'); $('det-fundo').classList.add('aberto');
             } catch (e) { mostrarErro('Não foi possível abrir o material: ' + e.message); }
         }
+        // ---- composição: material = Σ participação × componente ----
+        const linhaItem = (l, remover) => `<div class="comp-item" ${remover ? `data-lig="${l.id}"` : ''}>• ${l.existe
+            ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}`
+            : `<span class="motivo">item de compra não encontrado (código ${l.estoqueCodigo})</span>`}
+            ${remover ? `<button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação">✕</button>` : ''}</div>`;
+        const pctTexto = v => String(v).replace('.', ',');
+        const nomeComp = (c, i) => c.nome || `Componente ${i + 1}`;
+        function htmlComposicao(d) {
+            const comps = d.componentes || [];
+            if (!comps.length) return (d.ligacoes.length ? d.ligacoes.map(l => linhaItem(l, false)).join('') : '<div>Nenhum item ligado. Use a aba "Ligações".</div>')
+                + `<p class="prc-ref">Este material é a união de vários itens do estoque? <button type="button" class="btn-mini" id="det-compor" data-perm="precos.editar">Compor com vários itens</button></p>`;
+            const ed = podeEditar() ? '' : 'disabled';
+            return comps.map((c, i) => `<div class="componente" data-id="${c.id ?? ''}">
+                <div class="comp-topo"><input type="text" class="comp-nome" maxlength="60" value="${esc(c.nome || '')}" placeholder="Componente ${i + 1}" aria-label="Nome do componente" ${ed || (c.id == null ? 'disabled' : '')}>
+                    <span class="campo-pct"><input type="text" inputmode="decimal" class="comp-pct" value="${pctTexto(c.participacaoPct)}" aria-label="Participação de ${esc(nomeComp(c, i))}" ${ed || (c.id == null ? 'disabled' : '')}> %</span>
+                    <span class="comp-custo" data-valor>${c.custo == null ? '—' : `${moeda(c.custo)} × ${pctTexto(c.participacaoPct)}% = <b>${moeda(c.parcela)}</b>`}</span></div>
+                ${c.motivos.length ? `<div class="comp-motivo motivo">⚠️ ${c.motivos.map(esc).join(' · ')}</div>` : ''}
+                ${c.ligacoes.map(l => linhaItem(l, true)).join('')}
+                <div>${c.id == null ? '' : `<button type="button" class="btn-mini comp-mais-item" data-perm="precos.editar">+ item do estoque</button>
+                    <button type="button" class="btn-mini comp-remover" data-perm="precos.editar">Remover componente</button>`}</div></div>`).join('')
+                + `<button type="button" class="btn-mini" id="det-mais-comp" data-perm="precos.editar">+ componente</button>`;
+        }
+        async function recarregarDetalhe() { dados = null; await carregarMateriais(); await abrirDetalhe(detalheAtual.codigo); }
+        async function eventoComposicao(e) {
+            if (!detalheAtual) return;
+            const bloco = e.target.closest('.componente'), id = bloco?.dataset.id;
+            try {
+                if (e.target.closest('#det-compor') || e.target.closest('#det-mais-comp')) {
+                    await api('/custos/componentes', { method: 'POST', body: JSON.stringify({ materialCodigo: detalheAtual.codigo }) });
+                    return recarregarDetalhe();
+                }
+                const rem = e.target.closest('.comp-item-remover');
+                if (rem) { await api(`/custos/ligacoes/${rem.closest('.comp-item').dataset.lig}`, { method: 'DELETE' }); return recarregarDetalhe(); }
+                if (e.target.closest('.comp-remover')) {
+                    const nome = bloco.querySelector('.comp-nome').value || bloco.querySelector('.comp-nome').placeholder;
+                    if (!confirm(`Remover o componente "${nome}" e os itens ligados a ele?`)) return;
+                    await api(`/custos/componentes/${id}`, { method: 'DELETE' });
+                    return recarregarDetalhe();
+                }
+                if (e.target.closest('.comp-mais-item')) {
+                    buscaPara = { componenteId: Number(id) };
+                    $('busca-estoque').value = ''; $('lista-estoque').innerHTML = '';
+                    $('dlg-estoque').showModal(); $('busca-estoque').focus();
+                }
+            } catch (err) { mostrarErro(err.message); }
+        }
+        async function mudarComponente(e) {
+            const bloco = e.target.closest('.componente');
+            if (!bloco || !bloco.dataset.id) return;
+            let corpo;
+            if (e.target.matches('.comp-pct')) {
+                const t = String(e.target.value).trim().replace(',', '.'), n = Number(t);
+                if (!/^\d+(\.\d+)?$/.test(t) || !(n > 0 && n <= 1000)) return mostrarErro('Participação: de mais de 0% até 1000%.');
+                corpo = { participacaoPct: n };
+            } else if (e.target.matches('.comp-nome')) corpo = { nome: e.target.value.trim() };
+            else return;
+            try { await api(`/custos/componentes/${bloco.dataset.id}`, { method: 'PUT', body: JSON.stringify(corpo) }); mostrarErro(''); await recarregarDetalhe(); }
+            catch (err) { mostrarErro(err.message); }
+        }
+
         function fecharDetalhe() { $('det-material').classList.remove('aberto'); $('det-preco').classList.remove('aberto'); $('det-fundo').classList.remove('aberto'); }
 
         // ============ LIGAÇÕES ============
@@ -475,9 +543,11 @@
                 tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th>Itens comprados</th><th></th></tr>';
                 tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}">
                     <td><b>${esc(m.modelo)}</b><br><small>vendido por ${UN[m.unidade]}</small></td>
-                    <td>${m.ligacoes.map(l => `<div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}`
+                    <td>${(m.componentes && m.componentes.length ? m.componentes : [{ ligacoes: m.ligacoes, simples: true }]).map((c, i) =>
+                        (c.simples ? '' : `<div class="lig-componente"><b>${esc(nomeComp(c, i))} · ${pctTexto(c.participacaoPct)}%</b></div>`)
+                        + c.ligacoes.map(l => `<div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}`
                         : `<span class="motivo">⚠️ item de compra não encontrado (código ${l.estoqueCodigo})</span>`}
-                        <button type="button" class="btn-mini lig-desfazer" data-id="${l.id}" data-perm="precos.editar">Desfazer</button></div>`).join('')}</td>
+                        <button type="button" class="btn-mini lig-desfazer" data-id="${l.id}" data-perm="precos.editar">Desfazer</button></div>`).join('')).join('')}</td>
                     <td><button type="button" class="btn-mini lig-mais" data-perm="precos.editar">+ outro item de compra</button></td></tr>`).join('')
                     : '<tr><td class="vazio">Nenhuma ligação confirmada</td></tr>';
             } else {
@@ -547,6 +617,18 @@
             if (!li || !buscaPara) return;
             const item = ultimaBusca.get(li.dataset.codigo);
             if (!item) return;
+            if (buscaPara.componenteId) {
+                // item de um componente: pede o fator, liga e recarrega o detalhe
+                const { componenteId } = buscaPara;
+                $('dlg-estoque').close();
+                const sug = sugerirFator(detalheAtual.unidade, item);
+                const valor = window.prompt(`Fator para ${item.nome} (quantas unidades de venda há em 1 ${item.unidade || 'unidade de compra'}):`, sug ?? '');
+                const f = parseFloat(String(valor || '').replace(',', '.'));
+                if (!(f > 0)) return;
+                api('/custos/ligacoes', { method: 'POST', body: JSON.stringify({ materialCodigo: detalheAtual.codigo, estoqueCodigo: item.codigo, fator: f, componenteId }) })
+                    .then(recarregarDetalhe).catch(err => mostrarErro(err.message));
+                return;
+            }
             const { tr, mais } = buscaPara;
             $('dlg-estoque').close();
             const m = ligacoes.find(x => x.codigo === Number(tr.dataset.material));
@@ -602,6 +684,8 @@
         $('f-meses').addEventListener('change', () => carregarMateriais(true));
         $('tab-materiais').addEventListener('click', e => { const tr = e.target.closest('tr[data-codigo]'); if (tr) abrirDetalhe(tr.dataset.codigo); });
         $('det-fechar').addEventListener('click', fecharDetalhe);
+        $('det-ligacoes').addEventListener('click', eventoComposicao);
+        $('det-ligacoes').addEventListener('change', mudarComponente);
         $('det-fundo').addEventListener('click', fecharDetalhe);
         document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharDetalhe(); });
         $('det-unidade-salvar').addEventListener('click', async () => {
@@ -636,6 +720,6 @@
             mostrarAba(['ligacoes', 'precos'].includes(aba) ? aba : 'custos');
         });
     </script>
-    <script src="custos_precos.js?v=202610251300"></script>
+    <script src="custos_precos.js?v=202610251500"></script>
 </body>
 </html>

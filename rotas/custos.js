@@ -7,12 +7,12 @@ const { semValores } = require('../seguranca/valores');
 const { calcularCusto } = require('../calculo/custos');
 const { unidadeDaClasse, sugerirLigacoes, sugerirFator, fraseFator } = require('../calculo/custos_sugestao');
 const { chaveMySQL } = require('../calculo/nomes');
-const { hojeLocal, agoraLocal } = require('./estoque_movimentos');
+const { hojeLocal, agoraLocal, emTransacao, ErroUsuario } = require('./estoque_movimentos');
 
 const LER = ['precos.ver', 'valores.ver'];
 const EDITAR = ['precos.ver', 'precos.editar', 'valores.ver'];
 const PADRAO = { periodoMeses: 6, divergenciaPct: 15 };
-const CAMPOS_VALOR = ['custo', 'precoMedio', 'referencia', 'valorFixo', 'valor', 'precoConvertido', 'custoUnitario', 'valorEstoque'];
+const CAMPOS_VALOR = ['parcela', 'custo', 'precoMedio', 'referencia', 'valorFixo', 'valor', 'precoConvertido', 'custoUnitario', 'valorEstoque'];
 const ativo = m => /^ativo$/i.test(String(m.SITUACAO || '').trim());
 const inteiroEntre = (v, min, max) => { const n = Number(v); return Number.isInteger(n) && n >= min && n <= max ? n : null; };
 
@@ -37,7 +37,8 @@ async function lerParametros(db) {
 async function carregarBase(db) {
   const [materiais] = await db.execute('SELECT CODIGO, MODELO, CLASSE, VALOR_FIXO, SITUACAO FROM cadastro_de_produtos ORDER BY MODELO');
   const [itensLista] = await db.execute('SELECT CODIGO, NOME_PRODUTO, FORNECEDOR, UNIDADE, VALOR, IPI, FRETE, PERDA, TAMANHO, ALTURA, LARGURA, SITUACAO FROM estoque');
-  const [ligacoes] = await db.execute('SELECT id, material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por FROM web_custo_ligacoes ORDER BY id');
+  const [ligacoes] = await db.execute('SELECT id, material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id FROM web_custo_ligacoes ORDER BY id');
+  const [comps] = await db.execute('SELECT id, material_codigo, nome, participacao_pct, ordem FROM web_custo_componentes ORDER BY material_codigo, ordem, id');
   const [configs] = await db.execute('SELECT material_codigo, unidade_venda, sem_compra FROM web_custo_material');
   const itens = new Map(itensLista.map(i => [Number(i.CODIGO), i]));
   const ligPorMaterial = new Map();
@@ -58,17 +59,39 @@ async function carregarBase(db) {
     if (!comprasPorNome.has(k)) comprasPorNome.set(k, []);
     comprasPorNome.get(k).push(c);
   }
-  return { materiais, itensLista, itens, ligPorMaterial, configPorMaterial, comprasPorNome };
+  const compPorMaterial = new Map();
+  for (const c of comps) {
+    const k = Number(c.material_codigo);
+    if (!compPorMaterial.has(k)) compPorMaterial.set(k, []);
+    compPorMaterial.get(k).push(c);
+  }
+  return { materiais, itensLista, itens, ligPorMaterial, configPorMaterial, comprasPorNome, compPorMaterial };
 }
 
 function custoDo(base, material, desde, divergenciaPct) {
   const ligacoes = base.ligPorMaterial.get(Number(material.CODIGO)) || [];
   const chaves = [...new Set(ligacoes.map(l => base.itens.get(Number(l.estoque_codigo))).filter(Boolean).map(i => chaveMySQL(i.NOME_PRODUTO)))];
   const compras = chaves.flatMap(k => base.comprasPorNome.get(k) || []);
-  return calcularCusto({ material, config: base.configPorMaterial.get(Number(material.CODIGO)) || null, ligacoes, itens: base.itens, compras, desde, divergenciaPct });
+  return calcularCusto({ material, config: base.configPorMaterial.get(Number(material.CODIGO)) || null, ligacoes, itens: base.itens, compras, desde, divergenciaPct,
+    componentes: base.compPorMaterial.get(Number(material.CODIGO)) || [] });
 }
 
 const unidadeDo = (base, m) => base.configPorMaterial.get(Number(m.CODIGO))?.unidadeVenda || unidadeDaClasse(m.CLASSE);
+
+const semComponente = l => l.componente_id === null || l.componente_id === undefined;
+// componentes do material com as ligações de cada um (o grupo sem componente vira o principal, 100%); [] = material simples
+function componentesParaTela(base, m, unidade, calculados = []) {
+  const comps = base.compPorMaterial.get(Number(m.CODIGO)) || [];
+  if (!comps.length) return [];
+  const ligs = base.ligPorMaterial.get(Number(m.CODIGO)) || [];
+  const grupos = [...(ligs.some(semComponente) ? [{ id: null, nome: null, participacao_pct: 100, ordem: -1 }] : []), ...comps];
+  return grupos.map(g => {
+    const calc = calculados.find(c => c.id === (g.id === null ? null : Number(g.id))) || {};
+    return { custo: calc.custo ?? null, parcela: calc.parcela ?? null, situacao: calc.situacao ?? null, motivos: calc.motivos || [],
+      id: g.id === null ? null : Number(g.id), nome: g.nome ?? null, participacaoPct: Number(g.participacao_pct), ordem: Number(g.ordem),
+      ligacoes: ligs.filter(l => (g.id === null ? semComponente(l) : Number(l.componente_id) === Number(g.id))).map(l => ligacaoParaTela(base, l, unidade)) };
+  });
+}
 
 function ligacaoParaTela(base, l, unidade) {
   const item = base.itens.get(Number(l.estoque_codigo));
@@ -113,7 +136,7 @@ function registrarCustos({ rota, pool }) {
       const c = custoDo(base, m, inicioDoPeriodo(parametros.periodoMeses), parametros.divergenciaPct);
       const ligacoes = (base.ligPorMaterial.get(Number(m.CODIGO)) || []).map(l => ligacaoParaTela(base, l, c.unidade));
       res.json(semValores(req, { codigo: Number(m.CODIGO), modelo: m.MODELO, classe: m.CLASSE || '', valorFixo: Number(m.VALOR_FIXO) || null, ativo: ativo(m),
-        parametros, ligacoes, ...c }, CAMPOS_VALOR));
+        parametros, ligacoes, ...c, componentes: componentesParaTela(base, m, c.unidade, c.componentes) }, CAMPOS_VALOR));
     } catch (err) { falha(res, 'GET /custos/materiais/:codigo', err); }
   });
 
@@ -125,10 +148,12 @@ function registrarCustos({ rota, pool }) {
       for (const m of base.materiais.filter(ativo)) {
         const cod = Number(m.CODIGO), unidade = unidadeDo(base, m);
         const semCompra = !!base.configPorMaterial.get(cod)?.semCompra, ligs = base.ligPorMaterial.get(cod) || [];
+        const temComp = (base.compPorMaterial.get(cod) || []).length > 0;
         const comum = { codigo: cod, modelo: m.MODELO, classe: m.CLASSE || '', unidade };
         if (situacao === 'sem_compra' && semCompra) lista.push(comum);
-        else if (situacao === 'confirmadas' && !semCompra && ligs.length) lista.push({ ...comum, ligacoes: ligs.map(l => ligacaoParaTela(base, l, unidade)) });
-        else if (situacao === 'revisar' && !semCompra && !ligs.length) {
+        else if (situacao === 'confirmadas' && !semCompra && (ligs.length || temComp))
+          lista.push({ ...comum, ligacoes: ligs.map(l => ligacaoParaTela(base, l, unidade)), componentes: componentesParaTela(base, m, unidade) });
+        else if (situacao === 'revisar' && !semCompra && !ligs.length && !temComp) {
           lista.push({ ...comum, sugestoes: sugerirLigacoes(m, base.itensLista).map(s => {
             const fatorSugerido = sugerirFator(unidade, s.estoque);
             return { estoqueCodigo: Number(s.estoque.CODIGO), nome: s.estoque.NOME_PRODUTO, fornecedor: s.estoque.FORNECEDOR, unidadeCompra: s.estoque.UNIDADE,
@@ -153,28 +178,106 @@ function registrarCustos({ rota, pool }) {
       if (!mat.length) return res.status(400).json({ error: 'Material de venda não encontrado.' });
       const [item] = await pool.execute('SELECT CODIGO FROM estoque WHERE CODIGO = ? LIMIT 1', [estoqueCodigo]);
       if (!item.length) return res.status(400).json({ error: 'Item de estoque não encontrado.' });
+      const componenteId = b.componenteId === undefined || b.componenteId === null ? null : Number(b.componenteId);
+      if (componenteId !== null) {
+        const [comp] = Number.isInteger(componenteId) ? await pool.execute('SELECT id, material_codigo FROM web_custo_componentes WHERE id = ?', [componenteId]) : [[]];
+        if (!comp.length || Number(comp[0].material_codigo) !== materialCodigo) return res.status(400).json({ error: 'Componente não encontrado neste material.' });
+      }
       let r;
       try {
-        [r] = await pool.execute('INSERT INTO web_custo_ligacoes (material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por) VALUES (?, ?, ?, ?, ?)',
-          [materialCodigo, estoqueCodigo, fator, agoraLocal(), req.acesso?.nome || '']);
+        [r] = await pool.execute('INSERT INTO web_custo_ligacoes (material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [materialCodigo, estoqueCodigo, fator, agoraLocal(), req.acesso?.nome || '', componenteId]);
       } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Este item de compra já está ligado a este material.' });
         throw err;
       }
-      await auditar(req, 'custo_ligacao_confirmada', materialCodigo, { estoqueCodigo, fator });
+      await auditar(req, 'custo_ligacao_confirmada', materialCodigo, { estoqueCodigo, fator, componenteId });
       res.status(201).json({ id: r.insertId });
     } catch (err) { falha(res, 'POST /custos/ligacoes', err); }
   });
 
   rota('delete', '/custos/ligacoes/:id', EDITAR, async (req, res) => {
     try {
-      const [atual] = await pool.execute('SELECT id, material_codigo, estoque_codigo, fator FROM web_custo_ligacoes WHERE id = ?', [Number(req.params.id)]);
+      const [atual] = await pool.execute('SELECT id, material_codigo, estoque_codigo, fator, componente_id FROM web_custo_ligacoes WHERE id = ?', [Number(req.params.id)]);
       const lig = atual.find(l => Number(l.id) === Number(req.params.id));
       if (!lig) return res.status(404).json({ error: 'Ligação não encontrada.' });
       await pool.execute('DELETE FROM web_custo_ligacoes WHERE id = ?', [Number(lig.id)]);
-      await auditar(req, 'custo_ligacao_desfeita', lig.material_codigo, { estoqueCodigo: Number(lig.estoque_codigo), fator: Number(lig.fator) });
+      await auditar(req, 'custo_ligacao_desfeita', lig.material_codigo, { estoqueCodigo: Number(lig.estoque_codigo), fator: Number(lig.fator), componenteId: lig.componente_id ?? null });
+      // componente que ficou sem item sai junto (não sobra componente vazio por engano)
+      if (!semComponente(lig)) {
+        const [[c] = []] = await pool.execute('SELECT COUNT(*) AS n FROM web_custo_ligacoes WHERE componente_id = ?', [Number(lig.componente_id)]);
+        if (!Number(c?.n)) {
+          await pool.execute('DELETE FROM web_custo_componentes WHERE id = ?', [Number(lig.componente_id)]);
+          await auditar(req, 'custo_componente_excluido', lig.material_codigo, { id: Number(lig.componente_id), motivo: 'último item desfeito' });
+        }
+      }
       res.json({ ok: true });
     } catch (err) { falha(res, 'DELETE /custos/ligacoes/:id', err); }
+  });
+
+  // ---- composição: material = Σ participação × componente ----
+  const pctComponente = v => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1000 ? v : null);
+  const nomeComponente = v => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim());
+  const auditarConn = (conn, req, acao, alvo, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
+    [agoraLocal(), req.acesso?.nome || '', acao, String(alvo), JSON.stringify(detalhe)]);
+  const ERRO_PCT = 'Participação: de mais de 0% até 1000%.';
+
+  rota('post', '/custos/componentes', EDITAR, async (req, res) => {
+    const b = req.body || {}, materialCodigo = Number(b.materialCodigo);
+    const pct = b.participacaoPct === undefined ? 100 : pctComponente(b.participacaoPct), nome = nomeComponente(b.nome);
+    if (pct === null) return res.status(400).json({ error: ERRO_PCT });
+    if (nome && nome.length > 60) return res.status(400).json({ error: 'Nome do componente: até 60 caracteres.' });
+    const feito = await emTransacao(pool, res, 'POST /custos/componentes', async conn => {
+      const [mat] = await conn.execute('SELECT CODIGO FROM cadastro_de_produtos WHERE CODIGO = ? LIMIT 1', [materialCodigo]);
+      if (!mat.length) throw new ErroUsuario(404, 'Material de venda não encontrado.');
+      const [comps] = await conn.execute('SELECT id, material_codigo, ordem FROM web_custo_componentes WHERE material_codigo = ?', [materialCodigo]);
+      const doMaterial = comps.filter(c => Number(c.material_codigo) === materialCodigo);
+      let ordem = doMaterial.reduce((mx, c) => Math.max(mx, Number(c.ordem)), -1) + 1;
+      // primeira composição: o que já estava ligado vira o componente principal (100%) e continua valendo
+      const [ligs] = await conn.execute('SELECT id, material_codigo, componente_id FROM web_custo_ligacoes WHERE material_codigo = ?', [materialCodigo]);
+      if (ligs.some(l => Number(l.material_codigo) === materialCodigo && semComponente(l))) {
+        const [p] = await conn.execute('INSERT INTO web_custo_componentes (material_codigo, nome, participacao_pct, ordem, atualizado_em, atualizado_por) VALUES (?, ?, ?, ?, ?, ?)',
+          [materialCodigo, null, 100, ordem++, agoraLocal(), req.acesso?.nome || '']);
+        await conn.execute('UPDATE web_custo_ligacoes SET componente_id = ? WHERE material_codigo = ? AND componente_id IS NULL', [p.insertId, materialCodigo]);
+        await auditarConn(conn, req, 'custo_componente_criado', materialCodigo, { id: p.insertId, nome: null, participacaoPct: 100, motivo: 'ligações existentes' });
+      }
+      const [r] = await conn.execute('INSERT INTO web_custo_componentes (material_codigo, nome, participacao_pct, ordem, atualizado_em, atualizado_por) VALUES (?, ?, ?, ?, ?, ?)',
+        [materialCodigo, nome, pct, ordem, agoraLocal(), req.acesso?.nome || '']);
+      await auditarConn(conn, req, 'custo_componente_criado', materialCodigo, { id: r.insertId, nome, participacaoPct: pct });
+      return { id: r.insertId };
+    });
+    if (feito) res.status(201).json(feito);
+  });
+
+  rota('put', '/custos/componentes/:id', EDITAR, async (req, res) => {
+    try {
+      const b = req.body || {}, id = Number(req.params.id);
+      if (b.participacaoPct !== undefined && pctComponente(b.participacaoPct) === null) return res.status(400).json({ error: ERRO_PCT });
+      const nome = nomeComponente(b.nome);
+      if (nome && nome.length > 60) return res.status(400).json({ error: 'Nome do componente: até 60 caracteres.' });
+      const [rows] = await pool.execute('SELECT id, material_codigo, nome, participacao_pct FROM web_custo_componentes WHERE id = ?', [id]);
+      const c = rows.find(x => Number(x.id) === id);
+      if (!c) return res.status(404).json({ error: 'Componente não encontrado.' });
+      const novo = { nome: b.nome !== undefined ? nome : c.nome, participacaoPct: b.participacaoPct !== undefined ? b.participacaoPct : Number(c.participacao_pct) };
+      await pool.execute('UPDATE web_custo_componentes SET nome = ?, participacao_pct = ?, atualizado_em = ?, atualizado_por = ? WHERE id = ?',
+        [novo.nome, novo.participacaoPct, agoraLocal(), req.acesso?.nome || '', id]);
+      await auditar(req, 'custo_componente_alterado', c.material_codigo, { id, antes: { nome: c.nome, participacaoPct: Number(c.participacao_pct) }, depois: novo });
+      res.json({ ok: true });
+    } catch (err) { falha(res, 'PUT /custos/componentes/:id', err); }
+  });
+
+  rota('delete', '/custos/componentes/:id', EDITAR, async (req, res) => {
+    const id = Number(req.params.id);
+    const feito = await emTransacao(pool, res, 'DELETE /custos/componentes/:id', async conn => {
+      const [rows] = await conn.execute('SELECT id, material_codigo, nome, participacao_pct FROM web_custo_componentes WHERE id = ?', [id]);
+      const c = rows.find(x => Number(x.id) === id);
+      if (!c) throw new ErroUsuario(404, 'Componente não encontrado.');
+      await conn.execute('DELETE FROM web_custo_ligacoes WHERE componente_id = ?', [id]);
+      await conn.execute('DELETE FROM web_custo_componentes WHERE id = ?', [id]);
+      await auditarConn(conn, req, 'custo_componente_excluido', c.material_codigo, { id, nome: c.nome, participacaoPct: Number(c.participacao_pct) });
+      return { ok: true };
+    });
+    if (feito) res.json(feito);
   });
 
   rota('put', '/custos/material/:codigo', EDITAR, async (req, res) => {

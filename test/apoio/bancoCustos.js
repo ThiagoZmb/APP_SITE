@@ -66,6 +66,7 @@ function bancoCustos() {
       { classificacaoId: null, nome: null, COMPORTAMENTO: null, ENTRA_DRE: null, SITUACAO: 'Recebido', total: 200000 }
     ],
     encargos: [],
+    componentes: [],
     margens: [],
     historico: []
   };
@@ -111,6 +112,23 @@ function bancoCustos() {
       const m = estado.materiais.find(x => x.CODIGO === Number(c)); if (m) m.VALOR_FIXO = v; return { affectedRows: m ? 1 : 0 }; }],
     [/DELETE FROM web_custo_parametros WHERE chave = \?/, (sql, [chave]) => {
       const i = estado.parametros.findIndex(p => p.chave === chave); if (i >= 0) estado.parametros.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
+    // composição
+    [/^SELECT .*FROM web_custo_componentes WHERE id = \?/, (sql, [id]) => estado.componentes.filter(c => c.id === Number(id)).map(c => ({ ...c }))],
+    [/^SELECT .*FROM web_custo_componentes/, () => estado.componentes.map(c => ({ ...c }))],
+    [/INSERT INTO web_custo_componentes/, (sql, [material_codigo, nome, participacao_pct, ordem, atualizado_em, atualizado_por]) => {
+      const id = ++proxId; estado.componentes.push({ id, material_codigo, nome, participacao_pct: String(participacao_pct), ordem, atualizado_em, atualizado_por });
+      return { insertId: id, affectedRows: 1 }; }],
+    [/UPDATE web_custo_componentes SET nome = \?, participacao_pct = \?/, (sql, [nome, participacao_pct, atualizado_em, atualizado_por, id]) => {
+      const c = estado.componentes.find(x => x.id === Number(id)); if (c) Object.assign(c, { nome, participacao_pct: String(participacao_pct), atualizado_em, atualizado_por });
+      return { affectedRows: c ? 1 : 0 }; }],
+    [/DELETE FROM web_custo_componentes WHERE id = \?/, (sql, [id]) => {
+      const i = estado.componentes.findIndex(c => c.id === Number(id)); if (i >= 0) estado.componentes.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
+    [/UPDATE web_custo_ligacoes SET componente_id = \? WHERE material_codigo = \? AND componente_id IS NULL/, (sql, [cid, mat]) => {
+      const ls = estado.ligacoes.filter(l => l.material_codigo === Number(mat) && (l.componente_id ?? null) === null); ls.forEach(l => { l.componente_id = cid; });
+      return { affectedRows: ls.length }; }],
+    [/DELETE FROM web_custo_ligacoes WHERE componente_id = \?/, (sql, [cid]) => {
+      const antes = estado.ligacoes.length; estado.ligacoes = estado.ligacoes.filter(l => l.componente_id !== Number(cid)); return { affectedRows: antes - estado.ligacoes.length }; }],
+    [/SELECT COUNT\(\*\) AS n FROM web_custo_ligacoes WHERE componente_id = \?/, (sql, [cid]) => [{ n: estado.ligacoes.filter(l => l.componente_id === Number(cid)).length }]],
     [/FROM web_custo_parametros/, () => estado.parametros.map(p => ({ ...p }))],
     [/FROM cadastro_de_produtos WHERE CODIGO = \?/, (sql, [c]) => estado.materiais.filter(m => m.CODIGO === Number(c)).map(m => ({ CODIGO: m.CODIGO }))],
     [/FROM cadastro_de_produtos/, () => estado.materiais.map(m => ({ ...m }))],
@@ -127,10 +145,10 @@ function bancoCustos() {
     [/FROM entrada_estoque WHERE NOME_PRODUTO IN/, (sql, nomes) => estado.compras.filter(c => nomes.some(n => igualMySQL(n, c.NOME_PRODUTO)))
       .sort((a, b) => (a.DATA < b.DATA ? -1 : a.DATA > b.DATA ? 1 : a.id - b.id)).map(c => ({ ...c }))],
     // escrita (Task 5)
-    [/INSERT INTO web_custo_ligacoes/, (sql, [material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por]) => {
+    [/INSERT INTO web_custo_ligacoes/, (sql, [material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id = null]) => {
       if (estado.ligacoes.some(l => l.material_codigo === material_codigo && l.estoque_codigo === estoque_codigo))
         throw Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 });
-      const id = ++proxId; estado.ligacoes.push({ id, material_codigo, estoque_codigo, fator: String(fator), confirmado_em, confirmado_por }); return { insertId: id, affectedRows: 1 }; }],
+      const id = ++proxId; estado.ligacoes.push({ id, material_codigo, estoque_codigo, fator: String(fator), confirmado_em, confirmado_por, componente_id }); return { insertId: id, affectedRows: 1 }; }],
     [/DELETE FROM web_custo_ligacoes WHERE id = \?/, (sql, [id]) => {
       const i = estado.ligacoes.findIndex(l => l.id === Number(id)); if (i >= 0) estado.ligacoes.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
     [/INSERT INTO web_custo_material/, (sql, [material_codigo, unidade_venda, sem_compra, atualizado_em, atualizado_por]) => {

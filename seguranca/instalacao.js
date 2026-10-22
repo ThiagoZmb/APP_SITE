@@ -97,7 +97,19 @@ const TABELAS = [
      fator DECIMAL(14,6) NOT NULL,
      confirmado_em DATETIME NULL,
      confirmado_por VARCHAR(190) NULL,
+     componente_id INT NULL,
      UNIQUE KEY uk_material_estoque (material_codigo, estoque_codigo)
+   ) ${OPCOES}`,
+  // composição: material de venda = Σ participação × componente; ligação sem componente = componente principal (100%)
+  `CREATE TABLE IF NOT EXISTS \`web_custo_componentes\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     material_codigo INT NOT NULL,
+     nome VARCHAR(60) NULL,
+     participacao_pct DECIMAL(9,3) NOT NULL DEFAULT 100,
+     ordem INT NOT NULL DEFAULT 0,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL,
+     KEY idx_material (material_codigo)
    ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_custo_parametros\` (
      chave VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -146,6 +158,10 @@ const TABELAS = [
 
 async function instalarTabelas(pool) {
   for (const sql of TABELAS) await pool.execute(sql);
+  // instalações anteriores à composição: acrescenta a coluna na tabela da web (nunca em tabela do VB)
+  const [[c] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_ligacoes' AND COLUMN_NAME = 'componente_id'");
+  if (!Number(c?.n)) await pool.execute('ALTER TABLE web_custo_ligacoes ADD COLUMN componente_id INT NULL');
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo
