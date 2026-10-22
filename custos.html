@@ -81,7 +81,18 @@
         #prc-selo { background: #fff4e0; color: var(--atencao); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
         #prc-soma { font-size: 13px; }
         #prc-soma.alerta { color: var(--falta); font-weight: 800; }
-        #prc-variacao { width: 70px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        /* barra de filtros da formação de preço: busca compacta, tudo na mesma altura, gravação à direita */
+        #aba-precos .filtros { gap: 10px; }
+        #aba-precos .filtros > * { height: 34px; }
+        #aba-precos .filtros label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        #aba-precos .filtros input[type=checkbox] { width: 16px; height: 16px; margin: 0; }
+        #prc-busca { flex: 0 1 240px; min-width: 150px; }
+        #prc-classe { height: 34px; }
+        #prc-variacao { width: 64px; height: 34px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        #prc-gravar { margin-left: auto; height: 34px; padding: 0 14px; }
+        #prc-fora-filtro { display: inline-flex; align-items: center; }
+        #prc-fora-filtro:empty { display: none; }
+        #prc-recarregar { height: 34px; }
         #tab-precos tbody tr { cursor: pointer; }
         #tab-precos tbody tr:hover td { background: #fafbfc; }
         #tab-precos tr.conflito td { background: #fdecea; }
