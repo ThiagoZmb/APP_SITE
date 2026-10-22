@@ -83,6 +83,34 @@ const qtdTxt = v => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
 // quantidade gravada; componentes da forma antiga (só participacao_pct) valem pct ÷ 100
 const quantidadeDo = g => (g.quantidade !== null && g.quantidade !== undefined ? Number(g.quantidade) : Number(g.participacao_pct ?? 100) / 100);
 
+// Componente = SOMA dos seus itens do estoque, cada um com a sua quantidade (por 1 unidade de venda do material).
+// Um item sem custo deixa o componente sem custo (motivo com o nome do item).
+function somaDoComponente(ligs, comum) {
+  const itensSaida = [], motivos = [];
+  for (const l of ligs) {
+    const qtd = l.quantidade === null || l.quantidade === undefined ? 1 : Number(l.quantidade);
+    const est = comum.itens.get(Number(l.estoque_codigo));
+    const nome = est ? est.NOME_PRODUTO : null;
+    const prefixo = nome ? `${nome}: ` : '';
+    const item = { ligacaoId: Number(l.id), estoqueCodigo: Number(l.estoque_codigo), nome, quantidade: qtd, situacao: 'faltando', motivos: [], custo: null,
+      precoMedio: null, parcela: null, r: null };
+    itensSaida.push(item);
+    if (!(qtd > 0)) { item.motivos = ['quantidade inválida']; motivos.push(`${prefixo}quantidade inválida`); continue; }
+    const r = custoDoGrupo({ ligacoes: [l], ...comum });
+    Object.assign(item, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio, parcela: r.custo === null ? null : r.custo * qtd });
+    if (r.custo === null) motivos.push(...r.motivos.map(m => `${prefixo}${m}`));
+  }
+  const marcar = (lista, it) => lista.map(c => ({ ...c, itemEstoque: it.nome }));
+  const usadas = itensSaida.flatMap(it => (it.r ? marcar(it.r.usadas, it) : []));
+  const ignoradas = itensSaida.flatMap(it => (it.r ? marcar(it.r.ignoradas, it) : []));
+  const itens = itensSaida.map(({ r, ...it }) => it);
+  if (motivos.length) return { situacao: 'faltando', motivos, custo: null, precoMedio: null, referencia: null, divergente: false, ultimaCompra: null, usadas, ignoradas, itens };
+  const soma = f => itensSaida.reduce((t, it) => t + it.r[f] * it.quantidade, 0);
+  return { situacao: itensSaida.some(it => it.situacao === 'desatualizado') ? 'desatualizado' : 'confiavel', motivos: [], custo: soma('custo'), precoMedio: soma('precoMedio'),
+    referencia: itensSaida.every(it => it.r.referencia !== null) ? soma('referencia') : null, divergente: itensSaida.some(it => it.r.divergente),
+    ultimaCompra: itensSaida.map(it => it.r.ultimaCompra).filter(Boolean).sort()[0] ?? null, usadas, ignoradas, itens };
+}
+
 // Material de venda = Σ quantidade × componente (quantidade na unidade de venda do material, depois do fator). Sem componentes cadastrados, as ligações formam um grupo só
 // (o material simples de hoje, resultado idêntico). Um componente sem custo deixa o material sem custo: nunca custo parcial.
 function calcularCusto({ material, config, ligacoes, itens, compras, desde, divergenciaPct = 15, componentes = [] }) {
@@ -105,7 +133,7 @@ function calcularCusto({ material, config, ligacoes, itens, compras, desde, dive
     const ligs = g.id === null ? implicitas : ligacoes.filter(l => Number(l.componente_id) === Number(g.id));
     const temInformado = g.custo_informado !== null && g.custo_informado !== undefined;
     const parte = { id: g.id === null ? null : Number(g.id), nome: g.nome ?? null, rotulo: nome, quantidade: qtd, situacao: 'faltando', motivos: [],
-      custo: null, precoMedio: null, parcela: null, r: null, custoInformado: temInformado ? Number(g.custo_informado) : null,
+      custo: null, precoMedio: null, parcela: null, r: null, itens: [], custoInformado: temInformado ? Number(g.custo_informado) : null,
       informadoEm: temInformado ? g.informado_em ?? null : null, informadoPor: temInformado ? g.informado_por ?? null : null };
     partes.push(parte);
     if (!(qtd > 0)) { parte.motivos = ['quantidade inválida']; motivos.push(`${nome}: quantidade inválida`); return; }
@@ -119,8 +147,8 @@ function calcularCusto({ material, config, ligacoes, itens, compras, desde, dive
       return;
     }
     if (!ligs.length) { parte.motivos = ['sem item do estoque']; motivos.push(`componente ${nome} sem item do estoque`); return; }
-    const r = custoDoGrupo({ ligacoes: ligs, ...comum });
-    Object.assign(parte, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio,
+    const r = somaDoComponente(ligs, comum);
+    Object.assign(parte, { r, situacao: r.situacao, motivos: r.motivos, custo: r.custo, precoMedio: r.precoMedio, itens: r.itens,
       parcela: r.custo === null ? null : r.custo * qtd });
     if (r.custo === null) motivos.push(...r.motivos.map(m => `${nome}: ${m}`));
   });
@@ -137,7 +165,14 @@ function calcularCusto({ material, config, ligacoes, itens, compras, desde, dive
   const ultimaCompra = partes.map(p => p.r.ultimaCompra).filter(Boolean).sort()[0] ?? null;
   const suf = SUFIXO[unidade];
   const quando = p => (p.custoInformado !== null ? ` (informado em ${String(p.informadoEm || '').slice(0, 10).split('-').reverse().join('/')})` : '');
-  const passos = [...partes.map(p => `${p.rotulo}: ${qtdTxt(p.quantidade)} × ${moeda(p.custo)}${suf}${quando(p)} = ${moeda(p.parcela)}${suf}`), `= Custo: ${moeda(custo)}${suf}`];
+  // um item só com qtd 1: "C: 2 × R$ 3,00/m = R$ 6,00/m"; vários: "Conjunto: 1 × R$ 10,00/m (PERFIL A) + 2 × R$ 5,00/m (PERFIL B) = R$ 20,00/m"
+  const linha = p => {
+    if (p.custoInformado !== null || (p.itens.length === 1 && p.itens[0].quantidade === 1))
+      return `${p.rotulo}: ${qtdTxt(p.quantidade)} × ${moeda(p.custo)}${suf}${quando(p)} = ${moeda(p.parcela)}${suf}`;
+    const soma = p.itens.map(it => `${qtdTxt(it.quantidade)} × ${moeda(it.custo)}${suf} (${it.nome})`).join(' + ');
+    return `${p.rotulo}: ${p.quantidade === 1 ? soma : `(${soma}) × ${qtdTxt(p.quantidade)}`} = ${moeda(p.parcela)}${suf}`;
+  };
+  const passos = [...partes.map(linha), `= Custo: ${moeda(custo)}${suf}`];
   return { situacao: partes.some(p => p.situacao === 'desatualizado') ? 'desatualizado' : 'confiavel', motivos: [], custo, precoMedio, ultimaCompra,
     qtdCompras: usadas.length, referencia, divergencia, divergente: partes.some(p => p.r.divergente), usadas, ignoradas, passos, unidade, componentes: saidaComp,
     informado: partes.some(p => p.custoInformado !== null) };

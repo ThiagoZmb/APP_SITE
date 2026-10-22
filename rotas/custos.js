@@ -37,7 +37,7 @@ async function lerParametros(db) {
 async function carregarBase(db) {
   const [materiais] = await db.execute('SELECT CODIGO, MODELO, CLASSE, VALOR_FIXO, SITUACAO FROM cadastro_de_produtos ORDER BY MODELO');
   const [itensLista] = await db.execute('SELECT CODIGO, NOME_PRODUTO, FORNECEDOR, UNIDADE, VALOR, IPI, FRETE, PERDA, TAMANHO, ALTURA, LARGURA, SITUACAO FROM estoque');
-  const [ligacoes] = await db.execute('SELECT id, material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id FROM web_custo_ligacoes ORDER BY id');
+  const [ligacoes] = await db.execute('SELECT id, material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id, quantidade FROM web_custo_ligacoes ORDER BY id');
   const [comps] = await db.execute('SELECT id, material_codigo, nome, participacao_pct, quantidade, custo_informado, informado_em, informado_por, ordem FROM web_custo_componentes ORDER BY material_codigo, ordem, id');
   const [configs] = await db.execute('SELECT material_codigo, unidade_venda, sem_compra FROM web_custo_material');
   const itens = new Map(itensLista.map(i => [Number(i.CODIGO), i]));
@@ -89,7 +89,7 @@ function componentesParaTela(base, m, unidade, calculados = []) {
     const calc = calculados.find(c => c.id === (g.id === null ? null : Number(g.id))) || {};
     const informado = g.custo_informado !== null && g.custo_informado !== undefined;
     return { custo: calc.custo ?? null, parcela: calc.parcela ?? null, situacao: calc.situacao ?? null, motivos: calc.motivos || [],
-      custoInformado: informado ? Number(g.custo_informado) : null, informadoEm: informado ? g.informado_em : null, informadoPor: informado ? g.informado_por : null,
+      itens: calc.itens || [], custoInformado: informado ? Number(g.custo_informado) : null, informadoEm: informado ? g.informado_em : null, informadoPor: informado ? g.informado_por : null,
       id: g.id === null ? null : Number(g.id), nome: g.nome ?? null, quantidade: g.quantidade !== null && g.quantidade !== undefined ? Number(g.quantidade) : Number(g.participacao_pct ?? 100) / 100, ordem: Number(g.ordem),
       ligacoes: ligs.filter(l => (g.id === null ? semComponente(l) : Number(l.componente_id) === Number(g.id))).map(l => ligacaoParaTela(base, l, unidade)) };
   });
@@ -100,7 +100,8 @@ function ligacaoParaTela(base, l, unidade) {
   const fator = Number(l.fator);
   return { id: Number(l.id), estoqueCodigo: Number(l.estoque_codigo), existe: !!item, nome: item ? item.NOME_PRODUTO : null, fornecedor: item?.FORNECEDOR ?? null,
     unidadeCompra: item?.UNIDADE ?? null, fator, frase: item ? fraseFator(item.UNIDADE, fator, unidade) : null,
-    valorEstoque: item ? Number(item.VALOR) || 0 : null, confirmadoEm: l.confirmado_em, confirmadoPor: l.confirmado_por };
+    valorEstoque: item ? Number(item.VALOR) || 0 : null, confirmadoEm: l.confirmado_em, confirmadoPor: l.confirmado_por,
+    quantidade: l.quantidade === null || l.quantidade === undefined ? 1 : Number(l.quantidade) };
 }
 
 function registrarCustos({ rota, pool }) {
@@ -181,6 +182,9 @@ function registrarCustos({ rota, pool }) {
       const [item] = await pool.execute('SELECT CODIGO FROM estoque WHERE CODIGO = ? LIMIT 1', [estoqueCodigo]);
       if (!item.length) return res.status(400).json({ error: 'Item de estoque não encontrado.' });
       const componenteId = b.componenteId === undefined || b.componenteId === null ? null : Number(b.componenteId);
+      const quantidade = b.quantidade === undefined ? 1 : b.quantidade;
+      if (!(typeof quantidade === 'number' && Number.isFinite(quantidade) && quantidade > 0 && quantidade <= 10000))
+        return res.status(400).json({ error: 'Quantidade do item: maior que 0 e até 10.000 (por 1 unidade de venda do produto).' });
       if (componenteId !== null) {
         const [comp] = Number.isInteger(componenteId) ? await pool.execute('SELECT id, material_codigo, custo_informado FROM web_custo_componentes WHERE id = ?', [componenteId]) : [[]];
         if (!comp.length || Number(comp[0].material_codigo) !== materialCodigo) return res.status(400).json({ error: 'Componente não encontrado neste material.' });
@@ -189,8 +193,8 @@ function registrarCustos({ rota, pool }) {
       }
       let r;
       try {
-        [r] = await pool.execute('INSERT INTO web_custo_ligacoes (material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [materialCodigo, estoqueCodigo, fator, agoraLocal(), req.acesso?.nome || '', componenteId]);
+        [r] = await pool.execute('INSERT INTO web_custo_ligacoes (material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id, quantidade) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [materialCodigo, estoqueCodigo, fator, agoraLocal(), req.acesso?.nome || '', componenteId, quantidade]);
       } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Este item de compra já está ligado a este material.' });
         throw err;
@@ -198,6 +202,22 @@ function registrarCustos({ rota, pool }) {
       await auditar(req, 'custo_ligacao_confirmada', materialCodigo, { estoqueCodigo, fator, componenteId });
       res.status(201).json({ id: r.insertId });
     } catch (err) { falha(res, 'POST /custos/ligacoes', err); }
+  });
+
+  // quantidade do item dentro do componente (por 1 unidade de venda do produto)
+  rota('put', '/custos/ligacoes/:id', EDITAR, async (req, res) => {
+    try {
+      const id = Number(req.params.id), q = (req.body || {}).quantidade;
+      if (!(typeof q === 'number' && Number.isFinite(q) && q > 0 && q <= 10000))
+        return res.status(400).json({ error: 'Quantidade do item: maior que 0 e até 10.000 (por 1 unidade de venda do produto).' });
+      const [atual] = await pool.execute('SELECT id, material_codigo, estoque_codigo, fator, componente_id, quantidade FROM web_custo_ligacoes WHERE id = ?', [id]);
+      const lig = atual.find(l => Number(l.id) === id);
+      if (!lig) return res.status(404).json({ error: 'Ligação não encontrada.' });
+      await pool.execute('UPDATE web_custo_ligacoes SET quantidade = ? WHERE id = ?', [q, id]);
+      await auditar(req, 'custo_ligacao_alterada', lig.material_codigo, { id, estoqueCodigo: Number(lig.estoque_codigo),
+        antes: lig.quantidade === null || lig.quantidade === undefined ? 1 : Number(lig.quantidade), depois: q });
+      res.json({ ok: true });
+    } catch (err) { falha(res, 'PUT /custos/ligacoes/:id', err); }
   });
 
   rota('delete', '/custos/ligacoes/:id', EDITAR, async (req, res) => {

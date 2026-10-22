@@ -98,6 +98,7 @@ const TABELAS = [
      confirmado_em DATETIME NULL,
      confirmado_por VARCHAR(190) NULL,
      componente_id INT NULL,
+     quantidade DECIMAL(14,4) NULL,
      UNIQUE KEY uk_material_estoque (material_codigo, estoque_codigo)
    ) ${OPCOES}`,
   // composição: material de venda = Σ quantidade × componente (quantidade na unidade de venda); ligação sem componente = componente principal (1)
@@ -178,6 +179,14 @@ async function instalarTabelas(pool) {
   const [[ci] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_componentes' AND COLUMN_NAME = 'custo_informado'");
   if (!Number(ci?.n)) await pool.execute('ALTER TABLE web_custo_componentes ADD COLUMN custo_informado DECIMAL(14,4) NULL, ADD COLUMN informado_em DATETIME NULL, ADD COLUMN informado_por VARCHAR(190) NULL');
+  // quantidade por item dentro do componente (os itens se somam); a qtd que estava no componente passa para os itens dele, uma vez
+  const [[ql] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_ligacoes' AND COLUMN_NAME = 'quantidade'");
+  if (!Number(ql?.n)) {
+    await pool.execute('ALTER TABLE web_custo_ligacoes ADD COLUMN quantidade DECIMAL(14,4) NULL');
+    await pool.execute('UPDATE web_custo_ligacoes l JOIN web_custo_componentes c ON c.id = l.componente_id SET l.quantidade = c.quantidade WHERE c.quantidade IS NOT NULL AND c.quantidade <> 1');
+    await pool.execute('UPDATE web_custo_componentes SET quantidade = 1 WHERE quantidade IS NOT NULL AND quantidade <> 1');
+  }
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo

@@ -195,3 +195,17 @@ test('custo informado: colunas no CREATE e ALTER só quando faltam', async () =>
   assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /custo_informado DECIMAL\(14,4\) NULL/);
   assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
 });
+
+test('quantidade por item: coluna nas ligações e passagem da qtd do componente para os itens (uma vez)', async () => {
+  const sem = criarPoolFalso([[/COLUMN_NAME = 'componente_id'/, [{ n: 1 }]], [/COLUMN_NAME = 'quantidade' AND TABLE_NAME|TABLE_NAME = 'web_custo_ligacoes' AND COLUMN_NAME = 'quantidade'/, [{ n: 0 }]],
+    [/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(sem);
+  const sqls = sem.chamadas.map(c => c.sql);
+  assert.ok(sqls.includes('ALTER TABLE web_custo_ligacoes ADD COLUMN quantidade DECIMAL(14,4) NULL'));
+  assert.ok(sqls.includes('UPDATE web_custo_ligacoes l JOIN web_custo_componentes c ON c.id = l.componente_id SET l.quantidade = c.quantidade WHERE c.quantidade IS NOT NULL AND c.quantidade <> 1'));
+  assert.ok(sqls.includes('UPDATE web_custo_componentes SET quantidade = 1 WHERE quantidade IS NOT NULL AND quantidade <> 1'));
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  await instalarTabelas(com);
+  assert.ok(!com.chamadas.some(c => /^ALTER|^UPDATE/.test(c.sql)));
+  assert.match(com.chamadas.find(c => /`web_custo_ligacoes`/.test(c.sql)).sql, /quantidade DECIMAL\(14,4\) NULL/);
+});

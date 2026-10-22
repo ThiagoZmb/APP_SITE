@@ -138,14 +138,36 @@ test('composição: Canelado = 1 m² de vidro (chapa → m²) + 1 m² de pintura
   assert.equal(r4(r.custo), 135);
 });
 
-test('composição: componente com 2 fornecedores faz média dentro e soma fora', () => {
-  const b = belluno();
-  b.ligacoes.push({ id: 4, estoque_codigo: 14, fator: 6, componente_id: 1 });
-  b.itens.set(14, limpo(14, 'PERFIL A FORN 2'));
-  b.compras.push(compra('2026-08-02', 10, 72, 'PERFIL A FORN 2')); // R$ 12/m → A = média 11
+test('composição: itens de um mesmo componente SE SOMAM, cada um com a sua quantidade', () => {
+  const b = belluno({ componentes: [comp(1, 'Conjunto de perfis', 1), comp(3, 'C', 2)] });
+  b.ligacoes = [{ id: 1, estoque_codigo: 11, fator: 6, componente_id: 1, quantidade: '1' }, { id: 2, estoque_codigo: 12, fator: 6, componente_id: 1, quantidade: '2' },
+    { id: 3, estoque_codigo: 13, fator: 6, componente_id: 3 }];
   const r = calcularCusto(b);
-  assert.equal(r4(r.componentes[0].custo), 11);
-  assert.equal(r4(r.custo), 22);
+  // conjunto: 1 × 10 (A) + 2 × 5 (B) = 20; C: 2 × 3 = 6 → 26
+  assert.equal(r.situacao, 'confiavel');
+  assert.equal(r4(r.componentes[0].custo), 20);
+  assert.equal(r4(r.custo), 26);
+  assert.deepEqual(r.componentes[0].itens.map(i => [i.ligacaoId, i.estoqueCodigo, i.nome, i.quantidade, r4(i.custo), r4(i.parcela), i.situacao]),
+    [[1, 11, 'PERFIL A', 1, 10, 10, 'confiavel'], [2, 12, 'PERFIL B', 2, 5, 10, 'confiavel']]);
+  assert.ok(r.passos.includes('Conjunto de perfis: 1 × R$ 10,00/m (PERFIL A) + 2 × R$ 5,00/m (PERFIL B) = R$ 20,00/m'), r.passos.join(' | '));
+  assert.ok(r.passos.includes('C: 2 × R$ 3,00/m = R$ 6,00/m'), r.passos.join(' | '));
+});
+
+test('composição: item sem compra deixa o componente sem custo, com o nome do item no motivo', () => {
+  const b = belluno({ componentes: [comp(1, 'Conjunto de perfis', 1)] });
+  b.ligacoes = [{ id: 1, estoque_codigo: 11, fator: 6, componente_id: 1, quantidade: '1' }, { id: 2, estoque_codigo: 12, fator: 6, componente_id: 1, quantidade: '1' }];
+  b.compras = b.compras.filter(c => c.NOME_PRODUTO !== 'PERFIL B');
+  const r = calcularCusto(b);
+  assert.equal(r.situacao, 'faltando');
+  assert.equal(r.custo, null);
+  assert.deepEqual(r.motivos, ['Conjunto de perfis: PERFIL B: item nunca comprado']);
+  assert.deepEqual(r.componentes[0].itens.map(i => [i.nome, i.situacao, i.custo === null ? null : r4(i.custo)]), [['PERFIL A', 'confiavel', 10], ['PERFIL B', 'faltando', null]]);
+});
+
+test('composição: quantidade do item inválida vira motivo', () => {
+  const b = belluno({ componentes: [comp(1, 'A', 1)] });
+  b.ligacoes = [{ id: 1, estoque_codigo: 11, fator: 6, componente_id: 1, quantidade: '0' }];
+  assert.deepEqual(calcularCusto(b).motivos, ['A: PERFIL A: quantidade inválida']);
 });
 
 test('composição: componente sem compra deixa o material sem custo, com o nome no motivo', () => {
@@ -154,7 +176,7 @@ test('composição: componente sem compra deixa o material sem custo, com o nome
   const r = calcularCusto(b);
   assert.equal(r.situacao, 'faltando');
   assert.equal(r.custo, null);
-  assert.deepEqual(r.motivos, ['Pintura: item nunca comprado']);
+  assert.deepEqual(r.motivos, ['Pintura: PERFIL C: item nunca comprado']);
   assert.equal(r.componentes[2].situacao, 'faltando');
   assert.equal(r4(r.componentes[0].custo), 10); // os outros continuam informados no detalhe
 });

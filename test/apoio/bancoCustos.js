@@ -147,10 +147,12 @@ function bancoCustos() {
     [/FROM entrada_estoque WHERE NOME_PRODUTO IN/, (sql, nomes) => estado.compras.filter(c => nomes.some(n => igualMySQL(n, c.NOME_PRODUTO)))
       .sort((a, b) => (a.DATA < b.DATA ? -1 : a.DATA > b.DATA ? 1 : a.id - b.id)).map(c => ({ ...c }))],
     // escrita (Task 5)
-    [/INSERT INTO web_custo_ligacoes/, (sql, [material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id = null]) => {
+    [/UPDATE web_custo_ligacoes SET quantidade = \? WHERE id = \?/, (sql, [q, id]) => {
+      const l = estado.ligacoes.find(x => x.id === Number(id)); if (l) l.quantidade = String(q); return { affectedRows: l ? 1 : 0 }; }],
+    [/INSERT INTO web_custo_ligacoes/, (sql, [material_codigo, estoque_codigo, fator, confirmado_em, confirmado_por, componente_id = null, quantidade = 1]) => {
       if (estado.ligacoes.some(l => l.material_codigo === material_codigo && l.estoque_codigo === estoque_codigo))
         throw Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 });
-      const id = ++proxId; estado.ligacoes.push({ id, material_codigo, estoque_codigo, fator: String(fator), confirmado_em, confirmado_por, componente_id }); return { insertId: id, affectedRows: 1 }; }],
+      const id = ++proxId; estado.ligacoes.push({ id, material_codigo, estoque_codigo, fator: String(fator), confirmado_em, confirmado_por, componente_id, quantidade: String(quantidade) }); return { insertId: id, affectedRows: 1 }; }],
     [/DELETE FROM web_custo_ligacoes WHERE id = \?/, (sql, [id]) => {
       const i = estado.ligacoes.findIndex(l => l.id === Number(id)); if (i >= 0) estado.ligacoes.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
     [/INSERT INTO web_custo_material/, (sql, [material_codigo, unidade_venda, sem_compra, atualizado_em, atualizado_por]) => {

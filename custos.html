@@ -142,7 +142,13 @@
         .comp-qtd-rotulo { font-weight: 400; }
         .comp-topo .comp-qtd { width: 70px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .comp-custo { font-size: 12.5px; color: var(--text-light); }
-        .comp-item { font-size: 13px; margin: 2px 0; }
+        .comp-item { font-size: 13px; margin: 2px 0; padding: 6px 0; border-top: 1px dashed var(--border-color); }
+        .comp-item .item-nome { margin-bottom: 4px; }
+        .comp-item .item-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+        .comp-item .item-qtd { width: 64px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .comp-item .item-qtd-rotulo { font-weight: 400; color: var(--text-light); font-size: 12px; }
+        .comp-item .item-custo { font-size: 12.5px; color: var(--text-light); margin-left: auto; }
+        .comp-topo .comp-custo { margin-left: auto; font-size: 13px; }
         .comp-motivo { margin: 4px 0 8px; }
         /* ações da aba Ligações: quebram em linhas (o tema cortava a célula com "…") */
         html body #tab-ligacoes td.lig-acoes-td { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; width: 230px; }
@@ -478,6 +484,15 @@
             ${remover ? `<button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação">✕</button>` : ''}</div>`;
         const pctTexto = v => String(v).replace('.', ',');
         const nomeComp = (c, i) => c.nome || `Componente ${i + 1}`;
+        // item dentro de um componente: nome, conversão, qtd por 1 unidade do produto e "qtd × custo = subtotal"
+        const linhaItemComp = (l, calc, un, ed) => `<div class="comp-item" data-lig="${l.id}">
+            <div class="item-nome">${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')}) — ${esc(l.frase)}</small>`
+                : `<span class="motivo">item de compra não encontrado (código ${l.estoqueCodigo})</span>`}</div>
+            <div class="item-linha"><span class="campo-qtd">qtd <input type="text" inputmode="decimal" class="item-qtd" value="${pctTexto(l.quantidade ?? 1)}" aria-label="Quantidade de ${esc(l.nome || '')}" ${ed}>
+                <span class="item-qtd-rotulo">${un} por 1 ${un} do produto</span></span>
+              <span class="item-custo" data-valor>${calc && calc.custo != null ? `${pctTexto(calc.quantidade)} × ${moeda(calc.custo)} = <b>${moeda(calc.parcela)}</b>`
+                : `<span class="motivo">${esc((calc && calc.motivos || []).join(' · ') || '—')}</span>`}</span>
+              <button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação">✕</button></div></div>`;
         function htmlComposicao(d) {
             const comps = d.componentes || [];
             if (!comps.length) return (d.ligacoes.length ? d.ligacoes.map(l => linhaItem(l, false)).join('') : '<div>Nenhum item ligado. Use a aba "Ligações".</div>')
@@ -486,14 +501,12 @@
             const ed = podeEditar() ? '' : 'disabled', un = UN[d.unidade] || 'un';
             return comps.map((c, i) => `<div class="componente" data-id="${c.id ?? ''}">
                 <div class="comp-topo"><input type="text" class="comp-nome" maxlength="60" value="${esc(c.nome || '')}" placeholder="Componente ${i + 1}" aria-label="Nome do componente" ${ed || (c.id == null ? 'disabled' : '')}>
-                    <span class="campo-qtd">qtd <input type="text" inputmode="decimal" class="comp-qtd" value="${pctTexto(c.quantidade)}" aria-label="Quantidade de ${esc(nomeComp(c, i))}" ${ed || (c.id == null ? 'disabled' : '')}>
-                        <span class="comp-qtd-rotulo">${un} por 1 ${un} do produto</span></span>
-                    <span class="comp-custo" data-valor>${c.custo == null ? '—' : `${pctTexto(c.quantidade)} × ${moeda(c.custo)} = <b>${moeda(c.parcela)}</b>`}</span></div>
+                    <span class="comp-custo" data-valor>Total: <b>${c.parcela == null ? '—' : moeda(c.parcela) + ' / ' + un}</b>${c.quantidade !== 1 ? ` <small>(× ${pctTexto(c.quantidade)})</small>` : ''}</span></div>
                 ${c.motivos.length ? `<div class="comp-motivo motivo">⚠️ ${c.motivos.map(esc).join(' · ')}</div>` : ''}
                 ${c.custoInformado != null ? `<div class="comp-informado-linha">✍️ custo informado: R$ <input type="text" inputmode="decimal" class="comp-informado" value="${pctTexto(c.custoInformado)}"
                         aria-label="Custo informado de ${esc(nomeComp(c, i))}" ${ed}> por ${un}
                         <span class="comp-informado-quando">em ${dataBR(c.informadoEm)} por ${esc(c.informadoPor || '—')}</span></div>`
-                    : c.ligacoes.map(l => linhaItem(l, true)).join('')}
+                    : c.ligacoes.map(l => linhaItemComp(l, (c.itens || []).find(it => it.ligacaoId === l.id), un, ed)).join('')}
                 <div class="comp-acoes">${c.id == null ? '' : (c.custoInformado != null
                     ? '<button type="button" class="btn-mini comp-usar-estoque" data-perm="precos.editar">Usar itens do estoque</button>'
                     : '<button type="button" class="btn-mini comp-mais-item" data-perm="precos.editar">+ item do estoque</button>'
@@ -564,6 +577,12 @@
                 const t = String(e.target.value).trim().replace(',', '.'), n = Number(t);
                 if (!/^\d+(\.\d+)?$/.test(t) || !(n > 0 && n <= 10000)) return mostrarErro('Quantidade: maior que 0 e até 10.000 (na unidade de venda do produto).');
                 corpo = { quantidade: n };
+            } else if (e.target.matches('.item-qtd')) {
+                const t = String(e.target.value).trim().replace(',', '.'), n = Number(t);
+                if (!/^\d+(\.\d+)?$/.test(t) || !(n > 0 && n <= 10000)) return mostrarErro('Quantidade do item: maior que 0 e até 10.000 (por 1 unidade de venda do produto).');
+                try { await api(`/custos/ligacoes/${e.target.closest('.comp-item').dataset.lig}`, { method: 'PUT', body: JSON.stringify({ quantidade: n }) }); mostrarErro(''); await recarregarDetalhe(); }
+                catch (err) { mostrarErro(err.message); }
+                return;
             } else if (e.target.matches('.comp-informado')) {
                 const v = lerValor(e.target.value);
                 if (!(v > 0 && v <= 1000000)) return mostrarErro(ERRO_INFORMADO);
@@ -623,8 +642,8 @@
                 tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}">
                     <td><b>${esc(m.modelo)}</b><br><small>vendido por ${UN[m.unidade]}</small></td>
                     <td>${(m.componentes && m.componentes.length ? m.componentes : [{ ligacoes: m.ligacoes, simples: true }]).map((c, i) =>
-                        (c.simples ? '' : `<div class="lig-componente"><b>${esc(nomeComp(c, i))} · qtd ${pctTexto(c.quantidade)}</b></div>`)
-                        + c.ligacoes.map(l => `<div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}`
+                        (c.simples ? '' : `<div class="lig-componente"><b>${esc(nomeComp(c, i))}</b></div>`)
+                        + c.ligacoes.map(l => `<div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}${c.simples ? '' : ` · qtd ${pctTexto(l.quantidade ?? 1)}`}`
                         : `<span class="motivo">⚠️ item de compra não encontrado (código ${l.estoqueCodigo})</span>`}
                         <button type="button" class="btn-mini lig-desfazer" data-id="${l.id}" data-perm="precos.editar">Desfazer</button></div>`).join('')).join('')}</td>
                     <td class="lig-acoes-td"><div class="lig-acoes"><button type="button" class="btn-mini lig-mais" data-perm="precos.editar">+ outro item de compra</button>

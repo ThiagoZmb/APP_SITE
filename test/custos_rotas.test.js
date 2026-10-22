@@ -271,3 +271,28 @@ test('custo informado: num componente; alterar, limpar; com itens → 409; item 
   assert.deepEqual([c.custo_informado, c.informado_em, c.informado_por], [null, null, null]);
   assert.equal((await (await chamar('/custos/materiais/100')).json()).situacao, 'faltando');
 });
+
+// ---------- quantidade por item dentro do componente ----------
+test('itens do componente: cada um com a sua quantidade (padrão 1); alterar a qtd muda o custo; validação', async t => {
+  const { chamar, banco } = await prepararCustos(t);
+  const { id } = await (await chamar('/custos/componentes', 'POST', { materialCodigo: 100, nome: 'Conjunto' })).json();
+  const principal = banco.estado.componentes[0].id;
+  await chamar('/custos/componentes/' + principal, 'DELETE');
+  const custo1 = 12.539130434782608; // PERFIL 1036 BARRA
+  banco.estado.compras.push({ id: 60, NOTA_FISCAL: '701', DATA: banco.estado.compras[0].DATA, FABRICANTE: 'FORN C', NOME_PRODUTO: 'PUXADOR CONCHA', QTD: 10, VALOR_UNITARIO: 15 });
+  assert.equal((await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 1, fator: 6, componenteId: id })).status, 201);
+  const l2 = await (await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 4, fator: 1, componenteId: id, quantidade: 2 })).json();
+  let d = await (await chamar('/custos/materiais/100')).json();
+  assert.equal(Math.round(d.custo * 10000), Math.round((custo1 + 2 * 15) * 10000));
+  assert.deepEqual(d.componentes[0].itens.map(i => [i.estoqueCodigo, i.quantidade]), [[1, 1], [4, 2]]);
+  assert.deepEqual(d.componentes[0].ligacoes.map(l => [l.estoqueCodigo, l.quantidade]), [[1, 1], [4, 2]]);
+  assert.equal((await chamar('/custos/ligacoes/' + l2.id, 'PUT', { quantidade: 0.5 })).status, 200);
+  d = await (await chamar('/custos/materiais/100')).json();
+  assert.equal(Math.round(d.custo * 10000), Math.round((custo1 + 7.5) * 10000));
+  for (const q of [0, -1, 10001, '2']) assert.equal((await chamar('/custos/ligacoes/' + l2.id, 'PUT', { quantidade: q })).status, 400, String(q));
+  assert.equal((await chamar('/custos/ligacoes', 'POST', { materialCodigo: 100, estoqueCodigo: 3, fator: 1, componenteId: id, quantidade: 0 })).status, 400);
+  assert.equal((await chamar('/custos/ligacoes/9999', 'PUT', { quantidade: 1 })).status, 404);
+  assert.ok(banco.estado.auditoria.some(a => a[2] === 'custo_ligacao_alterada'));
+  const v = await prepararCustos(t, { perfil: 'Só ver custos', banco });
+  assert.equal((await v.chamar('/custos/ligacoes/' + l2.id, 'PUT', { quantidade: 1 })).status, 403);
+});
