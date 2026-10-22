@@ -591,3 +591,71 @@ body .painel-head { padding-top: 18px !important; }
 .abas-estoque .aba-est { padding: 8px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--text-light, #6c757d); text-decoration: none; white-space: nowrap; }
 .abas-estoque .aba-est:hover { color: var(--primary-color, #8B0000); }
 .abas-estoque .aba-est.on { background: #fff; color: var(--primary-color, #8B0000); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
+
+/* =========================================================================
+   PAINEL DE DETALHE (gaveta lateral) e BLOCOS de informação
+   Padrão para telas com grupos de informação: cada grupo é um bloco com
+   cabeçalho próprio, borda e respiro — fica claro onde começa e onde acaba.
+   ========================================================================= */
+.painel-det { background: var(--bg) !important; padding: 0 !important; }
+.painel-det .pd-cab {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 16px 18px 14px; background: var(--white); border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-light);
+}
+.painel-det .pd-sobre { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-light); margin-bottom: 2px; }
+.painel-det .pd-cab h2 { font-size: 19px !important; line-height: 1.25; margin: 0 !important; color: var(--text-dark); }
+.painel-det .pd-fechar { flex: none; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--white); font-size: 16px; cursor: pointer; color: var(--text-mid); }
+.painel-det .pd-fechar:hover { background: var(--secondary-color); }
+.painel-det .pd-corpo { padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+
+/* destaque do valor principal */
+.pd-hero { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; box-shadow: var(--shadow-light); }
+.pd-hero .pd-rotulo { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-light); }
+.pd-hero .pd-valor { font-size: 26px; font-weight: 800; color: var(--text-dark); line-height: 1.15; }
+.pd-hero .pd-valor small { font-size: 14px; font-weight: 600; color: var(--text-light); }
+.pd-hero .pd-valor.sem { color: var(--danger-color); font-size: 20px; }
+
+/* alertas em caixa (não soltos no texto) */
+.pd-alerta { display: flex; gap: 10px; align-items: flex-start; border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; line-height: 1.45;
+    background: #fff4e5; border: 1px solid #f6d7a7; border-left: 4px solid var(--warning-color); color: #7a4b00; }
+.pd-alerta.erro { background: #fdecee; border-color: #f5c2c8; border-left-color: var(--danger-color); color: #8a1c2b; }
+.pd-alerta ul { margin: 0; padding-left: 16px; }
+
+/* bloco = grupo de informação */
+.bloco { background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-light); overflow: hidden; }
+.bloco-cab { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+.bloco-cab .ico { font-size: 15px; }
+.bloco-cab h3 { margin: 0 !important; font-size: 12.5px !important; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--primary-color) !important; }
+.bloco-cab .bloco-acao { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.bloco-corpo { padding: 12px 14px; }
+.bloco-corpo > p:first-child { margin-top: 0; }
+.bloco-rodape { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 14px; background: var(--surface-2); border-top: 1px solid var(--border-color); }
+.bloco .tabela-wrap { margin: 0; }
+
+/* passos de uma conta: linhas, a última é o resultado */
+.passos-lista { list-style: none; margin: 0; padding: 4px 0; counter-reset: passo; }
+.passos-lista li { counter-increment: passo; display: flex; gap: 10px; padding: 7px 14px; font-size: 13.5px; border-bottom: 1px dashed var(--border-color); }
+.passos-lista li::before { content: counter(passo); flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--secondary-color); color: var(--text-light);
+    font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.passos-lista li:last-child { border-bottom: none; font-weight: 800; background: var(--primary-light); color: var(--primary-dark); }
+.passos-lista li:last-child::before { background: var(--primary-color); color: #fff; }
+.passos-lista li.sem-calculo { font-weight: 600; background: none; color: var(--text-light); }
+.passos-lista li.sem-calculo::before { content: '–'; background: var(--secondary-color); color: var(--text-light); }
+
+/* sub-bloco (ex.: um componente) com faixa de cor à esquerda */
+.sub-bloco { border: 1px solid var(--border-color); border-left: 4px solid var(--primary-color); border-radius: var(--radius-sm); background: var(--white); margin-bottom: 10px; overflow: hidden; }
+.sub-bloco.falta { border-left-color: var(--danger-color); }
+.sub-bloco.aviso { border-left-color: var(--warning-color); }
+.sub-bloco-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+.chip-total { margin-left: auto; display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 12px; border-radius: 999px; background: var(--white);
+    border: 1px solid var(--border-strong); font-size: 12px; color: var(--text-light); white-space: nowrap; }
+.chip-total b { font-size: 14px; color: var(--text-dark); }
+.chip-total.vazio b { color: var(--danger-color); }
+
+/* linhas de item dentro de um bloco */
+.linha-item { padding: 10px 12px; border-top: 1px solid var(--border-color); }
+.sub-bloco-cab + .linha-item, .sub-bloco-cab + .pd-alerta + .linha-item { border-top: none; }
+.linha-item:hover { background: #fcfcfe; }
+.linha-item.falta { background: #fff7f8; }
+.linha-item.aviso { background: #fffaf0; }

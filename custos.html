@@ -41,11 +41,13 @@
         .motivo { display: block; font-size: 11.5px; color: var(--falta); }
         .diverge { color: var(--atencao); font-size: 11.5px; display: block; }
         .det-fundo { position: fixed; inset: 0; background: rgba(15, 23, 42, .35); display: none; z-index: 50; }
-        #det-material { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-material { position: fixed; top: 0; right: 0; bottom: 0; width: min(660px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-material .bloco-corpo .prc-ref { margin: 0 0 10px; }
+        #det-material #det-situacao .sit { font-size: 12.5px; padding: 4px 12px; }
         #det-material.aberto, .det-fundo.aberto { display: block; }
         #det-material h2 { font-size: 18px; margin-bottom: 4px; }
         #det-material h3 { font-size: 12px; text-transform: uppercase; color: var(--primary-color); margin: 14px 0 6px; letter-spacing: .5px; }
-        #det-passos { padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+        #det-passos { padding: 4px 0; }
         #det-passos li:last-child { font-weight: 800; }
         .fechar { float: right; border: none; background: none; font-size: 20px; cursor: pointer; }
         tr.ignorada td { color: var(--text-light); text-decoration: line-through; }
@@ -135,26 +137,28 @@
         .campo-pct input { flex: 1; min-width: 0; }
         .dlg-rolagem { max-height: 50vh; overflow: auto; }
         #dlg-gravar { width: min(560px, calc(100vw - 32px)); }
-        .componente { border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-        .comp-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
-        .comp-topo .comp-nome { flex: 1; min-width: 120px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; font-weight: 700; }
+        .componente .comp-motivo { margin: 10px 12px 0; }
+        .componente .comp-acoes.bloco-rodape { margin-top: 0; }
+        .comp-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .comp-topo .comp-nome { flex: 1 1 200px; min-width: 180px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; font-weight: 700; }
         .campo-qtd { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-light); }
         .comp-qtd-rotulo { font-weight: 400; }
         .comp-topo .comp-qtd { width: 70px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .comp-custo { font-size: 12.5px; color: var(--text-light); }
-        .comp-item { font-size: 13px; margin: 2px 0; padding: 6px 0; border-top: 1px dashed var(--border-color); }
-        .comp-item .item-nome { margin-bottom: 4px; }
+        .comp-item { font-size: 13px; }
+        .comp-item .item-nome { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+        .comp-item .item-nome .btn-mini { flex: none; margin: 0; }
         .comp-item .item-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
         .comp-item .item-qtd { width: 64px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .comp-item .item-qtd-rotulo { font-weight: 400; color: var(--text-light); font-size: 12px; }
         .comp-item .item-custo { font-size: 12.5px; color: var(--text-light); margin-left: auto; }
         .comp-topo .comp-custo { margin-left: auto; font-size: 13px; }
-        .comp-motivo { margin: 4px 0 8px; }
         /* ações da aba Ligações: quebram em linhas (o tema cortava a célula com "…") */
         html body #tab-ligacoes td.lig-acoes-td { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; width: 230px; }
         .lig-acoes { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
         .lig-acoes .btn-mini { margin: 0; text-align: left; }
         .comp-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .comp-acoes.bloco-rodape { margin-top: 0; }
         .comp-informado-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0; }
         .comp-informado { width: 100px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .comp-informado-quando { color: var(--text-light); font-size: 12px; }
@@ -165,7 +169,7 @@
         .campo-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251500">
+    <link rel="stylesheet" href="tema.css?v=202610251800">
     <script src="layout.js?v=202610251500" defer></script>
 </head>
 <body>
@@ -283,22 +287,39 @@
     </div>
 
     <div class="det-fundo" id="det-fundo"></div>
-    <aside id="det-material" aria-label="Detalhe do material">
-        <button type="button" class="fechar" id="det-fechar" aria-label="Fechar">✕</button>
-        <h2 id="det-titulo">—</h2>
-        <div id="det-situacao"></div>
-        <div id="det-alertas"></div>
-        <h3>Como o custo foi calculado</h3>
-        <ol id="det-passos"></ol>
-        <h3 id="det-titulo-composicao">Composição</h3>
-        <p id="det-explica-composicao" class="prc-ref">Junte aqui os itens do estoque que formam este produto, cada um com a sua quantidade, ou informe o custo quando ele não vem do estoque.</p>
-        <div id="det-ligacoes"></div>
-        <h3>Unidade de venda</h3>
-        <div id="det-unidade-wrap"><select id="det-unidade" aria-label="Unidade de venda"><option value="">pela classe</option><option value="m">metro</option><option value="m2">m²</option><option value="un">unidade</option></select>
-            <button type="button" class="btn-mini" id="det-unidade-salvar" data-perm="precos.editar">Salvar</button></div>
-        <h3>Notas de compra usadas</h3>
-        <div class="tabela-wrap"><table id="det-compras"><thead><tr><th>NF</th><th>Data</th><th>Fornecedor</th><th class="num">Qtd</th>
-            <th class="num" data-valor>Valor</th><th class="num" data-valor>Por unid. venda</th><th></th></tr></thead><tbody></tbody></table></div>
+    <aside id="det-material" class="painel-det" aria-label="Detalhe do material">
+        <div class="pd-cab">
+            <div><div class="pd-sobre">Material de venda</div><h2 id="det-titulo">—</h2></div>
+            <button type="button" class="pd-fechar" id="det-fechar" aria-label="Fechar">✕</button>
+        </div>
+        <div class="pd-corpo">
+            <div class="pd-hero">
+                <div><div class="pd-rotulo">Custo por unidade de venda</div><div class="pd-valor" id="det-valor">—</div></div>
+                <div id="det-situacao"></div>
+            </div>
+            <div id="det-alertas"></div>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧮</span><h3>Como o custo foi calculado</h3></div>
+                <ol id="det-passos" class="passos-lista"></ol>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧩</span><h3 id="det-titulo-composicao">Composição</h3></div>
+                <div class="bloco-corpo">
+                    <p id="det-explica-composicao" class="prc-ref">Junte aqui os itens do estoque que formam este produto, cada um com a sua quantidade, ou informe o custo quando ele não vem do estoque.</p>
+                    <div id="det-ligacoes"></div>
+                </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">📏</span><h3>Unidade de venda</h3></div>
+                <div class="bloco-corpo" id="det-unidade-wrap"><select id="det-unidade" aria-label="Unidade de venda"><option value="">pela classe</option><option value="m">metro</option><option value="m2">m²</option><option value="un">unidade</option></select>
+                    <button type="button" class="btn-mini" id="det-unidade-salvar" data-perm="precos.editar">Salvar</button></div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧾</span><h3>Notas de compra usadas</h3></div>
+                <div class="tabela-wrap"><table id="det-compras"><thead><tr><th>NF</th><th>Data</th><th>Fornecedor</th><th class="num">Qtd</th>
+                    <th class="num" data-valor>Valor</th><th class="num" data-valor>Por unid. venda</th><th></th></tr></thead><tbody></tbody></table></div>
+            </section>
+        </div>
     </aside>
 
     <aside id="det-preco" aria-label="Formação do preço do material">
@@ -461,12 +482,15 @@
             try {
                 const d = await api(`/custos/materiais/${codigo}?meses=${encodeURIComponent($('f-meses').value)}`);
                 detalheAtual = d;
-                $('det-titulo').textContent = `${d.modelo} — ${moeda(d.custo)}${d.custo != null ? ' / ' + (UN[d.unidade] || '') : ''}`;
+                $('det-titulo').textContent = d.modelo;
+                $('det-valor').innerHTML = d.custo != null ? `${moeda(d.custo)} <small>/ ${UN[d.unidade] || ''}</small>` : 'sem custo';
+                $('det-valor').classList.toggle('sem', d.custo == null);
                 $('det-situacao').innerHTML = `<span class="sit ${d.situacao}">${SITUACAO[d.situacao]}</span>`;
                 const alertas = [...d.motivos];
                 if (d.divergente) alertas.push(`custo e VALOR do estoque divergem (referência ${moeda(d.referencia)})`);
-                $('det-alertas').innerHTML = alertas.map(a => `<span class="motivo">⚠️ ${esc(a)}</span>`).join('');
-                $('det-passos').innerHTML = (d.passos || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li>Sem cálculo: veja os alertas.</li>';
+                $('det-alertas').innerHTML = alertas.length ? `<div class="pd-alerta ${d.custo == null ? 'erro' : ''}"><span>⚠️</span><div>${alertas.length === 1 ? esc(alertas[0])
+                    : '<ul>' + alertas.map(a => `<li>${esc(a)}</li>`).join('') + '</ul>'}</div></div>` : '';
+                $('det-passos').innerHTML = (d.passos || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li class="sem-calculo">Sem cálculo: resolva o que está no aviso acima.</li>';
                 $('det-ligacoes').innerHTML = htmlComposicao(d);
                 $('det-unidade').value = d.unidade || ''; // unidade em uso (da classe ou a corrigida)
                 const linhaCompra = (c, ignorada) => `<tr class="${ignorada ? 'ignorada' : ''}"><td>${esc(c.nf)}</td><td>${dataBR(c.data)}</td><td>${esc(c.fornecedor)}</td>
@@ -485,29 +509,29 @@
         const pctTexto = v => String(v).replace('.', ',');
         const nomeComp = (c, i) => c.nome || `Componente ${i + 1}`;
         // item dentro de um componente: nome, conversão, qtd por 1 unidade do produto e "qtd × custo = subtotal"
-        const linhaItemComp = (l, calc, un, ed) => `<div class="comp-item" data-lig="${l.id}">
-            <div class="item-nome">${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')}) — ${esc(l.frase)}</small>`
+        const linhaItemComp = (l, calc, un, ed) => `<div class="comp-item linha-item ${!calc || calc.custo == null ? 'falta' : calc.fonte === 'cadastro' ? 'aviso' : ''}" data-lig="${l.id}">
+            <div class="item-nome"><div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')}) — ${esc(l.frase)}</small>`
                 : `<span class="motivo">item de compra não encontrado (código ${l.estoqueCodigo})</span>`}</div>
+                <button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação" title="Tirar este item">✕</button></div>
             <div class="item-linha"><span class="campo-qtd">qtd <input type="text" inputmode="decimal" class="item-qtd" value="${pctTexto(l.quantidade ?? 1)}" aria-label="Quantidade de ${esc(l.nome || '')}" ${ed}>
                 <span class="item-qtd-rotulo">${un} por 1 ${un} do produto</span></span>
               <span class="item-custo" data-valor>${calc && calc.custo != null ? `${pctTexto(calc.quantidade)} × ${moeda(calc.custo)} = <b>${moeda(calc.parcela)}</b>${calc.fonte === 'cadastro' ? '<br><span class="diverge">🕒 valor do cadastro (sem nota de compra)</span>' : ''}`
-                : `<span class="motivo">${esc((calc && calc.motivos || []).join(' · ') || '—')}</span>`}</span>
-              <button type="button" class="btn-mini comp-item-remover" data-perm="precos.editar" aria-label="Desfazer ligação">✕</button></div></div>`;
+                : `<span class="motivo">${esc((calc && calc.motivos || []).join(' · ') || '—')}</span>`}</span></div></div>`;
         function htmlComposicao(d) {
             const comps = d.componentes || [];
             if (!comps.length) return (d.ligacoes.length ? d.ligacoes.map(l => linhaItem(l, false)).join('') : '<div>Nenhum item ligado. Use a aba "Ligações".</div>')
                 + `<div class="comp-acoes"><button type="button" class="btn-mini" id="det-compor" data-perm="precos.editar">🧩 Compor com vários itens</button>
                    ${d.ligacoes.length ? '' : '<button type="button" class="btn-mini" id="det-informar" data-perm="precos.editar">✍️ Informar custo (sem estoque)</button>'}</div>`;
             const ed = podeEditar() ? '' : 'disabled', un = UN[d.unidade] || 'un';
-            return comps.map((c, i) => `<div class="componente" data-id="${c.id ?? ''}">
-                <div class="comp-topo"><input type="text" class="comp-nome" maxlength="60" value="${esc(c.nome || '')}" placeholder="Componente ${i + 1}" aria-label="Nome do componente" ${ed || (c.id == null ? 'disabled' : '')}>
-                    <span class="comp-custo" data-valor>Total: <b>${c.parcela == null ? '—' : moeda(c.parcela) + ' / ' + un}</b>${c.quantidade !== 1 ? ` <small>(× ${pctTexto(c.quantidade)})</small>` : ''}</span></div>
-                ${c.motivos.length ? `<div class="comp-motivo motivo">⚠️ ${c.motivos.map(esc).join(' · ')}</div>` : ''}
-                ${c.custoInformado != null ? `<div class="comp-informado-linha">✍️ custo informado: R$ <input type="text" inputmode="decimal" class="comp-informado" value="${pctTexto(c.custoInformado)}"
+            return comps.map((c, i) => `<div class="componente sub-bloco ${c.parcela == null ? 'falta' : c.situacao === 'desatualizado' ? 'aviso' : ''}" data-id="${c.id ?? ''}">
+                <div class="comp-topo sub-bloco-cab"><input type="text" class="comp-nome" maxlength="60" value="${esc(c.nome || '')}" placeholder="Componente ${i + 1}" aria-label="Nome do componente" ${ed || (c.id == null ? 'disabled' : '')}>
+                    <span class="comp-custo chip-total ${c.parcela == null ? 'vazio' : ''}" data-valor>Total: <b>${c.parcela == null ? 'sem custo' : moeda(c.parcela) + ' / ' + un}</b>${c.quantidade !== 1 ? ` <small>(× ${pctTexto(c.quantidade)})</small>` : ''}</span></div>
+                ${c.motivos.length ? `<div class="comp-motivo pd-alerta erro"><span>⚠️</span><div>${c.motivos.map(esc).join(' · ')}</div></div>` : ''}
+                ${c.custoInformado != null ? `<div class="comp-informado-linha linha-item">✍️ custo informado: R$ <input type="text" inputmode="decimal" class="comp-informado" value="${pctTexto(c.custoInformado)}"
                         aria-label="Custo informado de ${esc(nomeComp(c, i))}" ${ed}> por ${un}
                         <span class="comp-informado-quando">em ${dataBR(c.informadoEm)} por ${esc(c.informadoPor || '—')}</span></div>`
                     : c.ligacoes.map(l => linhaItemComp(l, (c.itens || []).find(it => it.ligacaoId === l.id), un, ed)).join('')}
-                <div class="comp-acoes">${c.id == null ? '' : (c.custoInformado != null
+                <div class="comp-acoes bloco-rodape">${c.id == null ? '' : (c.custoInformado != null
                     ? '<button type="button" class="btn-mini comp-usar-estoque" data-perm="precos.editar">Usar itens do estoque</button>'
                     : '<button type="button" class="btn-mini comp-mais-item" data-perm="precos.editar">+ item do estoque</button>'
                       + (c.ligacoes.length ? '' : ' <button type="button" class="btn-mini comp-informar" data-perm="precos.editar">✍️ Informar custo</button>'))
