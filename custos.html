@@ -72,7 +72,8 @@
         dialog > .btn-mini { margin-top: 16px; }
         dialog .msg:empty { display: none; }
         dialog input::placeholder, .componente input::placeholder { color: #a0a8b2 !important; font-weight: 400 !important; font-style: italic; }
-        #lista-estoque { list-style: none; max-height: 50vh; overflow: auto; margin: 8px 0; }
+        #lista-estoque { list-style: none; max-height: 50vh; overflow: auto; margin: 0; padding: 4px; }
+        #lista-estoque:empty { display: none; }
         #lista-estoque li { padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
         #lista-estoque li:hover { background: var(--secondary-color); }
         #lista-estoque li small { color: var(--text-light); }
@@ -119,18 +120,21 @@
         .prc-motivo { color: var(--falta); font-size: 12px; }
         .prc-aviso { display: block; font-size: 11.5px; color: var(--atencao); }
         .neg { color: var(--falta); font-weight: 700; }
-        #det-preco { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-preco { position: fixed; top: 0; right: 0; bottom: 0; width: min(660px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-preco .dp-atual { text-align: right; font-weight: 700; }
+        #det-preco .simulador label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; color: var(--text-light); font-size: 12.5px; }
+        #det-preco .sim-res { font-size: 12.5px; color: var(--text-light); }
         #det-preco.aberto { display: block; }
         #det-preco h2 { font-size: 18px; margin-bottom: 4px; }
         #det-preco h3 { font-size: 12px; text-transform: uppercase; color: var(--primary-color); margin: 14px 0 6px; letter-spacing: .5px; }
-        #dp-passos { padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+        #dp-passos { padding: 4px 0; }
+        #dp-avisos { display: flex; flex-direction: column; gap: 8px; }
         .simulador { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; font-size: 13px; }
         .simulador b { display: block; font-size: 18px; }
         #sim-valor { width: 120px; } #dp-margem-propria { width: 190px; }
         #sim-valor, #dp-margem-propria { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
         #dlg-precos-param { width: min(620px, calc(100vw - 32px)); }
         #dlg-precos-param .grade-param { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px 18px; font-size: 13px; }
-        #dlg-precos-param h4 { margin: 22px 0 8px; font-size: 12px; text-transform: uppercase; color: var(--primary-color); }
         #dlg-precos-param table input { width: 100%; padding: 4px 6px; }
         #dlg-precos-param input[type=checkbox] { width: auto; }
         .campo-pct { display: flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
@@ -169,8 +173,8 @@
         .campo-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251800">
-    <script src="layout.js?v=202610251500" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610251900" defer></script>
 </head>
 <body>
     <div class="container">
@@ -322,78 +326,115 @@
         </div>
     </aside>
 
-    <aside id="det-preco" aria-label="Formação do preço do material">
-        <button type="button" class="fechar" id="dp-fechar" aria-label="Fechar">✕</button>
-        <h2 id="dp-titulo">—</h2>
-        <div id="dp-avisos"></div>
-        <h3>Como o preço foi formado</h3>
-        <ol id="dp-passos"></ol>
-        <h3>Margem própria deste material</h3>
-        <div><input type="text" inputmode="decimal" id="dp-margem-propria" aria-label="Margem própria em %" placeholder="automática"> %
-            <span id="dp-margem-origem" class="prc-ref"></span></div>
-        <h3>Simulador (não grava nada)</h3>
-        <div class="simulador">
-            <label>VALOR_FIXO a testar<br><input type="text" inputmode="decimal" id="sim-valor" aria-label="VALOR_FIXO a testar"></label>
-            <div>Margem com o desconto padrão<b id="sim-margem">—</b></div>
-            <div>Margem no cliente de maior desconto<b id="sim-margem-pior">—</b></div>
-            <div><button type="button" class="btn-mini" id="sim-usar" data-perm="precos.gravar">Usar este valor</button></div>
+    <aside id="det-preco" class="painel-det" aria-label="Formação do preço do material">
+        <div class="pd-cab">
+            <div><div class="pd-sobre">Formação de preço</div><h2 id="dp-titulo">—</h2></div>
+            <button type="button" class="pd-fechar" id="dp-fechar" aria-label="Fechar">✕</button>
         </div>
-        <h3>Histórico de gravações</h3>
-        <div class="tabela-wrap"><table id="dp-historico"><thead><tr><th>Quando</th><th>Quem</th><th class="num">De</th><th class="num">Para</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="pd-corpo">
+            <div class="pd-hero">
+                <div><div class="pd-rotulo">VALOR_FIXO sugerido</div><div class="pd-valor" id="dp-valor">—</div></div>
+                <div class="dp-atual"><div class="pd-rotulo">Atual no cadastro</div><div id="dp-atual">—</div></div>
+            </div>
+            <div id="dp-avisos"></div>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧮</span><h3>Como o preço foi formado</h3></div>
+                <ol id="dp-passos" class="passos-lista"></ol>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🎯</span><h3>Margem própria deste material</h3></div>
+                <div class="bloco-corpo"><span class="campo-pct"><input type="text" inputmode="decimal" id="dp-margem-propria" aria-label="Margem própria em %" placeholder="automática"> %</span>
+                    <span id="dp-margem-origem" class="prc-ref"></span></div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧪</span><h3>Simulador</h3><span class="bloco-acao prc-ref">não grava nada</span></div>
+                <div class="bloco-corpo simulador">
+                    <label>VALOR_FIXO a testar<input type="text" inputmode="decimal" id="sim-valor" aria-label="VALOR_FIXO a testar"></label>
+                    <div class="sim-res">Margem com o desconto padrão<b id="sim-margem">—</b></div>
+                    <div class="sim-res">Margem no cliente de maior desconto<b id="sim-margem-pior">—</b></div>
+                    <div><button type="button" class="btn-mini" id="sim-usar" data-perm="precos.gravar">Usar este valor</button></div>
+                </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🕓</span><h3>Histórico de gravações</h3></div>
+                <div class="tabela-wrap"><table id="dp-historico"><thead><tr><th>Quando</th><th>Quem</th><th class="num">De</th><th class="num">Para</th><th></th></tr></thead><tbody></tbody></table></div>
+            </section>
+        </div>
     </aside>
 
-    <dialog id="dlg-precos-param" aria-labelledby="dlg-pp-titulo">
-        <h3 id="dlg-pp-titulo">Premissas da formação de preço</h3>
-        <p class="prc-ref">Deixe em branco para "não definido". Aceita vírgula.</p>
-        <div class="grade-param">
-            <label>Imposto (Simples)<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-imposto"> %</span></label>
-            <label>Comissão padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-comissao"> %</span></label>
-            <label>Custo fixo<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-custo-fixo"> %</span></label>
-            <label>Desconto padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-desconto"> %</span></label>
-            <label>Margem padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-margem"> %</span></label>
-            <label>Referências: últimos (meses)<input type="number" id="pp-meses" min="1" max="36"></label>
+    <dialog id="dlg-precos-param" class="dlg-padrao" aria-labelledby="dlg-pp-titulo">
+        <div class="dlg-cab"><h3 id="dlg-pp-titulo">Premissas da formação de preço</h3>
+            <p>Deixe em branco para "não definido". Aceita vírgula.</p></div>
+        <div class="dlg-corpo">
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">%</span><h3>Percentuais</h3></div>
+                <div class="bloco-corpo grade-param">
+                    <label>Imposto (Simples)<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-imposto"> %</span></label>
+                    <label>Comissão padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-comissao"> %</span></label>
+                    <label>Custo fixo<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-custo-fixo"> %</span></label>
+                    <label>Desconto padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-desconto"> %</span></label>
+                    <label>Margem padrão<span class="campo-pct"><input type="text" inputmode="decimal" id="pp-margem"> %</span></label>
+                    <label>Referências: últimos (meses)<input type="number" id="pp-meses" min="1" max="36"></label>
+                </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">➕</span><h3>Outros encargos sobre a venda</h3>
+                    <span class="bloco-acao"><button type="button" class="btn-mini" id="pp-enc-novo">+ encargo</button></span></div>
+                <div class="dlg-rolagem"><table id="pp-encargos"><thead><tr><th>Nome</th><th>%</th><th>Ativo</th><th></th></tr></thead><tbody></tbody></table></div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🎯</span><h3>Margem por classe</h3><span class="bloco-acao prc-ref">vazio = usa a margem padrão</span></div>
+                <div class="dlg-rolagem"><table id="pp-margens"><thead><tr><th>Classe</th><th>Margem %</th></tr></thead><tbody></tbody></table></div>
+            </section>
         </div>
-        <h4>Outros encargos sobre a venda</h4>
-        <div class="dlg-rolagem"><table id="pp-encargos"><thead><tr><th>Nome</th><th>%</th><th>Ativo</th><th></th></tr></thead><tbody></tbody></table></div>
-        <button type="button" class="btn-mini" id="pp-enc-novo">+ encargo</button>
-        <h4>Margem por classe (vazio = usa a margem padrão)</h4>
-        <div class="dlg-rolagem"><table id="pp-margens"><thead><tr><th>Classe</th><th>Margem %</th></tr></thead><tbody></tbody></table></div>
-        <div class="msg erro" id="pp-msg"></div>
-        <button type="button" class="btn-mini prim" id="pp-salvar">Salvar</button>
-        <button type="button" class="btn-mini" id="pp-cancelar">Cancelar</button>
+        <div class="dlg-rodape">
+            <div class="msg erro" id="pp-msg"></div>
+            <button type="button" class="btn-mini" id="pp-cancelar">Cancelar</button>
+            <button type="button" class="btn-mini prim" id="pp-salvar">Salvar</button>
+        </div>
     </dialog>
 
-    <dialog id="dlg-contas" aria-labelledby="dlg-contas-titulo">
-        <h3 id="dlg-contas-titulo">Referência de custo fixo</h3>
-        <div id="dlg-contas-corpo" class="dlg-rolagem"></div>
-        <div class="msg erro" id="cf-msg"></div>
-        <button type="button" class="btn-mini prim" id="cf-usar" style="display:none">Usar</button>
-        <button type="button" class="btn-mini" id="dlg-contas-fechar">Fechar</button>
+    <dialog id="dlg-contas" class="dlg-padrao" aria-labelledby="dlg-contas-titulo">
+        <div class="dlg-cab"><h3 id="dlg-contas-titulo">Referência de custo fixo</h3></div>
+        <div class="dlg-corpo"><div id="dlg-contas-corpo" class="bloco bloco-corpo"></div></div>
+        <div class="dlg-rodape">
+            <div class="msg erro" id="cf-msg"></div>
+            <button type="button" class="btn-mini" id="dlg-contas-fechar">Fechar</button>
+            <button type="button" class="btn-mini prim" id="cf-usar" style="display:none">Usar</button>
+        </div>
     </dialog>
 
-    <dialog id="dlg-gravar" aria-labelledby="dlg-gravar-titulo">
-        <h3 id="dlg-gravar-titulo">Gravar VALOR_FIXO no cadastro</h3>
-        <p class="prc-ref">O VB passa a usar estes valores nos próximos pedidos e orçamentos. Pedidos já gravados não mudam. Dá para desfazer pelo histórico do material.</p>
-        <div class="dlg-rolagem"><table id="dlg-gravar-tabela"><thead><tr><th>Material</th><th class="num">Atual → novo</th><th class="num">Variação</th></tr></thead><tbody></tbody></table></div>
-        <div class="msg erro" id="dlg-gravar-msg"></div>
-        <button type="button" class="btn-mini prim" id="dlg-gravar-confirmar">Confirmar</button>
-        <button type="button" class="btn-mini" id="dlg-gravar-cancelar">Cancelar</button>
+    <dialog id="dlg-gravar" class="dlg-padrao" aria-labelledby="dlg-gravar-titulo">
+        <div class="dlg-cab"><h3 id="dlg-gravar-titulo">Gravar VALOR_FIXO no cadastro</h3>
+            <p>O VB passa a usar estes valores nos próximos pedidos e orçamentos. Pedidos já gravados não mudam. Dá para desfazer pelo histórico do material.</p></div>
+        <div class="dlg-corpo"><div class="bloco"><div class="dlg-rolagem"><table id="dlg-gravar-tabela"><thead><tr><th>Material</th><th class="num">Atual → novo</th><th class="num">Variação</th></tr></thead><tbody></tbody></table></div></div></div>
+        <div class="dlg-rodape">
+            <div class="msg erro" id="dlg-gravar-msg"></div>
+            <button type="button" class="btn-mini" id="dlg-gravar-cancelar">Cancelar</button>
+            <button type="button" class="btn-mini prim" id="dlg-gravar-confirmar">Confirmar</button>
+        </div>
     </dialog>
 
-    <dialog id="dlg-estoque" aria-labelledby="dlg-estoque-titulo">
-        <h3 id="dlg-estoque-titulo">Buscar item no estoque</h3>
-        <input type="search" id="busca-estoque" placeholder="Nome do item comprado" aria-label="Buscar no estoque">
-        <ul id="lista-estoque"></ul>
-        <button type="button" class="btn-mini" id="dlg-estoque-fechar">Fechar</button>
+    <dialog id="dlg-estoque" class="dlg-padrao" aria-labelledby="dlg-estoque-titulo">
+        <div class="dlg-cab"><h3 id="dlg-estoque-titulo">Buscar item no estoque</h3><p>Digite parte do nome do item comprado.</p></div>
+        <div class="dlg-corpo">
+            <input type="search" id="busca-estoque" placeholder="Nome do item comprado" aria-label="Buscar no estoque">
+            <div class="bloco"><ul id="lista-estoque"></ul></div>
+        </div>
+        <div class="dlg-rodape"><button type="button" class="btn-mini" id="dlg-estoque-fechar">Fechar</button></div>
     </dialog>
 
-    <dialog id="dlg-parametros" aria-labelledby="dlg-param-titulo">
-        <h3 id="dlg-param-titulo">Parâmetros do custo</h3>
-        <label>Média das compras dos últimos (meses, 1 a 36)<input type="number" id="p-meses" min="1" max="36"></label>
-        <label>Avisar quando divergir do VALOR do estoque acima de (%)<input type="number" id="p-diverg" min="1" max="100"></label>
-        <div class="msg erro" id="p-msg"></div>
-        <button type="button" class="btn-mini prim" id="p-salvar">Salvar</button>
-        <button type="button" class="btn-mini" id="p-cancelar">Cancelar</button>
+    <dialog id="dlg-parametros" class="dlg-padrao" aria-labelledby="dlg-param-titulo">
+        <div class="dlg-cab"><h3 id="dlg-param-titulo">Parâmetros do custo</h3></div>
+        <div class="dlg-corpo"><div class="bloco bloco-corpo">
+            <label>Média das compras dos últimos (meses, 1 a 36)<input type="number" id="p-meses" min="1" max="36"></label>
+            <label>Avisar quando divergir do VALOR do estoque acima de (%)<input type="number" id="p-diverg" min="1" max="100"></label>
+        </div></div>
+        <div class="dlg-rodape">
+            <div class="msg erro" id="p-msg"></div>
+            <button type="button" class="btn-mini" id="p-cancelar">Cancelar</button>
+            <button type="button" class="btn-mini prim" id="p-salvar">Salvar</button>
+        </div>
     </dialog>
 
     <script>

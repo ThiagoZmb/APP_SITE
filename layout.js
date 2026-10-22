@@ -30,8 +30,8 @@
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
+        { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
-        { href: 'custos.html', texto: 'Custos e preços', icone: 'precos' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
@@ -170,7 +170,7 @@
                     const oculto = visivel[i] ? '' : ' hidden';
                     if (m.secao) return `<div class="sb-secao"${oculto}>${m.secao}</div>`;
                     const ativo = m.href === atual ? ' active' : '';
-                    return `<a class="menu-item${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
+                    return `<a class="menu-item${m.sub ? ' sub' : ''}${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
                 }).join('') +
                 `<div class="sb-rodape"><button type="button" class="sb-sair">${ICONES.sair}<span>Sair</span></button></div>`;
             nav.querySelector('.sb-sair').addEventListener('click', () => {

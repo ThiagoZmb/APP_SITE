@@ -224,8 +224,11 @@ async function abrirDetalhePreco(codigo) {
         detalhePreco = await api(`/precos/formacao/${codigo}`);
         const d = detalhePreco, p = d.preco;
         $('dp-titulo').textContent = d.material.modelo;
-        $('dp-avisos').innerHTML = [...p.motivos.map(m => `<span class="prc-motivo" style="display:block">⚠️ ${esc(m)}</span>`),
-            ...p.avisos.map(a => `<span class="prc-aviso">🕒 ${esc(a)}</span>`)].join('');
+        $('dp-valor').innerHTML = p.sugerido != null ? `${moeda(p.sugerido)} <small>/ ${UN[d.material.unidade] || ''}</small>` : 'sem sugestão';
+        $('dp-valor').classList.toggle('sem', p.sugerido == null);
+        $('dp-atual').textContent = moeda(p.atual);
+        $('dp-avisos').innerHTML = (p.motivos.length ? `<div class="pd-alerta erro"><span>⚠️</span><div>${p.motivos.map(esc).join('<br>')}</div></div>` : '')
+            + (p.avisos.length ? `<div class="pd-alerta"><span>🕒</span><div>${p.avisos.map(esc).join('<br>')}</div></div>` : '');
         $('dp-passos').innerHTML = [...d.custo.passos, ...p.passos.slice(1)].map(t => `<li>${esc(t)}</li>`).join('');
         const propria = (precos?.margens.materiais || []).find(x => x.codigo === d.material.codigo)?.pct;
         $('dp-margem-propria').value = propria == null ? '' : String(propria).replace('.', ',');

@@ -317,7 +317,11 @@
         .gaveta-topo h3 { font-size: 20px; }
         .gaveta-topo small { opacity: .8; font-size: 13px; }
         .gaveta-topo button { border: none; background: rgba(255,255,255,.15); color: white; width: 36px; height: 36px; border-radius: 10px; font-size: 18px; cursor: pointer; }
-        .gaveta-corpo { padding: 22px 24px; overflow-y: auto; flex: 1; }
+        .gaveta-corpo { padding: 16px 18px; overflow-y: auto; flex: 1; background: var(--bg); display: flex; flex-direction: column; gap: 12px; }
+        .gaveta-corpo > .bloco { flex-shrink: 0; }
+        .gaveta-corpo .tipo-mov { margin-bottom: 12px; }
+        .gaveta-corpo .bloco.categoria, .gaveta-corpo .bloco-corpo.categoria { border: none; border-radius: 0; background: none; }
+        .gaveta-corpo #f-obs { width: 100%; min-height: 80px; }
         .tipo-mov { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
         .tipo-mov button {
             padding: 14px; border-radius: 14px; border: 2px solid var(--border-color); background: var(--white); font-size: 15px; font-weight: 700;
@@ -426,8 +430,8 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251200">
-    <script src="layout.js?v=202610251200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610251900" defer></script>
 </head>
 <body>
     <div class="container">
@@ -579,35 +583,48 @@
         </div>
         <form class="gaveta-corpo" id="form" autocomplete="off" onsubmit="return false">
             <input type="hidden" id="f-id">
-            <div class="tipo-mov">
-                <button type="button" class="e" data-mov="Entrada">⬇️ Entrada</button>
-                <button type="button" class="s" data-mov="Saída">⬆️ Saída</button>
-            </div>
-            <div class="grid-form">
-                <div class="form-group full"><label for="f-nome" id="l-nome">Cliente / Fornecedor</label><input id="f-nome" list="lista-nomes" placeholder="Escolha o tipo de movimento"></div>
-                <div class="form-group full valor-grande"><label for="f-valor">Valor</label><input id="f-valor" class="num dec moeda" value="R$ 0,00"></div>
-                <div class="form-group"><label for="f-data">Data <span class="link-hoje" id="link-hoje">hoje</span></label><input type="date" id="f-data"></div>
-                <div class="form-group"><label for="f-situacao">Situação</label><select id="f-situacao"><option value="">— escolha o tipo —</option></select></div>
-                <div class="form-group"><label for="f-forma">Forma de pagamento</label><input id="f-forma" list="lista-formas"></div>
-                <div class="form-group"><label for="f-banco">Banco</label><input id="f-banco" list="lista-bancos"></div>
-                <div class="form-group"><label for="f-pedido">Pedido</label><input id="f-pedido" class="so-num"></div>
-                <div class="form-group"><label for="f-pdv">PDV</label><input id="f-pdv" class="so-num"></div>
-                <div class="form-group"><label for="f-prenota">Pré-nota</label><input id="f-prenota"></div>
-                <div class="form-group"><label for="f-nf">Nota fiscal</label><input id="f-nf"></div>
-                <div class="form-group full"><label for="f-obs">Observação</label><textarea id="f-obs" maxlength="2000"></textarea></div>
-                <div class="form-group full">
-                    <label>Categoria</label>
-                    <div class="categoria">
-                        <div class="grid-form">
-                            <select id="cat-tipo" aria-label="Tipo"></select>
-                            <select id="cat-c1" aria-label="Classe 1"></select>
-                            <select id="cat-c2" aria-label="Classe 2"></select>
-                            <select id="cat-c3" aria-label="Classe 3"></select>
-                        </div>
-                        <div class="cat-status" id="cat-status">Informe o cliente ou fornecedor.</div>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">💵</span><h3>Movimento</h3></div>
+                <div class="bloco-corpo">
+                    <div class="tipo-mov">
+                        <button type="button" class="e" data-mov="Entrada">⬇️ Entrada</button>
+                        <button type="button" class="s" data-mov="Saída">⬆️ Saída</button>
+                    </div>
+                    <div class="grid-form">
+                        <div class="form-group full"><label for="f-nome" id="l-nome">Cliente / Fornecedor</label><input id="f-nome" list="lista-nomes" placeholder="Escolha o tipo de movimento"></div>
+                        <div class="form-group full valor-grande"><label for="f-valor">Valor</label><input id="f-valor" class="num dec moeda" value="R$ 0,00"></div>
+                        <div class="form-group"><label for="f-data">Data <span class="link-hoje" id="link-hoje">hoje</span></label><input type="date" id="f-data"></div>
+                        <div class="form-group"><label for="f-situacao">Situação</label><select id="f-situacao"><option value="">— escolha o tipo —</option></select></div>
                     </div>
                 </div>
-            </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🧾</span><h3>Pagamento e documentos</h3></div>
+                <div class="bloco-corpo grid-form">
+                    <div class="form-group"><label for="f-forma">Forma de pagamento</label><input id="f-forma" list="lista-formas"></div>
+                    <div class="form-group"><label for="f-banco">Banco</label><input id="f-banco" list="lista-bancos"></div>
+                    <div class="form-group"><label for="f-pedido">Pedido</label><input id="f-pedido" class="so-num"></div>
+                    <div class="form-group"><label for="f-pdv">PDV</label><input id="f-pdv" class="so-num"></div>
+                    <div class="form-group"><label for="f-prenota">Pré-nota</label><input id="f-prenota"></div>
+                    <div class="form-group"><label for="f-nf">Nota fiscal</label><input id="f-nf"></div>
+                </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">🏷️</span><h3>Categoria</h3></div>
+                <div class="bloco-corpo categoria form-group">
+                    <div class="grid-form">
+                        <select id="cat-tipo" aria-label="Tipo"></select>
+                        <select id="cat-c1" aria-label="Classe 1"></select>
+                        <select id="cat-c2" aria-label="Classe 2"></select>
+                        <select id="cat-c3" aria-label="Classe 3"></select>
+                    </div>
+                    <div class="cat-status" id="cat-status">Informe o cliente ou fornecedor.</div>
+                </div>
+            </section>
+            <section class="bloco">
+                <div class="bloco-cab"><span class="ico">📝</span><h3>Observação</h3></div>
+                <div class="bloco-corpo"><textarea id="f-obs" maxlength="2000" aria-label="Observação"></textarea></div>
+            </section>
             <datalist id="lista-nomes"></datalist><datalist id="lista-formas"></datalist><datalist id="lista-bancos"></datalist>
         </form>
         <div class="acoes">

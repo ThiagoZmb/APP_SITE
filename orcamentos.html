@@ -265,13 +265,15 @@
         .msg-salvar.ok { color: #15803d; font-weight: 600; }
         #itens-tbody tr.preco-mudou td { background: #fef2f2; }
         #itens-tbody tr.preco-mudou td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
-        .dlg-salvar { margin: auto; border: none; border-radius: 12px; padding: 22px; max-width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+        .dlg-salvar { margin: auto; border: none; border-radius: 12px; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+        .dlg-salvar .abrir-lista { margin: 0; padding: 4px; max-height: 50vh; overflow: auto; }
+        .dlg-salvar .abrir-lista:empty { display: none; }
         .dlg-salvar::backdrop { background: rgba(15, 23, 42, .45); }
         .dlg-salvar h3 { margin: 0 0 8px; }
         .dlg-salvar p { margin: 0 0 16px; color: var(--text-light); }
         .dlg-acoes { display: flex; gap: 10px; flex-wrap: wrap; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251200">
+    <link rel="stylesheet" href="tema.css?v=202610251900">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -284,6 +286,11 @@
         html body .frente-btn { padding: 6px 12px !important; font-size: 13px !important; }
         html body .secao-item { padding: 10px 12px 10px !important; margin-bottom: 8px !important; border-radius: 10px !important; }
         html body .secao-item h4 { font-size: 11px !important; margin-bottom: 6px !important; }
+        /* padrão de bloco (tema): fundo branco, borda, cabeçalho em faixa — fica claro onde cada seção começa e termina */
+        html body .secao-item { background: var(--white) !important; box-shadow: var(--shadow-light); overflow: hidden; }
+        html body .secao-item > h4 { margin: -10px -12px 10px !important; padding: 8px 12px !important; background: var(--surface-2);
+            border-bottom: 1px solid var(--border-color); font-size: 11.5px !important; font-weight: 800 !important; letter-spacing: .6px !important; }
+        html body .secao-item > h4::after { display: none; }
         html body .grid-form { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important; gap: 6px 10px !important; }
         html body .form-group label, html body .viz-check { font-size: 11.5px !important; margin-bottom: 3px !important; }
         html body .form-group input:not([type=checkbox]):not([type=radio]), html body .form-group select, html body #desconto {
@@ -363,7 +370,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202610251200" defer></script>
+    <script src="layout.js?v=202610251900" defer></script>
 </head>
 <body>
     <div class="container">
@@ -673,24 +680,25 @@
         </main>
     </div>
     <!-- ═══════════ SALVAR (frm_Opcao_Pedido) ═══════════ -->
-    <dialog id="dlg-salvar" class="dlg-salvar" aria-labelledby="dlg-salvar-titulo">
-        <h3 id="dlg-salvar-titulo">Salvar</h3>
-        <p id="dlg-salvar-texto"></p>
-        <div class="dlg-acoes">
-            <button type="button" class="btn btn-primary" id="btn-salvar-novo">Salvar com novo número</button>
-            <button type="button" class="btn btn-secondary" id="btn-atualizar" style="display:none">Atualizar</button>
+    <dialog id="dlg-salvar" class="dlg-salvar dlg-padrao" aria-labelledby="dlg-salvar-titulo">
+        <div class="dlg-cab"><h3 id="dlg-salvar-titulo">Salvar</h3><p id="dlg-salvar-texto"></p></div>
+        <div class="dlg-rodape dlg-acoes">
             <button type="button" class="btn btn-secondary" id="btn-dlg-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-secondary" id="btn-atualizar" style="display:none">Atualizar</button>
+            <button type="button" class="btn btn-primary" id="btn-salvar-novo">Salvar com novo número</button>
         </div>
     </dialog>
     <!-- ═══════════ ABRIR (frm_Lista_Pedidos_Orçamentos) ═══════════ -->
-    <dialog id="dlg-abrir" class="dlg-salvar" aria-labelledby="dlg-abrir-titulo">
-        <h3 id="dlg-abrir-titulo">Abrir orçamento ou pedido</h3>
-        <div class="abrir-filtros">
-            <select id="abrir-tipo" aria-label="Tipo"><option value="Orçamento">Orçamentos</option><option value="Pedido">Pedidos</option></select>
-            <input type="search" id="abrir-busca" placeholder="Número ou cliente" aria-label="Buscar">
+    <dialog id="dlg-abrir" class="dlg-salvar dlg-padrao" aria-labelledby="dlg-abrir-titulo">
+        <div class="dlg-cab"><h3 id="dlg-abrir-titulo">Abrir orçamento ou pedido</h3><p>Busque pelo número ou pelo nome do cliente.</p></div>
+        <div class="dlg-corpo">
+            <div class="abrir-filtros">
+                <select id="abrir-tipo" aria-label="Tipo"><option value="Orçamento">Orçamentos</option><option value="Pedido">Pedidos</option></select>
+                <input type="search" id="abrir-busca" placeholder="Número ou cliente" aria-label="Buscar">
+            </div>
+            <div class="bloco"><ul id="abrir-lista" class="abrir-lista"></ul></div>
         </div>
-        <ul id="abrir-lista" class="abrir-lista"></ul>
-        <div class="dlg-acoes"><button type="button" class="btn btn-secondary" id="btn-abrir-fechar">Fechar</button></div>
+        <div class="dlg-rodape dlg-acoes"><button type="button" class="btn btn-secondary" id="btn-abrir-fechar">Fechar</button></div>
     </dialog>
     <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
     <div class="avl-fundo" id="avl-fundo"></div>

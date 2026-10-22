@@ -174,6 +174,11 @@ body .container > .sidebar .menu-item.active, body .container > nav .menu-item.a
 }
 body .container > .sidebar .menu-item.active svg, body .container > nav .menu-item.active svg { opacity: 1; }
 body .container .menu-item[hidden] { display: none !important; }
+/* subitem do menu: recuado, com um traço ligando ao item pai */
+body .container > .sidebar .menu-item.sub, body .container > nav .menu-item.sub { position: relative; margin: 0 12px 2px 38px !important; padding: 7px 12px !important; font-size: 13.5px !important; }
+body .container > .sidebar .menu-item.sub::before, body .container > nav .menu-item.sub::before {
+    content: ''; position: absolute; left: -12px; top: -6px; bottom: 50%; width: 10px; border-left: 1.5px solid var(--side-muted); border-bottom: 1.5px solid var(--side-muted); border-bottom-left-radius: 6px; opacity: .7; }
+body .container > .sidebar .menu-item.sub svg, body .container > nav .menu-item.sub svg { width: 16px; height: 16px; }
 .sb-rodape { margin-top: auto; padding: 16px 12px 20px; }
 .sb-sair {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 10px;
@@ -659,3 +664,34 @@ body .painel-head { padding-top: 18px !important; }
 .linha-item:hover { background: #fcfcfe; }
 .linha-item.falta { background: #fff7f8; }
 .linha-item.aviso { background: #fffaf0; }
+
+/* =========================================================================
+   JANELA (dialog) padrão: cabeçalho, corpo com rolagem e rodapé com as ações
+   <dialog class="dlg-padrao"><div class="dlg-cab"><h3>…</h3><p>…</p></div>
+     <div class="dlg-corpo">…</div><div class="dlg-rodape">botões</div></dialog>
+   ========================================================================= */
+dialog.dlg-padrao { padding: 0 !important; border: none; border-radius: 14px; box-shadow: var(--shadow-heavy); overflow: hidden; max-height: calc(100vh - 32px); }
+dialog.dlg-padrao[open] { display: flex; flex-direction: column; }
+dialog.dlg-padrao::backdrop { background: rgba(15, 12, 20, .48); }
+.dlg-padrao .dlg-cab { padding: 16px 20px 12px; border-bottom: 1px solid var(--border-color); background: var(--white); }
+.dlg-padrao .dlg-cab h3 { margin: 0 !important; font-size: 17px !important; color: var(--text-dark) !important; text-transform: none !important; letter-spacing: 0 !important; }
+.dlg-padrao .dlg-cab p { margin: 4px 0 0 !important; font-size: 13px; color: var(--text-light); line-height: 1.45; }
+.dlg-padrao .dlg-corpo { padding: 16px 20px; overflow: auto; background: var(--bg); display: flex; flex-direction: column; gap: 12px; }
+.dlg-padrao .dlg-corpo > .bloco .bloco-corpo { background: var(--white); }
+.dlg-padrao .dlg-rodape { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; padding: 12px 20px; border-top: 1px solid var(--border-color); background: var(--white); }
+.dlg-padrao .dlg-rodape .msg { margin: 0 auto 0 0; }
+.dlg-padrao .dlg-rodape .btn-mini { margin: 0 !important; padding: 7px 14px; font-size: 13.5px; }
+.bloco-cab .bloco-acao { font-size: 12px; font-weight: 600; color: var(--text-light); }
+.dlg-padrao .dlg-rolagem { overflow: auto; }
+@media (max-width: 520px) {
+    .dlg-padrao .dlg-cab, .dlg-padrao .dlg-corpo, .dlg-padrao .dlg-rodape { padding-left: 14px; padding-right: 14px; }
+    .dlg-padrao table th, .dlg-padrao table td { white-space: normal !important; padding: 6px 8px !important; font-size: 12.5px; }
+}
+.dlg-padrao .dlg-corpo > *, .painel-det .pd-corpo > * { flex-shrink: 0; }
+.bloco-cab .bloco-acao .btn-mini { white-space: nowrap; }
+
+/* fichas que já tinham blocos (clientes .cf-bloco, usuários .g-corpo > .bloco): cabeçalho em faixa, como o padrão */
+.cf-bloco, .g-corpo > .bloco { box-shadow: var(--shadow-light); overflow: hidden; }
+.cf-bloco > h4 { margin: -16px -18px 14px !important; padding: 10px 18px !important; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+.g-corpo > .bloco > h4 { margin: -14px -16px 12px !important; padding: 10px 16px !important; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+.g-corpo > .bloco, .cf-corpo .cf-bloco, .gaveta-corpo > .bloco { flex-shrink: 0; }
