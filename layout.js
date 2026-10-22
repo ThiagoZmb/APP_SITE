@@ -18,7 +18,8 @@
         financeiro: ic('<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19M6.5 15h3"/>'),
         sair: ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>'),
         menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
-        usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>')
+        usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>'),
+        precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
     const MENU = [
         { secao: 'Visão geral' },
@@ -30,6 +31,7 @@
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
+        { href: 'custos.html', texto: 'Custos e preços', icone: 'precos' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
@@ -45,6 +47,7 @@
         'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
         'produtos.html': ['produtos.ver'],
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
+        'custos.html': ['precos.ver', 'valores.ver'],
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
         'usuarios.html': ['admin.usuarios']
     };

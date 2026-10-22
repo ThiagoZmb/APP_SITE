@@ -10,12 +10,13 @@ const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc } = require('./seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
+const { registrarCustos } = require('./rotas/custos');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -1662,6 +1663,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
+registrarCustos({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
 
 // ================= SUBIDA =================
@@ -1673,6 +1675,7 @@ async function iniciar() {
   if (!m.jaFeita) console.log(`[permissões] migração inicial: ${m.criados} usuário(s) receberam perfil`);
   if ((await acrescentarPermissoesEstoque(pool)).feito) console.log('[permissões] estoque.desfazer e estoque.ajustar acrescentadas aos perfis completos');
   if ((await acrescentarPermissoesPedOrc(pool)).feito) console.log('[permissões] orcamentos.salvar e pedidos.criar acrescentadas');
+  if ((await acrescentarPermissoesPrecos(pool)).feito) console.log('[permissões] precos.ver e precos.editar acrescentadas');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

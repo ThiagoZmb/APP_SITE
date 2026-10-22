@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Custos e preços</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d;
+            --white: #ffffff; --border-color: #e9ecef; --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --ok: #1e7e34; --atencao: #b26a00; --falta: #c0392b; --neutro: #6c757d;
+        }
+        body { background: var(--secondary-color); color: var(--text-dark); }
+        .welcome-subtitle { color: var(--text-light); font-size: 13px; margin-bottom: 12px; }
+        .abas { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .abas button { border: 1px solid var(--border-color); background: var(--white); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+        .abas button.on { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+        #cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
+        #cartoes button { text-align: left; border: 1px solid var(--border-color); background: var(--white); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+        #cartoes button b { display: block; font-size: 22px; }
+        #cartoes button span { font-size: 12px; color: var(--text-light); }
+        #cartoes button.on { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-light); }
+        .filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .filtros input[type=search], .filtros select { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        .filtros input[type=search] { flex: 1; min-width: 160px; }
+        .tabela-wrap { overflow: auto; max-height: 62vh; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { position: sticky; top: 0; background: var(--secondary-color); text-align: left; padding: 6px 8px; font-size: 11px; text-transform: uppercase; color: var(--text-light); white-space: nowrap; }
+        td { padding: 6px 8px; border-top: 1px solid var(--border-color); vertical-align: top; }
+        td.num, th.num { text-align: right; white-space: nowrap; }
+        #tab-materiais tbody tr { cursor: pointer; }
+        #tab-materiais tbody tr:hover td { background: #fafbfc; }
+        .sit { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+        .sit.confiavel { background: #e6f4ea; color: var(--ok); }
+        .sit.desatualizado { background: #fff4e0; color: var(--atencao); }
+        .sit.faltando { background: #fdecea; color: var(--falta); }
+        .sit.sem_compra { background: #eef0f2; color: var(--neutro); }
+        .motivo { display: block; font-size: 11.5px; color: var(--falta); }
+        .diverge { color: var(--atencao); font-size: 11.5px; display: block; }
+        .det-fundo { position: fixed; inset: 0; background: rgba(15, 23, 42, .35); display: none; z-index: 50; }
+        #det-material { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); background: var(--white); z-index: 51; overflow: auto; padding: 16px; display: none; box-shadow: -10px 0 30px rgba(0,0,0,.15); }
+        #det-material.aberto, .det-fundo.aberto { display: block; }
+        #det-material h2 { font-size: 18px; margin-bottom: 4px; }
+        #det-material h3 { font-size: 12px; text-transform: uppercase; color: var(--primary-color); margin: 14px 0 6px; letter-spacing: .5px; }
+        #det-passos { padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+        #det-passos li:last-child { font-weight: 800; }
+        .fechar { float: right; border: none; background: none; font-size: 20px; cursor: pointer; }
+        tr.ignorada td { color: var(--text-light); text-decoration: line-through; }
+        tr.ignorada td:last-child { text-decoration: none; }
+        .forca-forte, .forca-parecida { display: block; width: fit-content; max-width: none !important; overflow: visible !important; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; margin: 3px 0 2px; }
+        html body #tab-ligacoes .lig-confirmar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
+        html body .sit { white-space: normal; }
+        .forca-forte { background: #e6f4ea; color: var(--ok); }
+        .forca-parecida { background: #fff4e0; color: var(--atencao); }
+        .lig-fator { width: 90px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .lig-frase { display: block; font-size: 12px; color: var(--text-light); margin-top: 2px; }
+        .lig-alternativa { max-width: 100%; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .btn-mini { border: 1px solid var(--border-color); background: var(--white); border-radius: 6px; padding: 3px 9px; font-size: 12.5px; cursor: pointer; margin: 2px 2px 2px 0; }
+        .btn-mini.prim { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        dialog { border: none; border-radius: 12px; padding: 16px; margin: auto; width: min(480px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+        dialog::backdrop { background: rgba(15, 23, 42, .45); }
+        #lista-estoque { list-style: none; max-height: 50vh; overflow: auto; margin: 8px 0; }
+        #lista-estoque li { padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+        #lista-estoque li:hover { background: var(--secondary-color); }
+        #lista-estoque li small { color: var(--text-light); }
+        dialog input { width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        .vazio { text-align: center; color: var(--text-light); padding: 18px; }
+        .msg { font-size: 13px; margin: 6px 0; }
+        .msg.erro { color: var(--falta); }
+        @media (max-width: 700px) { .col-opc { display: none; } }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610241200">
+    <script src="layout.js?v=202610241200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info"><span id="user-name">Usuário</span><span class="user-cargo" id="user-cargo"></span></div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+            <a class="menu-item" href="inicio.html">🏠 Início</a>
+            <a class="menu-item active" href="custos.html">🏷️ Custos e preços</a>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Custos e preços</h1>
+            <p class="welcome-subtitle">Custo real de cada material por unidade de venda, calculado com as notas de compra. Nada aqui altera o cadastro, o estoque ou as notas.</p>
+            <div class="abas" role="tablist">
+                <button type="button" id="aba-btn-custos" class="on" data-aba="custos">Custos dos materiais</button>
+                <button type="button" id="aba-btn-ligacoes" data-aba="ligacoes">Ligações</button>
+            </div>
+            <div class="msg erro" id="msg" role="alert"></div>
+
+            <!-- ===== CUSTOS DOS MATERIAIS ===== -->
+            <section id="aba-custos">
+                <div id="cartoes">
+                    <button type="button" data-situacao="todos" class="on"><b>—</b><span>Materiais ativos</span></button>
+                    <button type="button" data-situacao="confiavel"><b>—</b><span>✅ Confiáveis</span></button>
+                    <button type="button" data-situacao="desatualizado"><b>—</b><span>🕒 Desatualizados</span></button>
+                    <button type="button" data-situacao="faltando"><b>—</b><span>⚠️ Dados faltando</span></button>
+                    <button type="button" data-situacao="sem_compra"><b>—</b><span>➖ Sem custo de compra</span></button>
+                    <button type="button" data-situacao="divergente"><b>—</b><span>↕️ Divergem do estoque</span></button>
+                </div>
+                <div class="painel">
+                    <div class="filtros">
+                        <input type="search" id="busca" placeholder="Buscar material…" aria-label="Buscar material">
+                        <select id="f-classe" aria-label="Classe"><option value="">Todas as classes</option></select>
+                        <select id="f-situacao" aria-label="Situação">
+                            <option value="todos">Todas as situações</option><option value="confiavel">Confiáveis</option><option value="desatualizado">Desatualizados</option>
+                            <option value="faltando">Dados faltando</option><option value="sem_compra">Sem custo de compra</option><option value="divergente">Divergem do estoque</option>
+                        </select>
+                        <label>Média dos últimos
+                            <select id="f-meses" aria-label="Período da média"><option value="3">3</option><option value="6">6</option><option value="12">12</option></select> meses</label>
+                        <label><input type="checkbox" id="f-inativos"> inativos</label>
+                        <button type="button" class="btn-mini" id="btn-parametros" data-perm="precos.editar">⚙️ Parâmetros</button>
+                    </div>
+                    <div class="tabela-wrap">
+                        <table id="tab-materiais">
+                            <thead><tr><th>Material</th><th class="col-opc">Classe</th><th>Un.</th><th class="num" data-valor>Custo / unidade</th>
+                                <th class="num col-opc" data-valor>Preço médio de compra</th><th class="col-opc">IPI / Frete / Perda</th><th class="col-opc">Última compra</th>
+                                <th class="num col-opc">Compras</th><th>Situação</th><th class="num col-opc" data-valor>VALOR_FIXO atual</th></tr></thead>
+                            <tbody><tr><td colspan="10" class="vazio">Carregando…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== LIGAÇÕES ===== -->
+            <section id="aba-ligacoes" style="display:none">
+                <div class="painel">
+                    <div class="filtros">
+                        <select id="lig-grupo" aria-label="Grupo">
+                            <option value="revisar">Para revisar</option><option value="confirmadas">Confirmadas</option><option value="sem_compra">Sem custo de compra</option>
+                        </select>
+                        <span style="color:var(--text-light)">Ligue cada material de venda ao item comprado e diga quantas unidades de venda há em 1 unidade de compra.</span>
+                    </div>
+                    <div class="tabela-wrap">
+                        <table id="tab-ligacoes"><thead></thead><tbody><tr><td class="vazio">Carregando…</td></tr></tbody></table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="det-fundo" id="det-fundo"></div>
+    <aside id="det-material" aria-label="Detalhe do material">
+        <button type="button" class="fechar" id="det-fechar" aria-label="Fechar">✕</button>
+        <h2 id="det-titulo">—</h2>
+        <div id="det-situacao"></div>
+        <div id="det-alertas"></div>
+        <h3>Como o custo foi calculado</h3>
+        <ol id="det-passos"></ol>
+        <h3>Itens de compra ligados</h3>
+        <div id="det-ligacoes"></div>
+        <h3>Unidade de venda</h3>
+        <div id="det-unidade-wrap"><select id="det-unidade" aria-label="Unidade de venda"><option value="">pela classe</option><option value="m">metro</option><option value="m2">m²</option><option value="un">unidade</option></select>
+            <button type="button" class="btn-mini" id="det-unidade-salvar" data-perm="precos.editar">Salvar</button></div>
+        <h3>Notas de compra usadas</h3>
+        <div class="tabela-wrap"><table id="det-compras"><thead><tr><th>NF</th><th>Data</th><th>Fornecedor</th><th class="num">Qtd</th>
+            <th class="num" data-valor>Valor</th><th class="num" data-valor>Por unid. venda</th><th></th></tr></thead><tbody></tbody></table></div>
+    </aside>
+
+    <dialog id="dlg-estoque" aria-labelledby="dlg-estoque-titulo">
+        <h3 id="dlg-estoque-titulo">Buscar item no estoque</h3>
+        <input type="search" id="busca-estoque" placeholder="Nome do item comprado" aria-label="Buscar no estoque">
+        <ul id="lista-estoque"></ul>
+        <button type="button" class="btn-mini" id="dlg-estoque-fechar">Fechar</button>
+    </dialog>
+
+    <dialog id="dlg-parametros" aria-labelledby="dlg-param-titulo">
+        <h3 id="dlg-param-titulo">Parâmetros do custo</h3>
+        <label>Média das compras dos últimos (meses, 1 a 36)<input type="number" id="p-meses" min="1" max="36"></label>
+        <label>Avisar quando divergir do VALOR do estoque acima de (%)<input type="number" id="p-diverg" min="1" max="100"></label>
+        <div class="msg erro" id="p-msg"></div>
+        <button type="button" class="btn-mini prim" id="p-salvar">Salvar</button>
+        <button type="button" class="btn-mini" id="p-cancelar">Cancelar</button>
+    </dialog>
+
+    <script>
+        const API_BASE = 'https://elegance-backend-hrho.onrender.com';
+        const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
+        const $ = id => document.getElementById(id);
+        // escapa para texto E para atributos entre aspas (nomes do estoque podem ter ' e ")
+        const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+        const UN = { m: 'm', m2: 'm²', un: 'un' };
+        const SITUACAO = { confiavel: '✅ Confiável', desatualizado: '🕒 Desatualizado', faltando: '⚠️ Dados faltando', sem_compra: '➖ Sem custo de compra' };
+        // R$ com 2 casas (4 quando menor que R$ 1 — preço por metro de itens baratos)
+        const moeda = v => v == null ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: Math.abs(v) < 1 ? 4 : 2 });
+        const dataBR = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—';
+        const numBR = v => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+        function getAuth() {
+            try {
+                const a = JSON.parse(localStorage.getItem('auth') || 'null');
+                if (!a || !a.token || !a.user) return null;
+                if (Date.now() > (a.exp || 0)) { localStorage.removeItem('auth'); return null; }
+                return a;
+            } catch { return null; }
+        }
+        async function api(caminho, opts = {}) {
+            const a = getAuth();
+            const res = await fetch(API_BASE + caminho, { ...opts,
+                headers: { 'Authorization': 'Bearer ' + (a ? a.token : ''), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+            if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.error || `Erro ${res.status}`);
+            return json;
+        }
+        const mostrarErro = t => { $('msg').textContent = t || ''; };
+        const podeEditar = () => window.Acesso && Acesso.pode('precos.editar');
+
+        // ============ CUSTOS DOS MATERIAIS ============
+        let dados = null, filtroSit = 'todos';
+        async function carregarMateriais(doFiltro = false) {
+            try {
+                dados = await api(doFiltro ? `/custos/materiais?meses=${encodeURIComponent($('f-meses').value)}` : '/custos/materiais');
+                // o período em uso (salvo nos parâmetros ou escolhido no filtro) aparece no filtro, mesmo fora de 3/6/12
+                const meses = String(dados.parametros.periodoMeses);
+                if (![...$('f-meses').options].some(o => o.value === meses)) $('f-meses').add(new Option(meses, meses));
+                $('f-meses').value = meses;
+                mostrarErro('');
+                const r = dados.resumo;
+                const vals = { todos: r.total, confiavel: r.confiavel, desatualizado: r.desatualizado, faltando: r.faltando, sem_compra: r.semCompra, divergente: r.divergentes };
+                document.querySelectorAll('#cartoes [data-situacao]').forEach(b => { b.querySelector('b').textContent = vals[b.dataset.situacao]; });
+                const classes = [...new Set(dados.materiais.map(m => m.classe).filter(Boolean))].sort();
+                const atual = $('f-classe').value;
+                $('f-classe').innerHTML = '<option value="">Todas as classes</option>' + classes.map(c => `<option>${esc(c)}</option>`).join('');
+                $('f-classe').value = classes.includes(atual) ? atual : '';
+                renderMateriais();
+            } catch (e) { mostrarErro('Não foi possível carregar os custos: ' + e.message); }
+        }
+        function renderMateriais() {
+            if (!dados) return;
+            const termo = $('busca').value.trim().toLowerCase(), classe = $('f-classe').value, inativos = $('f-inativos').checked;
+            const lista = dados.materiais.filter(m => (inativos || m.ativo)
+                && (!termo || m.modelo.toLowerCase().includes(termo)) && (!classe || m.classe === classe)
+                && (filtroSit === 'todos' || (filtroSit === 'divergente' ? m.divergente : m.situacao === filtroSit)));
+            $('tab-materiais').querySelector('tbody').innerHTML = lista.length ? lista.map(m => `
+                <tr data-codigo="${m.codigo}">
+                    <td><b>${esc(m.modelo)}</b>${m.ativo ? '' : ' <small>(inativo)</small>'}${m.motivos.map(x => `<span class="motivo">${esc(x)}</span>`).join('')}</td>
+                    <td class="col-opc">${esc(m.classe)}</td>
+                    <td>${UN[m.unidade] || ''}</td>
+                    <td class="num" data-valor><b>${moeda(m.custo)}</b>${m.divergente ? `<span class="diverge">↕️ ${numBR(Math.round(m.divergencia))}% do estoque</span>` : ''}</td>
+                    <td class="num col-opc" data-valor>${moeda(m.precoMedio)}</td>
+                    <td class="col-opc">${m.percentuais.map(p => `${esc(p.ipi ?? 0)}% / ${esc(p.frete ?? 0)}% / ${esc(p.perda || 0)}%`).join('<br>') || '—'}</td>
+                    <td class="col-opc">${dataBR(m.ultimaCompra)}</td>
+                    <td class="num col-opc">${m.qtdCompras || 0}</td>
+                    <td><span class="sit ${m.situacao}">${SITUACAO[m.situacao]}</span></td>
+                    <td class="num col-opc" data-valor>${moeda(m.valorFixo)}</td>
+                </tr>`).join('') : '<tr><td colspan="10" class="vazio">Nenhum material com esses filtros</td></tr>';
+        }
+        function escolherSituacao(s) {
+            filtroSit = filtroSit === s && s !== 'todos' ? 'todos' : s; // clicar de novo no mesmo cartão limpa o filtro
+            document.querySelectorAll('#cartoes [data-situacao]').forEach(b => b.classList.toggle('on', b.dataset.situacao === filtroSit));
+            $('f-situacao').value = filtroSit;
+            renderMateriais();
+        }
+
+        // ============ DETALHE ============
+        let detalheAtual = null;
+        async function abrirDetalhe(codigo) {
+            try {
+                const d = await api(`/custos/materiais/${codigo}?meses=${encodeURIComponent($('f-meses').value)}`);
+                detalheAtual = d;
+                $('det-titulo').textContent = `${d.modelo} — ${moeda(d.custo)}${d.custo != null ? ' / ' + (UN[d.unidade] || '') : ''}`;
+                $('det-situacao').innerHTML = `<span class="sit ${d.situacao}">${SITUACAO[d.situacao]}</span>`;
+                const alertas = [...d.motivos];
+                if (d.divergente) alertas.push(`custo e VALOR do estoque divergem (referência ${moeda(d.referencia)})`);
+                $('det-alertas').innerHTML = alertas.map(a => `<span class="motivo">⚠️ ${esc(a)}</span>`).join('');
+                $('det-passos').innerHTML = (d.passos || []).map(p => `<li>${esc(p)}</li>`).join('') || '<li>Sem cálculo: veja os alertas.</li>';
+                $('det-ligacoes').innerHTML = d.ligacoes.length ? d.ligacoes.map(l => l.existe
+                    ? `<div>• <b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}</div>`
+                    : `<div class="motivo">• item de compra não encontrado (código ${l.estoqueCodigo})</div>`).join('') : '<div>Nenhum item ligado. Use a aba "Ligações".</div>';
+                $('det-unidade').value = d.unidade || ''; // unidade em uso (da classe ou a corrigida)
+                const linhaCompra = (c, ignorada) => `<tr class="${ignorada ? 'ignorada' : ''}"><td>${esc(c.nf)}</td><td>${dataBR(c.data)}</td><td>${esc(c.fornecedor)}</td>
+                    <td class="num">${numBR(c.qtd)}</td><td class="num" data-valor>${moeda(c.valor)}</td><td class="num" data-valor>${ignorada ? '—' : moeda(c.precoConvertido)}</td>
+                    <td>${ignorada ? `ignorada: ${esc(c.motivo)}` : ''}</td></tr>`;
+                const linhas = [...(d.usadas || []).map(c => linhaCompra(c, false)), ...(d.ignoradas || []).map(c => linhaCompra(c, true))];
+                $('det-compras').querySelector('tbody').innerHTML = linhas.join('') || '<tr><td colspan="7" class="vazio">Nenhuma compra</td></tr>';
+                $('det-material').classList.add('aberto'); $('det-fundo').classList.add('aberto');
+            } catch (e) { mostrarErro('Não foi possível abrir o material: ' + e.message); }
+        }
+        function fecharDetalhe() { $('det-material').classList.remove('aberto'); $('det-fundo').classList.remove('aberto'); }
+
+        // ============ LIGAÇÕES ============
+        let ligacoes = [], buscaPara = null;
+        // espelho de calculo/custos_sugestao.js (fator e frase para o item escolhido na busca)
+        function sugerirFator(un, i) {
+            if (un === 'm') return i.tamanho > 0 ? i.tamanho / 1000 : null;
+            if (un === 'm2') return i.altura > 0 && i.largura > 0 ? Math.round(i.altura * i.largura) / 1e6 : null;
+            return un === 'un' ? 1 : null;
+        }
+        function fraseFator(unCompra, fator, un) {
+            const f = Number(fator);
+            if (!(f > 0)) return 'informe o fator';
+            const nome = un === 'm' ? (f === 1 ? 'metro' : 'metros') : un === 'm2' ? 'm²' : (f === 1 ? 'unidade' : 'unidades');
+            return `1 ${String(unCompra || '').trim() || 'unidade de compra'} = ${numBR(Math.round(f * 1000) / 1000)} ${nome}`;
+        }
+        async function carregarLigacoes() {
+            const grupo = $('lig-grupo').value;
+            try {
+                ligacoes = await api(`/custos/ligacoes?situacao=${grupo}`);
+                mostrarErro('');
+                renderLigacoes();
+            } catch (e) { mostrarErro('Não foi possível carregar as ligações: ' + e.message); }
+        }
+        function renderLigacoes() {
+            const grupo = $('lig-grupo').value, tab = $('tab-ligacoes');
+            if (grupo === 'revisar') {
+                tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th>Item comprado (sugestão)</th><th>Fator</th><th></th></tr>';
+                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => {
+                    const s0 = m.sugestoes[0];
+                    return `<tr data-material="${m.codigo}">
+                        <td><b>${esc(m.modelo)}</b><br><small>${esc(m.classe)} · vendido por ${UN[m.unidade]}</small></td>
+                        <td>${m.sugestoes.length ? `<select class="lig-alternativa" aria-label="Item comprado">${m.sugestoes.map(s =>
+                            `<option value="${s.estoqueCodigo}" data-unidade="${esc(s.unidadeCompra || '')}" data-fator="${s.fatorSugerido ?? ''}">${esc(s.nome)} — ${esc(s.fornecedor || '')}</option>`).join('')}</select>
+                            <span class="forca-${s0.forca}">${s0.forca === 'forte' ? 'nome igual' : 'nome parecido'}</span>` : '<select class="lig-alternativa" aria-label="Item comprado" style="display:none"></select><span class="sem-sug">sem sugestão</span>'}
+                            <br><button type="button" class="btn-mini lig-buscar">🔍 buscar no estoque</button></td>
+                        <td><input type="number" class="lig-fator" min="0" step="any" value="${s0 && s0.fatorSugerido != null ? s0.fatorSugerido : ''}" aria-label="Fator" data-perm="precos.editar">
+                            <span class="lig-frase"></span></td>
+                        <td><button type="button" class="btn-mini prim lig-confirmar" data-perm="precos.editar">Confirmar</button>
+                            <button type="button" class="btn-mini lig-sem-compra" data-perm="precos.editar">Sem custo de compra</button></td>
+                    </tr>`; }).join('') : '<tr><td class="vazio">Nada para revisar 🎉</td></tr>';
+                tab.querySelectorAll('tr[data-material]').forEach(atualizarFrase);
+            } else if (grupo === 'confirmadas') {
+                tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th>Itens comprados</th><th></th></tr>';
+                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}">
+                    <td><b>${esc(m.modelo)}</b><br><small>vendido por ${UN[m.unidade]}</small></td>
+                    <td>${m.ligacoes.map(l => `<div>${l.existe ? `<b>${esc(l.nome)}</b> <small>(${esc(l.fornecedor || '')})</small> — ${esc(l.frase)}`
+                        : `<span class="motivo">⚠️ item de compra não encontrado (código ${l.estoqueCodigo})</span>`}
+                        <button type="button" class="btn-mini lig-desfazer" data-id="${l.id}" data-perm="precos.editar">Desfazer</button></div>`).join('')}</td>
+                    <td><button type="button" class="btn-mini lig-mais" data-perm="precos.editar">+ outro item de compra</button></td></tr>`).join('')
+                    : '<tr><td class="vazio">Nenhuma ligação confirmada</td></tr>';
+            } else {
+                tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th></th></tr>';
+                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}"><td><b>${esc(m.modelo)}</b></td>
+                    <td><button type="button" class="btn-mini lig-com-compra" data-perm="precos.editar">Voltar a ter custo de compra</button></td></tr>`).join('')
+                    : '<tr><td class="vazio">Nenhum material marcado</td></tr>';
+            }
+        }
+        function atualizarFrase(tr) {
+            const m = ligacoes.find(x => x.codigo === Number(tr.dataset.material));
+            const sel = tr.querySelector('select.lig-alternativa'), op = sel && sel.selectedOptions[0];
+            const frase = tr.querySelector('.lig-frase');
+            if (frase) frase.textContent = op ? fraseFator(op.dataset.unidade, tr.querySelector('input.lig-fator').value, m.unidade) : '';
+        }
+        async function confirmar(tr, estoqueCodigo, fator) {
+            try {
+                await api('/custos/ligacoes', { method: 'POST', body: JSON.stringify({ materialCodigo: Number(tr.dataset.material), estoqueCodigo, fator }) });
+                if ($('lig-grupo').value === 'revisar') tr.remove();
+                else carregarLigacoes();
+                mostrarErro('');
+                dados = null; // os custos mudaram
+            } catch (e) { mostrarErro(e.message); }
+        }
+        async function eventoLigacoes(e) {
+            const tr = e.target.closest('tr[data-material]');
+            if (!tr) return;
+            const codigo = Number(tr.dataset.material);
+            if (e.target.closest('.lig-confirmar')) {
+                const sel = tr.querySelector('select.lig-alternativa');
+                const fator = parseFloat(String(tr.querySelector('input.lig-fator').value).replace(',', '.'));
+                if (!sel || !sel.value) return mostrarErro('Escolha o item comprado (ou busque no estoque).');
+                if (!(fator > 0)) return mostrarErro('Informe o fator: quantas unidades de venda há em 1 unidade de compra.');
+                return confirmar(tr, Number(sel.value), fator);
+            }
+            if (e.target.closest('.lig-sem-compra') || e.target.closest('.lig-com-compra')) {
+                try {
+                    await api(`/custos/material/${codigo}`, { method: 'PUT', body: JSON.stringify({ semCompra: !!e.target.closest('.lig-sem-compra') }) });
+                    tr.remove(); dados = null;
+                } catch (err) { mostrarErro(err.message); }
+                return;
+            }
+            const desf = e.target.closest('.lig-desfazer');
+            if (desf) {
+                try { await api(`/custos/ligacoes/${desf.dataset.id}`, { method: 'DELETE' }); dados = null; carregarLigacoes(); } catch (err) { mostrarErro(err.message); }
+                return;
+            }
+            if (e.target.closest('.lig-buscar') || e.target.closest('.lig-mais')) {
+                buscaPara = { tr, mais: !!e.target.closest('.lig-mais') };
+                $('busca-estoque').value = ''; $('lista-estoque').innerHTML = '';
+                $('dlg-estoque').showModal(); $('busca-estoque').focus();
+            }
+        }
+        let timerBusca = null, ultimaBusca = new Map();
+        async function buscarEstoque() {
+            const q = $('busca-estoque').value.trim();
+            if (!q) { $('lista-estoque').innerHTML = ''; return; }
+            try {
+                const itens = await api(`/custos/estoque?q=${encodeURIComponent(q)}`);
+                ultimaBusca = new Map(itens.map(i => [String(i.codigo), i]));
+                $('lista-estoque').innerHTML = itens.length ? itens.map(i => `<li data-codigo="${esc(i.codigo)}">
+                    <b>${esc(i.nome)}</b> <small>${esc(i.fornecedor || '')} · ${esc(i.unidade || '')}</small></li>`).join('') : '<li class="vazio">Nada encontrado</li>';
+            } catch (e) { $('lista-estoque').innerHTML = `<li class="vazio">${esc(e.message)}</li>`; }
+        }
+        function escolherDoEstoque(e) {
+            const li = e.target.closest('li[data-codigo]');
+            if (!li || !buscaPara) return;
+            const item = ultimaBusca.get(li.dataset.codigo);
+            if (!item) return;
+            const { tr, mais } = buscaPara;
+            $('dlg-estoque').close();
+            const m = ligacoes.find(x => x.codigo === Number(tr.dataset.material));
+            const fator = sugerirFator(m.unidade, item);
+            if (mais) {
+                // confirmadas: "+ outro item de compra" pede só o fator
+                const valor = window.prompt(`Fator para ${item.nome} (quantas unidades de venda há em 1 ${item.unidade || 'unidade de compra'}):`, fator ?? '');
+                const f = parseFloat(String(valor || '').replace(',', '.'));
+                if (f > 0) confirmar(tr, item.codigo, f);
+                return;
+            }
+            const sel = tr.querySelector('select.lig-alternativa');
+            sel.style.display = '';
+            tr.querySelector('.sem-sug')?.remove();
+            sel.insertAdjacentHTML('afterbegin', `<option value="${item.codigo}" data-unidade="${esc(item.unidade || '')}" data-fator="${fator ?? ''}">${esc(item.nome)} — ${esc(item.fornecedor || '')}</option>`);
+            sel.value = String(item.codigo);
+            tr.querySelector('input.lig-fator').value = fator ?? '';
+            atualizarFrase(tr);
+        }
+
+        // ============ PARÂMETROS ============
+        function abrirParametros() {
+            $('p-meses').value = dados?.parametros?.periodoMeses ?? 6;
+            $('p-diverg').value = dados?.parametros?.divergenciaPct ?? 15;
+            $('p-msg').textContent = '';
+            $('dlg-parametros').showModal();
+        }
+        async function salvarParametros() {
+            try {
+                await api('/custos/parametros', { method: 'PUT', body: JSON.stringify({ periodoMeses: Number($('p-meses').value), divergenciaPct: Number($('p-diverg').value) }) });
+                $('dlg-parametros').close();
+                carregarMateriais(); // sem "meses": usa o período recém-salvo
+            } catch (e) { $('p-msg').textContent = e.message; }
+        }
+
+        // ============ ABAS ============
+        function mostrarAba(aba) {
+            document.querySelectorAll('.abas button').forEach(b => b.classList.toggle('on', b.dataset.aba === aba));
+            $('aba-custos').style.display = aba === 'custos' ? '' : 'none';
+            $('aba-ligacoes').style.display = aba === 'ligacoes' ? '' : 'none';
+            if (aba === 'ligacoes') carregarLigacoes();
+            else if (!dados) carregarMateriais();
+        }
+
+        document.querySelectorAll('.abas button').forEach(b => b.addEventListener('click', () => mostrarAba(b.dataset.aba)));
+        document.querySelectorAll('#cartoes [data-situacao]').forEach(b => b.addEventListener('click', () => escolherSituacao(b.dataset.situacao)));
+        $('f-situacao').addEventListener('change', () => { filtroSit = 'todos'; escolherSituacao($('f-situacao').value); });
+        $('busca').addEventListener('input', renderMateriais);
+        $('f-classe').addEventListener('change', renderMateriais);
+        $('f-inativos').addEventListener('change', renderMateriais);
+        $('f-meses').addEventListener('change', () => carregarMateriais(true));
+        $('tab-materiais').addEventListener('click', e => { const tr = e.target.closest('tr[data-codigo]'); if (tr) abrirDetalhe(tr.dataset.codigo); });
+        $('det-fechar').addEventListener('click', fecharDetalhe);
+        $('det-fundo').addEventListener('click', fecharDetalhe);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharDetalhe(); });
+        $('det-unidade-salvar').addEventListener('click', async () => {
+            if (!detalheAtual) return;
+            try {
+                await api(`/custos/material/${detalheAtual.codigo}`, { method: 'PUT', body: JSON.stringify({ unidadeVenda: $('det-unidade').value || null }) });
+                await carregarMateriais(); abrirDetalhe(detalheAtual.codigo);
+            } catch (e) { mostrarErro(e.message); }
+        });
+        $('lig-grupo').addEventListener('change', carregarLigacoes);
+        $('tab-ligacoes').addEventListener('click', eventoLigacoes);
+        $('tab-ligacoes').addEventListener('change', e => { const tr = e.target.closest('tr[data-material]'); if (!tr) return;
+            if (e.target.matches('select.lig-alternativa')) { const f = e.target.selectedOptions[0]?.dataset.fator; tr.querySelector('input.lig-fator').value = f || ''; }
+            atualizarFrase(tr); });
+        $('tab-ligacoes').addEventListener('input', e => { const tr = e.target.closest('tr[data-material]'); if (tr && e.target.matches('input.lig-fator')) atualizarFrase(tr); });
+        $('busca-estoque').addEventListener('input', () => { clearTimeout(timerBusca); timerBusca = setTimeout(buscarEstoque, 250); });
+        $('lista-estoque').addEventListener('click', escolherDoEstoque);
+        $('dlg-estoque-fechar').addEventListener('click', () => $('dlg-estoque').close());
+        $('btn-parametros').addEventListener('click', abrirParametros);
+        $('p-salvar').addEventListener('click', salvarParametros);
+        $('p-cancelar').addEventListener('click', () => $('dlg-parametros').close());
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const auth = getAuth();
+            if (!auth) { location.href = LOGIN_URL; return; }
+            $('user-empresa').textContent = auth.user.empresa || 'Elegance';
+            $('user-name').textContent = auth.user.nome || '';
+            $('user-cargo').textContent = auth.user.cargo || '';
+            $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
+            if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
+            mostrarAba(new URLSearchParams(location.search).get('aba') === 'ligacoes' ? 'ligacoes' : 'custos');
+        });
+    </script>
+</body>
+</html>

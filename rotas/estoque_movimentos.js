@@ -97,16 +97,8 @@ function somarPorProduto(linhas) {
 }
 const NAO_ENCONTRADO = 'Movimento não encontrado (talvez já desfeito).';
 
-// nome para comparar: sem acento, maiúsculas, só letras e números separados por um espaço
-const normalizarNome = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
-// semelhança entre nomes (Dice das palavras): 1 = mesmas palavras, 0 = nenhuma em comum
-function semelhanca(a, b) {
-  const pa = new Set(normalizarNome(a).split(' ').filter(Boolean)), pb = new Set(normalizarNome(b).split(' ').filter(Boolean));
-  if (!pa.size || !pb.size) return 0;
-  let comuns = 0;
-  for (const p of pa) if (pb.has(p)) comuns++;
-  return (2 * comuns) / (pa.size + pb.size);
-}
+// normalização e semelhança de nomes: calculo/nomes.js (também usadas nas ligações de custo)
+const { normalizarNome, semelhanca } = require('../calculo/nomes');
 const SEMELHANCA_MINIMA = 0.5;
 const MAX_SUGESTOES = 3;
 

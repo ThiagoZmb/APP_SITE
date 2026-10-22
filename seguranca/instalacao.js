@@ -81,6 +81,28 @@ const TABELAS = [
      motivo VARCHAR(500) NOT NULL,
      KEY idx_quando (quando)
    ) ${OPCOES}`,
+  // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)
+  `CREATE TABLE IF NOT EXISTS \`web_custo_material\` (
+     material_codigo INT NOT NULL PRIMARY KEY,
+     unidade_venda VARCHAR(4) NULL,
+     sem_compra TINYINT(1) NOT NULL DEFAULT 0,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL
+   ) ${OPCOES}`,
+  // ligações confirmadas material de venda ↔ item de estoque; fator = unidades de venda em 1 unidade de compra
+  `CREATE TABLE IF NOT EXISTS \`web_custo_ligacoes\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     material_codigo INT NOT NULL,
+     estoque_codigo INT NOT NULL,
+     fator DECIMAL(14,6) NOT NULL,
+     confirmado_em DATETIME NULL,
+     confirmado_por VARCHAR(190) NULL,
+     UNIQUE KEY uk_material_estoque (material_codigo, estoque_codigo)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_custo_parametros\` (
+     chave VARCHAR(64) NOT NULL PRIMARY KEY,
+     valor VARCHAR(190) NOT NULL
+   ) ${OPCOES}`,
   // prazo de reposição por item (análises do estoque); sem linha = 15 dias
   `CREATE TABLE IF NOT EXISTS \`web_estoque_reposicao\` (
      produto_codigo INT NOT NULL PRIMARY KEY,
@@ -226,4 +248,26 @@ async function acrescentarPermissoesPedOrc(pool) {
   }
 }
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc };
+// "Ver custos e preços" e "Editar ligações de custo" para o Administrador (os demais perfis o Thiago libera)
+async function acrescentarPermissoesPrecos(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_precos' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [admin] = await conn.execute("SELECT id FROM web_perfis WHERE nome = 'Administrador' ORDER BY id");
+    for (const p of admin) for (const permissao of ['precos.ver', 'precos.editar'])
+      await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_precos', '', JSON.stringify({ perfis: admin.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos };

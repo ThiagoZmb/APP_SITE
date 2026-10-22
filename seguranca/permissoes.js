@@ -25,6 +25,8 @@ const CATALOGO = [
   { codigo: 'financeiro.ver', nome: 'Ver fluxo de caixa (também exige Valores financeiros)', area: 'Financeiro' },
   { codigo: 'financeiro.lancar', nome: 'Lançar, editar e mudar situação (também exige Valores financeiros)', area: 'Financeiro' },
   { codigo: 'financeiro.excluir', nome: 'Excluir lançamento (também exige Valores financeiros)', area: 'Financeiro' },
+  { codigo: 'precos.ver', nome: 'Ver custos e preços (também exige Valores financeiros)', area: 'Preços' },
+  { codigo: 'precos.editar', nome: 'Editar ligações de custo', area: 'Preços' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' }
 ];
@@ -33,7 +35,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'precos.editar') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },
