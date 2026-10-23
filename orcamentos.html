@@ -248,16 +248,16 @@
         #ped-numero { width: 110px; flex: none; font-weight: 700; text-align: center; }
         .faixa-leitura { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 14px; }
         body.so-leitura #btn-salvar, body.so-leitura #btn-salvar-topo,body.so-leitura #btn-adicionar, body.so-leitura #btn-vazio, body.so-leitura #itens-tbody .col-acoes button { display: none !important; }
-        /* etapa 3: o cartão inteiro se destaca (tema.css usa !important, por isso html body + !important) */
-        html body section.card.card-itens { border: 2px solid var(--primary-color) !important; background: linear-gradient(180deg, #fdf3f4 0, #ffffff 120px) !important;
-            box-shadow: 0 0 0 4px var(--primary-ring), 0 14px 34px -10px rgba(155, 27, 48, .38) !important; }
-        html body section.card.card-itens > .card-title { color: var(--primary-color) !important; font-size: 18px !important; padding-bottom: 10px; border-bottom: 2px solid var(--primary-ring); }
+        /* etapa 3: cartão inteiro no estilo da caixa de Observação (fundo tingido, borda e faixa lateral), em vermelho claro; tema.css usa !important */
+        html body section.card.card-itens { background: #fdeaea !important; border: 1px solid #f0a8a8 !important; border-left: 5px solid #e05555 !important;
+            box-shadow: 0 8px 22px -10px rgba(224, 85, 85, .45) !important; }
+        html body section.card.card-itens > .card-title { color: #a52a2a !important; font-size: 18px !important; padding-bottom: 10px; border-bottom: 1px solid #f0c4c4; }
         html body .card-itens thead th { background: var(--primary-color) !important; color: #fff !important; border-bottom: none !important; }
         html body .card-itens thead th:first-child { border-top-left-radius: 8px; }
         html body .card-itens thead th:last-child { border-top-right-radius: 8px; }
-        html body .card-itens #itens-tbody tr:nth-child(even):not(.preco-mudou):not(.travado) td { background: #faf0f1 !important; }
-        html body .card-itens #itens-tbody tr:hover:not(.preco-mudou):not(.travado) td { background: #f6dde0 !important; }
-        html body .card-itens #itens-tbody td { border-bottom: 1px solid #ecd5d8 !important; }
+        html body .card-itens #itens-tbody tr:nth-child(even):not(.preco-mudou):not(.travado) td { background: #fadada !important; }
+        html body .card-itens #itens-tbody tr:hover:not(.preco-mudou):not(.travado) td { background: #f6c6c6 !important; }
+        html body .card-itens #itens-tbody td { border-bottom: 1px solid #f0c4c4 !important; }
         html body .card-itens .totais { padding: 14px 18px; border-radius: 10px; background: #fff; border: 2px solid var(--primary-ring); }
         html body .card-itens .totais .grupo:last-child .valor { font-size: 30px; }
         #tab-itens.ocultar-pct .col-pct { display: none; }
