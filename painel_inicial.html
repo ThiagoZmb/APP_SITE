@@ -358,7 +358,7 @@
                             <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
                             <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
                         </div>
-                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar número, cliente, observação..."></div>
+                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar em todos os campos: número, cliente, valor, data, observação..."></div>
                         <button class="btn btn-secondary btn-mini" id="refresh-btn">↻ Atualizar</button>
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
@@ -707,6 +707,18 @@
         }
 
         // ================= LISTA =================
+        // texto pesquisável do registro, montado uma vez: todos os campos + valor também no formato da tela (1.234,56)
+        const _buscaCache = new WeakMap();
+        function textoBusca(x) {
+            let t = _buscaCache.get(x);
+            if (t === undefined) {
+                const partes = Object.entries(x).filter(([k, v]) => !['dt', 's'].includes(k) && v !== null && v !== undefined && typeof v !== 'object').map(([, v]) => v);
+                if (x.valor !== undefined && x.valor !== null) partes.push(x.v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); // sem valores.ver o campo não vem
+                t = norm(partes.join(' '));
+                _buscaCache.set(x, t);
+            }
+            return t;
+        }
         function renderLista() {
             const j = janela();
             const base = entre(doCliente(tipoLista === 'Pedido' ? pedidos : orcamentos), j.ini, j.fim);
@@ -714,9 +726,10 @@
             $('chips-sit').innerHTML = tipoLista === 'Pedido'
                 ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
                     .map(([k, t]) => `<button class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}">${t}</button>`).join('') : '';
-            const termo = norm($('search-input').value);
+            // busca em todos os campos do registro (o que a lista mostra e o que mais vier da API); várias palavras = todas precisam aparecer
+            const palavras = norm($('search-input').value).split(/\s+/).filter(Boolean);
             const lista = base.filter(x => (tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit) &&
-                (!termo || norm(`${x.numero} ${x.cliente} ${x.clienteFinal} ${x.observacao} ${x.situacao}`).includes(termo)));
+                (!palavras.length || palavras.every(p => textoBusca(x).includes(p))));
             $('lista-titulo').textContent = `Lista de ${tipoLista === 'Pedido' ? 'pedidos' : 'orçamentos'}`;
             $('lista-qtd').textContent = `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
             $('lista-total').textContent = moeda(soma(lista));
