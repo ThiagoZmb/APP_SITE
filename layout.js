@@ -26,7 +26,7 @@
         { href: 'inicio.html', texto: 'Início', icone: 'inicio' },
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
-        { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo' },
+        { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
