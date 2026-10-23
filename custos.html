@@ -150,6 +150,10 @@
         .campo-pct input { flex: 1; min-width: 0; }
         .dlg-rolagem { max-height: 50vh; overflow: auto; }
         #dlg-gravar { width: min(560px, calc(100vw - 32px)); }
+        /* referência de custo fixo: nomes longos das contas ("CUSTOS FIXOS › Mão de Obra › …") aparecem inteiros */
+        #dlg-contas { width: min(860px, calc(100vw - 32px)); }
+        html body #dlg-contas td { max-width: none !important; overflow: visible !important; text-overflow: clip !important; white-space: normal !important; }
+        html body #dlg-contas td.num { white-space: nowrap !important; width: 130px; }
         .componente .comp-motivo { margin: 10px 12px 0; }
         .componente .comp-acoes.bloco-rodape { margin-top: 0; }
         .comp-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

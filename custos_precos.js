@@ -179,8 +179,8 @@ function mostrarCustoFixo(cf, meses, calcular) {
         + `<p class="prc-ref">Despesas pagas com classificação fixa ÷ receitas recebidas (que entram na DRE ou sem classificação), média dos últimos ${meses} meses.
            Despesas variáveis (material, comissão, imposto, frete) ficam de fora: já entram no preço como custo e encargos.
            Receitas sem classificação incluídas: ${moeda(cf.receitasSemClassificacao)}.</p>`
-        + (cf.contas.length ? `<table><thead><tr><th>Conta fixa</th><th class="num">Total no período</th></tr></thead><tbody>`
-            + cf.contas.map(c => `<tr><td>${esc(c.nome)}</td><td class="num">${moeda(c.total)}</td></tr>`).join('') + '</tbody></table>' : '')
+        + (cf.contas.length ? `<table><thead><tr><th>Conta fixa</th><th class="num">Total no período</th><th class="num">Média por mês</th></tr></thead><tbody>`
+            + cf.contas.map(c => `<tr><td>${esc(c.nome)}</td><td class="num">${moeda(c.total)}</td><td class="num">${meses > 0 && c.total != null ? moeda(c.total / meses) : '—'}</td></tr>`).join('') + '</tbody></table>' : '')
         + (cf.comportamentos.length ? `<p class="prc-ref">Comportamentos encontrados: ${cf.comportamentos.map(esc).join(', ')}</p>` : '')
         + (cf.semComportamento.length ? `<p class="prc-ref">Despesas sem comportamento: ${cf.semComportamento.map(esc).join(', ')}</p>` : '');
     const usavel = calcular && cf.pct != null && cf.pct < 100;
