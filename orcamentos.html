@@ -2022,6 +2022,7 @@
             document.getElementById('f-qtd').value = 1;
             ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
             atualizarMetragemSerr();
+            renderAcessorios(); // porta de correr: aviso do sistema e "Portas: A × L" são refeitos já com os campos limpos
             document.getElementById('f-soldas').value = 0;
             document.getElementById('chk-pares').checked = false;
             document.getElementById('chk-toda-ext').checked = false;
