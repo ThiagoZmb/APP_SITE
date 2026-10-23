@@ -267,7 +267,8 @@ function montarCelula(doc, cel, largura) {
       base.linhas.push({ texto: t, estilo: p.estilo, tamanho: p.tamanho, base: y });
     }
   }
-  return { ...base, altura: y + PAD };
+  // célula de texto vazia não ocupa altura (no PDF do VB a "Observação" vazia não abre uma linha a mais)
+  return { ...base, altura: pars.length ? y + PAD : 0 };
 }
 
 function escrever(ctx, texto, estilo, tamanho, x, baseY) {
@@ -338,8 +339,9 @@ function tabela(ctx, pesos, linhas, { espacoAntes = 0, cabecalho = null } = {}) 
   for (const linha of linhas) {
     let montadas = montar(linha);
     let altura = Math.max(...montadas.map(m => m.altura));
-    const cabeNumaPagina = altura <= fimDaPagina(ctx) - MARGEM - hCab;
-    if (ctx.y + altura > fimDaPagina(ctx) && cabeNumaPagina) {
+    // SplitLate do iText: a linha que não cabe vai inteira para a página seguinte;
+    // só é cortada se não couber nem numa página nova
+    if (ctx.y + altura > fimDaPagina(ctx) && ctx.y > MARGEM + hCab + 0.01) {
       novaPagina(ctx);
       if (cab) desenhar(cab, hCab);
     }

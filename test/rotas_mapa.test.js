@@ -93,10 +93,10 @@ test('cliente fora dos estados do usuário: 403', async t => {
 });
 
 test('colunasPdf: sem valores não tem Unitário nem Total', () => {
-  assert.deepEqual(colunasPdf(false).map(c => c.label), ['Item', 'Qtd', 'Descrição', 'Observação']);
-  assert.deepEqual(colunasPdf(true).map(c => c.label), ['Item', 'Qtd', 'Descrição', 'Observação', 'Unitário', 'Total']);
+  assert.deepEqual(colunasPdf(false).map(c => c.label), ['Item', 'Qtd', 'Imagem', 'Descrição', 'Observação']);
+  assert.deepEqual(colunasPdf(true).map(c => c.label), ['Item', 'Qtd', 'Imagem', 'Descrição', 'Observação', 'Unitário', 'Total']);
   const soma = cols => cols.reduce((s, c) => s + c.w, 0);
-  assert.ok(Math.abs(soma(colunasPdf(false), 500) - soma(colunasPdf(true))) < 1e-9);
+  assert.ok(Math.abs(soma(colunasPdf(false)) - soma(colunasPdf(true))) < 1e-9);
 });
 
 test('estoque/salvar sem valores.ver preserva VALOR, FRETE e IPI do banco', async t => {

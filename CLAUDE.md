@@ -35,6 +35,8 @@ calculo/                 Funções puras (testáveis sem banco)
   engenharia.js          Regras de engenharia das portas
   leitura_vb.js / linhas_vb.js   Conversão banco<->tela no formato do VB
   nomes.js               Normalização/semelhança de nomes de produtos
+pdf/ped_orc.js           PDF do pedido/orçamento (rota /dados_pdf) fiel ao Gerar_PDF_PedOrc do VB; ?producao=1 = Guia de Produção (só Pedido)
+imagens/logo_elegance.png  Logo do cabeçalho do PDF (convertido do Elegance_Logo.JPEG do VB, que na verdade é BMP)
 seguranca/               acesso.js (perfil+permissões por requisição, cache 60 s), permissoes.js (catálogo único de permissões), rotas.js (registro obrigatório de rotas), valores.js (esconde dinheiro de quem não tem `valores.ver`), instalacao.js (cria tabelas web_*, migrações)
 *.html, layout.js, login.js, ranking.js, custos_precos.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
 test/                    Testes (node:test); test/apoio/ = banco/pool falsos, servidor de teste, XMLs de NF-e
