@@ -260,6 +260,16 @@
         html body .card-itens #itens-tbody td { border-bottom: 1px solid #f0c4c4 !important; }
         html body .card-itens .totais { padding: 14px 18px; border-radius: 10px; background: #fff; border: 2px solid var(--primary-ring); }
         html body .card-itens .totais .grupo:last-child .valor { font-size: 30px; }
+        /* cancelar (âmbar, reversível pelo VB/edição) e excluir (vermelho, sem volta) */
+        html body .btn-perigo-suave { background: #fff4e0 !important; border: 1px solid #e8b35a !important; color: #8a5200 !important; }
+        html body .btn-perigo-suave:hover { background: #ffe9c2 !important; }
+        html body .btn-perigo { background: #fdecec !important; border: 1px solid #e58a8a !important; color: #a52a2a !important; }
+        html body .btn-perigo:hover { background: #f9d3d3 !important; }
+        body.so-leitura .btn-cancelar-doc, body.so-leitura .btn-excluir-doc { display: none !important; }
+        /* botões de ação do item */
+        html body #btn-add-acessorio { background: #e8f1ff !important; border: 1px solid #8fb4ea !important; color: #1f4e9c !important; font-weight: 700; }
+        html body #btn-add-acessorio:hover { background: #d6e6ff !important; }
+        html body #btn-adicionar:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
         #tab-itens.ocultar-pct .col-pct { display: none; }
         #tab-itens .col-pct { white-space: nowrap; }
         #itens-tbody tr.travado td { background: #f8fafc; }
@@ -287,6 +297,21 @@
         .dlg-salvar h3 { margin: 0 0 8px; }
         .dlg-salvar p { margin: 0 0 16px; color: var(--text-light); }
         .dlg-acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+        /* janela Salvar: duas opções em cartões, cada uma com a sua cor (azul = altera o existente, verde = cria um novo) */
+        #dlg-salvar { width: min(480px, calc(100vw - 32px)); }
+        #dlg-salvar .opcoes-salvar { gap: 10px; }
+        .opcao-salvar { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border-radius: 12px; border: 2px solid; font: inherit; text-align: left; cursor: pointer; transition: transform .12s, box-shadow .12s, background .12s; }
+        .opcao-salvar:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(0,0,0,.35); }
+        .opcao-salvar:focus-visible { outline: 3px solid rgba(0,0,0,.25); outline-offset: 2px; }
+        .opcao-salvar .opc-ico { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; font-size: 18px; background: #fff; }
+        .opcao-salvar .opc-txt { display: flex; flex-direction: column; gap: 2px; }
+        .opcao-salvar b { font-size: 15px; }
+        .opcao-salvar small { font-size: 12.5px; font-weight: 400; opacity: .85; }
+        .opc-atualizar { background: #e8f1ff; border-color: #8fb4ea; color: #1f4e9c; }
+        .opc-atualizar:hover { background: #d6e6ff; }
+        .opc-novo { background: #e7f6ec; border-color: #7cc596; color: #1d6b3b; }
+        .opc-novo:hover { background: #d3efdc; }
+        #btn-atualizar[style*="none"] { display: none !important; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <style>
@@ -421,6 +446,8 @@
                     <button type="button" class="btn btn-secondary" data-atalho="btn-abrir">📂 Abrir</button>
                     <button type="button" class="btn btn-primary" id="btn-salvar-topo" data-atalho="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
                     <button type="button" class="btn btn-secondary" data-atalho="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo">📄 PDF</button>
+                    <button type="button" class="btn btn-secondary btn-perigo-suave btn-cancelar-doc" data-atalho="btn-cancelar-doc" data-perm="pedidos.cancelar" title="Cancela o pedido aberto (a situação vira Cancelado)">🚫 Cancelar pedido</button>
+                    <button type="button" class="btn btn-secondary btn-perigo btn-excluir-doc" data-atalho="btn-excluir-doc" data-perm="pedidos.excluir" title="Apaga o documento aberto do banco">🗑️ Excluir</button>
                 </div>
                 <div class="grid-form">
                     <div class="form-group full">
@@ -491,8 +518,8 @@
                         <h4 id="tit-medidas">📐 Medidas e quantidade</h4>
                         <div class="grid-form">
                             <div class="form-group"><label for="f-qtd">Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
-                            <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="2100"></div>
-                            <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="number" id="f-largura" placeholder="800"></div>
+                            <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="0"></div>
+                            <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="number" id="f-largura" placeholder="0"></div>
                             <div class="form-group f-porta" id="wrap-pares">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
@@ -700,6 +727,8 @@
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
                     <button class="btn btn-secondary" id="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo">📄 PDF</button>
+                    <button class="btn btn-secondary btn-perigo-suave btn-cancelar-doc" id="btn-cancelar-doc" data-perm="pedidos.cancelar" title="Cancela o pedido aberto (a situação vira Cancelado)">🚫 Cancelar pedido</button>
+                    <button class="btn btn-secondary btn-perigo btn-excluir-doc" id="btn-excluir-doc" data-perm="pedidos.excluir" title="Apaga o documento aberto do banco">🗑️ Excluir</button>
                     <button class="btn btn-secondary" id="btn-novo">📄 Novo</button>
                     <button class="btn btn-secondary" id="btn-abrir">📂 Abrir</button>
                     <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
@@ -711,10 +740,18 @@
     <!-- ═══════════ SALVAR (frm_Opcao_Pedido) ═══════════ -->
     <dialog id="dlg-salvar" class="dlg-salvar dlg-padrao" aria-labelledby="dlg-salvar-titulo">
         <div class="dlg-cab"><h3 id="dlg-salvar-titulo">Salvar</h3><p id="dlg-salvar-texto"></p></div>
-        <div class="dlg-rodape dlg-acoes">
+        <div class="dlg-corpo opcoes-salvar">
+            <button type="button" class="opcao-salvar opc-atualizar" id="btn-atualizar" style="display:none">
+                <span class="opc-ico" aria-hidden="true">✏️</span>
+                <span class="opc-txt"><b>Atualizar</b><small>Grava por cima do documento aberto</small></span>
+            </button>
+            <button type="button" class="opcao-salvar opc-novo" id="btn-salvar-novo">
+                <span class="opc-ico" aria-hidden="true">➕</span>
+                <span class="opc-txt"><b>Salvar com novo número</b><small>Cria um documento novo; o original continua como está</small></span>
+            </button>
+        </div>
+        <div class="dlg-rodape">
             <button type="button" class="btn btn-secondary" id="btn-dlg-cancelar">Cancelar</button>
-            <button type="button" class="btn btn-secondary" id="btn-atualizar" style="display:none">Atualizar</button>
-            <button type="button" class="btn btn-primary" id="btn-salvar-novo">Salvar com novo número</button>
         </div>
     </dialog>
     <!-- ═══════════ ABRIR (frm_Lista_Pedidos_Orçamentos) ═══════════ -->
@@ -861,6 +898,20 @@
         function qtdEfetiva() {
             return Math.max(1, parseInt(document.getElementById('f-qtd').value) || 1);
         }
+        // "Adicionar item" só fica habilitado com valor unitário > 0. O valor é escrito por vários trechos (cálculo, edição, limpeza),
+        // então a propriedade value do campo avisa sozinha quando muda.
+        function atualizarBotaoAdicionar() {
+            const btn = document.getElementById('btn-adicionar'), campo = document.getElementById('f-valor');
+            if (!btn || !campo) return;
+            const v = parseFloat(String(campo.value || '').replace(',', '.')) || 0;
+            btn.disabled = !(v > 0);
+            btn.title = btn.disabled ? 'Disponível quando o item tiver valor maior que 0' : '';
+        }
+        (function () {
+            const campo = document.getElementById('f-valor'), nativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+            Object.defineProperty(campo, 'value', { configurable: true, get() { return nativo.get.call(this); }, set(v) { nativo.set.call(this, v); atualizarBotaoAdicionar(); } });
+            atualizarBotaoAdicionar();
+        })();
         // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
         function atualizarTotalItem() {
             const u = parseFloat((document.getElementById('f-valor').value || '').replace(',', '.')) || 0;
@@ -2636,7 +2687,7 @@
                 ? `Gravar por cima do ${docAberto.tipo.toLowerCase()} nº ${docAberto.numero} ou criar um com número novo?`
                 : `Será criado um ${tipoAtual().toLowerCase()} com número novo.`;
             $s('btn-atualizar').style.display = podeAtualizar ? '' : 'none';
-            if (podeAtualizar) $s('btn-atualizar').textContent = `Atualizar nº ${docAberto.numero}`;
+            if (podeAtualizar) $s('btn-atualizar').querySelector('b').textContent = `Atualizar nº ${docAberto.numero}`;
             $s('dlg-salvar').showModal();
         }
         async function gravar(modo) {
@@ -2794,6 +2845,29 @@
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
         // PDF do documento já salvo (o mesmo da lista de Pedidos e Orçamentos)
+        // cancelar / excluir o documento aberto: sempre pergunta antes; o servidor confere a permissão e registra quem fez
+        async function acaoNoDocumentoAberto(acao) {
+            if (!docAberto) { mostrarMsgSalvar(acao === 'cancelar' ? 'Abra um pedido para cancelar.' : 'Abra um documento salvo para excluir.', 'erro'); return; }
+            const { tipo, numero } = docAberto;
+            if (acao === 'cancelar' && tipo !== 'Pedido') { mostrarMsgSalvar('Só pedidos podem ser cancelados. Para um orçamento, use Excluir.', 'erro'); return; }
+            const quem = $s('sel-cliente').selectedOptions[0]?.text || '';
+            const pergunta = acao === 'cancelar'
+                ? `Cancelar o pedido nº ${numero} (${quem})?\n\nA situação passa para "Cancelado". Os itens continuam gravados.`
+                : `EXCLUIR o ${tipo.toLowerCase()} nº ${numero} (${quem})?\n\nO documento e todos os seus itens serão apagados do banco. Esta ação não pode ser desfeita.`;
+            if (!confirm(pergunta)) return;
+            mostrarMsgSalvar('');
+            try {
+                const res = await fetch(`${API_BASE}/ped_orc/${encodeURIComponent(tipo)}/${encodeURIComponent(numero)}${acao === 'cancelar' ? '/cancelar' : ''}`,
+                    { method: acao === 'cancelar' ? 'POST' : 'DELETE', headers: { 'Authorization': 'Bearer ' + getToken() } });
+                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return; }
+                const j = await res.json().catch(() => ({}));
+                if (!res.ok) { mostrarMsgSalvar(j.error || `Erro (HTTP ${res.status}).`, 'erro'); return; }
+                if (acao === 'cancelar') { await abrirDocumento(tipo, numero, { confirmar: false, silencioso: true }); mostrarMsgSalvar(`Pedido nº ${numero} cancelado.`, 'ok'); }
+                else { limparDocumento(); mostrarMsgSalvar(`${tipo} nº ${numero} excluído.`, 'ok'); }
+            } catch { mostrarMsgSalvar('Sem conexão com o servidor. Tente de novo.', 'erro'); }
+        }
+        document.getElementById('btn-cancelar-doc').addEventListener('click', () => acaoNoDocumentoAberto('cancelar'));
+        document.getElementById('btn-excluir-doc').addEventListener('click', () => acaoNoDocumentoAberto('excluir'));
         document.getElementById('btn-pdf').addEventListener('click', () => {
             if (!docAberto) { mostrarMsgSalvar('Salve o orçamento antes de abrir o PDF.', 'erro'); return; }
             abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(docAberto.numero)}&tipo=${encodeURIComponent(docAberto.tipo)}`);

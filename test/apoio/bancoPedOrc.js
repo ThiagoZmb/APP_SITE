@@ -46,7 +46,7 @@ function bancoPedOrc() {
     serrComponentes: [{ id: 11, modelo_padrao_id: 1, tipo_componente: 'Fechadura', descricao_componente: 'Fechadura tetra', unidade_medida: 'UN', valor_unitario: 10, ativo: 1 },
       { id: 12, modelo_padrao_id: 1, tipo_componente: 'Pintura', descricao_componente: 'Pintura eletrostática', unidade_medida: 'M2', valor_unitario: 25.5, ativo: 1 },
       { id: 13, modelo_padrao_id: 9, tipo_componente: 'Roldana', descricao_componente: 'Roldana de portão', unidade_medida: 'UN', valor_unitario: 40, ativo: 1 }],
-    pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: []
+    pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: [], auditoria: []
   };
   // falhas simuladas: { 'ped_orc': n } → as n próximas gravações nessa tabela falham
   const falhas = {};
@@ -55,7 +55,7 @@ function bancoPedOrc() {
   let ultimoId = 1000;
   const TABELA = { ped_orc_lista_itens: 'listaItens', ped_orc_itens_v4: 'itensV4', vidros: 'vidros', perfis: 'perfis',
     furacao_pedidos_orcamentos: 'furacao', ped_orc_complementos: 'complementos', ped_orc_serralheria: 'serralheria',
-    ped_orc_serralheria_complementos: 'serralheriaComp', ped_orc: 'pedOrc' };
+    ped_orc_serralheria_complementos: 'serralheriaComp', ped_orc: 'pedOrc', web_auditoria: 'auditoria' };
   const norm = t => String(t ?? '').trim();
   const regras = [
     // cadastro

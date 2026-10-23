@@ -10,6 +10,8 @@ const CATALOGO = [
   { codigo: 'orcamentos.criar', nome: 'Montar orçamento (também exige Valores financeiros)', area: 'Pedidos' },
   { codigo: 'orcamentos.salvar', nome: 'Salvar orçamento', area: 'Pedidos' },
   { codigo: 'pedidos.criar', nome: 'Salvar como pedido', area: 'Pedidos' },
+  { codigo: 'pedidos.cancelar', nome: 'Cancelar pedido', area: 'Pedidos' },
+  { codigo: 'pedidos.excluir', nome: 'Excluir pedido/orçamento (apaga do banco, sem desfazer)', area: 'Pedidos' },
   { codigo: 'clientes.ver', nome: 'Ver clientes e análise', area: 'Clientes' },
   { codigo: 'clientes.editar', nome: 'Cadastrar e editar cliente', area: 'Clientes' },
   { codigo: 'clientes.permissao', nome: 'Bloquear/liberar cliente no sistema', area: 'Clientes' },
@@ -36,7 +38,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'precos.editar' && c !== 'precos.gravar') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

@@ -501,6 +501,56 @@ function registrarPedOrc({ rota, pool }) {
     });
     if (resultado) res.json({ ok: true, tipo, numero: resultado.numero });
   });
+
+  // ---- cancelar / excluir (a tela sempre pergunta antes; aqui só o servidor decide e registra) ----
+  const auditarDoc = (conn, req, acao, tipo, numero, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
+    [agoraLocal(), req.acesso?.nome || req.usuario?.nome || '', acao, `${tipo} ${numero}`, JSON.stringify(detalhe)]);
+  // documento travado + conferência de estado do cliente; devolve as linhas ou lança ErroUsuario
+  async function docParaAcao(conn, req, tipo, numero) {
+    const linhas = await lerDocumento(conn, tipo, numero, { travar: true });
+    if (!linhas) throw new ErroUsuario(404, `${tipo} nº ${numero} não encontrado.`);
+    if ((req.acesso?.estados || []).length) {
+      const [cli] = await conn.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
+      if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
+    }
+    return linhas;
+  }
+  const validarAlvo = (req, res) => {
+    const tipo = req.params.tipo, numero = Number(req.params.numero);
+    if (!TIPOS.includes(tipo) || !(Number.isInteger(numero) && numero > 0)) { res.status(400).json({ error: 'Documento inválido.' }); return null; }
+    return { tipo, numero };
+  };
+
+  // cancelar: só pedido; a situação vira "Cancelado" (o documento e os itens continuam, como o VB)
+  rota('post', '/ped_orc/:tipo/:numero/cancelar', ['pedidos.cancelar'], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'Só pedidos podem ser cancelados. Orçamento: use Excluir.' });
+    const r = await emTransacao(pool, res, 'POST /ped_orc/cancelar', async conn => {
+      const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      const antes = String(linhas.cab.SITUACAO || '');
+      if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está cancelado.`);
+      await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', ['Cancelado', alvo.numero, alvo.tipo]);
+      await auditarDoc(conn, req, 'pedido_cancelado', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, situacaoAnterior: antes });
+      return { ok: true };
+    });
+    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: 'Cancelado' });
+  });
+
+  // excluir: apaga o cabeçalho e todas as linhas do documento (mesmas tabelas que o salvar regrava); sem desfazer
+  rota('delete', '/ped_orc/:tipo/:numero', ['pedidos.excluir'], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    const r = await emTransacao(pool, res, 'DELETE /ped_orc', async conn => {
+      const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      const resumo = { cliente: linhas.cab.RAZAO_SOCIAL, data: String(linhas.cab.DATA || '').slice(0, 10), total: linhas.cab.TOTAL, situacao: linhas.cab.SITUACAO, financeiro: linhas.cab.FINANCEIRO,
+        itens: linhas.lista.length };
+      for (const tabela of TABELAS_ITENS) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ? AND TIPO = ?`, [alvo.numero, alvo.tipo]);
+      if (alvo.tipo === 'Pedido') for (const tabela of ['vidros', 'perfis']) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ?`, [alvo.numero]);
+      await conn.execute('DELETE FROM ped_orc WHERE NUMERO = ? AND TIPO = ?', [alvo.numero, alvo.tipo]);
+      await auditarDoc(conn, req, 'documento_excluido', alvo.tipo, alvo.numero, resumo);
+      return { ok: true };
+    });
+    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero });
+  });
 }
 
 module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento };

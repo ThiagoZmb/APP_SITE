@@ -1,0 +1,71 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { prepararPedOrc, bancoPedOrc } = require('./apoio/bancoPedOrc');
+
+// documento mínimo no "banco": cabeçalho + uma linha em cada tabela de itens
+function comDocumento(banco, tipo, numero, extra = {}) {
+  banco.pedOrc.push({ id: numero, TIPO: tipo, NUMERO: numero, RAZAO_SOCIAL: 'CLIENTE TESTE', SITUACAO: tipo === 'Pedido' ? 'Em Produção' : 'Aguardando resposta', TOTAL: 100, ...extra });
+  banco.listaItens.push({ id: 1, TIPO: tipo, NUMERO: numero, ITEM: 1 });
+  banco.itensV4.push({ ID: 1, TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: 1 });
+  if (tipo === 'Pedido') { banco.vidros.push({ id: 1, NUMERO: numero, ITEM: 1 }); banco.perfis.push({ id: 1, NUMERO: numero, ITEM: 1 }); }
+}
+
+test('cancelar pedido: situação vira Cancelado, itens ficam e a ação é auditada', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  const r = await chamar('/ped_orc/Pedido/5/cancelar', 'POST');
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Cancelado');
+  assert.equal(banco.listaItens.length, 1);
+  assert.equal(banco.auditoria.length, 1);
+  assert.equal(banco.auditoria[0].acao, 'pedido_cancelado');
+});
+
+test('cancelar: pedido já cancelado → 409; orçamento → 400; inexistente → 404', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5, { SITUACAO: 'Cancelado' }); comDocumento(banco, 'Orçamento', 6);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5/cancelar', 'POST')).status, 409);
+  assert.equal((await chamar('/ped_orc/Orçamento/6/cancelar', 'POST')).status, 400);
+  assert.equal((await chamar('/ped_orc/Pedido/99/cancelar', 'POST')).status, 404);
+  assert.equal(banco.auditoria.length, 0);
+});
+
+test('excluir pedido: apaga cabeçalho, itens, vidros e perfis; não mexe em outros documentos', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); comDocumento(banco, 'Pedido', 6); comDocumento(banco, 'Orçamento', 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  const r = await chamar('/ped_orc/Pedido/5', 'DELETE');
+  assert.equal(r.status, 200);
+  assert.deepEqual(banco.pedOrc.map(p => `${p.TIPO}${p.NUMERO}`).sort(), ['Orçamento5', 'Pedido6']);
+  assert.deepEqual(banco.listaItens.map(x => `${x.TIPO}${x.NUMERO}`).sort(), ['Orçamento5', 'Pedido6']);
+  assert.deepEqual(banco.vidros.map(x => x.NUMERO), [6]);
+  assert.deepEqual(banco.perfis.map(x => x.NUMERO), [6]);
+  assert.equal(banco.auditoria.at(-1).acao, 'documento_excluido');
+});
+
+test('excluir orçamento: não apaga vidros/perfis de um pedido de mesmo número', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); comDocumento(banco, 'Orçamento', 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Orçamento/5', 'DELETE')).status, 200);
+  assert.deepEqual(banco.pedOrc.map(p => p.TIPO), ['Pedido']);
+  assert.equal(banco.vidros.length, 1);
+});
+
+test('excluir/cancelar: sem a permissão → 403; excluir inexistente → 404; tipo inválido → 400', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5);
+  const { chamar } = await prepararPedOrc(t, { banco, perfil: 'Interno completo' });
+  assert.equal((await chamar('/ped_orc/Pedido/5', 'DELETE')).status, 403);
+  assert.equal((await chamar('/ped_orc/Pedido/5/cancelar', 'POST')).status, 403);
+  assert.equal(banco.pedOrc.length, 1);
+  const { chamar: adm } = await prepararPedOrc(t, { banco });
+  assert.equal((await adm('/ped_orc/Pedido/99', 'DELETE')).status, 404);
+  assert.equal((await adm('/ped_orc/Outro/5', 'DELETE')).status, 400);
+});
+
+test('representante só mexe em documento de cliente do seu estado', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); // cliente do RJ
+  const { chamar } = await prepararPedOrc(t, { banco, perfil: 'Representante SP' });
+  assert.equal((await chamar('/ped_orc/Pedido/5', 'DELETE')).status, 403);
+  assert.equal((await chamar('/ped_orc/Pedido/5/cancelar', 'POST')).status, 403);
+  assert.equal(banco.pedOrc.length, 1);
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção');
+});

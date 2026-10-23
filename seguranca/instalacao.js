@@ -347,4 +347,6 @@ async function darAoAdministrador(pool, marcador, permissoes) {
 const acrescentarPermissoesPrecos = pool => darAoAdministrador(pool, 'permissoes_precos', ['precos.ver', 'precos.editar']);
 const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'permissoes_precos_gravar', ['precos.gravar']);
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar };
+const acrescentarPermissoesCancelarExcluir = pool => darAoAdministrador(pool, 'permissoes_cancelar_excluir', ['pedidos.cancelar', 'pedidos.excluir']);
+
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
