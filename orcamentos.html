@@ -420,6 +420,7 @@
                     <button type="button" class="btn btn-secondary" data-atalho="btn-novo">📄 Novo</button>
                     <button type="button" class="btn btn-secondary" data-atalho="btn-abrir">📂 Abrir</button>
                     <button type="button" class="btn btn-primary" id="btn-salvar-topo" data-atalho="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
+                    <button type="button" class="btn btn-secondary" data-atalho="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo">📄 PDF</button>
                 </div>
                 <div class="grid-form">
                     <div class="form-group full">
@@ -698,6 +699,7 @@
                 <div style="font-size:12px;color:var(--text-light);text-align:right;margin-top:6px;" id="desconto-aviso"></div>
                 <div class="acoes-linha">
                     <button class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
+                    <button class="btn btn-secondary" id="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo">📄 PDF</button>
                     <button class="btn btn-secondary" id="btn-novo">📄 Novo</button>
                     <button class="btn btn-secondary" id="btn-abrir">📂 Abrir</button>
                     <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
@@ -2791,6 +2793,11 @@
             if (itens.length && confirm('Esvaziar a lista de itens?')) { itens = []; renderItens(); }
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
+        // PDF do documento já salvo (o mesmo da lista de Pedidos e Orçamentos)
+        document.getElementById('btn-pdf').addEventListener('click', () => {
+            if (!docAberto) { mostrarMsgSalvar('Salve o orçamento antes de abrir o PDF.', 'erro'); return; }
+            abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(docAberto.numero)}&tipo=${encodeURIComponent(docAberto.tipo)}`);
+        });
         // coluna Porcentagem: oculta por padrão; o botão do cartão liga/desliga e o navegador lembra a escolha
         (function () {
             const tab = document.getElementById('tab-itens'), btn = document.getElementById('btn-ver-pct');
