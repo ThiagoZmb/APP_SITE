@@ -97,7 +97,7 @@
         #aba-precos .filtros > * { height: 34px; }
         #aba-precos .filtros label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         #aba-precos .filtros input[type=checkbox] { width: 16px; height: 16px; margin: 0; }
-        #prc-busca { flex: 0 1 240px; min-width: 150px; }
+        #prc-busca, #lig-busca { flex: 0 1 240px; min-width: 150px; }
         #prc-classe { height: 34px; }
         #prc-variacao { width: 64px; height: 34px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
         #prc-gravar { margin-left: auto; height: 34px; padding: 0 14px; }
@@ -238,6 +238,7 @@
             <section id="aba-ligacoes" style="display:none">
                 <div class="painel">
                     <div class="filtros">
+                        <input type="search" id="lig-busca" placeholder="Buscar material…" aria-label="Buscar material">
                         <select id="lig-grupo" aria-label="Grupo">
                             <option value="revisar">Para revisar</option><option value="confirmadas">Confirmadas</option><option value="sem_compra">Sem custo de compra</option>
                         </select>
@@ -684,9 +685,13 @@
         }
         function renderLigacoes() {
             const grupo = $('lig-grupo').value, tab = $('tab-ligacoes');
+            // busca (sem acento, maiúscula/minúscula indiferente) pelo nome do material de venda ou pela classe
+            const sem = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const termo = sem($('lig-busca').value.trim());
+            const lista = termo ? ligacoes.filter(m => sem(`${m.modelo} ${m.classe || ''}`).includes(termo)) : ligacoes;
             if (grupo === 'revisar') {
                 tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th>Item comprado (sugestão)</th><th>Fator</th><th></th></tr>';
-                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => {
+                tab.querySelector('tbody').innerHTML = lista.length ? lista.map(m => {
                     const s0 = m.sugestoes[0];
                     return `<tr data-material="${m.codigo}">
                         <td><b>${esc(m.modelo)}</b><br><small>${esc(m.classe)} · vendido por ${UN[m.unidade]}</small></td>
@@ -700,11 +705,11 @@
                             <button type="button" class="btn-mini lig-sem-compra" data-perm="precos.editar">Sem custo de compra</button>
                             <button type="button" class="btn-mini lig-compor" data-perm="precos.editar">🧩 Compor com vários itens</button>
                             <button type="button" class="btn-mini lig-informar" data-perm="precos.editar">✍️ Informar custo</button></div></td>
-                    </tr>`; }).join('') : '<tr><td class="vazio">Nada para revisar 🎉</td></tr>';
+                    </tr>`; }).join('') : `<tr><td class="vazio">${termo ? 'Nenhum material encontrado para a busca' : 'Nada para revisar 🎉'}</td></tr>`;
                 tab.querySelectorAll('tr[data-material]').forEach(atualizarFrase);
             } else if (grupo === 'confirmadas') {
                 tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th>Itens comprados</th><th></th></tr>';
-                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}">
+                tab.querySelector('tbody').innerHTML = lista.length ? lista.map(m => `<tr data-material="${m.codigo}">
                     <td><b>${esc(m.modelo)}</b><br><small>vendido por ${UN[m.unidade]}</small></td>
                     <td>${(m.componentes && m.componentes.length ? m.componentes : [{ ligacoes: m.ligacoes, simples: true }]).map((c, i) =>
                         (c.simples ? '' : `<div class="lig-componente"><b>${esc(nomeComp(c, i))}</b></div>`)
@@ -713,12 +718,12 @@
                         <button type="button" class="btn-mini lig-desfazer" data-id="${l.id}" data-perm="precos.editar">Desfazer</button></div>`).join('')).join('')}</td>
                     <td class="lig-acoes-td"><div class="lig-acoes"><button type="button" class="btn-mini lig-mais" data-perm="precos.editar">+ outro item de compra</button>
                         <button type="button" class="btn-mini lig-compor" data-perm="precos.editar">🧩 Compor com vários itens</button></div></td></tr>`).join('')
-                    : '<tr><td class="vazio">Nenhuma ligação confirmada</td></tr>';
+                    : `<tr><td class="vazio">${termo ? 'Nenhum material encontrado para a busca' : 'Nenhuma ligação confirmada'}</td></tr>`;
             } else {
                 tab.querySelector('thead').innerHTML = '<tr><th>Material de venda</th><th></th></tr>';
-                tab.querySelector('tbody').innerHTML = ligacoes.length ? ligacoes.map(m => `<tr data-material="${m.codigo}"><td><b>${esc(m.modelo)}</b></td>
+                tab.querySelector('tbody').innerHTML = lista.length ? lista.map(m => `<tr data-material="${m.codigo}"><td><b>${esc(m.modelo)}</b></td>
                     <td><button type="button" class="btn-mini lig-com-compra" data-perm="precos.editar">Voltar a ter custo de compra</button></td></tr>`).join('')
-                    : '<tr><td class="vazio">Nenhum material marcado</td></tr>';
+                    : `<tr><td class="vazio">${termo ? 'Nenhum material encontrado para a busca' : 'Nenhum material marcado'}</td></tr>`;
             }
         }
         function atualizarFrase(tr) {
@@ -882,6 +887,7 @@
             } catch (e) { mostrarErro(e.message); }
         });
         $('lig-grupo').addEventListener('change', carregarLigacoes);
+        $('lig-busca').addEventListener('input', renderLigacoes);
         $('tab-ligacoes').addEventListener('click', eventoLigacoes);
         $('tab-ligacoes').addEventListener('change', e => { const tr = e.target.closest('tr[data-material]'); if (!tr) return;
             if (e.target.matches('select.lig-alternativa')) { const f = e.target.selectedOptions[0]?.dataset.fator; tr.querySelector('input.lig-fator').value = f || ''; }
