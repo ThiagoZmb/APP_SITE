@@ -100,6 +100,7 @@
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+        html body .acoes-linha.acoes-topo { margin: 0 0 12px; }
         .calc-status { font-size: 13px; color: var(--text-light); }
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--secondary-color); padding: 13px 12px; text-align: left; font-weight: 600; font-size: 13px; border-bottom: 2px solid var(--border-color); }
@@ -246,7 +247,20 @@
         .tipo-numero select { flex: 1; min-width: 0; }
         #ped-numero { width: 110px; flex: none; font-weight: 700; text-align: center; }
         .faixa-leitura { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 14px; }
-        body.so-leitura #btn-salvar, body.so-leitura #btn-adicionar, body.so-leitura #btn-vazio, body.so-leitura #itens-tbody .col-acoes button { display: none !important; }
+        body.so-leitura #btn-salvar, body.so-leitura #btn-salvar-topo,body.so-leitura #btn-adicionar, body.so-leitura #btn-vazio, body.so-leitura #itens-tbody .col-acoes button { display: none !important; }
+        /* etapa 3: a lista dos itens e o total precisam chamar a atenção */
+        html body section.card.card-itens { border-top: 4px solid var(--primary-color); box-shadow: 0 6px 22px rgba(139,0,0,.14); }
+        .card-itens > .card-title { font-size: 17px !important; }
+        .card-itens thead th { background: var(--primary-color); color: #fff; border-bottom: none; }
+        .card-itens thead th:first-child { border-top-left-radius: 8px; }
+        .card-itens thead th:last-child { border-top-right-radius: 8px; }
+        .card-itens #itens-tbody tr:nth-child(even):not(.preco-mudou):not(.travado) td { background: #faf6f6; }
+        .card-itens #itens-tbody tr:hover:not(.preco-mudou):not(.travado) td { background: #fdeeee; }
+        .card-itens #itens-tbody td { border-bottom: 1px solid #ecdede; }
+        .card-itens .totais { padding: 12px 16px; border-radius: 10px; background: #fbf3f3; border: 1px solid #f0d6d6; }
+        .card-itens .totais .grupo:last-child .valor { font-size: 28px; }
+        #tab-itens.ocultar-pct .col-pct { display: none; }
+        #tab-itens .col-pct { white-space: nowrap; }
         #itens-tbody tr.travado td { background: #f8fafc; }
         .cadeado { cursor: help; margin-right: 4px; }
         .abrir-filtros { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -400,6 +414,12 @@
             <section class="card">
                 <div class="card-title"><span class="etapa">1</span> Cliente</div>
                 <div id="faixa-leitura" class="faixa-leitura" style="display:none">🔒 Somente leitura — você pode ver este pedido, mas não alterar.</div>
+                <!-- atalhos: repetem Novo / Abrir / Salvar do rodapé (cada um aciona o botão original) -->
+                <div class="acoes-linha acoes-topo">
+                    <button type="button" class="btn btn-secondary" data-atalho="btn-novo">📄 Novo</button>
+                    <button type="button" class="btn btn-secondary" data-atalho="btn-abrir">📂 Abrir</button>
+                    <button type="button" class="btn btn-primary" id="btn-salvar-topo" data-atalho="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
+                </div>
                 <div class="grid-form">
                     <div class="form-group full">
                         <label for="sel-cliente">Cliente (Razão Social) — define a tabela de preço e o desconto</label>
@@ -649,14 +669,16 @@
                 </div>
             </section>
             <!-- ═══════════ ETAPA 3: LISTA ═══════════ -->
-            <section class="card">
-                <div class="card-title"><span class="etapa">3</span> Itens do orçamento</div>
+            <section class="card card-itens">
+                <div class="card-title"><span class="etapa">3</span> Itens do orçamento
+                    <button type="button" class="btn-mini" id="btn-ver-pct" aria-pressed="false" title="Mostrar ou ocultar a coluna Porcentagem" style="margin-left:auto">👁️ Mostrar porcentagem</button>
+                </div>
                 <div style="overflow-x:auto">
-                    <table>
+                    <table id="tab-itens" class="ocultar-pct">
                         <thead>
                             <tr>
                                 <th>#</th><th>Frente</th><th>Descrição</th><th>Qtd</th>
-                                <th>Unitário</th><th>Total</th><th>Porcentagem</th><th>Obs</th><th></th>
+                                <th>Unitário</th><th>Total</th><th class="col-pct">Porcentagem</th><th>Obs</th><th></th>
                             </tr>
                         </thead>
                         <tbody id="itens-tbody">
@@ -2767,6 +2789,23 @@
             if (itens.length && confirm('Esvaziar a lista de itens?')) { itens = []; renderItens(); }
         });
         document.getElementById('btn-salvar').addEventListener('click', salvarOrcamento);
+        // coluna Porcentagem: oculta por padrão; o botão do cartão liga/desliga e o navegador lembra a escolha
+        (function () {
+            const tab = document.getElementById('tab-itens'), btn = document.getElementById('btn-ver-pct');
+            const aplicar = ver => {
+                tab.classList.toggle('ocultar-pct', !ver);
+                btn.setAttribute('aria-pressed', String(ver));
+                btn.textContent = ver ? '🙈 Ocultar porcentagem' : '👁️ Mostrar porcentagem';
+            };
+            let ver = false;
+            try { ver = localStorage.getItem('orc_ver_pct') === '1'; } catch { /* sem armazenamento: começa oculta */ }
+            aplicar(ver);
+            btn.addEventListener('click', () => {
+                ver = !ver; aplicar(ver);
+                try { localStorage.setItem('orc_ver_pct', ver ? '1' : '0'); } catch { /* ignora */ }
+            });
+        })();
+        document.querySelectorAll('[data-atalho]').forEach(b => b.addEventListener('click', () => document.getElementById(b.dataset.atalho).click()));
         document.getElementById('btn-salvar-novo').addEventListener('click', () => gravar('novo'));
         document.getElementById('btn-atualizar').addEventListener('click', () => gravar('atualizar'));
         document.getElementById('btn-dlg-cancelar').addEventListener('click', () => document.getElementById('dlg-salvar').close());
