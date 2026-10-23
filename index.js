@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
-const PDFDocument = require('pdfkit');
+const pdfPedOrc = require('./pdf/ped_orc');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
@@ -675,28 +675,12 @@ registro.rota('get', '/dados_compras_orcamentos', [{ algum: ['paineis.ver', 'ped
 });
 
 // ================= PDF =================
-// Colunas do PDF; sem valores, Descrição e Observação ocupam o espaço de Unitário e Total.
-function colunasPdf(verValores, W = 1) {
-  if (!verValores) {
-    return [
-      { label: 'Item',       w: W * 0.07, align: 'center' },
-      { label: 'Qtd',        w: W * 0.07, align: 'center' },
-      { label: 'Descrição',  w: W * 0.55, align: 'left'  },
-      { label: 'Observação', w: W * 0.31, align: 'left'  }
-    ];
-  }
-  return [
-    { label: 'Item',       w: W * 0.07, align: 'center' },
-    { label: 'Qtd',        w: W * 0.07, align: 'center' },
-    { label: 'Descrição',  w: W * 0.46, align: 'left'  },
-    { label: 'Observação', w: W * 0.22, align: 'left'  },
-    { label: 'Unitário',   w: W * 0.09, align: 'right' },
-    { label: 'Total',      w: W * 0.09, align: 'right' }
-  ];
-}
+// Layout fiel ao VB (Gerar_PDF_PedOrc) em pdf/ped_orc.js. Sem valores.ver (ou com ?producao=1,
+// a "Guia de Produção" do VB, só para Pedido) a tabela sai sem Unitário/Total e sem os totais.
 registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
   const { numero, tipo } = req.query;
   if (!numero || !tipo) return res.status(400).json({ error: 'Informe numero e tipo' });
+  const producao = tipo === 'Pedido' && /^(1|true|sim)$/i.test(String(req.query.producao || ''));
   try {
     const [cabs] = await pool.execute(
       `SELECT RAZAO_SOCIAL, CLIENTE_FINAL, DATA, DATA_PRONTO, OBS_GERAL,
@@ -723,141 +707,23 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
       `SELECT * FROM ped_orc_serralheria_complementos WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
     const [furos] = await pool.execute(
       `SELECT * FROM furacao_pedidos_orcamentos WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo]);
-
-    const agrupar = (rows, col) => {
-      const m = {};
-      rows.forEach(r => { const k = String(r[col] ?? '').trim(); if (k) (m[k] = m[k] || []).push(r); });
-      return m;
-    };
-    const v4Por = agrupar(v4, 'ITEM_PEDIDO');
-    const serrPor = agrupar(serr, 'ITEM_PEDIDO');
-    const compPor = agrupar(comps, 'ITEM_PEDIDO');
-    const compSerrPor = agrupar(compSerr, 'ITEM_PEDIDO');
-    const furosPor = agrupar(furos, 'ITEM');
-    const fmtD = v => v ? new Date(v).toLocaleDateString('pt-BR') : '-';
-    const fmtM = v => (parseFloat(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    let medicao = '';
+    if (producao) {
+      const [med] = await pool.execute('SELECT MEDICAO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [cab.RAZAO_SOCIAL]);
+      medicao = med[0]?.MEDICAO ?? '';
+    }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition',
-      `inline; filename="${numero}_${String(cab.RAZAO_SOCIAL).replace(/[^\w ]/g, '').trim()}.pdf"`);
-    const doc = new PDFDocument({ size: 'A4', margin: 15 });
+      `inline; filename="${numero}_${String(cab.RAZAO_SOCIAL).replace(/[^\w ]/g, '').trim()}${producao ? '_P' : ''}.pdf"`);
+    const doc = pdfPedOrc.novoDocumento();
     doc.pipe(res);
-    const M = doc.page.margins.left;
-    const W = doc.page.width - M - doc.page.margins.right;
-
-    // CABEÇALHO
-    doc.font('Helvetica-Bold').fontSize(10)
-       .text('Elegance Indústria e Comércio de Artefatos de Alumínio LTDA/Me', M, doc.y, { width: W, align: 'center' });
-    doc.font('Helvetica').fontSize(8)
-       .text('Tel: (27) 3326-7213  |  elegance@elegancealuminio.com.br', M, doc.y, { width: W, align: 'center' });
-    doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').fontSize(14)
-       .text(`${tipo} n°: ${numero}`, M, doc.y, { width: W, align: 'center' });
-    doc.moveDown(0.8);
-
-    // DADOS DO CLIENTE
-    doc.font('Helvetica-Bold').fontSize(9);
-    doc.text(`Cliente: ${cab.RAZAO_SOCIAL}`, M, doc.y, { width: W });
-    doc.text(`Cliente Final: ${cab.CLIENTE_FINAL || '-'}`, M, doc.y, { width: W });
-    doc.font('Helvetica').fontSize(9);
-    doc.text(`Data do ${tipo.toLowerCase()}: ${fmtD(cab.DATA)}          Pronto em: ${fmtD(cab.DATA_PRONTO)}`, M, doc.y, { width: W });
-    if (tipo !== 'Pedido') {
-      doc.moveDown(0.2);
-      doc.font('Helvetica-Bold').fontSize(9)
-         .text('Este orçamento tem validade de 10 dias úteis a partir da data discriminada acima', M, doc.y, { width: W });
-    }
-    doc.moveDown(0.6);
-
-    // DESCRITIVO
-    function descritivo(itemID, tipoProduto) {
-      const linhas = [];
-      if (v4Por[itemID]) v4Por[itemID].forEach(d => {
-        linhas.push('— ' + (d.TIPO_PRODUTO || tipoProduto || 'Produto'));
-        linhas.push('Perfil: ' + (d.PERFIL || '') + ' ' + (d.ACABAMENTO_PERFIL || '') +
-          ((d.COR_PERFIL || '') ? ' | Cor: ' + d.COR_PERFIL : ''));
-        if (d.PUXADOR && d.QTD_PUXADOR) {
-          linhas.push('Puxador: ' + d.QTD_PUXADOR + ' - ' + d.PUXADOR + ' ' + (d.ACABAMENTO_PUXADOR || ''));
-          linhas.push('Posição: ' + (d.POSICAO_PUXADOR || '') + ' | Tamanho: ' + (d.TAM_PUXADOR || '') + ' mm');
-        }
-        if (d.REVESTIMENTO) linhas.push('Revestimento: ' + d.REVESTIMENTO + ((d.COR_REVESTIMENTO) ? ' (' + d.COR_REVESTIMENTO + ')' : ''));
-        if (d.PORTA) linhas.push(d.PORTA + ': H = ' + (d.ALTURA || '') + ' x L = ' + (d.LARGURA || '') + ' mm');
-      });
-      if (serrPor[itemID]) serrPor[itemID].forEach(m => {
-        linhas.push('— ' + (m.PRODUTO || 'Metalon'));
-        linhas.push('Material: ' + (m.MATERIAL || '') + ' | Acabamento: ' + (m.ACABAMENTO || '') + ' | Cor: ' + (m.COR || ''));
-        linhas.push('H=' + (m.ALTURA || '') + ' x L=' + (m.LARGURA || '') + ' x P=' + (m.PROFUNDIDADE || ''));
-      });
-      if (compPor[itemID]) {
-        linhas.push('Complementos:');
-        compPor[itemID].forEach(c => linhas.push((c.QTD || '') + ' - ' + (c.COMPLEMENTO || '')));
-      }
-      if (compSerrPor[itemID]) {
-        linhas.push('Complementos:');
-        compSerrPor[itemID].forEach(c => linhas.push((c.QUANTIDADE || '') + ' - ' + (c.DESCRICAO || '')));
-      }
-      if (furosPor[itemID]) linhas.push('Furos: ' + furosPor[itemID].length + ' furos');
-      return linhas.filter(l => l && l.trim() !== '');
-    }
-
-    // TABELA COM GRADE
-    const cols = colunasPdf(verValores, W);
-    const fontCel = 7.5, PAD = 4;
-    function drawHeader(y0) {
-      doc.rect(M, y0, W, 16).stroke();
-      let x = M;
-      cols.forEach(c => {
-        doc.font('Helvetica-Bold').fontSize(8)
-           .text(c.label, x + 2, y0 + 4, { width: c.w - 4, align: c.align, lineBreak: false });
-        x += c.w;
-      });
-      return y0 + 16;
-    }
-    let y = doc.y + 8;
-    y = drawHeader(y);
-    itens.forEach(i => {
-      const itemID = String(i.ITEM || '').trim();
-      const descLinhas = descritivo(itemID, String(i.TIPO_PRODUTO || ''));
-      const descTexto = descLinhas.join('\n') || '-';
-      const obsTexto = String(i.OBSERVACAO || '-');
-      doc.font('Helvetica').fontSize(fontCel);
-      const hDesc = doc.heightOfString(descTexto, { width: cols[2].w - 6 });
-      const hObs  = doc.heightOfString(obsTexto,  { width: cols[3].w - 6 });
-      const rowH  = Math.max(hDesc, hObs, 14) + PAD * 2;
-      if (y + rowH > doc.page.height - doc.page.margins.bottom - 60) {
-        doc.addPage();
-        y = doc.page.margins.top;
-        y = drawHeader(y);
-      }
-      let x = M;
-      doc.text(String(itemID), x + 2, y + PAD, { width: cols[0].w - 4, align: 'center', height: rowH, ellipsis: true }); x += cols[0].w;
-      doc.text(String(i.QTD || ''), x + 2, y + PAD, { width: cols[1].w - 4, align: 'center', height: rowH, ellipsis: true }); x += cols[1].w;
-      doc.text(descTexto, x + 2, y + PAD, { width: cols[2].w - 4, height: rowH, ellipsis: true }); x += cols[2].w;
-      doc.text(obsTexto, x + 2, y + PAD, { width: cols[3].w - 4, height: rowH, ellipsis: true }); x += cols[3].w;
-      if (verValores) {
-        doc.text(fmtM(i.UNITARIO), x + 2, y + PAD, { width: cols[4].w - 4, align: 'right', height: rowH, ellipsis: true }); x += cols[4].w;
-        doc.text(fmtM(i.TOTAL), x + 2, y + PAD, { width: cols[5].w - 4, align: 'right', height: rowH, ellipsis: true });
-      }
-      doc.moveTo(M, y).lineTo(M + W, y).stroke();
-      let gx = M;
-      cols.forEach(c => { doc.moveTo(gx, y).lineTo(gx, y + rowH).stroke(); gx += c.w; });
-      y += rowH;
-    });
-    doc.moveTo(M, y).lineTo(M + W, y).stroke();
-    doc.y = y;
-
-    // OBSERVAÇÃO GERAL
-    doc.moveDown(1);
-    doc.font('Helvetica-Bold').fontSize(9).text('Observação:', M, doc.y, { width: W, align: 'center' });
-    doc.font('Helvetica').fontSize(9).text(String(cab.OBS_GERAL || ''), M, doc.y, { width: W });
-
-    // TOTAIS (só para quem vê valores — sem eles o PDF sai no formato da Guia de Produção)
-    if (verValores) {
-      doc.moveDown(1);
-      doc.font('Helvetica-Bold').fontSize(10);
-      doc.text(`Subtotal: ${fmtM(cab.SUB_TOTAL)}`, { width: W, align: 'right' });
-      doc.text(`Desconto: ${(parseFloat(cab.DESCONTO) || 0).toFixed(2)} %`, { width: W, align: 'right' });
-      doc.text(`TOTAL: ${fmtM(cab.TOTAL)}`, { width: W, align: 'right' });
-    }
+    // dinheiro só para quem tem valores.ver (o desenho também omite as colunas)
+    const camposDinheiro = ['SUB_TOTAL', 'TOTAL', 'DESCONTO', 'UNITARIO', 'VALOR_UNITARIO', 'VALOR_TOTAL', 'VALOR'];
+    pdfPedOrc.desenharPedOrc(doc, {
+      tipo, numero, cab: semValores(req, cab, camposDinheiro), itens: semValores(req, itens, camposDinheiro),
+      v4, complementos: comps, serralheria: serr, compSerralheria: semValores(req, compSerr, camposDinheiro), furos, medicao
+    }, { verValores, producao });
     doc.end();
   } catch (err) {
     console.error('Erro ao gerar PDF:', err.message);
@@ -1694,4 +1560,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool, acesso, registro, colunasPdf };
+module.exports = { app, pool, acesso, registro, colunasPdf: pdfPedOrc.colunasPdf };
