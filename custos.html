@@ -107,6 +107,15 @@
         #tab-precos tbody tr { cursor: pointer; }
         #tab-precos tbody tr:hover td { background: #fafbfc; }
         #tab-precos tr.conflito td { background: #fdecea; }
+        /* balão de explicação das colunas da formação de preço */
+        #tab-precos [data-balao] { cursor: help; }
+        #tab-precos thead th[data-balao] { text-decoration: underline dotted; text-underline-offset: 3px; }
+        #balao { position: fixed; z-index: 3000; display: none; max-width: 340px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; text-transform: none; font-weight: 400; white-space: normal;
+                 background: #1c2230; color: #f4f6fa; box-shadow: 0 8px 24px rgba(0,0,0,.28); pointer-events: none; }
+        #balao b { color: #fff; }
+        #balao .bl-titulo { display: block; font-weight: 800; margin-bottom: 4px; }
+        #balao .bl-conta { display: block; margin: 5px 0; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,.1); font-variant-numeric: tabular-nums; }
+        #balao .bl-ex { display: block; margin-top: 5px; color: #b9c2d3; }
         .seta { color: var(--text-light); margin: 0 3px; }
         .novo { font-weight: 800; }
         .var-sobe, .var-desce { color: var(--text-dark); font-weight: 700; }
@@ -291,6 +300,7 @@
         </main>
     </div>
 
+    <div id="balao" role="tooltip"></div>
     <div class="det-fundo" id="det-fundo"></div>
     <aside id="det-material" class="painel-det" aria-label="Detalhe do material">
         <div class="pd-cab">

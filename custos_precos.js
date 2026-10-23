@@ -353,6 +353,73 @@ $('tab-precos').addEventListener('click', e => {
     if (e.target.closest('input, button, a')) return;
     const tr = e.target.closest('tr[data-codigo]'); if (tr) abrirDetalhePreco(Number(tr.dataset.codigo));
 });
+// ---------- balões de explicação (cabeçalho = conceito + exemplo; célula = a conta com os números da linha) ----------
+// Exemplo fixo do cabeçalho: custo 100, V 20%, F 30%, M 10%, desconto 20%, preço atual 300.
+const COL_BALAO = { 3: 'custo', 4: 'minimo', 5: 'equilibrio', 6: 'alvo', 7: 'valor', 8: 'variacao', 9: 'margemAtual', 10: 'margemPior', 11: 'margem' };
+const cx = (t, conta, ex) => `<span class="bl-titulo">${t}</span>${conta ? `<span class="bl-conta">${conta}</span>` : ''}${ex ? `<span class="bl-ex">${ex}</span>` : ''}`;
+
+function balaoCabecalho(col) {
+    return {
+        custo: cx('Custo', 'média das compras + IPI + frete, ÷ (1 − perda)', 'Quanto custa 1 unidade vendida. Exemplo: o fornecedor cobra R$ 90, com IPI/frete/perda o custo real é <b>R$ 100,00</b>.'),
+        minimo: cx('Mínimo', 'custo ÷ (1 − V)', 'V = imposto + comissão + encargos sobre a venda. Exemplo: V 20% → 100 ÷ 0,80 = <b>R$ 125,00</b>. Abaixo disso você paga para vender.'),
+        equilibrio: cx('Equilíbrio', 'custo ÷ (1 − V − F)', 'F = custo fixo (aluguel, salários…) como % da venda. Exemplo: V 20% + F 30% → 100 ÷ 0,50 = <b>R$ 200,00</b>. Aqui o lucro é zero: todas as contas ficam pagas.'),
+        alvo: cx('Alvo', 'custo ÷ (1 − V − F − M)', 'M = margem de lucro desejada. Exemplo: 20% + 30% + 10% → 100 ÷ 0,40 = <b>R$ 250,00</b>.'),
+        valor: cx('VALOR_FIXO atual → novo', 'novo = alvo ÷ (1 − desconto)', 'Preço de tabela. Exemplo: alvo R$ 250 e desconto máximo 20% → 250 ÷ 0,80 = <b>R$ 312,50</b>; o cliente com 20% paga R$ 250 e a margem fica garantida.'),
+        variacao: cx('Variação', '(novo − atual) ÷ atual', 'Exemplo: atual R$ 300, novo R$ 312,50 → <b>+4,2%</b>. Saltos muito grandes costumam indicar custo ou fator errado: confira antes de gravar.'),
+        margemAtual: cx('Margem atual', '1 − V − F − custo ÷ (atual × (1 − desconto))', 'O lucro (% da venda) que o preço de hoje deixa. Exemplo: atual R$ 300 com 20% de desconto = R$ 240 → 1 − 0,20 − 0,30 − 100÷240 = <b>8,3%</b>. Negativa = prejuízo.'),
+        margemPior: cx('Margem pior cliente', 'mesma conta, com o maior desconto de cliente', 'Mostra o pior caso. Exemplo: se um cliente tem 30% de desconto, R$ 300 viram R$ 210 → 1 − 0,20 − 0,30 − 100÷210 = <b>2,4%</b>.'),
+        margem: cx('Margem', '', 'Qual margem M entrou na conta: própria do material, da classe, ou a padrão. Você muda no detalhe do material (“Margem própria deste material”) ou em “Editar premissas”.')
+    }[col];
+}
+
+function balaoCelula(col, m) {
+    const p = pctBR, c = m.custo, V = m.V, F = m.F, M = m.M, D = m.D;
+    const novo = selecao.has(m.codigo) ? selecao.get(m.codigo) : m.sugerido;
+    const dMax = precos.referencias?.desconto?.maior;
+    switch (col) {
+        case 'custo': return cx('Custo de ' + esc(m.modelo), `${moeda(c)} por ${UN[m.unidade] || m.unidade}`, 'Compras reais + IPI + frete, ÷ (1 − perda). Clique na linha para ver as notas usadas.');
+        case 'minimo': return cx('Mínimo', `${moeda(c)} ÷ (1 − ${p(V)}) = <b>${moeda(m.minimo)}</b>`, `Depois de pagar ${p(V)} de imposto, comissão e encargos, sobra só o custo. Lucro zero e custo fixo sem pagar.`);
+        case 'equilibrio': return cx('Equilíbrio', `${moeda(c)} ÷ (1 − ${p(V + F)}) = <b>${moeda(m.equilibrio)}</b>`, `Cobre o custo, ${p(V)} de encargos e ${p(F)} de custo fixo. Lucro zero: abaixo disso a empresa perde dinheiro.`);
+        case 'alvo': return cx('Alvo', `${moeda(c)} ÷ (1 − ${p(V + F + M)}) = <b>${moeda(m.alvo)}</b>`, `Equilíbrio + margem de ${p(M)}. É o que você quer receber por unidade, já com o desconto dado.`);
+        case 'valor': return cx('VALOR_FIXO', `${moeda(m.alvo)} ÷ (1 − ${p(D)}) = <b>${moeda(m.sugerido)}</b>`, `Hoje: ${moeda(m.atual)}. O cliente com ${p(D)} de desconto paga ${moeda(m.sugerido * (1 - D / 100))} e a margem alvo se mantém.`);
+        case 'variacao': return novo != null && m.atual ? cx('Variação', `(${moeda(novo)} − ${moeda(m.atual)}) ÷ ${moeda(m.atual)} = <b>${pctBR((novo - m.atual) / m.atual * 100)}</b>`, Math.abs((novo - m.atual) / m.atual) > 1 ? '⚠️ Salto de mais de 100%: confira custo e fator da ligação antes de gravar.' : 'Quanto o preço de tabela muda se você gravar.') : null;
+        case 'margemAtual': return m.atual ? cx('Margem atual', `${moeda(m.atual)} × (1 − ${p(D)}) = ${moeda(m.atual * (1 - D / 100))} líquidos<br>1 − ${p(V)} − ${p(F)} − ${moeda(c)} ÷ ${moeda(m.atual * (1 - D / 100))} = <b>${pctBR(m.margemAtual)}</b>`, m.margemAtual < 0 ? '⚠️ Negativa: com o preço de hoje e o desconto padrão a venda dá prejuízo.' : 'Lucro, em % da venda, que o preço atual deixa.') : null;
+        case 'margemPior': return m.atual && dMax != null ? cx('Margem no cliente de maior desconto', `${moeda(m.atual)} × (1 − ${p(dMax)}) = ${moeda(m.atual * (1 - dMax / 100))} líquidos<br>resultado: <b>${pctBR(m.margemPior)}</b>`, 'O pior caso: o cliente que mais desconto tem.') : null;
+        case 'margem': return m.origemMargem ? cx('Margem usada: ' + p(M), '', { material: 'Margem própria definida para este material.', classe: 'Margem definida para a classe ' + esc(m.classe) + '.', padrao: 'Margem padrão das premissas (nenhuma própria nem da classe).' }[m.origemMargem]) : null;
+    }
+    return null;
+}
+
+(function ligarBaloes() {
+    const tab = $('tab-precos'), bal = $('balao');
+    const esconder = () => { bal.style.display = 'none'; };
+    function mostrar(el, html) {
+        if (!html) return esconder();
+        bal.innerHTML = html; bal.style.display = 'block';
+        const r = el.getBoundingClientRect(), w = bal.offsetWidth, h = bal.offsetHeight;
+        const x = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+        const y = r.bottom + 6 + h > window.innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6;
+        bal.style.left = x + 'px'; bal.style.top = y + 'px';
+    }
+    function alvoDe(e) {
+        const cel = e.target.closest('th, td');
+        if (!cel || !tab.contains(cel) || cel.classList.contains('prc-motivo')) return null;
+        const col = COL_BALAO[cel.cellIndex];
+        return col ? { cel, col } : null;
+    }
+    tab.addEventListener('mouseover', e => {
+        const a = alvoDe(e); if (!a) return esconder();
+        if (a.cel.tagName === 'TH') return mostrar(a.cel, balaoCabecalho(a.col));
+        const tr = a.cel.closest('tr[data-codigo]'); const m = tr && precos && precos.materiais.find(x => x.codigo === Number(tr.dataset.codigo));
+        mostrar(a.cel, m && m.minimo != null ? balaoCelula(a.col, m) : null);
+    });
+    tab.addEventListener('mouseleave', esconder);
+    document.addEventListener('scroll', esconder, true);
+    document.querySelectorAll('#tab-precos thead th').forEach(th => { if (COL_BALAO[th.cellIndex]) th.dataset.balao = '1'; });
+    new MutationObserver(() => tab.querySelectorAll('tbody td').forEach(td => { if (COL_BALAO[td.cellIndex] && !td.classList.contains('prc-motivo')) td.dataset.balao = '1'; }))
+        .observe(tab.querySelector('tbody'), { childList: true });
+})();
+
 $('prc-gravar').addEventListener('click', abrirGravar);
 $('prc-recarregar').addEventListener('click', carregarPrecos);
 $('dlg-gravar-confirmar').addEventListener('click', confirmarGravar);
