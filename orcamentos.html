@@ -2692,6 +2692,7 @@
         }
         function limparDocumento() {
             itens = []; docAberto = null;
+            limparForm(); // também zera o item em montagem (medidas, peças, complementos, acessórios, trilhos…) e sai do modo "Atualizar item"
             ['ped-cliente-final', 'ped-obs', 'ped-entrega', 'ped-situacao', 'ped-financeiro'].forEach(id => { $s(id).value = ''; });
             $s('desconto').value = 0;
             $s('ped-tipo').value = 'Orçamento';
