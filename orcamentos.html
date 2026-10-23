@@ -2002,6 +2002,8 @@
             set('f-obs', item.obs);
             limparAcessorios();
             acessoriosItem = (item.acessorios || []).filter(a => a.origem !== ORIGEM_SIS).map(a => ({ ...a }));
+            // trilhos já reduzidos no item salvo: o recálculo do sistema reaplica (limitado ao máximo da tabela)
+            (item.acessorios || []).filter(ehTrilhoSis).forEach(a => { trilhosReduzidos[a.nome] = a.qtd; });
             complementosSerr = (item.complementos || []).map(c => ({ ...c }));
             renderComplementos();
             renderPecas();
@@ -2439,12 +2441,15 @@
             lAlt.textContent = doVao ? 'Altura do vão (mm)' : 'Altura da porta (mm)';
             lLarg.textContent = doVao ? 'Largura do vão (mm)' : 'Largura da porta (mm)';
         }
+        // trilhos do sistema: a quantidade pode ser reduzida (1 até a da tabela), nunca aumentada
+        const ehTrilhoSis = a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`);
+        let trilhosReduzidos = {}; // nome → qtd escolhida pelo usuário; sobrevive ao recálculo do sistema, zera ao trocar sistema/portas
         function renderAcessorios() {
             atualizarModoCorrer();
             document.querySelector('#quadro-acessorios tbody').innerHTML = acessoriosItem.map((a, i) => `
                 <tr data-nome="${escapeHtml(a.nome)}" data-origem="${escapeHtml(a.origem)}">
                     <td>${escapeHtml(a.nome)}</td>
-                    <td><input type="number" class="ac-qtd" min="1" step="1" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? 'readonly title="Quantidade definida pelo sistema"' : ''}></td>
+                    <td><input type="number" class="ac-qtd" min="1" step="1" value="${a.qtd}" data-i="${i}" ${ehTrilhoSis(a) ? `max="${a.qtdMax || a.qtd}" title="Trilho: de 1 até ${a.qtdMax || a.qtd} (definido pela tabela do sistema)"` : a.origem === ORIGEM_SIS ? 'readonly title="Quantidade definida pelo sistema"' : ''}></td>
                     <td>${a.tamanho || 0}</td>
                     <td data-valor>${a.valorUnitario != null ? formatCurrency(a.valorUnitario) : '—'}</td>
                     <td data-valor>${a.valorTotal != null ? formatCurrency(a.valorTotal) : '—'}</td>
@@ -2495,8 +2500,16 @@
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/sistema_correr?${q}`);
                 if (meu !== seqSistema) return; // chegou uma resposta mais nova
                 sistemaCorrer = { descontoAltura: r.descontoAltura, temDesempenador: r.temDesempenador };
-                acessoriosItem = [...r.acessorios.map(a => ({ nome: a.nome, classe: a.classe, qtd: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS,
-                    valorUnitario: a.valorUnitario, valorTotal: a.valorTotal })), ...manuais];
+                acessoriosItem = [...r.acessorios.map(a => {
+                    const x = { nome: a.nome, classe: a.classe, qtd: a.qtd, qtdMax: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS,
+                        valorUnitario: a.valorUnitario, valorTotal: a.valorTotal };
+                    const red = ehTrilhoSis(x) ? parseInt(trilhosReduzidos[x.nome]) : 0;
+                    if (red >= 1 && red < x.qtd) {
+                        x.qtd = red;
+                        x.valorTotal = x.valorUnitario != null ? Math.round(x.valorUnitario * red * 100) / 100 : null;
+                    }
+                    return x;
+                }), ...manuais];
                 lbl.style.display = r.temDesempenador ? '' : 'none';
             } catch {
                 if (meu !== seqSistema) return;
@@ -2507,7 +2520,7 @@
             calcularPrecoAutomatico();
         }
         function limparAcessorios() {
-            acessoriosItem = []; sistemaCorrer = null; seqSistema++;
+            acessoriosItem = []; sistemaCorrer = null; seqSistema++; trilhosReduzidos = {};
             document.getElementById('chk-desempenador').checked = false;
             document.getElementById('lbl-desempenador').style.display = 'none';
             document.getElementById('sel-acessorio').style.display = 'none';
@@ -2520,7 +2533,8 @@
             if (!inp || inp.readOnly) return;
             const a = acessoriosItem[Number(inp.dataset.i)];
             if (!a) return;
-            a.qtd = Math.min(9999, Math.max(1, parseInt(inp.value) || 1));
+            a.qtd = Math.min(ehTrilhoSis(a) ? (a.qtdMax || a.qtd) : 9999, Math.max(1, parseInt(inp.value) || 1));
+            if (ehTrilhoSis(a)) trilhosReduzidos[a.nome] = a.qtd;
             a.valorTotal = a.valorUnitario != null ? Math.round(a.valorUnitario * a.qtd * 100) / 100 : null; // o motor confirma em seguida
             renderAcessorios();
             calcularPrecoAutomatico();
@@ -2533,9 +2547,12 @@
             calcularPrecoAutomatico();
         });
         ['f-sistema', 'f-transpasse', 'f-largura', 'chk-desempenador'].forEach(id =>
-            document.getElementById(id).addEventListener('change', () => { if (ehCorrer()) atualizarSistemaCorrer(); }));
+            document.getElementById(id).addEventListener('change', () => {
+                if (id === 'f-sistema') trilhosReduzidos = {}; // outro sistema: volta à quantidade da tabela
+                if (ehCorrer()) atualizarSistemaCorrer();
+            }));
         document.getElementById('f-altura').addEventListener('change', renderAcessorios);
-        document.getElementById('f-qtd').addEventListener('input', () => { if (ehCorrer() && temSistemaCorrer()) atualizarSistemaCorrer(); else renderAcessorios(); });
+        document.getElementById('f-qtd').addEventListener('input', () => { trilhosReduzidos = {}; if (ehCorrer() && temSistemaCorrer()) atualizarSistemaCorrer(); else renderAcessorios(); });
         // trocar de frente: os acessórios permitidos são outros
         document.querySelectorAll('.frente-btn').forEach(b => b.addEventListener('click', () => {
             limparAcessorios();

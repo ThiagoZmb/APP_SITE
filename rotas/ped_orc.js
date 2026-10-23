@@ -150,7 +150,17 @@ async function prepararItem(db, leitor, cliente, item, n) {
       if (!sis) throw new ErroItem(422, `Item ${n}: sistema de correr '${d.sistema}' não encontrado.`, { item: n });
       descontoAlturaSistema = sis.descontoAltura;
       const doSistema = acessoriosDoSistema(sis.itens, sis.config, { larguraVao: parseFloat(item.largura) || 0, folhas: n0, incluirDesempenador: !!d.desempenador });
-      acessorios = [...doSistema.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho, origem: 'SISTEMA DE CORRER' })), ...acessorios];
+      // trilhos: o usuário pode reduzir a quantidade (1 até o que a tabela do sistema dá para este nº de portas), nunca aumentar
+      const reduzidos = new Map();
+      for (const a of Array.isArray(item.acessorios) ? item.acessorios : []) {
+        if (a && a.origem === 'SISTEMA DE CORRER' && !reduzidos.has(a.nome)) reduzidos.set(a.nome, parseInt(a.qtd));
+      }
+      acessorios = [...doSistema.map(a => {
+        const pedida = reduzidos.get(a.nome);
+        const ehTrilho = /TRILHO/i.test(`${a.classe || ''} ${a.nome}`);
+        const qtd = ehTrilho && pedida >= 1 ? Math.min(a.qtd, pedida) : a.qtd;
+        return { nome: a.nome, qtd, tamanho: a.tamanho, origem: 'SISTEMA DE CORRER' };
+      }), ...acessorios];
     }
     folhas = folhasDoItem(item, { descontoAlturaSistema });
   }
