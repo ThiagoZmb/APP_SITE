@@ -29,8 +29,19 @@ function bancoEntregas() {
     itens: [],     // itens do pedido
     usuarios: [    // cliente_usuarios
       { CODIGO: 21, NOME: 'Motorista Um' },
-      { CODIGO: 22, NOME: 'Motorista Dois' }
-    ]
+      { CODIGO: 22, NOME: 'Motorista Dois' },
+      { CODIGO: 30, NOME: 'Sem Acesso' }
+    ],
+    acessos: [     // web_usuario_acesso
+      { usuario_codigo: 21, perfil_id: 9, ativo: 1 },
+      { usuario_codigo: 22, perfil_id: 9, ativo: 1 },
+      { usuario_codigo: 30, perfil_id: 1, ativo: 1 }
+    ],
+    permsPerfil: [ // web_perfil_permissoes
+      { perfil_id: 9, permissao: 'entregas.baixar' },
+      { perfil_id: 1, permissao: 'entregas.ver' }
+    ],
+    excecoes: []   // web_usuario_excecoes: { usuario_codigo, permissao, tipo }
   };
   const { pedidos, clientes, entregas, eventos, usuarios } = estado;
   const ehPronto = p => p.TIPO === 'Pedido' && p.SITUACAO === 'Pronto';
@@ -84,6 +95,49 @@ function bancoEntregas() {
       const e = entregas.find(x => x.id === id && x.status === 'a_programar');
       if (!e) return { affectedRows: 0 };
       Object.assign(e, { status: 'cancelada', atualizado_em }); return { affectedRows: 1 };
+    }],
+
+    // ---- programar entrega (T4) ----
+    // detalhe de uma entrega + endereço do cadastro do cliente (filtro de estados opcional, depois do id)
+    [/AS cli_endereco/, (sql, [id, ...estados]) => {
+      const e = entregas.find(x => x.id === id); if (!e) return [];
+      const ped = pedidoDe(e); const cli = clienteDe(ped);
+      if (sql.includes('c.ESTADO IN') && !(cli && estados.includes(cli.ESTADO))) return [];
+      return [{ ...e, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_ENTREGA ?? null,
+        cli_endereco: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null, cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null,
+        cli_estado: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null, cli_telefone: cli?.TELEFONE ?? null }];
+    }],
+    [/FROM web_entrega_eventos WHERE entrega_id = \? ORDER BY/, (sql, [id]) => eventos.filter(v => v.entrega_id === id)],
+    [/FROM ped_orc_lista_itens/, (sql, [numero]) => estado.itens.filter(i => i.NUMERO === numero && i.TIPO === 'Pedido')
+      .sort((a, b) => a.ITEM - b.ITEM).map(i => ({ DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+    // motoristas: ativos, com entregas.baixar pelo perfil ou liberado, e não bloqueado
+    [/FROM cliente_usuarios u JOIN web_usuario_acesso/, () => {
+      const exc = (u, tipo) => estado.excecoes.some(x => x.usuario_codigo === u.CODIGO && x.permissao === 'entregas.baixar' && x.tipo === tipo);
+      return usuarios.filter(u => {
+        const a = estado.acessos.find(x => x.usuario_codigo === u.CODIGO);
+        if (!a || a.ativo !== 1) return false;
+        const doPerfil = estado.permsPerfil.some(p => p.perfil_id === a.perfil_id && p.permissao === 'entregas.baixar');
+        return (doPerfil || exc(u, 'liberar')) && !exc(u, 'bloquear');
+      }).sort((a, b) => a.NOME.localeCompare(b.NOME)).map(u => ({ CODIGO: u.CODIGO, NOME: u.NOME }));
+    }],
+    [/FROM web_entregas WHERE id = \? FOR UPDATE/, (sql, [id]) => entregas.filter(e => e.id === id).map(e => ({ ...e }))],
+    [/SELECT 1 AS ok FROM web_entregas e/, (sql, [id, ...estados]) => {
+      const e = entregas.find(x => x.id === id); const cli = e && clienteDe(pedidoDe(e));
+      return cli && estados.includes(cli.ESTADO) ? [{ ok: 1 }] : [];
+    }],
+    // UPDATE genérico: "SET a = ?, b = ? WHERE id = ?" (as colunas vêm do próprio SQL)
+    [/^UPDATE web_entregas SET [\s\S]* WHERE id = \?$/, (sql, params) => {
+      const cols = /SET ([\s\S]*) WHERE/.exec(sql)[1].split(',').map(s => s.trim().replace(/ = \?$/, ''));
+      const e = entregas.find(x => x.id === params[cols.length]); if (!e) return { affectedRows: 0 };
+      cols.forEach((c, i) => { e[c] = params[i]; });
+      return { affectedRows: 1 };
+    }],
+    [/INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo, detalhe\)/, (sql, [entrega_id, quando, usuario, tipo, motivo, detalhe]) => {
+      eventos.push({ id: eventos.length + 1, entrega_id, quando, usuario, tipo, motivo: motivo ?? null, entregue_a: null, detalhe: detalhe ?? null });
+      return { affectedRows: 1, insertId: eventos.length };
+    }],
+    [/INSERT INTO web_auditoria \(quando, quem, acao, alvo, detalhe\)/, (sql, [quando, quem, acao, alvo, detalhe]) => {
+      estado.auditoria.push({ quando, quem, acao, alvo, detalhe }); return { affectedRows: 1, insertId: estado.auditoria.length };
     }]
   ];
   const f = criarPoolFalso(regras);
