@@ -1,5 +1,8 @@
 // Apoio dos testes: raiz da skill, fixtures e construtores de documentos mínimos.
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ_URL = new URL('../', import.meta.url);
@@ -55,4 +58,21 @@ export function docPortas(itens, mudar = () => {}) {
   const doc = { versaoSchema: '1.0.0', dominio: 'portas-aluminio', documento: { arquivo: 'a.pdf' }, itens, pendencias, alertasSeguranca: [] };
   mudar(doc);
   return doc;
+}
+
+// ---- Apoio dos testes de CLI (fase 1c) ----
+// Roda um script da skill com o node atual; devolve { status, stdout, stderr } sem lançar em saída != 0
+export function rodarScript(script, args = [], env = process.env) {
+  const r = spawnSync(process.execPath, [caminho(script), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env });
+  return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+}
+
+export function comPastaTemp(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'skill-'));
+  const limpar = () => rmSync(dir, { recursive: true, force: true });
+  let r;
+  try { r = fn(dir); } catch (e) { limpar(); throw e; }
+  if (r && typeof r.then === 'function') return r.finally(limpar);
+  limpar();
+  return r;
 }
