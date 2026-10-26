@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar } = require('../seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesEntregas } = require('../seguranca/instalacao');
 
 const NOMES = ['Administrador', 'Interno completo', 'Vendedor', 'Estoquista', 'Representante'];
 
@@ -24,11 +24,11 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 17 tabelas web_', async () => {
+test('cria as 20 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao',
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao',
     'web_perfil_permissoes', 'web_perfis', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_usuario_acesso', 'web_usuario_excecoes']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);
@@ -208,4 +208,45 @@ test('quantidade por item: coluna nas ligações e passagem da qtd do componente
   await instalarTabelas(com);
   assert.ok(!com.chamadas.some(c => /^ALTER|^UPDATE/.test(c.sql)));
   assert.match(com.chamadas.find(c => /`web_custo_ligacoes`/.test(c.sql)).sql, /quantidade DECIMAL\(14,4\) NULL/);
+});
+
+test('tabelas de entregas: número único, índice dos eventos, anexo em MEDIUMBLOB, sem nome de coluna de dinheiro', async () => {
+  const pool = criarPoolFalso([]);
+  await instalarTabelas(pool);
+  const sql = n => pool.chamadas.find(c => new RegExp('`' + n + '`').test(c.sql)).sql;
+  assert.match(sql('web_entregas'), /numero INT NOT NULL/);
+  assert.match(sql('web_entregas'), /UNIQUE KEY uk_numero \(numero\)/);
+  assert.match(sql('web_entregas'), /status VARCHAR\(20\) NOT NULL/);
+  assert.match(sql('web_entrega_eventos'), /KEY idx_entrega \(entrega_id, id\)/);
+  assert.match(sql('web_entrega_eventos'), /entregue_a VARCHAR\(190\) NULL/);
+  assert.match(sql('web_entrega_anexos'), /dados MEDIUMBLOB/);
+  assert.match(sql('web_entrega_anexos'), /evento_id INT NULL/);
+  const { REGEX_VALOR } = require('../seguranca/valores');
+  for (const n of ['web_entregas', 'web_entrega_eventos', 'web_entrega_anexos']) {
+    const colunas = [...sql(n).matchAll(/^\s+([a-z_]+) (?:INT|VARCHAR|DATE|DATETIME|JSON|MEDIUMBLOB|CHAR|TEXT)/gm)].map(m => m[1]);
+    assert.ok(colunas.length >= 5, n);
+    for (const col of colunas) assert.ok(!REGEX_VALOR.test(col), n + '.' + col);
+  }
+});
+
+function poolEntregas({ jaFeito = false } = {}) {
+  return criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_entregas'/, jaFeito ? [{ id: 9 }] : []],
+    [/SELECT id, nome FROM web_perfis WHERE nome IN/, [{ id: 1, nome: 'Administrador' }, { id: 2, nome: 'Interno completo' }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+}
+
+test('entregas: ver e programar para Administrador e Interno completo (nunca baixar), uma vez', async () => {
+  const pool = poolEntregas();
+  assert.deepEqual(await acrescentarPermissoesEntregas(pool), { feito: true });
+  const ins = pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params);
+  assert.deepEqual(ins, [[1, 'entregas.ver'], [1, 'entregas.programar'], [2, 'entregas.ver'], [2, 'entregas.programar']]);
+  assert.ok(pool.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_entregas'));
+  const seq = pool.chamadas.map(c => c.sql);
+  assert.ok(seq.indexOf('BEGIN') >= 0 && seq.indexOf('COMMIT') > seq.indexOf('BEGIN'));
+  const ja = poolEntregas({ jaFeito: true });
+  assert.deepEqual(await acrescentarPermissoesEntregas(ja), { feito: false });
+  assert.ok(!ja.chamadas.some(c => /INSERT/.test(c.sql)));
 });

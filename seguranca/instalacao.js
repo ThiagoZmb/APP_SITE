@@ -159,6 +159,52 @@ const TABELAS = [
      prazo_dias INT NOT NULL,
      atualizado_em DATETIME NULL,
      atualizado_por VARCHAR(190) NULL
+   ) ${OPCOES}`,
+  // módulo Entregas: cabeçalho, histórico (eventos) e comprovantes (foto/assinatura)
+  `CREATE TABLE IF NOT EXISTS \`web_entregas\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     numero INT NOT NULL,
+     status VARCHAR(20) NOT NULL,
+     tipo VARCHAR(20) NULL,
+     data_agendada DATE NULL,
+     motorista_codigo INT NULL,
+     endereco_rua VARCHAR(190) NULL,
+     endereco_numero VARCHAR(30) NULL,
+     endereco_bairro VARCHAR(120) NULL,
+     endereco_cidade VARCHAR(120) NULL,
+     endereco_uf CHAR(2) NULL,
+     endereco_cep VARCHAR(12) NULL,
+     endereco_ref VARCHAR(190) NULL,
+     contato_local VARCHAR(190) NULL,
+     transportadora VARCHAR(190) NULL,
+     rastreio VARCHAR(120) NULL,
+     previsao DATE NULL,
+     observacao VARCHAR(500) NULL,
+     criado_em DATETIME NOT NULL,
+     atualizado_em DATETIME NOT NULL,
+     UNIQUE KEY uk_numero (numero)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_entrega_eventos\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     entrega_id INT NOT NULL,
+     quando DATETIME NOT NULL,
+     usuario VARCHAR(190) NOT NULL,
+     tipo VARCHAR(30) NOT NULL,
+     motivo VARCHAR(500) NULL,
+     entregue_a VARCHAR(190) NULL,
+     detalhe JSON NULL,
+     KEY idx_entrega (entrega_id, id)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_entrega_anexos\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     entrega_id INT NOT NULL,
+     evento_id INT NULL,
+     tipo VARCHAR(20) NOT NULL,
+     mime VARCHAR(60) NOT NULL,
+     dados MEDIUMBLOB NOT NULL,
+     criado_por VARCHAR(190) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     KEY idx_entrega (entrega_id)
    ) ${OPCOES}`
 ];
 
@@ -298,6 +344,32 @@ async function acrescentarPermissoesEstoque(pool) {
   }
 }
 
+// Entregas: ver e programar para Administrador e Interno completo; baixar (motorista) ninguém recebe aqui
+const PERMISSOES_ENTREGAS = ['entregas.ver', 'entregas.programar'];
+async function acrescentarPermissoesEntregas(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_entregas' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of PERMISSOES_ENTREGAS) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_entregas', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // "Salvar orçamento" para todo perfil que já monta orçamento; "Salvar como pedido" só para o Administrador
 async function acrescentarPermissoesPedOrc(pool) {
   const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_ped_orc' LIMIT 1");
@@ -349,4 +421,4 @@ const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'perm
 
 const acrescentarPermissoesCancelarExcluir = pool => darAoAdministrador(pool, 'permissoes_cancelar_excluir', ['pedidos.cancelar', 'pedidos.excluir']);
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

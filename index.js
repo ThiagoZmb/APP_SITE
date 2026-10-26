@@ -10,7 +10,7 @@ const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir } = require('./seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -1556,6 +1556,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesPrecos(pool)).feito) console.log('[permissões] precos.ver e precos.editar acrescentadas');
   if ((await acrescentarPermissoesPrecosGravar(pool)).feito) console.log('[permissões] precos.gravar acrescentada');
   if ((await acrescentarPermissoesCancelarExcluir(pool)).feito) console.log('[permissões] pedidos.cancelar e pedidos.excluir acrescentadas ao Administrador');
+  if ((await acrescentarPermissoesEntregas(pool)).feito) console.log('[permissões] entregas.ver e entregas.programar acrescentadas ao Administrador e Interno completo');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
