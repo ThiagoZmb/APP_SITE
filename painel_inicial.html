@@ -298,6 +298,7 @@
         .st.pronto { color: #a86d00; border-color: #f2d48a; background: #fffaf0; }
         .st.entregue { color: #127a3f; border-color: #a3d9b1; background: #f1faf3; }
         .st.retirado { color: #0f7f7f; border-color: #9fdcdc; background: #f0fbfb; }
+        .st.entrega { color: #5b3f8c; border-color: #cdbfe6; background: #f7f3fd; margin-left: 4px; }
         .st.cancelado { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
         .st.fin-aberto { color: #a86d00; border-color: #f2d48a; }
         .st.fin-atraso { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
@@ -744,10 +745,13 @@
                         <button type="button" class="acao-doc" data-acao="excluir" data-perm="pedidos.excluir" title="Excluir este documento">🗑️</button></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
-                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}</td>
+                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}</td>
                 </tr>`).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
+        // status interno da entrega (web_entregas) -> rótulo; só pedidos com registro de entrega têm selo
+        const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
+        const seloEntrega = st => st ? `<span class="st entrega">${esc(ROT_ENTREGA[st] || st)}</span>` : '';
         // cancelar / excluir: sempre pergunta antes; o servidor confere a permissão e registra quem fez
         async function acaoNoDocumento(acao, numero) {
             const x = (tipoLista === 'Pedido' ? pedidos : orcamentos).find(d => String(d.numero) === String(numero));

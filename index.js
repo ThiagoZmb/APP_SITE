@@ -233,8 +233,10 @@ registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
         CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
         p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao,
         p.FINANCEIRO as financeiro,
-        CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
+        CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega,
+        en.status as entregaStatus, DATE_FORMAT(en.data_agendada, '%Y-%m-%d') as dataAgendada
       FROM ped_orc p
+      LEFT JOIN web_entregas en ON en.numero = p.NUMERO AND p.TIPO = 'Pedido'
       ${est.sql ? JOIN_CLIENTE : ''}
       WHERE p.TIPO = ? ${est.sql ? 'AND ' + est.sql : ''}
       ORDER BY p.NUMERO DESC`;
@@ -255,8 +257,9 @@ registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
              DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
-             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
-      FROM ped_orc p ${where} ORDER BY NUMERO DESC`, est.params);
+             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega,
+             en.status as entregaStatus, DATE_FORMAT(en.data_agendada, '%Y-%m-%d') as dataAgendada
+      FROM ped_orc p LEFT JOIN web_entregas en ON en.numero = p.NUMERO AND p.TIPO = 'Pedido' ${where} ORDER BY p.NUMERO DESC`, est.params);
     res.json(semValores(req, comDatasSeguras(rows), ['valor']));
   } catch (err) {
     console.error('Erro /dados_pedidos:', err.message);
@@ -270,8 +273,10 @@ registro.rota('get', '/dados_pedidos_rj', ['pedidos.ver'], async (req, res) => {
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
              DATE_FORMAT(p.DATA, '%d/%m/%Y') as data, CAST(p.DATA_PRONTO AS CHAR) as prontoEm,
              p.TOTAL as valor, p.OBS_GERAL as observacao, p.SITUACAO as situacao, p.FINANCEIRO as financeiro,
-             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega
+             CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega,
+             en.status as entregaStatus, DATE_FORMAT(en.data_agendada, '%Y-%m-%d') as dataAgendada
       FROM ped_orc p
+      LEFT JOIN web_entregas en ON en.numero = p.NUMERO AND p.TIPO = 'Pedido'
       ${JOIN_CLIENTE}
       WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido' ${filtroEstados(req, 'c.ESTADO').sql ? 'AND ' + filtroEstados(req, 'c.ESTADO').sql : ''}
       ORDER BY p.DATA DESC`, filtroEstados(req, 'c.ESTADO').params);
@@ -505,10 +510,16 @@ registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valor
     if (!razao) return;
     const todos = req.query.todos === '1';
     const [pedidos] = await pool.execute(
-      `SELECT NUMERO, CLIENTE_FINAL, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, CAST(DATA_PRONTO AS CHAR) AS DATA_PRONTO, TOTAL, OBS_GERAL, SITUACAO, FINANCEIRO
-       FROM ped_orc WHERE RAZAO_SOCIAL = ? AND TIPO = 'Pedido'
-       ${todos ? '' : "AND SITUACAO IN ('Em Produção', 'Pronto', 'Entregue', 'Retirado') AND FINANCEIRO IN ('A Receber', 'Atrasado', 'Protestado')"}
-       ORDER BY NUMERO DESC`, [razao]);
+      `SELECT p.NUMERO, p.CLIENTE_FINAL, DATE_FORMAT(p.DATA, '%Y-%m-%d') AS DATA, CAST(p.DATA_PRONTO AS CHAR) AS DATA_PRONTO, p.TOTAL, p.OBS_GERAL, p.SITUACAO, p.FINANCEIRO,
+            en.status AS ENTREGA_STATUS
+       FROM ped_orc p LEFT JOIN web_entregas en ON en.numero = p.NUMERO
+       WHERE p.RAZAO_SOCIAL = ? AND p.TIPO = 'Pedido'
+       ${todos ? '' : "AND p.SITUACAO IN ('Em Produção', 'Pronto', 'Entregue', 'Retirado') AND p.FINANCEIRO IN ('A Receber', 'Atrasado', 'Protestado')"}
+       ORDER BY p.NUMERO DESC`, [razao]);
+    // entregas ainda em andamento (todos os pedidos do cliente, não só os listados); só leitura
+    const [[pend]] = await pool.execute(
+      `SELECT COUNT(*) AS qtd_entregas_pendentes FROM web_entregas en JOIN ped_orc p ON p.NUMERO = en.numero AND p.TIPO = 'Pedido'
+       WHERE p.RAZAO_SOCIAL = ? AND en.status IN ('a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada')`, [razao]);
     const [fluxo] = await pool.execute(
       `SELECT ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, PEDIDO, NOTA_FISCAL, VALOR, OBSERVACAO_GERAL, SITUACAO
        FROM fluxo_de_caixa WHERE RAZAO_SOCIAL = ? ${todos ? '' : "AND SITUACAO IN ('A Receber', 'Atrasado', 'Protestado')"}
@@ -524,7 +535,8 @@ registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valor
     const receberFluxo = numEstq(res1.receber), receberPedidos = numEstq(res2.receber), credito = numEstq(cli?.CREDITO);
     res.json({
       pedidos: pedidos.map(p => ({ numero: p.NUMERO, clienteFinal: p.CLIENTE_FINAL || '', data: p.DATA, entrega: dataBRSegura(p.DATA_PRONTO),
-        valor: numEstq(p.TOTAL), observacao: p.OBS_GERAL || '', situacao: p.SITUACAO || '', financeiro: p.FINANCEIRO || '' })),
+        valor: numEstq(p.TOTAL), observacao: p.OBS_GERAL || '', situacao: p.SITUACAO || '', financeiro: p.FINANCEIRO || '', entregaStatus: p.ENTREGA_STATUS || null })),
+      qtdEntregasPendentes: Number(pend?.qtd_entregas_pendentes ?? pend?.qtd) || 0,
       fluxo: fluxo.map(f => ({ id: f.ID, data: f.DATA, pedido: f.PEDIDO ?? '', notaFiscal: f.NOTA_FISCAL ?? '', valor: numEstq(f.VALOR),
         observacao: f.OBSERVACAO_GERAL || '', situacao: f.SITUACAO || '' })),
       resumo: { receberFluxo, receberPedidos, credito, atrasado: numEstq(res1.atrasado), saldoDevedor: receberFluxo + receberPedidos - credito }

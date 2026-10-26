@@ -1,6 +1,17 @@
 # Módulo de Entregas — desenho
 
-Data: 2026-10-26 · Status: aguardando revisão
+Data: 2026-10-26 · Status: implementada
+
+## Desvios da implementação (valem sobre o texto abaixo)
+
+1. **Sem gancho no web**: o registro de entrega nasce só pela varredura idempotente (`sincronizarFila`); a web nunca marca Pronto.
+2. `recebedor` virou **`entregue_a`** (`receb` casa com `REGEX_VALOR`).
+3. **Upload por PUT binário** (`PUT .../anexo`) e colunas extras em `web_entrega_anexos`: `entrega_id`, `criado_por`, `criado_em`; `evento_id` fica nulo até a baixa vincular o anexo.
+4. **Foto do canhoto obrigatória**; assinatura opcional.
+5. A aba **"Em rota"** da equipe inclui o status `enviada`.
+6. **Rotas extras**: `GET /entregas/motoristas` e `GET .../anexo/:anexoId` (equipe e motorista).
+7. A migração de permissões dá `entregas.ver` + `entregas.programar` a Administrador e Interno completo e **nenhuma** a `entregas.baixar` (o perfil Motorista é criado pela administração).
+8. Ligações: `entregaStatus`/`dataAgendada` nas listas de pedidos, selo no painel de pedidos, "Entregas da semana" usa a data agendada, e o financeiro do cliente mostra `qtdEntregasPendentes` (somente leitura).
 
 ## 1. Objetivo
 

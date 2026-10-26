@@ -15,6 +15,7 @@ Funcionalidades (páginas HTML na raiz):
 - Estoque: entrada manual e por XML de NF-e, saída, ajuste, histórico, estornos, análises (previsão de falta, curva ABC, itens parados) (`estoque.html`, `movimentacao_estoque.html`, `rotas/estoque_*.js`, `rotas/nfe_xml.js`).
 - Financeiro / fluxo de caixa (`financeiro.html`) e gráficos de pedidos (`graficos_pedidos.html`).
 - Custos e **formação de preço** (`custos.html`, `custos_precos.js`, `rotas/custos.js`, `rotas/precos_formacao.js`): calcula custo real dos materiais pelas compras e sugere o `VALOR_FIXO`.
+- **Entregas** (`entregas.html`, `minhas_entregas.html`, `rotas/entregas.js`): fila de pedidos Pronto, agenda (motorista, retirada, outro estado), baixa pelo motorista no celular com foto do canhoto, ocorrências e histórico; também aparece em Início, Pedidos (selo) e Financeiro do cliente (somente leitura). Regras na seção 5, "Entregas".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Leitura de projeto técnico em PDF** na tela de orçamentos (botão "📄 Ler projeto (PDF)", `leitura/`, `leitura_pdf.js`): o servidor lê o PDF pela API do Claude e o vendedor confere cada valor antes de importar (seção 5, "Leitura de PDF").
 
@@ -32,9 +33,12 @@ rotas/                   Módulos de rotas registrados pelo index.js
   nfe_xml.js             Leitura do XML da NF-e (recusa DOCTYPE)
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
+  entregas.js            Entregas: varredura da fila (`sincronizarFila`), agenda, anexos, rotas da equipe (`/entregas*`) e do motorista (`/minhas_entregas*`)
+  transacao.js           Transação com nova tentativa em deadlock, `ErroUsuario`, hora local (compartilhado pelas rotas)
 calculo/                 Funções puras (testáveis sem banco)
   precos.js              Motor de preço: portas, serralheria, avulso, acessórios; leitor do cadastro
   precos_formacao.js / precos_referencias.js / custos.js / custos_sugestao.js   Formação de preço e custos
+  entregas.js            Máquina de status das entregas (`proximo`, `pedidoPara`) e validação de anexo
   engenharia.js          Regras de engenharia das portas
   leitura_vb.js / linhas_vb.js   Conversão banco<->tela no formato do VB
   nomes.js               Normalização/semelhança de nomes de produtos
@@ -43,6 +47,7 @@ imagens/logo_elegance.png  Logo do cabeçalho do PDF (convertido do Elegance_Log
 leitura/                 Leitura de PDF pela web: rotas.js (rotas /leitura_pdf, tarefas em memória, limites, auditoria), claude.js (pedido à API pelo SDK, erros), pdf.js (assinatura, senha, nº de páginas sem poppler), conferencia.js (dados da janela de conferência)
 .claude/skills/engenharia-projetos-tecnicos/   Skill de leitura de projetos (regras, validação, mapa, confirmação). O servidor IMPORTA scripts/lib/servico.mjs dela: a pasta precisa ir no deploy
 seguranca/               acesso.js (perfil+permissões por requisição, cache 60 s), permissoes.js (catálogo único de permissões), rotas.js (registro obrigatório de rotas), valores.js (esconde dinheiro de quem não tem `valores.ver`), instalacao.js (cria tabelas web_*, migrações)
+entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
 *.html, layout.js, login.js, ranking.js, custos_precos.js, importar_itens.js, leitura_pdf.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
 test/                    Testes (node:test); test/apoio/ = banco/pool falsos, servidor de teste, XMLs de NF-e
 .gitignore               node_modules/, .env, *.log
@@ -95,6 +100,15 @@ Nunca colocar valores de senhas/tokens neste arquivo nem no git.
 - **Tarefas em memória** (Map, dono = usuário, TTL 30 min depois de terminar, tempo máximo 15 min, 1 por usuário, 3 no servidor). Tarefa de outro usuário responde 404. Reinício do servidor perde as tarefas (a tela pede para enviar de novo). O PDF nunca vai para disco nem log.
 - **Custo**: 10 leituras/hora por usuário (só as aceitas contam); 1 nova leitura automática se a resposta vier fora do formato; cada leitura grava em `web_auditoria` (`acao = leitura_pdf`: quem, arquivo, páginas, bytes, modelo, tentativas, `tokensEntrada`/`tokensSaida`, resultado, duração) e cada conferência (`leitura_pdf_conferir`). Para acompanhar o gasto: somar os tokens dessas linhas. Ordem de grandeza: cada página de PDF custa alguns milhares de tokens de entrada; o preço por token é o do modelo escolhido.
 - **Testes**: `test/leitura_pdf.test.js` (cliente da API falso; nunca chama a API real), `test/leitura_pdf_tela.test.js`, `.claude/skills/engenharia-projetos-tecnicos/tests/leitura.test.mjs`.
+
+### Entregas (módulo web, tabelas `web_entregas`, `web_entrega_eventos`, `web_entrega_anexos`)
+- **Criação**: só a varredura idempotente (`sincronizarFila`) cria registros, para pedidos `SITUACAO='Pronto'`; não há gancho nas rotas da web. A web **nunca marca Pronto** (quem marca é o VB). Pedido que sai de Pronto antes de agendar é cancelado na varredura.
+- **Baixa**: grava `ped_orc.SITUACAO` somente `'Entregue'` ou `'Retirado'`, na **mesma transação** do evento (`rotas/transacao.js`). Nenhuma outra escrita em tabela do VB; nada de lançamento em `fluxo_de_caixa` (fase 2).
+- **Motorista**: perfil `Motorista` é criado pela administração (não vem nos perfis iniciais); só tem `entregas.baixar`. Vê e age apenas nas **próprias** entregas; entrega de outro motorista, inexistente ou em estado inválido responde **404 uniforme**.
+- **Anexos**: no MySQL (MEDIUMBLOB), ≤ 1 MB, enviados por PUT binário; só JPEG ou PNG (conferido pelos bytes, não só pelo mime). Foto do canhoto obrigatória na baixa; assinatura opcional. Dono, tipo e status do anexo são conferidos dentro da trava da transação.
+- **Nomes de campo**: nada que case com `REGEX_VALOR` (por isso `entregue_a`, e não `recebedor`: "receb" é dinheiro). Contagens usam `qtd*`. Os campos `entregaStatus`, `dataAgendada` e `qtdEntregasPendentes` são seguros e aparecem em `/dados_lista`, `/dados_pedidos`, `/dados_pedidos_rj` (LEFT JOIN só para `TIPO='Pedido'`) e em `/clientes/financeiro/:codigo`.
+- **Permissões**: `entregas.ver`, `entregas.programar`, `entregas.baixar`. A migração dá ver+programar a Administrador e Interno completo; `baixar` a nenhum perfil.
+- **Testes**: `test/entregas_*.test.js`, `test/minhas_entregas_tela.test.js`; `test/entregas_ligacoes.test.js` cobre as ligações e confirma que o app sobe com as rotas novas (`registro.verificar()`).
 
 ### Outras regras não óbvias
 - **Fidelidade ao VB**: cálculos devem reproduzir o VB (comentários citam `MotorFinanceiro`, `MotorPrecificacaoSerralheria`, `frmPortasAbrir`, etc.). Antes de "corrigir" uma conta, confirme se é comportamento do VB.
