@@ -37,7 +37,7 @@ function errosDoSchema(doc) {
 }
 
 // Lista todos os valores rastreáveis "de primeiro nível" com caminho e papel
-function coletarValores(doc) {
+export function coletarValores(doc) {
   const lista = [];
   const add = (v, caminho, papel) => lista.push({ v, caminho, papel });
   doc.itens.forEach((it, i) => {

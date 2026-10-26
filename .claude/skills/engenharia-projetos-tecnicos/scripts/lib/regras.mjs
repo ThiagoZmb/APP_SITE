@@ -3,7 +3,7 @@
 // Usadas pelos construtores (valor.mjs) e pela validação (validacao.mjs).
 // ============================================================
 export const ESTADOS = ['confirmado', 'inferido', 'ausente', 'conflitante'];
-export const METODOS = ['texto_vetorial', 'ocr', 'leitura_visual', 'calculado', 'configuracao'];
+export const METODOS = ['texto_vetorial', 'ocr', 'leitura_visual', 'calculado', 'configuracao', 'informado_humano'];
 export const UNIDADES = ['mm', 'un', 'kg', 'm2'];
 
 // Quanto maior, pior. ausente e conflitante são igualmente "inutilizáveis"
@@ -41,6 +41,9 @@ export function errosDoValor(v, caminho) {
   }
   if (v.estado === 'confirmado' && (v.metodo === 'ocr' || v.metodo === 'leitura_visual') && !v.confirmacao) {
     e(`estado "confirmado" com metodo "${v.metodo}" exige confirmacao humana registrada (por, em); sem ela o estado é "inferido"`);
+  }
+  if (v.metodo === 'informado_humano' && !v.confirmacao) {
+    e('metodo "informado_humano" exige confirmacao humana registrada (por, em): foi uma pessoa quem informou o valor');
   }
   if (v.confirmacao && (textoVazio(v.confirmacao.por) || !ISO_DATA.test(v.confirmacao.em ?? ''))) {
     e('confirmacao exige "por" (quem) e "em" (data ISO)');
