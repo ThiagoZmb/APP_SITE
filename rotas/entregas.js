@@ -31,8 +31,8 @@ const ANEXO_INVALIDO = 'Anexo inválido.';
 
 // Guarda uma foto/assinatura solta (evento_id NULL) da entrega `entrega` (id); a baixa a vincula depois (vincularAnexos).
 // `usuario` = código numérico de quem enviou (req.user.id): vira `criado_por` e é conferido na baixa.
-// Lança ErroUsuario (400/409). Reutilizada pelas rotas da equipe e do motorista.
-async function guardarAnexo(pool, entrega, tipo, corpo, mime, usuario) {
+// `conferir(linhaTravada)` (opcional) roda depois da trava e antes do COUNT/INSERT. Lança ErroUsuario (400/404/409). Reutilizada pelas rotas da equipe e do motorista.
+async function guardarAnexo(pool, entrega, tipo, corpo, mime, usuario, conferir) {
   if (!TIPOS_ANEXO.includes(tipo)) throw new ErroUsuario(400, 'Tipo de anexo inválido: use foto ou assinatura.');
   const v = validarAnexo(corpo, mime);
   if (!v.ok) throw new ErroUsuario(400, v.motivo);
@@ -41,8 +41,9 @@ async function guardarAnexo(pool, entrega, tipo, corpo, mime, usuario) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [[e]] = await conn.execute('SELECT id FROM web_entregas WHERE id = ? FOR UPDATE', [entrega]);
+    const [[e]] = await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [entrega]);
     if (!e) throw new ErroUsuario(404, 'Entrega não encontrada.');
+    if (conferir) conferir(e); // decisão final, com a linha travada: lança ErroUsuario para recusar
     const [[c]] = await conn.execute(
       'SELECT COUNT(*) AS n FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL', [entrega, criadoPor]);
     if (Number(c?.n) >= MAX_ANEXOS_PENDENTES) throw new ErroUsuario(409, `Já há ${MAX_ANEXOS_PENDENTES} anexos aguardando baixa nesta entrega. Conclua a baixa antes de enviar mais.`);
@@ -399,8 +400,9 @@ function registrarEntregas({ rota, pool }) {
     try {
       const e = await entregaVisivel(req, id);
       if (!e) return nao_encontrada(res);
-      if (FINAIS.includes(e.status)) return res.status(409).json({ error: `Esta entrega está em '${ROTULO_STATUS[e.status]}' e não aceita mais anexos.` });
-      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, req.user.id));
+      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, req.user.id, linha => {
+        if (FINAIS.includes(linha.status)) throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[linha.status]}' e não aceita mais anexos.`);
+      }));
     } catch (err) {
       if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
       falha(res, 'PUT /entregas/:id/anexo', err);
@@ -523,10 +525,11 @@ function registrarEntregas({ rota, pool }) {
     if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
     const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
     try {
-      const e = await buscarDoMotorista(pool, id, DONO(req));
-      if (!e) return nao_encontrada(res);
-      if (e.status !== STATUS.EM_ROTA) return res.status(409).json({ error: 'Só é possível anexar depois de sair para a entrega.' });
-      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, DONO(req)));
+      // dono, tipo e status são decididos dentro da trava de guardarAnexo (sem janela de corrida)
+      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, DONO(req), linha => {
+        if (Number(linha.motorista_codigo) !== DONO(req) || linha.tipo !== TIPOS.MOTORISTA) throw new ErroUsuario(404, 'Entrega não encontrada.');
+        if (linha.status !== STATUS.EM_ROTA) throw new ErroUsuario(409, 'Só é possível anexar depois de sair para a entrega.');
+      }));
     } catch (err) {
       if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
       falha(res, 'PUT /minhas_entregas/:id/anexo', err);

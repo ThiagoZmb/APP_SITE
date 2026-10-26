@@ -337,3 +337,50 @@ test('409 nunca diz "undefined" nas ações do motorista', async t => {
     assert.match(msg, /não pode ser \S+/, acao);
   }
 });
+
+// Corrida: a entrega muda entre a primeira leitura e a trava (FOR UPDATE); a decisão final é a de dentro da trava.
+function aoTravar(banco, mudar) {
+  banco.regras.unshift([/SELECT \* FROM web_entregas WHERE id = \? FOR UPDATE/, (sql, [id]) => {
+    const e = banco.entregas.find(x => x.id === id); if (e) mudar(e); return e ? [{ ...e }] : [];
+  }]);
+}
+const enviarAnexo = (chamar, id) => chamar(`/minhas_entregas/${id}/anexo?tipo=foto`, 'PUT', JPEG, { 'Content-Type': 'image/jpeg' });
+
+test('corrida no anexo do motorista: trocou o motorista antes da trava -> 404 e nada gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  banco.entregas[0].status = 'em_rota';
+  aoTravar(banco, e => { e.motorista_codigo = 22; });
+  const r = await enviarAnexo(chamar, 1);
+  assert.equal(r.status, 404);
+  assert.deepEqual(await r.json(), { error: 'Entrega não encontrada.' });
+  assert.equal(banco.anexos.length, 0);
+});
+
+test('corrida no anexo do motorista: baixada antes da trava -> 409 e nada gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  banco.entregas[0].status = 'em_rota';
+  aoTravar(banco, e => { e.status = 'entregue'; });
+  const r = await enviarAnexo(chamar, 1);
+  assert.equal(r.status, 409);
+  assert.equal(banco.anexos.length, 0);
+});
+
+test('corrida no anexo do motorista: tipo mudou antes da trava -> 404 e nada gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  banco.entregas[0].status = 'em_rota';
+  aoTravar(banco, e => { e.tipo = 'retirada'; });
+  assert.equal((await enviarAnexo(chamar, 1)).status, 404);
+  assert.equal(banco.anexos.length, 0);
+});
+
+test('corrida no anexo da equipe: entrega ficou final antes da trava -> 409 e nada gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  cenario(banco);
+  aoTravar(banco, e => { e.status = 'cancelada'; });
+  const r = await chamar('/entregas/1/anexo?tipo=foto', 'PUT', JPEG, { 'Content-Type': 'image/jpeg' });
+  assert.equal(r.status, 409);
+  assert.equal(banco.anexos.length, 0);
+});
