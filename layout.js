@@ -242,10 +242,69 @@
 
     // Abre um PDF do backend sem token na URL: baixa com o cabeçalho Authorization e mostra numa aba nova.
     // A aba é aberta já no clique (depois de um await o navegador bloquearia o pop-up).
+    // ----- gravar o PDF em "C:\Programa Elegance\<pasta>\<nº>_<cliente>.PDF", como o VB -----
+    // O navegador não escreve em qualquer lugar do disco: a pasta "Programa Elegance" é escolhida UMA vez (Chrome/Edge), o
+    // navegador guarda a escolha e, depois, cada PDF aberto é gravado direto na subpasta certa (Pedidos(PDF), Orçamentos(PDF), Produção).
+    const PastaPdf = (() => {
+        const abrirDb = () => new Promise((ok, falha) => {
+            const r = indexedDB.open('elegance_pdf', 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('pastas');
+            r.onsuccess = () => ok(r.result); r.onerror = () => falha(r.error);
+        });
+        const ler = async () => { const db = await abrirDb(); return new Promise((ok, falha) => { const q = db.transaction('pastas').objectStore('pastas').get('raiz'); q.onsuccess = () => ok(q.result || null); q.onerror = () => falha(q.error); }); };
+        const guardar = async h => { const db = await abrirDb(); return new Promise((ok, falha) => { const t = db.transaction('pastas', 'readwrite'); t.objectStore('pastas').put(h, 'raiz'); t.oncomplete = ok; t.onerror = () => falha(t.error); }); };
+        const suportado = () => typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined';
+        // pasta já escolhida com permissão de gravação (pede a permissão ao usuário se o navegador a esqueceu; precisa de um clique recente)
+        async function pronta() {
+            if (!suportado()) return null;
+            const h = await ler();
+            if (!h) return null;
+            const opc = { mode: 'readwrite' };
+            if ((await h.queryPermission(opc)) === 'granted') return h;
+            return (await h.requestPermission(opc)) === 'granted' ? h : null;
+        }
+        async function escolher() {
+            const h = await window.showDirectoryPicker({ id: 'programa-elegance', mode: 'readwrite' });
+            await guardar(h);
+            return h;
+        }
+        async function salvar(raiz, pasta, nome, blob) {
+            const dir = await raiz.getDirectoryHandle(pasta, { create: true });
+            const arq = await dir.getFileHandle(nome, { create: true });
+            const w = await arq.createWritable();
+            await w.write(blob); await w.close();
+            return `${raiz.name}\\${pasta}\\${nome}`;
+        }
+        return { suportado, pronta, escolher, salvar };
+    })();
+
+    // aviso discreto no canto da tela (some sozinho, ou fica até o clique quando traz botão)
+    function avisoCanto(texto, { botao, aoClicar, tipo } = {}) {
+        let el = document.getElementById('aviso-pdf');
+        if (!el) {
+            el = document.createElement('div'); el.id = 'aviso-pdf';
+            el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:10000;max-width:360px;padding:12px 14px;border-radius:12px;font:13px/1.45 sans-serif;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center';
+            document.body.appendChild(el);
+        }
+        el.style.background = tipo === 'erro' ? '#a52a2a' : '#1c2230';
+        el.textContent = '';
+        const t = document.createElement('span'); t.textContent = texto; el.appendChild(t);
+        const fechar = () => { el.remove(); };
+        if (botao) {
+            const b = document.createElement('button'); b.type = 'button'; b.textContent = botao;
+            b.style.cssText = 'flex:none;padding:6px 10px;border:none;border-radius:8px;background:#fff;color:#1c2230;font-weight:700;cursor:pointer';
+            b.addEventListener('click', async () => { try { await aoClicar(); } finally { fechar(); } });
+            el.appendChild(b);
+        } else setTimeout(fechar, 7000);
+    }
+
     window.abrirPdfAutenticado = async function (url) {
         const aba = window.open('', '_blank');
         const aviso = t => { if (aba) aba.document.body.innerHTML = `<p style="font:15px sans-serif;padding:24px;color:#444">${esc(t)}</p>`; };
         aviso('Gerando PDF…');
+        // a permissão de gravar na pasta só pode ser pedida enquanto o clique é recente: antes de esperar o servidor
+        let raiz = null;
+        try { raiz = await PastaPdf.pronta(); } catch { raiz = null; }
         try {
             const r = await fetch(url, { headers: { Authorization: 'Bearer ' + (auth()?.token || '') } });
             if (r.status === 401) {
@@ -255,9 +314,26 @@
                 return;
             }
             if (!r.ok) throw new Error(r.status === 404 ? 'Pedido não encontrado.' : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
-            const link = URL.createObjectURL(await r.blob());
+            const pdf = await r.blob();
+            const link = URL.createObjectURL(pdf);
             if (aba) aba.location.href = link; else location.href = link;
             setTimeout(() => URL.revokeObjectURL(link), 120000);
+            // nome e pasta vêm do servidor (mesma regra do VB)
+            const nome = decodeURIComponent(r.headers.get('X-Pdf-Nome') || ''), pasta = decodeURIComponent(r.headers.get('X-Pdf-Pasta') || '');
+            if (nome && pasta && PastaPdf.suportado()) {
+                if (raiz) {
+                    try { avisoCanto('PDF salvo em ' + await PastaPdf.salvar(raiz, pasta, nome, pdf)); }
+                    catch (e) { avisoCanto('O PDF abriu, mas não foi possível salvá-lo na pasta: ' + e.message, { tipo: 'erro' }); }
+                } else {
+                    avisoCanto(`Quer salvar os PDFs em "Programa Elegance\\${pasta}"? Escolha a pasta C:\\Programa Elegance (uma vez só).`, {
+                        botao: 'Escolher pasta',
+                        aoClicar: async () => {
+                            try { const h = await PastaPdf.escolher(); avisoCanto('PDF salvo em ' + await PastaPdf.salvar(h, pasta, nome, pdf)); }
+                            catch (e) { if (e.name !== 'AbortError') avisoCanto('Não foi possível salvar: ' + e.message, { tipo: 'erro' }); }
+                        }
+                    });
+                }
+            }
         } catch (e) {
             if (aba) aviso('Não foi possível gerar o PDF: ' + e.message); else alert('Não foi possível gerar o PDF: ' + e.message);
         }

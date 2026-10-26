@@ -447,7 +447,17 @@ function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo
 
 const novoDocumento = (extra = {}) => new PDFDocument({ size: 'A4', margin: MARGEM, ...extra });
 
+// Pasta e nome do arquivo como no VB (Module1: pasta_pedidos / pasta_orçamentos / pasta_produção, dentro de "C:\Programa Elegance\";
+// Gerar_PDF_PedOrc, BLOCO 4): {nº}_{razão social}.PDF · Guia de Produção: {nº}_{razão social}_P.PDF.
+// O VB grava a razão social como está; aqui só saem os caracteres que o Windows não aceita em nome de arquivo.
+const nomeSeguroWindows = t => String(t ?? '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().replace(/[. ]+$/, '');
+function destinoPdf({ tipo, numero, razaoSocial, producao = false }) {
+  const base = `${numero}_${nomeSeguroWindows(razaoSocial)}`;
+  if (producao) return { pasta: 'Produção', nome: `${base}_P.PDF` };
+  return { pasta: tipo === 'Pedido' ? 'Pedidos(PDF)' : 'Orçamentos(PDF)', nome: `${base}.PDF` };
+}
+
 module.exports = {
-  desenharPedOrc, novoDocumento, descricaoItem, blocosDeFuros, colunasPdf,
+  desenharPedOrc, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
   textoVB, lerDecimal, moedaBR, numeroBR, formatarQuantidade, dataVB, dataHoraVB, quebrar, LOGO_PADRAO
 };

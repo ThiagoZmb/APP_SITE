@@ -260,6 +260,8 @@
         html body .card-itens #itens-tbody td { border-bottom: 1px solid #f0c4c4 !important; }
         html body .card-itens .totais { padding: 14px 18px; border-radius: 10px; background: #fff; border: 2px solid var(--primary-ring); }
         html body .card-itens .totais .grupo:last-child .valor { font-size: 30px; }
+        #wrap-pares.inativo { opacity: .5; }
+        #wrap-pares.inativo label { cursor: not-allowed; }
         /* cancelar (âmbar, reversível pelo VB/edição) e excluir (vermelho, sem volta) */
         html body .btn-perigo-suave { background: #fff4e0 !important; border: 1px solid #e8b35a !important; color: #8a5200 !important; }
         html body .btn-perigo-suave:hover { background: #ffe9c2 !important; }
@@ -414,7 +416,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202610251900" defer></script>
+    <script src="layout.js?v=202610261200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -940,7 +942,11 @@
             const ehPorta = frenteAtual !== 'Serralheria' && !ehAvulso;
             // Porta basculante: chkPares invisível (frmPortasAbrir_Load)
             const wrapPares = document.getElementById('wrap-pares');
-            if (ehBasculante() && document.getElementById('chk-pares').checked) {
+            // basculante e frente de gaveta: o campo continua visível, mas inativo (não existe "par")
+            const semPares = ehBasculante() || frenteAtual === 'Frente de gaveta';
+            document.getElementById('chk-pares').disabled = semPares;
+            wrapPares?.classList.toggle('inativo', semPares);
+            if (semPares && document.getElementById('chk-pares').checked) {
                 document.getElementById('chk-pares').checked = false;
                 document.getElementById('f-qtd').value = 1;
             }
@@ -961,7 +967,7 @@
             document.querySelector('label[for="f-qtd"]').textContent = ehSerr ? 'Qtd de conjuntos' : 'Qtd';
             document.getElementById('tit-medidas').textContent = ehSerr ? '📐 Medidas da peça' : '📐 Medidas e quantidade';
             atualizarMetragemSerr();
-            if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
+            if (wrapPares) wrapPares.style.display = ehPorta && !ehCorrer ? '' : 'none';
             alternarCamposPuxador(!ehPorta ? '' : (document.getElementById('f-puxador')?.value || ''));
             if (ehCorrer && document.getElementById('chk-pares').checked) document.getElementById('chk-pares').checked = false;
             garantirFolhas();
@@ -1349,7 +1355,7 @@
         // ============================================================
         function ehBasculante() { return frenteAtual === 'Porta basculante'; }
         function ehPortaComFuros() { return frenteAtual === 'Porta de giro' || ehBasculante(); }
-        function paresAtivo() { return !ehBasculante() && !ehCorrer() && (document.getElementById('chk-pares')?.checked || false); }
+        function paresAtivo() { return !ehBasculante() && frenteAtual !== 'Frente de gaveta' && !ehCorrer() &&(document.getElementById('chk-pares')?.checked || false); }
         function qtdFolhasAtual() { return qtdEfetiva(); }
         // InverterLado (furos): Esquerdo ↔ Direito / Superior ↔ Inferior
         function inverterLado(lado) {
