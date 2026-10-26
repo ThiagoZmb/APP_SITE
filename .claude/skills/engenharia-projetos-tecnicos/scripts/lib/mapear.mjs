@@ -8,7 +8,9 @@
 //  - "inferido" NÃO entra: vira sugestão (e pendência bloqueante se o campo é obrigatório);
 //  - ausente e conflitante não entram e geram pendência (ausente só se obrigatório; conflitante sempre);
 //  - tradução sem correspondência ou valor de tipo/faixa inválido → pendência bloqueante (nunca adivinha);
-//  - cada campo preenchido registra rastreio[destino] = id do ValorRastreavel de origem.
+//  - cada campo preenchido registra rastreio[destino] = id do ValorRastreavel de origem;
+//  - "foraDoEscopo" (opcional no mapa): tipos que a Elegance fabrica mas que NÃO têm mapa para o item da tela.
+//    Saem como item vazio, foraDoEscopo:true, com pendência informativa (nunca descartados em silêncio).
 // Não calcula nada: não aplica descontos, não converte unidade, não arredonda.
 // ============================================================
 export const TIPOS_CAMPO = ['numero', 'inteiro', 'texto', 'lista'];
@@ -27,6 +29,11 @@ export function validarMapa(mapa) {
   if (typeof mapa.dominio !== 'string' || !mapa.dominio) erros.push('"dominio" ausente');
   if (!Array.isArray(mapa.campos) || mapa.campos.length === 0) erros.push('"campos" deve ser uma lista não vazia');
   if (mapa.base !== undefined && !ehObjeto(mapa.base)) erros.push('"base" deve ser um objeto');
+  if (mapa.foraDoEscopo !== undefined) {
+    const f = mapa.foraDoEscopo;
+    if (!ehObjeto(f) || !Array.isArray(f.tipos) || f.tipos.length === 0 || f.tipos.some(t => typeof t !== 'string' || !t.trim())) erros.push('"foraDoEscopo" deve ter "tipos" (lista não vazia de textos)');
+    if (ehObjeto(f) && f.motivo !== undefined && typeof f.motivo !== 'string') erros.push('"foraDoEscopo.motivo" deve ser texto');
+  }
   const destinos = new Set();
   for (const [i, c] of (Array.isArray(mapa.campos) ? mapa.campos : []).entries()) {
     const nome = `campos[${i}]`;
@@ -118,7 +125,22 @@ function definir(obj, caminho, valor) {
 const lerDestino = (obj, caminho) => caminho.split('.').reduce((o, p) => (ehObjeto(o) ? o[p] : undefined), obj);
 
 // ---------- 1 item ----------
+const foraDoEscopo = (item, mapa) => (mapa.foraDoEscopo?.tipos ?? []).some(t => normalizar(t) === normalizar(item.tipo));
+
+// Item de tipo que a skill reconhece mas ainda não mapeia: registrado, nunca lançado, não bloqueia os demais
+function itemForaDoEscopo(item, mapa) {
+  const motivo = mapa.foraDoEscopo.motivo ? ` ${mapa.foraDoEscopo.motivo}` : '';
+  return {
+    idItem: item.id, item: {}, prontoParaLancar: false, foraDoEscopo: true, rastreio: {}, sugestoes: [],
+    pendencias: [{
+      id: `pend-${item.id}-fora-do-escopo`, tipo: 'fora_do_escopo', destino: 'tipo', bloqueante: false, refs: [item.id],
+      mensagem: `Item ${item.id} (tipo "${item.tipo}"): fora do escopo atual (sem mapeamento para o item da tela do domínio "${mapa.dominio}"); registrado no projeto, não será lançado.${motivo}`,
+    }],
+  };
+}
+
 function mapearItem(item, mapa) {
+  if (foraDoEscopo(item, mapa)) return itemForaDoEscopo(item, mapa);
   const saida = structuredClone(mapa.base ?? {});
   const rastreio = {};
   const sugestoes = [];
@@ -199,7 +221,8 @@ export function montarSaida(doc, mapa, versao = '1.0.0') {
   const pendenciasDocumento = pendenciasDoDocumento(doc, mapa);
   return {
     versao, dominio: mapa.dominio, origem: { arquivo: doc.documento.arquivo },
-    prontoParaLancar: itens.length > 0 && itens.every(i => i.prontoParaLancar) && pendenciasDocumento.length === 0,
+    // itens fora do escopo não bloqueiam os demais, mas é preciso haver ao menos um item lançável
+    prontoParaLancar: itens.some(i => !i.foraDoEscopo) && itens.every(i => i.foraDoEscopo || i.prontoParaLancar) && pendenciasDocumento.length === 0,
     itens, pendenciasDocumento,
   };
 }

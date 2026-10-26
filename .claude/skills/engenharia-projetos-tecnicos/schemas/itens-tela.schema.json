@@ -28,6 +28,7 @@
         "idItem": { "type": "string", "minLength": 1 },
         "item": { "type": "object" },
         "prontoParaLancar": { "type": "boolean" },
+        "foraDoEscopo": { "type": "boolean", "description": "true: tipo reconhecido, mas sem mapeamento para o item da tela (registrado, não lançado)" },
         "rastreio": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
         "sugestoes": { "type": "array", "items": { "$ref": "#/definitions/Sugestao" } },
         "pendencias": { "type": "array", "items": { "$ref": "#/definitions/PendenciaItem" } }
@@ -68,7 +69,7 @@
         "id": { "type": "string", "minLength": 1 },
         "tipo": {
           "type": "string",
-          "enum": ["obrigatorio_ausente", "conflitante", "inferido", "traducao_sem_correspondencia", "valor_invalido"]
+          "enum": ["obrigatorio_ausente", "conflitante", "inferido", "traducao_sem_correspondencia", "valor_invalido", "fora_do_escopo"]
         },
         "destino": { "type": "string", "minLength": 1 },
         "mensagem": { "type": "string", "minLength": 1 },

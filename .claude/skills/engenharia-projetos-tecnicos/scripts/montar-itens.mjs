@@ -47,10 +47,12 @@ try { saida = montarSaida(aplicarVerificacoes(doc, carregarConfig()), mapa); } c
 }
 const json = `${JSON.stringify(saida, null, 2)}\n`;
 const prontos = saida.itens.filter(i => i.prontoParaLancar).length;
+const fora = saida.itens.filter(i => i.foraDoEscopo).length;
+const resumo = `${prontos} de ${saida.itens.length} pronto(s) para lançar${fora ? ` (${fora} fora do escopo atual, sem mapeamento)` : ''}; ${saida.pendenciasDocumento.length} pendência(s) do documento.`;
 if (opcoes.saida) {
   writeFileSync(opcoes.saida, json, 'utf8');
-  console.log(`Itens gravados em ${opcoes.saida}: ${prontos} de ${saida.itens.length} pronto(s) para lançar; ${saida.pendenciasDocumento.length} pendência(s) do documento.`);
+  console.log(`Itens gravados em ${opcoes.saida}: ${resumo}`);
 } else {
   process.stdout.write(json);
-  console.error(`${prontos} de ${saida.itens.length} item(ns) pronto(s) para lançar; ${saida.pendenciasDocumento.length} pendência(s) do documento.`);
+  console.error(resumo);
 }

@@ -61,7 +61,19 @@ function linhasPendencia(p, porId) {
   return linhas;
 }
 
-export function gerarRelatorio(doc) {
+// Itens de tipos reconhecidos mas sem mapeamento (ver "foraDoEscopo" no mapa do domínio)
+function linhasForaDoEscopo(doc, foraDoEscopo) {
+  const tipos = new Set((foraDoEscopo?.tipos ?? []).map(t => limpar(t).toLowerCase()));
+  return doc.itens.filter(it => tipos.has(limpar(it.tipo).toLowerCase()))
+    .map(it => `- Item ${it.id} (${it.tipo}): fora do escopo atual (sem mapeamento); registrado, não será lançado no orçamento/pedido.`);
+}
+
+const linhasHistorico = doc => (doc.historico || []).map(h => `- ${h.em} — ${limpar(h.por)}: ${h.acao} (${h.ids.length ? h.ids.join(', ') : '—'})${h.nota ? ` — ${limpar(h.nota)}` : ''}`);
+
+// opcoes.foraDoEscopo: { tipos } do mapa do domínio (a seção só aparece se houver item desses tipos)
+export function gerarRelatorio(doc, opcoes = {}) {
+  const fora = linhasForaDoEscopo(doc, opcoes.foraDoEscopo);
+  const hist = linhasHistorico(doc);
   const valores = listarValores(doc);
   const porId = new Map(valores.map(x => [x.v.id, x.v]));
   const contagem = Object.fromEntries(ESTADOS.map(e => [e, valores.filter(x => x.v.estado === e).length]));
@@ -81,6 +93,8 @@ export function gerarRelatorio(doc) {
     ...secao('Inferido', doEstado('inferido').map(x => linhaValor(x, 'INFERIDO — conferir: ')), 'Nenhum valor inferido.'),
     ...secao('Pendências', doc.pendencias.flatMap(p => linhasPendencia(p, porId)), 'Nenhuma pendência.'),
     ...secao('Alertas de segurança', doc.alertasSeguranca.map(a => `- ${textoPagina(a.pagina)}: "${limpar(a.trecho)}" — ${limpar(a.motivo)}`), 'Nenhum alerta.'),
+    ...(fora.length ? secao('Fora do escopo atual (sem mapeamento)', fora) : []),
+    ...(hist.length ? secao('Histórico de confirmações', hist) : []),
   ];
   return `${linhas.join('\n').trimEnd()}\n`;
 }

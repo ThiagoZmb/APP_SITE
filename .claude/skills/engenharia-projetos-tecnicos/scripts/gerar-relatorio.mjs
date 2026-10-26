@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Uso: node gerar-relatorio.mjs arquivo.json [--saida arq.md]
 // Valida antes; se inválido, sai com 1 e NÃO gera relatório. Saída: 0 ok | 1 inválido | 2 uso errado
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { validarProjeto } from './lib/validacao.mjs';
 import { aplicarVerificacoes } from './lib/cruzada.mjs';
 import { gerarRelatorio } from './lib/relatorio.mjs';
@@ -29,7 +29,13 @@ if (!bruto.ok) {
   process.exit(1);
 }
 
-const md = gerarRelatorio(aplicarVerificacoes(doc, carregarConfig()));
+// mapa do domínio (se existir): só para listar itens fora do escopo; o nome vira nome de arquivo, então é validado
+let foraDoEscopo;
+if (/^[a-z0-9][a-z0-9-]*$/.test(doc.dominio)) {
+  const arq = new URL(`../config/regras-por-dominio/${doc.dominio}.json`, import.meta.url);
+  if (existsSync(arq)) { try { foraDoEscopo = lerJson(arq).foraDoEscopo; } catch { /* mapa ilegível: relatório sai sem a seção */ } }
+}
+const md = gerarRelatorio(aplicarVerificacoes(doc, carregarConfig()), { foraDoEscopo });
 if (saida) {
   writeFileSync(saida, md, 'utf8');
   console.log(`Relatório gravado em ${saida}`);
