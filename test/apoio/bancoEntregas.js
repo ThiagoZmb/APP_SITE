@@ -132,13 +132,38 @@ function bancoEntregas() {
       cols.forEach((c, i) => { e[c] = params[i]; });
       return { affectedRows: 1 };
     }],
-    [/INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo, detalhe\)/, (sql, [entrega_id, quando, usuario, tipo, motivo, detalhe]) => {
-      eventos.push({ id: eventos.length + 1, entrega_id, quando, usuario, tipo, motivo: motivo ?? null, entregue_a: null, detalhe: detalhe ?? null });
+    [/INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a\)/, (sql, [entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a]) => {
+      eventos.push({ id: eventos.length + 1, entrega_id, quando, usuario, tipo, motivo: motivo ?? null, entregue_a: entregue_a ?? null, detalhe: detalhe ?? null });
       return { affectedRows: 1, insertId: eventos.length };
     }],
     [/INSERT INTO web_auditoria \(quando, quem, acao, alvo, detalhe\)/, (sql, [quando, quem, acao, alvo, detalhe]) => {
       estado.auditoria.push({ quando, quem, acao, alvo, detalhe }); return { affectedRows: 1, insertId: estado.auditoria.length };
-    }]
+    }],
+
+    // ---- anexos e baixa (T5) ----
+    [/^SELECT id, status FROM web_entregas WHERE id = \?$/, (sql, [id]) => entregas.filter(e => e.id === id).map(e => ({ id: e.id, status: e.status }))],
+    [/^SELECT COUNT\(\*\) AS n FROM web_entrega_anexos/, (sql, [entrega_id, criado_por]) =>
+      [{ n: String(estado.anexos.filter(a => a.entrega_id === entrega_id && a.criado_por === criado_por && a.evento_id == null).length) }]],
+    [/^INSERT INTO web_entrega_anexos \(entrega_id, tipo, mime, dados, criado_por, criado_em\)/, (sql, [entrega_id, tipo, mime, dados, criado_por, criado_em]) => {
+      const id = estado.anexos.length + 1;
+      estado.anexos.push({ id, entrega_id, evento_id: null, tipo, mime, dados, criado_por, criado_em });
+      return { affectedRows: 1, insertId: id };
+    }],
+    // anexos que o usuário pode vincular: da entrega, dele e ainda soltos
+    [/^SELECT id FROM web_entrega_anexos WHERE entrega_id = \? AND criado_por = \? AND evento_id IS NULL AND id IN/, (sql, [entrega_id, criado_por, ...ids]) =>
+      estado.anexos.filter(a => a.entrega_id === entrega_id && a.criado_por === criado_por && a.evento_id == null && ids.includes(a.id)).map(a => ({ id: a.id }))],
+    [/^UPDATE web_entrega_anexos SET evento_id = \? WHERE id IN/, (sql, [evento_id, ...ids]) => {
+      const alvo = estado.anexos.filter(a => ids.includes(a.id)); alvo.forEach(a => { a.evento_id = evento_id; });
+      return { affectedRows: alvo.length };
+    }],
+    [/^UPDATE ped_orc SET SITUACAO = \? WHERE NUMERO = \? AND TIPO = 'Pedido'$/, (sql, [situacao, numero]) => {
+      const p = pedidos.find(x => x.NUMERO === numero && x.TIPO === 'Pedido'); if (!p) return { affectedRows: 0 };
+      p.SITUACAO = situacao; return { affectedRows: 1 };
+    }],
+    [/^SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = \? AND evento_id IS NOT NULL/, (sql, [id]) =>
+      estado.anexos.filter(a => a.entrega_id === id && a.evento_id != null).map(({ id: i, tipo, mime, criado_em }) => ({ id: i, tipo, mime, criado_em }))],
+    [/^SELECT mime, dados FROM web_entrega_anexos WHERE id = \? AND entrega_id = \?/, (sql, [id, entrega_id]) =>
+      estado.anexos.filter(a => a.id === id && a.entrega_id === entrega_id).map(a => ({ mime: a.mime, dados: a.dados }))]
   ];
   const f = criarPoolFalso(regras);
   // como no MySQL: ROLLBACK desfaz o que a transação mudou (BEGIN tira uma foto do estado; ROLLBACK volta a ela)
@@ -188,7 +213,7 @@ async function prepararEntregas(t, { perfil = 'Programador', usuario = { codigo:
   t.after(s.fechar);
   const chamar = (caminho, metodo = 'GET', corpo, cabecalhos = {}) => fetch(s.url + caminho, {
     method: metodo, headers: { Authorization: 'Bearer ' + token(usuario.codigo, usuario.nome), 'Content-Type': 'application/json', ...cabecalhos },
-    body: corpo === undefined ? undefined : (typeof corpo === 'string' ? corpo : JSON.stringify(corpo)) });
+    body: corpo === undefined ? undefined : (typeof corpo === 'string' || Buffer.isBuffer(corpo) ? corpo : JSON.stringify(corpo)) });
   return { banco, chamar };
 }
 

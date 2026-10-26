@@ -3,8 +3,9 @@
 // Só da web: tudo fica em web_entregas / web_entrega_eventos / web_entrega_anexos;
 // ped_orc e cadastro_clientes são apenas lidos.
 // ==========================================================================
+const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
-const { STATUS, TIPOS, proximo } = require('../calculo/entregas');
+const { STATUS, TIPOS, proximo, pedidoPara, validarAnexo } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
@@ -21,6 +22,58 @@ const CAMPOS_TEXTO = [['contatoLocal', 'contato_local', 190], ['observacao', 'ob
   ['rastreio', 'rastreio', 120]];
 const OCORRENCIAS = ['ausente', 'endereco_errado', 'recusa', 'parcial']; // tipos de evento que contam como ocorrência
 const MOTIVO_SAIU_DE_PRONTO = 'Pedido saiu de Pronto';
+const TIPOS_ANEXO = ['foto', 'assinatura'];
+const MAX_ANEXOS_PENDENTES = 10; // por entrega e por usuário (anexos enviados e ainda não vinculados a uma baixa)
+const MAX_ANEXOS_POR_BAIXA = 3;
+const ANEXO_INVALIDO = 'Anexo inválido.';
+
+// Guarda uma foto/assinatura solta (evento_id NULL) da entrega `entrega` (id); a baixa a vincula depois (vincularAnexos).
+// `usuario` = código numérico de quem enviou (req.user.id): vira `criado_por` e é conferido na baixa.
+// Lança ErroUsuario (400/409). Reutilizada pelas rotas da equipe e do motorista.
+async function guardarAnexo(pool, entrega, tipo, corpo, mime, usuario) {
+  if (!TIPOS_ANEXO.includes(tipo)) throw new ErroUsuario(400, 'Tipo de anexo inválido: use foto ou assinatura.');
+  const v = validarAnexo(corpo, mime);
+  if (!v.ok) throw new ErroUsuario(400, v.motivo);
+  const criadoPor = String(usuario);
+  const [[c]] = await pool.execute(
+    'SELECT COUNT(*) AS n FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL', [entrega, criadoPor]);
+  if (Number(c?.n) >= MAX_ANEXOS_PENDENTES) throw new ErroUsuario(409, `Já há ${MAX_ANEXOS_PENDENTES} anexos aguardando baixa nesta entrega. Conclua a baixa antes de enviar mais.`);
+  const [ins] = await pool.execute(
+    'INSERT INTO web_entrega_anexos (entrega_id, tipo, mime, dados, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
+    [entrega, tipo, mime, corpo, criadoPor, agoraLocal()]);
+  return { anexoId: ins.insertId };
+}
+
+// Lista de ids do corpo: inteiros positivos, sem repetição, no máximo 3. Lança ErroUsuario 400 (mensagem genérica).
+function lerAnexoIds(v, { minimo = 0 } = {}) {
+  const ids = v === undefined || v === null ? [] : v;
+  if (!Array.isArray(ids) || ids.length > MAX_ANEXOS_POR_BAIXA || ids.some(i => !Number.isInteger(i) || i <= 0) || new Set(ids).size !== ids.length) {
+    throw new ErroUsuario(400, ANEXO_INVALIDO);
+  }
+  if (ids.length < minimo) throw new ErroUsuario(400, 'Anexe ao menos uma foto ou assinatura do comprovante.');
+  return ids;
+}
+
+// Vincula os anexos ao evento, dentro da transação da baixa. Só vale anexo da mesma entrega, enviado por quem dá a baixa
+// e ainda solto; qualquer violação lança 400 genérico (sem dizer qual) e a transação inteira é desfeita.
+async function vincularAnexos(conn, entregaId, eventoId, ids, usuario) {
+  if (!ids.length) return;
+  const marcas = ids.map(() => '?').join(', ');
+  const [ok] = await conn.execute(
+    `SELECT id FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL AND id IN (${marcas})`,
+    [entregaId, String(usuario), ...ids]);
+  if (ok.length !== ids.length) throw new ErroUsuario(400, ANEXO_INVALIDO);
+  await conn.execute(`UPDATE web_entrega_anexos SET evento_id = ? WHERE id IN (${marcas})`, [eventoId, ...ids]);
+}
+
+// body-parser dentro da rota: estouro de tamanho vira 413 em português (e não a página de erro padrão)
+const rawImagem = express.raw({ type: ['image/jpeg', 'image/png'], limit: '1mb' });
+const lerImagem = (req, res, next) => rawImagem(req, res, err => {
+  if (!err) return next();
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Arquivo muito grande (máximo 1 MB).' });
+  if (err.status && err.status < 500) return res.status(400).json({ error: 'Arquivo inválido.' });
+  next(err);
+});
 
 // Mantém a fila A programar em dia com os pedidos do VB, de forma idempotente:
 //  - todo pedido Pronto sem registro ganha um (UNIQUE(numero) + INSERT IGNORE: duas varreduras simultâneas não duplicam);
@@ -204,11 +257,14 @@ function registrarEntregas({ rota, pool }) {
       const [eventos] = await pool.execute(
         'SELECT id, quando, usuario, tipo, motivo, entregue_a, detalhe FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]);
       const itens = await itensDoPedido(pool, r.numero);
+      const [anexos] = await pool.execute(
+        'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND evento_id IS NOT NULL ORDER BY id', [id]);
       res.json({
         entrega: { ...paraEntrega(r), cliente: r.cliente || '', dataPrometida: dia(r.prometida) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
         itens,
+        anexos: anexos.map(a => ({ id: a.id, tipo: a.tipo, mime: a.mime, criadoEm: a.criado_em })), // só metadados; o binário vem de /anexo/:anexoId
         clienteEndereco: { rua: r.cli_endereco || '', numero: r.cli_numero || '', bairro: r.cli_bairro || '', cidade: r.cli_cidade || '',
           uf: r.cli_estado || '', cep: r.cli_cep || '', telefone: r.cli_telefone || '' }
       });
@@ -217,7 +273,8 @@ function registrarEntregas({ rota, pool }) {
 
   // Grava uma mudança na entrega: trava a linha, confere visibilidade (estados) e status, atualiza, e registra
   // evento no histórico + auditoria, tudo na mesma transação. `acao` = nome em proximo(); null = sem mudar o status.
-  // `montar(conn, atual)` devolve { cols, motivo?, detalhe? } (ou lança ErroUsuario).
+  // `montar(conn, atual)` devolve { cols, motivo?, detalhe?, entregueA?, depois? } (ou lança ErroUsuario);
+  // `depois(conn, { eventoId, status })` roda na mesma transação, logo após o evento (vínculo de anexos, baixa no pedido).
   async function gravar(req, res, nomeRota, acao, evento, montar) {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
@@ -239,14 +296,15 @@ function registrarEntregas({ rota, pool }) {
       } else if (FINAIS.includes(atual.status)) {
         throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e o endereço não pode mais ser alterado.`);
       }
-      const { cols, motivo = null, detalhe = null } = await montar(conn, atual);
+      const { cols, motivo = null, detalhe = null, entregueA = null, depois = null } = await montar(conn, atual);
       const agora = agoraLocal();
       const novo = { ...cols, status, atualizado_em: agora };
       const chaves = Object.keys(novo);
       await conn.execute(`UPDATE web_entregas SET ${chaves.map(k => `${k} = ?`).join(', ')} WHERE id = ?`, [...chaves.map(k => novo[k]), id]);
       const json = detalhe ? JSON.stringify(detalhe) : null;
-      await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo, detalhe) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, agora, req.acesso.nome, tipoEvento, motivo, json]);
+      const [ev] = await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, agora, req.acesso.nome, tipoEvento, motivo, json, entregueA]);
+      if (depois) await depois(conn, { eventoId: ev.insertId, status });
       await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
         [agora, req.acesso.nome, `entrega_${tipoEvento}`, String(atual.numero), JSON.stringify({ entregaId: id, ...(motivo ? { motivo } : {}), ...(detalhe || {}) })]);
       return paraEntrega({ ...atual, ...novo });
@@ -288,6 +346,91 @@ function registrarEntregas({ rota, pool }) {
     const cols = lerOu400(res, () => ({ ...colunasEndereco(b), ...(Object.hasOwn(b, 'contatoLocal') ? { contato_local: txt(b.contatoLocal, 190) || null } : {}) }));
     if (cols) await gravar(req, res, 'PUT /entregas/:id/endereco', null, 'endereco', async () => ({ cols, detalhe: { endereco: cols } }));
   });
+
+  // ---- anexos (foto/assinatura) ----
+  // linha mínima da entrega se o usuário pode vê-la (filtro de estados), senão null
+  async function entregaVisivel(req, id) {
+    const [[e]] = await pool.execute('SELECT id, status FROM web_entregas WHERE id = ?', [id]);
+    if (!e) return null;
+    const est = filtroEstados(req, 'c.ESTADO');
+    if (est.sql) {
+      const [ok] = await pool.execute(
+        `SELECT 1 AS ok FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+         JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE e.id = ? AND ${est.sql}`, [id, ...est.params]);
+      if (!ok.length) return null;
+    }
+    return e;
+  }
+
+  rota('put', '/entregas/:id/anexo', PROGRAMAR, lerImagem, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    const tipo = String(req.query.tipo || '');
+    if (!TIPOS_ANEXO.includes(tipo)) return res.status(400).json({ error: 'Tipo de anexo inválido: use foto ou assinatura.' });
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
+    const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    try {
+      const e = await entregaVisivel(req, id);
+      if (!e) return nao_encontrada(res);
+      if (FINAIS.includes(e.status)) return res.status(409).json({ error: `Esta entrega está em '${ROTULO_STATUS[e.status]}' e não aceita mais anexos.` });
+      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, req.user.id));
+    } catch (err) {
+      if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
+      falha(res, 'PUT /entregas/:id/anexo', err);
+    }
+  });
+
+  rota('get', '/entregas/:id/anexo/:anexoId', VER, async (req, res) => {
+    const id = idDe(req);
+    if (id === null || !/^\d+$/.test(String(req.params.anexoId))) return nao_encontrada(res);
+    try {
+      if (!(await entregaVisivel(req, id))) return nao_encontrada(res);
+      const [[a]] = await pool.execute('SELECT mime, dados FROM web_entrega_anexos WHERE id = ? AND entrega_id = ?', [Number(req.params.anexoId), id]);
+      if (!a) return res.status(404).json({ error: 'Anexo não encontrado.' });
+      res.set('Content-Type', a.mime).set('Content-Disposition', 'inline').set('Cache-Control', 'no-store').send(a.dados);
+    } catch (err) { falha(res, 'GET /entregas/:id/anexo/:anexoId', err); }
+  });
+
+  // ---- baixa pela equipe ----
+  const lerEntregueA = (v, { obrigatorio }) => {
+    const t = String(v ?? '').trim();
+    if (obrigatorio && !t) throw bad('Informe quem recebeu.');
+    if (t.length > 190) throw bad('Nome de quem recebeu muito longo (máximo 190 caracteres).');
+    return t || null;
+  };
+
+  // evento + vínculo dos anexos + SITUACAO do pedido, tudo dentro da transação de gravar()
+  const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, usuario }) => async (conn, atual) => ({
+    cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}) },
+    depois: async (c, { eventoId, status }) => {
+      await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
+      const situacao = pedidoPara(status);
+      if (situacao) await c.execute("UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = 'Pedido'", [situacao, atual.numero]);
+    }
+  });
+
+  rota('post', '/entregas/:id/retirada', PROGRAMAR, async (req, res) => {
+    const b = req.body || {};
+    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds) }));
+    if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }));
+  });
+
+  rota('post', '/entregas/:id/enviada', PROGRAMAR, async (req, res) => {
+    const b = req.body || {};
+    const cols = lerOu400(res, () => {
+      const transportadora = String(b.transportadora ?? '').trim();
+      if (!transportadora || transportadora.length > 190) throw bad('Informe a transportadora (até 190 caracteres).');
+      return { transportadora, ...colunasTexto({ rastreio: b.rastreio ?? '', previsao: b.previsao ?? '' }) };
+    });
+    if (cols) await gravar(req, res, 'POST /entregas/:id/enviada', 'enviada', null,
+      baixa({ cols, detalhe: { transportadora: cols.transportadora, rastreio: cols.rastreio, previsao: cols.previsao ?? null }, usuario: req.user.id }));
+  });
+
+  rota('post', '/entregas/:id/comprovante', PROGRAMAR, async (req, res) => {
+    const b = req.body || {};
+    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }) }));
+    if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }));
+  });
 }
 
-module.exports = { registrarEntregas, sincronizarFila, itensDoPedido, motoristasValidos };
+module.exports = { registrarEntregas, sincronizarFila, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };
