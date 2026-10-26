@@ -245,7 +245,7 @@ function registrarEntregas({ rota, pool }) {
     if (status && !Object.values(STATUS).includes(status)) return res.status(400).json({ error: 'Status inválido.' });
     const busca = String(req.query.busca || '').trim().slice(0, 100);
 
-    if (!(await sincronizarFila(pool, res))) return;
+    try { await sincronizarFila(pool); } catch (err) { console.error('Erro sincronizarFila (a lista segue sem a varredura):', err.message); }
     try {
       const where = ["p.TIPO = 'Pedido'"], params = [];
       if (status) { where.push('e.status = ?'); params.push(status); }

@@ -202,3 +202,14 @@ test('F5: falha ao excluir o pedido desfaz tudo e preserva a entrega', async t =
   assert.equal(banco.pedOrc.length, 1);
   assert.equal(banco.auditoria.length, 0);
 });
+
+// ---- extra: GET /entregas devolve a lista mesmo se a varredura falhar (e registra o erro) ----
+test('extra: varredura com erro não derruba GET /entregas (200 + log)', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  cenario(banco);
+  banco.regras.unshift([/^INSERT IGNORE INTO web_entregas/, () => { throw new Error('falha forçada'); }]);
+  const r = await chamar('/entregas');
+  assert.equal(r.status, 200);
+  assert.deepEqual((await r.json()).entregas.map(e => e.numero), [501]);
+  assert.ok(console.error.mock.calls.some(c => String(c.arguments.join(' ')).includes('sincronizarFila')));
+});

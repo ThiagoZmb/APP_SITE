@@ -18,6 +18,29 @@ test('helpers compartilhados: esc, datas e escala de imagem continuam disponíve
   assert.equal(M.esc, C.esc);
 });
 
+test('F7: telefoneLimpo usa o primeiro número com 8+ dígitos (dois números não viram um só)', () => {
+  assert.equal(M.telefoneLimpo('(21) 2222-3333 / (21) 99999-8888'), '2122223333');
+  assert.equal(M.telefoneLimpo('2122223333; 21999998888'), '2122223333');
+  assert.equal(M.telefoneLimpo('2122223333, 21999998888'), '2122223333');
+  assert.equal(M.telefoneLimpo('2122223333 | 21999998888'), '2122223333');
+  assert.equal(M.telefoneLimpo('2122223333 e 21999998888'), '2122223333');
+  assert.equal(M.telefoneLimpo('123 / (21) 99999-8888'), '21999998888'); // primeiro trecho curto é ignorado
+  assert.equal(M.telefoneLimpo('+55 21 99999-8888 / 2122223333'), '+5521999998888');
+  assert.equal(M.telefoneLimpo('1234567 / 7654321'), '');
+  assert.equal(M.telefoneLimpo(''), '');
+  assert.equal(M.urlLigar('2122223333 / 21999998888'), 'tel:2122223333');
+});
+
+test('F7: cartão mostra SEMPRE o telefone bruto (escapado), com ou sem link de ligar', () => {
+  assert.ok(M.htmlTelefone('(21) 2222-3333 / (21) 99999-8888').includes('(21) 2222-3333 / (21) 99999-8888'));
+  assert.match(M.htmlTelefone('sem número'), /sem número/); // sem link, mas visível
+  assert.equal(M.htmlTelefone(''), '');
+  assert.equal(M.htmlTelefone(null), '');
+  assert.ok(!M.htmlTelefone('<img src=x onerror=1>').includes('<img'));
+  // o cartão usa o helper (ver htmlCartao)
+  assert.ok(ler('minhas_entregas.js').includes('htmlTelefone(e.telefone)'));
+});
+
 test('telefoneLimpo: só dígitos e + inicial', () => {
   assert.equal(M.telefoneLimpo('(21) 99999-8888'), '21999998888');
   assert.equal(M.telefoneLimpo('+55 21 99999-8888'), '+5521999998888');

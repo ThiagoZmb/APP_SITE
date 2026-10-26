@@ -32,12 +32,18 @@
   const corStatus = s => COR_STATUS[s] || 'neutro';
   const rotuloResultado = id => (RESULTADOS.find(r => r.id === id) || {}).rotulo || String(id ?? '');
 
-  // só dígitos e um + no início (o valor vai para href="tel:"; nada além disso passa); menos de 8 dígitos não é telefone
+  // O cadastro pode trazer mais de um número ("2222-3333 / 99999-8888"): separa por / ; , | ou " e " e usa o primeiro trecho com 8+ dígitos.
+  // Só dígitos e um + no início (o valor vai para href="tel:"; nada além disso passa); menos de 8 dígitos não é telefone.
   function telefoneLimpo(t) {
-    const s = String(t ?? '').trim();
-    const digitos = s.replace(/\D/g, '');
-    return digitos.length >= 8 ? (s.startsWith('+') ? '+' : '') + digitos : '';
+    for (const trecho of String(t ?? '').split(/[\/;,|]| e /)) {
+      const s = trecho.trim();
+      const digitos = s.replace(/\D/g, '');
+      if (digitos.length >= 8) return (s.startsWith('+') ? '+' : '') + digitos;
+    }
+    return '';
   }
+  // texto bruto do telefone no cartão (escapado), sempre visível, mesmo sem link de ligar
+  const htmlTelefone = t => (txt(t) ? `<p class="telefone"><span class="cinza">Telefone:</span> ${esc(txt(t))}</p>` : '');
   const urlLigar = t => { const n = telefoneLimpo(t); return n ? 'tel:' + n : ''; };
 
   const parte = v => txt(v);
@@ -196,6 +202,7 @@
       return `<article class="cartao" data-id="${esc(e.id)}">
         <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}</strong>${selo(e.status)}</div>
         <h3>${esc(e.cliente)}</h3>
+        ${htmlTelefone(e.telefone)}
         ${enderecoHtml}
         ${e.contatoLocal ? `<p><span class="cinza">Contato no local:</span> ${esc(e.contatoLocal)}</p>` : ''}
         ${links ? `<div class="acoes">${links}</div>` : ''}
@@ -459,6 +466,6 @@
     carregar();
   }
 
-  return { esc, RESULTADOS, rotuloStatus, corStatus, rotuloResultado, telefoneLimpo, urlLigar, enderecoTexto, enderecoDe, urlMapa, acoesMotorista,
+  return { esc, RESULTADOS, rotuloStatus, corStatus, rotuloResultado, telefoneLimpo, htmlTelefone, urlLigar, enderecoTexto, enderecoDe, urlMapa, acoesMotorista,
     motivoOcorrencia, hojeISO, deslocarDia, agruparCartoes, maxInteiro, validarBaixa, corpoBaixa, corpoOcorrencia, iniciar };
 });
