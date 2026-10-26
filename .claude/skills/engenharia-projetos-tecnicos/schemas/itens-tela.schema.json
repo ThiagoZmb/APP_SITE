@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elegance.local/schemas/engenharia-projetos-tecnicos/itens-tela/1.0.0",
+  "title": "Itens montados para a tela de orçamento/pedido 1.0.0",
+  "description": "Saída de scripts/montar-itens.mjs. O formato interno de cada \"item\" é definido pelo mapa do domínio (config/regras-por-dominio); este schema só garante o envelope, o rastreio e as pendências.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["versao", "dominio", "origem", "prontoParaLancar", "itens", "pendenciasDocumento"],
+  "properties": {
+    "versao": { "const": "1.0.0" },
+    "dominio": { "type": "string", "minLength": 1 },
+    "origem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arquivo"],
+      "properties": { "arquivo": { "type": "string", "minLength": 1 } }
+    },
+    "prontoParaLancar": { "type": "boolean" },
+    "itens": { "type": "array", "items": { "$ref": "#/definitions/ItemMontado" } },
+    "pendenciasDocumento": { "type": "array", "items": { "$ref": "#/definitions/PendenciaDocumento" } }
+  },
+  "definitions": {
+    "ItemMontado": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["idItem", "item", "prontoParaLancar", "rastreio", "sugestoes", "pendencias"],
+      "properties": {
+        "idItem": { "type": "string", "minLength": 1 },
+        "item": { "type": "object" },
+        "prontoParaLancar": { "type": "boolean" },
+        "rastreio": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+        "sugestoes": { "type": "array", "items": { "$ref": "#/definitions/Sugestao" } },
+        "pendencias": { "type": "array", "items": { "$ref": "#/definitions/PendenciaItem" } }
+      }
+    },
+    "Sugestao": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destino", "valor", "confianca", "idValor", "origem"],
+      "properties": {
+        "destino": { "type": "string", "minLength": 1 },
+        "valor": {
+          "anyOf": [
+            { "type": "number" },
+            { "type": "string" },
+            { "type": "array", "items": { "type": ["number", "string"] } },
+            { "type": "null" }
+          ]
+        },
+        "confianca": { "type": "number", "minimum": 0, "maximum": 1 },
+        "idValor": { "type": "string", "minLength": 1 },
+        "origem": {
+          "type": "object",
+          "required": ["arquivo", "pagina", "trecho"],
+          "properties": {
+            "arquivo": { "type": ["string", "null"] },
+            "pagina": { "type": ["integer", "null"], "minimum": 1 },
+            "trecho": { "type": "string" }
+          }
+        }
+      }
+    },
+    "PendenciaItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tipo", "destino", "mensagem", "bloqueante", "refs"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tipo": {
+          "type": "string",
+          "enum": ["obrigatorio_ausente", "conflitante", "inferido", "traducao_sem_correspondencia", "valor_invalido"]
+        },
+        "destino": { "type": "string", "minLength": 1 },
+        "mensagem": { "type": "string", "minLength": 1 },
+        "bloqueante": { "type": "boolean" },
+        "refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "PendenciaDocumento": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tipo", "mensagem", "refs"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tipo": { "type": "string", "enum": ["divergencia", "unidade_ambigua", "texto_suspeito", "dominio_divergente"] },
+        "mensagem": { "type": "string", "minLength": 1 },
+        "refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "pagina": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "versao": "1.0.0",
+  "dominio": "portas-aluminio",
+  "origem": {
+    "arquivo": "projeto-portas-sintetico.pdf"
+  },
+  "prontoParaLancar": true,
+  "itens": [
+    {
+      "idItem": "P1",
+      "item": {
+        "furos": {
+          "lista": [],
+          "lados": [],
+          "referenciaInvertida": false
+        },
+        "detalhes": {
+          "perfil": "PERFIL EXEMPLO 25",
+          "acabamento": "Anodizado",
+          "cor": "Fosco",
+          "puxador": "PUXADOR EXEMPLO",
+          "tipoPuxador": "Sobreposto",
+          "acabPux": "Anodizado",
+          "corPux": "Fosco",
+          "tamanhoPux": 800,
+          "posicoesFolhas": [
+            "Lateral Direita Centro",
+            "Lateral Esquerda Centro"
+          ],
+          "revestimento": "VIDRO EXEMPLO",
+          "corRevest": "Incolor",
+          "sistema": "SISTEMA EXEMPLO 2 FOLHAS",
+          "transpasse": 50
+        },
+        "acessorios": [],
+        "obs": "Conferir medida no local",
+        "frente": "Porta de Correr",
+        "qtd": 2,
+        "altura": 2100,
+        "largura": 3000
+      },
+      "prontoParaLancar": true,
+      "rastreio": {
+        "frente": "P1",
+        "qtd": "P1.qtd",
+        "altura": "P1.altura",
+        "largura": "P1.largura",
+        "detalhes.perfil": "P1.perfil",
+        "detalhes.acabamento": "P1.acabPerfil",
+        "detalhes.cor": "P1.corPerfil",
+        "detalhes.puxador": "P1.puxador",
+        "detalhes.tipoPuxador": "P1.tipoPuxador",
+        "detalhes.acabPux": "P1.acabPux",
+        "detalhes.corPux": "P1.corPux",
+        "detalhes.tamanhoPux": "P1.tamPux",
+        "detalhes.posicoesFolhas": "P1.posPux",
+        "detalhes.revestimento": "P1.revest",
+        "detalhes.corRevest": "P1.corRevest",
+        "detalhes.sistema": "P1.sistema",
+        "detalhes.transpasse": "P1.transp",
+        "obs": "P1.obs"
+      },
+      "sugestoes": [],
+      "pendencias": []
+    },
+    {
+      "idItem": "P2",
+      "item": {
+        "furos": {
+          "lista": [
+            100,
+            1000,
+            100
+          ],
+          "lados": [
+            "Esquerdo"
+          ],
+          "referenciaInvertida": false
+        },
+        "detalhes": {
+          "perfil": "PERFIL EXEMPLO 25",
+          "acabamento": "Anodizado",
+          "cor": "Fosco",
+          "revestimento": "VIDRO EXEMPLO"
+        },
+        "acessorios": [],
+        "obs": "",
+        "frente": "Porta de giro",
+        "qtd": 1,
+        "altura": 2100,
+        "largura": 900
+      },
+      "prontoParaLancar": true,
+      "rastreio": {
+        "frente": "P2",
+        "qtd": "P2.qtd",
+        "altura": "P2.altura",
+        "largura": "P2.largura",
+        "detalhes.perfil": "P2.perfil",
+        "detalhes.acabamento": "P2.acabPerfil",
+        "detalhes.cor": "P2.corPerfil",
+        "detalhes.revestimento": "P2.revest",
+        "furos.lista": "P2.furos",
+        "furos.lados": "P2.lados"
+      },
+      "sugestoes": [
+        {
+          "destino": "detalhes.corRevest",
+          "valor": "Incolor",
+          "confianca": 0.6,
+          "idValor": "P2.corRevest",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 4,
+            "trecho": "cor do vidro lida na legenda, borrada"
+          }
+        }
+      ],
+      "pendencias": [
+        {
+          "id": "pend-P2-detalhes.corRevest",
+          "tipo": "inferido",
+          "destino": "detalhes.corRevest",
+          "mensagem": "Campo \"detalhes.corRevest\" (origem atributos.corRevestimento) só tem valor inferido (P2.corRevest); não foi usado, confirme-o se for necessário.",
+          "bloqueante": false,
+          "refs": [
+            "P2.corRevest"
+          ]
+        }
+      ]
+    }
+  ],
+  "pendenciasDocumento": []
+}
