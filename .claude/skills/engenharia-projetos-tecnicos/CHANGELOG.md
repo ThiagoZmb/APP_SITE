@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.1 — 2026-10-26
+
+Correção do núcleo achada ao ler uma amostra real, mais decisões do usuário.
+
+Motivo da correção: a regra 2 ("inferido nunca vira confirmado sozinho") era violada. O campo de origem `tipo` do item virava **sempre** valor `confirmado` com confiança 1, mas o tipo de frente (giro, basculante, gaveta, correr) normalmente é **deduzido do desenho** (leitura visual) e precisa poder ser `inferido`. Achado ao usar a skill numa amostra real.
+
+Mudanças:
+
+- `portas-aluminio`: o destino `frente` passa a ter origem `atributos.tipoFrente` (ValorRastreavel, mesma tabela de tradução). Tipo de frente `inferido` vira sugestão + pendência bloqueante e só entra em `frente` depois de `confirmar-valores --ids`. O `rastreio.frente` agora aponta o id do valor (`P1.tipoFrente`), não o do item.
+- `item.tipo` passa a ser só a **categoria** do item (`porta_aluminio` nas portas; continua usado por `foraDoEscopo`). O mapa ganha `categorias` (opcional): categoria fora dela e fora de `foraDoEscopo.tipos` vira pendência bloqueante `traducao_sem_correspondencia` com destino `tipo` (nunca adivinha, como antes).
+- A origem `tipo` continua disponível no núcleo (usada pelo domínio de teste `guarda-corpo-teste` para a categoria), mas está documentada como **sempre confirmada**: não usar para nada deduzido do desenho.
+- Fixtures, golden (só o `rastreio.frente` mudou), testes, `esquadrias-aluminio.md` e `leitura-pdf.md` atualizados. Testes de regressão: tipoFrente inferido não entra e bloqueia; depois de confirmar entra.
+- Atenção: projetos já estruturados com o tipo de frente em `item.tipo` precisam migrar para `atributos.tipoFrente` e `tipo: "porta_aluminio"`.
+
+Decisões do usuário (2026-10-26), aprovadas por: usuário do sistema.
+
+- **Perda de serra (kerf) = 3 mm** em `config/barras-comerciais.json` (`kerfMm: 3`). `sobraMinimaMm` continua `null`, pendente. Ainda não usado por nenhum script (plano de corte é Fase 2).
+- **Governança**: quem aprova as regras é qualquer pessoa que esteja usando o sistema. O `responsavel` dos metadados guarda o nome de quem aprovou; sem nome registrado usa-se `"usuário do sistema"` (status `aprovado`). Política no README ("Governança das regras").
+- Metadados passam a `responsavel: "usuário do sistema"`, `status: "aprovado"` para o que o usuário decidiu: barra de 6000 mm (D5) e kerf de 3 mm. Registradas como aprovadas as decisões já tomadas: D3 (a skill não aplica descontos de fabricação), D4 (saída no formato do item da tela), D5, D6 (amostras fora do git), cota em cm inferida pela convenção, golden de amostras reais fora do git e a lista de produtos que a Elegance fabrica (portas; estantes/louceiros em perfil; estruturas de aço), todas já descritas nas versões 0.2.0 e 0.3.0 abaixo.
+- **Continua pendente**: `config/nucleo.json` (tolerância de soma de cotas 0 mm; o usuário não decidiu) e o mapa `portas-aluminio` (responsável não registrado).
+
 ## 0.3.0 — 2026-10-26
 
 Fase 1c: leitura de PDF com poppler, confirmação humana registrada e itens fora do escopo.

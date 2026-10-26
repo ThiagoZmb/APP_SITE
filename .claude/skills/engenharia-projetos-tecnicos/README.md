@@ -95,6 +95,10 @@ Como aprovar e gerar um golden:
 
 `config/nucleo.json` guarda os parâmetros editáveis, cada um com metadados (`versao`, `data`, `responsavel`, `motivo`). `tolerancias.somaCotasMm` é 0 e o `responsavel` está pendente de aprovação. Ao mudar um parâmetro, atualize os metadados e o `CHANGELOG.md`.
 
+### Governança das regras
+
+Decisão do usuário (2026-10-26): **quem aprova as regras é qualquer pessoa que esteja usando o sistema**; não há um responsável técnico único. Na prática: o campo `responsavel` dos metadados guarda **o nome de quem aprovou** cada mudança; quando a decisão veio do usuário do sistema sem nome registrado, usa-se `"usuário do sistema"` com `status: "aprovado"`. Nunca invente um nome. Parâmetro que ninguém decidiu continua com `responsavel: null` e status "pendente" (hoje: `config/nucleo.json` com tolerância de soma de 0 mm, o mapa `portas-aluminio` e `barraComercial.sobraMinimaMm`). Toda mudança de regra atualiza os metadados e o `CHANGELOG.md`.
+
 ## Adicionar um domínio
 
 O núcleo não conhece "porta": `itens[].dimensoes` e `atributos` são mapas livres, e `scripts/lib/mapear.mjs` só interpreta um **mapa declarativo em JSON**. Um domínio novo não muda nenhum código do núcleo:

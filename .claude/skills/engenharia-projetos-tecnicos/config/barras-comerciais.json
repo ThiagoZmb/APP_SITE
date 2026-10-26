@@ -1,23 +1,23 @@
 {
   "barraComercial": {
     "comprimentoMm": 6000,
-    "kerfMm": null,
+    "kerfMm": 3,
     "sobraMinimaMm": null
   },
   "metadados": {
     "barraComercial.comprimentoMm": {
-      "versao": "0.2.0",
+      "versao": "0.3.1",
       "data": "2026-10-26",
-      "responsavel": null,
-      "status": "decidido pelo usuário (D5); responsável pendente de registro",
+      "responsavel": "usuário do sistema",
+      "status": "aprovado",
       "motivo": "Barra comercial de 6000 mm decidida em 2026-10-26 para uso na Fase 2 (plano de corte). Ainda não usada por nenhum script."
     },
     "barraComercial.kerfMm": {
-      "versao": "0.2.0",
+      "versao": "0.3.1",
       "data": "2026-10-26",
-      "responsavel": null,
-      "status": "pendente de definição",
-      "motivo": "Espessura do corte (kerf) não informada; null até alguém definir. Não assumir valor típico."
+      "responsavel": "usuário do sistema",
+      "status": "aprovado",
+      "motivo": "Perda de serra (kerf) de 3 mm, decisão do usuário em 2026-10-26. Para uso na Fase 2 (plano de corte); ainda não usada por nenhum script."
     },
     "barraComercial.sobraMinimaMm": {
       "versao": "0.2.0",

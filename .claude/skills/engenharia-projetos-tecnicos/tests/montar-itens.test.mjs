@@ -161,18 +161,22 @@ test('consumo pela web: correr com sistema leva o VÃO; é a web que desconta (e
   assert.equal(folhas[1].posicaoPuxador, 'Lateral Esquerda Centro');
 });
 
-test('config/barras-comerciais.json: 6000 mm decidido; kerf e sobra mínima pendentes (null) e marcados', () => {
+test('config/barras-comerciais.json: 6000 mm e kerf 3 mm aprovados pelo usuário; sobra mínima pendente (null) e marcada', () => {
   const cfg = JSON.parse(readFileSync(caminho('config/barras-comerciais.json'), 'utf8'));
   assert.equal(cfg.barraComercial.comprimentoMm, 6000);
-  assert.equal(cfg.barraComercial.kerfMm, null);
+  assert.equal(cfg.barraComercial.kerfMm, 3);
   assert.equal(cfg.barraComercial.sobraMinimaMm, null);
   for (const chave of ['comprimentoMm', 'kerfMm', 'sobraMinimaMm']) {
     const m = cfg.metadados[`barraComercial.${chave}`];
     assert.ok(m, chave);
     assert.deepEqual(Object.keys(m).sort(), ['data', 'motivo', 'responsavel', 'status', 'versao']);
-    assert.equal(m.responsavel, null);
   }
-  assert.match(cfg.metadados['barraComercial.kerfMm'].status, /pendente/);
+  for (const chave of ['comprimentoMm', 'kerfMm']) {
+    const m = cfg.metadados[`barraComercial.${chave}`];
+    assert.equal(m.responsavel, 'usuário do sistema');
+    assert.equal(m.status, 'aprovado');
+  }
+  assert.equal(cfg.metadados['barraComercial.sobraMinimaMm'].responsavel, null);
   assert.match(cfg.metadados['barraComercial.sobraMinimaMm'].status, /pendente/);
 });
 
