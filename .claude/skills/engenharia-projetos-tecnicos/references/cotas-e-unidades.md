@@ -42,7 +42,7 @@ O valor de uma cota vinda de unidade inferida deve virar `ValorRastreavel` com `
 
 `scripts/lib/cruzada.mjs`:
 
-- `verificarSoma(cota, { toleranciaMm })`: compara a soma das `parciais` com o `total`. Se `|soma - total| > tolerância`, gera pendência `divergencia` com as páginas de origem (`paginas`). Padrão da tolerância: **0 mm** (`config/nucleo.json`, `tolerancias.somaCotasMm`), até um responsável aprovar outro valor. Diferenças abaixo de 1e-9 mm são ruído de ponto flutuante, não tolerância.
+- `verificarSoma(cota, { toleranciaMm })`: compara a soma das `parciais` com o `total`. Se `|soma - total| > tolerância`, gera pendência `divergencia` com as páginas de origem (`paginas`). Padrão da tolerância: **0 mm** (`config/nucleo.json`, `tolerancias.somaCotasMm`), valor aprovado pelo usuário em 2026-10-26. Diferenças abaixo de 1e-9 mm são ruído de ponto flutuante, não tolerância.
 - `verificarContagem(contagem)`: `declarado` diferente de `contado` gera `divergencia`.
 - Se o total ou alguma parcial/contagem está `ausente` ou `conflitante`, **nunca se assume 0**: gera pendência dizendo que a verificação não pôde ser feita (tipo `ausente` ou `conflitante`).
 - `aplicarVerificacoes(doc, config)` devolve um documento novo com essas pendências acrescentadas (ids `pend-soma-<cota>` e `pend-contagem-<contagem>`), sem duplicar e sem alterar o original.

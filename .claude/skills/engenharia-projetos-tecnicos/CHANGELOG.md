@@ -1,5 +1,17 @@
 # Changelog
 
+## Não lançado — 2026-10-26 (só documentação)
+
+- A tela de orçamentos da web passa a importar a saída do `montar-itens.mjs` (botão "📥 Importar itens (JSON)", `importar_itens.js` na raiz do repositório). Documentado em `references/esquadrias-aluminio.md` ("Importar na tela de orçamentos") e no README. Nenhum script, schema ou mapa da skill mudou.
+
+## 0.3.3 — 2026-10-26
+
+Decisões do usuário (2026-10-26), aprovadas por: usuário do sistema.
+
+- **Tolerância da soma de cotas = 0 mm** (exata), agora aprovada em `config/nucleo.json` (antes pendente). Nenhuma mudança de comportamento.
+- **Sobra mínima de barra = 300 mm** em `config/barras-comerciais.json` (`sobraMinimaMm`, antes `null`): abaixo disso a sobra é refugo; a partir disso é retalho reaproveitável. Ainda não usada por nenhum script (plano de corte é Fase 2).
+- README e SKILL.md atualizados para a versão 0.3.3. Continua pendente apenas o responsável pelo mapa `portas-aluminio`.
+
 ## 0.3.2 — 2026-10-26
 
 `confirmar-valores --rejeitar`.

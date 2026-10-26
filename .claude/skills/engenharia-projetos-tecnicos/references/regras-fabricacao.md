@@ -30,4 +30,4 @@ Decisão D3 do usuário (2026-10-26), opção (b): **a skill não aplica descont
 
 ## Plano de corte (Fase 2, ainda não implementado)
 
-Decisão D5: barra comercial de 6000 mm, registrada em `config/barras-comerciais.json`. Perda de serra (`kerfMm`) = 3 mm, decisão do usuário em 2026-10-26. `sobraMinimaMm` continua `null`, **pendente de definição**; ninguém deve assumir valor típico. Nenhum script lê esse arquivo ainda.
+Decisão D5: barra comercial de 6000 mm, registrada em `config/barras-comerciais.json`. Perda de serra (`kerfMm`) = 3 mm, decisão do usuário em 2026-10-26. `sobraMinimaMm` = 300 mm (decisão do usuário em 2026-10-26: sobra abaixo disso é refugo, a partir disso é retalho reaproveitável). Nenhum script lê esse arquivo ainda.

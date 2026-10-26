@@ -1,6 +1,6 @@
 # engenharia-projetos-tecnicos
 
-Agent Skill do Claude que lê projetos técnicos em PDF (esquadrias de alumínio, portas, serralheria) e produz dados estruturados **rastreáveis**. Versão 0.3.0: preparo do PDF com poppler (inventário, texto, renderização e recortes), núcleo comum (contrato, validação, unidades, verificação cruzada, segurança, relatório), confirmação humana registrada e montagem de itens de portas de alumínio no formato da tela de orçamentos/pedidos. Plano de corte ainda não existe. Veja `SKILL.md`.
+Agent Skill do Claude que lê projetos técnicos em PDF (esquadrias de alumínio, portas, serralheria) e produz dados estruturados **rastreáveis**. Versão 0.3.3: preparo do PDF com poppler (inventário, texto, renderização e recortes), núcleo comum (contrato, validação, unidades, verificação cruzada, segurança, relatório), confirmação humana registrada e montagem de itens de portas de alumínio no formato da tela de orçamentos/pedidos. Plano de corte ainda não existe. Veja `SKILL.md`.
 
 ## Instalar
 
@@ -54,6 +54,10 @@ Origem padrão dos projetos em PDF: `C:\Programa Elegance\Projetos_PDF\`. A skil
 
 Se o documento for inválido, `gerar-relatorio` e `montar-itens` saem com 1 e não geram nada. Divergências de soma de cotas e de contagens viram pendências automaticamente.
 
+## Importar na tela de orçamentos
+
+O arquivo do `montar-itens.mjs` (`--saida itens.json`) é importado na web pelo botão **📥 Importar itens (JSON)** da etapa 3 de `orcamentos.html` (precisa de cliente escolhido e documento editável). A tela confere o arquivo, mostra quais itens entram e quais ficam de fora (com o motivo), lista os valores inferidos que não entram e só acrescenta os itens depois da confirmação. O preço é calculado pelo mesmo motor da tela (`/calcular_preco`) e o servidor refaz tudo ao salvar. Detalhes em `references/esquadrias-aluminio.md` ("Importar na tela de orçamentos").
+
 Como biblioteca (ESM): `scripts/lib/valor.mjs` (construtores), `validacao.mjs`, `unidades.mjs`, `cruzada.mjs`, `seguranca.mjs`, `relatorio.mjs`, `mapear.mjs` (`mapearItens`, `montarSaida`, `validarMapa`), `pdf.mjs` (classificação e recorte, funções puras), `poppler.mjs` (localização e execução sem shell) e `confirmacao.mjs` (`aplicarConfirmacoes`).
 
 ## Rodar os testes
@@ -95,11 +99,11 @@ Como aprovar e gerar um golden:
 
 ## Configuração
 
-`config/nucleo.json` guarda os parâmetros editáveis, cada um com metadados (`versao`, `data`, `responsavel`, `motivo`). `tolerancias.somaCotasMm` é 0 e o `responsavel` está pendente de aprovação. Ao mudar um parâmetro, atualize os metadados e o `CHANGELOG.md`.
+`config/nucleo.json` guarda os parâmetros editáveis, cada um com metadados (`versao`, `data`, `responsavel`, `motivo`). `tolerancias.somaCotasMm` é 0 mm (aprovado pelo usuário em 2026-10-26). Ao mudar um parâmetro, atualize os metadados e o `CHANGELOG.md`.
 
 ### Governança das regras
 
-Decisão do usuário (2026-10-26): **quem aprova as regras é qualquer pessoa que esteja usando o sistema**; não há um responsável técnico único. Na prática: o campo `responsavel` dos metadados guarda **o nome de quem aprovou** cada mudança; quando a decisão veio do usuário do sistema sem nome registrado, usa-se `"usuário do sistema"` com `status: "aprovado"`. Nunca invente um nome. Parâmetro que ninguém decidiu continua com `responsavel: null` e status "pendente" (hoje: `config/nucleo.json` com tolerância de soma de 0 mm, o mapa `portas-aluminio` e `barraComercial.sobraMinimaMm`). Toda mudança de regra atualiza os metadados e o `CHANGELOG.md`.
+Decisão do usuário (2026-10-26): **quem aprova as regras é qualquer pessoa que esteja usando o sistema**; não há um responsável técnico único. Na prática: o campo `responsavel` dos metadados guarda **o nome de quem aprovou** cada mudança; quando a decisão veio do usuário do sistema sem nome registrado, usa-se `"usuário do sistema"` com `status: "aprovado"`. Nunca invente um nome. Parâmetro que ninguém decidiu continua com `responsavel: null` e status "pendente" (hoje: o mapa `portas-aluminio`). Toda mudança de regra atualiza os metadados e o `CHANGELOG.md`.
 
 ## Adicionar um domínio
 
