@@ -10,7 +10,7 @@ Os projetos chegam de escritórios de arquitetura (projeto executivo de marcenar
 
 | # | Família | Exemplos de legenda/chamada | `tipo` no projeto | Mapa para o item da tela |
 |---|---|---|---|---|
-| 1 | Portas de alumínio para móveis | `PORTAS EM PERFIL DE ALUMÍNIO COR INOX ESCOVADO + VIDRO PINTADO` | `porta_giro`, `porta_basculante`, `frente_gaveta`, `porta_correr` | **Sim** (este domínio, `portas-aluminio`) |
+| 1 | Portas de alumínio para móveis | `PORTAS EM PERFIL DE ALUMÍNIO COR INOX ESCOVADO + VIDRO PINTADO` | `porta_aluminio` (o tipo de frente `porta_giro`, `porta_basculante`, `frente_gaveta` ou `porta_correr` vai em `atributos.tipoFrente`) | **Sim** (este domínio, `portas-aluminio`) |
 | 2 | Estantes, louceiros e afins em perfil de alumínio | `PORTAS EM PERFIL 3136 E PUXADORES 2790`, `SISTEMA THIN1802`, `SISTEMA EVIDENCE` | `estante_perfil_aluminio`, `louceiro_perfil_aluminio`, `sistema_perfil_aluminio` | **Não** (fora do escopo atual) |
 | 3 | Estruturas metálicas em aço carbono (base de mesa, adega, nicho, suporte de prateleira) | `ESTRUTURA METÁLICA`, `METALON` | `estrutura_metalica_aco` | **Não** (fora do escopo atual) |
 
@@ -38,7 +38,7 @@ Frentes de porta aceitas: `Porta de giro`, `Porta basculante`, `Frente de gaveta
 
 | Campo do item | Tipo | Obrig. | Origem no projeto (`atributos.*` salvo indicação) | Citação |
 |---|---|---|---|---|
-| `frente` | texto (4 valores acima) | sim | `tipo` do item, por tabela de tradução | `orcamentos.html:1945`; `rotas/ped_orc.js:15,131-132`; `calculo/linhas_vb.js:208-210` |
+| `frente` | texto (4 valores acima) | sim | `tipoFrente` (ValorRastreavel; o `tipo` do item é só a categoria `porta_aluminio`), por tabela de tradução | `orcamentos.html:1945`; `rotas/ped_orc.js:15,131-132`; `calculo/linhas_vb.js:208-210` |
 | `qtd` | inteiro 1 a 500 | sim | `quantidade` | `orcamentos.html:1946`; `rotas/ped_orc.js:17,96-97` (`MAX_QTD_ITEM`); `calculo/engenharia.js:29` |
 | `altura` | número, mm | sim | `dimensoes.altura` | `orcamentos.html:1948`; `calculo/engenharia.js:30` |
 | `largura` | número, mm | sim | `dimensoes.largura` | `orcamentos.html:1949`; `calculo/engenharia.js:30` |
@@ -77,9 +77,9 @@ Quantidade em correr: `qtd` é o **número de folhas do conjunto** (`calculo/eng
 
 ## Traduções do mapa
 
-`tipo` do item no projeto-tecnico → `frente` (comparação sem diferença de maiúsculas e espaços; tudo fora da tabela vira pendência `traducao_sem_correspondencia`, nunca é adivinhado):
+`atributos.tipoFrente` do item no projeto-tecnico → `frente`. `tipoFrente` é um **ValorRastreavel** como qualquer outro atributo: normalmente é deduzido do desenho (leitura visual), logo `inferido`; nesse caso vira sugestão + pendência bloqueante e só entra em `frente` depois de `confirmar-valores --ids`. O `tipo` do item é só a **categoria** (`porta_aluminio`); ela é conferida contra `categorias` do mapa e categoria desconhecida (que também não está em `foraDoEscopo.tipos`) vira pendência bloqueante `traducao_sem_correspondencia` com destino `tipo`. Comparação sem diferença de maiúsculas e espaços; tudo fora da tabela vira pendência `traducao_sem_correspondencia`, nunca é adivinhado):
 
-| `tipo` no projeto | `frente` |
+| `tipoFrente` no projeto | `frente` |
 |---|---|
 | `porta_giro` | `Porta de giro` |
 | `porta_basculante` | `Porta basculante` |
@@ -107,6 +107,7 @@ Para acrescentar um sinônimo (por exemplo `porta_de_giro`), edite o mapa, atual
 - Inferido: nunca entra no item; vira `sugestoes` e pendência `inferido` (bloqueante se o campo é obrigatório).
 - Conflitante: nunca entra; pendência `conflitante` (bloqueante), a decisão é humana.
 - Confirmado com tipo ou faixa inválidos (texto onde se espera número, `qtd` fora de 1 a 500, medida <= 0, lista com item não numérico): `valor_invalido` (bloqueante).
-- Tipo sem tradução: `traducao_sem_correspondencia` (bloqueante).
+- `tipoFrente` sem tradução: `traducao_sem_correspondencia` (bloqueante, destino `frente`). Categoria do item fora de `categorias`: `traducao_sem_correspondencia` (bloqueante, destino `tipo`).
+- `tipoFrente` inferido: sugestão + pendência `inferido` bloqueante (`frente` é obrigatório) até a confirmação humana.
 - Pendências do documento (soma de cotas divergente, unidade ambígua, texto suspeito, domínio diferente do mapa) ficam em `pendenciasDocumento` e impedem o `prontoParaLancar` global.
 - Tipo declarado em `foraDoEscopo.tipos` (estante, louceiro, sistema em perfil, estrutura de aço): `fora_do_escopo` (não bloqueante), item `foraDoEscopo: true` sem objeto de tela; não impede o `prontoParaLancar` global se houver ao menos um item de porta lançável.

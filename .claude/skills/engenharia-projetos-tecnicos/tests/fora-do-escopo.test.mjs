@@ -79,9 +79,17 @@ test('CLI montar-itens e gerar-relatorio mostram o item fora do escopo; saída v
   const r = rodarScript('scripts/gerar-relatorio.mjs', [arq]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /## Fora do escopo atual \(sem mapeamento\)\n\n- Item E1 \(estante_perfil_aluminio\): fora do escopo atual/);
-  assert.ok(!r.stdout.includes('Item P1 (porta_giro): fora do escopo'));
+  assert.ok(!r.stdout.includes('Item P1 (porta_aluminio): fora do escopo'));
 }));
 
 test('relatório sem item fora do escopo não ganha a seção (golden intacto)', () => {
   assert.ok(!gerarRelatorio(docPortas([itemPorta('P1')]), { foraDoEscopo: MAPA.foraDoEscopo }).includes('Fora do escopo'));
+});
+
+test('validarMapa: categorias malformadas são recusadas; mapa de portas declara porta_aluminio', () => {
+  assert.deepEqual(MAPA.categorias, ['porta_aluminio']);
+  const ruim = c => () => validarMapa({ ...structuredClone(MAPA), categorias: c });
+  assert.throws(ruim([]), /categorias/);
+  assert.throws(ruim(['a', '']), /categorias/);
+  assert.throws(ruim('x'), /categorias/);
 });

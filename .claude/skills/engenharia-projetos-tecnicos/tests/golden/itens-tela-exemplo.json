@@ -41,7 +41,7 @@
       },
       "prontoParaLancar": true,
       "rastreio": {
-        "frente": "P1",
+        "frente": "P1.tipoFrente",
         "qtd": "P1.qtd",
         "altura": "P1.altura",
         "largura": "P1.largura",
@@ -92,7 +92,7 @@
       },
       "prontoParaLancar": true,
       "rastreio": {
-        "frente": "P2",
+        "frente": "P2.tipoFrente",
         "qtd": "P2.qtd",
         "altura": "P2.altura",
         "largura": "P2.largura",

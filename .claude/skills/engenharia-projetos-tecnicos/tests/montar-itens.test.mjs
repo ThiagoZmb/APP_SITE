@@ -72,7 +72,7 @@ test('CLI: projeto com pendências sai 0, mas nada incerto entra no item e pront
   assert.equal(p3.sugestoes[0].valor, 800);
   assert.deepEqual(p3.pendencias.map(p => p.tipo).sort(), ['conflitante', 'inferido', 'obrigatorio_ausente']);
   assert.equal(p4.item.frente, undefined);
-  assert.equal(p4.pendencias[0].tipo, 'traducao_sem_correspondencia');
+  assert.ok(p4.pendencias.some(p => p.tipo === 'traducao_sem_correspondencia' && p.destino === 'tipo' && p.bloqueante), 'categoria desconhecida');
   assert.equal(saida.pendenciasDocumento[0].tipo, 'divergencia');
 });
 

@@ -26,7 +26,7 @@ test('item completo e confirmado: entra no objeto, rastreio por campo e pronto p
   assert.equal(r.item.largura, 900);
   assert.equal(r.item.detalhes.perfil, 'PERFIL EXEMPLO 25');
   assert.equal(r.rastreio['detalhes.perfil'], 'P1.perfil');
-  assert.equal(r.rastreio.frente, 'P1');
+  assert.equal(r.rastreio.frente, 'P1.tipoFrente');
 });
 
 test('o mapa base entrega o item com a estrutura que a tela envia (detalhes, furos, acessorios, obs)', () => {
@@ -100,7 +100,7 @@ test('REGRESSÃO: tipoFrente inferido (leitura visual) não entra em frente: sug
   assert.equal(r.item.frente, undefined);
   assert.equal(r.rastreio.frente, undefined);
   assert.equal(r.prontoParaLancar, false);
-  assert.deepEqual(r.sugestoes.map(s => [s.destino, s.valor, s.idValor]), [['frente', 'porta_giro', 'P1.tipoFrente']]);
+  assert.deepEqual(r.sugestoes.map(s => [s.destino, s.valor, s.idValor]), [['frente', 'Porta de giro', 'P1.tipoFrente']]);
   assert.ok(r.pendencias.some(p => p.destino === 'frente' && p.tipo === 'inferido' && p.bloqueante));
 });
 
