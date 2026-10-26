@@ -24,6 +24,8 @@ const CAMPOS_TEXTO = [['contatoLocal', 'contato_local', 190], ['observacao', 'ob
   ['rastreio', 'rastreio', 120]];
 const OCORRENCIAS = ['ausente', 'endereco_errado', 'recusa', 'parcial']; // tipos de evento que contam como ocorrência
 const MOTIVO_SAIU_DE_PRONTO = 'Pedido saiu de Pronto';
+const MOTIVO_VOLTOU_A_PRONTO = 'Pedido voltou a Pronto';
+const MOTIVO_PEDIDO_CANCELADO = 'Pedido cancelado';
 const TIPOS_ANEXO = ['foto', 'assinatura'];
 const MAX_ANEXOS_PENDENTES = 10; // por entrega e por usuário (anexos enviados e ainda não vinculados a uma baixa)
 const MAX_ANEXOS_POR_BAIXA = 3;
@@ -91,37 +93,59 @@ const lerImagem = (req, res, next) => rawImagem(req, res, err => {
   next(err);
 });
 
-// Mantém a fila A programar em dia com os pedidos do VB, de forma idempotente:
-//  - todo pedido Pronto sem registro ganha um (UNIQUE(numero) + INSERT IGNORE: duas varreduras simultâneas não duplicam);
-//  - registro A programar cujo pedido deixou de estar Pronto vira cancelado.
-// Registro em qualquer outro status nunca é alterado aqui. Devolve `null` se `res` já recebeu o erro.
+// Mantém a fila A programar em dia com os pedidos do VB, de forma idempotente e em lote (poucas idas ao banco remoto):
+//  - todo pedido Pronto sem registro ganha um (UNIQUE(numero) + INSERT IGNORE ... SELECT: duas varreduras simultâneas não duplicam)
+//    e toda entrega sem nenhum evento ganha o evento 'criada';
+//  - registro A programar/Agendada/Ocorrência cujo pedido foi Cancelado vira cancelado ('Pedido cancelado'); Em rota nunca é cancelado aqui;
+//  - registro A programar cujo pedido deixou de estar Pronto vira cancelado ('Pedido saiu de Pronto');
+//  - cancelada pela varredura por ter saído de Pronto, cujo pedido voltou a Pronto, reabre como A programar.
+// Qualquer outro registro nunca é alterado aqui. Devolve `null` se `res` já recebeu o erro.
 async function sincronizarFila(pool, res) {
   const executar = async conn => {
     const agora = agoraLocal();
-    let criadas = 0, canceladas = 0;
-    const [novos] = await conn.execute(
-      `SELECT p.NUMERO FROM ped_orc p WHERE p.TIPO = 'Pedido' AND p.SITUACAO = 'Pronto'
-         AND NOT EXISTS (SELECT 1 FROM web_entregas e WHERE e.numero = p.NUMERO) ORDER BY p.NUMERO`);
-    for (const { NUMERO } of novos) {
-      const [ins] = await conn.execute(
-        "INSERT IGNORE INTO web_entregas (numero, status, criado_em, atualizado_em) VALUES (?, 'a_programar', ?, ?)", [NUMERO, agora, agora]);
-      if (ins.affectedRows !== 1) continue; // outra varredura chegou primeiro
-      await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo) VALUES (?, ?, ?, ?, ?)',
-        [ins.insertId, agora, 'sistema', 'criada', null]);
-      criadas++;
-    }
+    let reabertas = 0, canceladas = 0;
+    const [criadas] = await conn.execute(
+      `INSERT IGNORE INTO web_entregas (numero, status, criado_em, atualizado_em)
+       SELECT p.NUMERO, 'a_programar', ?, ? FROM ped_orc p WHERE p.TIPO = 'Pedido' AND p.SITUACAO = 'Pronto'
+         AND NOT EXISTS (SELECT 1 FROM web_entregas e WHERE e.numero = p.NUMERO)`, [agora, agora]);
+    await conn.execute(
+      `INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo)
+       SELECT e.id, ?, 'sistema', 'criada', NULL FROM web_entregas e
+       WHERE NOT EXISTS (SELECT 1 FROM web_entrega_eventos v WHERE v.entrega_id = e.id)`, [agora]);
+    const cancelar = async (ids, motivo, de) => {
+      for (const { id } of ids) {
+        const [up] = await conn.execute(
+          `UPDATE web_entregas SET status = 'cancelada', atualizado_em = ? WHERE id = ? AND status IN (${de.map(d => `'${d}'`).join(', ')})`, [agora, id]);
+        if (up.affectedRows !== 1) continue;
+        await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo) VALUES (?, ?, ?, ?, ?)',
+          [id, agora, 'sistema', 'cancelada', motivo]);
+        canceladas++;
+      }
+    };
+    const [pedidoCancelado] = await conn.execute(
+      `SELECT e.id FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       WHERE e.status IN ('a_programar', 'agendada', 'ocorrencia') AND p.SITUACAO = 'Cancelado' ORDER BY e.id`);
+    await cancelar(pedidoCancelado, MOTIVO_PEDIDO_CANCELADO, ['a_programar', 'agendada', 'ocorrencia']);
     const [fora] = await conn.execute(
       `SELECT e.id FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
        WHERE e.status = 'a_programar' AND p.SITUACAO <> 'Pronto' ORDER BY e.id`);
-    for (const { id } of fora) {
+    await cancelar(fora, MOTIVO_SAIU_DE_PRONTO, ['a_programar']);
+    // reabre só o que a própria varredura cancelou por "saiu de Pronto" (último evento); cancelamento da equipe ou do pedido fica
+    const [voltaram] = await conn.execute(
+      `SELECT e.id FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       WHERE e.status = 'cancelada' AND p.SITUACAO = 'Pronto'
+         AND EXISTS (SELECT 1 FROM web_entrega_eventos v WHERE v.entrega_id = e.id AND v.usuario = 'sistema' AND v.tipo = 'cancelada' AND v.motivo = ?
+                       AND v.id = (SELECT MAX(v2.id) FROM web_entrega_eventos v2 WHERE v2.entrega_id = e.id))
+       ORDER BY e.id`, [MOTIVO_SAIU_DE_PRONTO]);
+    for (const { id } of voltaram) {
       const [up] = await conn.execute(
-        "UPDATE web_entregas SET status = 'cancelada', atualizado_em = ? WHERE id = ? AND status = 'a_programar'", [agora, id]);
+        "UPDATE web_entregas SET status = 'a_programar', atualizado_em = ? WHERE id = ? AND status = 'cancelada'", [agora, id]);
       if (up.affectedRows !== 1) continue;
       await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo) VALUES (?, ?, ?, ?, ?)',
-        [id, agora, 'sistema', 'cancelada', MOTIVO_SAIU_DE_PRONTO]);
-      canceladas++;
+        [id, agora, 'sistema', 'criada', MOTIVO_VOLTOU_A_PRONTO]);
+      reabertas++;
     }
-    return { criadas, canceladas };
+    return { criadas: criadas.affectedRows || 0, canceladas, reabertas };
   };
   if (res) return emTransacao(pool, res, 'sincronizarFila', executar);
   const conn = await pool.getConnection(); // chamada sem rota (por exemplo, de outros módulos): o erro sobe
@@ -428,13 +452,24 @@ function registrarEntregas({ rota, pool }) {
     return t || null;
   };
 
+  // Como o VB (Pedido_Entregue/Pedido_Retirado): grava SITUACAO e DATA_ENTREGA (data da entrega). Nunca sobrescreve pedido Cancelado.
+  // Se o UPDATE não atingir linha, o SELECT distingue "já está no destino" (sucesso, p.ex. o VB já marcou) de cancelado/excluído (409 e rollback).
+  async function baixarPedido(c, numero, situacao) {
+    const [up] = await c.execute(
+      "UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = 'Pedido' AND SITUACAO <> 'Cancelado'", [situacao, hojeLocal(), numero]);
+    if (up.affectedRows === 1) return;
+    const [[p]] = await c.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido'", [numero]);
+    if (p && p.SITUACAO === situacao) return;
+    throw new ErroUsuario(409, 'O pedido foi cancelado ou excluído no sistema; fale com a equipe.');
+  }
+
   // evento + vínculo dos anexos + SITUACAO do pedido, tudo dentro da transação de gravar()
   const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, usuario }) => async (conn, atual) => ({
     cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}) },
     depois: async (c, { eventoId, status }) => {
       await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
       const situacao = pedidoPara(status);
-      if (situacao) await c.execute("UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = 'Pedido'", [situacao, atual.numero]);
+      if (situacao) await baixarPedido(c, atual.numero, situacao);
     }
   });
 

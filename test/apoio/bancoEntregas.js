@@ -96,28 +96,47 @@ function bancoEntregas() {
           qtd_ocorrencias: String(eventos.filter(v => v.entrega_id === e.id && OCORRENCIAS.includes(v.tipo)).length)
         }));
     }],
-    // varredura: pedidos Pronto ainda sem registro
-    [/SELECT p\.NUMERO FROM ped_orc p WHERE [\s\S]*NOT EXISTS/, () =>
-      pedidos.filter(p => ehPronto(p) && !entregas.some(e => e.numero === p.NUMERO)).map(p => ({ NUMERO: p.NUMERO }))],
-    // UNIQUE(numero): INSERT IGNORE de número repetido não grava (affectedRows 0)
-    [/INSERT IGNORE INTO web_entregas \(numero, status, criado_em, atualizado_em\)/, (sql, [numero, criado_em, atualizado_em]) => {
-      if (entregas.some(e => e.numero === numero)) return { affectedRows: 0, insertId: 0 };
-      const e = { id: entregas.length + 1, numero, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
-        endereco_rua: null, endereco_numero: null, endereco_bairro: null, endereco_cidade: null, endereco_uf: null, endereco_cep: null,
-        endereco_ref: null, contato_local: null, transportadora: null, rastreio: null, previsao: null, observacao: null, criado_em, atualizado_em };
-      entregas.push(e); return { affectedRows: 1, insertId: e.id };
+    // varredura em lote: INSERT IGNORE ... SELECT dos pedidos Pronto sem registro (UNIQUE(numero)) e eventos 'criada' das entregas sem evento
+    [/^INSERT IGNORE INTO web_entregas \(numero, status, criado_em, atualizado_em\)\s+SELECT/, (sql, [criado_em, atualizado_em]) => {
+      const novos = pedidos.filter(p => ehPronto(p) && !entregas.some(e => e.numero === p.NUMERO));
+      for (const p of novos) {
+        entregas.push({ id: entregas.length + 1, numero: p.NUMERO, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
+          endereco_rua: null, endereco_numero: null, endereco_bairro: null, endereco_cidade: null, endereco_uf: null, endereco_cep: null,
+          endereco_ref: null, contato_local: null, transportadora: null, rastreio: null, previsao: null, observacao: null, criado_em, atualizado_em });
+      }
+      return { affectedRows: novos.length, insertId: novos.length ? entregas.length - novos.length + 1 : 0 };
     }],
-    [/INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo\)/, (sql, [entrega_id, quando, usuario, tipo, motivo]) => {
+    [/^INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo\)\s+SELECT/, (sql, [quando]) => {
+      const sem = entregas.filter(e => !eventos.some(v => v.entrega_id === e.id));
+      for (const e of sem) eventos.push({ id: eventos.length + 1, entrega_id: e.id, quando, usuario: 'sistema', tipo: 'criada', motivo: null, entregue_a: null, detalhe: null });
+      return { affectedRows: sem.length };
+    }],
+    [/INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo\) VALUES/, (sql, [entrega_id, quando, usuario, tipo, motivo]) => {
       eventos.push({ id: eventos.length + 1, entrega_id, quando, usuario, tipo, motivo: motivo ?? null, entregue_a: null, detalhe: null });
       return { affectedRows: 1, insertId: eventos.length };
     }],
+    // pedido Cancelado: A programar, Agendada e Ocorrência (Em rota fica)
+    [/SELECT e\.id FROM web_entregas e JOIN ped_orc p [\s\S]*e\.status IN \('a_programar', 'agendada', 'ocorrencia'\)/, () =>
+      entregas.filter(e => ['a_programar', 'agendada', 'ocorrencia'].includes(e.status)).filter(e => pedidoDe(e)?.SITUACAO === 'Cancelado').map(e => ({ id: e.id }))],
     // cancelamento: A programar cujo pedido deixou de estar Pronto
     [/SELECT e\.id FROM web_entregas e JOIN ped_orc p [\s\S]*e\.status = 'a_programar'/, () =>
       entregas.filter(e => e.status === 'a_programar').filter(e => { const p = pedidoDe(e); return p && !ehPronto(p); }).map(e => ({ id: e.id }))],
-    [/UPDATE web_entregas SET status = 'cancelada', atualizado_em = \? WHERE id = \? AND status = 'a_programar'/, (sql, [atualizado_em, id]) => {
-      const e = entregas.find(x => x.id === id && x.status === 'a_programar');
+    [/^UPDATE web_entregas SET status = 'cancelada', atualizado_em = \? WHERE id = \? AND status IN \(([^)]*)\)/, (sql, [atualizado_em, id]) => {
+      const de = /status IN \(([^)]*)\)/.exec(sql)[1].split(',').map(x => x.trim().replace(/'/g, ''));
+      const e = entregas.find(x => x.id === id && de.includes(x.status));
       if (!e) return { affectedRows: 0 };
       Object.assign(e, { status: 'cancelada', atualizado_em }); return { affectedRows: 1 };
+    }],
+    // reabertura: cancelada pela varredura por "saiu de Pronto" (último evento) cujo pedido voltou a Pronto
+    [/SELECT e\.id FROM web_entregas e JOIN ped_orc p [\s\S]*e\.status = 'cancelada'/, (sql, [motivo]) =>
+      entregas.filter(e => e.status === 'cancelada' && ehPronto(pedidoDe(e) || {})).filter(e => {
+        const ult = eventos.filter(v => v.entrega_id === e.id).sort((x, y) => y.id - x.id)[0];
+        return ult && ult.usuario === 'sistema' && ult.tipo === 'cancelada' && ult.motivo === motivo;
+      }).map(e => ({ id: e.id }))],
+    [/^UPDATE web_entregas SET status = 'a_programar', atualizado_em = \? WHERE id = \? AND status = 'cancelada'/, (sql, [atualizado_em, id]) => {
+      const e = entregas.find(x => x.id === id && x.status === 'cancelada');
+      if (!e) return { affectedRows: 0 };
+      Object.assign(e, { status: 'a_programar', atualizado_em }); return { affectedRows: 1 };
     }],
 
     // ---- programar entrega (T4) ----
@@ -179,10 +198,16 @@ function bancoEntregas() {
       const alvo = estado.anexos.filter(a => ids.includes(a.id)); alvo.forEach(a => { a.evento_id = evento_id; });
       return { affectedRows: alvo.length };
     }],
-    [/^UPDATE ped_orc SET SITUACAO = \? WHERE NUMERO = \? AND TIPO = 'Pedido'$/, (sql, [situacao, numero]) => {
-      const p = pedidos.find(x => x.NUMERO === numero && x.TIPO === 'Pedido'); if (!p) return { affectedRows: 0 };
-      p.SITUACAO = situacao; return { affectedRows: 1 };
+    // baixa no pedido: SITUACAO + DATA_ENTREGA (como o VB); com "<> 'Cancelado'" só atinge pedido não cancelado
+    [/^UPDATE ped_orc SET SITUACAO = \?/, (sql, params) => {
+      const comData = sql.includes('DATA_ENTREGA = ?');
+      const [situacao, ...resto] = params; const data = comData ? resto.shift() : undefined; const [numero] = resto;
+      const p = pedidos.find(x => x.NUMERO === numero && x.TIPO === 'Pedido');
+      if (!p || (sql.includes("SITUACAO <> 'Cancelado'") && p.SITUACAO === 'Cancelado')) return { affectedRows: 0 };
+      p.SITUACAO = situacao; if (comData) p.DATA_ENTREGA = data; return { affectedRows: 1 };
     }],
+    [/^SELECT SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido'$/, (sql, [numero]) =>
+      pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO }))],
     [/^SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = \? AND evento_id IS NOT NULL/, (sql, [id]) =>
       estado.anexos.filter(a => a.entrega_id === id && a.evento_id != null).map(({ id: i, tipo, mime, criado_em }) => ({ id: i, tipo, mime, criado_em }))],
     [/^SELECT mime, dados FROM web_entrega_anexos WHERE id = \? AND entrega_id = \?/, (sql, [id, entrega_id]) =>

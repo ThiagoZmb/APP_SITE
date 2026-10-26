@@ -67,9 +67,10 @@ test('agendada cujo pedido saiu de Pronto não muda', async t => {
   const { banco, chamar } = await prepararEntregas(t);
   cenario(banco, { situacao: 'Em Produção' });
   banco.semear.entrega({ numero: 501, status: 'agendada', data_agendada: '2026-11-03' });
+  banco.semear.evento({ entrega_id: 1, tipo: 'agendada', usuario: 'Caio' }); // entrega real sempre tem histórico
   await chamar('/entregas');
   assert.equal(banco.entregas[0].status, 'agendada');
-  assert.equal(banco.eventos.length, 0);
+  assert.equal(banco.eventos.length, 1);
 });
 
 test('perfil Somente ver lista (200)', async t => {
