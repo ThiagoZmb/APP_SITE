@@ -39,9 +39,9 @@ export const conflitanteVal = (id, a, b) => val(id, null, { unidade: null, estad
 // Item de porta mínimo e completo (giro). "mudar" ajusta o item.
 export function itemPorta(id = 'P1', mudar = () => {}) {
   const item = {
-    id, tipo: 'porta_giro', quantidade: qtd(`${id}.qtd`, 1),
+    id, tipo: 'porta_aluminio', quantidade: qtd(`${id}.qtd`, 1),
     dimensoes: { altura: val(`${id}.altura`, 2100), largura: val(`${id}.largura`, 900) },
-    atributos: { perfil: txt(`${id}.perfil`, 'PERFIL EXEMPLO 25'), acabamentoPerfil: txt(`${id}.acab`, 'Anodizado') },
+    atributos: { tipoFrente: txt(`${id}.tipoFrente`, 'porta_giro'), perfil: txt(`${id}.perfil`, 'PERFIL EXEMPLO 25'), acabamentoPerfil: txt(`${id}.acab`, 'Anodizado') },
   };
   mudar(item);
   return item;

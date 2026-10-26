@@ -9,6 +9,9 @@
 //  - ausente e conflitante não entram e geram pendência (ausente só se obrigatório; conflitante sempre);
 //  - tradução sem correspondência ou valor de tipo/faixa inválido → pendência bloqueante (nunca adivinha);
 //  - cada campo preenchido registra rastreio[destino] = id do ValorRastreavel de origem;
+//  - "tipo" do item é só a CATEGORIA (ex.: porta_aluminio). "categorias" (opcional no mapa) lista as categorias do domínio;
+//    categoria fora dela e fora de "foraDoEscopo" vira pendência bloqueante (nunca adivinha).
+//    O que é deduzido do desenho (ex.: tipo de frente) deve ser atributo ValorRastreavel, nunca "tipo".
 //  - "foraDoEscopo" (opcional no mapa): tipos que a Elegance fabrica mas que NÃO têm mapa para o item da tela.
 //    Saem como item vazio, foraDoEscopo:true, com pendência informativa (nunca descartados em silêncio).
 // Não calcula nada: não aplica descontos, não converte unidade, não arredonda.
@@ -29,6 +32,7 @@ export function validarMapa(mapa) {
   if (typeof mapa.dominio !== 'string' || !mapa.dominio) erros.push('"dominio" ausente');
   if (!Array.isArray(mapa.campos) || mapa.campos.length === 0) erros.push('"campos" deve ser uma lista não vazia');
   if (mapa.base !== undefined && !ehObjeto(mapa.base)) erros.push('"base" deve ser um objeto');
+  if (mapa.categorias !== undefined && (!Array.isArray(mapa.categorias) || mapa.categorias.length === 0 || mapa.categorias.some(t => typeof t !== 'string' || !t.trim()))) erros.push('"categorias" deve ser uma lista não vazia de textos');
   if (mapa.foraDoEscopo !== undefined) {
     const f = mapa.foraDoEscopo;
     if (!ehObjeto(f) || !Array.isArray(f.tipos) || f.tipos.length === 0 || f.tipos.some(t => typeof t !== 'string' || !t.trim())) erros.push('"foraDoEscopo" deve ter "tipos" (lista não vazia de textos)');
@@ -67,7 +71,9 @@ export function validarMapa(mapa) {
 }
 
 // ---------- leitura do projeto ----------
-// → ValorRastreavel | null. "tipo" não é ValorRastreavel: vira valor confirmado ligado ao id do item.
+// → ValorRastreavel | null. "tipo" não é ValorRastreavel: vira valor SEMPRE confirmado (confiança 1) ligado ao id do item.
+// Use a origem "tipo" só para a categoria do item (cadastro, não leitura do desenho). Nunca para algo deduzido
+// do desenho: isso deve ser atributo ValorRastreavel, que pode ser inferido (sugestão + pendência).
 function lerOrigem(item, origem) {
   const [raiz, ...resto] = origem.split('.');
   if (raiz === 'tipo') {
@@ -187,6 +193,14 @@ function mapearItem(item, mapa) {
     } else if (r.status === 'invalido') {
       pend(r, 'valor_invalido', true, `Campo ${rotulo}: ${r.motivo}.`);
     }
+  }
+
+  // categoria do item fora das declaradas pelo domínio (e que não é fora do escopo): nunca adivinha
+  if (mapa.categorias && !mapa.categorias.some(c => normalizar(c) === normalizar(item.tipo))) {
+    pendencias.push({
+      id: `pend-${item.id}-categoria`, tipo: 'traducao_sem_correspondencia', destino: 'tipo', bloqueante: true, refs: [item.id],
+      mensagem: `Item ${item.id}: categoria "${item.tipo}" não consta nas categorias do domínio "${mapa.dominio}" (${mapa.categorias.join(', ')}) nem em foraDoEscopo.`,
+    });
   }
 
   const obrigatoriosOk = resultados.every(r => !r.obrigatorio || r.status === 'ok');

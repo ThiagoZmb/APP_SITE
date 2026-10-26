@@ -9,7 +9,7 @@
   "itens": [
     {
       "id": "P3",
-      "tipo": "porta_giro",
+      "tipo": "porta_aluminio",
       "quantidade": {
         "id": "P3.qtd",
         "valor": 1,
@@ -52,6 +52,19 @@
         }
       },
       "atributos": {
+        "tipoFrente": {
+          "id": "P3.tipoFrente",
+          "valor": "porta_giro",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "PORTA DE GIRO"
+          }
+        },
         "perfil": {
           "id": "P3.perfil",
           "valor": null,

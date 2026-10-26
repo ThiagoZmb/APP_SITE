@@ -9,7 +9,7 @@
   "itens": [
     {
       "id": "P1",
-      "tipo": "porta_correr",
+      "tipo": "porta_aluminio",
       "quantidade": {
         "id": "P1.qtd",
         "valor": 2,
@@ -52,6 +52,19 @@
         }
       },
       "atributos": {
+        "tipoFrente": {
+          "id": "P1.tipoFrente",
+          "valor": "porta_correr",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 2,
+            "trecho": "PORTA DE CORRER"
+          }
+        },
         "perfil": {
           "id": "P1.perfil",
           "valor": "PERFIL EXEMPLO 25",
@@ -238,7 +251,7 @@
     },
     {
       "id": "P2",
-      "tipo": "porta_giro",
+      "tipo": "porta_aluminio",
       "quantidade": {
         "id": "P2.qtd",
         "valor": 1,
@@ -281,6 +294,19 @@
         }
       },
       "atributos": {
+        "tipoFrente": {
+          "id": "P2.tipoFrente",
+          "valor": "porta_giro",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 4,
+            "trecho": "PORTA DE GIRO"
+          }
+        },
         "perfil": {
           "id": "P2.perfil",
           "valor": "PERFIL EXEMPLO 25",

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mapearItens, validarMapa, montarSaida } from '../scripts/lib/mapear.mjs';
 import { validarProjeto } from '../scripts/lib/validacao.mjs';
 import { aplicarVerificacoes } from '../scripts/lib/cruzada.mjs';
-import { caminho, lerFixture, val, txt, qtd, inferidoVal, ausenteVal, conflitanteVal, itemPorta, docPortas } from './apoio.mjs';
+import { caminho, lerFixture, val, txt, qtd, inferidoVal, ausenteVal, conflitanteVal, itemPorta, docPortas, rodarScript, comPastaTemp } from './apoio.mjs';
 
 const MAPA = JSON.parse(readFileSync(caminho('config/regras-por-dominio/portas-aluminio.json'), 'utf8'));
 const mapear = (...itens) => {
@@ -79,15 +80,46 @@ test('conflitante nunca entra (nem opcional): pendência bloqueante, sem escolhe
   assert.ok(r.pendencias.some(p => p.tipo === 'conflitante' && p.destino === 'detalhes.cor' && p.bloqueante));
 });
 
-test('tipo sem tradução: pendência e frente não preenchida (nunca adivinha)', () => {
-  const r = um(itemPorta('P1', it => { it.tipo = 'janela_maxim_ar'; }));
+test('tipoFrente sem tradução: pendência e frente não preenchida (nunca adivinha)', () => {
+  const r = um(itemPorta('P1', it => { it.atributos.tipoFrente = txt('P1.tipoFrente', 'janela_maxim_ar'); }));
   assert.equal(r.item.frente, undefined);
   assert.equal(r.prontoParaLancar, false);
   assert.ok(r.pendencias.some(p => p.tipo === 'traducao_sem_correspondencia' && p.destino === 'frente' && p.bloqueante));
 });
 
+test('categoria do item fora das categorias do domínio: pendência bloqueante (nunca adivinha)', () => {
+  const r = um(itemPorta('P1', it => { it.tipo = 'janela_maxim_ar'; }));
+  assert.equal(r.prontoParaLancar, false);
+  assert.ok(r.pendencias.some(p => p.tipo === 'traducao_sem_correspondencia' && p.destino === 'tipo' && p.bloqueante));
+  // categoria reconhecida sem diferença de maiúsculas e espaços
+  assert.equal(um(itemPorta('P1', it => { it.tipo = ' Porta_Aluminio '; })).prontoParaLancar, true);
+});
+
+test('REGRESSÃO: tipoFrente inferido (leitura visual) não entra em frente: sugestão + pendência bloqueante', () => {
+  const r = um(itemPorta('P1', it => { it.atributos.tipoFrente = inferidoVal('P1.tipoFrente', 'porta_giro', null); }));
+  assert.equal(r.item.frente, undefined);
+  assert.equal(r.rastreio.frente, undefined);
+  assert.equal(r.prontoParaLancar, false);
+  assert.deepEqual(r.sugestoes.map(s => [s.destino, s.valor, s.idValor]), [['frente', 'porta_giro', 'P1.tipoFrente']]);
+  assert.ok(r.pendencias.some(p => p.destino === 'frente' && p.tipo === 'inferido' && p.bloqueante));
+});
+
+test('REGRESSÃO: tipoFrente inferido, depois de confirmar-valores --ids, entra em frente', () => comPastaTemp(dir => {
+  const doc = docPortas([itemPorta('P1', it => { it.atributos.tipoFrente = inferidoVal('P1.tipoFrente', 'porta_giro', null); })]);
+  assert.deepEqual(validarProjeto(doc).erros, []);
+  const entrada = join(dir, 'in.json'); const saida = join(dir, 'out.json');
+  writeFileSync(entrada, JSON.stringify(doc));
+  const c = rodarScript('scripts/confirmar-valores.mjs', [entrada, '--por', 'Teste', '--ids', 'P1.tipoFrente', '--saida', saida]);
+  assert.equal(c.status, 0, c.stderr);
+  const [r] = mapearItens(JSON.parse(readFileSync(saida, 'utf8')), MAPA);
+  assert.equal(r.item.frente, 'Porta de giro');
+  assert.equal(r.rastreio.frente, 'P1.tipoFrente');
+  assert.equal(r.prontoParaLancar, true);
+  assert.deepEqual(r.pendencias, []);
+}));
+
 test('tradução do tipo: valores exatos da web; ignora só maiúsculas e espaços', () => {
-  const frente = tipo => um(itemPorta('P1', it => { it.tipo = tipo; })).item.frente;
+  const frente = tipo => um(itemPorta('P1', it => { it.atributos.tipoFrente = txt('P1.tipoFrente', tipo); })).item.frente;
   assert.equal(frente('porta_giro'), 'Porta de giro');
   assert.equal(frente('Porta Basculante'), 'Porta basculante');
   assert.equal(frente('frente_gaveta'), 'Frente de gaveta');
@@ -129,7 +161,7 @@ test('listas: furos numéricos e posições de puxador por folha', () => {
 });
 
 test('porta de correr: sistema é obrigatório (a medida muda de significado: vão x porta)', () => {
-  const correr = it => { it.tipo = 'porta_correr'; };
+  const correr = it => { it.atributos.tipoFrente = txt('P1.tipoFrente', 'porta_correr'); };
   const sem = um(itemPorta('P1', correr));
   assert.equal(sem.prontoParaLancar, false);
   assert.ok(sem.pendencias.some(p => p.destino === 'detalhes.sistema' && p.tipo === 'obrigatorio_ausente'));
@@ -142,7 +174,7 @@ test('porta de correr: sistema é obrigatório (a medida muda de significado: v�
 
 test('correr com sistema leva a medida do VÃO sem nenhum desconto (a web desconta)', () => {
   const { item } = um(itemPorta('P1', it => {
-    it.tipo = 'porta_correr'; it.quantidade = qtd('P1.qtd', 2);
+    it.atributos.tipoFrente = txt('P1.tipoFrente', 'porta_correr'); it.quantidade = qtd('P1.qtd', 2);
     it.dimensoes = { altura: val('P1.altura', 2100), largura: val('P1.largura', 3000) };
     it.atributos.sistema = txt('P1.sis', 'SISTEMA EXEMPLO'); it.atributos.transpasse = val('P1.t', 50);
   }));

@@ -52,7 +52,7 @@ test('saída: fora do escopo não bloqueia os itens de porta, mas sozinho nada �
   assert.equal(portaPendente.prontoParaLancar, false, 'pendência da porta continua bloqueando');
 });
 
-test('tipo desconhecido (não declarado) continua virando traducao_sem_correspondencia: nunca adivinha', () => {
+test('categoria desconhecida (não declarada) continua virando traducao_sem_correspondencia: nunca adivinha', () => {
   const [r] = mapearItens(docPortas([itemPorta('P1', it => { it.tipo = 'janela_maxim_ar'; })]), MAPA);
   assert.equal(r.foraDoEscopo, undefined);
   assert.ok(r.pendencias.some(p => p.tipo === 'traducao_sem_correspondencia' && p.bloqueante));

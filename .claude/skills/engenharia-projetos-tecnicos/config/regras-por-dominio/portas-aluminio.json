@@ -7,6 +7,7 @@
     "status": "pendente de aprovação",
     "motivo": "Mapa do projeto técnico para o item da tela de orçamentos/pedidos (orcamentos.html coletarForm, orcamentos.html:1918-1981). Nomes de campos e valores de frente conferidos em rotas/ped_orc.js e calculo/engenharia.js; detalhes e citações em references/esquadrias-aluminio.md. Decisão D3: a skill não aplica descontos de fabricação; D4: saída no formato do item da tela."
   },
+  "categorias": ["porta_aluminio"],
   "foraDoEscopo": {
     "tipos": ["estante_perfil_aluminio", "louceiro_perfil_aluminio", "sistema_perfil_aluminio", "estrutura_metalica_aco"],
     "motivo": "A Elegance fabrica este item, mas ele ainda não tem mapa para o orçamento/pedido (hoje só portas de alumínio têm)."
@@ -19,7 +20,7 @@
   },
   "campos": [
     {
-      "destino": "frente", "origem": "tipo", "tipo": "texto", "obrigatorio": true,
+      "destino": "frente", "origem": "atributos.tipoFrente", "tipo": "texto", "obrigatorio": true,
       "traducao": {
         "porta_giro": "Porta de giro", "porta de giro": "Porta de giro",
         "porta_basculante": "Porta basculante", "porta basculante": "Porta basculante",
