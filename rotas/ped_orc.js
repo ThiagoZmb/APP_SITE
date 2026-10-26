@@ -545,6 +545,20 @@ function registrarPedOrc({ rota, pool }) {
         itens: linhas.lista.length };
       for (const tabela of TABELAS_ITENS) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ? AND TIPO = ?`, [alvo.numero, alvo.tipo]);
       if (alvo.tipo === 'Pedido') for (const tabela of ['vidros', 'perfis']) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ?`, [alvo.numero]);
+      // Entregas: o NUMERO é reaproveitado (MAX+1), então a entrega do pedido excluído sai junto, na mesma transação
+      // (só exclusão feita pela web passa por aqui; exclusão feita direto no VB não limpa web_entregas).
+      if (alvo.tipo === 'Pedido') {
+        const [entregas] = await conn.execute('SELECT id FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
+        for (const { id } of entregas) {
+          await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
+          await conn.execute('DELETE FROM web_entrega_eventos WHERE entrega_id = ?', [id]);
+          await conn.execute('DELETE FROM web_entregas WHERE id = ?', [id]);
+        }
+        if (entregas.length) {
+          await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
+            [agoraLocal(), req.acesso?.nome || req.usuario?.nome || '', 'entrega_removida_com_pedido', String(alvo.numero), JSON.stringify({ entregaIds: entregas.map(e => e.id) })]);
+        }
+      }
       await conn.execute('DELETE FROM ped_orc WHERE NUMERO = ? AND TIPO = ?', [alvo.numero, alvo.tipo]);
       await auditarDoc(conn, req, 'documento_excluido', alvo.tipo, alvo.numero, resumo);
       return { ok: true };

@@ -46,7 +46,9 @@ function bancoPedOrc() {
     serrComponentes: [{ id: 11, modelo_padrao_id: 1, tipo_componente: 'Fechadura', descricao_componente: 'Fechadura tetra', unidade_medida: 'UN', valor_unitario: 10, ativo: 1 },
       { id: 12, modelo_padrao_id: 1, tipo_componente: 'Pintura', descricao_componente: 'Pintura eletrostática', unidade_medida: 'M2', valor_unitario: 25.5, ativo: 1 },
       { id: 13, modelo_padrao_id: 9, tipo_componente: 'Roldana', descricao_componente: 'Roldana de portão', unidade_medida: 'UN', valor_unitario: 40, ativo: 1 }],
-    pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: [], auditoria: []
+    pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: [], auditoria: [],
+    // módulo Entregas (só o que a exclusão de pedido toca)
+    entregas: [], entregaEventos: [], entregaAnexos: []
   };
   // falhas simuladas: { 'ped_orc': n } → as n próximas gravações nessa tabela falham
   const falhas = {};
@@ -73,6 +75,14 @@ function bancoPedOrc() {
     [/FROM sistema_correr WHERE NOME = \?/, (sql, [n]) => estado.sistemas.filter(s => s.NOME === n)],
     [/FROM itens_sistema_correr WHERE NOME = \?/, (sql, [n]) => estado.itensSistema.filter(i => i.NOME === n)],
     [/FROM config_sistema_correr WHERE NOME = \? AND QTD_PORTAS = \?/, (sql, [n, q]) => estado.configSistema.filter(c => c.NOME === n && c.QTD_PORTAS === Number(q))],
+    // entrega do pedido excluído (módulo Entregas): filhos por entrega_id, depois a própria entrega
+    [/^SELECT id FROM web_entregas WHERE numero = \? FOR UPDATE$/, (sql, [n]) => estado.entregas.filter(e => e.numero === Number(n)).map(e => ({ id: e.id }))],
+    [/^DELETE FROM web_entrega_anexos WHERE entrega_id = \?$/, (sql, [id]) => {
+      const fica = estado.entregaAnexos.filter(a => a.entrega_id !== id); estado.entregaAnexos.splice(0, estado.entregaAnexos.length, ...fica); return { affectedRows: 1 }; }],
+    [/^DELETE FROM web_entrega_eventos WHERE entrega_id = \?$/, (sql, [id]) => {
+      const fica = estado.entregaEventos.filter(a => a.entrega_id !== id); estado.entregaEventos.splice(0, estado.entregaEventos.length, ...fica); return { affectedRows: 1 }; }],
+    [/^DELETE FROM web_entregas WHERE id = \?$/, (sql, [id]) => {
+      const fica = estado.entregas.filter(a => a.id !== id); estado.entregas.splice(0, estado.entregas.length, ...fica); return { affectedRows: 1 }; }],
     // cabeçalho
     // InnoDB (REPEATABLE READ): leitura comum vê a foto do início da transação; FOR UPDATE vê o que já foi gravado
     [/SELECT MAX\(NUMERO\) AS m FROM ped_orc WHERE TIPO = \?/, (sql, [t]) => {

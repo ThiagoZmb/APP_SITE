@@ -36,7 +36,8 @@ test('acoesDisponiveis: espelha as transições do servidor', () => {
   assert.deepEqual(a('agendada', 'outro_estado'), ['reagendar', 'enviada', 'cancelar']);
   assert.deepEqual(a('enviada', 'outro_estado'), ['comprovante']);
   assert.deepEqual(a('ocorrencia', 'motorista'), ['reagendar', 'cancelar']);
-  for (const s of ['em_rota', 'entregue', 'retirado', 'cancelada']) assert.deepEqual(a(s, 'motorista'), []);
+  assert.deepEqual(a('em_rota', 'motorista'), ['reagendar', 'cancelar']);
+  for (const s of ['entregue', 'retirado', 'cancelada']) assert.deepEqual(a(s, 'motorista'), []);
   assert.deepEqual(E.acoesDisponiveis(null), []);
 });
 

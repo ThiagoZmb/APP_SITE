@@ -71,11 +71,11 @@
     if (!e) return [];
     const r = [];
     if (e.status === 'a_programar') r.push('agendar');
-    if (e.status === 'ocorrencia' || e.status === 'agendada') r.push('reagendar');
+    if (['ocorrencia', 'agendada', 'em_rota'].includes(e.status)) r.push('reagendar');
     if (e.status === 'agendada' && e.tipo === 'retirada') r.push('retirada');
     if (e.status === 'agendada' && e.tipo === 'outro_estado') r.push('enviada');
     if (e.status === 'enviada' && e.tipo === 'outro_estado') r.push('comprovante');
-    if (['a_programar', 'agendada', 'ocorrencia'].includes(e.status)) r.push('cancelar');
+    if (['a_programar', 'agendada', 'ocorrencia', 'em_rota'].includes(e.status)) r.push('cancelar');
     return r;
   }
 
@@ -177,13 +177,15 @@
       let resto;
       if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td>${botaoAcao('reagendar', 'Reagendar')}</td>`;
-      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.status)}</td>`;
+      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.status)}</td>` +
+        (aba === 'em_rota' ? `<td>${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {
       fila: ['Pedido', 'Cliente', 'Cidade/UF', 'Prometido', 'Status', ''],
       ocorrencias: ['Pedido', 'Cliente', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
-      outras: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status']
+      outras: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
+      em_rota: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
     };
 
     function desenharLista() {

@@ -7,16 +7,17 @@ const TIPOS = Object.freeze({ MOTORISTA: 'motorista', RETIRADA: 'retirada', OUTR
 
 const MOTIVOS_OCORRENCIA = ['ausente', 'endereco_errado', 'recusa', 'parcial'];
 
+// em_rota: só o motorista conclui (entregue/ocorrência); a equipe pode reagendar ou cancelar para não deixar a entrega presa
 // ação -> { de: status de origem, tipo: tipo exigido (null = qualquer), para: status novo, evento }
 const TRANSICOES = {
   agendar: { de: ['a_programar'], tipo: null, para: 'agendada', evento: 'agendada' },
-  reagendar: { de: ['ocorrencia', 'agendada'], tipo: null, para: 'agendada', evento: 'reagendada' },
+  reagendar: { de: ['ocorrencia', 'agendada', 'em_rota'], tipo: null, para: 'agendada', evento: 'reagendada' },
   saiu: { de: ['agendada'], tipo: 'motorista', para: 'em_rota', evento: 'saiu' },
   entregue: { de: ['em_rota'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
   retirada: { de: ['agendada'], tipo: 'retirada', para: 'retirado', evento: 'retirada' },
   enviada: { de: ['agendada'], tipo: 'outro_estado', para: 'enviada', evento: 'enviada' },
   comprovante: { de: ['enviada'], tipo: 'outro_estado', para: 'entregue', evento: 'comprovante' },
-  cancelar: { de: ['a_programar', 'agendada', 'ocorrencia'], tipo: null, para: 'cancelada', evento: 'cancelada' }
+  cancelar: { de: ['a_programar', 'agendada', 'ocorrencia', 'em_rota'], tipo: null, para: 'cancelada', evento: 'cancelada' }
 };
 for (const m of MOTIVOS_OCORRENCIA) {
   TRANSICOES['ocorrencia:' + m] = { de: ['em_rota'], tipo: 'motorista', para: 'ocorrencia', evento: m };

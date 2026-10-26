@@ -127,3 +127,78 @@ test('F6: varredura de 50 pedidos Pronto usa um INSERT de entregas e um de event
   assert.equal(sqls.filter(s => /^INSERT INTO web_entrega_eventos/.test(s)).length, 1);
   assert.equal(sqls.filter(s => /^SELECT p\.NUMERO/.test(s)).length, 0);
 });
+
+// ---- F4: equipe reagenda/cancela entrega em_rota (destrava motorista que não conclui) ----
+test('F4: reagendar em_rota -> agendada com evento reagendada; cancelar em_rota -> cancelada com motivo', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente(); banco.semear.pedido({ NUMERO: 501 });
+  const a = banco.semear.entrega({ numero: 501, status: 'em_rota', tipo: 'motorista', motorista_codigo: 21, data_agendada: '2026-10-26' });
+  const r = await post(chamar, a.id, 'reagendar', { dataAgendada: '2026-10-28' });
+  assert.equal(r.status, 200);
+  assert.equal(a.status, 'agendada');
+  assert.equal(a.data_agendada, '2026-10-28');
+  assert.equal(banco.eventos.at(-1).tipo, 'reagendada');
+  banco.pedidos.push({ NUMERO: 502, TIPO: 'Pedido', SITUACAO: 'Pronto', RAZAO_SOCIAL: 'CLIENTE TESTE LTDA', DATA_ENTREGA: null });
+  const b = banco.semear.entrega({ numero: 502, status: 'em_rota', tipo: 'motorista', motorista_codigo: 21, data_agendada: '2026-10-26' });
+  assert.equal((await post(chamar, b.id, 'cancelar', { motivo: 'Motorista sumiu' })).status, 200);
+  assert.equal(b.status, 'cancelada');
+  assert.equal(banco.eventos.at(-1).motivo, 'Motorista sumiu');
+});
+
+test('F4: enviada continua sem reagendar/cancelar (409)', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente(); banco.semear.pedido({ NUMERO: 501 });
+  const e = banco.semear.entrega({ numero: 501, status: 'enviada', tipo: 'outro_estado' });
+  assert.equal((await post(chamar, e.id, 'cancelar', { motivo: 'teste' })).status, 409);
+  assert.equal((await post(chamar, e.id, 'reagendar', { dataAgendada: '2026-10-28' })).status, 409);
+});
+
+// ---- F5: excluir pedido apaga a entrega (anexos, eventos, entrega) na mesma transação e audita ----
+const { prepararPedOrc, bancoPedOrc } = require('./apoio/bancoPedOrc');
+function pedidoComEntrega(banco, numero = 5) {
+  banco.pedOrc.push({ id: numero, TIPO: 'Pedido', NUMERO: numero, RAZAO_SOCIAL: 'CLIENTE TESTE', SITUACAO: 'Pronto', TOTAL: 100 });
+  banco.entregas.push({ id: 40 + numero, numero });
+  banco.entregaEventos.push({ id: 1, entrega_id: 40 + numero }, { id: 2, entrega_id: 99 });
+  banco.entregaAnexos.push({ id: 1, entrega_id: 40 + numero }, { id: 2, entrega_id: 99 });
+}
+
+test('F5: excluir pedido com entrega remove anexos, eventos e entrega (só as dele) e audita', async t => {
+  const banco = bancoPedOrc(); pedidoComEntrega(banco);
+  banco.entregas.push({ id: 99, numero: 8 });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5', 'DELETE')).status, 200);
+  assert.deepEqual(banco.entregas.map(e => e.id), [99]);
+  assert.deepEqual(banco.entregaEventos.map(e => e.entrega_id), [99]);
+  assert.deepEqual(banco.entregaAnexos.map(e => e.entrega_id), [99]);
+  const a = banco.auditoria.find(x => x.acao === 'entrega_removida_com_pedido');
+  assert.ok(a);
+  assert.equal(a.alvo, '5');
+});
+
+test('F5: excluir pedido sem entrega não falha nem audita remoção de entrega', async t => {
+  const banco = bancoPedOrc();
+  banco.pedOrc.push({ id: 6, TIPO: 'Pedido', NUMERO: 6, RAZAO_SOCIAL: 'CLIENTE TESTE', SITUACAO: 'Em Produção', TOTAL: 1 });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/6', 'DELETE')).status, 200);
+  assert.equal(banco.auditoria.some(x => x.acao === 'entrega_removida_com_pedido'), false);
+});
+
+test('F5: excluir orçamento não mexe em entrega de pedido de mesmo número', async t => {
+  const banco = bancoPedOrc(); pedidoComEntrega(banco);
+  banco.pedOrc.push({ id: 7, TIPO: 'Orçamento', NUMERO: 5, RAZAO_SOCIAL: 'CLIENTE TESTE', SITUACAO: 'Aguardando resposta', TOTAL: 1 });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Orçamento/5', 'DELETE')).status, 200);
+  assert.equal(banco.entregas.length, 1);
+});
+
+test('F5: falha ao excluir o pedido desfaz tudo e preserva a entrega', async t => {
+  const banco = bancoPedOrc(); pedidoComEntrega(banco);
+  banco.f.regras.unshift([/^DELETE FROM ped_orc WHERE/, () => { throw new Error('falha forçada'); }]);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5', 'DELETE')).status, 500);
+  assert.equal(banco.entregas.length, 1);
+  assert.equal(banco.entregaEventos.length, 2);
+  assert.equal(banco.entregaAnexos.length, 2);
+  assert.equal(banco.pedOrc.length, 1);
+  assert.equal(banco.auditoria.length, 0);
+});

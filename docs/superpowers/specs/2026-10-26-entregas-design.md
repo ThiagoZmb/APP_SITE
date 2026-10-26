@@ -65,6 +65,8 @@ Outro estado: A programar → Agendada → Enviada → Entregue (comprovante ane
 - *Entregue* grava `ped_orc.SITUACAO='Entregue'` e *Retirado* grava `'Retirado'`, na **mesma transação** do evento.
 - *Parcial* não fecha o pedido: vira ocorrência com a lista do entregue e pede reagendamento do restante.
 - Cancelar a entrega não altera a situação do pedido.
+- **Entrega Em rota presa:** só o motorista conclui `em_rota` (entregue/ocorrência), mas a equipe pode **Reagendar** (`em_rota` → Agendada, evento `reagendada`) ou **Cancelar** (`em_rota` → Cancelada) para destravar quem não conclui. `enviada` segue só o fluxo próprio (comprovante).
+- A baixa grava no pedido `SITUACAO` **e** `DATA_ENTREGA` (data da entrega, como `Pedido_Entregue`/`Pedido_Retirado` do VB) e nunca sobrescreve pedido `Cancelado` (409, nada é gravado). A varredura cancela entregas A programar/Agendada/Ocorrência de pedido `Cancelado` (Em rota não) e reabre a que ela mesma cancelou por "saiu de Pronto" quando o pedido volta a `Pronto`.
 - Pedido que volte de `Pronto` para `Em Produção` antes de ser agendado tem o registro "A programar" cancelado.
 
 ## 5. Criação do registro

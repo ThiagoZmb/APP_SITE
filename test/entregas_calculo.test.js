@@ -14,10 +14,11 @@ test('agendar só em a_programar', () => {
   assert.equal(proximo(e('agendada'), 'agendar'), null);
 });
 
-test('reagendar vale em ocorrencia e agendada', () => {
+test('reagendar vale em ocorrencia, agendada e em_rota (equipe destrava entrega presa)', () => {
   assert.deepEqual(proximo(e('ocorrencia', 'motorista'), 'reagendar'), { status: 'agendada', evento: 'reagendada' });
   assert.deepEqual(proximo(e('agendada', 'motorista'), 'reagendar'), { status: 'agendada', evento: 'reagendada' });
-  assert.equal(proximo(e('em_rota', 'motorista'), 'reagendar'), null);
+  assert.deepEqual(proximo(e('em_rota', 'motorista'), 'reagendar'), { status: 'agendada', evento: 'reagendada' });
+  assert.equal(proximo(e('enviada', 'outro_estado'), 'reagendar'), null);
 });
 
 test('saiu exige tipo motorista', () => {
@@ -44,10 +45,10 @@ test('retirada e outro estado', () => {
 });
 
 test('cancelar', () => {
-  for (const s of ['a_programar', 'agendada', 'ocorrencia']) {
+  for (const s of ['a_programar', 'agendada', 'ocorrencia', 'em_rota']) {
     assert.deepEqual(proximo(e(s, 'motorista'), 'cancelar'), { status: 'cancelada', evento: 'cancelada' });
   }
-  assert.equal(proximo(e('em_rota', 'motorista'), 'cancelar'), null);
+  assert.equal(proximo(e('enviada', 'outro_estado'), 'cancelar'), null);
 });
 
 test('estados finais e ação desconhecida', () => {
