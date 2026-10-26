@@ -2,6 +2,8 @@
 
 Não havia README nem CLAUDE.md anterior; este arquivo foi gerado a partir da leitura do código.
 
+> **Trabalho em andamento (branch `feat/skill-engenharia-projetos`):** antes de mexer na skill `.claude/skills/engenharia-projetos-tecnicos/`, leia `CONTEXTO_SKILL_ENGENHARIA.md` (raiz), que tem decisões, estado atual e próximos passos.
+
 ## 1. O que o sistema faz
 
 Versão web (front-end + API) de um sistema de gestão que já existe em **VB (Visual Basic)** para uma empresa de esquadrias/portas/serralheria ("ELEGANCE"). A web lê e grava **as mesmas tabelas do banco do VB**; muitos comentários dizem "fiel ao VB" e citam formulários/módulos do VB (ex.: `frm_Pedido2`, `ModPedOrc`, `MotorFinanceiro`).
