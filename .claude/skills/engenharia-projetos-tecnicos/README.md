@@ -43,7 +43,7 @@ node scripts/gerar-relatorio.mjs projeto.json --saida relatorio.md
 # Confirmação humana registrada (tudo ou nada; o arquivo de entrada nunca é alterado)
 # Exit 0 = ok, 1 = entrada/saída inválida ou regra violada, 2 = uso errado
 node scripts/confirmar-valores.mjs projeto.json --por "Nome" --saida novo.json \
-  [--ids a,b] [--resolver conflitante=candidato] [--informar id=valor] [--nota "..."] [--em ISO]
+  [--ids a,b] [--resolver conflitante=candidato] [--informar id=valor] [--rejeitar a,b] [--nota "..."] [--em ISO]
 
 # Monta os itens no formato da tela do orçamento/pedido (stdout, ou arquivo com --saida)
 # Exit 0 = ok (veja prontoParaLancar), 1 = projeto inválido (nada é gerado), 2 = uso errado
@@ -77,6 +77,8 @@ Fixtures sintéticos (sem dados de cliente) em `tests/fixtures/`; relatório e i
 - `--ids a,b`: só valor `inferido` vira `confirmado` (mantém método e origem; grava `confirmacao`). Qualquer outro estado é erro e nada é gravado.
 - `--resolver conflitante=candidato`: o conflitante vira o candidato escolhido, confirmado; os candidatos originais ficam no `historico`.
 - `--informar id=valor`: para valor **ausente**; método `informado_humano`. Em campo de comprimento o número é em mm (aceita `79,5 cm` e converte); em campo de texto vale o texto; `num:2` informa número em campo sem unidade.
+- `--rejeitar id[,id...]`: para valor **inferido** que está errado; exige `--nota` (motivo). O valor vira `ausente` (`valor: null`, `confianca: 0`), mantém `id`, `unidade`, `metodo` e `origem`; o valor rejeitado, quem, quando e a nota vão para o `historico` (ação `rejeitar`). Confirmado, ausente ou conflitante é erro (conflitante se resolve com `--resolver`). As pendências `inferido_sem_confirmacao`/`unidade_ambigua` do valor saem e entra **uma** pendência `ausente` "rejeitado por <por>: <nota>"; se a pendência tinha outros refs, ela fica sem o id rejeitado quando algum ref restante ainda exige pendência, e sai por inteiro quando todos já estão resolvidos. Valor calculado que dependia do rejeitado gera aviso; como o validador exige calculado ausente quando uma entrada está ausente, rejeite-o na mesma execução (`--rejeitar rejeitado,calculado`) ou a saída é recusada com a indicação de qual calculado rejeitar.
+- O mesmo id não pode estar em duas ações da mesma execução. As opções se combinam (`--ids`, `--resolver`, `--informar`, `--rejeitar`).
 - Remove pendências cujos valores ficaram todos resolvidos (nunca `divergencia` nem `texto_suspeito`), acrescenta `historico`, avisa quando um valor calculado depende de valor recém-confirmado (recalcule) e valida entrada e saída (saída inválida: não grava, exit 1). O schema do documento vira 1.1.0.
 
 ## Golden de amostras reais (fora do git)

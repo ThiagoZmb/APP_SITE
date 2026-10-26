@@ -281,3 +281,134 @@ test('CLI: sem --em usa a data de agora (ISO válida)', () => comPastaTemp(dir =
   const em = JSON.parse(readFileSync(saida, 'utf8')).historico[0].em;
   assert.ok(Math.abs(Date.now() - Date.parse(em)) < 60_000, em);
 }));
+
+// ---------- --rejeitar ----------
+test('--rejeitar: inferido vira ausente (valor null, confianca 0), mantém id/unidade/metodo/origem; valor vai para o histórico', () => {
+  const entrada = projeto();
+  const copia = structuredClone(entrada);
+  const antes = entrada.itens[0].atributos.puxador;
+  const { doc, historico } = aplicarConfirmacoes(entrada, { ...BASE, nota: 'o projeto não tem puxador', rejeitar: ['P1.puxador'] });
+  assert.deepEqual(entrada, copia, 'documento de entrada intacto');
+  const v = achar(doc, 'P1.puxador');
+  assert.deepEqual([v.id, v.estado, v.valor, v.confianca, v.unidade, v.metodo], ['P1.puxador', 'ausente', null, 0, antes.unidade, antes.metodo]);
+  assert.deepEqual(v.origem, antes.origem);
+  assert.equal(v.confirmacao, undefined);
+  const h = historico.find(x => x.acao === 'rejeitar');
+  assert.deepEqual([h.por, h.em, h.nota, h.ids], ['Maria Souza', EM, 'o projeto não tem puxador', ['P1.puxador']]);
+  assert.equal(h.detalhes.rejeitados[0].valorRejeitado, 'PUXADOR 2790');
+  assert.equal(h.detalhes.rejeitados[0].confiancaAnterior, antes.confianca);
+  assert.deepEqual(h.detalhes.pendenciasCriadas, ['pend-rejeitado-P1.puxador']);
+  // pendência: a de inferido sai, entra UMA "ausente" com o motivo
+  assert.ok(!idsPend(doc).includes('pend-puxador'));
+  const novas = doc.pendencias.filter(p => p.refs.includes('P1.puxador'));
+  assert.deepEqual(novas.map(p => [p.tipo, p.mensagem, p.refs]), [['ausente', 'rejeitado por Maria Souza: o projeto não tem puxador', ['P1.puxador']]]);
+  assert.equal(historico.find(x => x.acao === 'remover_pendencias').ids.includes('pend-puxador'), true);
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
+  assert.match(gerarRelatorio(doc), /rejeitar \(P1\.puxador\).*valor rejeitado de P1\.puxador: PUXADOR 2790/);
+});
+
+test('--rejeitar: pendências com outros refs — fica (sem o id rejeitado) se algum ref restante ainda está aberto; sai se todos resolvidos', () => {
+  const d = projeto();
+  d.pendencias.push({ id: 'pend-dupla', tipo: 'inferido_sem_confirmacao', mensagem: 'puxador e altura', refs: ['P1.puxador', 'P1.altura'] });
+  d.pendencias.push({ id: 'pend-dupla2', tipo: 'inferido_sem_confirmacao', mensagem: 'puxador e larg2', refs: ['P1.puxador', 'P1.larg2'] });
+  const { doc } = aplicarConfirmacoes(d, { ...BASE, nota: 'n', rejeitar: ['P1.puxador'] });
+  assert.deepEqual(doc.pendencias.find(p => p.id === 'pend-dupla').refs, ['P1.altura'], 'altura ainda inferida: a pendência continua');
+  assert.ok(!idsPend(doc).includes('pend-dupla2'), 'larg2 já confirmado: nada mais a pendenciar');
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
+});
+
+test('--rejeitar: confirmado, ausente ou conflitante → erro e nada é aplicado (tudo ou nada); id inexistente também', () => {
+  const d = projeto();
+  const falha = (rejeitar, padrao) => assert.throws(() => aplicarConfirmacoes(d, { ...BASE, nota: 'n', rejeitar }), padrao);
+  falha(['P1.larg2'], /"P1.larg2" está "confirmado"; só valor "inferido"/);
+  falha(['P1.largura'], /"P1.largura" está "ausente"/);
+  falha(['P1.cor'], /"P1.cor" está "conflitante".*--resolver/);
+  falha(['nao-existe'], /não existe no documento/);
+  falha(['P1.puxador', 'P1.larg2'], /"P1.larg2" está "confirmado"/); // o primeiro seria válido: nada é aplicado
+});
+
+test('--rejeitar: exige nota (motivo) — sem nota ou nota vazia é erro', () => {
+  const d = projeto();
+  assert.throws(() => aplicarConfirmacoes(d, { ...BASE, rejeitar: ['P1.puxador'] }), /--rejeitar exige --nota/);
+  assert.throws(() => aplicarConfirmacoes(d, { ...BASE, nota: '  ', rejeitar: ['P1.puxador'] }), /--rejeitar exige --nota/);
+  // a nota só é obrigatória quando há rejeição
+  assert.doesNotThrow(() => aplicarConfirmacoes(d, { ...BASE, ids: ['P1.puxador'] }));
+});
+
+test('--rejeitar: o mesmo id em duas ações é erro', () => {
+  const d = projeto();
+  const falha = args => assert.throws(() => aplicarConfirmacoes(d, { ...BASE, nota: 'n', ...args }), /"P1.altura" aparece mais de uma vez/);
+  falha({ ids: ['P1.altura'], rejeitar: ['P1.altura'] });
+  falha({ informar: [{ id: 'P1.altura', valor: '1' }], rejeitar: ['P1.altura'] });
+  falha({ resolver: [{ conflitante: 'P1.altura', candidato: 'x' }], rejeitar: ['P1.altura'] });
+  falha({ rejeitar: ['P1.altura', 'P1.altura'] });
+});
+
+test('--rejeitar: calculado que depende do rejeitado gera aviso (e fica sinalizado para rejeitar junto)', () => {
+  const r = aplicarConfirmacoes(projeto(), { ...BASE, nota: 'n', rejeitar: ['P1.altura', 'P1.area'] });
+  assert.equal(r.avisos.length, 0, 'área rejeitada junto: nada a avisar');
+  assert.deepEqual(r.dependentesRejeitados, []);
+  assert.equal(validarProjeto(r.doc).ok, true, JSON.stringify(validarProjeto(r.doc).erros));
+  // pendência "pend-misto" (tipo ausente) e a divergência não são tocadas
+  assert.ok(idsPend(r.doc).includes('pend-misto') && idsPend(r.doc).includes('pend-soma'));
+
+  const so = aplicarConfirmacoes(projeto(), { ...BASE, nota: 'n', rejeitar: ['P1.altura'] });
+  assert.equal(so.avisos.length, 1);
+  assert.match(so.avisos[0], /"P1\.area".*altura x largura.*"P1\.altura".*rejeitado.*--rejeitar P1\.area/);
+  assert.deepEqual(so.dependentesRejeitados, ['P1.area']);
+  assert.equal(validarProjeto(so.doc).ok, false, 'calculado inferido com entrada ausente é inválido');
+});
+
+test('--rejeitar combina com --ids, --informar e --resolver na mesma execução', () => {
+  const { doc, historico } = aplicarConfirmacoes(projeto(), {
+    ...BASE, nota: 'conferência', ids: ['P1.altura'], rejeitar: ['P1.puxador'],
+    informar: [{ id: 'P1.perfil', valor: 'PERFIL 3136' }], resolver: [{ conflitante: 'P1.cor', candidato: 'P1.cor.a' }],
+  });
+  assert.deepEqual(historico.map(h => h.acao), ['confirmar', 'resolver_conflito', 'informar', 'rejeitar', 'remover_pendencias']);
+  assert.equal(achar(doc, 'P1.altura').estado, 'confirmado');
+  assert.equal(achar(doc, 'P1.puxador').estado, 'ausente');
+  assert.equal(achar(doc, 'P1.perfil').estado, 'confirmado');
+  assert.equal(achar(doc, 'P1.cor').estado, 'confirmado');
+  assert.ok(doc.pendencias.some(p => p.id === 'pend-rejeitado-P1.puxador'));
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
+});
+
+test('CLI --rejeitar: grava o projeto e mostra a contagem; exige --nota (exit 2)', () => comPastaTemp(dir => {
+  const entrada = gravar(dir, projeto());
+  const saida = join(dir, 'novo.json');
+  const r = rodarScript(SCRIPT, [entrada, '--por', 'Maria Souza', '--em', EM, '--nota', 'é acabamento, não cor', '--ids', 'P1.altura',
+    '--rejeitar', 'P1.puxador', '--informar', 'P1.perfil=PERFIL 3136', '--saida', saida]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /1 confirmado\(s\), 0 conflito\(s\) resolvido\(s\), 1 informado\(s\), 1 rejeitado\(s\)/);
+  const novo = JSON.parse(readFileSync(saida, 'utf8'));
+  assert.equal(validarProjeto(novo).ok, true);
+  assert.ok(novo.historico.some(h => h.acao === 'rejeitar'));
+
+  const sem = rodarScript(SCRIPT, [entrada, '--por', 'M', '--rejeitar', 'P1.puxador', '--saida', join(dir, 'x.json')]);
+  assert.equal(sem.status, 2);
+  assert.match(sem.stderr, /--rejeitar exige --nota/);
+  assert.equal(existsSync(join(dir, 'x.json')), false);
+}));
+
+test('CLI --rejeitar: saída inválida por calculado dependente → erro diz qual calculado rejeitar junto; nada gravado', () => comPastaTemp(dir => {
+  const entrada = gravar(dir, projeto());
+  const saida = join(dir, 'novo.json');
+  const r = rodarScript(SCRIPT, [entrada, '--por', 'M', '--nota', 'errado', '--rejeitar', 'P1.altura', '--saida', saida]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /P1\.area: depende de valor rejeitado.*--rejeitar P1\.area/);
+  assert.equal(existsSync(saida), false);
+  const ok = rodarScript(SCRIPT, [entrada, '--por', 'M', '--nota', 'errado', '--rejeitar', 'P1.altura,P1.area', '--saida', saida]);
+  assert.equal(ok.status, 0, ok.stderr);
+}));
+
+test('CLI --rejeitar: id em duas ações e rejeitar confirmado → exit 1 e nada gravado', () => comPastaTemp(dir => {
+  const entrada = gravar(dir, projeto());
+  const saida = join(dir, 'novo.json');
+  const dup = rodarScript(SCRIPT, [entrada, '--por', 'M', '--nota', 'x', '--ids', 'P1.puxador', '--rejeitar', 'P1.puxador', '--saida', saida]);
+  assert.equal(dup.status, 1);
+  assert.match(dup.stderr, /mais de uma vez/);
+  const conf = rodarScript(SCRIPT, [entrada, '--por', 'M', '--nota', 'x', '--rejeitar', 'P1.larg2', '--saida', saida]);
+  assert.equal(conf.status, 1);
+  assert.match(conf.stderr, /só valor "inferido"/);
+  assert.equal(existsSync(saida), false);
+}));

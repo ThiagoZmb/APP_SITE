@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2 — 2026-10-26
+
+`confirmar-valores --rejeitar`.
+
+Motivo: a conferência humana de uma amostra real achou uma lacuna. A pessoa precisava poder **rejeitar** um valor inferido errado (a leitura visual classificou "Inox escovado" como cor do perfil, mas é acabamento; ou leu "15" como tamanho de puxador num projeto sem puxador). Só existiam `--ids` (confirmar), `--resolver` e `--informar`.
+
+- `--rejeitar id[,id...]` com `--nota` obrigatória (motivo). Só valor `inferido`; qualquer outro estado é erro e nada é gravado (conflitante se resolve com `--resolver`).
+- O valor vira `ausente` (null, confiança 0), mantém id, unidade, método e origem; o valor rejeitado vai para o `historico` (ação `rejeitar`, com valor anterior, quem, quando e nota; o relatório mostra o valor rejeitado).
+- Pendências: `inferido_sem_confirmacao`/`unidade_ambigua` do valor são substituídas por **uma** pendência `ausente` "rejeitado por <por>: <nota>" (regra 6). Com outros refs, a pendência continua (sem o id rejeitado) se algum ref restante ainda exige pendência; senão sai.
+- Calculado que depende do rejeitado: aviso em stderr; se a saída ficar inválida (entrada ausente), o erro diz qual calculado rejeitar junto ou recalcular.
+- Combina com `--ids`, `--resolver` e `--informar`; o mesmo id em duas ações é erro.
+
 ## 0.3.1 — 2026-10-26
 
 Correção do núcleo achada ao ler uma amostra real, mais decisões do usuário.

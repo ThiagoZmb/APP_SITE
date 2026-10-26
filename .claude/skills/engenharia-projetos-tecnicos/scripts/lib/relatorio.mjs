@@ -68,7 +68,7 @@ function linhasForaDoEscopo(doc, foraDoEscopo) {
     .map(it => `- Item ${it.id} (${it.tipo}): fora do escopo atual (sem mapeamento); registrado, não será lançado no orçamento/pedido.`);
 }
 
-const linhasHistorico = doc => (doc.historico || []).map(h => `- ${h.em} — ${limpar(h.por)}: ${h.acao} (${h.ids.length ? h.ids.join(', ') : '—'})${h.nota ? ` — ${limpar(h.nota)}` : ''}`);
+const linhasHistorico = doc => (doc.historico || []).map(h => `- ${h.em} — ${limpar(h.por)}: ${h.acao} (${h.ids.length ? h.ids.join(', ') : '—'})${h.nota ? ` — ${limpar(h.nota)}` : ''}${(h.detalhes?.rejeitados ?? []).map(r => ` [valor rejeitado de ${r.id}: ${limpar(r.valorRejeitado)}${r.unidade ? ` ${r.unidade}` : ''}]`).join('')}`);
 
 // opcoes.foraDoEscopo: { tipos } do mapa do domínio (a seção só aparece se houver item desses tipos)
 export function gerarRelatorio(doc, opcoes = {}) {
