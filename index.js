@@ -16,6 +16,7 @@ const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
+const { registrarEntregas } = require('./rotas/entregas');
 const { registrarCustos } = require('./rotas/custos');
 const { registrarPrecosFormacao } = require('./rotas/precos_formacao');
 const { registrarLeituraPdf } = require('./leitura/rotas');
@@ -1538,6 +1539,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
+registrarEntregas({ rota: registro.rota, pool });
 registrarCustos({ rota: registro.rota, pool });
 registrarPrecosFormacao({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });

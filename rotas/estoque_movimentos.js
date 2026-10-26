@@ -5,6 +5,7 @@
 // o que é só da web nas tabelas web_estoque_*. Toda gravação é uma transação.
 // ==========================================================================
 const express = require('express');
+const { ErroUsuario, emTransacao, agoraLocal, hojeLocal, horaLocal } = require('./transacao');
 const { lerNFe, ErroNFe } = require('./nfe_xml');
 
 const VER = 'estoque.ver';
@@ -22,42 +23,7 @@ function validarData(texto) {
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? m[0] : null;
 }
 const inteiroPositivo = v => Number.isInteger(v) && v >= 1;
-class ErroUsuario extends Error {
-  constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; }
-}
-
 const ehDuplicado = err => err?.code === 'ER_DUP_ENTRY' || err?.errno === 1062;
-// deadlock ou espera de trava esgotada: o MySQL desfez a transação inteira, dá para tentar de novo
-const ehConcorrencia = err => err?.errno === 1213 || err?.errno === 1205;
-const TENTATIVAS = 3;
-
-// Roda `trabalho(conn)` numa transação; ErroUsuario vira a resposta com a mensagem, outros erros viram 500.
-// Em deadlock (por exemplo, o VB gravando ao mesmo tempo) a transação é refeita do zero, até 3 vezes.
-async function emTransacao(pool, res, rotaNome, trabalho) {
-  for (let tentativa = 1; ; tentativa++) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      await conn.beginTransaction();
-      const resultado = await trabalho(conn);
-      await conn.commit();
-      return resultado;
-    } catch (err) {
-      if (conn) await conn.rollback().catch(() => {});
-      if (ehConcorrencia(err) && tentativa < TENTATIVAS) continue;
-      if (err instanceof ErroUsuario) res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
-      else { console.error(`Erro ${rotaNome}:`, err.message); if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' }); }
-      return undefined;
-    } finally {
-      if (conn) conn.release();
-    }
-  }
-}
-
-// hora de Brasília (o servidor no Render roda em UTC; o VB grava a hora local)
-const horaLocal = () => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date());
-const agoraLocal = () => `${hojeLocal()} ${horaLocal()}`; // gravado nas tabelas web_ no lugar de NOW() (o MySQL pode estar em outro fuso)
-const hojeLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); // AAAA-MM-DD
 const LIMITE_LINHA_SAIDA = 127; // saida_estoque.QTD é tinyint
 
 // Reserva a chave do lançamento (identificador gerado pela tela) gravando-a já no início da transação.
