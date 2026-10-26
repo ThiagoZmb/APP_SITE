@@ -6,14 +6,16 @@
 const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
 const { STATUS, TIPOS, proximo, pedidoPara, validarAnexo } = require('../calculo/entregas');
-const { ErroUsuario, emTransacao, agoraLocal } = require('./transacao');
+const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
 const VER = ['entregas.ver'];
 const PROGRAMAR = ['entregas.programar'];
 const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
   retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
-const PARTICIPIO = { agendar: 'agendada', reagendar: 'reagendada', cancelar: 'cancelada' };
+const PARTICIPIO = { agendar: 'agendada', reagendar: 'reagendada', cancelar: 'cancelada', retirada: 'registrada como retirada', enviada: 'marcada como enviada',
+  comprovante: 'confirmada', saiu: 'iniciada', entregue: 'baixada' };
+const participio = acao => (String(acao).startsWith('ocorrencia:') ? 'registrada como ocorrência' : PARTICIPIO[acao] || 'alterada');
 const FINAIS = ['entregue', 'retirado', 'cancelada']; // endereço não muda mais
 // campo do corpo -> coluna e tamanho máximo (endereço de entrega)
 const CAMPOS_ENDERECO = [['rua', 'endereco_rua', 190], ['numero', 'endereco_numero', 30], ['bairro', 'endereco_bairro', 120],
@@ -35,13 +37,26 @@ async function guardarAnexo(pool, entrega, tipo, corpo, mime, usuario) {
   const v = validarAnexo(corpo, mime);
   if (!v.ok) throw new ErroUsuario(400, v.motivo);
   const criadoPor = String(usuario);
-  const [[c]] = await pool.execute(
-    'SELECT COUNT(*) AS n FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL', [entrega, criadoPor]);
-  if (Number(c?.n) >= MAX_ANEXOS_PENDENTES) throw new ErroUsuario(409, `Já há ${MAX_ANEXOS_PENDENTES} anexos aguardando baixa nesta entrega. Conclua a baixa antes de enviar mais.`);
-  const [ins] = await pool.execute(
-    'INSERT INTO web_entrega_anexos (entrega_id, tipo, mime, dados, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
-    [entrega, tipo, mime, corpo, criadoPor, agoraLocal()]);
-  return { anexoId: ins.insertId };
+  // contagem + INSERT atômicos: a linha da entrega fica travada, então dois envios simultâneos não passam do limite
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[e]] = await conn.execute('SELECT id FROM web_entregas WHERE id = ? FOR UPDATE', [entrega]);
+    if (!e) throw new ErroUsuario(404, 'Entrega não encontrada.');
+    const [[c]] = await conn.execute(
+      'SELECT COUNT(*) AS n FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL', [entrega, criadoPor]);
+    if (Number(c?.n) >= MAX_ANEXOS_PENDENTES) throw new ErroUsuario(409, `Já há ${MAX_ANEXOS_PENDENTES} anexos aguardando baixa nesta entrega. Conclua a baixa antes de enviar mais.`);
+    const [ins] = await conn.execute(
+      'INSERT INTO web_entrega_anexos (entrega_id, tipo, mime, dados, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
+      [entrega, tipo, mime, corpo, criadoPor, agoraLocal()]);
+    await conn.commit();
+    return { anexoId: ins.insertId };
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 // Lista de ids do corpo: inteiros positivos, sem repetição, no máximo 3. Lança ErroUsuario 400 (mensagem genérica).
@@ -148,6 +163,16 @@ const paraEntrega = r => ({
   contatoLocal: r.contato_local ?? null, transportadora: r.transportadora ?? null, rastreio: r.rastreio ?? null,
   previsao: dia(r.previsao), observacao: r.observacao ?? null, criadoEm: r.criado_em ?? null, atualizadoEm: r.atualizado_em ?? null
 });
+
+// Entrega do motorista `usuarioId` (tipo motorista). De outro motorista, sem motorista, de outro tipo ou inexistente: undefined
+// (todos viram o mesmo 404). Única porta de entrada das rotas /minhas_entregas.
+async function buscarDoMotorista(conn, id, usuarioId, { travar = false } = {}) {
+  const uid = Number(usuarioId);
+  if (!Number.isInteger(id) || !Number.isInteger(uid)) return undefined;
+  const [[e]] = await conn.execute(
+    `SELECT * FROM web_entregas WHERE id = ? AND motorista_codigo = ? AND tipo = 'motorista'${travar ? ' FOR UPDATE' : ''}`, [id, uid]);
+  return e;
+}
 
 const idDe = req => (/^\d+$/.test(String(req.params.id)) ? Number(req.params.id) : null);
 const bad = msg => new ErroUsuario(400, msg);
@@ -275,14 +300,16 @@ function registrarEntregas({ rota, pool }) {
   // evento no histórico + auditoria, tudo na mesma transação. `acao` = nome em proximo(); null = sem mudar o status.
   // `montar(conn, atual)` devolve { cols, motivo?, detalhe?, entregueA?, depois? } (ou lança ErroUsuario);
   // `depois(conn, { eventoId, status })` roda na mesma transação, logo após o evento (vínculo de anexos, baixa no pedido).
-  async function gravar(req, res, nomeRota, acao, evento, montar) {
+  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false } = {}) {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const est = filtroEstados(req, 'c.ESTADO');
     const entrega = await emTransacao(pool, res, nomeRota, async conn => {
-      const [[atual]] = await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [id]);
+      // motorista: só a própria entrega (buscarDoMotorista); equipe: qualquer uma, respeitando o filtro de estados
+      const atual = motorista ? await buscarDoMotorista(conn, id, req.user.id, { travar: true })
+        : (await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [id]))[0][0];
       if (!atual) throw new ErroUsuario(404, 'Entrega não encontrada.');
-      if (est.sql) { // a trava fica só na linha da web; a conferência de estado é leitura comum
+      if (!motorista && est.sql) { // a trava fica só na linha da web; a conferência de estado é leitura comum
         const [ok] = await conn.execute(
           `SELECT 1 AS ok FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
            JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE e.id = ? AND ${est.sql}`, [id, ...est.params]);
@@ -291,7 +318,7 @@ function registrarEntregas({ rota, pool }) {
       let status = atual.status, tipoEvento = evento;
       if (acao) {
         const p = proximo(atual, acao);
-        if (!p) throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e não pode ser ${PARTICIPIO[acao]}.`);
+        if (!p) throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e não pode ser ${participio(acao)}.`);
         status = p.status; tipoEvento = p.evento;
       } else if (FINAIS.includes(atual.status)) {
         throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e o endereço não pode mais ser alterado.`);
@@ -430,6 +457,145 @@ function registrarEntregas({ rota, pool }) {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }) }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }));
+  });
+
+  // ==== Rotas do motorista (/minhas_entregas) ====
+  // Isolamento: toda rota passa por buscarDoMotorista (motorista_codigo = req.user.id). Nada daqui devolve dinheiro,
+  // nem para quem tem valores.ver: só se leem colunas de endereço, contato, itens (descrição/quantidade) e histórico.
+  const BAIXAR = ['entregas.baixar'];
+  const FICHA_SQL = `p.RAZAO_SOCIAL AS cliente, c.TELEFONE AS cli_telefone, c.ENDERECO AS cli_rua, c.NUMERO AS cli_numero,
+    c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade, c.ESTADO AS cli_uf, c.CEP AS cli_cep`;
+  const DONO = req => Number(req.user.id);
+
+  // endereço da entrega; todo vazio -> null + `enderecoCliente` (cadastro do cliente, só como sugestão de leitura)
+  function itemMotorista(r, qtdItens) {
+    const end = { rua: r.endereco_rua ?? null, numero: r.endereco_numero ?? null, bairro: r.endereco_bairro ?? null, cidade: r.endereco_cidade ?? null,
+      uf: r.endereco_uf ?? null, cep: r.endereco_cep ?? null, ref: r.endereco_ref ?? null };
+    const vazio = Object.values(end).every(v => !v);
+    const item = { id: r.id, numero: r.numero, status: r.status, dataAgendada: dia(r.data_agendada), cliente: r.cliente || '', telefone: r.cli_telefone || '',
+      endereco: vazio ? null : end, contatoLocal: r.contato_local ?? null, qtdItens: Number(qtdItens) || 0 };
+    if (vazio) item.enderecoCliente = { rua: r.cli_rua || '', numero: r.cli_numero || '', bairro: r.cli_bairro || '', cidade: r.cli_cidade || '', uf: r.cli_uf || '', cep: r.cli_cep || '' };
+    return item;
+  }
+
+  rota('get', '/minhas_entregas', BAIXAR, async (req, res) => {
+    const diaPedido = req.query.dia === undefined ? null : String(req.query.dia);
+    if (diaPedido !== null && !validarData(diaPedido)) return res.status(400).json({ error: 'Data inválida: use AAAA-MM-DD.' });
+    try {
+      const [linhas] = await pool.execute(
+        `SELECT e.*, ${FICHA_SQL},
+                (SELECT COUNT(*) FROM ped_orc_lista_itens i WHERE i.TIPO = 'Pedido' AND i.NUMERO = e.numero) AS qtd_itens
+         FROM web_entregas e
+         LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+         LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
+         WHERE e.motorista_codigo = ? AND e.tipo = 'motorista' AND e.status IN ('agendada', 'em_rota', 'ocorrencia')
+           AND e.data_agendada ${diaPedido ? '=' : '<='} ?
+         ORDER BY e.data_agendada, e.numero`, [DONO(req), diaPedido || hojeLocal()]);
+      res.json({ entregas: linhas.map(l => itemMotorista(l, l.qtd_itens)) });
+    } catch (err) { falha(res, 'GET /minhas_entregas', err); }
+  });
+
+  rota('get', '/minhas_entregas/:id', BAIXAR, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    try {
+      const e = await buscarDoMotorista(pool, id, DONO(req));
+      if (!e) return nao_encontrada(res);
+      const [[ficha]] = await pool.execute(
+        `SELECT ${FICHA_SQL} FROM ped_orc p LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido'`, [e.numero]);
+      const itens = await itensDoPedido(pool, e.numero);
+      const [eventos] = await pool.execute('SELECT quando, tipo, motivo, entregue_a FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]);
+      const [anexos] = await pool.execute(
+        'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?) ORDER BY id', [id, String(DONO(req))]);
+      res.json({
+        ...itemMotorista({ ...e, ...(ficha || {}) }, itens.length), itens, observacao: e.observacao ?? null,
+        eventos: eventos.map(v => ({ quando: v.quando, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null })),
+        anexos: anexos.map(a => ({ id: a.id, tipo: a.tipo, mime: a.mime, criadoEm: a.criado_em }))
+      });
+    } catch (err) { falha(res, 'GET /minhas_entregas/:id', err); }
+  });
+
+  rota('put', '/minhas_entregas/:id/anexo', BAIXAR, lerImagem, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    const tipo = String(req.query.tipo || '');
+    if (!TIPOS_ANEXO.includes(tipo)) return res.status(400).json({ error: 'Tipo de anexo inválido: use foto ou assinatura.' });
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
+    const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    try {
+      const e = await buscarDoMotorista(pool, id, DONO(req));
+      if (!e) return nao_encontrada(res);
+      if (e.status !== STATUS.EM_ROTA) return res.status(409).json({ error: 'Só é possível anexar depois de sair para a entrega.' });
+      res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, DONO(req)));
+    } catch (err) {
+      if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
+      falha(res, 'PUT /minhas_entregas/:id/anexo', err);
+    }
+  });
+
+  rota('get', '/minhas_entregas/:id/anexo/:anexoId', BAIXAR, async (req, res) => {
+    const id = idDe(req);
+    if (id === null || !/^\d+$/.test(String(req.params.anexoId))) return nao_encontrada(res);
+    try {
+      if (!(await buscarDoMotorista(pool, id, DONO(req)))) return nao_encontrada(res);
+      const [[a]] = await pool.execute(
+        'SELECT mime, dados FROM web_entrega_anexos WHERE id = ? AND entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?)',
+        [Number(req.params.anexoId), id, String(DONO(req))]);
+      if (!a) return res.status(404).json({ error: 'Anexo não encontrado.' });
+      res.set('Content-Type', a.mime).set('Content-Disposition', 'inline').set('Cache-Control', 'no-store').send(a.dados);
+    } catch (err) { falha(res, 'GET /minhas_entregas/:id/anexo/:anexoId', err); }
+  });
+
+  const MOTORISTA = { motorista: true };
+
+  rota('post', '/minhas_entregas/:id/saiu', BAIXAR, async (req, res) => {
+    await gravar(req, res, 'POST /minhas_entregas/:id/saiu', 'saiu', null, async () => ({ cols: {} }), MOTORISTA);
+  });
+
+  const SEM_FOTO = 'Anexe a foto do canhoto.';
+  rota('post', '/minhas_entregas/:id/baixa', BAIXAR, async (req, res) => {
+    const b = req.body || {};
+    const lido = lerOu400(res, () => {
+      const entregueA = lerEntregueA(b.entregueA, { obrigatorio: true });
+      const anexoIds = lerAnexoIds(b.anexoIds);
+      if (!anexoIds.length) throw bad(SEM_FOTO);
+      return { entregueA, anexoIds };
+    });
+    if (!lido) return;
+    const usuario = DONO(req);
+    const montarBaixa = baixa({ ...lido, usuario });
+    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => {
+      const marcas = lido.anexoIds.map(() => '?').join(', ');
+      const [fotos] = await conn.execute(
+        `SELECT id FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL AND tipo = 'foto' AND id IN (${marcas})`,
+        [atual.id, String(usuario), ...lido.anexoIds]);
+      if (!fotos.length) throw bad(SEM_FOTO);
+      return montarBaixa(conn, atual);
+    }, MOTORISTA);
+  });
+
+  // ocorrência: tipo, motivo (3-500) e, no parcial, o que foi entregue
+  function lerOcorrencia(b) {
+    if (!OCORRENCIAS.includes(b.tipo)) throw bad('Tipo de ocorrência inválido.');
+    const motivo = String(b.motivo ?? '').trim();
+    if (motivo.length < 3 || motivo.length > 500) throw bad('Informe o motivo (3 a 500 caracteres).');
+    let detalhe = null;
+    if (b.tipo === 'parcial') {
+      const lista = b.itensEntregues;
+      if (!Array.isArray(lista) || !lista.length || lista.length > 50) throw bad('Informe os itens entregues (de 1 a 50).');
+      detalhe = { itensEntregues: lista.map(i => {
+        const descricao = String(i?.descricao ?? '').trim();
+        if (!descricao || descricao.length > 300 || !Number.isInteger(i?.qtd) || i.qtd < 1) throw bad('Item entregue inválido: descrição (até 300) e quantidade inteira maior que zero.');
+        return { descricao, qtd: i.qtd };
+      }) };
+    }
+    return { tipo: b.tipo, motivo, detalhe };
+  }
+
+  rota('post', '/minhas_entregas/:id/ocorrencia', BAIXAR, async (req, res) => {
+    const lido = lerOu400(res, () => lerOcorrencia(req.body || {}));
+    if (lido) await gravar(req, res, 'POST /minhas_entregas/:id/ocorrencia', `ocorrencia:${lido.tipo}`, null,
+      async () => ({ cols: {}, motivo: lido.motivo, detalhe: lido.detalhe }), MOTORISTA);
   });
 }
 

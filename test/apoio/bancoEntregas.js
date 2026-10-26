@@ -48,7 +48,30 @@ function bancoEntregas() {
   const pedidoDe = e => pedidos.find(p => p.NUMERO === e.numero && p.TIPO === 'Pedido');
   const clienteDe = p => clientes.find(c => c.RAZAO_SOCIAL === p?.RAZAO_SOCIAL);
 
+  const fichaDe = e => {
+    const ped = pedidoDe(e); const cli = clienteDe(ped);
+    return { cliente: ped?.RAZAO_SOCIAL ?? null, cli_telefone: cli?.TELEFONE ?? null, cli_rua: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null,
+      cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null, cli_uf: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null };
+  };
   const regras = [
+    // ---- rotas do motorista (T6): o dono é sempre motorista_codigo ----
+    [/AS qtd_itens/, (sql, [uid, data]) => entregas
+      .filter(e => e.motorista_codigo === uid && e.tipo === 'motorista' && ['agendada', 'em_rota', 'ocorrencia'].includes(e.status) && e.data_agendada
+        && (sql.includes('<= ?') ? e.data_agendada <= data : e.data_agendada === data))
+      .sort((a, b) => String(a.data_agendada).localeCompare(String(b.data_agendada)) || a.numero - b.numero)
+      .map(e => ({ ...e, ...fichaDe(e), qtd_itens: String(estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
+    [/FROM web_entregas WHERE id = \? AND motorista_codigo = \?/, (sql, [id, uid]) =>
+      entregas.filter(e => e.id === id && e.motorista_codigo === uid && e.tipo === 'motorista').map(e => ({ ...e }))],
+    [/^SELECT p\.RAZAO_SOCIAL AS cliente, c\.TELEFONE AS cli_telefone/, (sql, [numero]) => {
+      const ped = pedidos.find(p => p.NUMERO === numero && p.TIPO === 'Pedido'); return ped ? [fichaDe({ numero })] : [];
+    }],
+    [/^SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = \? AND \(evento_id IS NOT NULL OR criado_por = \?\)/, (sql, [id, por]) =>
+      estado.anexos.filter(a => a.entrega_id === id && (a.evento_id != null || a.criado_por === por)).map(({ id: i, tipo, mime, criado_em }) => ({ id: i, tipo, mime, criado_em }))],
+    [/^SELECT mime, dados FROM web_entrega_anexos WHERE id = \? AND entrega_id = \? AND \(evento_id IS NOT NULL OR criado_por = \?\)/, (sql, [id, entrega_id, por]) =>
+      estado.anexos.filter(a => a.id === id && a.entrega_id === entrega_id && (a.evento_id != null || a.criado_por === por)).map(a => ({ mime: a.mime, dados: a.dados }))],
+    [/AND tipo = 'foto' AND id IN/, (sql, [entrega_id, criado_por, ...ids]) =>
+      estado.anexos.filter(a => a.entrega_id === entrega_id && a.criado_por === criado_por && a.evento_id == null && a.tipo === 'foto' && ids.includes(a.id)).map(a => ({ id: a.id }))],
+
     // listagem (GET /entregas): os filtros entram no SQL na ordem status, busca (2 parâmetros), estados
     [/AS data_prometida/, (sql, params) => {
       const p = [...params];
