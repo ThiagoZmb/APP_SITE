@@ -13,7 +13,7 @@ Todo valor extraído ou calculado tem:
 | `unidade` | `mm`, `un`, `kg`, `m2` ou `null` |
 | `estado` | `confirmado`, `inferido`, `ausente`, `conflitante` |
 | `confianca` | 0 a 1 |
-| `metodo` | `texto_vetorial`, `ocr`, `leitura_visual`, `calculado`, `configuracao` |
+| `metodo` | `texto_vetorial`, `ocr`, `leitura_visual`, `calculado`, `configuracao`, `informado_humano` (valor dado por uma pessoa; exige `confirmacao`) |
 | `origem` | `arquivo`, `pagina` (inteiro >= 1 ou `null`), `trecho`; opcionais `regiao` `[x,y,w,h]`, `chave`, `entradas` |
 | `regra` | obrigatória se `metodo=calculado` |
 | `confirmacao` | `{por, em, nota}`: quem confirmou, data ISO, observação |
@@ -39,10 +39,15 @@ Ordem de qualidade: confirmado, inferido, ausente/conflitante. Um valor `calcula
 | 5. Calculado: regra, entradas e estado | `calculado "confirmado" é melhor que o pior estado das entradas` |
 | 6. Incerto precisa de pendência | `não consta em pendencias; registre uma pendência com refs [...]` |
 | 7. Ids únicos | `id "X" repetido (já usado em ...)` |
+| 8. (schema 1.1.0) Valor informado por humano exige confirmação | `metodo "informado_humano" exige confirmacao humana registrada` |
 
 Unidades por campo: `quantidade` e contagens em `un`; `cotas` (total e parciais) em `mm`; `dimensoes` em `mm`, `m2` ou `kg` (número sem unidade é erro); `atributos` livres.
 
 Todos os ids (itens, cotas, contagens, pendências, valores e candidatos) dividem o mesmo espaço de nomes. Uma `refs` de pendência que não existe é erro.
+
+## Versão do schema e histórico
+
+`versaoSchema` aceita `1.0.0` e `1.1.0`. A 1.1.0 acrescenta o campo opcional `historico` (`[{ em, por, acao, ids, nota?, detalhes? }]`, uma entrada por ação de `confirmar-valores.mjs`) e o método `informado_humano`. Documentos 1.0.0 continuam válidos. `confirmar-valores.mjs` sempre grava 1.1.0.
 
 ## Pendências
 
@@ -55,4 +60,5 @@ A verificação cruzada (`scripts/lib/cruzada.mjs`, detalhada em `cotas-e-unidad
 ```
 node scripts/validar-projeto.mjs projeto.json        # 0 válido | 1 inválido | 2 uso errado
 node scripts/gerar-relatorio.mjs projeto.json [--saida relatorio.md]
+node scripts/confirmar-valores.mjs projeto.json --por "Nome" --saida novo.json [--ids a,b] [--resolver conf=cand] [--informar id=valor]
 ```

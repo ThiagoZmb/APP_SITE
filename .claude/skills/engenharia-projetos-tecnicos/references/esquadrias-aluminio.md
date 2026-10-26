@@ -4,6 +4,20 @@ Domínio `portas-aluminio` (mapa em `config/regras-por-dominio/portas-aluminio.j
 
 Citações no formato `arquivo:linha`, conferidas em 2026-10-26 no repositório. Se esses arquivos mudarem, o teste `montar-itens.test.mjs` só confere a lista de frentes; o restante precisa de revisão manual.
 
+## O que a Elegance fabrica nos projetos de arquitetura (decisão do usuário, 2026-10-26)
+
+Os projetos chegam de escritórios de arquitetura (projeto executivo de marcenaria). Três famílias de itens interessam à Elegance:
+
+| # | Família | Exemplos de legenda/chamada | `tipo` no projeto | Mapa para o item da tela |
+|---|---|---|---|---|
+| 1 | Portas de alumínio para móveis | `PORTAS EM PERFIL DE ALUMÍNIO COR INOX ESCOVADO + VIDRO PINTADO` | `porta_giro`, `porta_basculante`, `frente_gaveta`, `porta_correr` | **Sim** (este domínio, `portas-aluminio`) |
+| 2 | Estantes, louceiros e afins em perfil de alumínio | `PORTAS EM PERFIL 3136 E PUXADORES 2790`, `SISTEMA THIN1802`, `SISTEMA EVIDENCE` | `estante_perfil_aluminio`, `louceiro_perfil_aluminio`, `sistema_perfil_aluminio` | **Não** (fora do escopo atual) |
+| 3 | Estruturas metálicas em aço carbono (base de mesa, adega, nicho, suporte de prateleira) | `ESTRUTURA METÁLICA`, `METALON` | `estrutura_metalica_aco` | **Não** (fora do escopo atual) |
+
+As famílias 2 e 3 **são registráveis no projeto** como itens desses tipos (com quantidade, dimensões e atributos como qualquer outro item). Na saída de `montar-itens.mjs` saem com `foraDoEscopo: true`, `item: {}`, `prontoParaLancar: false` e a pendência informativa `fora_do_escopo` (não bloqueante): **nunca são descartados em silêncio** e **não impedem** o lançamento das portas. O relatório os lista em "Fora do escopo atual (sem mapeamento)". A lista de tipos está em `foraDoEscopo.tipos` do mapa. Um tipo que não consta nem na tradução nem nessa lista continua virando `traducao_sem_correspondencia` (pendência bloqueante), porque a skill não adivinha.
+
+Uma legenda que mistura famílias (por exemplo "portas em perfil 3136" dentro de um louceiro) deve ser registrada pelo que a Elegance fabrica: as portas em perfil de alumínio são família 1 (`porta_giro` etc., com `perfil` e `puxador` em `atributos`); a estrutura do louceiro é família 2. Em dúvida, registre pendência e pergunte; não escolha.
+
 ## Onde o item nasce e como o servidor o consome
 
 | Etapa | Onde |
@@ -95,3 +109,4 @@ Para acrescentar um sinônimo (por exemplo `porta_de_giro`), edite o mapa, atual
 - Confirmado com tipo ou faixa inválidos (texto onde se espera número, `qtd` fora de 1 a 500, medida <= 0, lista com item não numérico): `valor_invalido` (bloqueante).
 - Tipo sem tradução: `traducao_sem_correspondencia` (bloqueante).
 - Pendências do documento (soma de cotas divergente, unidade ambígua, texto suspeito, domínio diferente do mapa) ficam em `pendenciasDocumento` e impedem o `prontoParaLancar` global.
+- Tipo declarado em `foraDoEscopo.tipos` (estante, louceiro, sistema em perfil, estrutura de aço): `fora_do_escopo` (não bloqueante), item `foraDoEscopo: true` sem objeto de tela; não impede o `prontoParaLancar` global se houver ao menos um item de porta lançável.

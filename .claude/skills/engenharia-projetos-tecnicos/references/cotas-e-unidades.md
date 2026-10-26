@@ -46,3 +46,14 @@ O valor de uma cota vinda de unidade inferida deve virar `ValorRastreavel` com `
 - `verificarContagem(contagem)`: `declarado` diferente de `contado` gera `divergencia`.
 - Se o total ou alguma parcial/contagem está `ausente` ou `conflitante`, **nunca se assume 0**: gera pendência dizendo que a verificação não pôde ser feita (tipo `ausente` ou `conflitante`).
 - `aplicarVerificacoes(doc, config)` devolve um documento novo com essas pendências acrescentadas (ids `pend-soma-<cota>` e `pend-contagem-<contagem>`), sem duplicar e sem alterar o original.
+
+## Projetos de arquitetura: cotas em cm sem unidade (decisão de 2026-10-26)
+
+As amostras reais (projeto executivo de marcenaria) trazem cotas em **centímetros com vírgula decimal** (`206,3`, `79,5`) e **a unidade não aparece escrita**; as escalas são 1/50, 1/25 e 1/5. Decisão: quando a convenção de projeto de arquitetura e a escala indicam cm, a leitura usa `interpretarCota(texto, { unidadeDeclarada: { unidade: 'cm', inferida: true } })`.
+
+- O valor sai em mm (`206,3` vira `2063`), com `estadoUnidade: 'inferido'` e a pendência `unidade_ambigua`.
+- O `ValorRastreavel` fica `inferido` (e, vindo de leitura visual, o método é `leitura_visual`). **Nunca `confirmado` sem humano**: quem confirma é a pessoa, com `confirmar-valores.mjs --ids`, depois de conferir a unidade no desenho.
+- Resolver a pendência `unidade_ambigua` é confirmar o valor: `confirmar-valores` remove a pendência quando todos os valores citados nela foram confirmados.
+- Se a escala ou o contexto não permitem concluir que é cm, **não infira**: valor `ausente` + pendência, ou a pessoa informa com `--informar` (aceita `206,3 cm`).
+
+`--informar` em campo de comprimento converte para mm (a unidade do campo é preservada): `79,5` informa 79,5 mm; `79,5 cm` informa 795 mm; `2.100` é recusado por ambiguidade.

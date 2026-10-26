@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+Fase 1c: leitura de PDF com poppler, confirmação humana registrada e itens fora do escopo.
+
+Motivo: as amostras reais são projetos executivos de marcenaria de escritórios de arquitetura (PDF A3 exportado de CAD, `/Rotate 270`, **sem nenhuma fonte**: `pdftotext` devolve 0 caracteres). A leitura real é visual e a confirmação humana passa a ser a etapa central. Aprovado por: pendente.
+
+Decisões registradas:
+
+- **Cotas em cm inferidas pela convenção**: as cotas vêm em centímetros com vírgula decimal e a unidade não aparece escrita. Quando a convenção de projeto de arquitetura e a escala (1/50, 1/25, 1/5) indicam cm, a leitura usa `unidadeDeclarada: { unidade: 'cm', inferida: true }`: estado `inferido` + pendência `unidade_ambigua`, sempre pendente de confirmação humana.
+- **Golden de amostras reais fora do git**: `tests/amostras-reais.test.mjs` lê pares de `amostras_pdf/golden/` (ou `ENG_GOLDEN_DIR`) e é pulado quando a pasta não existe. Os fixtures versionados continuam 100% sintéticos.
+- **O que a Elegance fabrica nesses projetos** (decisão do usuário, 2026-10-26): (1) portas de alumínio para móveis; (2) estantes, louceiros e afins em perfil de alumínio (por exemplo "PORTAS EM PERFIL 3136 E PUXADORES 2790", "SISTEMA THIN1802", "SISTEMA EVIDENCE"); (3) estruturas metálicas em aço carbono (base de mesa, adega, nicho, suporte de prateleira). Só (1) tem mapa para o item da tela; (2) e (3) são registráveis e saem como "fora do escopo atual (sem mapeamento)".
+- **Poppler escolhido** para ler PDF: funciona também no ambiente do Claude.ai e habilita a leitura de PDF do Claude Code. A API de PDF do Windows foi descartada por existir só nesta máquina.
+
+Novidades:
+
+- `scripts/extrair-texto.mjs` (nome mantido da arquitetura; faz o "preparo" do PDF): localiza o poppler (`POPPLER_BIN`, PATH com verificação de que é poppler, padrão do winget; senão exit 3 com instrução de instalação), `execFile` sem shell, com timeout. Grava `inventario.json` (classificação por página: `texto_vetorial`, `vetorial_sem_texto`, `escaneado`, `misto`), `pagina-NN.txt` quando há texto, alertas de segurança (`detectarInstrucoes`), `pagina-NN.png` (`--renderizar`) e `recorte-NN-x-y-w-h.png` (`--recorte`, frações da página já girada; rotação 90/270 troca largura e altura). Funções puras em `scripts/lib/pdf.mjs`; execução do poppler em `scripts/lib/poppler.mjs`.
+- `scripts/confirmar-valores.mjs` e `scripts/lib/confirmacao.mjs`: `--ids` (inferido para confirmado), `--resolver` (conflitante para o candidato escolhido, candidatos no histórico), `--informar` (ausente para valor dado por pessoa). Tudo ou nada; remove pendências resolvidas (nunca divergência nem texto suspeito); acrescenta `historico`; avisa quando um calculado depende de valor recém-confirmado; valida entrada e saída.
+- **Schema 1.1.0**: campo opcional `historico` e método `informado_humano` (regra semântica nova: exige `confirmacao`). Documentos 1.0.0 continuam válidos.
+- Mapa de domínio: `foraDoEscopo.tipos` (opcional). Item desses tipos sai com `foraDoEscopo: true`, `item: {}` e pendência informativa `fora_do_escopo` (não bloqueante); não impede o lançamento das portas. O relatório ganha as seções "Fora do escopo atual (sem mapeamento)" e "Histórico de confirmações" (só quando há conteúdo).
+- `references/leitura-pdf.md` (protocolo de leitura econômica); `cotas-e-unidades.md`, `esquadrias-aluminio.md` e `validacao.md` atualizados.
+- Testes com fixtures sintéticos (PDFs gerados com pdfkit em tempo de teste; os que precisam do poppler são pulados se ele faltar).
+
+Não incluído: OCR automático e plano de corte.
+
 ## 0.2.0 — 2026-10-26
 
 Fase 1b: montagem de itens no formato da tela de orçamentos/pedidos, com núcleo genérico e domínio por configuração.
