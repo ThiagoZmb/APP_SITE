@@ -38,9 +38,19 @@ test('SKILL.md: corpo com menos de 500 linhas', () => {
 test('SKILL.md: references citados existem', () => {
   const texto = skill.corpo.join('\n');
   const refs = [...texto.matchAll(/references\/([\w-]+\.md)/g)].map(m => m[1]);
-  assert.ok(refs.includes('validacao.md') && refs.includes('cotas-e-unidades.md'));
+  const implementados = ['validacao.md', 'cotas-e-unidades.md', 'esquadrias-aluminio.md', 'regras-fabricacao.md'];
+  for (const r of implementados) assert.ok(refs.includes(r), `SKILL.md deve citar references/${r}`);
   for (const r of refs) {
-    const implementado = ['validacao.md', 'cotas-e-unidades.md'].includes(r);
-    if (implementado) assert.ok(readFileSync(caminho('references', r), 'utf8').length > 0, r);
+    if (implementados.includes(r)) assert.ok(readFileSync(caminho('references', r), 'utf8').length > 0, r);
   }
+});
+
+test('SKILL.md: cita os CLIs, o mapa de domínio e marca o que ainda não existe', () => {
+  const texto = skill.corpo.join('\n');
+  for (const arquivo of ['scripts/montar-itens.mjs', 'config/regras-por-dominio/portas-aluminio.json', 'schemas/itens-tela.schema.json']) {
+    assert.ok(texto.includes(arquivo), arquivo);
+    assert.ok(readFileSync(caminho(arquivo), 'utf8').length > 0, arquivo);
+  }
+  assert.ok(texto.includes('**NÃO implementado** (aguarda poppler)'));
+  assert.ok(texto.includes('**NÃO implementado** (Fase 2'));
 });
