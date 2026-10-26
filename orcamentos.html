@@ -326,6 +326,36 @@
         .imp-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
         .imp-lista > li { background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
         .imp-lista ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-light); font-size: 12.5px; }
+        /* janela Ler projeto (PDF): leitura pelo servidor + conferência humana de cada valor (leitura_pdf.js) */
+        body.so-leitura #btn-ler-pdf { display: none !important; }
+        .dlg-leitura { margin: auto; width: min(920px, calc(100vw - 32px)); }
+        .lp-andamento { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
+        .lp-andamento progress { width: 100%; height: 10px; }
+        .lp-aviso { font-size: 12.5px; color: var(--text-light); }
+        .lp-item { background: var(--white); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .lp-item > header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+        .lp-item > header b { font-size: 14px; }
+        .lp-item > header .lp-legenda { flex: 1 1 240px; font-size: 12px; color: var(--text-light); overflow-wrap: anywhere; }
+        .lp-chip { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: #334155; white-space: nowrap; }
+        .lp-chip.ok { background: #e7f6ec; color: #1d6b3b; } .lp-chip.pendente { background: #fff4e0; color: #8a5300; }
+        .lp-chip.bloqueado { background: #fdecec; color: #b91c1c; } .lp-chip.fora { background: #eef2f7; color: #475569; }
+        .lp-linhas { list-style: none; margin: 0; padding: 0; }
+        .lp-linha { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(140px, 1.3fr) auto; gap: 4px 10px; align-items: start; padding: 7px 12px; border-top: 1px solid var(--border-color); font-size: 13px; }
+        .lp-linha:first-child { border-top: none; }
+        .lp-linha.inferido { background: #fffaf0; } .lp-linha.conflitante { background: #fff1f2; } .lp-linha.ausente.obrig { background: #fff1f2; }
+        .lp-linha .lp-rot { font-weight: 600; } .lp-linha .lp-rot small { display: block; font-weight: 400; color: var(--text-light); }
+        .lp-linha .lp-val { overflow-wrap: anywhere; } .lp-linha .lp-val small { display: block; color: var(--text-light); font-size: 11.5px; }
+        .lp-linha .lp-acoes { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+        .lp-linha .lp-acoes button { font-size: 12px; padding: 3px 8px; }
+        .lp-linha .lp-decisao { grid-column: 1 / -1; font-size: 12.5px; color: #1f4e9c; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .lp-linha .lp-form { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .lp-linha .lp-form input { flex: 1 1 160px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
+        .lp-linha .lp-erro { grid-column: 1 / -1; color: #b91c1c; font-size: 12px; }
+        .lp-pend { margin: 0; padding: 8px 12px 8px 28px; font-size: 12.5px; border-top: 1px solid var(--border-color); }
+        .lp-pend li.bloq { color: #b91c1c; }
+        .lp-ausentes summary { padding: 7px 12px; cursor: pointer; font-size: 12.5px; color: var(--text-light); border-top: 1px solid var(--border-color); }
+        .lp-item-acoes { padding: 6px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-wrap: wrap; }
+        @media (max-width: 640px) { .lp-linha { grid-template-columns: 1fr; } .lp-linha .lp-acoes { justify-content: flex-start; } }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <style>
@@ -717,6 +747,8 @@
                     <button type="button" class="btn-mini" id="btn-ver-pct" aria-pressed="false" title="Mostrar ou ocultar a coluna Porcentagem" style="margin-left:auto">👁️ Mostrar porcentagem</button>
                     <button type="button" class="btn-mini" id="btn-importar" data-perm="orcamentos.criar valores.ver" title="Lança os itens do arquivo JSON gerado pela leitura do projeto (skill engenharia-projetos-tecnicos)">📥 Importar itens (JSON)</button>
                     <input type="file" id="inp-importar" accept=".json,application/json" hidden aria-label="Arquivo JSON de itens">
+                    <button type="button" class="btn-mini" id="btn-ler-pdf" data-perm="orcamentos.criar valores.ver" title="O servidor lê o projeto técnico em PDF; você confere cada valor antes de importar">📄 Ler projeto (PDF)</button>
+                    <input type="file" id="inp-ler-pdf" accept=".pdf,application/pdf" hidden aria-label="Projeto técnico em PDF">
                 </div>
                 <div style="overflow-x:auto">
                     <table id="tab-itens" class="ocultar-pct">
@@ -791,6 +823,17 @@
             <button type="button" class="btn btn-primary" id="btn-importar-confirmar" disabled>Importar</button>
         </div>
     </dialog>
+    <!-- ═══════════ LER PROJETO (PDF): leitura pelo servidor + conferência de cada valor ═══════════ -->
+    <dialog id="dlg-leitura" class="dlg-leitura dlg-padrao" aria-labelledby="dlg-leitura-titulo">
+        <div class="dlg-cab"><h3 id="dlg-leitura-titulo">Ler projeto (PDF)</h3><p id="dlg-leitura-texto"></p></div>
+        <div class="dlg-corpo" id="dlg-leitura-corpo" aria-live="polite"></div>
+        <div class="dlg-rodape">
+            <span class="msg lp-aviso" id="dlg-leitura-dica"></span>
+            <button type="button" class="btn btn-secondary" id="btn-leitura-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-secondary" id="btn-leitura-aplicar" disabled>Aplicar decisões</button>
+            <button type="button" class="btn btn-primary" id="btn-leitura-importar" disabled>Importar</button>
+        </div>
+    </dialog>
     <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
     <div class="avl-fundo" id="avl-fundo"></div>
     <aside class="avl" id="avl" aria-label="Alteração de valores">
@@ -833,6 +876,7 @@
         </div>
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
+    <script src="leitura_pdf.js?v=202610262000"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -2939,7 +2983,11 @@
             }
             if (meu !== seqImportacao) return;
             if (!lido.ok) { statusImportacao(lido.erro, true); return; }
-            const tri = ImportarItens.triar(lido.dados, { itensNaLista: itens.length });
+            await importarDados(lido.dados, arq.name, ctx, meu);
+        }
+        // triagem + cadastro + preço + resumo (o mesmo caminho para o arquivo JSON e para a leitura do PDF)
+        async function importarDados(dados, nomeArquivo, ctx, meu) {
+            const tri = ImportarItens.triar(dados, { itensNaLista: itens.length });
             if (tri.erro) { statusImportacao(tri.erro, true); return; }
             if (tri.arquivo) $s('dlg-importar-texto').textContent += ` · projeto: ${tri.arquivo}`;
             const prep = tri.aceitos.length
@@ -2947,7 +2995,7 @@
                     aoProgresso: (i, n, id) => { if (meu === seqImportacao) statusImportacao(`Conferindo o cadastro e calculando o preço: item ${i} de ${n} (${id})…`); } })
                 : { importados: [], falhas: [], descontoJaAplicado: false };
             if (meu !== seqImportacao) return;
-            importacao = { clienteCodigo: ctx.clienteCodigo, arquivo: arq.name, importados: prep.importados, descontoJaAplicado: prep.descontoJaAplicado };
+            importacao = { clienteCodigo: ctx.clienteCodigo, arquivo: nomeArquivo, importados: prep.importados, descontoJaAplicado: prep.descontoJaAplicado };
             mostrarResumoImportacao(tri, prep);
         }
         function confirmarImportacao() {
@@ -2968,6 +3016,229 @@
         $s('btn-importar-cancelar').addEventListener('click', () => $s('dlg-importar').close());
         // fechar (Cancelar ou Esc) descarta o resultado e qualquer cálculo ainda em andamento
         $s('dlg-importar').addEventListener('close', () => { seqImportacao++; importacao = null; });
+        // ============ LER PROJETO (PDF) — leitura no servidor + conferência humana (leitura_pdf.js) ============
+        // Nenhum valor entra sem uma pessoa conferir: a janela mostra cada valor lido com estado, confiança e página;
+        // "Importar N itens" entrega os itens liberados ao mesmo fluxo do JSON (importarDados → #dlg-importar).
+        // Tudo que vem do PDF aparece só por textContent (elImp).
+        let leitura = null;      // { id, arquivo, conferencia, decisoes, ctx, inicio }
+        let seqLeitura = 0;      // fechar/cancelar descarta respostas que chegarem depois
+        function rodapeLeitura() {
+            const btnA = $s('btn-leitura-aplicar'), btnI = $s('btn-leitura-importar'), dica = $s('dlg-leitura-dica');
+            if (!leitura || !leitura.conferencia) { btnA.disabled = true; btnI.disabled = true; btnA.textContent = 'Aplicar decisões'; btnI.textContent = 'Importar'; dica.textContent = ''; return; }
+            const r = LeituraPdf.resumo(leitura.conferencia, leitura.decisoes);
+            btnA.disabled = !r.podeAplicar || leitura.ocupado;
+            btnA.textContent = r.decisoesPendentes ? `Aplicar decisões (${r.decisoesPendentes})` : 'Aplicar decisões';
+            btnI.disabled = !r.podeImportar || leitura.ocupado;
+            btnI.textContent = r.textoImportar;
+            dica.textContent = r.dica;
+        }
+        function andamentoLeitura(texto, erro) {
+            const corpo = $s('dlg-leitura-corpo');
+            const box = elImp('div', 'lp-andamento');
+            if (!erro) { const p = document.createElement('progress'); p.setAttribute('aria-label', 'Andamento da leitura'); box.append(p); }
+            box.append(elImp('p', 'imp-status' + (erro ? ' erro' : ''), texto));
+            if (!erro) box.append(elImp('p', 'lp-aviso', 'A leitura leva de 30 segundos a alguns minutos. Pode cancelar a qualquer momento.'));
+            corpo.replaceChildren(box);
+            $s('btn-leitura-cancelar').textContent = erro ? 'Fechar' : 'Cancelar leitura';
+        }
+        async function abrirLeituraPdf() {
+            if (document.body.classList.contains('so-leitura')) { mostrarMsgSalvar('Documento somente leitura: não é possível importar itens.', 'erro'); return; }
+            if (!temClienteSelecionado()) { mostrarMsgSalvar('Selecione o cliente (etapa 1) antes de ler o projeto.', 'erro'); $s('sel-cliente').focus(); return; }
+            try {
+                const d = await apiImportacao('/leitura_pdf/disponivel');
+                if (!d.disponivel) { mostrarMsgSalvar(d.mensagem || 'Leitura de PDF não configurada no servidor.', 'erro'); return; }
+            } catch (e) { mostrarMsgSalvar(e.message || 'Leitura de PDF indisponível.', 'erro'); return; }
+            const inp = $s('inp-ler-pdf');
+            inp.value = '';
+            inp.click();
+        }
+        async function aoEscolherPdf() {
+            const arq = $s('inp-ler-pdf').files && $s('inp-ler-pdf').files[0];
+            if (!arq) return;
+            const meu = ++seqLeitura;
+            const sel = $s('sel-cliente');
+            const ctx = { clienteCodigo: sel.value, clienteNome: sel.options[sel.selectedIndex]?.text || '' };
+            leitura = { id: null, arquivo: arq.name, conferencia: null, decisoes: {}, ctx, inicio: Date.now(), ocupado: false };
+            $s('dlg-leitura-texto').textContent = `Arquivo: ${arq.name} · cliente: ${ctx.clienteNome}`;
+            rodapeLeitura();
+            if (!$s('dlg-leitura').open) $s('dlg-leitura').showModal();
+            const erroArq = LeituraPdf.validarArquivo(arq);
+            if (erroArq) { andamentoLeitura(erroArq, true); return; }
+            andamentoLeitura('Enviando…');
+            let r;
+            try {
+                const res = await fetch(`${API_BASE}/leitura_pdf`, { method: 'POST', body: arq,
+                    headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/pdf', 'X-Arquivo-Nome': encodeURIComponent(arq.name) } });
+                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return; }
+                const j = await res.json().catch(() => null);
+                if (!res.ok) throw new Error((j && j.error) || `Erro HTTP: ${res.status}`);
+                r = j;
+            } catch (e) { if (meu === seqLeitura) andamentoLeitura(e.message || 'Não foi possível enviar o PDF.', true); return; }
+            if (meu !== seqLeitura) { apiImportacao(`/leitura_pdf/${encodeURIComponent(r.id)}`, { method: 'DELETE' }).catch(() => {}); return; }
+            leitura.id = r.id;
+            let t;
+            try {
+                t = await LeituraPdf.acompanhar(r.id, { api: apiImportacao, deveParar: () => meu !== seqLeitura,
+                    aoMudar: x => { if (meu === seqLeitura && x.estado !== 'pronto') andamentoLeitura(LeituraPdf.textoAndamento(x, (Date.now() - leitura.inicio) / 1000)); } });
+            } catch (e) { if (meu === seqLeitura) andamentoLeitura(e.message || 'Falha ao acompanhar a leitura.', true); return; }
+            if (!t || meu !== seqLeitura) return;
+            if (t.estado !== 'pronto') { andamentoLeitura(LeituraPdf.textoAndamento(t), true); return; }
+            leitura.conferencia = t.conferencia;
+            leitura.avisos = t.avisos || [];
+            $s('btn-leitura-cancelar').textContent = 'Fechar';
+            mostrarConferencia();
+        }
+        // ---- janela de conferência ----
+        function linhaConferencia(l) {
+            const d = LeituraPdf.descreverLinha(l);
+            const li = elImp('li', `lp-linha ${l.estado}${l.obrigatorio ? ' obrig' : ''}`);
+            const rot = elImp('div', 'lp-rot', l.rotulo + (l.obrigatorio ? ' *' : ''));
+            rot.append(elImp('small', '', d.estado));
+            const val = elImp('div', 'lp-val', d.valor);
+            val.append(elImp('small', '', d.detalhes));
+            if (d.trecho) val.append(elImp('small', '', `Origem: “${d.trecho}”`));
+            const acoes = elImp('div', 'lp-acoes');
+            li.append(rot, val, acoes);
+            const dec = leitura.decisoes[l.id];
+            const botao = (texto, fn, titulo) => { const b = elImp('button', 'btn-mini', texto); b.type = 'button'; if (titulo) b.title = titulo; b.addEventListener('click', fn); acoes.append(b); return b; };
+            const registrar = (decisao, erroEl) => {
+                const erro = LeituraPdf.validarDecisao(l, decisao);
+                if (erro) { erroEl.textContent = erro; return; }
+                leitura.decisoes = LeituraPdf.decidir(leitura.decisoes, l.id, decisao);
+                mostrarConferencia();
+            };
+            // formulário em linha: motivo e/ou valor
+            const formulario = (campos, tipo) => {
+                li.querySelectorAll('.lp-form, .lp-erro').forEach(x => x.remove());
+                const f = elImp('div', 'lp-form'), erroEl = elImp('div', 'lp-erro');
+                const inputs = campos.map(([nome, ph]) => { const i = document.createElement('input'); i.type = 'text'; i.maxLength = 200; i.placeholder = ph; i.dataset.nome = nome; i.setAttribute('aria-label', ph); f.append(i); return i; });
+                const ok = elImp('button', 'btn-mini', 'OK'); ok.type = 'button';
+                ok.addEventListener('click', () => registrar(Object.fromEntries([['tipo', tipo], ...inputs.map(i => [i.dataset.nome, i.value])]), erroEl));
+                f.append(ok);
+                li.append(f, erroEl);
+                inputs[0].focus();
+            };
+            const dicaValor = l.unidade === 'mm' ? 'Valor correto em mm (ou escreva "79,5 cm")' : 'Valor correto';
+            if (dec) {
+                const linhaDec = elImp('div', 'lp-decisao', LeituraPdf.textoDecisao(dec, l));
+                const desfazer = elImp('button', 'btn-mini', 'Desfazer'); desfazer.type = 'button';
+                desfazer.addEventListener('click', () => { leitura.decisoes = LeituraPdf.decidir(leitura.decisoes, l.id, null); mostrarConferencia(); });
+                linhaDec.append(desfazer);
+                li.append(linhaDec);
+                return li;
+            }
+            if (l.acoes.includes('confirmar')) botao('Confirmar', () => registrar({ tipo: 'confirmar' }, elImp('div')), 'Conferi no desenho: o valor está certo');
+            if (l.acoes.includes('rejeitar')) {
+                botao('Rejeitar', () => formulario([['motivo', 'Motivo da rejeição']], 'rejeitar'), 'O valor está errado ou não se aplica');
+                botao('Corrigir', () => formulario([['valor', dicaValor], ['motivo', 'Motivo da correção']], 'corrigir'), 'Rejeita o valor lido e informa o correto');
+            }
+            if (l.acoes.includes('informar')) botao('Informar', () => formulario([['valor', dicaValor]], 'informar'));
+            if (l.acoes.includes('resolver')) (l.candidatos || []).forEach(c => botao(`Vale ${c.valor}${c.unidade && c.unidade !== 'un' ? ' ' + c.unidade : ''}${c.pagina ? ` (pág. ${c.pagina})` : ''}`,
+                () => registrar({ tipo: 'resolver', candidato: c.id }, elImp('div')), c.trecho ? `Origem: ${c.trecho}` : ''));
+            return li;
+        }
+        function blocoItem(item) {
+            const sec = elImp('section', 'lp-item');
+            const cab = elImp('header');
+            const s = LeituraPdf.situacaoItem(item);
+            cab.append(elImp('b', '', `${item.idItem} · ${item.categoria}`), elImp('span', 'lp-legenda', item.legenda), elImp('span', `lp-chip ${s.classe}`, s.texto));
+            sec.append(cab);
+            const g = LeituraPdf.gruposDoItem(item);
+            const ul = elImp('ul', 'lp-linhas');
+            g.principais.forEach(l => ul.append(linhaConferencia(l)));
+            sec.append(ul);
+            if (g.ausentesOpcionais.length) {
+                const det = document.createElement('details');
+                det.className = 'lp-ausentes';
+                det.append(elImp('summary', '', `Campos opcionais não encontrados no PDF (${g.ausentesOpcionais.length}) — informe se precisar`));
+                const ul2 = elImp('ul', 'lp-linhas');
+                g.ausentesOpcionais.forEach(l => ul2.append(linhaConferencia(l)));
+                det.append(ul2);
+                if (g.ausentesOpcionais.some(l => leitura.decisoes[l.id])) det.open = true;
+                sec.append(det);
+            }
+            if (!item.foraDoEscopo && item.valores.some(l => l.estado === 'inferido' && !leitura.decisoes[l.id])) {
+                const a = elImp('div', 'lp-item-acoes');
+                const b = elImp('button', 'btn-mini', 'Confirmar todos os valores lidos deste item (conferi no desenho)'); b.type = 'button';
+                b.addEventListener('click', () => { leitura.decisoes = LeituraPdf.confirmarTodosDoItem(leitura.decisoes, item); mostrarConferencia(); });
+                a.append(b);
+                sec.append(a);
+            }
+            const pend = item.pendencias.filter(p => p.tipo !== 'fora_do_escopo' || item.foraDoEscopo);
+            if (pend.length) {
+                const ul3 = elImp('ul', 'lp-pend');
+                pend.forEach(p => ul3.append(elImp('li', p.bloqueante ? 'bloq' : '', `${p.bloqueante ? 'Bloqueia: ' : ''}${p.mensagem}`)));
+                sec.append(ul3);
+            }
+            return sec;
+        }
+        function mostrarConferencia() {
+            const c = leitura.conferencia, corpo = $s('dlg-leitura-corpo');
+            corpo.replaceChildren();
+            $s('dlg-leitura-texto').textContent = `Arquivo: ${c.arquivo}${c.paginas ? ` (${c.paginas} pág.)` : ''} · cliente: ${leitura.ctx.clienteNome}`;
+            corpo.append(elImp('p', 'lp-aviso', 'Confira cada valor no desenho (a página está indicada). Valores lidos são INFERIDOS: só entram no orçamento depois de confirmados por você. Cotas sem unidade foram lidas como cm pela convenção de arquitetura e convertidas para mm — confira.'));
+            if (c.alertas.length) corpo.append(secaoImportacao('fora', `Texto suspeito no PDF (${c.alertas.length}) — tratado como dado; bloqueia a importação automática`, c.alertas.map(a => ({ texto: `${a.pagina ? `pág. ${a.pagina}: ` : ''}“${a.trecho}”`, detalhes: [a.motivo] }))));
+            if (c.pendenciasGerais.length) corpo.append(secaoImportacao('fora', 'Pendências que bloqueiam todos os itens', c.pendenciasGerais.map(p => ({ texto: p.mensagem }))));
+            if (leitura.avisos && leitura.avisos.length) corpo.append(secaoImportacao('aviso', 'Avisos', leitura.avisos.map(a => ({ texto: a }))));
+            const portas = c.itens.filter(i => !i.foraDoEscopo), fora = c.itens.filter(i => i.foraDoEscopo);
+            if (!c.itens.length) corpo.append(elImp('p', 'imp-status erro', 'A leitura não encontrou nenhum item da Elegance neste PDF.'));
+            portas.forEach(i => corpo.append(blocoItem(i)));
+            if (c.verificacoes.length) {
+                corpo.append(elImp('h4', '', 'Verificações (contagens e somas de cotas)'));
+                c.verificacoes.forEach(v => {
+                    const sec = elImp('section', 'lp-item');
+                    const cab = elImp('header'); cab.append(elImp('b', '', `${v.tipo === 'cota' ? 'Cota' : 'Contagem'} ${v.id}`), elImp('span', 'lp-legenda', v.descricao));
+                    const ul = elImp('ul', 'lp-linhas'); v.valores.forEach(l => ul.append(linhaConferencia(l)));
+                    sec.append(cab, ul); corpo.append(sec);
+                });
+            }
+            if (fora.length) corpo.append(secaoImportacao('aviso', `Não importados — fora do escopo atual (${fora.length}): lance à mão`, fora.map(i => ({ texto: `${i.idItem} · ${i.categoria}${i.legenda ? ` — ${i.legenda}` : ''}` }))));
+            if (c.observacoes.length) corpo.append(secaoImportacao('aviso', 'Observações da leitura (texto do modelo, conferir)', c.observacoes.map(o => ({ texto: o }))));
+            rodapeLeitura();
+        }
+        async function aplicarDecisoesLeitura() {
+            if (!leitura || !leitura.id || !LeituraPdf.qtdDecisoes(leitura.decisoes)) return;
+            const meu = seqLeitura;
+            leitura.ocupado = true; rodapeLeitura();
+            try {
+                const t = await apiImportacao(`/leitura_pdf/${encodeURIComponent(leitura.id)}/confirmar`, { method: 'POST', body: LeituraPdf.corpoDecisoes(leitura.decisoes) });
+                if (meu !== seqLeitura) return;
+                leitura.conferencia = t.conferencia; leitura.avisos = t.avisos || []; leitura.decisoes = {};
+                leitura.ocupado = false;
+                mostrarConferencia();
+            } catch (e) {
+                if (meu !== seqLeitura) return;
+                leitura.ocupado = false; rodapeLeitura();
+                $s('dlg-leitura-dica').textContent = e.message || 'Não foi possível aplicar as decisões.';
+            }
+        }
+        async function importarDaLeitura() {
+            if (!leitura || !leitura.conferencia) return;
+            const dados = LeituraPdf.saidaParaImportar(leitura.conferencia);
+            const ctx = leitura.ctx, nome = leitura.arquivo;
+            if ($s('sel-cliente').value !== ctx.clienteCodigo) { $s('dlg-leitura-dica').textContent = 'O cliente mudou depois da leitura. Volte ao cliente da leitura ou leia de novo.'; return; }
+            $s('dlg-leitura').close();
+            const meu = ++seqImportacao;
+            importacao = null;
+            $s('dlg-importar-texto').textContent = `Projeto (PDF): ${nome} · cliente: ${ctx.clienteNome}`;
+            $s('btn-importar-confirmar').disabled = true;
+            $s('btn-importar-confirmar').textContent = 'Importar';
+            statusImportacao('Conferindo os itens…');
+            if (!$s('dlg-importar').open) $s('dlg-importar').showModal();
+            await importarDados(dados, nome, ctx, meu);
+        }
+        function fecharLeitura() {
+            if (leitura && leitura.id && !leitura.conferencia) apiImportacao(`/leitura_pdf/${encodeURIComponent(leitura.id)}`, { method: 'DELETE' }).catch(() => {});
+            $s('dlg-leitura').close();
+        }
+        $s('btn-ler-pdf').addEventListener('click', abrirLeituraPdf);
+        $s('inp-ler-pdf').addEventListener('change', aoEscolherPdf);
+        $s('btn-leitura-cancelar').addEventListener('click', fecharLeitura);
+        $s('btn-leitura-aplicar').addEventListener('click', aplicarDecisoesLeitura);
+        $s('btn-leitura-importar').addEventListener('click', importarDaLeitura);
+        // Esc também cancela a leitura em andamento; fechar descarta a janela (a leitura pronta expira sozinha no servidor)
+        $s('dlg-leitura').addEventListener('cancel', e => { e.preventDefault(); fecharLeitura(); });
+        $s('dlg-leitura').addEventListener('close', () => { seqLeitura++; });
                 // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');

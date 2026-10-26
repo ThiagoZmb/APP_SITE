@@ -1,6 +1,6 @@
 # engenharia-projetos-tecnicos
 
-Agent Skill do Claude que lê projetos técnicos em PDF (esquadrias de alumínio, portas, serralheria) e produz dados estruturados **rastreáveis**. Versão 0.3.3: preparo do PDF com poppler (inventário, texto, renderização e recortes), núcleo comum (contrato, validação, unidades, verificação cruzada, segurança, relatório), confirmação humana registrada e montagem de itens de portas de alumínio no formato da tela de orçamentos/pedidos. Plano de corte ainda não existe. Veja `SKILL.md`.
+Agent Skill do Claude que lê projetos técnicos em PDF (esquadrias de alumínio, portas, serralheria) e produz dados estruturados **rastreáveis**. Versão 0.4.0: leitura de PDF pela web (o servidor chama a API do Claude e a pessoa confere cada valor na tela; ver `references/leitura-web.md`), preparo do PDF com poppler (inventário, texto, renderização e recortes), núcleo comum (contrato, validação, unidades, verificação cruzada, segurança, relatório), confirmação humana registrada e montagem de itens de portas de alumínio no formato da tela de orçamentos/pedidos. Plano de corte ainda não existe. Veja `SKILL.md`.
 
 ## Instalar
 
@@ -58,7 +58,13 @@ Se o documento for inválido, `gerar-relatorio` e `montar-itens` saem com 1 e n�
 
 O arquivo do `montar-itens.mjs` (`--saida itens.json`) é importado na web pelo botão **📥 Importar itens (JSON)** da etapa 3 de `orcamentos.html` (precisa de cliente escolhido e documento editável). A tela confere o arquivo, mostra quais itens entram e quais ficam de fora (com o motivo), lista os valores inferidos que não entram e só acrescenta os itens depois da confirmação. O preço é calculado pelo mesmo motor da tela (`/calcular_preco`) e o servidor refaz tudo ao salvar. Detalhes em `references/esquadrias-aluminio.md` ("Importar na tela de orçamentos").
 
-Como biblioteca (ESM): `scripts/lib/valor.mjs` (construtores), `validacao.mjs`, `unidades.mjs`, `cruzada.mjs`, `seguranca.mjs`, `relatorio.mjs`, `mapear.mjs` (`mapearItens`, `montarSaida`, `validarMapa`), `pdf.mjs` (classificação e recorte, funções puras), `poppler.mjs` (localização e execução sem shell) e `confirmacao.mjs` (`aplicarConfirmacoes`).
+Como biblioteca (ESM): `scripts/lib/servico.mjs` (fachada da web), `leitura.mjs` (`esquemaLeitura`, `validarLeitura`, `leituraParaProjeto`), `scripts/lib/valor.mjs` (construtores), `validacao.mjs`, `unidades.mjs`, `cruzada.mjs`, `seguranca.mjs`, `relatorio.mjs`, `mapear.mjs` (`mapearItens`, `montarSaida`, `validarMapa`), `pdf.mjs` (classificação e recorte, funções puras), `poppler.mjs` (localização e execução sem shell) e `confirmacao.mjs` (`aplicarConfirmacoes`).
+
+## Ler o PDF pela web (0.4.0)
+
+Na web o vendedor não precisa de Claude Code nem de poppler: o botão **📄 Ler projeto (PDF)** da etapa 3 de `orcamentos.html` envia o PDF ao servidor, que chama a API do Claude (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` opcional) com a saída estruturada de `scripts/lib/leitura.mjs` e o prompt `prompts/leitura-pdf-sistema.md`. A resposta é convertida e validada pela própria skill (`scripts/lib/servico.mjs`: `processarLeitura`, `avaliar`, `aplicarDecisoes`), todo valor nasce **inferido** e só entra no orçamento depois de conferido na janela. Detalhes, fluxo e limitações em `references/leitura-web.md`; rotas e configuração no `CLAUDE.md` da raiz.
+
+O mapa de domínio ganhou `"unidade": "mm"` (opcional) nos campos de comprimento: diz à leitura quais textos converter com `interpretarCota`. Não muda o mapeamento.
 
 ## Rodar os testes
 
