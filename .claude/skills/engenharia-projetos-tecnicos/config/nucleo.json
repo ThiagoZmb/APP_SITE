@@ -1,0 +1,14 @@
+{
+  "tolerancias": {
+    "somaCotasMm": 0
+  },
+  "metadados": {
+    "tolerancias.somaCotasMm": {
+      "versao": "0.3.3",
+      "data": "2026-10-26",
+      "responsavel": "usuário do sistema",
+      "status": "aprovado",
+      "motivo": "Tolerância exata (0 mm) para a soma das cotas parciais, decisão do usuário em 2026-10-26."
+    }
+  }
+}

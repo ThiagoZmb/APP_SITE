@@ -260,6 +260,8 @@
         html body .card-itens #itens-tbody td { border-bottom: 1px solid #f0c4c4 !important; }
         html body .card-itens .totais { padding: 14px 18px; border-radius: 10px; background: #fff; border: 2px solid var(--primary-ring); }
         html body .card-itens .totais .grupo:last-child .valor { font-size: 30px; }
+        #wrap-pares.inativo { opacity: .5; }
+        #wrap-pares.inativo label { cursor: not-allowed; }
         /* cancelar (âmbar, reversível pelo VB/edição) e excluir (vermelho, sem volta) */
         html body .btn-perigo-suave { background: #fff4e0 !important; border: 1px solid #e8b35a !important; color: #8a5200 !important; }
         html body .btn-perigo-suave:hover { background: #ffe9c2 !important; }
@@ -312,6 +314,18 @@
         .opc-novo { background: #e7f6ec; border-color: #7cc596; color: #1d6b3b; }
         .opc-novo:hover { background: #d3efdc; }
         #btn-atualizar[style*="none"] { display: none !important; }
+        /* janela Importar itens (JSON da skill engenharia-projetos-tecnicos) */
+        body.so-leitura #btn-importar { display: none !important; }
+        .dlg-importar { margin: auto; width: min(680px, calc(100vw - 32px)); }
+        .imp-status { font-size: 13px; color: var(--text-light); }
+        .imp-status.erro { color: #b91c1c; font-weight: 600; }
+        .imp-sec h4 { margin: 0 0 6px; font-size: 13.5px; }
+        .imp-sec.ok h4 { color: #15803d; }
+        .imp-sec.fora h4 { color: #b91c1c; }
+        .imp-sec.aviso h4 { color: #b26a00; }
+        .imp-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .imp-lista > li { background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
+        .imp-lista ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-light); font-size: 12.5px; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <style>
@@ -414,7 +428,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202610251900" defer></script>
+    <script src="layout.js?v=202610261200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -701,6 +715,8 @@
             <section class="card card-itens">
                 <div class="card-title"><span class="etapa">3</span> Itens do orçamento
                     <button type="button" class="btn-mini" id="btn-ver-pct" aria-pressed="false" title="Mostrar ou ocultar a coluna Porcentagem" style="margin-left:auto">👁️ Mostrar porcentagem</button>
+                    <button type="button" class="btn-mini" id="btn-importar" data-perm="orcamentos.criar valores.ver" title="Lança os itens do arquivo JSON gerado pela leitura do projeto (skill engenharia-projetos-tecnicos)">📥 Importar itens (JSON)</button>
+                    <input type="file" id="inp-importar" accept=".json,application/json" hidden aria-label="Arquivo JSON de itens">
                 </div>
                 <div style="overflow-x:auto">
                     <table id="tab-itens" class="ocultar-pct">
@@ -766,6 +782,15 @@
         </div>
         <div class="dlg-rodape dlg-acoes"><button type="button" class="btn btn-secondary" id="btn-abrir-fechar">Fechar</button></div>
     </dialog>
+    <!-- ═══════════ IMPORTAR ITENS (JSON da skill engenharia-projetos-tecnicos) ═══════════ -->
+    <dialog id="dlg-importar" class="dlg-importar dlg-padrao" aria-labelledby="dlg-importar-titulo">
+        <div class="dlg-cab"><h3 id="dlg-importar-titulo">Importar itens do projeto</h3><p id="dlg-importar-texto"></p></div>
+        <div class="dlg-corpo" id="dlg-importar-corpo" aria-live="polite"></div>
+        <div class="dlg-rodape">
+            <button type="button" class="btn btn-secondary" id="btn-importar-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btn-importar-confirmar" disabled>Importar</button>
+        </div>
+    </dialog>
     <!-- ═══════════ ALTERAÇÃO DE VALORES (frm_Alterar_Valor) ═══════════ -->
     <div class="avl-fundo" id="avl-fundo"></div>
     <aside class="avl" id="avl" aria-label="Alteração de valores">
@@ -807,6 +832,7 @@
             <button type="button" class="btn btn-primary" id="avl-ok">OK</button>
         </div>
     </aside>
+    <script src="importar_itens.js?v=202610261800"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -940,7 +966,11 @@
             const ehPorta = frenteAtual !== 'Serralheria' && !ehAvulso;
             // Porta basculante: chkPares invisível (frmPortasAbrir_Load)
             const wrapPares = document.getElementById('wrap-pares');
-            if (ehBasculante() && document.getElementById('chk-pares').checked) {
+            // basculante e frente de gaveta: o campo continua visível, mas inativo (não existe "par")
+            const semPares = ehBasculante() || frenteAtual === 'Frente de gaveta';
+            document.getElementById('chk-pares').disabled = semPares;
+            wrapPares?.classList.toggle('inativo', semPares);
+            if (semPares && document.getElementById('chk-pares').checked) {
                 document.getElementById('chk-pares').checked = false;
                 document.getElementById('f-qtd').value = 1;
             }
@@ -961,7 +991,7 @@
             document.querySelector('label[for="f-qtd"]').textContent = ehSerr ? 'Qtd de conjuntos' : 'Qtd';
             document.getElementById('tit-medidas').textContent = ehSerr ? '📐 Medidas da peça' : '📐 Medidas e quantidade';
             atualizarMetragemSerr();
-            if (wrapPares) wrapPares.style.display = ehPorta && !ehBasculante() && !ehCorrer ? '' : 'none';
+            if (wrapPares) wrapPares.style.display = ehPorta && !ehCorrer ? '' : 'none';
             alternarCamposPuxador(!ehPorta ? '' : (document.getElementById('f-puxador')?.value || ''));
             if (ehCorrer && document.getElementById('chk-pares').checked) document.getElementById('chk-pares').checked = false;
             garantirFolhas();
@@ -1349,7 +1379,7 @@
         // ============================================================
         function ehBasculante() { return frenteAtual === 'Porta basculante'; }
         function ehPortaComFuros() { return frenteAtual === 'Porta de giro' || ehBasculante(); }
-        function paresAtivo() { return !ehBasculante() && !ehCorrer() && (document.getElementById('chk-pares')?.checked || false); }
+        function paresAtivo() { return !ehBasculante() && frenteAtual !== 'Frente de gaveta' && !ehCorrer() &&(document.getElementById('chk-pares')?.checked || false); }
         function qtdFolhasAtual() { return qtdEfetiva(); }
         // InverterLado (furos): Esquerdo ↔ Direito / Superior ↔ Inferior
         function inverterLado(lado) {
@@ -2824,6 +2854,120 @@
             $s('dlg-abrir').close();
             abrirDocumento(li.dataset.tipo, li.dataset.numero);
         }
+        // ============ IMPORTAR ITENS (JSON da skill engenharia-projetos-tecnicos) ============
+        // Triagem, conferência no cadastro, regras do puxador e preço ficam em importar_itens.js (testado no Node);
+        // aqui só a tela: arquivo, janela de resumo e lista. O texto do arquivo só aparece via textContent.
+        let importacao = null;   // resultado pronto para confirmar: { clienteCodigo, arquivo, importados, descontoJaAplicado }
+        let seqImportacao = 0;   // cancelar durante o cálculo descarta o resultado que chegar depois
+        async function apiImportacao(caminho, { method = 'GET', body } = {}) {
+            const res = await fetch(API_BASE + caminho, { method,
+                headers: { 'Authorization': 'Bearer ' + getToken(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+                body: body ? JSON.stringify(body) : undefined });
+            if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
+            const j = await res.json().catch(() => null);
+            if (!res.ok) throw Object.assign(new Error((j && typeof j.error === 'string' && j.error) || `Erro HTTP: ${res.status}`), { status: res.status });
+            return j;
+        }
+        // elemento com texto (nunca innerHTML com dado do arquivo)
+        function elImp(tag, classe, texto) {
+            const e = document.createElement(tag);
+            if (classe) e.className = classe;
+            if (texto != null) e.textContent = texto;
+            return e;
+        }
+        function statusImportacao(texto, erro) {
+            const corpo = $s('dlg-importar-corpo');
+            corpo.replaceChildren(elImp('p', 'imp-status' + (erro ? ' erro' : ''), texto));
+        }
+        function abrirImportacao() {
+            if (document.body.classList.contains('so-leitura')) { mostrarMsgSalvar('Documento somente leitura: não é possível importar itens.', 'erro'); return; }
+            if (!temClienteSelecionado()) { mostrarMsgSalvar('Selecione o cliente (etapa 1) antes de importar itens.', 'erro'); $s('sel-cliente').focus(); return; }
+            const inp = $s('inp-importar');
+            inp.value = '';
+            inp.click();
+        }
+        function secaoImportacao(classe, titulo, linhas) {
+            const s = elImp('section', 'imp-sec ' + classe);
+            s.append(elImp('h4', '', titulo));
+            const ul = elImp('ul', 'imp-lista');
+            linhas.forEach(({ texto, detalhes }) => {
+                const li = elImp('li', '', texto);
+                if (detalhes && detalhes.length) {
+                    const sub = elImp('ul');
+                    detalhes.forEach(d => sub.append(elImp('li', '', d)));
+                    li.append(sub);
+                }
+                ul.append(li);
+            });
+            s.append(ul);
+            return s;
+        }
+        function mostrarResumoImportacao(tri, prep) {
+            const corpo = $s('dlg-importar-corpo');
+            corpo.replaceChildren();
+            const fora = [...tri.recusados, ...prep.falhas];
+            if (prep.importados.length) corpo.append(secaoImportacao('ok', `Entram (${prep.importados.length})`, prep.importados.map(({ idItem, item, avisos }) => ({
+                texto: `${idItem} · ${item.frente} · ${item.altura} × ${item.largura} mm · qtd ${item.qtd} — ${formatCurrency(item.valor)} cada, total ${formatCurrency(item.valor * item.qtd)}`,
+                detalhes: avisos }))));
+            if (fora.length) corpo.append(secaoImportacao('fora', `Ficam de fora (${fora.length})`, fora.map(({ idItem, motivos }) => ({ texto: idItem, detalhes: motivos }))));
+            if (tri.sugestoes.length) corpo.append(secaoImportacao('aviso', `Valores inferidos que NÃO entram (${tri.sugestoes.length})`, tri.sugestoes.map(s => ({
+                texto: `${s.idItem} · ${s.destino}: ${s.valor}` + (s.confianca != null ? ` (confiança ${Math.round(s.confianca * 100)}%)` : '') + (s.pagina ? ` · pág. ${s.pagina}` : ''),
+                detalhes: s.trecho ? [`Origem: ${s.trecho}`] : [] }))));
+            corpo.append(secaoImportacao('aviso', 'Avisos', tri.avisos.map(a => ({ texto: a }))));
+            if (!prep.importados.length) corpo.prepend(elImp('p', 'imp-status erro', 'Nenhum item pode ser importado deste arquivo.'));
+            const btn = $s('btn-importar-confirmar');
+            btn.disabled = !prep.importados.length;
+            btn.textContent = prep.importados.length ? `Importar ${prep.importados.length} item(ns)` : 'Importar';
+        }
+        async function aoEscolherArquivoImportar() {
+            const arq = $s('inp-importar').files && $s('inp-importar').files[0];
+            if (!arq) return;
+            const meu = ++seqImportacao;
+            importacao = null;
+            const sel = $s('sel-cliente');
+            const ctx = { clienteCodigo: sel.value, clienteNome: sel.options[sel.selectedIndex]?.text || '' };
+            $s('dlg-importar-texto').textContent = `Arquivo: ${arq.name} · cliente: ${ctx.clienteNome}`;
+            $s('btn-importar-confirmar').disabled = true;
+            $s('btn-importar-confirmar').textContent = 'Importar';
+            statusImportacao('Lendo o arquivo…');
+            if (!$s('dlg-importar').open) $s('dlg-importar').showModal();
+            // o tamanho é conferido antes de ler o conteúdo
+            let lido = ImportarItens.lerJson('', arq.size);
+            if (arq.size > 0 && arq.size <= ImportarItens.LIMITES.bytes) {
+                try { lido = ImportarItens.lerJson(await arq.text(), arq.size); }
+                catch { lido = { ok: false, erro: 'Não foi possível ler o arquivo.' }; }
+            }
+            if (meu !== seqImportacao) return;
+            if (!lido.ok) { statusImportacao(lido.erro, true); return; }
+            const tri = ImportarItens.triar(lido.dados, { itensNaLista: itens.length });
+            if (tri.erro) { statusImportacao(tri.erro, true); return; }
+            if (tri.arquivo) $s('dlg-importar-texto').textContent += ` · projeto: ${tri.arquivo}`;
+            const prep = tri.aceitos.length
+                ? await ImportarItens.prepararItens(tri.aceitos, { api: apiImportacao, ...ctx,
+                    aoProgresso: (i, n, id) => { if (meu === seqImportacao) statusImportacao(`Conferindo o cadastro e calculando o preço: item ${i} de ${n} (${id})…`); } })
+                : { importados: [], falhas: [], descontoJaAplicado: false };
+            if (meu !== seqImportacao) return;
+            importacao = { clienteCodigo: ctx.clienteCodigo, arquivo: arq.name, importados: prep.importados, descontoJaAplicado: prep.descontoJaAplicado };
+            mostrarResumoImportacao(tri, prep);
+        }
+        function confirmarImportacao() {
+            const imp = importacao;
+            if (!imp || !imp.importados.length) return;
+            if ($s('sel-cliente').value !== imp.clienteCodigo) { statusImportacao('O cliente mudou depois do cálculo. Importe o arquivo de novo.', true); importacao = null; $s('btn-importar-confirmar').disabled = true; return; }
+            if (itens.length + imp.importados.length > ImportarItens.LIMITES.itens) { statusImportacao(`A lista passaria de ${ImportarItens.LIMITES.itens} itens. Nada foi importado.`, true); importacao = null; $s('btn-importar-confirmar').disabled = true; return; }
+            imp.importados.forEach(x => itens.push(x.item));
+            if (imp.descontoJaAplicado) { descontoJaAplicado = true; atualizarTravaDesconto(); }
+            importacao = null;
+            $s('dlg-importar').close();
+            renderItens();
+            mostrarMsgSalvar(`${imp.importados.length} item(ns) importado(s) de ${imp.arquivo}. Confira a lista e salve.`, 'ok');
+        }
+        $s('btn-importar').addEventListener('click', abrirImportacao);
+        $s('inp-importar').addEventListener('change', aoEscolherArquivoImportar);
+        $s('btn-importar-confirmar').addEventListener('click', confirmarImportacao);
+        $s('btn-importar-cancelar').addEventListener('click', () => $s('dlg-importar').close());
+        // fechar (Cancelar ou Esc) descarta o resultado e qualquer cálculo ainda em andamento
+        $s('dlg-importar').addEventListener('close', () => { seqImportacao++; importacao = null; });
                 // ============ CARREGAMENTO ============
         async function carregarClientes() {
             const sel = document.getElementById('sel-cliente');

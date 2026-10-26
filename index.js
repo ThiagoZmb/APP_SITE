@@ -49,6 +49,7 @@ const pool = mysql.createPool({
 
 app.use(helmet());
 app.use(cors({
+  exposedHeaders: ['Content-Disposition', 'X-Pdf-Nome', 'X-Pdf-Pasta'], // a tela lê o nome/pasta do PDF para gravar o arquivo
   origin(origin, callback) {
     const origemLocal = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
     if (!origin || origin === 'https://thiagozmb.github.io' || origemLocal.test(origin)) {
@@ -714,8 +715,12 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition',
-      `inline; filename="${numero}_${String(cab.RAZAO_SOCIAL).replace(/[^\w ]/g, '').trim()}${producao ? '_P' : ''}.pdf"`);
+    // nome e pasta iguais aos do VB; a tela usa X-Pdf-Pasta/X-Pdf-Nome para gravar em "C:\Programa Elegance\<pasta>\"
+    const destino = pdfPedOrc.destinoPdf({ tipo, numero, razaoSocial: cab.RAZAO_SOCIAL, producao });
+    const semAcento = destino.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Disposition', `inline; filename="${semAcento}"; filename*=UTF-8''${encodeURIComponent(destino.nome)}`);
+    res.setHeader('X-Pdf-Nome', encodeURIComponent(destino.nome));
+    res.setHeader('X-Pdf-Pasta', encodeURIComponent(destino.pasta));
     const doc = pdfPedOrc.novoDocumento();
     doc.pipe(res);
     // dinheiro só para quem tem valores.ver (o desenho também omite as colunas)

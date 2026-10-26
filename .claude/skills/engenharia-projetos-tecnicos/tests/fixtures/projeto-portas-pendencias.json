@@ -1,0 +1,288 @@
+{
+  "versaoSchema": "1.0.0",
+  "dominio": "portas-aluminio",
+  "documento": {
+    "arquivo": "projeto-portas-sintetico.pdf",
+    "paginas": 4,
+    "classificacao": "projeto de portas de alumínio (sintético)"
+  },
+  "itens": [
+    {
+      "id": "P3",
+      "tipo": "porta_aluminio",
+      "quantidade": {
+        "id": "P3.qtd",
+        "valor": 1,
+        "unidade": "un",
+        "estado": "confirmado",
+        "confianca": 1,
+        "metodo": "texto_vetorial",
+        "origem": {
+          "arquivo": "projeto-portas-sintetico.pdf",
+          "pagina": 5,
+          "trecho": "QTD: 1"
+        }
+      },
+      "dimensoes": {
+        "altura": {
+          "id": "P3.altura",
+          "valor": 2100,
+          "unidade": "mm",
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "H 2100"
+          }
+        },
+        "largura": {
+          "id": "P3.largura",
+          "valor": 800,
+          "unidade": "mm",
+          "estado": "inferido",
+          "confianca": 0.7,
+          "metodo": "leitura_visual",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "largura lida na linha de cota, borrada"
+          }
+        }
+      },
+      "atributos": {
+        "tipoFrente": {
+          "id": "P3.tipoFrente",
+          "valor": "porta_giro",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "PORTA DE GIRO"
+          }
+        },
+        "perfil": {
+          "id": "P3.perfil",
+          "valor": null,
+          "unidade": null,
+          "estado": "ausente",
+          "confianca": 0,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "perfil não consta na prancha"
+          }
+        },
+        "acabamentoPerfil": {
+          "id": "P3.acabPerfil",
+          "valor": "Anodizado",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "ACABAMENTO: ANODIZADO"
+          }
+        },
+        "corPerfil": {
+          "id": "P3.corPerfil",
+          "valor": null,
+          "unidade": null,
+          "estado": "conflitante",
+          "confianca": 0,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 5,
+            "trecho": "COR: FOSCO"
+          },
+          "candidatos": [
+            {
+              "id": "P3.corPerfil.a",
+              "valor": "Fosco",
+              "unidade": null,
+              "estado": "confirmado",
+              "confianca": 1,
+              "metodo": "texto_vetorial",
+              "origem": {
+                "arquivo": "projeto-portas-sintetico.pdf",
+                "pagina": 5,
+                "trecho": "COR: FOSCO"
+              }
+            },
+            {
+              "id": "P3.corPerfil.b",
+              "valor": "Brilhante",
+              "unidade": null,
+              "estado": "confirmado",
+              "confianca": 1,
+              "metodo": "texto_vetorial",
+              "origem": {
+                "arquivo": "projeto-portas-sintetico.pdf",
+                "pagina": 6,
+                "trecho": "COR: BRILHANTE"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "P4",
+      "tipo": "janela_maxim_ar",
+      "quantidade": {
+        "id": "P4.qtd",
+        "valor": 3,
+        "unidade": "un",
+        "estado": "confirmado",
+        "confianca": 1,
+        "metodo": "texto_vetorial",
+        "origem": {
+          "arquivo": "projeto-portas-sintetico.pdf",
+          "pagina": 6,
+          "trecho": "QTD: 3"
+        }
+      },
+      "dimensoes": {
+        "altura": {
+          "id": "P4.altura",
+          "valor": 600,
+          "unidade": "mm",
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 6,
+            "trecho": "H 600"
+          }
+        },
+        "largura": {
+          "id": "P4.largura",
+          "valor": 1200,
+          "unidade": "mm",
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 6,
+            "trecho": "L 1200"
+          }
+        }
+      },
+      "atributos": {
+        "perfil": {
+          "id": "P4.perfil",
+          "valor": "PERFIL EXEMPLO 25",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 6,
+            "trecho": "PERFIL: PERFIL EXEMPLO 25"
+          }
+        },
+        "acabamentoPerfil": {
+          "id": "P4.acabPerfil",
+          "valor": "Anodizado",
+          "unidade": null,
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 6,
+            "trecho": "ACABAMENTO: ANODIZADO"
+          }
+        }
+      }
+    }
+  ],
+  "cotas": [
+    {
+      "id": "C1",
+      "descricao": "largura total dos vãos",
+      "total": {
+        "id": "C1.total",
+        "valor": 3000,
+        "unidade": "mm",
+        "estado": "confirmado",
+        "confianca": 1,
+        "metodo": "texto_vetorial",
+        "origem": {
+          "arquivo": "projeto-portas-sintetico.pdf",
+          "pagina": 3,
+          "trecho": "3000"
+        }
+      },
+      "parciais": [
+        {
+          "id": "C1.p1",
+          "valor": 1400,
+          "unidade": "mm",
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 3,
+            "trecho": "1400"
+          }
+        },
+        {
+          "id": "C1.p2",
+          "valor": 1500,
+          "unidade": "mm",
+          "estado": "confirmado",
+          "confianca": 1,
+          "metodo": "texto_vetorial",
+          "origem": {
+            "arquivo": "projeto-portas-sintetico.pdf",
+            "pagina": 3,
+            "trecho": "1500"
+          }
+        }
+      ]
+    }
+  ],
+  "pendencias": [
+    {
+      "id": "pend-largura-P3",
+      "tipo": "inferido_sem_confirmacao",
+      "mensagem": "Largura da porta P3 lida visualmente.",
+      "refs": [
+        "P3.largura"
+      ],
+      "pagina": 5
+    },
+    {
+      "id": "pend-perfil-P3",
+      "tipo": "ausente",
+      "mensagem": "Perfil da porta P3 não consta na prancha.",
+      "refs": [
+        "P3.perfil"
+      ],
+      "pagina": 5
+    },
+    {
+      "id": "pend-cor-P3",
+      "tipo": "conflitante",
+      "mensagem": "Cor do perfil da porta P3 diverge entre as páginas 5 e 6.",
+      "refs": [
+        "P3.corPerfil"
+      ],
+      "pagina": 5
+    }
+  ],
+  "alertasSeguranca": []
+}

@@ -203,11 +203,23 @@ test('GET /dados_pdf?producao=1: Guia de Produção só para Pedido (lê MEDICAO
   const { f, chamar } = await preparar(t);
   const r = await chamar(1, '/dados_pdf?numero=23425&tipo=Pedido&producao=1');
   assert.equal(r.status, 200);
-  assert.match(r.headers.get('content-disposition'), /_P\.pdf"$/);
+  assert.match(r.headers.get('content-disposition'), /_P.PDF"/);
+  assert.equal(decodeURIComponent(r.headers.get('x-pdf-pasta')), 'Produção');
+  assert.match(decodeURIComponent(r.headers.get('x-pdf-nome')), /_P.PDF$/);
   assert.ok(f.chamadas.some(c => /SELECT MEDICAO/.test(c.sql)));
   const n = f.chamadas.length;
   const o = await chamar(1, '/dados_pdf?numero=21280&tipo=' + encodeURIComponent('Orçamento') + '&producao=1');
   await o.arrayBuffer();
   assert.ok(!f.chamadas.slice(n).some(c => /MEDICAO/.test(c.sql)));
-  assert.doesNotMatch(o.headers.get('content-disposition') || '', /_P\.pdf/);
+  assert.doesNotMatch(o.headers.get('content-disposition') || '', /_P\.PDF/);
+});
+
+test('destinoPdf: pasta e nome iguais ao VB (Pedidos(PDF), Orçamentos(PDF), Produção)', () => {
+  const { destinoPdf } = pdf;
+  assert.deepEqual(destinoPdf({ tipo: 'Pedido', numero: 23425, razaoSocial: 'Iamonde Design de Moveis Ltda Me' }),
+    { pasta: 'Pedidos(PDF)', nome: '23425_Iamonde Design de Moveis Ltda Me.PDF' });
+  assert.deepEqual(destinoPdf({ tipo: 'Orçamento', numero: 21280, razaoSocial: 'Cliente Final' }), { pasta: 'Orçamentos(PDF)', nome: '21280_Cliente Final.PDF' });
+  assert.deepEqual(destinoPdf({ tipo: 'Pedido', numero: 7, razaoSocial: 'Ação & Cia', producao: true }), { pasta: 'Produção', nome: '7_Ação & Cia_P.PDF' });
+  // só caem os caracteres que o Windows não aceita (acentos ficam, como no VB)
+  assert.equal(destinoPdf({ tipo: 'Pedido', numero: 1, razaoSocial: ' A/B: "C"? ' }).nome, '1_AB C.PDF');
 });

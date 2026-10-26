@@ -1,0 +1,21 @@
+{
+  "dominio": "guarda-corpo-teste",
+  "metadados": {
+    "versao": "0.0.1",
+    "data": "2026-10-26",
+    "responsavel": null,
+    "motivo": "Domínio fictício só para provar que o núcleo (mapear.mjs) não conhece nenhum domínio. Não é regra de negócio."
+  },
+  "base": { "peca": { "medidas": {} }, "origemProjeto": "guarda-corpo" },
+  "campos": [
+    {
+      "destino": "peca.categoria", "origem": "tipo", "tipo": "texto", "obrigatorio": true,
+      "traducao": { "gc_vidro": "GUARDA-CORPO VIDRO", "gc_tubo": "GUARDA-CORPO TUBULAR" }
+    },
+    { "destino": "peca.unidades", "origem": "quantidade", "tipo": "inteiro", "obrigatorio": true, "minimo": 1 },
+    { "destino": "peca.medidas.alturaMm", "origem": "dimensoes.altura", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "peca.medidas.comprimentoMm", "origem": "dimensoes.comprimento", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "peca.vidro.espessuraMm", "origem": "atributos.espessuraVidro", "tipo": "numero", "obrigatorioQuando": { "destino": "peca.categoria", "em": ["GUARDA-CORPO VIDRO"] } },
+    { "destino": "peca.fixacoes", "origem": "atributos.fixacoes", "tipo": "lista", "itemTipo": "texto", "separador": "," }
+  ]
+}
