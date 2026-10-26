@@ -24,3 +24,35 @@ export function docMinimo(mudar = () => {}) {
   mudar(doc);
   return doc;
 }
+
+// ---- Apoio dos testes de mapeamento (montar-itens) ----
+// Atributo de texto (sem unidade), confirmado por padrão
+export const txt = (id, valor, extra = {}) => val(id, valor, { unidade: null, ...extra });
+export const qtd = (id, valor) => val(id, valor, { unidade: 'un' });
+export const inferidoVal = (id, valor, unidade = 'mm') => val(id, valor, { unidade, estado: 'inferido', confianca: 0.6, metodo: 'leitura_visual' });
+export const ausenteVal = (id, unidade = null) => val(id, null, { unidade, estado: 'ausente', confianca: 0 });
+export const conflitanteVal = (id, a, b) => val(id, null, { unidade: null, estado: 'conflitante', confianca: 0, candidatos: [txt(`${id}.a`, a), txt(`${id}.b`, b)] });
+
+// Item de porta mínimo e completo (giro). "mudar" ajusta o item.
+export function itemPorta(id = 'P1', mudar = () => {}) {
+  const item = {
+    id, tipo: 'porta_giro', quantidade: qtd(`${id}.qtd`, 1),
+    dimensoes: { altura: val(`${id}.altura`, 2100), largura: val(`${id}.largura`, 900) },
+    atributos: { perfil: txt(`${id}.perfil`, 'PERFIL EXEMPLO 25'), acabamentoPerfil: txt(`${id}.acab`, 'Anodizado') },
+  };
+  mudar(item);
+  return item;
+}
+
+// Documento de portas válido: gera as pendências que o núcleo exige para valores incertos
+export function docPortas(itens, mudar = () => {}) {
+  const pendencias = [];
+  for (const it of itens) {
+    for (const v of [it.quantidade, ...Object.values(it.dimensoes), ...Object.values(it.atributos)]) {
+      if (v.estado !== 'confirmado') pendencias.push({ id: `pend-${v.id}`, tipo: v.estado === 'inferido' ? 'inferido_sem_confirmacao' : v.estado, mensagem: `${v.id} incerto`, refs: [v.id] });
+    }
+  }
+  const doc = { versaoSchema: '1.0.0', dominio: 'portas-aluminio', documento: { arquivo: 'a.pdf' }, itens, pendencias, alertasSeguranca: [] };
+  mudar(doc);
+  return doc;
+}

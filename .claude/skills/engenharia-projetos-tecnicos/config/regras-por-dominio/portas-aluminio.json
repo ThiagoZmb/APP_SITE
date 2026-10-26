@@ -1,0 +1,52 @@
+{
+  "dominio": "portas-aluminio",
+  "metadados": {
+    "versao": "0.2.0",
+    "data": "2026-10-26",
+    "responsavel": null,
+    "status": "pendente de aprovação",
+    "motivo": "Mapa do projeto técnico para o item da tela de orçamentos/pedidos (orcamentos.html coletarForm, orcamentos.html:1918-1981). Nomes de campos e valores de frente conferidos em rotas/ped_orc.js e calculo/engenharia.js; detalhes e citações em references/esquadrias-aluminio.md. Decisão D3: a skill não aplica descontos de fabricação; D4: saída no formato do item da tela."
+  },
+  "base": {
+    "furos": { "lista": [], "lados": [], "referenciaInvertida": false },
+    "detalhes": {},
+    "acessorios": [],
+    "obs": ""
+  },
+  "campos": [
+    {
+      "destino": "frente", "origem": "tipo", "tipo": "texto", "obrigatorio": true,
+      "traducao": {
+        "porta_giro": "Porta de giro", "porta de giro": "Porta de giro",
+        "porta_basculante": "Porta basculante", "porta basculante": "Porta basculante",
+        "frente_gaveta": "Frente de gaveta", "frente de gaveta": "Frente de gaveta",
+        "porta_correr": "Porta de Correr", "porta de correr": "Porta de Correr"
+      }
+    },
+    { "destino": "qtd", "origem": "quantidade", "tipo": "inteiro", "obrigatorio": true, "minimo": 1, "maximo": 500 },
+    { "destino": "altura", "origem": "dimensoes.altura", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "largura", "origem": "dimensoes.largura", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "detalhes.perfil", "origem": "atributos.perfil", "tipo": "texto", "obrigatorio": true },
+    { "destino": "detalhes.acabamento", "origem": "atributos.acabamentoPerfil", "tipo": "texto", "obrigatorio": true },
+    { "destino": "detalhes.cor", "origem": "atributos.corPerfil", "tipo": "texto" },
+    { "destino": "detalhes.puxador", "origem": "atributos.puxador", "tipo": "texto" },
+    { "destino": "detalhes.tipoPuxador", "origem": "atributos.tipoPuxador", "tipo": "texto" },
+    { "destino": "detalhes.acabPux", "origem": "atributos.acabamentoPuxador", "tipo": "texto" },
+    { "destino": "detalhes.corPux", "origem": "atributos.corPuxador", "tipo": "texto" },
+    { "destino": "detalhes.tamanhoPux", "origem": "atributos.tamanhoPuxador", "tipo": "numero", "minimo": 0 },
+    { "destino": "detalhes.posicoesFolhas", "origem": "atributos.posicoesPuxador", "tipo": "lista", "itemTipo": "texto", "separador": ";" },
+    { "destino": "detalhes.revestimento", "origem": "atributos.revestimento", "tipo": "texto" },
+    { "destino": "detalhes.corRevest", "origem": "atributos.corRevestimento", "tipo": "texto" },
+    { "destino": "detalhes.divisor", "origem": "atributos.divisor", "tipo": "texto" },
+    { "destino": "detalhes.divH", "origem": "atributos.divisoresHorizontais", "tipo": "inteiro", "minimo": 0 },
+    { "destino": "detalhes.divV", "origem": "atributos.divisoresVerticais", "tipo": "inteiro", "minimo": 0 },
+    {
+      "destino": "detalhes.sistema", "origem": "atributos.sistema", "tipo": "texto",
+      "obrigatorioQuando": { "destino": "frente", "em": ["Porta de Correr"] }
+    },
+    { "destino": "detalhes.transpasse", "origem": "atributos.transpasse", "tipo": "numero", "minimo": 0 },
+    { "destino": "furos.lista", "origem": "atributos.furos", "tipo": "lista", "itemTipo": "numero", "separador": ";" },
+    { "destino": "furos.lados", "origem": "atributos.ladosFuros", "tipo": "lista", "itemTipo": "texto", "separador": ";" },
+    { "destino": "obs", "origem": "atributos.observacao", "tipo": "texto" }
+  ]
+}
