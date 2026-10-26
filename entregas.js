@@ -6,12 +6,15 @@
 // Dado vindo da API só entra na tela por esc() ou textContent. Nenhum valor em dinheiro passa por aqui.
 // ==========================================================================
 (function (raiz, fabrica) {
-  const lib = fabrica();
+  const lib = fabrica(raiz);
   if (typeof module === 'object' && module.exports) module.exports = lib;
   else raiz.Entregas = lib;
   if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => lib.iniciar(raiz));
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
+  // helpers compartilhados com a tela do motorista (entregas_comum.js, carregado antes no navegador)
+  const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  const { esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem } = C;
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
@@ -28,25 +31,6 @@
     { id: 'concluidas', rotulo: 'Concluídas', status: ['entregue', 'retirado', 'cancelada'] },
     { id: 'ocorrencias', rotulo: 'Ocorrências', status: ['ocorrencia'] }
   ];
-  const LIMITE_IMAGEM = 1000 * 1000; // o servidor aceita até 1 MiB; ficamos abaixo
-
-  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const txt = v => String(v ?? '').trim();
-
-  function dataValida(s) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s ?? ''));
-    if (!m) return false;
-    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
-  }
-  const dataBR = iso => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
-  };
-  const dataHoraBR = q => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(q ?? ''));
-    return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : dataBR(q);
-  };
 
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
   const corStatus = s => COR_STATUS[s] || 'neutro';
@@ -138,48 +122,14 @@
   const validarComprovante = f => (f.temFoto ? null : 'Anexe a foto do comprovante.');
   const validarCancelamento = m => (txt(m).length >= 3 ? null : 'Informe o motivo (mínimo 3 caracteres).');
 
-  // maior lado limitado a `max`, sem ampliar
-  function escalaImagem(w, h, max) {
-    const f = Math.min(1, max / Math.max(w, h));
-    return { largura: Math.round(w * f), altura: Math.round(h * f) };
-  }
-
   // ============ TELA (só no navegador) ============
   function iniciar(win) {
-    const API_BASE = 'https://elegance-backend-hrho.onrender.com';
-    const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
     const doc = win.document;
     const $ = id => doc.getElementById(id);
     const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false };
 
-    function getAuth() {
-      try {
-        const a = JSON.parse(win.localStorage.getItem('auth') || 'null');
-        if (!a || !a.token || !a.user) return null;
-        if (Date.now() > (a.exp || 0)) { win.localStorage.removeItem('auth'); return null; }
-        return a;
-      } catch { return null; }
-    }
-    async function chamar(caminho, { metodo = 'GET', corpo, binario, mime, blob } = {}) {
-      const auth = getAuth();
-      const headers = { Authorization: 'Bearer ' + (auth ? auth.token : '') };
-      let body;
-      if (binario) { body = binario; headers['Content-Type'] = mime; } else if (corpo !== undefined) { body = JSON.stringify(corpo); headers['Content-Type'] = 'application/json'; }
-      const res = await win.fetch(API_BASE + caminho, { method: metodo, headers, body });
-      if (res.status === 401) { win.localStorage.removeItem('auth'); win.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
-      if (blob && res.ok) return res.blob();
-      const dados = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(dados.error || `Erro HTTP ${res.status}`);
-      return dados;
-    }
-
-    function toast(msg, tipo = 'info') {
-      const t = doc.createElement('div');
-      t.className = `toast ${tipo}`;
-      t.textContent = msg;
-      $('toasts').appendChild(t);
-      win.setTimeout(() => t.remove(), 5000);
-    }
+    const { getAuth, chamar } = C.criarApi(win);
+    const toast = C.criarToast(doc, win);
 
     // desabilita os botões do painel durante a chamada (evita envio duplo)
     async function ocupado(fn) {
@@ -391,30 +341,7 @@
     }
 
     // ---------- foto (reduzida para ≤ 1 MB) ----------
-    function carregarImagem(arquivo) {
-      return new Promise((ok, falha) => {
-        const url = URL.createObjectURL(arquivo);
-        const img = new win.Image();
-        img.onload = () => { URL.revokeObjectURL(url); ok(img); };
-        img.onerror = () => { URL.revokeObjectURL(url); falha(new Error('Não foi possível ler a imagem.')); };
-        img.src = url;
-      });
-    }
-    async function reduzirImagem(arquivo) {
-      if (!/^image\//.test(arquivo.type || '')) throw new Error('Escolha uma imagem (foto).');
-      const img = await carregarImagem(arquivo);
-      for (const max of [1600, 1200, 900, 600]) {
-        const { largura, altura } = escalaImagem(img.naturalWidth, img.naturalHeight, max);
-        const c = doc.createElement('canvas');
-        c.width = largura; c.height = altura;
-        c.getContext('2d').drawImage(img, 0, 0, largura, altura);
-        for (const q of [0.85, 0.7, 0.55]) {
-          const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
-          if (blob && blob.size <= LIMITE_IMAGEM) return blob;
-        }
-      }
-      throw new Error('A foto continua grande demais. Tente outra.');
-    }
+    const reduzirImagem = arquivo => C.reduzirImagem(win, arquivo);
     // envia a foto uma única vez por arquivo escolhido (um novo clique após erro na baixa não duplica o anexo)
     async function enviarFoto(entregaId, arquivo) {
       if (estado.anexoEnviado && estado.anexoEnviado.arquivo === arquivo) return estado.anexoEnviado.id;
@@ -512,7 +439,7 @@
 
     // ---------- init ----------
     const auth = getAuth();
-    if (!auth) { win.location.href = LOGIN_URL; return; }
+    if (!auth) { win.location.href = C.LOGIN_URL; return; }
     $('user-empresa').textContent = auth.user.empresa || 'Elegance';
     $('user-name').textContent = auth.user.nome || '';
     $('user-cargo').textContent = auth.user.cargo || '';

@@ -30,6 +30,7 @@
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },
+        { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas' },
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
@@ -52,7 +53,8 @@
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
         'custos.html': ['precos.ver', 'valores.ver'],
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
-        'usuarios.html': ['admin.usuarios']
+        'usuarios.html': ['admin.usuarios'],
+        'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };
     window.ACESSO_PAGINAS = PAGINAS;
 

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Minhas entregas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
+            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
+        }
+        [hidden] { display: none !important; }
+        /* mobile primeiro: sem moldura, uma coluna */
+        body { background: #f5f7fa; color: var(--text-dark); min-height: 100vh; }
+        .container { display: grid; grid-template-columns: 1fr; grid-template-areas: "header" "main"; min-height: 100vh; background: var(--white); }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 18px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: none; }
+        .sidebar { grid-area: sidebar; }
+        main { grid-area: main; padding: 16px 14px 40px; min-width: 0; }
+        .welcome-title { font-size: 24px; margin-bottom: 4px; font-weight: 700; }
+        .welcome-subtitle { font-size: 14px; color: var(--text-light); margin-bottom: 14px; }
+
+        .nav-dia { display: grid; grid-template-columns: 56px 1fr 56px; gap: 8px; align-items: center; margin-bottom: 14px; }
+        .nav-dia .rotulo { text-align: center; font-weight: 700; font-size: 16px; }
+        .nav-dia .hoje { grid-column: 1 / -1; }
+
+        .dia h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-color); margin: 18px 0 10px; }
+        .cartao { background: var(--white); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: var(--shadow-light); padding: 16px; margin-bottom: 14px; position: relative; overflow: hidden; }
+        .cartao::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .cartao-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; font-size: 15px; }
+        .cartao h3 { font-size: 20px; margin: 8px 0 6px; overflow-wrap: anywhere; }
+        .cartao h4 { font-size: 12px; text-transform: uppercase; color: var(--text-light); margin: 14px 0 6px; letter-spacing: .4px; }
+        .cartao p { font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
+        .endereco { font-size: 16px; }
+        .endereco.sem { color: var(--danger-color); font-weight: 600; }
+        .aviso { background: #fff3cd; color: #7a5d00; border-radius: 10px; padding: 8px 10px; font-size: 13px !important; }
+        .itens { list-style: none; font-size: 15px; }
+        .itens li { padding: 6px 0; border-bottom: 1px dashed var(--border-color); overflow-wrap: anywhere; }
+        .ocorrencia { background: #f8d7da; color: #7a1a24; border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+        .cinza { color: var(--text-light); font-size: 13px; }
+        .vazio { text-align: center; padding: 40px 10px; color: var(--text-light); }
+        .selo { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #e9ecef; color: #495057; white-space: nowrap; }
+        .selo.info { background: #dbeafe; color: #1e40af; }
+        .selo.ok { background: #d4edda; color: #1b6b30; }
+        .selo.perigo { background: #f8d7da; color: #a12330; }
+
+        .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .acoes > :only-child { grid-column: 1 / -1; }
+        .btn { padding: 14px 16px; border: none; border-radius: 14px; font-weight: 700; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; min-height: 52px; width: 100%; }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-ok { background: var(--success-color); color: white; }
+        .btn-perigo { background: var(--white); color: var(--danger-color); border: 2px solid var(--danger-color); }
+        .btn-nav { padding: 0; min-height: 52px; font-size: 22px; }
+        .btn:disabled { opacity: .6; cursor: wait; }
+
+        .folha h2 { font-size: 22px; margin-bottom: 2px; }
+        .folha .sub { color: var(--text-light); margin-bottom: 16px; overflow-wrap: anywhere; }
+        .folha .pilha { display: grid; gap: 12px; }
+        .folha .separador { border-top: 1px solid var(--border-color); margin: 8px 0 0; padding-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group textarea { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 17px; background: var(--white); }
+        .form-group input[type=file] { padding: 12px; font-size: 15px; }
+        .form-group textarea { resize: vertical; min-height: 96px; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .item-parcial { display: grid; grid-template-columns: 1fr 96px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border-color); }
+        .item-parcial label { margin: 0; text-transform: none; font-size: 15px; color: var(--text-dark); letter-spacing: 0; overflow-wrap: anywhere; }
+        .item-parcial input { text-align: center; }
+        #b-previa { max-width: 100%; max-height: 180px; border-radius: 10px; border: 1px solid var(--border-color); margin-top: 8px; display: block; }
+        #assinatura { width: 100%; height: 180px; border: 2px dashed var(--border-color); border-radius: 12px; background: var(--white); touch-action: none; display: block; }
+        .erro-form { color: var(--danger-color); font-size: 15px; min-height: 20px; margin: 4px 0 10px; font-weight: 600; }
+
+        #toasts { position: fixed; left: 12px; right: 12px; bottom: 16px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { padding: 14px 18px; border-radius: 12px; color: white; font-size: 15px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (min-width: 769px) {
+            body { padding: 20px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+            .container { grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden; }
+            header { padding: 0 40px; }
+            .logo { font-size: 28px; }
+            .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+            .user-cargo { font-size: 11px; opacity: 0.8; }
+            main { padding: 40px; }
+            #vista-lista, #vista-baixa { max-width: 640px; }
+            #toasts { left: auto; right: 24px; max-width: 380px; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610261500" defer></script>
+    <script src="entregas_comum.js?v=202610261500" defer></script>
+    <script src="minhas_entregas.js?v=202610261500" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <!-- lista do dia -->
+            <section id="vista-lista">
+                <h1 class="welcome-title">Minhas entregas</h1>
+                <p class="welcome-subtitle">Suas entregas agendadas: inicie a rota e dê baixa no local.</p>
+                <div class="nav-dia">
+                    <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-ant" aria-label="Dia anterior">‹</button>
+                    <div class="rotulo" id="dia-rotulo" aria-live="polite"></div>
+                    <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-prox" aria-label="Próximo dia">›</button>
+                    <button type="button" class="btn btn-secondary hoje" id="btn-dia-hoje">Hoje</button>
+                </div>
+                <div id="cartoes" aria-live="polite"><p class="vazio">Carregando…</p></div>
+            </section>
+
+            <!-- dar baixa: uma ação por tela -->
+            <section id="vista-baixa" class="folha" hidden>
+                <h2 id="b-titulo"></h2>
+                <p class="sub" id="b-cliente"></p>
+
+                <div id="b-escolha">
+                    <div class="pilha">
+                        <button type="button" class="btn btn-ok" data-resultado="entregue" data-perm="entregas.baixar">Entregue</button>
+                        <button type="button" class="btn btn-secondary" data-resultado="parcial" data-perm="entregas.baixar">Entrega parcial</button>
+                        <button type="button" class="btn btn-secondary" data-resultado="ausente" data-perm="entregas.baixar">Cliente ausente</button>
+                    </div>
+                    <div class="separador">
+                        <button type="button" class="btn btn-perigo" data-resultado="endereco_errado" data-perm="entregas.baixar">Endereço errado</button>
+                        <button type="button" class="btn btn-perigo" data-resultado="recusa" data-perm="entregas.baixar">Recusa</button>
+                    </div>
+                    <div class="pilha" style="margin-top:18px">
+                        <button type="button" class="btn btn-secondary" id="btn-voltar-lista">Voltar</button>
+                    </div>
+                </div>
+
+                <form id="b-form" hidden>
+                    <h2 id="b-resultado"></h2>
+
+                    <div id="b-sec-entregue">
+                        <div class="form-group"><label for="b-quem">Quem recebeu</label><input id="b-quem" maxlength="190" autocomplete="off"></div>
+                        <div class="form-group">
+                            <label for="b-foto">Foto do canhoto</label>
+                            <input type="file" id="b-foto" accept="image/*" capture="environment">
+                            <img id="b-previa" alt="Prévia da foto do canhoto" hidden>
+                        </div>
+                        <div class="form-group">
+                            <label for="assinatura">Assinatura (opcional)</label>
+                            <canvas id="assinatura" width="300" height="180" aria-label="Assinatura de quem recebeu"></canvas>
+                            <button type="button" class="btn btn-secondary" id="btn-limpar-assinatura" style="margin-top:8px">Limpar assinatura</button>
+                        </div>
+                    </div>
+
+                    <div id="b-sec-itens" hidden>
+                        <div class="form-group"><label>Itens entregues (quantidade)</label><div id="b-itens"></div></div>
+                    </div>
+
+                    <div id="b-sec-motivo" hidden>
+                        <div class="form-group"><label for="b-motivo">Motivo</label><textarea id="b-motivo" maxlength="500"></textarea></div>
+                        <p class="cinza">A equipe é avisada e reagenda a entrega.</p>
+                    </div>
+
+                    <p class="erro-form" id="b-erro" role="alert"></p>
+                    <div class="pilha">
+                        <button type="submit" class="btn btn-primary" id="btn-confirmar" data-perm="entregas.baixar">Confirmar</button>
+                        <button type="button" class="btn btn-secondary" id="btn-voltar-escolha">Voltar</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
