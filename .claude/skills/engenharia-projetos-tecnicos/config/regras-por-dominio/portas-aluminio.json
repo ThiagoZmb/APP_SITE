@@ -1,11 +1,11 @@
 {
   "dominio": "portas-aluminio",
   "metadados": {
-    "versao": "0.3.1",
+    "versao": "0.4.0",
     "data": "2026-10-26",
     "responsavel": null,
     "status": "pendente de aprovação",
-    "motivo": "Mapa do projeto técnico para o item da tela de orçamentos/pedidos (orcamentos.html coletarForm, orcamentos.html:1918-1981). Nomes de campos e valores de frente conferidos em rotas/ped_orc.js e calculo/engenharia.js; detalhes e citações em references/esquadrias-aluminio.md. Decisão D3: a skill não aplica descontos de fabricação; D4: saída no formato do item da tela."
+    "motivo": "Mapa do projeto técnico para o item da tela de orçamentos/pedidos (orcamentos.html coletarForm, orcamentos.html:1918-1981). Nomes de campos e valores de frente conferidos em rotas/ped_orc.js e calculo/engenharia.js; detalhes e citações em references/esquadrias-aluminio.md. Decisão D3: a skill não aplica descontos de fabricação; D4: saída no formato do item da tela. 0.4.0: campos de comprimento marcados com unidade mm (usado pela leitura de PDF na web para converter cotas com interpretarCota; não muda o mapeamento)."
   },
   "categorias": ["porta_aluminio"],
   "foraDoEscopo": {
@@ -29,8 +29,8 @@
       }
     },
     { "destino": "qtd", "origem": "quantidade", "tipo": "inteiro", "obrigatorio": true, "minimo": 1, "maximo": 500 },
-    { "destino": "altura", "origem": "dimensoes.altura", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
-    { "destino": "largura", "origem": "dimensoes.largura", "tipo": "numero", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "altura", "origem": "dimensoes.altura", "tipo": "numero", "unidade": "mm", "obrigatorio": true, "maiorQue": 0 },
+    { "destino": "largura", "origem": "dimensoes.largura", "tipo": "numero", "unidade": "mm", "obrigatorio": true, "maiorQue": 0 },
     { "destino": "detalhes.perfil", "origem": "atributos.perfil", "tipo": "texto", "obrigatorio": true },
     { "destino": "detalhes.acabamento", "origem": "atributos.acabamentoPerfil", "tipo": "texto", "obrigatorio": true },
     { "destino": "detalhes.cor", "origem": "atributos.corPerfil", "tipo": "texto" },
@@ -38,7 +38,7 @@
     { "destino": "detalhes.tipoPuxador", "origem": "atributos.tipoPuxador", "tipo": "texto" },
     { "destino": "detalhes.acabPux", "origem": "atributos.acabamentoPuxador", "tipo": "texto" },
     { "destino": "detalhes.corPux", "origem": "atributos.corPuxador", "tipo": "texto" },
-    { "destino": "detalhes.tamanhoPux", "origem": "atributos.tamanhoPuxador", "tipo": "numero", "minimo": 0 },
+    { "destino": "detalhes.tamanhoPux", "origem": "atributos.tamanhoPuxador", "tipo": "numero", "unidade": "mm", "minimo": 0 },
     { "destino": "detalhes.posicoesFolhas", "origem": "atributos.posicoesPuxador", "tipo": "lista", "itemTipo": "texto", "separador": ";" },
     { "destino": "detalhes.revestimento", "origem": "atributos.revestimento", "tipo": "texto" },
     { "destino": "detalhes.corRevest", "origem": "atributos.corRevestimento", "tipo": "texto" },
@@ -49,8 +49,8 @@
       "destino": "detalhes.sistema", "origem": "atributos.sistema", "tipo": "texto",
       "obrigatorioQuando": { "destino": "frente", "em": ["Porta de Correr"] }
     },
-    { "destino": "detalhes.transpasse", "origem": "atributos.transpasse", "tipo": "numero", "minimo": 0 },
-    { "destino": "furos.lista", "origem": "atributos.furos", "tipo": "lista", "itemTipo": "numero", "separador": ";" },
+    { "destino": "detalhes.transpasse", "origem": "atributos.transpasse", "tipo": "numero", "unidade": "mm", "minimo": 0 },
+    { "destino": "furos.lista", "origem": "atributos.furos", "tipo": "lista", "itemTipo": "numero", "unidade": "mm", "separador": ";" },
     { "destino": "furos.lados", "origem": "atributos.ladosFuros", "tipo": "lista", "itemTipo": "texto", "separador": ";" },
     { "destino": "obs", "origem": "atributos.observacao", "tipo": "texto" }
   ]

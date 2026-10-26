@@ -53,6 +53,9 @@ export function validarMapa(mapa) {
     if (c.obrigatorio !== undefined && typeof c.obrigatorio !== 'boolean') erros.push(`${nome}: "obrigatorio" deve ser booleano`);
     if (c.traducao !== undefined && (!ehObjeto(c.traducao) || c.tipo !== 'texto')) erros.push(`${nome}: "traducao" só vale para tipo texto e deve ser um objeto`);
     if (c.itemTipo !== undefined && (c.tipo !== 'lista' || !['numero', 'texto'].includes(c.itemTipo))) erros.push(`${nome}: "itemTipo" só vale para lista (numero|texto)`);
+    // "unidade" (opcional): só "mm", em número ou lista de números. Não muda o mapeamento; diz a quem LÊ o projeto
+    // (leitura de PDF na web, scripts/lib/leitura.mjs) que o campo é comprimento e deve ser convertido para mm.
+    if (c.unidade !== undefined && (c.unidade !== 'mm' || !(c.tipo === 'numero' || (c.tipo === 'lista' && c.itemTipo === 'numero')))) erros.push(`${nome}: "unidade" só aceita "mm" e só em numero ou lista de numero`);
     for (const lim of ['minimo', 'maximo', 'maiorQue']) {
       if (c[lim] !== undefined && (typeof c[lim] !== 'number' || !['numero', 'inteiro'].includes(c.tipo))) erros.push(`${nome}: "${lim}" só vale para numero/inteiro e deve ser número`);
     }

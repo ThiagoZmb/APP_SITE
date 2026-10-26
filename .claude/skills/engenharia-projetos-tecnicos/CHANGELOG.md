@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 — 2026-10-26
+
+Leitura de PDF na web. Pedido do usuário: vendedores em terminais diferentes, sem Claude Code e sem poppler, lendo o projeto direto na tela de orçamentos.
+
+- **Leitura pelo servidor**: o servidor web chama a API do Claude com o PDF (bloco `document` base64) e saída estruturada. Novos `scripts/lib/leitura.mjs` (`esquemaLeitura` gerado do mapa, `validarLeitura`, `leituraParaProjeto`) e `scripts/lib/servico.mjs` (fachada: `carregarMapa`, `textoSistema`, `processarLeitura`, `avaliar`, `aplicarDecisoes`), e o prompt `prompts/leitura-pdf-sistema.md`.
+- **O modelo transcreve, a skill decide**: o modelo devolve o texto literal de cada valor; a conversão é da skill. Todo valor nasce `inferido` (`leitura_visual`); cota sem unidade escrita usa `interpretarCota` com unidade inferida (pendência `unidade_ambigua`); número ambíguo ou unidade desconhecida → `ausente`; leituras divergentes → `conflitante`; campos não lidos de porta → `ausente` (para a pessoa informar); `detectarInstrucoes` em todo texto devolvido.
+- **Confirmação humana pela tela** com `aplicarConfirmacoes` (o mesmo do CLI): confirmar, rejeitar com motivo (cada um o seu), corrigir (rejeitar + informar) e escolher candidato.
+- **Verificação cruzada refeita a cada avaliação** (não gravada no projeto base): divergência some quando o valor errado é corrigido; contagem/cota ligada a um item bloqueia só aquele item.
+- Mapa `portas-aluminio` 0.4.0: campos de comprimento com `"unidade": "mm"` (`validarMapa` aceita só `mm` em número ou lista de números). Mapeamento inalterado; golden inalterado.
+- `references/leitura-web.md` (fluxo e limitações). Testes: `tests/leitura.test.mjs`.
+- Dependência: `ajv` passa a ser dependência de produção do repositório (o servidor valida com ele).
+
+Não incluído: OCR local, plano de corte, mapa para estantes/louceiros/aço.
+
 ## Não lançado — 2026-10-26 (só documentação)
 
 - A tela de orçamentos da web passa a importar a saída do `montar-itens.mjs` (botão "📥 Importar itens (JSON)", `importar_itens.js` na raiz do repositório). Documentado em `references/esquadrias-aluminio.md` ("Importar na tela de orçamentos") e no README. Nenhum script, schema ou mapa da skill mudou.

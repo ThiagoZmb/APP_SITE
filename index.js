@@ -18,6 +18,7 @@ const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precoSer
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarCustos } = require('./rotas/custos');
 const { registrarPrecosFormacao } = require('./rotas/precos_formacao');
+const { registrarLeituraPdf } = require('./leitura/rotas');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -1540,6 +1541,8 @@ registrarPedOrc({ rota: registro.rota, pool });
 registrarCustos({ rota: registro.rota, pool });
 registrarPrecosFormacao({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
+// leitura de projeto técnico em PDF pela API do Claude (ANTHROPIC_API_KEY; sem chave a rota responde 503 com mensagem clara)
+const leituraPdf = registrarLeituraPdf({ rota: registro.rota, pool });
 
 // ================= SUBIDA =================
 // Ordem: tabelas web_ → migração única dos usuários → todas as rotas precisam
@@ -1565,4 +1568,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool, acesso, registro, colunasPdf: pdfPedOrc.colunasPdf };
+module.exports = { app, pool, acesso, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
