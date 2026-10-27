@@ -23,7 +23,7 @@
     --border-strong: #d9d9e3;
     --text-dark: #18151d;
     --text-mid: #4a4553;
-    --text-light: #77707f;
+    --text-light: #6b6473;
 
     /* semânticas */
     --success-color: #12a150;
@@ -695,3 +695,12 @@ dialog.dlg-padrao::backdrop { background: rgba(15, 12, 20, .48); }
 .cf-bloco > h4 { margin: -16px -18px 14px !important; padding: 10px 18px !important; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
 .g-corpo > .bloco > h4 { margin: -14px -16px 12px !important; padding: 10px 16px !important; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
 .g-corpo > .bloco, .cf-corpo .cf-bloco, .gaveta-corpo > .bloco { flex-shrink: 0; }
+
+/* ===== MOVIMENTO REDUZIDO: quem pede menos movimento ao sistema não recebe entradas, deslizes nem transições ===== */
+@media (prefers-reduced-motion: reduce) {
+    html:root:root body *, html:root:root body *::before, html:root:root body *::after {
+        animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important; scroll-behavior: auto !important;
+    }
+    html:root:root { scroll-behavior: auto !important; }
+}

@@ -4,64 +4,19 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elegance Dashboard - Pedidos e Orçamentos</title>
+    <title>Pedidos e Orçamentos - Elegance</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* os tokens de cor, sombra e gradiente vêm do tema.css (carregado depois); aqui ficam só as cores de linha do VB */
         :root {
-            --primary-color: #8B0000;
-            --primary-light: rgba(139, 0, 0, 0.1);
-            --primary-dark: #600000;
-            --secondary-color: #f8f9fa;
-            --text-dark: #2c3e50;
-            --text-light: #6c757d;
-            --white: #ffffff;
-            --border-color: #e9ecef;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
-            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
-            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-            --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            --success-color: #28a745;
-            --warning-color: #e0a800;
-            --danger-color: #dc3545;
-            /* cores do Grifar_Estoque do VB */
             --row-inativo: #e2e3e5;
             --row-minimo: #ffe4c4;
             --row-falta: #ffb59a;
         }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
-        .container {
-            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
-            grid-template-areas: "header header" "sidebar main";
-            min-height: calc(100vh - 40px); background: var(--white);
-            border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
-        }
-        header {
-            grid-area: header; background: var(--gradient-primary); color: white;
-            display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium);
-        }
-        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
-        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
-        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
-        .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
-            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
-        }
-        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
-        .user-cargo { font-size: 11px; opacity: 0.8; }
-        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
-        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
-        .menu-item {
-            padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
-            font-weight: 500; color: var(--text-dark); text-decoration: none; transition: all .3s ease;
-        }
-        .menu-item:hover { background: var(--primary-light); color: var(--primary-color); }
-        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
-        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; animation: fadeIn .5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
-        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 30px; }
+        body { color: var(--text-dark); }
+        /* cabeçalho, casca e menu lateral: tema.css */
+        .logo { display: flex; align-items: center; }
         kbd { background: var(--secondary-color); border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; font-size: 12px; }
 
         /* ===== CARDS DE RESUMO ===== */
@@ -84,45 +39,19 @@
 
         /* ===== LAYOUT LISTA + FICHA ===== */
         .workspace { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-        .painel {
-            background: var(--white); border-radius: 20px; border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-light); position: relative; overflow: hidden;
-        }
-        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel { position: relative; overflow: hidden; }
         .painel-head { padding: 24px 24px 0; }
         .painel-titulo { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .painel-titulo .contagem { font-size: 13px; font-weight: 600; color: var(--primary-color); background: var(--primary-light); padding: 3px 10px; border-radius: 20px; }
 
         .busca { position: relative; margin-bottom: 14px; }
-        .busca input {
-            width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
-            font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
-        }
-        .busca input:focus { outline: none; border-color: var(--primary-color); background: #fffbe6; }
-        .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
         .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
-        .chip {
-            padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--white);
-            font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer; transition: all .2s ease;
-        }
-        .chip:hover { color: var(--primary-color); border-color: var(--primary-color); }
-        .chip.ativo { background: var(--gradient-primary); color: white; border-color: transparent; }
+        .chip { cursor: pointer; }
 
-        .tabela-wrap { max-height: 620px; overflow: auto; border-top: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; }
-        thead th {
-            position: sticky; top: 0; z-index: 1; background: var(--secondary-color); padding: 12px; text-align: left;
-            font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px;
-            border-bottom: 2px solid var(--border-color); white-space: nowrap;
-        }
+        .tabela-wrap { max-height: 620px; overflow: auto; }
+        thead th { position: sticky; top: 0; z-index: 1; text-align: left; }
         th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        tbody tr { cursor: pointer; transition: background .15s ease; }
-        tbody tr:hover { background: var(--primary-light); }
-        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
-        tbody tr.minimo { background: var(--row-minimo); }
-        tbody tr.falta { background: var(--row-falta); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        tbody tr { cursor: pointer; }
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
@@ -190,16 +119,9 @@
         .grafico-vazio { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 14px; }
 
         .acoes { display: flex; gap: 10px; padding: 16px 24px 24px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
-        .btn {
-            padding: 12px 22px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s ease;
-            display: inline-flex; align-items: center; gap: 8px;
-        }
-        .btn-primary { background: var(--gradient-primary); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn { border: none; cursor: pointer; }
         .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
-        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
-        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
-        .btn-mini { padding: 10px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; }
+        .btn-mini { white-space: nowrap; }
         .alteracoes { font-size: 12px; color: var(--warning-color); font-weight: 700; align-self: center; margin-left: auto; display: none; }
         .alteracoes.visivel { display: block; }
 
@@ -225,14 +147,6 @@
             .ficha { position: static; }
         }
         @media (max-width: 768px) {
-            body { padding: 0; }
-            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
-            .sidebar { display: none; }
-            header { padding: 0 16px; }
-            .logo { font-size: 18px; }
-            .user-info { display: none; }
-            main { padding: 20px 16px; }
-            .welcome-title { font-size: 26px; }
             .grid-form { grid-template-columns: 1fr; }
             .col-forn { display: none; }
         }
@@ -250,12 +164,12 @@
         .bloco-tit { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-light); margin: 4px 0 10px; }
         .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
         .kpi { background: #fff; border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
-        .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k, #a3213a); }
+        .kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k, var(--primary-color)); }
         .kpi > span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
         .kpi b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
         .kpi small { font-size: 12px; color: var(--text-light); font-weight: 600; }
-        .up { color: #1f9d55 !important; font-weight: 800; }
-        .down { color: #d22f42 !important; font-weight: 800; }
+        .up { color: color-mix(in srgb, var(--success-color) 70%, #000) !important; font-weight: 800; }
+        .down { color: color-mix(in srgb, var(--danger-color) 82%, #000) !important; font-weight: 800; }
         .neutro { color: var(--text-light); font-weight: 800; }
 
         .duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
@@ -271,10 +185,10 @@
         .insights { list-style: none; padding: 6px 22px 18px; display: flex; flex-direction: column; gap: 8px; }
         .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 12px; background: var(--surface-2, #f9f9fb); border: 1px solid var(--border-color); }
         .insights li .ic { width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; }
-        .insights li.pos .ic { background: #1f9d55; }
-        .insights li.alerta .ic { background: #e59a0b; }
-        .insights li.risco .ic { background: #d22f42; }
-        .insights li.info .ic { background: #2f6fdb; }
+        .insights li.pos .ic { background: var(--success-color); }
+        .insights li.alerta .ic { background: var(--warning-color); }
+        .insights li.risco .ic { background: var(--danger-color); }
+        .insights li.info .ic { background: var(--info-color); }
 
         .operacao { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 22px 18px; }
         .op { padding: 10px 14px; border-left: 1px solid var(--border-color); min-width: 0; }
@@ -282,7 +196,7 @@
         .op span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
         .op b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.03em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .op small { font-size: 12px; color: var(--text-light); font-weight: 600; }
-        .op.alerta b { color: #d22f42; }
+        .op.alerta b { color: color-mix(in srgb, var(--danger-color) 82%, #000); }
 
         /* lista */
         .lista-topo { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 18px 22px 12px; }
@@ -309,6 +223,10 @@
 
         @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .operacao { grid-template-columns: 1fr 1fr !important; } .op { border-left: none; padding-left: 0; } }
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
+        .ico { width: 15px; height: 15px; flex: none; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        #orders-tbody tr[data-numero]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+        .order-number .acao-menu { opacity: 1; font-weight: 800; color: var(--text-mid); border-radius: 6px; padding: 0 6px; min-width: 24px; }
+        .order-number .acao-menu:hover, .order-number .acao-menu[aria-expanded="true"] { background: var(--primary-light); color: var(--primary-color); transform: none; }
         .order-number a.editar { margin-left: 6px; text-decoration: none; opacity: .7; }
         .order-number a.editar:hover, .order-number a.editar:focus { opacity: 1; }
         .order-number .acao-doc { margin-left: 4px; padding: 0 2px; border: none; background: none; cursor: pointer; font-size: inherit; opacity: .7; }
@@ -325,7 +243,7 @@
         #menu-ctx button.mc-perigo { color: #b42318; }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <link rel="stylesheet" href="tema.css?v=202610272200">
     <script src="layout.js?v=202610272100" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>
@@ -358,22 +276,32 @@
                 <label for="f-cliente">Cliente</label>
                 <input id="f-cliente" list="l-clientes" placeholder="Todos os clientes (digite para filtrar)">
                 <datalist id="l-clientes"></datalist>
-                <span class="filtro-cliente" id="chip-cliente"><span id="chip-cliente-txt"></span><button type="button" id="limpar-cliente" title="Remover filtro">✕</button></span>
+                <span class="filtro-cliente" id="chip-cliente"><span id="chip-cliente-txt"></span><button type="button" id="limpar-cliente" title="Remover filtro" aria-label="Remover filtro de cliente">✕</button></span>
                 <span class="periodo-txt" id="periodo-txt"></span>
             </section>
 
-            <div id="carregando">Carregando pedidos e orçamentos...</div>
+            <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
+                <!-- ===== OPERAÇÃO AGORA ===== -->
+                <section class="painel" style="margin-bottom:18px">
+                    <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
+                    <div class="operacao" id="operacao"></div>
+                </section>
+
+                <!-- ===== RESULTADO DO PERÍODO ===== -->
+                <div class="bloco-tit">Resultado do período</div>
+                <section class="kpis" id="kpis-periodo"></section>
+
                 <!-- ===== LISTA ===== -->
                 <section class="painel" style="margin-bottom:18px">
                     <div class="lista-topo">
                         <h3 id="lista-titulo">Lista de pedidos</h3>
                         <div class="tipo-toggle">
-                            <button class="toggle-btn active" data-tipo="Pedido">📋 Pedidos</button>
-                            <button class="toggle-btn" data-tipo="Orçamento">📝 Orçamentos</button>
+                            <button type="button" class="toggle-btn active" data-tipo="Pedido" aria-pressed="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></svg>Pedidos</button>
+                            <button type="button" class="toggle-btn" data-tipo="Orçamento" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Orçamentos</button>
                         </div>
-                        <div class="busca"><input type="search" id="search-input" placeholder="Buscar em todos os campos: número, cliente, valor, data, observação..."></div>
-                        <button class="btn btn-secondary btn-mini" id="refresh-btn">↻ Atualizar</button>
+                        <div class="busca"><input type="search" id="search-input" aria-label="Buscar na lista de pedidos e orçamentos" placeholder="Buscar em todos os campos: número, cliente, valor, data, observação..."></div>
+                        <button type="button" class="btn btn-secondary btn-mini" id="refresh-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Atualizar</button>
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
                     <div class="tabela-wrap">
@@ -382,12 +310,8 @@
                             <tbody id="orders-tbody"></tbody>
                         </table>
                     </div>
-                    <div class="rodape-l"><span id="lista-qtd"></span><span><span data-perm="pedidos.pdf">Clique numa linha para abrir o PDF</span><span data-valor> · Total <b id="lista-total">R$ 0,00</b></span></span></div>
+                    <div class="rodape-l"><span id="lista-qtd" aria-live="polite"></span><span><span data-perm="pedidos.pdf">Clique numa linha para abrir o PDF</span><span data-valor> · Total <b id="lista-total">R$ 0,00</b></span></span></div>
                 </section>
-
-                <!-- ===== RESULTADO DO PERÍODO ===== -->
-                <div class="bloco-tit">Resultado do período</div>
-                <section class="kpis" id="kpis-periodo"></section>
 
                 <!-- ===== EVOLUÇÃO + LEITURA ===== -->
                 <section class="larga">
@@ -399,12 +323,6 @@
                         <div class="cab"><h3>Leitura rápida</h3><small>o que os números estão dizendo</small></div>
                         <ul class="insights" id="insights"></ul>
                     </div>
-                </section>
-
-                <!-- ===== OPERAÇÃO AGORA ===== -->
-                <section class="painel" style="margin-bottom:18px">
-                    <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
-                    <div class="operacao" id="operacao"></div>
                 </section>
 
                 <section class="duas">
@@ -451,6 +369,8 @@
         const num = v => (Number(v) || 0).toLocaleString('pt-BR');
         const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
         const deBR = s => { const p = String(s || '').split('/'); return p.length === 3 && +p[2] >= 1900 ? new Date(+p[2], +p[1] - 1, +p[0]) : null; };
+        const SEM_MOVIMENTO = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (SEM_MOVIMENTO && typeof Chart !== 'undefined') Chart.defaults.animation = false;
         const DIA = 86400000;
         const hoje = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
         const variacao = (a, b) => b > 0 ? (a - b) / b : (a > 0 ? Infinity : 0);
@@ -739,7 +659,7 @@
             const cont = {}; base.forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
             $('chips-sit').innerHTML = tipoLista === 'Pedido'
                 ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
-                    .map(([k, t]) => `<button class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}">${t}</button>`).join('') : '';
+                    .map(([k, t]) => `<button type="button" class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}" aria-pressed="${k === filtroSit}">${t}</button>`).join('') : '';
             // busca em todos os campos do registro (o que a lista mostra e o que mais vier da API); várias palavras = todas precisam aparecer
             const palavras = norm($('search-input').value).split(/\s+/).filter(Boolean);
             const lista = base.filter(x => (tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit) &&
@@ -749,11 +669,12 @@
             $('lista-total').textContent = moeda(soma(lista));
             const MAX = 500;
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
-                <tr data-numero="${esc(x.numero)}">
+                <tr data-numero="${esc(x.numero)}" tabindex="0">
                     <td class="order-number">${esc(x.numero)} <a class="editar" data-perm="orcamentos.criar valores.ver" title="Abrir para editar"
                         href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}">✏️</a>
                         ${tipoLista === 'Pedido' && x.s !== 'cancelado' ? '<button type="button" class="acao-doc" data-acao="cancelar" data-perm="pedidos.cancelar" title="Cancelar este pedido">🚫</button>' : ''}
-                        <button type="button" class="acao-doc" data-acao="excluir" data-perm="pedidos.excluir" title="Excluir este documento">🗑️</button></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
+                        <button type="button" class="acao-doc" data-acao="excluir" data-perm="pedidos.excluir" title="Excluir este documento">🗑️</button>
+                        <button type="button" class="acao-doc acao-menu" data-acao="menu" aria-label="Ações d${tipoLista === 'Pedido' ? 'o pedido' : 'o orçamento'} ${esc(x.numero)}" aria-haspopup="menu" aria-expanded="false" title="Mais ações">⋯</button></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
                     <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}</td>
@@ -780,9 +701,19 @@
         $('orders-tbody').addEventListener('click', e => {
             if (e.target.closest('a.editar')) return; // ✏️ abre a tela de orçamento, não o PDF
             const botao = e.target.closest('button.acao-doc');
-            if (botao) { acaoNoDocumento(botao.dataset.acao, botao.closest('tr[data-numero]').dataset.numero); return; }
+            if (botao) {
+                const linha = botao.closest('tr[data-numero]');
+                if (botao.dataset.acao === 'menu') { if (menuCtx && origemMenu === botao) fecharMenu(true); else abrirMenu(e, linha, botao); return; }
+                acaoNoDocumento(botao.dataset.acao, linha.dataset.numero); return;
+            }
             const tr = e.target.closest('tr[data-numero]');
             if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
+        });
+        // teclado: Enter ou Espaço na linha fazem o mesmo que o clique (PDF, se houver permissão); os botões da linha usam o próprio teclado
+        $('orders-tbody').addEventListener('keydown', e => {
+            if (e.target.tagName !== 'TR' || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            if (Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(e.target.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
         // ---------- menu do botão direito: ações do pedido/orçamento ----------
         // Cada item só aparece para quem tem a permissão; o servidor continua conferindo (cancelar, excluir e situação têm rota e permissão próprias).
@@ -832,19 +763,27 @@
             if (perigos.length) { sep(); L.push(...perigos); }
             return L;
         }
-        let menuCtx = null, linhaCtx = null;
-        function fecharMenu() {
+        let menuCtx = null, linhaCtx = null, origemMenu = null;
+        // devolverFoco: Esc, Tab e escolha de item devolvem o foco ao botão "⋯" (ou à linha) que abriu o menu
+        function fecharMenu(devolverFoco = false) {
             if (menuCtx) { menuCtx.remove(); menuCtx = null; }
             if (linhaCtx) { linhaCtx.classList.remove('ctx'); linhaCtx = null; }
+            if (origemMenu) {
+                if (origemMenu.hasAttribute('aria-expanded')) origemMenu.setAttribute('aria-expanded', 'false');
+                if (devolverFoco && origemMenu.isConnected) origemMenu.focus({ preventScroll: true });
+                origemMenu = null;
+            }
         }
-        function abrirMenu(ev, tr) {
+        function abrirMenu(ev, tr, botao) {
             const x = docDe(tr.dataset.numero);
             if (!x) return;
             ev.preventDefault();
             fecharMenu();
+            origemMenu = botao || tr;
+            if (botao) botao.setAttribute('aria-expanded', 'true');
             const itens = itensDoMenu(x);
             const m = document.createElement('div');
-            m.id = 'menu-ctx'; m.setAttribute('role', 'menu');
+            m.id = 'menu-ctx'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', `Ações do ${tipoLista === 'Pedido' ? 'pedido' : 'orçamento'} ${x.numero}`);
             m.innerHTML = `<div class="mc-cab">${esc(tipoLista === 'Pedido' ? 'Pedido' : 'Orçamento')} nº ${esc(x.numero)} · ${esc(x.cliente || '')}</div>` + itens.map((it, i) =>
                 it.sep ? '<div class="mc-sep" role="separator"></div>'
                 : it.titulo ? `<div class="mc-tit">${esc(it.titulo)}</div>`
@@ -853,7 +792,7 @@
                 const b = e.target.closest('button[data-i]');
                 if (!b) return;
                 const it = itens[Number(b.dataset.i)];
-                fecharMenu();
+                fecharMenu(true);
                 if (it && it.fn) it.fn();
             });
             m.addEventListener('keydown', e => {
@@ -861,9 +800,13 @@
                 const i = bs.indexOf(document.activeElement);
                 if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+                else if (e.key === 'Home') { e.preventDefault(); bs[0].focus(); }
+                else if (e.key === 'End') { e.preventDefault(); bs[bs.length - 1].focus(); }
+                else if (e.key === 'Tab') { e.preventDefault(); fecharMenu(true); }
             });
             document.body.appendChild(m);
-            const x0 = ev.clientX || tr.getBoundingClientRect().left + 40, y0 = ev.clientY || tr.getBoundingClientRect().top + 20;
+            const ref = (botao || tr).getBoundingClientRect();
+            const x0 = botao || !ev.clientX ? ref.left : ev.clientX, y0 = botao ? ref.bottom + 4 : (ev.clientY || ref.top + 20);
             m.style.left = Math.max(8, Math.min(x0, window.innerWidth - m.offsetWidth - 8)) + 'px';
             m.style.top = Math.max(8, Math.min(y0, window.innerHeight - m.offsetHeight - 8)) + 'px';
             menuCtx = m; linhaCtx = tr; tr.classList.add('ctx');
@@ -871,15 +814,15 @@
             if (primeiro) primeiro.focus({ preventScroll: true });
         }
         $('orders-tbody').addEventListener('contextmenu', e => { const tr = e.target.closest('tr[data-numero]'); if (tr) abrirMenu(e, tr); });
-        document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target)) fecharMenu(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenu(); });
+        document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target) && !e.target.closest('.acao-menu')) fecharMenu(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuCtx) fecharMenu(true); });
         document.addEventListener('scroll', fecharMenu, true);
         window.addEventListener('resize', fecharMenu);
         window.addEventListener('blur', fecharMenu);
         $('chips-sit').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filtroSit = b.dataset.sit; renderLista(); });
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
             tipoLista = b.dataset.tipo; filtroSit = '';
-            document.querySelectorAll('.toggle-btn').forEach(x => x.classList.toggle('active', x === b));
+            document.querySelectorAll('.toggle-btn').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
             renderLista();
         }));
         $('search-input').addEventListener('input', renderLista);
@@ -893,7 +836,7 @@
             if (cliente) url.searchParams.set('cliente', cliente); else url.searchParams.delete('cliente');
             history.replaceState(null, '', url);
             renderTudo();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ top: 0, behavior: SEM_MOVIMENTO ? 'auto' : 'smooth' });
         }
         $('periodo').addEventListener('change', renderTudo);
         $('f-cliente').addEventListener('change', () => {
