@@ -48,7 +48,9 @@ function bancoPedOrc() {
       { id: 13, modelo_padrao_id: 9, tipo_componente: 'Roldana', descricao_componente: 'Roldana de portão', unidade_medida: 'UN', valor_unitario: 40, ativo: 1 }],
     pedOrc: [], listaItens: [], itensV4: [], vidros: [], perfis: [], furacao: [], complementos: [], serralheria: [], serralheriaComp: [], auditoria: [],
     // módulo Entregas (só o que a exclusão de pedido toca)
-    entregas: [], entregaEventos: [], entregaAnexos: []
+    entregas: [], entregaEventos: [], entregaAnexos: [],
+    // desenhos das portas guardados para o PDF (web_item_desenhos)
+    desenhos: []
   };
   // falhas simuladas: { 'ped_orc': n } → as n próximas gravações nessa tabela falham
   const falhas = {};
@@ -60,6 +62,17 @@ function bancoPedOrc() {
     ped_orc_serralheria_complementos: 'serralheriaComp', ped_orc: 'pedOrc', web_auditoria: 'auditoria' };
   const norm = t => String(t ?? '').trim();
   const regras = [
+    // desenhos das portas (antes das regras genéricas de INSERT/DELETE por NUMERO)
+    [/^INSERT INTO web_item_desenhos/, (sql, [tipo, numero, item, png, carimbo, criado_em]) => {
+      const antigo = estado.desenhos.find(d => d.tipo === tipo && Number(d.numero) === Number(numero) && Number(d.item) === Number(item));
+      if (antigo) Object.assign(antigo, { png, carimbo, criado_em });
+      else estado.desenhos.push({ tipo, numero: Number(numero), item: Number(item), png, carimbo, criado_em });
+      return { affectedRows: 1 }; }],
+    [/^SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = \? AND numero = \?/, (sql, [t, n]) =>
+      estado.desenhos.filter(d => d.tipo === t && Number(d.numero) === Number(n)).map(d => ({ ...d }))],
+    [/^DELETE FROM web_item_desenhos WHERE tipo = \? AND numero = \?/, (sql, [t, n]) => {
+      const fica = estado.desenhos.filter(d => !(d.tipo === t && Number(d.numero) === Number(n)));
+      estado.desenhos.splice(0, estado.desenhos.length, ...fica); return { affectedRows: 1 }; }],
     // cadastro
     [/FROM cadastro_clientes WHERE CODIGO = \?/, (sql, [c]) => estado.clientes.filter(x => String(x.CODIGO) === String(c))],
     [/FROM cadastro_de_produtos WHERE TRIM\(MODELO\) = TRIM\(\?\) AND SITUACAO/, (sql, [m]) => estado.produtos.filter(p => norm(p.MODELO) === norm(m))],
@@ -153,7 +166,10 @@ async function prepararPedOrc(t, { perfil = 'Administrador', banco = bancoPedOrc
   const chamar = (caminho, metodo = 'GET', corpo) => fetch(s.url + caminho, {
     method: metodo, headers: { Authorization: 'Bearer ' + token(7, 'Thiago'), 'Content-Type': 'application/json' },
     body: corpo === undefined ? undefined : JSON.stringify(corpo) });
-  return { banco, chamar };
+  // corpo binário (imagens): devolve a resposta crua
+  const chamarBruto = (caminho, metodo, corpo, tipoConteudo) => fetch(s.url + caminho, {
+    method: metodo, headers: { Authorization: 'Bearer ' + token(7, 'Thiago'), 'Content-Type': tipoConteudo }, body: corpo });
+  return { banco, chamar, chamarBruto };
 }
 
 module.exports = { bancoPedOrc, prepararPedOrc };

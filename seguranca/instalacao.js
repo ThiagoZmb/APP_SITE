@@ -205,6 +205,17 @@ const TABELAS = [
      criado_por VARCHAR(190) NOT NULL,
      criado_em DATETIME NOT NULL,
      KEY idx_entrega (entrega_id)
+   ) ${OPCOES}`,
+  // desenho da porta capturado na configuração (PNG), mostrado na coluna Imagem do PDF; o carimbo diz se ainda vale para o documento
+  `CREATE TABLE IF NOT EXISTS \`web_item_desenhos\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     tipo VARCHAR(20) NOT NULL,
+     numero INT NOT NULL,
+     item INT NOT NULL,
+     png MEDIUMBLOB NOT NULL,
+     carimbo CHAR(64) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     UNIQUE KEY uq_doc_item (tipo, numero, item)
    ) ${OPCOES}`
 ];
 

@@ -6,7 +6,8 @@ const { semValores } = require('../seguranca/valores');
 const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco } = require('../calculo/precos');
 const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
-const { traduzirDocumento, impressaoDigital } = require('../calculo/leitura_vb');
+const express = require('express');
+const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 
 const TIPOS = ['Orçamento', 'Pedido'];
@@ -408,6 +409,41 @@ function registrarPedOrc({ rota, pool }) {
       res.status(500).json({ error: 'Erro de servidor' });
     }
   });
+
+  // Desenho da porta (PNG capturado na tela ao configurar o item) para a coluna Imagem do PDF. Sobe depois do salvar, separado do JSON
+  // (o corpo do salvar é limitado a 100 kb). Guarda o carimbo do documento: se o VB mudar os itens depois, o PDF deixa de usar a imagem.
+  const PNG_ASSINATURA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const LIMITE_DESENHO = 150 * 1024;
+  // erro do leitor de corpo (grande demais, etc.) vira JSON, não a página HTML padrão do Express
+  const lerPng = (req, res, next) => express.raw({ type: 'image/png', limit: LIMITE_DESENHO })(req, res, err => {
+    if (err) return res.status(err.status === 413 ? 413 : 400).json({ error: 'Desenho inválido ou maior que 150 kb.' });
+    next();
+  });
+  rota('put', '/ped_orc/:tipo/:numero/desenho/:item', ['orcamentos.criar', 'orcamentos.salvar'], lerPng, async (req, res) => {
+      const tipo = req.params.tipo, numero = Number(req.params.numero), item = Number(req.params.item);
+      if (!TIPOS.includes(tipo) || !(Number.isInteger(numero) && numero > 0) || !(Number.isInteger(item) && item > 0)) return res.status(400).json({ error: 'Documento ou item inválido.' });
+      const png = req.body;
+      if (!Buffer.isBuffer(png) || png.length <= PNG_ASSINATURA.length || !png.subarray(0, PNG_ASSINATURA.length).equals(PNG_ASSINATURA)) {
+        return res.status(400).json({ error: 'Envie o desenho como imagem PNG.' });
+      }
+      try {
+        const linhas = await lerDocumento(pool, tipo, numero);
+        const naoAchou = () => res.status(404).json({ error: 'Item não encontrado.' });
+        if (!linhas || !linhas.lista.some(l => Number(l.ITEM) === item)) return naoAchou();
+        if ((req.acesso?.estados || []).length) {
+          const [cli] = await pool.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
+          if (foraDosEstados(req, cli[0]?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
+        }
+        await pool.execute(
+          `INSERT INTO web_item_desenhos (tipo, numero, item, png, carimbo, criado_em) VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE png = VALUES(png), carimbo = VALUES(carimbo), criado_em = VALUES(criado_em)`,
+          [tipo, numero, item, png, carimboItens(linhas), agoraLocal()]);
+        res.json({ ok: true });
+      } catch (err) {
+        console.error('Erro PUT /ped_orc/desenho:', err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
+      }
+    });
 
   // Salvar_Ped_Orc_Blindado: novo número ou atualizar, tudo numa transação
   rota('post', '/ped_orc/salvar', ['orcamentos.criar', 'orcamentos.salvar', 'valores.ver'], async (req, res) => {
