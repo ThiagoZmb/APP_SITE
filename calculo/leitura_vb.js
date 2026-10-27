@@ -165,4 +165,16 @@ function impressaoDigital(linhas, tipo) {
   return crypto.createHash('sha256').update(JSON.stringify(dados)).digest('hex');
 }
 
-module.exports = { traduzirDocumento, impressaoDigital };
+// Carimbo do conteúdo dos itens: serve para saber se um desenho guardado ainda é o desta porta.
+// Só entra o que define a porta (medidas, puxador, furos, tipo e quantidade); cabeçalho, descrição e dinheiro ficam de fora,
+// então mudar situação, data ou preço não esconde os desenhos. Recebe as linhas cruas (SELECT *) e não depende da ordem.
+const COLUNAS_LISTA_CARIMBO = ['ITEM', 'QTD', 'TIPO_PRODUTO'];
+function carimboItens(linhas = {}) {
+  const canon = (r, colunas) => JSON.stringify(Object.keys(r).filter(k => k !== 'id' && k !== 'ID' && (!colunas || colunas.includes(k))).sort()
+    .map(k => [k, r[k] === null || r[k] === undefined ? null : String(r[k])]));
+  const tabela = (rows, colunas) => (rows || []).map(r => canon(r, colunas)).sort();
+  return crypto.createHash('sha256').update(JSON.stringify([
+    tabela(linhas.lista, COLUNAS_LISTA_CARIMBO), tabela(linhas.itensV4), tabela(linhas.furacao)])).digest('hex');
+}
+
+module.exports = { traduzirDocumento, impressaoDigital, carimboItens };
