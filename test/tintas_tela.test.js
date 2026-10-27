@@ -59,3 +59,12 @@ test('layout.js: Tintas no menu (subitem do Estoque) e em PAGINAS com tintas.ver
   assert.ok(l.indexOf("href: 'tintas.html'") > l.indexOf("href: 'estoque.html'") && l.indexOf("href: 'tintas.html'") < l.indexOf("href: 'produtos.html'"));
   assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
 });
+
+test('tintas: corValida (cor antiga fora do formato conta como não escolhida), paraTela com vírgula e milhar recusado', () => {
+  assert.equal(T.corValida('FF1A2B3C'), true);
+  assert.equal(T.corValida('0'), false);
+  assert.equal(T.corValida(''), false);
+  assert.equal(T.paraTela(12.5), '12,5');
+  assert.equal(T.paraTela(0), '0');
+  assert.ok(T.validarForm({ fabricante: 'a', classe: 'b', tipo: 'c', conjunto: 'd', porcentagem: '1.500' }).join().includes('% da mistura'));
+});

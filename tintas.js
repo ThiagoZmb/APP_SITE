@@ -15,7 +15,10 @@
   const { esc, txt } = C;
 
   const CAMPOS = ['fabricante', 'classe', 'tipo', 'conjunto', 'valor', 'porcentagem', 'refFabricante', 'corElegance', 'cor', 'rendimento'];
-  const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
+  // "1.500" (milhar ou decimal?) é ambíguo e recusado, como no servidor
+  const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) && !/^\d{1,3}(\.\d{3})+$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
+  const paraTela = n => String(n ?? '').replace('.', ',');   // o brasileiro lê e digita a vírgula
+  const corValida = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb));
 
   // cor do banco = ARGB de 8 dígitos (como o VB); o seletor de cor do navegador usa #rrggbb
   const corParaInput = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb)) ? '#' + txt(argb).slice(2).toLowerCase() : '#000000';
@@ -55,12 +58,13 @@
     function preencherListas(d) {
       if (estado.listas) return;
       estado.listas = true;
-      const opcoes = (el, itens) => { el.innerHTML = '<option value=""></option>' + itens.map(i => `<option>${esc(i)}</option>`).join(''); };
+      // value explícito: sem ele o navegador apara/junta espaços do texto e o nome do fabricante chegaria diferente ao servidor
+      const opcoes = (el, itens) => { el.innerHTML = '<option value=""></option>' + itens.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join(''); };
       opcoes($(ID('fabricante')), d.fabricantes || []);
       opcoes($(ID('classe')), d.classes || []);
       opcoes($(ID('tipo')), d.tipos || []);
       opcoes($(ID('conjunto')), d.conjuntos || []);
-      $('filtro-classe').innerHTML = '<option value="">Todas as classes</option>' + (d.classes || []).map(i => `<option>${esc(i)}</option>`).join('');
+      $('filtro-classe').innerHTML = '<option value="">Todas as classes</option>' + (d.classes || []).map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('');
     }
     async function carregar() {
       const q = new win.URLSearchParams();
@@ -97,8 +101,11 @@
       $('titulo-form').textContent = t ? (t.refFabricante || 'Tinta ' + t.codigo) : 'Nova tinta';
       for (const c of CAMPOS) {
         if (c === 'cor') $(ID('cor')).value = corParaInput(t ? t.cor : '');
-        else $(ID(c)).value = t ? (t[c] ?? '') : (c === 'porcentagem' || c === 'rendimento' ? '0' : '');
+        else if (c === 'valor' || c === 'porcentagem' || c === 'rendimento') $(ID(c)).value = t ? paraTela(t[c]) : (c === 'valor' ? '' : '0');
+        else $(ID(c)).value = t ? (t[c] ?? '') : '';
       }
+      // o seletor de cor sempre tem um valor; só vale como escolha se a tinta já tinha cor no formato do banco ou se a pessoa mexer nele
+      estado.corEscolhida = !!t && corValida(t.cor);
       $('erro-form').textContent = '';
       travarForm();
       desenharLista();
@@ -109,7 +116,7 @@
     }
     const lerForm = () => {
       const f = Object.fromEntries(CAMPOS.map(c => [c, $(ID(c)).value]));
-      f.cor = inputParaCor(f.cor);
+      f.cor = estado.corEscolhida ? inputParaCor(f.cor) : '';   // vazio: o servidor exige cor, exceto na classe Tinta (preto como o VB)
       return f;
     };
 
@@ -154,9 +161,10 @@
     $('btn-novo').addEventListener('click', () => mostrarForm(null));
     $('form').addEventListener('submit', salvar);
     $('btn-excluir').addEventListener('click', excluir);
+    $(ID('cor')).addEventListener('input', () => { estado.corEscolhida = true; });
     $('btn-cancelar').addEventListener('click', () => { estado.atual = null; $('form').hidden = true; $('vazio-painel').hidden = false; desenharLista(); });
     carregar();
   }
 
-  return { CAMPOS, corParaInput, inputParaCor, validarForm, corpoSalvar, iniciar };
+  return { CAMPOS, corParaInput, inputParaCor, corValida, paraTela, validarForm, corpoSalvar, iniciar };
 });

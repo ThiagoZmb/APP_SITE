@@ -49,7 +49,7 @@ test('tintas: atualiza (auditoria só com nomes dos campos); 404 e 400 de códig
   const r = await salvar(chamar, { ...TINTA, codigo: x.COD, rendimento: '9', valor: '41' });
   assert.equal(r.status, 200);
   assert.equal((await r.json()).criado, false);
-  assert.equal(banco.tintas[0].RENDIMENTO, 9);
+  assert.equal(banco.tintas[0].RENDIMENTO, '9');
   assert.equal(banco.auditoria.at(-1).acao, 'tinta_alterada');
   assert.deepEqual(banco.auditoria.at(-1).detalhe.campos.sort(), ['rendimento', 'valor']);
   assert.equal((await salvar(chamar, { ...TINTA, codigo: 999 })).status, 404);
@@ -122,4 +122,28 @@ test('tintas: sem permissão 403; só ver não salva nem exclui', async t => {
   assert.equal((await salvar(c, TINTA)).status, 403);
   assert.equal((await c(`/tintas/${x.COD}`, 'DELETE')).status, 403);
   assert.equal(banco.tintas.length, 1);
+});
+
+test('tintas: RENDIMENTO é texto no VB ("0,5"): lê como número, grava com vírgula e não zera ao editar outro campo', async t => {
+  const banco = bancoTintas(); const x = banco.semear.tinta({ RENDIMENTO: '0,5' });
+  const { chamar } = await prepararTintas(t, { banco });
+  assert.equal((await (await chamar(`/tintas/${x.COD}`)).json()).tinta.rendimento, 0.5);
+  assert.equal((await salvar(chamar, { ...TINTA, codigo: x.COD, rendimento: '0,5', corElegance: 'Só a cor' })).status, 200);
+  assert.equal(banco.tintas[0].RENDIMENTO, '0,5');
+  assert.equal((await salvar(chamar, { ...TINTA, codigo: x.COD, rendimento: '0.75' })).status, 200);
+  assert.equal(banco.tintas[0].RENDIMENTO, '0,75');
+});
+
+test('tintas: referências que já se repetiam no banco não travam a edição; mudar para a de outra ainda dá 409', async t => {
+  const banco = bancoTintas(); const a = banco.semear.tinta({ REF_FABRICANTE: 'TX-10' }); banco.semear.tinta({ REF_FABRICANTE: 'TX-10' }); banco.semear.tinta({ REF_FABRICANTE: 'OUTRA' });
+  const { chamar } = await prepararTintas(t, { banco });
+  assert.equal((await salvar(chamar, { ...TINTA, codigo: a.COD, refFabricante: 'TX-10', corElegance: 'Editada' })).status, 200);
+  assert.equal((await salvar(chamar, { ...TINTA, codigo: a.COD, refFabricante: 'OUTRA' })).status, 409);
+});
+
+test('tintas: codigo que não é número (true, objeto) dá 400', async t => {
+  const banco = bancoTintas(); banco.semear.tinta();
+  const { chamar } = await prepararTintas(t, { banco });
+  for (const codigo of [true, {}, [1]]) assert.equal((await salvar(chamar, { ...TINTA, codigo })).status, 400, JSON.stringify(codigo));
+  assert.equal(banco.tintas[0].CLASSE, 'Verniz');
 });

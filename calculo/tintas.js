@@ -18,10 +18,10 @@ const TIPOS_TINTA = ordenar([
 const COR_PRETA = 'FF000000'; // o VB grava preto quando a classe é Tinta e ninguém escolheu cor
 const t = v => String(v ?? '').trim();
 
-// número >= 0 com vírgula OU ponto decimal ("12,5" / "12.5"); "1.234,56", texto e negativo = NaN
+// número >= 0 com vírgula OU ponto decimal ("12,5" / "12.5"); "1.234,56", milhar "1.500", texto e negativo = NaN
 function numero(v) {
   const s = t(v);
-  if (!/^\d+([.,]\d+)?$/.test(s)) return NaN;
+  if (!/^\d+([.,]\d+)?$/.test(s) || /^\d{1,3}(\.\d{3})+$/.test(s)) return NaN; // "1.500": milhar ou decimal? ambíguo, recusa
   return Number(s.replace(',', '.'));
 }
 
@@ -45,8 +45,8 @@ function validarTinta(b = {}, { podeValores = false } = {}) {
     classe: escolha(erros, b.classe, 'a Classe', CLASSES_TINTA),
     tipo: escolha(erros, b.tipo, 'o Tipo', TIPOS_TINTA),
     conjunto: escolha(erros, b.conjunto, 'o Conjunto', CONJUNTOS_TINTA),
-    refFabricante: campo(erros, b.refFabricante, 'Referência do fabricante', 100),
-    corElegance: campo(erros, b.corElegance, 'Cor Elegance', 100)
+    refFabricante: campo(erros, b.refFabricante, 'Referência do fabricante', 255),
+    corElegance: campo(erros, b.corElegance, 'Cor Elegance', 255)
   };
   if (!dados.fabricante) erros.push('Fabricante é obrigatório.');
   if (podeValores) {

@@ -13,7 +13,10 @@ const like = s => '%' + String(s).replace(/[\\%_]/g, c => '\\' + c) + '%';
 
 const resumo = r => ({ codigo: Number(r.COD), fabricante: r.RAZAO_FABRICANTE || '', classe: r.CLASSE || '', tipo: r.TIPO || '', conjunto: r.CONJUNTO || '',
   refFabricante: r.REF_FABRICANTE || '', corElegance: r.COR_ELEGANCE || '', cor: r.COR || '', valor: Number(r.VALOR) || 0 });
-const completo = r => ({ ...resumo(r), porcentagem: Number(r.PORCENTAGEM) || 0, rendimento: Number(r.RENDIMENTO) || 0 });
+// RENDIMENTO é texto no VB e ele grava com vírgula ("0,5"): ler como número aceitando vírgula, gravar de volta com vírgula
+const rendimentoLido = v => Number(String(v ?? '').trim().replace(',', '.')) || 0;
+const rendimentoGravado = n => String(n).replace('.', ',');
+const completo = r => ({ ...resumo(r), porcentagem: Number(r.PORCENTAGEM) || 0, rendimento: rendimentoLido(r.RENDIMENTO) });
 
 function registrarTintas({ rota, pool }) {
   const auditar = (conn, req, acao, alvo, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
@@ -53,7 +56,7 @@ function registrarTintas({ rota, pool }) {
     const { erros, dados } = validarTinta(b, { podeValores: podeVerValores(req) });
     if (erros.length) return res.status(400).json({ error: erros.join(' ') });
     const criando = b.codigo === undefined || b.codigo === null || b.codigo === '';
-    const codigoAtual = criando ? null : Number(b.codigo);
+    const codigoAtual = criando ? null : (typeof b.codigo === 'number' || typeof b.codigo === 'string' ? Number(b.codigo) : NaN);
     if (!criando && !(Number.isInteger(codigoAtual) && codigoAtual > 0)) return res.status(400).json({ error: 'Código inválido.' });
     const r = await emTransacao(pool, res, 'POST /tintas/salvar', async conn => {
       let atual = null;
@@ -63,14 +66,16 @@ function registrarTintas({ rota, pool }) {
       }
       const [fab] = await conn.execute("SELECT COD FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE = ? AND RAZAO_FABRICANTE <> '.' LIMIT 1", [dados.fabricante]);
       if (!fab.length) throw new ErroUsuario(400, `Fabricante "${dados.fabricante}" não está cadastrado em Fornecedores.`);
-      if (dados.refFabricante) {
+      // só confere quando a referência é nova ou mudou: o VB nunca impediu repetição, então duplicatas antigas não podem travar a edição
+      const chave = s => String(s ?? '').trim().toLowerCase();
+      if (dados.refFabricante && (!atual || chave(atual.REF_FABRICANTE) !== chave(dados.refFabricante))) {
         const [iguais] = await conn.execute('SELECT COD FROM tintas WHERE REF_FABRICANTE = ? FOR UPDATE', [dados.refFabricante]);
         const outra = iguais.find(x => Number(x.COD) !== codigoAtual);
         if (outra) throw new ErroUsuario(409, `Já existe uma tinta com a referência "${dados.refFabricante}" (código ${outra.COD}).`);
       }
       // sem valores.ver: mantém o valor já gravado (ou 0 em cadastro novo)
       const d = preservarValores(req, dados, atual ? completo(atual) : { valor: 0 }, DINHEIRO);
-      const colunas = [d.fabricante, d.classe, d.valor, d.porcentagem, d.refFabricante, d.corElegance, d.tipo, d.conjunto, d.cor, d.rendimento];
+      const colunas = [d.fabricante, d.classe, d.valor, d.porcentagem, d.refFabricante, d.corElegance, d.tipo, d.conjunto, d.cor, rendimentoGravado(d.rendimento)];
       if (criando) {
         const [[{ proximo }]] = await conn.execute('SELECT COALESCE(MAX(COD), 0) + 1 AS proximo FROM tintas FOR UPDATE');
         const codigo = Number(proximo);
