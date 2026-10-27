@@ -1922,7 +1922,9 @@
                 // no desenho limpo (PDF) os furos aparecem como círculos maiores (a imagem é pequena); os números das medidas ficam só na tela
                 if (ehPortaComFuros() && furosLista.length) {
                     const lado = ladoFuroDaFolha(f);
-                    const raio = Math.max(35 * esc, 12) / 2 * (limpo ? 2 : 1);
+                    const raioBase = Math.max(35 * esc, 12) / 2;
+                    // no desenho limpo o furo é maior, mas SEMPRE cabe dentro do perfil (diâmetro ≤ 68% da largura do perfil); piso de 6 px (≈2 px depois da redução para 300×500), sem passar do teto
+                    const raio = limpo ? Math.min(Math.max(raioBase * 2, 6), perfilPx * 0.34) : raioBase;
                     ctx.font = fonte(14); ctx.lineWidth = 2;
                     furosLista.forEach(m => {
                         let cx, cy;
@@ -2218,7 +2220,7 @@
         // "desenho"/"desenhoPronto" ficam fora do JSON (rascunho do localStorage e corpo do salvar não levam o Blob).
         function definirDesenho(item, promessa) {
             Object.defineProperty(item, 'desenho', { value: null, writable: true, enumerable: false, configurable: true });
-            Object.defineProperty(item, 'desenhoPronto', { value: promessa.then(b => { item.desenho = b; }), writable: true, enumerable: false, configurable: true });
+            Object.defineProperty(item, 'desenhoPronto', { value: promessa.then(b => { item.desenho = b; if (b) { try { renderItens(); } catch { /* só atualiza o tamanho na lista */ } } }), writable: true, enumerable: false, configurable: true });
         }
         function capturarDesenho() {
             if (!Desenhos.FRENTES_COM_DESENHO.includes(frenteAtual)) return Promise.resolve(null);
@@ -2290,7 +2292,7 @@
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
-                        <td>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}</td>
+                        <td${it.desenho && it.desenho.size ? ` title="Desenho: ${Desenhos.formatarKb(it.desenho.size)}"` : ''}>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}${it.desenho && it.desenho.size ? `<small class="desenho-kb" style="display:block;color:var(--text-light)">Desenho: ${Desenhos.formatarKb(it.desenho.size)}</small>` : ''}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
@@ -2844,16 +2846,17 @@
             itens.forEach(it => { delete it.precoMudou; });
             if (res.ok && json.ok) {
                 // desenhos das portas sobem agora, antes de reabrir (a reabertura reconstrói os itens); falha não desfaz o salvar
-                let falhasDesenho = 0;
+                let falhasDesenho = 0, resumoDesenho = '';
                 try {
                     await Promise.all(itensSalvos.map(it => it.desenhoPronto).filter(Boolean));
-                    falhasDesenho = (await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itensSalvos)).falhas;
+                    const env = await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itensSalvos);
+                    falhasDesenho = env.falhas; resumoDesenho = Desenhos.resumoEnvio(env);
                 } catch { falhasDesenho = 0; }
                 // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
                 if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
                 if (falhasDesenho) mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo, mas ${falhasDesenho} desenho(s) não foram enviados; abra o item e salve de novo.`, 'erro');
-                else mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.`, 'ok');
+                else mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.${resumoDesenho ? ' ' + resumoDesenho : ''}`, 'ok');
                 return;
             }
             if (res.status === 409 && json.erro === 'preco_mudou') (json.itens || []).forEach(i => { if (itens[i]) itens[i].precoMudou = true; });

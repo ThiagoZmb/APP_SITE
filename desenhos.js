@@ -34,18 +34,23 @@
   // envia o desenho de cada item novo/editado (posição = índice + 1, como o servidor numera). Nunca lança.
   // chamar(caminho, { metodo, corpo, tipoConteudo }) é injetada (fetch com o token na tela)
   async function enviarDesenhos(chamar, tipo, numero, itens) {
-    let enviados = 0, falhas = 0;
+    let enviados = 0, falhas = 0, bytes = 0;
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i];
       if (!it || !it.desenho || typeof it.desenho.size !== 'number') continue;
       if (it.origem && ESTADOS_COPIA.includes(it.origem.estado)) continue;
       try {
         await chamar(`/ped_orc/${encodeURIComponent(tipo)}/${encodeURIComponent(numero)}/desenho/${i + 1}`, { metodo: 'PUT', corpo: it.desenho, tipoConteudo: 'image/png' });
-        enviados++;
+        enviados++; bytes += it.desenho.size;
       } catch { falhas++; }
     }
-    return { enviados, falhas };
+    return { enviados, falhas, bytes };
   }
 
-  return { FRENTES_COM_DESENHO, caixaDoDesenho, reduzirAteCaber, enviarDesenhos };
+  // "7,4 kb" (1 kb = 1024 bytes, vírgula decimal)
+  function formatarKb(bytes) { return (Math.round(bytes / 102.4) / 10).toFixed(1).replace('.', ',') + ' kb'; }
+  // "2 desenho(s), 14,8 kb." ou '' quando nada foi enviado
+  function resumoEnvio(r) { return r && r.enviados > 0 ? `${r.enviados} desenho(s), ${formatarKb(r.bytes || 0)}.` : ''; }
+
+  return { FRENTES_COM_DESENHO, caixaDoDesenho, reduzirAteCaber, enviarDesenhos, formatarKb, resumoEnvio };
 });

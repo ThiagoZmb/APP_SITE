@@ -41,12 +41,12 @@ test('enviarDesenhos: PUT de cada item com desenho na posição certa; falha de 
   const itens = [{ desenho: blob([1]) }, { desenho: blob([2]) }, { desenho: null }, { desenho: blob([3]) },
     { desenho: blob([4]), origem: { item: 9, estado: 'intacto' } }];
   const r = await D.enviarDesenhos(chamar, 'Pedido', 23425, itens);
-  assert.deepEqual(r, { enviados: 2, falhas: 1 });
+  assert.deepEqual(r, { enviados: 2, falhas: 1, bytes: 2 });
   assert.deepEqual(chamadas.map(c => c[0]), ['/ped_orc/Pedido/23425/desenho/1', '/ped_orc/Pedido/23425/desenho/2', '/ped_orc/Pedido/23425/desenho/4']);
   assert.ok(chamadas.every(c => c[1] === 'PUT' && c[2] === 'image/png'));
   assert.equal((await D.enviarDesenhos(chamar, 'Orçamento', 7, [{ desenho: blob([1]) }])).enviados, 1);
   assert.equal(chamadas.at(-1)[0], '/ped_orc/Or%C3%A7amento/7/desenho/1');
-  assert.deepEqual(await D.enviarDesenhos(chamar, 'Pedido', 1, []), { enviados: 0, falhas: 0 });
+  assert.deepEqual(await D.enviarDesenhos(chamar, 'Pedido', 1, []), { enviados: 0, falhas: 0, bytes: 0 });
 });
 
 test('FRENTES_COM_DESENHO: só as portas que têm desenho na tela', () => {
@@ -78,7 +78,22 @@ test('orcamentos.html: o desenho limpo do PDF mostra os furos (círculos, maiore
   const h = ler('orcamentos.html');
   assert.match(h, /if \(ehPortaComFuros\(\) && furosLista\.length\) \{/);       // sem "!limpo": os furos entram também no desenho limpo
   assert.doesNotMatch(h, /!limpo && ehPortaComFuros\(\)/);
-  assert.match(h, /const raio = Math\.max\(35 \* esc, 12\) \/ 2 \* \(limpo \? 2 : 1\);/);
+  assert.match(h, /const raioBase = Math\.max\(35 \* esc, 12\) \/ 2;/);
+  assert.match(h, /const raio = limpo \? Math\.min\(Math\.max\(raioBase \* 2, 6\), perfilPx \* 0\.34\) : raioBase;/);   // no PDF o furo nunca passa de 68% do perfil; na tela segue igual
   assert.match(h, /ctx\.fillStyle = limpo \? '#1f2d2d' : '#f5f5f5';/);   // escuro no PDF: o quadro da porta é fino e o furo claro sumia no cinza
   assert.match(h, /if \(limpo\) return;\s*\n\s*ctx\.fillStyle = '#8b0000';/);        // números das medidas só na tela
+});
+
+test('formatarKb e resumoEnvio: tamanho legível e total enviado', async () => {
+  assert.equal(D.formatarKb(7578), '7,4 kb');
+  assert.equal(D.resumoEnvio({ enviados: 0, falhas: 0, bytes: 0 }), '');
+  const r = await D.enviarDesenhos(async () => {}, 'Pedido', 1, [{ desenho: blob(new Array(2048).fill(1)) }, { desenho: blob(new Array(1024).fill(1)) }, {}]);
+  assert.deepEqual(r, { enviados: 2, falhas: 0, bytes: 3072 });
+  assert.equal(D.resumoEnvio(r), '2 desenho(s), 3,0 kb.');
+});
+test('orcamentos.html: tamanho do desenho aparece na lista e no aviso do salvar; o Blob continua fora do JSON', () => {
+  const h = ler('orcamentos.html');
+  assert.match(h, /Desenhos\.formatarKb\(it\.desenho\.size\)/);
+  assert.match(h, /Desenhos\.resumoEnvio\(env\)/);
+  assert.match(h, /Object\.defineProperty\(item, 'desenho', \{ value: null, writable: true, enumerable: false/);
 });
