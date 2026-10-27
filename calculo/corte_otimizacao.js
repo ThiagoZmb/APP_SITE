@@ -126,7 +126,7 @@ function otimizar({ pecas = [], retalhos = [], parametrosDe }) {
       qtdVarasNovas: todas.filter(b => b.tipo === 'vara').length,
       qtdRetalhosUsados: todas.filter(b => b.tipo === 'retalho').length,
       aproveitamentoPct: total ? Math.round(somaPecas * 1000 / total) / 10 : 0,
-      sobraTotal: todas.reduce((s, b) => s + b.sobra, 0)
+      sobraSomaMm: todas.reduce((s, b) => s + b.sobra, 0)   // não usar "total" no nome: REGEX_VALOR apagaria o campo
     }
   };
 }
