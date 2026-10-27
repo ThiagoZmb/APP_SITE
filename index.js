@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pdfPedOrc = require('./pdf/ped_orc');
+const { carimboItens } = require('./calculo/leitura_vb');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
@@ -738,13 +739,21 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="${semAcento}"; filename*=UTF-8''${encodeURIComponent(destino.nome)}`);
     res.setHeader('X-Pdf-Nome', encodeURIComponent(destino.nome));
     res.setHeader('X-Pdf-Pasta', encodeURIComponent(destino.pasta));
+    // desenhos das portas guardados na configuração: só valem se o carimbo ainda bate com os itens de agora (o VB pode ter mudado o documento);
+    // qualquer erro ao lê-los deixa a coluna Imagem vazia, nunca derruba o PDF
+    let desenhos = {};
+    try {
+      const [guardados] = await pool.execute('SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [tipo, numero]);
+      const carimbo = carimboItens({ lista: itens, itensV4: v4, furacao: furos });
+      for (const d of guardados) if (d.carimbo === carimbo) desenhos[Number(d.item)] = d.png;
+    } catch { desenhos = {}; }
     const doc = pdfPedOrc.novoDocumento();
     doc.pipe(res);
     // dinheiro só para quem tem valores.ver (o desenho também omite as colunas)
     const camposDinheiro = ['SUB_TOTAL', 'TOTAL', 'DESCONTO', 'UNITARIO', 'VALOR_UNITARIO', 'VALOR_TOTAL', 'VALOR'];
     pdfPedOrc.desenharPedOrc(doc, {
       tipo, numero, cab: semValores(req, cab, camposDinheiro), itens: semValores(req, itens, camposDinheiro),
-      v4, complementos: comps, serralheria: serr, compSerralheria: semValores(req, compSerr, camposDinheiro), furos, medicao
+      v4, complementos: comps, serralheria: serr, compSerralheria: semValores(req, compSerr, camposDinheiro), furos, medicao, desenhos
     }, { verValores, producao });
     doc.end();
   } catch (err) {

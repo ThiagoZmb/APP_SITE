@@ -250,12 +250,18 @@ function quebrar(doc, texto, fonte, tamanho, largura) {
 // Célula: { texto, estilo, tamanho } (modo texto do iText: entrelinha = tamanho)
 //      ou { paragrafos: [{ texto, estilo, tamanho }] } (AddElement: entrelinha = 1,5 × tamanho)
 //      ou { imagem } ; opcionais: alinhar ('left'|'center'|'right'), vertical ('top'|'middle')
+// Imagem contida na caixa: cabe inteira na largura e (se houver) na altura máxima, mantendo a proporção
+function ajustarImagem(w, h, larguraInterna, maxAltura = Infinity) {
+  const esc = Math.min(larguraInterna / w, maxAltura / h);
+  return { w: w * esc, h: h * esc };
+}
+
 function montarCelula(doc, cel, largura) {
   const interna = largura - 2 * PAD;
   const base = { alinhar: cel.alinhar || 'left', vertical: cel.vertical || 'top', fundo: cel.fundo || null, linhas: [] };
   if (cel.imagem) {
-    const h = interna * cel.imagem.height / cel.imagem.width;
-    return { ...base, imagem: { obj: cel.imagem, w: interna, h }, altura: h + 2 * PAD };
+    const { w, h } = ajustarImagem(cel.imagem.width, cel.imagem.height, interna, cel.maxAltura);
+    return { ...base, imagem: { obj: cel.imagem, w, h, dx: (interna - w) / 2 }, altura: h + 2 * PAD };
   }
   const pars = cel.paragrafos
     ? cel.paragrafos.map(p => ({ ...p, entrelinha: 1.5 * p.tamanho }))
@@ -290,7 +296,7 @@ function desenharCelula(ctx, m, x, y, largura, altura) {
   if (m.fundo) doc.save().fillColor(m.fundo).rect(x, y, largura, altura).fill().restore();
   doc.lineWidth(BORDA).rect(x, y, largura, altura).stroke();
   const desloc = m.vertical === 'middle' ? (altura - m.altura) / 2 : 0;
-  if (m.imagem) doc.image(m.imagem.obj, x + PAD, y + PAD + desloc, { width: m.imagem.w, height: m.imagem.h });
+  if (m.imagem) doc.image(m.imagem.obj, x + PAD + (m.imagem.dx || 0), y + PAD + desloc, { width: m.imagem.w, height: m.imagem.h });
   for (const l of m.linhas) {
     doc.font(FONTE[l.estilo]).fontSize(l.tamanho);
     const w = doc.widthOfString(l.texto);
@@ -386,7 +392,15 @@ function carregarLogo(doc, logo) {
   } catch { return null; }
 }
 
-// dados = { tipo, numero, cab, itens, v4, complementos, serralheria, compSerralheria, furos, medicao }
+// Desenho da porta (PNG capturado na configuração) na coluna Imagem; sem desenho, ou com bytes que não abrem como imagem, a célula fica vazia
+const ALTURA_MAX_DESENHO = 170;
+function imagemDoItem(doc, png) {
+  if (!png) return { texto: '' };
+  try { return { imagem: doc.openImage(png), maxAltura: ALTURA_MAX_DESENHO, alinhar: 'center', vertical: 'middle' }; }
+  catch { return { texto: '' }; }
+}
+
+// dados = { tipo, numero, cab, itens, v4, complementos, serralheria, compSerralheria, furos, medicao, desenhos: { [item]: Buffer PNG } }
 // opcoes = { verValores, producao, logo }  → devolve a lista de textos escritos (para os testes)
 function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo } = {}) {
   const ctx = { doc, y: MARGEM, textos: [] };
@@ -431,7 +445,7 @@ function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo
       v4: g.v4[id], complementos: g.complementos[id], serralheria: g.serralheria[id],
       compSerralheria: g.compSerralheria[id], furos: g.furos[id]
     });
-    const linha = [cel7(textoVB(it.ITEM)), cel7(textoVB(it.QTD)), { texto: '' },
+    const linha = [cel7(textoVB(it.ITEM)), cel7(textoVB(it.QTD)), imagemDoItem(doc, dados.desenhos?.[Number(id)]),
       { paragrafos: desc.map(l => ({ ...l, tamanho: 7 })) }, cel7(textoVB(it.OBSERVACAO))];
     if (comPrecos) linha.push(cel7(moedaBR(it.UNITARIO)), cel7(moedaBR(it.TOTAL)));
     return linha;
@@ -482,6 +496,6 @@ function destinoPdf({ tipo, numero, razaoSocial, producao = false, vidros = fals
 }
 
 module.exports = {
-  desenharPedOrc, desenharVidros, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
+  desenharPedOrc, desenharVidros, ajustarImagem, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
   textoVB, lerDecimal, moedaBR, numeroBR, formatarQuantidade, dataVB, dataHoraVB, quebrar, LOGO_PADRAO
 };
