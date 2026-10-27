@@ -213,3 +213,7 @@ test('entregas.html: botão de pesquisa do CEP e ViaCEP liberado na CSP', () => 
   assert.match(h, /id="btn-cep"/);
   assert.match(h, /connect-src[^"]*viacep\.com\.br/);
 });
+
+test('usuarios.html não usa data-perm (o layout.js esconde esse atributo de quem não tem a permissão; sumia o checkbox de entregas.baixar)', () => {
+  assert.doesNotMatch(ler('usuarios.html'), /data-perm\b(?!issao)/);
+});

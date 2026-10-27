@@ -421,7 +421,7 @@
                 if (p.area !== area) { area = p.area; html += `<tr class="area"><td colspan="4">${esc(area)}</td></tr>`; }
                 const ex = estadoFicha.excecoes.get(p.codigo) || 'herdar';
                 const res = resultadoDe(p.codigo, doPerfil);
-                html += `<tr data-perm="${esc(p.codigo)}"${CRITICAS.has(p.codigo) ? ' class="critica"' : ''}>
+                html += `<tr data-permissao="${esc(p.codigo)}"${CRITICAS.has(p.codigo) ? ' class="critica"' : ''}>
                     <td><b>${esc(p.nome)}</b></td>
                     <td class="do-perfil">${doPerfil.has(p.codigo) ? '✓' : '—'}</td>
                     <td><span class="tri">${['herdar', 'liberar', 'bloquear'].map(e =>
@@ -435,7 +435,7 @@
         $('grade-permissoes').addEventListener('click', e => {
             const b = e.target.closest('button[data-estado]');
             if (!b || !estadoFicha) return;
-            const codigo = b.closest('tr[data-perm]').dataset.perm;
+            const codigo = b.closest('tr[data-permissao]').dataset.permissao;
             if (b.dataset.estado === 'herdar') estadoFicha.excecoes.delete(codigo); else estadoFicha.excecoes.set(codigo, b.dataset.estado);
             renderGrade();
         });
@@ -621,7 +621,7 @@
             const areas = [];
             for (const c of catalogo) { let a = areas.find(x => x.nome === c.area); if (!a) areas.push(a = { nome: c.area, itens: [] }); a.itens.push(c); }
             $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(c =>
-                `<label><input type="checkbox" data-perm="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> ${esc(c.nome)}</label>`).join('')}</fieldset>`).join('');
+                `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> ${esc(c.nome)}</label>`).join('')}</fieldset>`).join('');
             mostrarFichaPerfil(true);
             $('p-nome').focus();
         }
@@ -630,7 +630,7 @@
             if (!perfilAtual) return;
             const nome = $('p-nome').value.trim();
             if (!nome) return toast('Informe o nome do perfil.', 'erro');
-            const marcadas = new Set([...document.querySelectorAll('#p-permissoes input[data-perm]:checked')].map(x => x.dataset.perm));
+            const marcadas = new Set([...document.querySelectorAll('#p-permissoes input[data-permissao]:checked')].map(x => x.dataset.permissao));
             const permissoes = catalogo.map(c => c.codigo).filter(c => marcadas.has(c));
             const ativo = $('p-ativo').checked;
             const original = perfisCache.find(x => x.id === perfilAtual.id);
