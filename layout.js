@@ -23,6 +23,7 @@
         fornecedores: ic('<path d="M3 21V9l6 4V9l6 4V4h6v17z"/><path d="M7 17h2M12 17h2M17 17h1"/>'),
         tintas: ic('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
         funcionarios: ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M17 8h4M17 12h4"/>'),
+        corte: ic('<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>'),
         gestao: ic('<path d="M3 20h18"/><rect x="5" y="11" width="3.5" height="9"/><rect x="10.25" y="6" width="3.5" height="14"/><rect x="15.5" y="3" width="3.5" height="17"/>'),
         precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
@@ -32,6 +33,7 @@
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
+        { href: 'corte.html', texto: 'Plano de corte', icone: 'corte', sub: true },   // subitem de Pedidos (corte de perfis por pedido e retalhos)
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },
         { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas', sub: true },   // subitem de Entregas (tela do motorista)
@@ -65,6 +67,7 @@
         'custos.html': ['precos.ver', 'valores.ver'],
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
         'gestao.html': ['gestao.ver', 'valores.ver'],
+        'corte.html': ['corte.ver'],
         'usuarios.html': ['admin.usuarios'],
         'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Plano de corte</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
+            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
+        }
+        [hidden] { display: none !important; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; color: var(--text-dark); text-decoration: none; }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; padding: 22px; margin-bottom: 24px; }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel > h2 { font-size: 20px; margin-bottom: 12px; }
+        .painel h3 { font-size: 13px; text-transform: uppercase; color: var(--text-light); margin-bottom: 8px; letter-spacing: .4px; }
+        .painel h4 { font-size: 15px; margin-bottom: 4px; }
+        .cartoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+        .cartoes .painel { margin-bottom: 0; }
+        .grande { font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+        .duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 12px; }
+        .bloco { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; }
+        .bloco.realizado { border-left: 5px solid var(--success-color); }
+        .bloco.previsto { border-left: 5px dashed var(--warning-color); background: var(--secondary-color); }
+        dl.info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; margin-top: 10px; }
+        dl.info dt { color: var(--text-light); }
+        .vazio { text-align: center; padding: 28px; color: var(--text-light); }
+        .erro-estado { text-align: center; padding: 20px; color: var(--danger-color); font-weight: 600; }
+        .cinza { color: var(--text-light); font-size: 13px; margin-top: 2px; }
+        .fonte { color: var(--text-light); font-size: 12px; margin-top: 8px; }
+        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
+        .selo.aviso { background: #fff3cd; color: #8a6d00; }
+        .selo.info { background: #dbeafe; color: #1e40af; }
+        .selo.ok { background: #d4edda; color: #1b6b30; }
+        .selo.perigo { background: #f8d7da; color: #a12330; }
+        .selo.neutro { background: #e9ecef; color: #495057; }
+        .alertas { list-style: none; }
+        .alertas li { padding: 12px 4px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .aviso-periodo { background: #fff3cd; color: #6b5300; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        .barra-mes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+        .barra-mes input[type="month"] { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; min-height: 44px; }
+        .barra-mes h2 { font-size: 20px; text-transform: capitalize; margin-left: 8px; }
+        .tabela-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: var(--secondary-color); padding: 10px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        tbody td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: top; }
+        td.num { text-align: right; white-space: nowrap; }
+        td.barra-col { min-width: 150px; }
+        tr.sem-cat { background: var(--secondary-color); }
+        .trilho { height: 12px; border-radius: 8px; background: #e9ecef; overflow: hidden; margin-bottom: 4px; }
+        .enche { height: 100%; border-radius: 8px; background: var(--text-light); }
+        .enche.ok { background: var(--success-color); }
+        .enche.aviso { background: var(--warning-color); }
+        .enche.perigo { background: var(--danger-color); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background: var(--white); min-height: 44px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
+        .linha2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .linha3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .erro-form { color: var(--danger-color); font-size: 13px; min-height: 18px; margin: 4px 0; }
+        .dica { font-size: 12px; color: var(--text-light); margin: 0 0 12px; }
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn:disabled { opacity: .6; cursor: wait; }
+        details { font-size: 14px; } details summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; } details ul { padding-left: 20px; }
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (max-width: 1100px) { .cartoes, .duas { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .linha2, .linha3 { grid-template-columns: 1fr; }
+        }
+
+        /* ---- plano de corte ---- */
+        .abas { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .abas button { padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--white); font-weight: 600; cursor: pointer; color: var(--text-dark); }
+        .abas button.ativa { background: var(--gradient-primary); color: #fff; border-color: transparent; }
+        .busca-pedido { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+        .acoes-plano { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+        dl.resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 18px; }
+        dl.resumo div { background: var(--secondary-color); border-radius: 12px; padding: 12px 14px; }
+        dl.resumo dt { font-size: 12px; color: var(--text-light); text-transform: uppercase; font-weight: 700; }
+        dl.resumo dd { font-size: 20px; font-weight: 700; margin-top: 4px; }
+        .aviso-pendencia { border: 1px solid var(--warning-color); background: #fff8e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        .aviso-pendencia ul { padding-left: 20px; margin-top: 6px; }
+        .grupo { margin-bottom: 26px; }
+        .grupo h3 { font-size: 17px; margin-bottom: 10px; }
+        .barra { margin-bottom: 14px; }
+        .barra-titulo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 4px; }
+        .faixa { display: flex; height: 54px; border: 2px solid var(--text-dark); border-radius: 6px; overflow: hidden; background: #eee; }
+        .peca { border: 0; border-right: 3px solid var(--text-dark); background: #cfe3ff; color: var(--text-dark); font-weight: 700; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; min-width: 0; padding: 0 2px; }
+        .peca small { font-weight: 400; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .peca[disabled] { cursor: default; }
+        .peca.cortada { background: #c8e6c9; }
+        .sobra { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; background: repeating-linear-gradient(45deg, #fff3cd, #fff3cd 6px, #ffe69c 6px, #ffe69c 12px); }
+        .sobra.descartar { background: repeating-linear-gradient(45deg, #eee, #eee 6px, #ddd 6px, #ddd 12px); color: var(--text-light); }
+        .conf-linha { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 14px; }
+        .conf-linha input[type=text], .conf-linha .conf-medida { width: 110px; }
+        .cinza, .dica { color: var(--text-light); font-size: 13px; }
+        .vazio { color: var(--text-light); padding: 16px 0; }
+        .erro-estado, .erro-form { color: var(--danger-color); font-size: 14px; min-height: 1em; }
+        .linha3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .form-group label { font-size: 13px; font-weight: 600; color: var(--text-light); }
+        input, select { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; }
+        .btn { padding: 10px 18px; border-radius: 10px; border: 1px solid transparent; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: var(--gradient-primary); color: #fff; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border-color: var(--border-color); }
+        .btn[disabled] { opacity: .6; cursor: default; }
+        .toast { padding: 12px 18px; border-radius: 10px; color: #fff; background: #333; box-shadow: var(--shadow-medium); }
+        .toast.ok { background: var(--success-color); } .toast.erro { background: var(--danger-color); }
+        .tabela-wrap { overflow-x: auto; }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610272300" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="corte.js?v=202610272300" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Plano de corte</h1>
+            <p class="welcome-subtitle">Distribui os perfis de um pedido em varas e retalhos para perder o mínimo. As medidas vêm do pedido gravado; peça com dado faltando aparece como pendência e fica fora do plano.</p>
+
+            <div class="abas" role="tablist">
+                <button type="button" role="tab" data-aba="plano" aria-selected="true" class="ativa">Plano do pedido</button>
+                <button type="button" role="tab" data-aba="retalhos" aria-selected="false">Retalhos</button>
+                <button type="button" role="tab" data-aba="config" aria-selected="false">Parâmetros</button>
+            </div>
+
+            <div id="painel-plano">
+                <section class="painel">
+                    <form id="form-pedido" class="busca-pedido" novalidate>
+                        <div class="form-group"><label for="numero">Número do pedido</label><input id="numero" inputmode="numeric" autocomplete="off" placeholder="ex.: 1234"></div>
+                        <button type="submit" class="btn btn-primary">Abrir</button>
+                    </form>
+                    <h2 id="plano-titulo"></h2>
+                    <p class="dica" id="plano-status" role="status"></p>
+                    <div class="acoes-plano" data-perm="corte.planejar">
+                        <button type="button" class="btn btn-primary" id="btn-salvar" hidden>Salvar plano e reservar retalhos</button>
+                        <button type="button" class="btn btn-secondary" id="btn-refazer" hidden>Refazer o plano</button>
+                        <button type="button" class="btn btn-secondary" id="btn-conferir" hidden>Conferir o corte</button>
+                        <button type="button" class="btn btn-primary" id="btn-confirmar" hidden>Confirmar o corte</button>
+                        <button type="button" class="btn btn-secondary" id="btn-cancelar-plano" hidden>Cancelar o plano</button>
+                    </div>
+                    <div id="plano-area" aria-live="polite"><p class="vazio">Informe o número de um pedido.</p></div>
+                </section>
+            </div>
+
+            <div id="painel-retalhos" hidden>
+                <section class="painel">
+                    <h2>Retalhos</h2>
+                    <p class="dica">Sobras de perfil guardadas para o próximo plano. Um retalho só entra no plano de quem tem o mesmo perfil, acabamento e cor. Entram automaticamente quando um plano é confirmado; aqui você também pode cadastrar à mão.</p>
+                    <div class="form-group"><label for="filtro-retalhos">Mostrar</label>
+                        <select id="filtro-retalhos"><option value="disponivel">Disponíveis</option><option value="reservado">Reservados</option><option value="usado">Usados</option><option value="descartado">Descartados</option><option value="">Todos</option></select></div>
+                    <div class="tabela-wrap" id="retalhos-lista" aria-live="polite"><p class="vazio">Carregando…</p></div>
+                </section>
+                <section class="painel">
+                    <form id="form-retalho" novalidate>
+                        <h2>Cadastrar ou ajustar retalho</h2>
+                        <input type="hidden" id="r-id">
+                        <div class="linha3">
+                            <div class="form-group"><label for="r-perfil">Perfil</label><input id="r-perfil" autocomplete="off"></div>
+                            <div class="form-group"><label for="r-acabamento">Acabamento</label><input id="r-acabamento" autocomplete="off"></div>
+                            <div class="form-group"><label for="r-cor">Cor</label><input id="r-cor" autocomplete="off"></div>
+                            <div class="form-group"><label for="r-comprimento">Comprimento (mm)</label><input id="r-comprimento" inputmode="numeric" autocomplete="off"></div>
+                        </div>
+                        <p class="erro-form" id="erro-retalho" role="alert"></p>
+                        <button type="submit" class="btn btn-primary" id="btn-retalho">Cadastrar retalho</button>
+                        <button type="button" class="btn btn-secondary" id="btn-retalho-limpar">Limpar</button>
+                    </form>
+                </section>
+            </div>
+
+            <div id="painel-config" hidden>
+                <section class="painel">
+                    <h2>Parâmetros de corte</h2>
+                    <p class="dica">Comprimento da vara, espessura da serra e sobra mínima para guardar como retalho. O padrão vale para todos os perfis; uma exceção troca só os campos preenchidos.</p>
+                    <div id="config-info" aria-live="polite"><p class="vazio">Carregando…</p></div>
+                </section>
+                <section class="painel">
+                    <form id="form-config" novalidate>
+                        <h2>Alterar parâmetros</h2>
+                        <div class="linha3">
+                            <div class="form-group"><label for="c-perfil">Perfil (vazio = padrão)</label><input id="c-perfil" autocomplete="off"></div>
+                            <div class="form-group"><label for="c-vara">Vara (mm)</label><input id="c-vara" inputmode="numeric" autocomplete="off" placeholder="ex.: 6000"></div>
+                            <div class="form-group"><label for="c-serra">Serra (mm)</label><input id="c-serra" inputmode="numeric" autocomplete="off" placeholder="ex.: 3"></div>
+                            <div class="form-group"><label for="c-sobra">Sobra mínima (mm)</label><input id="c-sobra" inputmode="numeric" autocomplete="off" placeholder="ex.: 500"></div>
+                        </div>
+                        <p class="erro-form" id="erro-config" role="alert"></p>
+                        <button type="submit" class="btn btn-primary" id="btn-config">Gravar parâmetros</button>
+                    </form>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
