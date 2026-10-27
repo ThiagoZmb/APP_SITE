@@ -165,3 +165,36 @@ test('layout.js: Entregas no menu (após Clientes), em PAGINAS e com ícone', ()
   assert.match(l, /'entregas\.html': \['entregas\.ver'\]/);
   assert.match(l, /\n\s+entregas: ic\(/);
 });
+
+test('montarMes: semanas de domingo a sábado cobrindo o mês, entregas no dia certo, canceladas fora', () => {
+  const l = [
+    ent(1, 'agendada', { dataAgendada: '2026-10-28' }), ent(2, 'em_rota', { dataAgendada: '2026-10-28' }),
+    ent(3, 'cancelada', { dataAgendada: '2026-10-28' }), ent(4, 'a_programar'), ent(5, 'ocorrencia', { dataAgendada: '2026-10-01 08:00:00' })
+  ];
+  const sem = E.montarMes(l, 2026, 9, '2026-10-27');
+  assert.ok(sem.every(s => s.length === 7));
+  assert.equal(sem.length, 5); // 27/09 a 31/10
+  assert.equal(sem[0][0].dia, '2026-09-27');
+  assert.equal(sem[0][0].doMes, false);
+  assert.equal(sem[4][6].dia, '2026-10-31');
+  const dia = d => sem.flat().find(c => c.dia === d);
+  assert.deepEqual(dia('2026-10-28').entregas.map(e => e.id), [1, 2]);
+  assert.deepEqual(dia('2026-10-01').entregas.map(e => e.id), [5]);
+  assert.equal(dia('2026-10-27').hoje, true);
+  assert.equal(sem.flat().filter(c => c.hoje).length, 1);
+  assert.equal(sem.flat().reduce((n, c) => n + c.entregas.length, 0), 3);
+});
+
+test('montarMes: mês que termina no sábado não ganha semana extra; lista inválida não quebra', () => {
+  const sem = E.montarMes(null, 2026, 6, ''); // julho/2026 termina numa sexta
+  assert.ok(sem.every(s => s.length === 7));
+  assert.equal(sem.flat().filter(c => c.doMes).length, 31);
+  const fev = E.montarMes([], 2026, 1, ''); // fev/2026: 1º é domingo, 28 dias = 4 semanas
+  assert.equal(fev.length, 4);
+});
+
+test('entregas.html: estilos do calendário da agenda', () => {
+  const h = ler('entregas.html');
+  assert.match(h, /\.cal-linha/);
+  assert.match(h, /\.etiqueta/);
+});

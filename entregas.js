@@ -66,6 +66,35 @@
     }));
   }
 
+  // Agenda em calendário: semanas (domingo a sábado) que cobrem o mês `mes` (0-11) de `ano`. Cada célula: { dia: 'AAAA-MM-DD', num, doMes, hoje, entregas }.
+  // Entra toda entrega com data agendada, menos as canceladas; a ordem do dia é pelo número do pedido.
+  const dois = n => String(n).padStart(2, '0');
+  const isoUTC = d => `${d.getUTCFullYear()}-${dois(d.getUTCMonth() + 1)}-${dois(d.getUTCDate())}`;
+  function montarMes(lista, ano, mes, hojeISO) {
+    const porDia = new Map();
+    for (const e of Array.isArray(lista) ? lista : []) {
+      const dia = e.dataAgendada ? String(e.dataAgendada).slice(0, 10) : '';
+      if (!dia || e.status === 'cancelada') continue;
+      if (!porDia.has(dia)) porDia.set(dia, []);
+      porDia.get(dia).push(e);
+    }
+    const primeiro = new Date(Date.UTC(ano, mes, 1));
+    const inicio = new Date(Date.UTC(ano, mes, 1 - primeiro.getUTCDay()));
+    const ultimo = new Date(Date.UTC(ano, mes + 1, 0));
+    const semanas = [];
+    for (let d = new Date(inicio); d <= ultimo || d.getUTCDay() !== 0; d.setUTCDate(d.getUTCDate() + 1)) {
+      if (d.getUTCDay() === 0) semanas.push([]);
+      const dia = isoUTC(d);
+      semanas[semanas.length - 1].push({
+        dia, num: d.getUTCDate(), doMes: d.getUTCMonth() === mes, hoje: dia === hojeISO,
+        entregas: (porDia.get(dia) || []).slice().sort((a, b) => a.numero - b.numero)
+      });
+    }
+    return semanas;
+  }
+  const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
   // Ações que o servidor aceita para cada estado (espelha calculo/entregas.js; o servidor continua decidindo)
   function acoesDisponiveis(e) {
     if (!e) return [];
@@ -126,7 +155,7 @@
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false };
+    const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false, mes: null, diaAberto: null };
 
     const { getAuth, chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
@@ -188,18 +217,42 @@
       em_rota: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
     };
 
+    // Agenda em calendário mensal: cada entrega é uma etiqueta colorida pelo status; clicar abre o detalhe
+    const MAX_ETIQUETAS = 3;
+    function hojeISO() {
+      const d = new win.Date();
+      return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
+    }
+    function desenharCalendario() {
+      if (!estado.mes) { const h = new win.Date(); estado.mes = { ano: h.getFullYear(), mes: h.getMonth() }; }
+      const { ano, mes } = estado.mes;
+      const semanas = montarMes(estado.lista.filter(casa), ano, mes, hojeISO());
+      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero} — ${e.cliente || ''} (${rotuloStatus(e.status)})`)}">` +
+        `<strong>${esc(e.numero)}</strong> ${esc(e.cliente || '')}</button>`;
+      const celula = c => {
+        const aberto = estado.diaAberto === c.dia;
+        const vistas = aberto ? c.entregas : c.entregas.slice(0, MAX_ETIQUETAS);
+        const mais = c.entregas.length - vistas.length;
+        return `<div class="cel${c.doMes ? '' : ' fora'}${c.hoje ? ' hoje' : ''}"><span class="num">${c.num}</span>` +
+          vistas.map(etiqueta).join('') +
+          (mais > 0 ? `<button type="button" class="mais" data-dia="${esc(c.dia)}">+${mais} mais</button>` : '') +
+          (aberto && c.entregas.length > MAX_ETIQUETAS ? '<button type="button" class="mais" data-dia="">recolher</button>' : '') + '</div>';
+      };
+      const total = semanas.flat().reduce((n, c) => n + (c.doMes ? c.entregas.length : 0), 0);
+      $('lista').innerHTML = '<div class="cal-topo"><button type="button" class="btn btn-mini btn-secondary" data-mes="-1" aria-label="Mês anterior">‹</button>' +
+        '<button type="button" class="btn btn-mini btn-secondary" data-mes="0">Hoje</button>' +
+        '<button type="button" class="btn btn-mini btn-secondary" data-mes="1" aria-label="Próximo mês">›</button>' +
+        `<h3>${MESES[mes]} de ${ano}</h3><span class="cinza">${total} entrega(s) no mês</span></div>` +
+        `<div class="cal"><div class="cal-sem">${DIAS_SEMANA.map(d => `<span>${d}</span>`).join('')}</div>` +
+        semanas.map(sem => `<div class="cal-linha">${sem.map(celula).join('')}</div>`).join('') + '</div>';
+    }
+
     function desenharLista() {
       desenharAbas();
+      if (estado.aba === 'agenda') { desenharCalendario(); return; }
       const itens = filtrarAba(estado.lista, estado.aba).filter(casa);
       const alvo = $('lista');
       if (!itens.length) { alvo.innerHTML = '<p class="vazio">Nada por aqui.</p>'; return; }
-      if (estado.aba === 'agenda') {
-        alvo.innerHTML = agruparAgenda(itens).map(d => `<section class="dia"><h3>${esc(dataBR(d.dia))}</h3>` +
-          d.grupos.map(g => `<div class="grupo"><h4>${esc(g.nome)}</h4><ul>` +
-            g.entregas.map(e => `<li data-id="${esc(e.id)}"><strong>${esc(e.numero)}</strong> ${esc(e.cliente)} <span class="cinza">${esc(local(e))}</span> ${selo(e.status)}</li>`).join('') +
-            '</ul></div>').join('') + '</section>').join('');
-        return;
-      }
       const cab = CABECALHO[estado.aba] || CABECALHO.outras;
       alvo.innerHTML = `<table><thead><tr>${cab.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${itens.map(e => linha(e, estado.aba)).join('')}</tbody></table>`;
     }
@@ -410,6 +463,18 @@
       doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); desenharLista(); }));
       $('busca').addEventListener('input', ev => { estado.busca = ev.target.value.trim(); desenharLista(); });
       $('lista').addEventListener('click', ev => {
+        const nav = ev.target.closest('[data-mes]');
+        if (nav) {
+          const h = new win.Date(), m = estado.mes || { ano: h.getFullYear(), mes: h.getMonth() };
+          const passo = Number(nav.getAttribute('data-mes'));
+          const d = passo === 0 ? new win.Date(h.getFullYear(), h.getMonth(), 1) : new win.Date(m.ano, m.mes + passo, 1);
+          estado.mes = { ano: d.getFullYear(), mes: d.getMonth() };
+          estado.diaAberto = null;
+          desenharLista();
+          return;
+        }
+        const mais = ev.target.closest('[data-dia]');
+        if (mais) { estado.diaAberto = mais.getAttribute('data-dia') || null; desenharLista(); return; }
         const botao = ev.target.closest('button[data-acao]');
         const alvo = ev.target.closest('[data-id]');
         if (!alvo) return;
@@ -452,6 +517,6 @@
     carregar();
   }
 
-  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, acoesDisponiveis,
+  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, montarMes, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
 });
