@@ -10,6 +10,7 @@ const express = require('express');
 const { validarPng } = require('../calculo/png');
 const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
+const { liberarPlanosDoPedido } = require('./corte');
 
 const TIPOS = ['Orçamento', 'Pedido'];
 const SITUACOES_PEDIDO = ['Em Produção', 'Entregue', 'Cancelado', 'Retirado'];
@@ -585,6 +586,7 @@ function registrarPedOrc({ rota, pool }) {
       const antes = String(linhas.cab.SITUACAO || '');
       if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está cancelado.`);
       await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', ['Cancelado', alvo.numero, alvo.tipo]);
+      await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '');   // plano de corte: cancela o plano gerado e solta os retalhos reservados
       await auditarDoc(conn, req, 'pedido_cancelado', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, situacaoAnterior: antes });
       return { ok: true };
     });
@@ -625,6 +627,7 @@ function registrarPedOrc({ rota, pool }) {
       // Entregas: o NUMERO é reaproveitado (MAX+1), então a entrega do pedido excluído sai junto, na mesma transação
       // (só exclusão feita pela web passa por aqui; exclusão feita direto no VB não limpa web_entregas).
       if (alvo.tipo === 'Pedido') {
+        await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '');   // plano de corte: idem (plano conferido fica como histórico)
         const [entregas] = await conn.execute('SELECT id FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
         for (const { id } of entregas) {
           await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
