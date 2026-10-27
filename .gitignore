@@ -4,3 +4,4 @@ node_modules/
 
 # amostras de projetos de clientes (decisão 2026-10-26: não versionar)
 amostras_pdf/
+.superpowers/
