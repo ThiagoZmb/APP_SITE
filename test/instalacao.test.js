@@ -269,3 +269,19 @@ test('entregas: ver e programar para Administrador e Interno completo (nunca bai
   assert.deepEqual(await acrescentarPermissoesEntregas(ja), { feito: false });
   assert.ok(!ja.chamadas.some(c => /INSERT/.test(c.sql)));
 });
+
+test('tintas: ver e editar para Administrador e Interno completo, uma vez', async () => {
+  const { acrescentarPermissoesTintas } = require('../seguranca/instalacao');
+  const poolTintas = ({ jaFeito = false } = {}) => criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_tintas'/, jaFeito ? [{ id: 9 }] : []],
+    [/SELECT id, nome FROM web_perfis WHERE nome IN/, [{ id: 1, nome: 'Administrador' }, { id: 2, nome: 'Interno completo' }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+  const pool = poolTintas();
+  assert.deepEqual(await acrescentarPermissoesTintas(pool), { feito: true });
+  const ins = pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params);
+  assert.deepEqual(ins, [[1, 'tintas.ver'], [1, 'tintas.editar'], [2, 'tintas.ver'], [2, 'tintas.editar']]);
+  assert.ok(pool.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_tintas'));
+  assert.deepEqual(await acrescentarPermissoesTintas(poolTintas({ jaFeito: true })), { feito: false });
+});
