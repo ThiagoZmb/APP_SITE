@@ -69,3 +69,48 @@ test('representante só mexe em documento de cliente do seu estado', async t => 
   assert.equal(banco.pedOrc.length, 1);
   assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção');
 });
+
+test('situação: Em Produção -> Pronto grava só a situação; Entregue/Retirado gravam DATA_ENTREGA = hoje; sair deles limpa a data; tudo auditado', async t => {
+  const { hojeLocal } = require('../rotas/transacao');
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  let r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Pronto' });
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Pronto');
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, null);
+  r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue' });
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, hojeLocal());
+  assert.equal((await r.json()).dataEntrega, hojeLocal());
+  r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Retirado' });
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Retirado');
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, hojeLocal());
+  await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Em Produção' });
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção');
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, null);
+  assert.deepEqual(banco.auditoria.map(a => a.acao), ['pedido_situacao', 'pedido_situacao', 'pedido_situacao', 'pedido_situacao']);
+  assert.deepEqual(JSON.parse(banco.auditoria[1].detalhe), { cliente: 'CLIENTE TESTE', de: 'Pronto', para: 'Entregue' });
+});
+
+test('situação: igual à atual 409; cancelado 409; valor inválido 400; orçamento 400; inexistente 404; itens intactos', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); comDocumento(banco, 'Pedido', 7, { SITUACAO: 'Cancelado' }); comDocumento(banco, 'Orçamento', 6);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Em Produção' })).status, 409);
+  assert.equal((await chamar('/ped_orc/Pedido/7/situacao', 'POST', { situacao: 'Pronto' })).status, 409);
+  assert.equal((await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Cancelado' })).status, 400); // cancelar tem rota e permissão próprias
+  assert.equal((await chamar('/ped_orc/Pedido/5/situacao', 'POST', {})).status, 400);
+  assert.equal((await chamar('/ped_orc/Orçamento/6/situacao', 'POST', { situacao: 'Pronto' })).status, 400);
+  assert.equal((await chamar('/ped_orc/Pedido/99/situacao', 'POST', { situacao: 'Pronto' })).status, 404);
+  assert.equal(banco.pedOrc.find(p => p.NUMERO === 7).SITUACAO, 'Cancelado');
+  assert.equal(banco.auditoria.length, 0);
+  assert.equal(banco.listaItens.length, 3);
+});
+
+test('situação: sem pedidos.situacao → 403 (Interno completo e Vendedor)', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5);
+  for (const perfil of ['Interno completo', 'Vendedor']) {
+    const { chamar } = await prepararPedOrc(t, { banco, perfil });
+    assert.equal((await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Pronto' })).status, 403);
+  }
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção');
+});

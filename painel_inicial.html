@@ -313,6 +313,17 @@
         .order-number a.editar:hover, .order-number a.editar:focus { opacity: 1; }
         .order-number .acao-doc { margin-left: 4px; padding: 0 2px; border: none; background: none; cursor: pointer; font-size: inherit; opacity: .7; }
         .order-number .acao-doc:hover, .order-number .acao-doc:focus-visible { opacity: 1; transform: scale(1.15); }
+        /* menu do botão direito nas linhas de pedidos/orçamentos */
+        #orders-tbody tr.ctx { background: var(--primary-light); }
+        #menu-ctx { position: fixed; z-index: 1000; min-width: 240px; max-width: 320px; padding: 6px; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); font-size: 13.5px; animation: entra .12s ease-out; }
+        #menu-ctx .mc-cab { padding: 8px 10px 6px; font-size: 12px; font-weight: 700; color: var(--text-light); border-bottom: 1px solid var(--border-color); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #menu-ctx .mc-tit { padding: 6px 10px 2px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        #menu-ctx .mc-sep { height: 1px; background: var(--border-color); margin: 5px 4px; }
+        #menu-ctx button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+        #menu-ctx button:hover:not(:disabled), #menu-ctx button:focus-visible { background: var(--primary-light); outline: none; }
+        #menu-ctx button:disabled { opacity: .55; cursor: default; font-weight: 700; }
+        #menu-ctx button.mc-perigo { color: #b42318; }
+        #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <script src="layout.js?v=202610271300" defer></script>
@@ -427,7 +438,7 @@
         }
         const getToken = () => getAuth()?.token || '';
         async function api(caminho, opcoes = {}) {
-            const res = await fetch(API_BASE + caminho, { ...opcoes, headers: { 'Authorization': 'Bearer ' + getToken() } });
+            const res = await fetch(API_BASE + caminho, { ...opcoes, headers: { ...(opcoes.headers || {}), 'Authorization': 'Bearer ' + getToken() } });
             if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             const d = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(d.error || `Erro HTTP: ${res.status}`);
@@ -773,6 +784,97 @@
             const tr = e.target.closest('tr[data-numero]');
             if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
+        // ---------- menu do botão direito: ações do pedido/orçamento ----------
+        // Cada item só aparece para quem tem a permissão; o servidor continua conferindo (cancelar, excluir e situação têm rota e permissão próprias).
+        const SITUACAO_NOME = { producao: 'Em Produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado' };
+        const docDe = numero => (tipoLista === 'Pedido' ? pedidos : orcamentos).find(d => String(d.numero) === String(numero));
+        const urlPdf = (numero, producao) => `${API_BASE}/dados_pdf?numero=${encodeURIComponent(numero)}&tipo=${encodeURIComponent(tipoLista)}${producao ? '&producao=1' : ''}`;
+        async function copiarTexto(texto) {
+            try { await navigator.clipboard.writeText(String(texto)); }
+            catch { const t = document.createElement('textarea'); t.value = String(texto); document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch { /* sem área de transferência */ } t.remove(); }
+        }
+        async function mudarSituacao(numero, nome) {
+            const x = docDe(numero);
+            const aviso = nome === 'Entregue' || nome === 'Retirado' ? '\n\nA data de entrega passa a ser hoje.' : '';
+            if (!confirm(`Mudar a situação do pedido nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?${aviso}`)) return;
+            try {
+                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome }) });
+                await carregar();
+            } catch (err) { alert(err.message); }
+        }
+        function itensDoMenu(x) {
+            const numero = x.numero, ehPedido = tipoLista === 'Pedido', cancelado = x.s === 'cancelado';
+            const L = [];
+            const add = (perm, icone, rotulo, fn, extra = {}) => { if (!perm || Acesso.pode(perm)) L.push({ icone, rotulo, fn, ...extra }); };
+            const sep = () => { if (L.length && !L[L.length - 1].sep) L.push({ sep: true }); };
+            add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
+            if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
+            add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
+                () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}`; });
+            if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {
+                sep(); L.push({ titulo: 'Mudar situação para' });
+                for (const [chave, nome] of Object.entries(SITUACAO_NOME)) {
+                    const atual = x.s === chave;
+                    L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(numero, nome), desativado: atual });
+                }
+            }
+            if (ehPedido && x.entregaStatus && Acesso.pode('entregas.ver')) {
+                sep();
+                L.push({ icone: '🚚', rotulo: `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
+            }
+            sep();
+            L.push({ icone: '📋', rotulo: `Copiar nº ${ehPedido ? 'do pedido' : 'do orçamento'}`, fn: () => copiarTexto(numero) });
+            L.push({ icone: '📋', rotulo: 'Copiar nome do cliente', fn: () => copiarTexto(x.cliente || '') });
+            const perigos = [];
+            if (ehPedido && !cancelado && Acesso.pode('pedidos.cancelar')) perigos.push({ icone: '🚫', rotulo: 'Cancelar pedido', fn: () => acaoNoDocumento('cancelar', numero), perigo: true });
+            if (Acesso.pode('pedidos.excluir')) perigos.push({ icone: '🗑️', rotulo: ehPedido ? 'Excluir pedido' : 'Excluir orçamento', fn: () => acaoNoDocumento('excluir', numero), perigo: true });
+            if (perigos.length) { sep(); L.push(...perigos); }
+            return L;
+        }
+        let menuCtx = null, linhaCtx = null;
+        function fecharMenu() {
+            if (menuCtx) { menuCtx.remove(); menuCtx = null; }
+            if (linhaCtx) { linhaCtx.classList.remove('ctx'); linhaCtx = null; }
+        }
+        function abrirMenu(ev, tr) {
+            const x = docDe(tr.dataset.numero);
+            if (!x) return;
+            ev.preventDefault();
+            fecharMenu();
+            const itens = itensDoMenu(x);
+            const m = document.createElement('div');
+            m.id = 'menu-ctx'; m.setAttribute('role', 'menu');
+            m.innerHTML = `<div class="mc-cab">${esc(tipoLista === 'Pedido' ? 'Pedido' : 'Orçamento')} nº ${esc(x.numero)} · ${esc(x.cliente || '')}</div>` + itens.map((it, i) =>
+                it.sep ? '<div class="mc-sep" role="separator"></div>'
+                : it.titulo ? `<div class="mc-tit">${esc(it.titulo)}</div>`
+                : `<button type="button" role="menuitem" data-i="${i}" class="${it.perigo ? 'mc-perigo' : ''}"${it.desativado ? ' disabled' : ''}><span class="mc-ic">${esc(it.icone || '')}</span>${esc(it.rotulo)}</button>`).join('');
+            m.addEventListener('click', e => {
+                const b = e.target.closest('button[data-i]');
+                if (!b) return;
+                const it = itens[Number(b.dataset.i)];
+                fecharMenu();
+                if (it && it.fn) it.fn();
+            });
+            m.addEventListener('keydown', e => {
+                const bs = [...m.querySelectorAll('button:not([disabled])')];
+                const i = bs.indexOf(document.activeElement);
+                if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+            });
+            document.body.appendChild(m);
+            const x0 = ev.clientX || tr.getBoundingClientRect().left + 40, y0 = ev.clientY || tr.getBoundingClientRect().top + 20;
+            m.style.left = Math.max(8, Math.min(x0, window.innerWidth - m.offsetWidth - 8)) + 'px';
+            m.style.top = Math.max(8, Math.min(y0, window.innerHeight - m.offsetHeight - 8)) + 'px';
+            menuCtx = m; linhaCtx = tr; tr.classList.add('ctx');
+            const primeiro = m.querySelector('button:not([disabled])');
+            if (primeiro) primeiro.focus({ preventScroll: true });
+        }
+        $('orders-tbody').addEventListener('contextmenu', e => { const tr = e.target.closest('tr[data-numero]'); if (tr) abrirMenu(e, tr); });
+        document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target)) fecharMenu(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenu(); });
+        document.addEventListener('scroll', fecharMenu, true);
+        window.addEventListener('resize', fecharMenu);
+        window.addEventListener('blur', fecharMenu);
         $('chips-sit').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filtroSit = b.dataset.sit; renderLista(); });
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
             tipoLista = b.dataset.tipo; filtroSit = '';

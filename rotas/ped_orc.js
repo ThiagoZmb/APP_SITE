@@ -536,6 +536,27 @@ function registrarPedOrc({ rota, pool }) {
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: 'Cancelado' });
   });
 
+  // mudar a situação do pedido (menu do botão direito da lista). Entregue/Retirado gravam DATA_ENTREGA = hoje, como Pedido_Entregue/Pedido_Retirado do VB;
+  // sair de Entregue/Retirado limpa a data. Pedido Cancelado não muda por aqui. A fila de Entregas acompanha pela varredura (Pronto entra; sair de Pronto antes de agendar cancela).
+  const SITUACOES_MUDAR = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
+  rota('post', '/ped_orc/:tipo/:numero/situacao', ['pedidos.situacao'], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'Só pedidos têm situação (Em Produção, Pronto, Entregue, Retirado).' });
+    const nova = String((req.body || {}).situacao ?? '');
+    if (!SITUACOES_MUDAR.includes(nova)) return res.status(400).json({ error: `Situação inválida. Use: ${SITUACOES_MUDAR.join(', ')}.` });
+    const dataEntrega = nova === 'Entregue' || nova === 'Retirado' ? hojeLocal() : null;
+    const r = await emTransacao(pool, res, 'POST /ped_orc/situacao', async conn => {
+      const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      const antes = String(linhas.cab.SITUACAO || '');
+      if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de situação.`);
+      if (antes === nova) throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está "${nova}".`);
+      await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
+      await auditarDoc(conn, req, 'pedido_situacao', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes, para: nova });
+      return { ok: true };
+    });
+    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
+  });
+
   // excluir: apaga o cabeçalho e todas as linhas do documento (mesmas tabelas que o salvar regrava); sem desfazer
   rota('delete', '/ped_orc/:tipo/:numero', ['pedidos.excluir'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;

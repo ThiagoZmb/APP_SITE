@@ -217,3 +217,14 @@ test('entregas.html: botão de pesquisa do CEP e ViaCEP liberado na CSP', () => 
 test('usuarios.html não usa data-perm (o layout.js esconde esse atributo de quem não tem a permissão; sumia o checkbox de entregas.baixar)', () => {
   assert.doesNotMatch(ler('usuarios.html'), /data-perm\b(?!issao)/);
 });
+
+test('abaDoStatus: aba em que cada status aparece (link entregas.html?pedido=N)', () => {
+  assert.equal(E.abaDoStatus('a_programar'), 'fila');
+  assert.equal(E.abaDoStatus('agendada'), 'agenda');
+  assert.equal(E.abaDoStatus('em_rota'), 'em_rota');
+  assert.equal(E.abaDoStatus('enviada'), 'em_rota');
+  assert.equal(E.abaDoStatus('ocorrencia'), 'ocorrencias');
+  assert.equal(E.abaDoStatus('entregue'), 'concluidas');
+  assert.equal(E.abaDoStatus('cancelada'), 'concluidas');
+  assert.equal(E.abaDoStatus('xx'), null);
+});

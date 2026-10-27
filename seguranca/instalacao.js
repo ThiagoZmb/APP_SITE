@@ -421,4 +421,7 @@ const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'perm
 
 const acrescentarPermissoesCancelarExcluir = pool => darAoAdministrador(pool, 'permissoes_cancelar_excluir', ['pedidos.cancelar', 'pedidos.excluir']);
 
-module.exports = { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Mudar a situação do pedido pela tela de pedidos: só o Administrador recebe (como cancelar/excluir)
+const acrescentarPermissoesSituacao = pool => darAoAdministrador(pool, 'permissoes_situacao', ['pedidos.situacao']);
+
+module.exports = { instalarTabelas, acrescentarPermissoesSituacao, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

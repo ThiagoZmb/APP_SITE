@@ -32,6 +32,9 @@
     { id: 'ocorrencias', rotulo: 'Ocorrências', status: ['ocorrencia'] }
   ];
 
+  // aba em que a entrega com esse status aparece (usada por entregas.html?pedido=N para abrir direto na aba certa)
+  const abaDoStatus = s => (ABAS.find(a => a.status.includes(s)) || {}).id || null;
+
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
   const corStatus = s => COR_STATUS[s] || 'neutro';
   const rotuloTipo = t => ROTULO_TIPO[t] || '—';
@@ -180,11 +183,17 @@
     }
 
     // ---------- lista ----------
+    // ?pedido=N (link do menu do botão direito em Pedidos): na primeira carga abre a aba e o detalhe da entrega desse pedido
+    let pedidoDoLink = '';
+    try { pedidoDoLink = (new win.URLSearchParams(win.location.search).get('pedido') || '').trim(); } catch { /* sem query */ }
     async function carregar() {
       try {
         const d = await chamar('/entregas');
         estado.lista = Array.isArray(d.entregas) ? d.entregas : [];
       } catch (err) { toast(err.message, 'erro'); estado.lista = []; }
+      const alvo = pedidoDoLink && estado.lista.find(e => String(e.numero) === pedidoDoLink);
+      pedidoDoLink = '';
+      if (alvo) { estado.aba = abaDoStatus(alvo.status) || estado.aba; desenharLista(); await abrirDetalhe(alvo.id); return; }
       desenharLista();
     }
 
@@ -541,6 +550,6 @@
     carregar();
   }
 
-  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, montarMes, acoesDisponiveis,
+  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
 });
