@@ -325,8 +325,8 @@
       } catch (err) { leg.textContent += ' — não foi possível carregar (' + err.message + ')'; }
     }
 
+    // sempre busca de novo: um motorista criado depois que a página abriu precisa aparecer sem recarregar
     async function garantirMotoristas() {
-      if (estado.motoristas) return;
       const d = await chamar('/entregas/motoristas');
       estado.motoristas = Array.isArray(d.motoristas) ? d.motoristas : [];
     }
@@ -346,7 +346,7 @@
       const e = estado.det.entrega;
       estado.reagendando = reagendar;
       $('ag-titulo').textContent = (reagendar ? 'Reagendar' : 'Agendar') + ` — pedido ${e.numero}`;
-      $('f-motorista').innerHTML = '<option value="">Escolha…</option>' + estado.motoristas.map(m => `<option value="${esc(m.codigo)}">${esc(m.nome)}</option>`).join('');
+      $('f-motorista').innerHTML = '<option value="">' + (estado.motoristas.length ? 'Escolha…' : 'Nenhum motorista com permissão de baixa') + '</option>' + estado.motoristas.map(m => `<option value="${esc(m.codigo)}">${esc(m.nome)}</option>`).join('');
       $('f-tipo').value = e.tipo || '';
       $('f-data').value = e.dataAgendada || '';
       $('f-motorista').value = e.motoristaCodigo ? String(e.motoristaCodigo) : '';
