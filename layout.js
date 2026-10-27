@@ -21,6 +21,7 @@
         menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
         usuarios: ic('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m16.5 3.5 1.5 1.5 3-3"/>'),
         fornecedores: ic('<path d="M3 21V9l6 4V9l6 4V4h6v17z"/><path d="M7 17h2M12 17h2M17 17h1"/>'),
+        tintas: ic('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
         funcionarios: ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M17 8h4M17 12h4"/>'),
         precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
@@ -36,6 +37,7 @@
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
+        { href: 'tintas.html', texto: 'Tintas', icone: 'tintas', sub: true },   // subitem do Estoque (cadastro de tintas e insumos de pintura)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'fornecedores.html', texto: 'Fornecedores', icone: 'fornecedores' },
         { href: 'funcionarios.html', texto: 'Funcionários', icone: 'funcionarios' },
@@ -55,6 +57,7 @@
         'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
         'produtos.html': ['produtos.ver'],
         'fornecedores.html': ['fornecedores.ver'],
+        'tintas.html': ['tintas.ver'],
         'funcionarios.html': ['funcionarios.ver'],
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
         'custos.html': ['precos.ver', 'valores.ver'],

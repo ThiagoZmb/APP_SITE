@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Tintas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
+            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
+        }
+        [hidden] { display: none !important; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; color: var(--text-dark); text-decoration: none; }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 22px 22px 0; }
+        .abas { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
+        .aba { border: none; background: none; padding: 12px 14px; font-size: 14px; font-weight: 600; color: var(--text-light); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; min-height: 44px; }
+        .aba.ativo { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .contagem { display: inline-block; margin-left: 6px; font-size: 12px; background: var(--primary-light); color: var(--primary-color); padding: 1px 8px; border-radius: 20px; }
+        .busca input { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; background: var(--secondary-color); margin-bottom: 14px; }
+        .busca input:focus { outline: none; border-color: var(--primary-color); }
+        .lista-wrap { max-height: 640px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { position: sticky; top: 0; background: var(--secondary-color); padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        tbody tr { cursor: pointer; }
+        tbody tr:hover { background: var(--primary-light); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.12); }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); }
+        .cinza { color: var(--text-light); font-size: 13px; }
+        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
+        .selo.aviso { background: #fff3cd; color: #8a6d00; }
+        .selo.info { background: #dbeafe; color: #1e40af; }
+        .selo.ok { background: #d4edda; color: #1b6b30; }
+        .selo.perigo { background: #f8d7da; color: #a12330; }
+
+        .dia { padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
+        .dia h3 { font-size: 16px; margin-bottom: 8px; }
+        .grupo h4 { font-size: 13px; color: var(--primary-color); text-transform: uppercase; margin: 8px 0 4px; }
+        .grupo ul { list-style: none; }
+        .grupo li { padding: 10px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .grupo li:hover { background: var(--primary-light); }
+
+        #painel { padding: 22px; }
+        #painel h2 { font-size: 22px; margin-bottom: 6px; }
+        #painel h3 { font-size: 13px; text-transform: uppercase; color: var(--text-light); margin: 18px 0 8px; letter-spacing: .4px; }
+        dl.info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; margin-top: 12px; }
+        dl.info dt { color: var(--text-light); }
+        #painel ul, #painel ol { padding-left: 18px; font-size: 14px; }
+        #painel li { margin-bottom: 6px; }
+        #d-anexos figure { margin-bottom: 12px; }
+        #d-anexos img { max-width: 100%; max-height: 320px; border-radius: 10px; border: 1px solid var(--border-color); display: block; }
+        #d-anexos figcaption { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+        .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background: var(--white); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
+        .linha2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .linha3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+        .erro-form { color: var(--danger-color); font-size: 13px; min-height: 18px; margin: 4px 0; }
+        fieldset { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px 4px; margin-bottom: 12px; }
+        legend { font-size: 12px; font-weight: 700; color: var(--text-light); padding: 0 6px; text-transform: uppercase; }
+
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-perigo { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
+        .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; }
+        .btn:disabled { opacity: .6; cursor: wait; }
+
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (max-width: 1100px) { .workspace { grid-template-columns: 1fr; } .lista-wrap { max-height: 420px; } }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .linha2, .linha3 { grid-template-columns: 1fr; }
+        }
+        .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
+
+        .barra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+        .barra .busca { flex: 1; min-width: 200px; }
+        .barra .busca input { margin-bottom: 0; }
+        .barra select { padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; background: var(--white); min-height: 44px; }
+        .selo.neutro { background: #e9ecef; color: #495057; }
+        .dica { font-size: 12px; color: var(--text-light); margin: -6px 0 12px; }
+        .marcar { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 12px; cursor: pointer; }
+        .marcar input { width: 18px; height: 18px; }
+        .linha3b { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+        @media (max-width: 768px) { .linha3b { grid-template-columns: 1fr; } }
+        .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
+        #form h2 { font-size: 22px; margin-bottom: 14px; }
+    </style>
+    <style>
+        .bola { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border-color); vertical-align: middle; }
+        input[type="color"] { padding: 2px; height: 44px; cursor: pointer; }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610271800" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="tintas.js?v=202610271800" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Tintas</h1>
+            <p class="welcome-subtitle">Cadastro de tintas, vernizes e insumos de pintura, com fabricante, cor e rendimento.</p>
+
+            <div class="workspace">
+                <section class="painel">
+                    <div class="painel-head">
+                        <div class="barra">
+                            <div class="busca"><input type="search" id="busca" placeholder="Buscar por referência ou cor Elegance" aria-label="Buscar por referência ou cor Elegance"></div>
+                            <select id="filtro-classe" aria-label="Classe"><option value="">Todas as classes</option></select>
+                            <button type="button" class="btn btn-primary" id="btn-novo" data-perm="tintas.editar">+ Nova tinta</button>
+                        </div>
+                        <p class="cinza" id="qtd" style="margin-bottom:10px"></p>
+                    </div>
+                    <div class="lista-wrap" id="lista"><p class="vazio">Carregando…</p></div>
+                </section>
+
+                <section class="painel" id="painel">
+                    <p class="vazio" id="vazio-painel">Selecione um registro na lista ou clique em "+ Nova tinta".</p>
+                    <form id="form" hidden>
+                        <h2 id="titulo-form">Nova tinta</h2>
+                        <div class="linha2">
+                            <div class="form-group"><label for="t-refFabricante">Referência do fabricante</label><input id="t-refFabricante" maxlength="100" autocomplete="off"></div>
+                            <div class="form-group"><label for="t-corElegance">Cor Elegance</label><input id="t-corElegance" maxlength="100" autocomplete="off"></div>
+                        </div>
+                        <div class="form-group"><label for="t-fabricante">Fabricante</label><select id="t-fabricante"><option value=""></option></select></div>
+                        <div class="linha2">
+                            <div class="form-group"><label for="t-classe">Classe</label><select id="t-classe"><option value=""></option></select></div>
+                            <div class="form-group"><label for="t-conjunto">Conjunto</label><select id="t-conjunto"><option value=""></option></select></div>
+                        </div>
+                        <div class="form-group"><label for="t-tipo">Tipo</label><select id="t-tipo"><option value=""></option></select></div>
+                        <div class="linha3b">
+                            <div class="form-group" data-valor><label for="t-valor">Valor</label><input id="t-valor" inputmode="decimal" autocomplete="off"></div>
+                            <div class="form-group"><label for="t-porcentagem">% na mistura</label><input id="t-porcentagem" inputmode="decimal" autocomplete="off"></div>
+                            <div class="form-group"><label for="t-rendimento">Rendimento (m²/g)</label><input id="t-rendimento" inputmode="decimal" autocomplete="off"></div>
+                        </div>
+                        <div class="form-group"><label for="t-cor">Cor predominante</label><input type="color" id="t-cor" value="#000000"></div>
+                        <p class="dica">A cor só é obrigatória para quem não é da classe Tinta; sem escolher, a classe Tinta fica com preto, como no sistema antigo.</p>
+                        <p class="erro-form" id="erro-form" role="alert"></p>
+                        <div class="acoes">
+                            <button type="submit" class="btn btn-primary" id="btn-salvar" data-perm="tintas.editar">Salvar</button>
+                            <button type="button" class="btn btn-perigo" id="btn-excluir" data-perm="tintas.editar" hidden>Excluir</button>
+                            <button type="button" class="btn btn-secondary" id="btn-cancelar">Fechar</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
