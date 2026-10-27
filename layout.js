@@ -30,7 +30,7 @@
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },
-        { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas' },
+        { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas', sub: true },   // subitem de Entregas (tela do motorista)
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
