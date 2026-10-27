@@ -252,7 +252,7 @@ function quebrar(doc, texto, fonte, tamanho, largura) {
 //      ou { imagem } ; opcionais: alinhar ('left'|'center'|'right'), vertical ('top'|'middle')
 function montarCelula(doc, cel, largura) {
   const interna = largura - 2 * PAD;
-  const base = { alinhar: cel.alinhar || 'left', vertical: cel.vertical || 'top', linhas: [] };
+  const base = { alinhar: cel.alinhar || 'left', vertical: cel.vertical || 'top', fundo: cel.fundo || null, linhas: [] };
   if (cel.imagem) {
     const h = interna * cel.imagem.height / cel.imagem.width;
     return { ...base, imagem: { obj: cel.imagem, w: interna, h }, altura: h + 2 * PAD };
@@ -287,6 +287,7 @@ function escrever(ctx, texto, estilo, tamanho, x, baseY) {
 
 function desenharCelula(ctx, m, x, y, largura, altura) {
   const { doc } = ctx;
+  if (m.fundo) doc.save().fillColor(m.fundo).rect(x, y, largura, altura).fill().restore();
   doc.lineWidth(BORDA).rect(x, y, largura, altura).stroke();
   const desloc = m.vertical === 'middle' ? (altura - m.altura) / 2 : 0;
   if (m.imagem) doc.image(m.imagem.obj, x + PAD, y + PAD + desloc, { width: m.imagem.w, height: m.imagem.h });
@@ -299,8 +300,10 @@ function desenharCelula(ctx, m, x, y, largura, altura) {
   }
 }
 
-const fimDaPagina = ctx => ctx.doc.page.height - MARGEM;
-function novaPagina(ctx) { ctx.doc.addPage({ size: 'A4', margin: MARGEM }); ctx.y = MARGEM; }
+// ctx.margem (opcional) troca a margem da página: o PDF de Vidros do VB usa 2 pt em vez de 10
+const margemDe = ctx => ctx.margem ?? MARGEM;
+const fimDaPagina = ctx => ctx.doc.page.height - margemDe(ctx);
+function novaPagina(ctx) { ctx.doc.addPage({ size: 'A4', margin: margemDe(ctx) }); ctx.y = margemDe(ctx); }
 
 // corta uma linha da tabela que não cabe nem numa página inteira (SplitRows do iText)
 function cortarLinha(montadas, disponivel) {
@@ -318,20 +321,23 @@ function cortarLinha(montadas, disponivel) {
 }
 
 // PdfPTable com WidthPercentage 100: larguras proporcionais aos pesos; cabecalho = HeaderRows 1
-function tabela(ctx, pesos, linhas, { espacoAntes = 0, cabecalho = null } = {}) {
+// larguraPct < 1: tabela mais estreita que a página, centralizada (WidthPercentage 70 = 0.7)
+function tabela(ctx, pesos, linhas, { espacoAntes = 0, cabecalho = null, larguraPct = 1 } = {}) {
   const { doc } = ctx;
-  const W = doc.page.width - 2 * MARGEM;
+  const M = margemDe(ctx);
+  const W = (doc.page.width - 2 * M) * larguraPct;
+  const X0 = (doc.page.width - W) / 2;
   const soma = pesos.reduce((s, p) => s + p, 0);
   const larguras = pesos.map(p => W * p / soma);
   const montar = linha => linha.map((cel, i) => montarCelula(doc, cel, larguras[i]));
   const desenhar = (montadas, altura) => {
-    let x = MARGEM;
+    let x = X0;
     montadas.forEach((m, i) => { desenharCelula(ctx, m, x, ctx.y, larguras[i], altura); x += larguras[i]; });
     ctx.y += altura;
   };
   const cab = cabecalho ? montar(cabecalho) : null;
   const hCab = cab ? Math.max(...cab.map(m => m.altura)) : 0;
-  if (ctx.y > MARGEM) ctx.y += espacoAntes;
+  if (ctx.y > M) ctx.y += espacoAntes;
   if (cab) {
     if (ctx.y + hCab > fimDaPagina(ctx)) novaPagina(ctx);
     desenhar(cab, hCab);
@@ -341,7 +347,7 @@ function tabela(ctx, pesos, linhas, { espacoAntes = 0, cabecalho = null } = {}) 
     let altura = Math.max(...montadas.map(m => m.altura));
     // SplitLate do iText: a linha que não cabe vai inteira para a página seguinte;
     // só é cortada se não couber nem numa página nova
-    if (ctx.y + altura > fimDaPagina(ctx) && ctx.y > MARGEM + hCab + 0.01) {
+    if (ctx.y + altura > fimDaPagina(ctx) && ctx.y > M + hCab + 0.01) {
       novaPagina(ctx);
       if (cab) desenhar(cab, hCab);
     }
@@ -445,19 +451,37 @@ function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo
   return ctx.textos;
 }
 
+// PDF de Vidros do VB (Modulo_Pedido_Orçamento.Gerar_PDF_Vidros): A4, margem 2, Arial 9 negrito, três tabelas com 70% da largura:
+// "Medição / Nº Pedido" (cinza), uma linha em branco e Item | Qtd | Vidro | Cor | Tamanho (cabeçalho cinza, sem repetir nas páginas seguintes).
+// Não calcula nada: imprime o que ProcessarPortasNoBanco gravou na tabela `vidros` ao salvar o pedido.
+// dados = { numero, medicao, linhas: [{ ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO }] } → devolve a lista de textos escritos
+const CINZA_VB = '#cccccc';   // o VB escreve "#ccccccc" (7 dígitos, provável erro de digitação)
+function desenharVidros(doc, { numero, medicao, linhas }) {
+  const ctx = { doc, y: 2, textos: [], margem: 2 };
+  const c = (texto, extra = {}) => ({ texto, estilo: 'negrito', tamanho: 9, ...extra });
+  const opc = { larguraPct: 0.7 };
+  tabela(ctx, [5.5, 1], [[c('Medição: ' + (medicao ?? ''), { fundo: CINZA_VB }), c(' Nº Pedido: ' + numero, { fundo: CINZA_VB })]], opc);
+  tabela(ctx, [1], [[c(' ')]], opc);
+  const cab = ['Item', 'Qtd ', 'Vidro ', 'Cor ', 'Tamanho '].map(t => c(t, { fundo: CINZA_VB }));
+  const corpo = linhas.map(l => [l.ITEM, l.QTD, l.MODELO, l.COR_REVESTIMENTO, l.TAMANHO].map(v => c(String(v ?? ''))));
+  tabela(ctx, [1, 1, 5, 4, 2], [cab, ...corpo], opc);
+  return ctx.textos;
+}
+
 const novoDocumento = (extra = {}) => new PDFDocument({ size: 'A4', margin: MARGEM, ...extra });
 
 // Pasta e nome do arquivo como no VB (Module1: pasta_pedidos / pasta_orçamentos / pasta_produção, dentro de "C:\Programa Elegance\";
 // Gerar_PDF_PedOrc, BLOCO 4): {nº}_{razão social}.PDF · Guia de Produção: {nº}_{razão social}_P.PDF.
 // O VB grava a razão social como está; aqui só saem os caracteres que o Windows não aceita em nome de arquivo.
 const nomeSeguroWindows = t => String(t ?? '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().replace(/[. ]+$/, '');
-function destinoPdf({ tipo, numero, razaoSocial, producao = false }) {
+function destinoPdf({ tipo, numero, razaoSocial, producao = false, vidros = false }) {
   const base = `${numero}_${nomeSeguroWindows(razaoSocial)}`;
+  if (vidros) return { pasta: 'Vidros_Produção', nome: `${base}_V.PDF` };   // Module1: pasta_vidros; frm_Controle_de_Pedidos: {nº}_{razão}_V.PDF
   if (producao) return { pasta: 'Produção', nome: `${base}_P.PDF` };
   return { pasta: tipo === 'Pedido' ? 'Pedidos(PDF)' : 'Orçamentos(PDF)', nome: `${base}.PDF` };
 }
 
 module.exports = {
-  desenharPedOrc, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
+  desenharPedOrc, desenharVidros, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
   textoVB, lerDecimal, moedaBR, numeroBR, formatarQuantidade, dataVB, dataHoraVB, quebrar, LOGO_PADRAO
 };

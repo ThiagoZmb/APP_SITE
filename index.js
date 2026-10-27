@@ -753,6 +753,45 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
   }
 });
 
+// PDF de Vidros (Gerar_PDF_Vidros do VB): imprime a tabela `vidros`, que a gravação do pedido já preenche com os tamanhos.
+// Só existe para Pedido (a tabela não tem TIPO). Dado técnico, sem dinheiro. Pedido sem vidros responde 404 com mensagem
+// (o VB geraria um PDF só com o cabeçalho).
+registro.rota('get', '/dados_pdf_vidros', ['pedidos.pdf'], async (req, res) => {
+  const numero = String(req.query.numero ?? '').trim();
+  if (!numero) return res.status(400).json({ error: 'Informe o numero' });
+  try {
+    const [cabs] = await pool.execute("SELECT RAZAO_SOCIAL FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido'", [numero]);
+    if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
+    const razao = cabs[0].RAZAO_SOCIAL;
+    if ((req.acesso.estados || []).length) {
+      const [est] = await pool.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [razao]);
+      if (foraDosEstados(req, res, est[0]?.ESTADO)) return;
+    }
+    const [vidros] = await pool.execute(
+      'SELECT MEDICAO, ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO FROM vidros WHERE NUMERO = ? ORDER BY id', [numero]);
+    if (vidros.length === 0) return res.status(404).json({ error: 'Este pedido não tem vidros.' });
+    // como o VB: vale a medição da última linha; se vier vazia, a do cadastro do cliente
+    let medicao = String(vidros[vidros.length - 1].MEDICAO ?? '').trim();
+    if (!medicao) {
+      const [med] = await pool.execute('SELECT MEDICAO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [razao]);
+      medicao = med[0]?.MEDICAO ?? '';
+    }
+    const destino = pdfPedOrc.destinoPdf({ tipo: 'Pedido', numero, razaoSocial: razao, vidros: true });
+    const semAcento = destino.nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${semAcento}"; filename*=UTF-8''${encodeURIComponent(destino.nome)}`);
+    res.setHeader('X-Pdf-Nome', encodeURIComponent(destino.nome));
+    res.setHeader('X-Pdf-Pasta', encodeURIComponent(destino.pasta));
+    const doc = pdfPedOrc.novoDocumento({ margin: 2 });
+    doc.pipe(res);
+    pdfPedOrc.desenharVidros(doc, { numero, medicao, linhas: vidros });
+    doc.end();
+  } catch (err) {
+    console.error('Erro ao gerar PDF de vidros:', err.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
+  }
+});
+
 // ================= ADMIN: definir/trocar senha =================
 registro.publica('post', '/admin/definir_senha', async (req, res) => {
   const chave = req.headers['x-admin-key'];

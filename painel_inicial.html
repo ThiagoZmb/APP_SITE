@@ -326,7 +326,7 @@
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
-    <script src="layout.js?v=202610271800" defer></script>
+    <script src="layout.js?v=202610272100" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>
 <body>
@@ -809,6 +809,7 @@
             const sep = () => { if (L.length && !L[L.length - 1].sep) L.push({ sep: true }); };
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
             if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
+            if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {

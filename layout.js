@@ -327,7 +327,11 @@
                 location.href = LOGIN_URL;
                 return;
             }
-            if (!r.ok) throw new Error(r.status === 404 ? 'Pedido não encontrado.' : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
+            if (!r.ok) {
+                // a rota de vidros explica o 404 ("Este pedido não tem vidros."); as demais caem nos textos padrão
+                let msg = ''; try { msg = (await r.json()).error || ''; } catch { /* sem corpo JSON */ }
+                throw new Error(r.status === 404 && /vidros/i.test(msg) ? msg : r.status === 404 ? 'Pedido não encontrado.' : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
+            }
             const pdf = await r.blob();
             const link = URL.createObjectURL(pdf);
             if (aba) aba.location.href = link; else location.href = link;
