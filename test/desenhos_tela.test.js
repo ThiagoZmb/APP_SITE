@@ -73,3 +73,11 @@ test('orcamentos.html: os desenhos enviados são os dos itens que foram salvos (
   // a cópia é tirada antes do fetch do salvar
   assert.ok(h.indexOf('const itensSalvos = itens.slice();') < h.indexOf('/ped_orc/salvar`, { method'));
 });
+
+test('orcamentos.html: o desenho limpo do PDF mostra os furos (círculos, maiores) mas não os números das medidas', () => {
+  const h = ler('orcamentos.html');
+  assert.match(h, /if \(ehPortaComFuros\(\) && furosLista\.length\) \{/);       // sem "!limpo": os furos entram também no desenho limpo
+  assert.doesNotMatch(h, /!limpo && ehPortaComFuros\(\)/);
+  assert.match(h, /const raio = Math\.max\(35 \* esc, 12\) \/ 2 \* \(limpo \? 1\.6 : 1\);/);
+  assert.match(h, /if \(limpo\) return;\s*\n\s*ctx\.fillStyle = '#8b0000';/);        // números das medidas só na tela
+});
