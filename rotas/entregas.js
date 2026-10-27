@@ -590,26 +590,17 @@ function registrarEntregas({ rota, pool }) {
     await gravar(req, res, 'POST /minhas_entregas/:id/saiu', 'saiu', null, async () => ({ cols: {} }), MOTORISTA);
   });
 
-  const SEM_FOTO = 'Anexe a foto do canhoto.';
   rota('post', '/minhas_entregas/:id/baixa', BAIXAR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => {
       const entregueA = lerEntregueA(b.entregueA, { obrigatorio: true });
-      const anexoIds = lerAnexoIds(b.anexoIds);
-      if (!anexoIds.length) throw bad(SEM_FOTO);
+      const anexoIds = lerAnexoIds(b.anexoIds); // foto e assinatura são opcionais; os que vierem são conferidos em vincularAnexos (dono, entrega, soltos)
       return { entregueA, anexoIds };
     });
     if (!lido) return;
     const usuario = DONO(req);
     const montarBaixa = baixa({ ...lido, usuario });
-    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => {
-      const marcas = lido.anexoIds.map(() => '?').join(', ');
-      const [fotos] = await conn.execute(
-        `SELECT id FROM web_entrega_anexos WHERE entrega_id = ? AND criado_por = ? AND evento_id IS NULL AND tipo = 'foto' AND id IN (${marcas})`,
-        [atual.id, String(usuario), ...lido.anexoIds]);
-      if (!fotos.length) throw bad(SEM_FOTO);
-      return montarBaixa(conn, atual);
-    }, MOTORISTA);
+    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => montarBaixa(conn, atual), MOTORISTA);
   });
 
   // ocorrência: tipo, motivo (3-500) e, no parcial, o que foi entregue

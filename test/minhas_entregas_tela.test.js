@@ -130,11 +130,11 @@ test('agruparCartoes: atrasadas primeiro, depois por dia; em rota antes de agend
 
 const PARCIAL = [{ descricao: 'Porta', qtd: 0, max: 2 }, { descricao: 'Janela', qtd: 1, max: 3 }];
 
-test('validarBaixa: entregue exige quem recebeu e foto', () => {
+test('validarBaixa: entregue exige só quem recebeu (foto é opcional)', () => {
   assert.deepEqual(M.validarBaixa('entregue', { entregueA: 'Maria', temFoto: true }), []);
   assert.match(M.validarBaixa('entregue', { entregueA: '  ', temFoto: true })[0], /quem recebeu/i);
-  assert.match(M.validarBaixa('entregue', { entregueA: 'Maria', temFoto: false })[0], /foto/i);
-  assert.equal(M.validarBaixa('entregue', { entregueA: '', temFoto: false }).length, 2);
+  assert.deepEqual(M.validarBaixa('entregue', { entregueA: 'Maria', temFoto: false }), []);
+  assert.equal(M.validarBaixa('entregue', { entregueA: '', temFoto: false }).length, 1);
   assert.match(M.validarBaixa('entregue', { entregueA: 'x'.repeat(191), temFoto: true })[0], /190/);
 });
 
@@ -182,7 +182,8 @@ test('minhas_entregas.html: viewport, CSP, permissão, scripts e sem handlers in
   assert.match(h, /<script src="layout\.js[^"]*" defer>/);
   assert.ok(h.indexOf('entregas_comum.js') < h.indexOf('minhas_entregas.js'), 'comum antes da tela');
   assert.match(h, /data-perm="entregas\.baixar"/);
-  assert.match(h, /type="file"[^>]*accept="image\/\*"[^>]*capture="environment"|capture="environment"[^>]*accept="image\/\*"/);
+  assert.match(h, /type="file"[^>]*accept="image\/\*"/);
+  assert.doesNotMatch(h, /capture="environment"/); // galeria liberada: a foto é opcional
   assert.match(h, /<canvas[^>]*id="assinatura"/);
   assert.doesNotMatch(h, /\son[a-z]+=/i);
   assert.doesNotMatch(h, /R\$|valor|preço/i);

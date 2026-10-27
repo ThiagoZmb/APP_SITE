@@ -122,7 +122,6 @@
       const quem = txt(f.entregueA);
       if (!quem) erros.push('Informe quem recebeu.');
       else if (quem.length > 190) erros.push('Nome de quem recebeu muito longo (máximo 190 caracteres).');
-      if (!f.temFoto) erros.push('Anexe a foto do canhoto.');
       return erros;
     }
     const motivo = txt(f.motivo);
@@ -407,7 +406,7 @@
         let fase = 'anexo';
         try {
           if (b.resultado === 'entregue') {
-            const ids = [await enviarFoto(id, arquivo)];
+            const ids = arquivo ? [await enviarFoto(id, arquivo)] : [];
             if (estado.traco.tem) ids.push(await enviarAssinatura(id));
             fase = 'registro';
             await chamar(`/minhas_entregas/${encodeURIComponent(id)}/baixa`, { metodo: 'POST', corpo: corpoBaixa(f, ids) });

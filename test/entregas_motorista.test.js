@@ -184,11 +184,7 @@ test('baixa: sem foto 400, sem entregueA 400; correta vira entregue, pedido Entr
   await post(chamar, 1, 'saiu');
   const f = foto(banco, 1);
   const assinatura = foto(banco, 1, { tipo: 'assinatura' });
-  const semFoto = await post(chamar, 1, 'baixa', { entregueA: 'Maria', anexoIds: [assinatura.id] });
-  assert.equal(semFoto.status, 400);
-  assert.equal((await semFoto.json()).error, 'Anexe a foto do canhoto.');
-  assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'Maria' })).status, 400);
-  assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'Maria', anexoIds: [] })).status, 400);
+  assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'Maria', anexoIds: [999] })).status, 400); // anexo inexistente/alheio
   assert.equal((await post(chamar, 1, 'baixa', { anexoIds: [f.id] })).status, 400);
   assert.equal((await post(chamar, 1, 'baixa', { entregueA: '  ', anexoIds: [f.id] })).status, 400);
   assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'x'.repeat(191), anexoIds: [f.id] })).status, 400);
@@ -383,4 +379,15 @@ test('corrida no anexo da equipe: entrega ficou final antes da trava -> 409 e na
   const r = await chamar('/entregas/1/anexo?tipo=foto', 'PUT', JPEG, { 'Content-Type': 'image/jpeg' });
   assert.equal(r.status, 409);
   assert.equal(banco.anexos.length, 0);
+});
+
+test('baixa: sem foto nem assinatura é aceita (só quem recebeu); pedido vira Entregue', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  await post(chamar, 1, 'saiu');
+  const r = await post(chamar, 1, 'baixa', { entregueA: 'Maria' });
+  assert.equal(r.status, 200);
+  assert.equal(banco.entregas[0].status, 'entregue');
+  assert.equal(banco.pedidos[0].SITUACAO, 'Entregue');
+  assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'Maria' })).status, 409);
 });
