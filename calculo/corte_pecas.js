@@ -1,7 +1,7 @@
 // ============================================================
 // PLANO DE CORTE — peças de perfil de um Pedido. Funções puras (as linhas chegam prontas).
 // Fontes: tabela `perfis` (medidas já calculadas na gravação do pedido, rotas/ped_orc.js) e
-// `ped_orc_itens_v4` (acabamento, cor e divisores). Nada é recalculado nem estimado: dado ausente vira pendência.
+// `ped_orc_itens_v4` (acabamento, cor e divisores). Nada é recalculado nem estimado: dado ausente vira pendência (tamanho, ligação); acabamento e cor em branco são válidos.
 //
 // Como as linhas são gravadas (rotas/ped_orc.js:281-300):
 //  - `perfis` tem UMA linha por grupo de folhas iguais; QTD_PORTAS = portas do grupo.
@@ -46,22 +46,18 @@ function montarPecas({ perfis = [], itens = [] }) {
         pendencia(n, nome, 'Não foi possível ligar acabamento e cor ao perfil (perfil, quantidade ou puxador das linhas de perfis e de itens não conferem).');
         return;
       }
-      const acab = txt(it.ACABAMENTO_PERFIL), cor = txt(it.COR_PERFIL);
-      if (!acab || !cor) pendencia(n, nome, 'Perfil sem acabamento ou sem cor no pedido.');
-      else {
-        const base = { perfil: nome, acabamento: acab, cor, item: n };
-        for (const [qtd, tam, origem, rotulo] of [[p.QTD_ALTURA, p.TAM_ALTURA, 'porta-altura', 'altura'], [p.QTD_LARGURA, p.TAM_LARGURA, 'porta-largura', 'largura']]) {
-          if (inteiro(qtd) <= 0) continue;
-          if (inteiro(tam) <= 0) pendencia(n, nome, `Perfil sem tamanho de ${rotulo}.`);
-          else adicionar(portas * inteiro(qtd), inteiro(tam), { ...base, origem });
-        }
+      // acabamento e cor em branco são dados válidos do pedido (acabamento sem lista de cores deixa a cor vazia; perfil pode ir sem acabamento):
+      // entram no agrupamento com o valor vazio, não são pendência
+      const base = { perfil: nome, acabamento: txt(it.ACABAMENTO_PERFIL), cor: txt(it.COR_PERFIL), item: n };
+      for (const [qtd, tam, origem, rotulo] of [[p.QTD_ALTURA, p.TAM_ALTURA, 'porta-altura', 'altura'], [p.QTD_LARGURA, p.TAM_LARGURA, 'porta-largura', 'largura']]) {
+        if (inteiro(qtd) <= 0) continue;
+        if (inteiro(tam) <= 0) pendencia(n, nome, `Perfil sem tamanho de ${rotulo}.`);
+        else adicionar(portas * inteiro(qtd), inteiro(tam), { ...base, origem });
       }
       const qtdPux = inteiro(p.QTD_PUXADOR), puxador = txt(p.PUXADOR);
       if (puxador && qtdPux > 0) {
-        const aP = txt(it.ACABAMENTO_PUXADOR), cP = txt(it.COR_PUXADOR);
-        if (!aP || !cP) pendencia(n, puxador, 'Puxador sem acabamento ou sem cor no pedido.');
-        else if (inteiro(p.TAM_PUXADOR) <= 0) pendencia(n, puxador, 'Puxador sem tamanho.');
-        else adicionar(portas * qtdPux, inteiro(p.TAM_PUXADOR), { perfil: puxador, acabamento: aP, cor: cP, item: n, origem: 'puxador' });
+        if (inteiro(p.TAM_PUXADOR) <= 0) pendencia(n, puxador, 'Puxador sem tamanho.');
+        else adicionar(portas * qtdPux, inteiro(p.TAM_PUXADOR), { perfil: puxador, acabamento: txt(it.ACABAMENTO_PUXADOR), cor: txt(it.COR_PUXADOR), item: n, origem: 'puxador' });
       }
     });
   }
@@ -75,7 +71,6 @@ function montarPecas({ perfis = [], itens = [] }) {
     const trechos = [[it.QTD_HORIZONTAL, it.TAM_DIV_HORIZONTAL, 'horizontal', it.LARGURA], [it.QTD_VERTICAL, it.TAM_DIV_VERTICAL, 'vertical', it.ALTURA]].filter(([q]) => inteiro(q) > 0);
     if (!trechos.length) continue;
     const acab = txt(it.ACABAMENTO_DIVISOR), cor = txt(it.COR_DIVISOR);
-    if (!acab || !cor) { pendencia(n, divisor, 'Divisor sem acabamento ou sem cor no pedido.'); continue; }
     for (const [qtd, tam, rotulo, porta] of trechos) {
       if (inteiro(tam) <= 0) pendencia(n, divisor, `Divisor ${rotulo} sem tamanho.`);
       else if (inteiro(tam) !== inteiro(porta)) pendencia(n, divisor, `Divisor ${rotulo}: a medida gravada (${inteiro(tam)} mm) não bate com a da porta (${inteiro(porta)} mm); confira o pedido.`);

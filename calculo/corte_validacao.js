@@ -38,8 +38,9 @@ function validarConfig(corpo = {}) {
 
 function validarRetalho(corpo = {}) {
   const dados = { perfil: txt(corpo.perfil), acabamento: txt(corpo.acabamento), cor: txt(corpo.cor) };
+  // só o perfil é obrigatório: acabamento e cor podem ficar vazios, como no pedido (acabamento sem lista de cores não tem cor)
+  if (!dados.perfil) return { ok: false, erro: 'Perfil é obrigatório.' };
   for (const [campo, rotulo] of [['perfil', 'Perfil'], ['acabamento', 'Acabamento'], ['cor', 'Cor']]) {
-    if (!dados[campo]) return { ok: false, erro: `${rotulo} é obrigatório.` };
     if (dados[campo].length > 190) return { ok: false, erro: `${rotulo} com mais de 190 caracteres.` };
   }
   const comprimento = inteiroMm(corpo.comprimento);

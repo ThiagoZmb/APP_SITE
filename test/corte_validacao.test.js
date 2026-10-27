@@ -23,7 +23,9 @@ test('config de um perfil aceita campos em branco (herdam o padrão), mas não t
 test('retalho manual: perfil, acabamento, cor e comprimento válidos', () => {
   assert.deepEqual(validarRetalho({ perfil: ' P100 ', acabamento: 'Anodizado', cor: 'Natural', comprimento: '1850' }),
     { ok: true, dados: { perfil: 'P100', acabamento: 'Anodizado', cor: 'Natural', comprimento: 1850 } });
-  for (const ruim of [{ perfil: '' }, { acabamento: '  ' }, { cor: null }, { comprimento: 0 }, { comprimento: 12.5 }, { comprimento: 99999 }]) {
+  assert.deepEqual(validarRetalho({ perfil: 'P', acabamento: '  ', cor: null, comprimento: 1000 }),
+    { ok: true, dados: { perfil: 'P', acabamento: '', cor: '', comprimento: 1000 } });   // acabamento e cor podem ser vazios (como no pedido)
+  for (const ruim of [{ perfil: '' }, { comprimento: 0 }, { comprimento: 12.5 }, { comprimento: 99999 }]) {
     assert.equal(validarRetalho({ perfil: 'P', acabamento: 'A', cor: 'C', comprimento: 1000, ...ruim }).ok, false, JSON.stringify(ruim));
   }
 });

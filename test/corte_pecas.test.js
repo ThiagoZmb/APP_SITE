@@ -77,14 +77,26 @@ test('tamanho nulo, zero ou negativo vira pendência e a peça não entra', () =
   }
 });
 
-test('item sem acabamento ou sem cor: pendência e nenhuma peça desse perfil entra', () => {
+test('acabamento ou cor em branco é dado válido do pedido (acabamento sem lista de cores deixa a cor vazia): as peças entram com o campo vazio', () => {
   for (const campo of ['ACABAMENTO_PERFIL', 'COR_PERFIL']) {
     for (const vazio of [null, '', '  ']) {
       const { pecas, pendencias } = montarPecas({ perfis: [perfil()], itens: [item({ [campo]: vazio })] });
-      assert.equal(pecas.length, 0, `${campo}=${JSON.stringify(vazio)}`);
-      assert.ok(pendencias.length >= 1);
+      assert.deepEqual(pendencias, [], `${campo}=${JSON.stringify(vazio)}`);
+      assert.equal(pecas.length, 12);
+      assert.ok(pecas.every(p => p[campo === 'COR_PERFIL' ? 'cor' : 'acabamento'] === ''));
     }
   }
+});
+
+test('puxador e divisor sem acabamento ou cor também entram, com o campo vazio', () => {
+  const { pecas, pendencias } = montarPecas({
+    perfis: [perfil({ PUXADOR: 'PX1', QTD_PUXADOR: 1, TAM_PUXADOR: 1500 })],
+    itens: [item({ PUXADOR: 'PX1', ACABAMENTO_PUXADOR: null, COR_PUXADOR: '', DIVISOR: 'DV1', ACABAMENTO_DIVISOR: '', COR_DIVISOR: null, QTD_HORIZONTAL: 1, TAM_DIV_HORIZONTAL: 900 })]
+  });
+  assert.deepEqual(pendencias, []);
+  assert.equal(pecas.filter(p => p.origem === 'puxador').length, 3);
+  assert.equal(pecas.filter(p => p.origem === 'divisor').length, 3);
+  assert.ok(pecas.filter(p => p.origem === 'puxador' || p.origem === 'divisor').every(p => p.acabamento === '' && p.cor === ''));
 });
 
 test('contagens de perfis e de itens que não batem: item inteiro vira pendência', () => {

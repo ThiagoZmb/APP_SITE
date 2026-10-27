@@ -99,3 +99,10 @@ test('retalho reservado: quem planeja pode cancelar o plano que o prende (saída
   assert.doesNotMatch(T.htmlRetalhos(lista, false, false), /cancelar-plano/);
   assert.doesNotMatch(T.htmlRetalhos(lista, true, false), /cancelar-plano/);
 });
+
+test('grupo sem acabamento ou sem cor é rotulado em vez de ficar em branco', () => {
+  const html = T.htmlGrupo({ chave: 'P||', perfil: 'P', acabamento: '', cor: '', barras: [barra()] }, {});
+  assert.match(html, /sem acabamento/);
+  assert.match(html, /sem cor/);
+  assert.match(T.htmlRetalhos([{ id: 1, perfil: 'P', acabamento: 'Anodizado', cor: '', comprimento: 900, situacao: 'disponivel', planoOrigem: null, planoReserva: null }], false), /sem cor/);
+});

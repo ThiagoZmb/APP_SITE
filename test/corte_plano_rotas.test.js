@@ -50,11 +50,11 @@ test('pré-visualização: calcula peças e plano, usa retalho compatível e nã
 });
 
 test('pré-visualização: dado ausente aparece como pendência e fica fora do plano', async t => {
-  const b = cenario(); b.estado.itens[0].COR_PERFIL = null;
+  const b = cenario(); b.estado.perfis[0].TAM_ALTURA = null; b.estado.perfis[0].TAM_LARGURA = 0;
   const { chamar } = await prepararCorte(t, { banco: b });
   const j = await prever(chamar);
   assert.equal(j.qtdPecas, 0);
-  assert.equal(j.pendencias.length, 1);
+  assert.equal(j.pendencias.length, 2);
 });
 
 test('salvar: grava o plano e reserva os retalhos usados, com auditoria', async t => {
@@ -109,7 +109,7 @@ test('salvar de novo substitui o plano gerado e move a reserva; plano conferido 
 });
 
 test('salvar sem peças para planejar: 409', async t => {
-  const b = cenario(); b.estado.itens[0].COR_PERFIL = '';
+  const b = cenario(); b.estado.perfis[0].TAM_ALTURA = 0; b.estado.perfis[0].TAM_LARGURA = 0;
   const { chamar } = await prepararCorte(t, { banco: b });
   assert.equal((await chamar('/corte/pedido/100/salvar', 'POST', corpoSalvar(await prever(chamar)))).status, 409);
   assert.equal(b.estado.planos.length, 0);
@@ -253,4 +253,15 @@ test('excluir o pedido solta o plano conferido (histórico preservado); cancelar
   assert.equal((await prever(chamar)).planoSalvo, null);
   assert.equal((await chamar('/corte/pedido/100/salvar', 'POST', corpoSalvar(await prever(chamar)))).status, 200);
   assert.ok(b.estado.planos.find(p => p.id === id).excluido_em);           // o registro antigo continua no banco
+});
+
+test('pedido real com acabamento sem cor (ex.: anodizado) gera plano normalmente, sem pendência', async t => {
+  const b = cenario(); b.estado.itens[0].COR_PERFIL = null;
+  b.semear.retalho({ comprimento: 2200, cor: '' });   // retalho de mesmo perfil e acabamento, sem cor
+  const { chamar } = await prepararCorte(t, { banco: b });
+  const j = await prever(chamar);
+  assert.deepEqual(j.pendencias, []);
+  assert.equal(j.qtdPecas, 8);
+  assert.equal(j.plano.resumo.qtdRetalhosUsados, 1);
+  assert.equal(j.plano.grupos[0].cor, '');
 });

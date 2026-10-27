@@ -24,6 +24,9 @@
   const SITUACOES = { gerado: 'Gerado (aguardando corte)', conferido: 'Conferido (corte confirmado)', cancelado: 'Cancelado',
     desatualizado: 'Desatualizado: o pedido mudou depois do plano — refaça o plano' };
   const rotuloSituacao = s => SITUACOES[s] || String(s ?? '');
+  // acabamento/cor em branco são válidos no pedido: a tela diz isso em vez de deixar o espaço vazio
+  const semAcab = v => txt(v) || '(sem acabamento)';
+  const semCor = v => txt(v) || '(sem cor)';
   const chaveCortada = (grupo, barra, peca) => `${grupo}\u0001${barra}\u0001${peca}`;
 
   // ---------- HTML do plano ----------
@@ -52,7 +55,7 @@
       `<div class="faixa">${pecas}${sobra}</div>${opcoes.conferindo ? htmlConferencia(chave, b, i) : ''}</div>`;
   }
   function htmlGrupo(g, opcoes) {
-    return `<section class="grupo"><h3>${esc(g.perfil)} <span class="cinza">· ${esc(g.acabamento)} · ${esc(g.cor)}</span></h3>` +
+    return `<section class="grupo"><h3>${esc(g.perfil)} <span class="cinza">· ${esc(semAcab(g.acabamento))} · ${esc(semCor(g.cor))}</span></h3>` +
       g.barras.map((b, i) => htmlBarra(g.chave, b, i, opcoes)).join('') + '</section>';
   }
   function htmlResumo(r) {
@@ -87,7 +90,7 @@
   // ---------- retalhos e parâmetros ----------
   function htmlRetalhos(lista, podeParametros, podePlanejar = false) {
     if (!lista.length) return '<p class="vazio" role="status">Nenhum retalho nesta situação.</p>';
-    const linhas = lista.map(r => `<tr><td>${esc(r.perfil)}</td><td>${esc(r.acabamento)}</td><td>${esc(r.cor)}</td><td class="num">${esc(mm(r.comprimento))}</td>` +
+    const linhas = lista.map(r => `<tr><td>${esc(r.perfil)}</td><td>${esc(semAcab(r.acabamento))}</td><td>${esc(semCor(r.cor))}</td><td class="num">${esc(mm(r.comprimento))}</td>` +
       `<td>${esc(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
       `<td>${podePlanejar && r.situacao === 'reservado' && r.planoReserva ? `<button type="button" class="btn btn-secondary" data-acao="cancelar-plano" data-plano="${esc(r.planoReserva)}">Cancelar plano ${esc(r.planoReserva)}</button>` : ''}${podeParametros && r.situacao === 'disponivel' ? `<button type="button" class="btn btn-secondary" data-acao="editar" data-id="${esc(r.id)}">Ajustar</button> <button type="button" class="btn btn-secondary" data-acao="descartar" data-id="${esc(r.id)}">Descartar</button>` : ''}</td></tr>`);
     return '<table><thead><tr><th>Perfil</th><th>Acabamento</th><th>Cor</th><th>Comprimento</th><th>Situação</th><th>Origem</th><th>Ações</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>';
