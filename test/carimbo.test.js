@@ -42,3 +42,12 @@ test('carimbo: não muda com descrição, valores nem com o resto do documento (
   d.vidros = [{ id: 1, TAMANHO: '1x1' }];
   assert.equal(carimboItens(d), base);
 });
+
+test('carimbo: preço nas linhas de itensV4 (UNITARIO, TOTAL) também não conta', () => {
+  const a = doc(), b = doc();
+  a.itensV4.forEach(l => { l.UNITARIO = 100; l.TOTAL = 200; });
+  b.itensV4.forEach(l => { l.UNITARIO = 999; l.TOTAL = 1998; });
+  assert.equal(carimboItens(a), carimboItens(b));
+  b.itensV4[0].LARGURA = 636;
+  assert.notEqual(carimboItens(a), carimboItens(b));
+});

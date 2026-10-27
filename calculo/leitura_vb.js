@@ -169,8 +169,9 @@ function impressaoDigital(linhas, tipo) {
 // Só entra o que define a porta (medidas, puxador, furos, tipo e quantidade); cabeçalho, descrição e dinheiro ficam de fora,
 // então mudar situação, data ou preço não esconde os desenhos. Recebe as linhas cruas (SELECT *) e não depende da ordem.
 const COLUNAS_LISTA_CARIMBO = ['ITEM', 'QTD', 'TIPO_PRODUTO'];
+const PRECO_CARIMBO = ['UNITARIO', 'TOTAL'];   // itensV4 também guarda o preço da linha
 function carimboItens(linhas = {}) {
-  const canon = (r, colunas) => JSON.stringify(Object.keys(r).filter(k => k !== 'id' && k !== 'ID' && (!colunas || colunas.includes(k))).sort()
+  const canon = (r, colunas) => JSON.stringify(Object.keys(r).filter(k => k !== 'id' && k !== 'ID' && !PRECO_CARIMBO.includes(k) && (!colunas || colunas.includes(k))).sort()
     .map(k => [k, r[k] === null || r[k] === undefined ? null : String(r[k])]));
   const tabela = (rows, colunas) => (rows || []).map(r => canon(r, colunas)).sort();
   return crypto.createHash('sha256').update(JSON.stringify([
