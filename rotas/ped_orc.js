@@ -493,6 +493,13 @@ function registrarPedOrc({ rota, pool }) {
           if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
         }
       }
+      // desenhos guardados do documento de origem, lidos ANTES de apagar; só valem se o carimbo ainda bate com os itens de origem
+      let desenhosSrc = [];
+      if (linhasSrc) {
+        const carimboSrc = carimboItens(linhasSrc);
+        [desenhosSrc] = await conn.execute('SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [src.tipo, src.numero]);
+        desenhosSrc = desenhosSrc.filter(d => d.carimbo === carimboSrc);
+      }
       // itens copiados: linhas lidas ANTES de apagar
       for (const p of preparados.filter(x => x.copia)) {
         if (!linhasSrc.lista.some(l => Number(l.ITEM) === p.origemItem)) throw new ErroUsuario(400, `Item ${p.n}: não pertence a este documento.`);
@@ -529,9 +536,21 @@ function registrarPedOrc({ rota, pool }) {
           }
         }
       }
+      // desenhos: o número é regravado por inteiro (apaga também sobras de um número reaproveitado)
+      await conn.execute('DELETE FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [tipo, numero]);
       for (const p of preparados) {
         if (p.copia) await gravarCopia(conn, p.linhas, { tipo, numero, n: p.n, origemItem: p.origemItem });
         else await gravarItem(conn, { tipo, numero, medicao: cliente.medicao }, p);
+      }
+      // item sem alteração leva o desenho do item de origem para a posição nova, com o carimbo do documento recém-gravado
+      const comDesenho = preparados.filter(x => x.copia && desenhosSrc.some(d => Number(d.item) === x.origemItem));
+      if (comDesenho.length) {
+        const carimbo = carimboItens(await lerDocumento(conn, tipo, numero));
+        for (const p of comDesenho) {
+          const d = desenhosSrc.find(x => Number(x.item) === p.origemItem);
+          await conn.execute('INSERT INTO web_item_desenhos (tipo, numero, item, png, carimbo, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
+            [tipo, numero, p.n, d.png, carimbo, agoraLocal()]);
+        }
       }
       return { numero };
     });
@@ -601,6 +620,7 @@ function registrarPedOrc({ rota, pool }) {
       const resumo = { cliente: linhas.cab.RAZAO_SOCIAL, data: String(linhas.cab.DATA || '').slice(0, 10), total: linhas.cab.TOTAL, situacao: linhas.cab.SITUACAO, financeiro: linhas.cab.FINANCEIRO,
         itens: linhas.lista.length };
       for (const tabela of TABELAS_ITENS) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ? AND TIPO = ?`, [alvo.numero, alvo.tipo]);
+      await conn.execute('DELETE FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [alvo.tipo, alvo.numero]);
       if (alvo.tipo === 'Pedido') for (const tabela of ['vidros', 'perfis']) await conn.execute(`DELETE FROM ${tabela} WHERE NUMERO = ?`, [alvo.numero]);
       // Entregas: o NUMERO é reaproveitado (MAX+1), então a entrega do pedido excluído sai junto, na mesma transação
       // (só exclusão feita pela web passa por aqui; exclusão feita direto no VB não limpa web_entregas).
