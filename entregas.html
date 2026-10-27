@@ -115,6 +115,7 @@
             .welcome-title { font-size: 26px; }
             .linha2, .linha3 { grid-template-columns: 1fr; }
         }
+        .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
         .cal-topo { display: flex; align-items: center; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
         .cal-topo h3 { font-size: 17px; margin: 0 8px; }
         .cal { padding: 0 8px 14px; min-width: 640px; }
@@ -203,7 +204,7 @@
                             <div class="linha3">
                                 <div class="form-group"><label for="f-rua">Rua</label><input id="f-rua" maxlength="190"></div>
                                 <div class="form-group"><label for="f-numero">Número</label><input id="f-numero" maxlength="30"></div>
-                                <div class="form-group"><label for="f-cep">CEP</label><input id="f-cep" maxlength="12"></div>
+                                <div class="form-group"><label for="f-cep">CEP</label><div class="cep-grupo"><input id="f-cep" maxlength="12" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-secondary btn-mini" id="btn-cep" title="Buscar endereço pelo CEP" aria-label="Buscar endereço pelo CEP"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></div></div>
                             </div>
                             <div class="linha3">
                                 <div class="form-group"><label for="f-bairro">Bairro</label><input id="f-bairro" maxlength="120"></div>

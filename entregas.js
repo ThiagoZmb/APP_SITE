@@ -146,6 +146,12 @@
     return o;
   };
 
+  // Resposta do ViaCEP -> campos do endereço de entrega; null se o CEP não existe (a API devolve { erro: true })
+  function enderecoDoViaCep(r) {
+    if (!r || typeof r !== 'object' || r.erro) return null;
+    return { rua: txt(r.logradouro), bairro: txt(r.bairro), cidade: txt(r.localidade), uf: txt(r.uf).toUpperCase().slice(0, 2) };
+  }
+  const cepLimpo = v => String(v ?? '').replace(/\D/g, '');
   const validarRetirada = f => (txt(f.entregueA) ? null : 'Informe quem retirou.');
   const validarEnviada = f => (txt(f.transportadora) ? null : 'Informe a transportadora.');
   const validarComprovante = f => (f.temFoto ? null : 'Anexe a foto do comprovante.');
@@ -361,6 +367,22 @@
       ajustarCamposTipo();
       mostrar('vista-agendar');
     }
+    // busca o CEP no ViaCEP e preenche rua, bairro, cidade e UF (número e referência continuam com quem agenda)
+    async function buscarCep() {
+      const cep = cepLimpo($('f-cep').value);
+      if (cep.length !== 8) { toast('Informe um CEP com 8 números.', 'erro'); return; }
+      const botao = $('btn-cep');
+      botao.disabled = true;
+      try {
+        const r = await win.fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const e = enderecoDoViaCep(await r.json());
+        if (!e) { toast('CEP não encontrado.', 'erro'); return; }
+        $('f-rua').value = e.rua; $('f-bairro').value = e.bairro; $('f-cidade').value = e.cidade; $('f-uf').value = e.uf;
+        $('f-numero').focus();
+      } catch { toast('Não foi possível consultar o CEP agora.', 'erro'); }
+      finally { botao.disabled = false; }
+    }
+
     function usarEnderecoCliente() {
       const end = enderecoDoCliente(estado.det && estado.det.clienteEndereco);
       for (const c of Object.keys(end)) $(CAMPOS_FORM[c]).value = end[c];
@@ -495,6 +517,8 @@
       $('btn-comprovante').addEventListener('click', () => abrirForm('vista-comprovante', ['k-entregue', 'k-foto']));
       $('f-tipo').addEventListener('change', ajustarCamposTipo);
       $('btn-usar-endereco').addEventListener('click', usarEnderecoCliente);
+      $('btn-cep').addEventListener('click', buscarCep);
+      $('f-cep').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); buscarCep(); } });
       doc.querySelectorAll('.voltar').forEach(b => b.addEventListener('click', () => { if (estado.det) mostrar('vista-detalhe'); else mostrar('vazio-painel'); }));
       const envio = (id, fn) => $(id).addEventListener('submit', ev => { ev.preventDefault(); fn(); });
       envio('vista-agendar', enviarAgendar);
@@ -518,5 +542,5 @@
   }
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, montarMes, acoesDisponiveis,
-    validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
+    validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
 });

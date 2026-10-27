@@ -198,3 +198,18 @@ test('entregas.html: estilos do calendário da agenda', () => {
   assert.match(h, /\.cal-linha/);
   assert.match(h, /\.etiqueta/);
 });
+
+test('enderecoDoViaCep: preenche rua, bairro, cidade e UF; CEP inexistente ou resposta inválida dá null', () => {
+  assert.deepEqual(E.enderecoDoViaCep({ cep: '24220-000', logradouro: ' Rua A ', bairro: 'Icaraí', localidade: 'Niterói', uf: 'rj' }),
+    { rua: 'Rua A', bairro: 'Icaraí', cidade: 'Niterói', uf: 'RJ' });
+  assert.deepEqual(E.enderecoDoViaCep({ localidade: 'Cidade', uf: 'SP' }), { rua: '', bairro: '', cidade: 'Cidade', uf: 'SP' }); // CEP geral: sem rua/bairro
+  assert.equal(E.enderecoDoViaCep({ erro: true }), null);
+  assert.equal(E.enderecoDoViaCep(null), null);
+  assert.equal(E.cepLimpo('24.220-000'), '24220000');
+});
+
+test('entregas.html: botão de pesquisa do CEP e ViaCEP liberado na CSP', () => {
+  const h = ler('entregas.html');
+  assert.match(h, /id="btn-cep"/);
+  assert.match(h, /connect-src[^"]*viacep\.com\.br/);
+});
