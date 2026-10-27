@@ -17,6 +17,7 @@ Funcionalidades (páginas HTML na raiz):
 - Custos e **formação de preço** (`custos.html`, `custos_precos.js`, `rotas/custos.js`, `rotas/precos_formacao.js`): calcula custo real dos materiais pelas compras e sugere o `VALOR_FIXO`.
 - **Entregas** (`entregas.html`, `minhas_entregas.html`, `rotas/entregas.js`): fila de pedidos Pronto, agenda (motorista, retirada, outro estado), baixa pelo motorista no celular com foto do canhoto, ocorrências e histórico; também aparece em Início, Pedidos (selo) e Financeiro do cliente (somente leitura). Regras na seção 5, "Entregas".
 - **Fornecedores e funcionários** (`fornecedores.html`, `funcionarios.html`, `rotas/fornecedores.js`, `rotas/funcionarios.js`): cadastros das tabelas do VB `cadastro_fornecedores` e `funcionarios`, com busca e CEP (ViaCEP). Regras na seção 5, "Cadastros".
+- **Tintas** (`tintas.html`, `tintas.js`, `rotas/tintas.js`): cadastro da tabela do VB `tintas` (fabricante, classe, tipo, conjunto, cor, valor, % da mistura, rendimento), com busca, cor e exclusão. Regras na seção 5, "Tintas".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Leitura de projeto técnico em PDF** na tela de orçamentos (botão "📄 Ler projeto (PDF)", `leitura/`, `leitura_pdf.js`): o servidor lê o PDF pela API do Claude e o vendedor confere cada valor antes de importar (seção 5, "Leitura de PDF").
 
@@ -35,6 +36,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
   fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
+  tintas.js              Cadastro de tintas (rotas; validação e listas fixas em calculo/tintas.js)
   entregas.js            Entregas: varredura da fila (`sincronizarFila`), agenda, anexos, rotas da equipe (`/entregas*`) e do motorista (`/minhas_entregas*`)
   transacao.js           Transação com nova tentativa em deadlock, `ErroUsuario`, hora local (compartilhado pelas rotas)
 calculo/                 Funções puras (testáveis sem banco)
@@ -119,6 +121,15 @@ Nunca colocar valores de senhas/tokens neste arquivo nem no git.
 - **Fornecedor**: classe obrigatória (Matéria prima, Insumos, Serviços, Geral); situação Ativo/Inativo; a razão social não muda depois de criada (estoque, compras e `fluxo_de_caixa.RAZAO_FABRICANTE` usam o nome como chave) e não pode repetir; o registro `.` do VB não aparece; sem exclusão (inativar). Permissões `fornecedores.ver`/`fornecedores.editar` (Administrador e Interno completo).
 - **Funcionário**: dados pessoais com `funcionarios.ver`/`funcionarios.editar` (**só Administrador** na migração); salário e encargos (SALARIO_BASE, FGTS, férias, 13º, almoço, transporte, plano, seguro, outros) só com `valores.ver` — sem ela a rota não devolve e, ao salvar, mantém o que está gravado (`preservarValores`). **SENHA, NIVEL e DARF do VB nunca saem nem são alterados pela web** (novo funcionário entra com SENHA vazia; NIVEL = cargo, como o VB). Como o VB, DEMISSAO sempre grava uma data (hoje se vazia); a tela só mostra para quem está Demitido. A auditoria (`funcionario_criado/alterado`) guarda só os nomes dos campos alterados, nunca CPF nem valores. Sem exclusão (Inativo/Demitido).
 - **Testes**: `test/cadastros_calculo.test.js`, `test/cadastros_rotas.test.js` (banco falso `test/apoio/bancoCadastros.js`), `test/cadastros_tela.test.js`.
+
+### Tintas (tabela do VB `tintas`)
+- **Colunas** (`COD, RAZAO_FABRICANTE, CLASSE, VALOR, PORCENTAGEM, REF_FABRICANTE, COR_ELEGANCE, TIPO, CONJUNTO, COR, RENDIMENTO`). Regras tiradas de `frm_Cadastro_Tintas.vb`; a web não cria nem altera a tabela. Código novo = `MAX(COD)+1` (gravado explicitamente, como o VB). Os tipos reais de `PORCENTAGEM`, `RENDIMENTO` e `COR` e se `COD` é AUTO_INCREMENT **ainda não foram conferidos no banco real** (rodar `SHOW CREATE TABLE tintas`).
+- **Obrigatórios**: fabricante (precisa existir em `cadastro_fornecedores`), classe, tipo, conjunto (listas fixas do VB em `calculo/tintas.js`), valor e % da mistura (0 a 100). Cor obrigatória, exceto na classe Tinta, que sem cor grava `FF000000` (o VB grava preto). Cor = ARGB de 8 dígitos hexadecimais maiúsculos (`Hex(c.ToArgb)` do VB); a tela converte de/para `#rrggbb`.
+- **Referência do fabricante** não repete (409, sem diferenciar caixa nem espaços das pontas): outras telas do VB buscam a tinta por ela.
+- **Valor** é dinheiro: sem `valores.ver` a rota não devolve e, ao salvar, mantém o valor gravado (cadastro novo entra com 0). Vírgula ou ponto decimal; `1.234,56` é recusado.
+- **Exclusão** permitida (como no VB) com `tintas.editar`, auditada (`tinta_excluida`). Auditoria guarda só nomes de campos. Permissões `tintas.ver`/`tintas.editar` (Administrador e Interno completo).
+- **Fora do escopo**: `frm_Calculo_Tintas` e `frm_Centro_Custo` (cálculo de tinta e centro de custo) ainda não existem na web.
+- **Testes**: `test/tintas_calculo.test.js`, `test/tintas_rotas.test.js` (banco falso `test/apoio/bancoTintas.js`), `test/tintas_tela.test.js`.
 
 ### Outras regras não óbvias
 - **Fidelidade ao VB**: cálculos devem reproduzir o VB (comentários citam `MotorFinanceiro`, `MotorPrecificacaoSerralheria`, `frmPortasAbrir`, etc.). Antes de "corrigir" uma conta, confirme se é comportamento do VB.
