@@ -45,8 +45,8 @@ function validarTinta(b = {}, { podeValores = false } = {}) {
     classe: escolha(erros, b.classe, 'a Classe', CLASSES_TINTA),
     tipo: escolha(erros, b.tipo, 'o Tipo', TIPOS_TINTA),
     conjunto: escolha(erros, b.conjunto, 'o Conjunto', CONJUNTOS_TINTA),
-    refFabricante: campo(erros, b.refFabricante, 'Referência do fabricante', 255),
-    corElegance: campo(erros, b.corElegance, 'Cor Elegance', 255)
+    refFabricante: campo(erros, b.refFabricante, 'Referência do fabricante', 190),
+    corElegance: campo(erros, b.corElegance, 'Cor Elegance', 190)
   };
   if (!dados.fabricante) erros.push('Fabricante é obrigatório.');
   if (podeValores) {
@@ -54,7 +54,7 @@ function validarTinta(b = {}, { podeValores = false } = {}) {
     if (Number.isNaN(dados.valor)) erros.push('Valor inválido (use números, com vírgula ou ponto decimal).');
   }
   dados.porcentagem = numero(b.porcentagem);
-  if (Number.isNaN(dados.porcentagem) || dados.porcentagem > 100) { erros.push('% da mistura inválida (de 0 a 100).'); dados.porcentagem = 0; }
+  if (!Number.isInteger(dados.porcentagem) || dados.porcentagem > 100) { erros.push('% da mistura inválida (número inteiro de 0 a 100).'); dados.porcentagem = 0; }
   const rendimento = t(b.rendimento);
   dados.rendimento = rendimento === '' ? 0 : numero(rendimento);
   if (Number.isNaN(dados.rendimento)) { erros.push('Rendimento inválido.'); dados.rendimento = 0; }

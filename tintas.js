@@ -33,7 +33,7 @@
     if (!txt(f.conjunto)) erros.push('Escolha o conjunto.');
     if (comValores && Number.isNaN(numero(f.valor))) erros.push('Informe o valor (números, com vírgula ou ponto).');
     const p = numero(f.porcentagem);
-    if (Number.isNaN(p) || p > 100) erros.push('% da mistura deve ser de 0 a 100.');
+    if (!Number.isInteger(p) || p > 100) erros.push('% da mistura deve ser um número inteiro de 0 a 100.');
     if (txt(f.rendimento) && Number.isNaN(numero(f.rendimento))) erros.push('Rendimento inválido.');
     return erros;
   }

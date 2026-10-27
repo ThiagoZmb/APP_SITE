@@ -56,10 +56,10 @@ test('sem valores.ver o valor nem é lido', () => {
   assert.equal(dados.valor, undefined);
 });
 
-test('textos: corta as pontas e limita a 255 caracteres', () => {
+test('textos: corta as pontas e limita a 190 caracteres', () => {
   assert.equal(validarTinta({ ...BASE, refFabricante: '  TX-10  ' }, COM).dados.refFabricante, 'TX-10');
-  assert.ok(erroCom({ ...BASE, refFabricante: 'x'.repeat(256) }, 'Referência'));
-  assert.ok(erroCom({ ...BASE, corElegance: 'x'.repeat(256) }, 'Cor Elegance'));
+  assert.ok(erroCom({ ...BASE, refFabricante: 'x'.repeat(191) }, 'Referência'));
+  assert.ok(erroCom({ ...BASE, corElegance: 'x'.repeat(191) }, 'Cor Elegance'));
 });
 
 test('milhar brasileiro ("1.500") é ambíguo e recusado; decimal com ponto continua valendo', () => {
@@ -68,7 +68,12 @@ test('milhar brasileiro ("1.500") é ambíguo e recusado; decimal com ponto cont
   assert.equal(validarTinta({ ...BASE, valor: '1500' }, COM).dados.valor, 1500);
 });
 
-test('textos aceitam até 255 caracteres (tamanho das colunas do VB)', () => {
-  assert.deepEqual(validarTinta({ ...BASE, refFabricante: 'x'.repeat(255), corElegance: 'y'.repeat(255) }, COM).erros, []);
-  assert.ok(erroCom({ ...BASE, refFabricante: 'x'.repeat(256) }, 'Referência'));
+test('textos aceitam até 190 caracteres (varchar(190) da tabela)', () => {
+  assert.deepEqual(validarTinta({ ...BASE, refFabricante: 'x'.repeat(190), corElegance: 'y'.repeat(190) }, COM).erros, []);
+  assert.ok(erroCom({ ...BASE, refFabricante: 'x'.repeat(191) }, 'Referência'));
+});
+
+test('% da mistura é inteira (coluna INT): "12,5" é recusada em vez de arredondar em silêncio', () => {
+  for (const p of ['12,5', '12.5', '0,1']) assert.ok(erroCom({ ...BASE, porcentagem: p }, '% da mistura'), p);
+  assert.equal(validarTinta({ ...BASE, porcentagem: '12' }, COM).dados.porcentagem, 12);
 });

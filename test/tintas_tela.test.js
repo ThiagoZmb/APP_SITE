@@ -68,3 +68,9 @@ test('tintas: corValida (cor antiga fora do formato conta como não escolhida), 
   assert.equal(T.paraTela(0), '0');
   assert.ok(T.validarForm({ fabricante: 'a', classe: 'b', tipo: 'c', conjunto: 'd', porcentagem: '1.500' }).join().includes('% da mistura'));
 });
+
+test('tintas: % da mistura inteira na tela também', () => {
+  const ok = { fabricante: 'a', classe: 'b', tipo: 'c', conjunto: 'd' };
+  assert.ok(T.validarForm({ ...ok, porcentagem: '12,5' }).join().includes('% da mistura'));
+  assert.deepEqual(T.validarForm({ ...ok, porcentagem: '12' }), []);
+});
