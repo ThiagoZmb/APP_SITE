@@ -25,13 +25,14 @@ const cancelarPlano = (conn, planoId) => conn.execute("UPDATE web_corte_planos S
 
 // Cancelar ou excluir um pedido: os planos ainda não conferidos são cancelados e os retalhos reservados voltam a ficar disponíveis.
 // Chamada dentro da transação do pedido (rotas/ped_orc.js). Plano conferido fica como histórico. Devolve quantos planos cancelou.
-async function liberarPlanosDoPedido(conn, numero, quem = '') {
+async function liberarPlanosDoPedido(conn, numero, quem = '', { excluindo = false } = {}) {   // excluindo: pedido APAGADO, número reaproveitado (MAX+1): o plano conferido é desligado dele (excluido_em); exclusão feita direto no VB não passa por aqui
   const [planos] = await conn.execute("SELECT id FROM web_corte_planos WHERE pedido = ? AND situacao = 'gerado' FOR UPDATE", [numero]);
   for (const p of planos) {
     await liberarReservas(conn, p.id);
     await cancelarPlano(conn, p.id);
     await auditarConn(conn, quem, 'corte_plano_cancelado_com_pedido', p.id, { campos: ['situacao'], pedido: numero });
   }
+  if (excluindo) await conn.execute("UPDATE web_corte_planos SET excluido_em = ? WHERE pedido = ? AND situacao = 'conferido' AND excluido_em IS NULL", [agoraLocal(), numero]);
   return planos.length;
 }
 
@@ -41,13 +42,13 @@ const lerPedido = async (db, numero, travar = false) => {
 };
 const lerConfig = async db => (await db.execute('SELECT perfil, comprimento_vara, serra, sobra_minima FROM web_corte_config ORDER BY perfil'))[0];
 const planoAtivo = async (db, numero, travar = false) => {
-  const [[p]] = await db.execute(`SELECT id, situacao, impressao_pecas, criado_por, criado_em, conferido_em FROM web_corte_planos WHERE pedido = ? AND situacao <> 'cancelado' ORDER BY id DESC LIMIT 1${travar ? ' FOR UPDATE' : ''}`, [numero]);
+  const [[p]] = await db.execute(`SELECT id, situacao, impressao_pecas, criado_por, criado_em, conferido_em FROM web_corte_planos WHERE pedido = ? AND situacao <> 'cancelado' AND excluido_em IS NULL ORDER BY id DESC LIMIT 1${travar ? ' FOR UPDATE' : ''}`, [numero]);
   return p || null;
 };
 
 async function lerPecasDoPedido(db, numero) {
   const [perfis] = await db.execute('SELECT id, ITEM, QTD_PORTAS, PERFIL, QTD_ALTURA, TAM_ALTURA, QTD_LARGURA, TAM_LARGURA, PUXADOR, QTD_PUXADOR, TAM_PUXADOR FROM perfis WHERE NUMERO = ? ORDER BY id', [numero]);
-  const [itens] = await db.execute("SELECT ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR, QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = 'Pedido' ORDER BY ITEM_PEDIDO, ITEM", [numero]);
+  const [itens] = await db.execute("SELECT ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR, QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL, ALTURA, LARGURA FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = 'Pedido' ORDER BY ITEM_PEDIDO, ITEM", [numero]);
   return { ...montarPecas({ perfis, itens }), vazio: perfis.length === 0 };
 }
 

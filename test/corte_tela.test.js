@@ -91,3 +91,11 @@ test('menu: Plano de corte no layout e no botão direito dos pedidos', () => {
   const painel = ler('painel_inicial.html');
   assert.match(painel, /add\('corte\.ver'[^\n]*Plano de corte[^\n]*corte\.html\?numero=/);
 });
+
+test('retalho reservado: quem planeja pode cancelar o plano que o prende (saída para reserva órfã)', () => {
+  const lista = [{ id: 2, perfil: 'P', acabamento: 'A', cor: 'C', comprimento: 800, situacao: 'reservado', planoOrigem: null, planoReserva: 9 }];
+  const com = T.htmlRetalhos(lista, false, true);
+  assert.match(com, /data-acao="cancelar-plano" data-plano="9"/);
+  assert.doesNotMatch(T.htmlRetalhos(lista, false, false), /cancelar-plano/);
+  assert.doesNotMatch(T.htmlRetalhos(lista, true, false), /cancelar-plano/);
+});

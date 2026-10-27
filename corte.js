@@ -85,11 +85,11 @@
   }
 
   // ---------- retalhos e parâmetros ----------
-  function htmlRetalhos(lista, podeParametros) {
+  function htmlRetalhos(lista, podeParametros, podePlanejar = false) {
     if (!lista.length) return '<p class="vazio" role="status">Nenhum retalho nesta situação.</p>';
     const linhas = lista.map(r => `<tr><td>${esc(r.perfil)}</td><td>${esc(r.acabamento)}</td><td>${esc(r.cor)}</td><td class="num">${esc(mm(r.comprimento))}</td>` +
       `<td>${esc(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
-      `<td>${podeParametros && r.situacao === 'disponivel' ? `<button type="button" class="btn btn-secondary" data-acao="editar" data-id="${esc(r.id)}">Ajustar</button> <button type="button" class="btn btn-secondary" data-acao="descartar" data-id="${esc(r.id)}">Descartar</button>` : ''}</td></tr>`);
+      `<td>${podePlanejar && r.situacao === 'reservado' && r.planoReserva ? `<button type="button" class="btn btn-secondary" data-acao="cancelar-plano" data-plano="${esc(r.planoReserva)}">Cancelar plano ${esc(r.planoReserva)}</button>` : ''}${podeParametros && r.situacao === 'disponivel' ? `<button type="button" class="btn btn-secondary" data-acao="editar" data-id="${esc(r.id)}">Ajustar</button> <button type="button" class="btn btn-secondary" data-acao="descartar" data-id="${esc(r.id)}">Descartar</button>` : ''}</td></tr>`);
     return '<table><thead><tr><th>Perfil</th><th>Acabamento</th><th>Cor</th><th>Comprimento</th><th>Situação</th><th>Origem</th><th>Ações</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>';
   }
   function htmlConfig(c) {
@@ -195,7 +195,7 @@
         const f = $('filtro-retalhos').value;
         const d = await chamar('/corte/retalhos' + (f ? '?situacao=' + encodeURIComponent(f) : ''));
         estado.retalhos = d.retalhos;
-        $('retalhos-lista').innerHTML = htmlRetalhos(d.retalhos, pode('corte.parametros'));
+        $('retalhos-lista').innerHTML = htmlRetalhos(d.retalhos, pode('corte.parametros'), pode('corte.planejar'));
       } catch (err) { mensagem('retalhos-lista', err.status === 403 ? 'Você não tem permissão para ver os retalhos.' : 'Não foi possível carregar: ' + err.message, 'erro'); }
     }
     function limparFormRetalho() { for (const id of ['r-id', 'r-perfil', 'r-acabamento', 'r-cor', 'r-comprimento']) $(id).value = ''; $('btn-retalho').textContent = 'Cadastrar retalho'; }
@@ -214,6 +214,12 @@
     async function cliqueRetalho(ev) {
       const b = ev.target.closest('[data-acao]');
       if (!b) return;
+      if (b.dataset.acao === 'cancelar-plano') {
+        if (!win.confirm(`Cancelar o plano nº ${b.dataset.plano}? Os retalhos reservados por ele voltam a ficar disponíveis.`)) return;
+        try { await chamar(`/corte/plano/${encodeURIComponent(b.dataset.plano)}/cancelar`, { metodo: 'POST' }); toast('Plano cancelado.', 'ok'); await carregarRetalhos(); }
+        catch (err) { toast(err.message, 'erro'); }
+        return;
+      }
       const r = estado.retalhos.find(x => String(x.id) === b.dataset.id);
       if (!r) return;
       if (b.dataset.acao === 'editar') {

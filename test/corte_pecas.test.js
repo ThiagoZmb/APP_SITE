@@ -5,7 +5,7 @@ const { montarPecas, chaveGrupo, impressaoPecas } = require('../calculo/corte_pe
 
 const perfil = (o = {}) => ({ id: 1, ITEM: 1, QTD_PORTAS: 3, PERFIL: 'P100', QTD_ALTURA: 2, TAM_ALTURA: 2100, QTD_LARGURA: 2, TAM_LARGURA: 900,
   PUXADOR: null, QTD_PUXADOR: 0, TAM_PUXADOR: 0, ...o });
-const item = (o = {}) => ({ ITEM_PEDIDO: 1, ITEM: 1, QTD: 3, PERFIL: 'P100', ACABAMENTO_PERFIL: 'Anodizado', COR_PERFIL: 'Natural',
+const item = (o = {}) => ({ ITEM_PEDIDO: 1, ITEM: 1, QTD: 3, ALTURA: 2100, LARGURA: 900, PERFIL: 'P100', ACABAMENTO_PERFIL: 'Anodizado', COR_PERFIL: 'Natural',
   PUXADOR: null, ACABAMENTO_PUXADOR: null, COR_PUXADOR: null, DIVISOR: null, ACABAMENTO_DIVISOR: null, COR_DIVISOR: null,
   QTD_HORIZONTAL: 0, QTD_VERTICAL: 0, TAM_DIV_HORIZONTAL: 0, TAM_DIV_VERTICAL: 0, ...o });
 
@@ -109,4 +109,26 @@ test('impressaoPecas: igual em outra ordem, diferente se um tamanho muda', () =>
   assert.equal(impressaoPecas([a, b]), impressaoPecas([b, a]));
   assert.notEqual(impressaoPecas([a, b]), impressaoPecas([a, c]));
   assert.match(impressaoPecas([a]), /^[0-9a-f]{64}$/);
+});
+
+// ---- revisão final: dados do VB que não podem enganar o plano ----
+test('perfis de OUTRO documento (orçamento de mesmo número): perfil, quantidade ou puxador diferentes viram pendência, nunca peças', () => {
+  for (const [p, i] of [[{ PERFIL: 'P100' }, { PERFIL: 'P200' }], [{ QTD_PORTAS: 3 }, { QTD: 2 }], [{ PUXADOR: 'PX1', QTD_PUXADOR: 1, TAM_PUXADOR: 1500 }, { PUXADOR: null }]]) {
+    const { pecas, pendencias } = montarPecas({ perfis: [perfil(p)], itens: [item(i)] });
+    assert.equal(pecas.length, 0, JSON.stringify([p, i]));
+    assert.equal(pendencias.length, 1, JSON.stringify([p, i]));
+    assert.match(pendencias[0].motivo, /não conferem|ligar/i);
+  }
+});
+
+test('divisor: a medida gravada só vale se bate com a porta (horizontal = largura, vertical = altura)', () => {
+  const div = o => item({ DIVISOR: 'DV1', ACABAMENTO_DIVISOR: 'A', COR_DIVISOR: 'B', ...o });
+  const ok = montarPecas({ perfis: [perfil()], itens: [div({ QTD_HORIZONTAL: 1, TAM_DIV_HORIZONTAL: 900, QTD_VERTICAL: 1, TAM_DIV_VERTICAL: 2100 })] });
+  assert.equal(ok.pecas.filter(p => p.origem === 'divisor').length, 6);
+  assert.deepEqual(ok.pendencias, []);
+  // H e V trocados (o VB recarrega invertido): nenhuma peça de divisor, uma pendência por medida
+  const troca = montarPecas({ perfis: [perfil()], itens: [div({ QTD_HORIZONTAL: 1, TAM_DIV_HORIZONTAL: 2100, QTD_VERTICAL: 1, TAM_DIV_VERTICAL: 900 })] });
+  assert.equal(troca.pecas.filter(p => p.origem === 'divisor').length, 0);
+  assert.equal(troca.pendencias.length, 2);
+  assert.match(troca.pendencias[0].motivo, /divisor/i);
 });

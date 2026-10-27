@@ -238,3 +238,19 @@ test('nomes de campo das respostas do plano não casam com REGEX_VALOR', async t
   assert.ok(nomes.length > 20);
   assert.deepEqual(nomes.filter(k => REGEX_VALOR.test(k)), []);
 });
+
+// ---- revisão final (I2): o número do pedido excluído é reaproveitado (MAX+1) ----
+test('excluir o pedido solta o plano conferido (histórico preservado); cancelar o pedido não', async t => {
+  const { liberarPlanosDoPedido } = require('../rotas/corte');
+  const b = cenario(); b.semear.retalho({ comprimento: 2200 });
+  const { chamar } = await prepararCorte(t, { banco: b });
+  const { id } = await salvar(chamar);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', {})).status, 200);
+  const conn = await b.f.getConnection();
+  await liberarPlanosDoPedido(conn, 100, 'Caio');                          // cancelar o pedido: o plano conferido continua ligado
+  assert.equal((await prever(chamar)).planoSalvo.id, id);
+  await liberarPlanosDoPedido(conn, 100, 'Caio', { excluindo: true });     // excluir o pedido: o número fica livre para o próximo
+  assert.equal((await prever(chamar)).planoSalvo, null);
+  assert.equal((await chamar('/corte/pedido/100/salvar', 'POST', corpoSalvar(await prever(chamar)))).status, 200);
+  assert.ok(b.estado.planos.find(p => p.id === id).excluido_em);           // o registro antigo continua no banco
+});

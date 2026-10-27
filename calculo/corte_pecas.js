@@ -40,6 +40,12 @@ function montarPecas({ perfis = [], itens = [] }) {
     }
     linhasPerfis.forEach((p, k) => {
       const it = comPerfil[k], portas = inteiro(p.QTD_PORTAS), nome = txt(p.PERFIL);
+      // `perfis` não tem TIPO e o VB também grava/apaga essa tabela para orçamento de mesmo número: a ordem sozinha não basta.
+      // Linha ligada só vale se perfil, quantidade de portas e puxador batem com a linha de itens; senão pendência (nunca peça com medida de outro documento).
+      if (txt(p.PERFIL) !== txt(it.PERFIL) || portas !== inteiro(it.QTD) || txt(p.PUXADOR) !== txt(it.PUXADOR)) {
+        pendencia(n, nome, 'Não foi possível ligar acabamento e cor ao perfil (perfil, quantidade ou puxador das linhas de perfis e de itens não conferem).');
+        return;
+      }
       const acab = txt(it.ACABAMENTO_PERFIL), cor = txt(it.COR_PERFIL);
       if (!acab || !cor) pendencia(n, nome, 'Perfil sem acabamento ou sem cor no pedido.');
       else {
@@ -64,12 +70,15 @@ function montarPecas({ perfis = [], itens = [] }) {
     const divisor = txt(it.DIVISOR), n = Number(it.ITEM_PEDIDO);
     if (!divisor) continue;
     const portas = inteiro(it.QTD);
-    const trechos = [[it.QTD_HORIZONTAL, it.TAM_DIV_HORIZONTAL, 'horizontal'], [it.QTD_VERTICAL, it.TAM_DIV_VERTICAL, 'vertical']].filter(([q]) => inteiro(q) > 0);
+    // horizontal = largura da porta, vertical = altura (engenharia.js folhasDoItem); medida que não bate com a porta
+    // (o VB recarrega H e V trocados ao reabrir o pedido) não é confiável: pendência
+    const trechos = [[it.QTD_HORIZONTAL, it.TAM_DIV_HORIZONTAL, 'horizontal', it.LARGURA], [it.QTD_VERTICAL, it.TAM_DIV_VERTICAL, 'vertical', it.ALTURA]].filter(([q]) => inteiro(q) > 0);
     if (!trechos.length) continue;
     const acab = txt(it.ACABAMENTO_DIVISOR), cor = txt(it.COR_DIVISOR);
     if (!acab || !cor) { pendencia(n, divisor, 'Divisor sem acabamento ou sem cor no pedido.'); continue; }
-    for (const [qtd, tam, rotulo] of trechos) {
+    for (const [qtd, tam, rotulo, porta] of trechos) {
       if (inteiro(tam) <= 0) pendencia(n, divisor, `Divisor ${rotulo} sem tamanho.`);
+      else if (inteiro(tam) !== inteiro(porta)) pendencia(n, divisor, `Divisor ${rotulo}: a medida gravada (${inteiro(tam)} mm) não bate com a da porta (${inteiro(porta)} mm); confira o pedido.`);
       else adicionar(portas * inteiro(qtd), inteiro(tam), { perfil: divisor, acabamento: acab, cor, item: n, origem: 'divisor' });
     }
   }

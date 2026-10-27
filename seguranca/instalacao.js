@@ -147,6 +147,7 @@ const TABELAS = [
      criado_em DATETIME NULL,
      conferido_por VARCHAR(100) NULL,
      conferido_em DATETIME NULL,
+     excluido_em DATETIME NULL,
      KEY ix_plano_pedido (pedido, situacao)
    ) ${OPCOES}`,
   // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)

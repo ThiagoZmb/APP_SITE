@@ -324,6 +324,7 @@ test('plano de corte: tabelas em mm inteiros, UNIQUE por perfil, sem chave estra
   assert.ok(ret.includes('comprimento INT NOT NULL'));
   assert.ok(ret.includes("ENUM('disponivel','reservado','usado','descartado')"));
   const pl = sql('web_corte_planos');
+  assert.ok(pl.includes('excluido_em DATETIME NULL'));
   assert.ok(pl.includes('pedido INT NOT NULL') && pl.includes('impressao_pecas CHAR(64)'));
   assert.ok(pl.includes("ENUM('gerado','conferido','desatualizado','cancelado')"));
   assert.ok(/resultado (JSON|LONGTEXT)/.test(pl));

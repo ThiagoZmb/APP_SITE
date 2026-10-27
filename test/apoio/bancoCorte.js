@@ -43,13 +43,17 @@ function bancoCorte() {
       retalhos.filter(r => r.situacao === 'disponivel' || (r.situacao === 'reservado' && r.plano_reserva === planoId))
         .map(r => ({ id: r.id, perfil: r.perfil, acabamento: r.acabamento, cor: r.cor, comprimento: r.comprimento })).sort((a, b) => a.id - b.id)],
     [/^SELECT id, situacao, impressao_pecas, criado_por, criado_em, conferido_em FROM web_corte_planos WHERE pedido = \?/, (sql, [n]) => {
-      const p = planos.filter(x => x.pedido === Number(n) && x.situacao !== 'cancelado').sort((a, b) => b.id - a.id)[0];
+      const p = planos.filter(x => x.pedido === Number(n) && x.situacao !== 'cancelado' && !x.excluido_em).sort((a, b) => b.id - a.id)[0];
       return p ? [{ id: p.id, situacao: p.situacao, impressao_pecas: p.impressao_pecas, criado_por: p.criado_por, criado_em: p.criado_em, conferido_em: p.conferido_em ?? null }] : [];
     }],
     [/^SELECT id FROM web_corte_planos WHERE pedido = \?/, (sql, [n]) => planos.filter(p => p.pedido === Number(n) && p.situacao === 'gerado').map(p => ({ id: p.id }))],
     [/^UPDATE web_retalhos SET situacao = 'disponivel', plano_reserva = NULL, atualizado_em = \? WHERE plano_reserva = \? AND situacao = 'reservado'/, (sql, [, planoId]) => {
       let n = 0; for (const r of retalhos) if (r.plano_reserva === planoId && r.situacao === 'reservado') { r.situacao = 'disponivel'; r.plano_reserva = null; n++; }
       return { affectedRows: n };
+    }],
+    [/^UPDATE web_corte_planos SET excluido_em = \?/, (sql, [agora, n]) => {
+      let c = 0; for (const p of planos) if (p.pedido === Number(n) && p.situacao === 'conferido' && !p.excluido_em) { p.excluido_em = agora; c++; }
+      return { affectedRows: c };
     }],
     [/^UPDATE web_corte_planos SET situacao = 'cancelado' WHERE id = \?/, (sql, [id]) => { planos.find(p => p.id === id).situacao = 'cancelado'; return { affectedRows: 1 }; }],
     [/^INSERT INTO web_corte_planos/, (sql, [pedido, situacao, impressao_pecas, parametros, resultado, progresso, criado_por, criado_em]) => {
@@ -101,7 +105,7 @@ function bancoCorte() {
     pedido: (x = {}) => { const r = { NUMERO: 100, RAZAO_SOCIAL: 'Cliente X', SITUACAO: 'Em Produção', ...x }; pedidos.push(r); return r; },
     perfil: (x = {}) => { const r = { id: proxPerfil++, NUMERO: 100, ITEM: 1, QTD_PORTAS: 2, PERFIL: 'P100', QTD_ALTURA: 2, TAM_ALTURA: 2100, QTD_LARGURA: 2, TAM_LARGURA: 900,
       PUXADOR: null, QTD_PUXADOR: 0, TAM_PUXADOR: 0, ...x }; perfis.push(r); return r; },
-    item: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', ITEM_PEDIDO: 1, ITEM: 1, QTD: 2, PERFIL: 'P100', ACABAMENTO_PERFIL: 'Anodizado', COR_PERFIL: 'Natural',
+    item: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', ITEM_PEDIDO: 1, ITEM: 1, QTD: 2, ALTURA: 2100, LARGURA: 900, PERFIL: 'P100', ACABAMENTO_PERFIL: 'Anodizado', COR_PERFIL: 'Natural',
       PUXADOR: null, ACABAMENTO_PUXADOR: null, COR_PUXADOR: null, DIVISOR: null, ACABAMENTO_DIVISOR: null, COR_DIVISOR: null,
       QTD_HORIZONTAL: 0, QTD_VERTICAL: 0, TAM_DIV_HORIZONTAL: 0, TAM_DIV_VERTICAL: 0, ...x }; itens.push(r); return r; },
     retalho: (x = {}) => { const r = { id: proxRetalho++, perfil: 'P100', acabamento: 'Anodizado', cor: 'Natural', comprimento: 1500, situacao: 'disponivel', ...x }; retalhos.push(r); return r; }

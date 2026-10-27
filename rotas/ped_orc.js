@@ -627,7 +627,7 @@ function registrarPedOrc({ rota, pool }) {
       // Entregas: o NUMERO é reaproveitado (MAX+1), então a entrega do pedido excluído sai junto, na mesma transação
       // (só exclusão feita pela web passa por aqui; exclusão feita direto no VB não limpa web_entregas).
       if (alvo.tipo === 'Pedido') {
-        await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '');   // plano de corte: idem (plano conferido fica como histórico)
+        await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '', { excluindo: true });   // plano de corte: idem; o conferido fica de histórico, mas solto do número (reaproveitado)
         const [entregas] = await conn.execute('SELECT id FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
         for (const { id } of entregas) {
           await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
