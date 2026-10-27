@@ -81,6 +81,34 @@ const TABELAS = [
      motivo VARCHAR(500) NOT NULL,
      KEY idx_quando (quando)
    ) ${OPCOES}`,
+  // Central de Gestão (entrega 1): metas por mês e orçamento por categoria. Valores em DECIMAL(14,2).
+  // classificacao_id é referência lógica a fluxo_de_caixa_classificacao.id (tabela do VB: sem chave estrangeira).
+  `CREATE TABLE IF NOT EXISTS \`web_gestao_metas\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     periodo CHAR(7) NOT NULL,
+     tipo ENUM('faturamento','despesa') NOT NULL,
+     valor DECIMAL(14,2) NOT NULL,
+     origem ENUM('web','vb') NOT NULL DEFAULT 'web',
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(100) NULL,
+     UNIQUE KEY uq_meta (periodo, tipo)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_gestao_orcamento\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     periodo CHAR(7) NOT NULL,
+     classificacao_id INT NOT NULL,
+     nivel TINYINT NOT NULL DEFAULT 1,
+     valor DECIMAL(14,2) NOT NULL,
+     limiar_atencao DECIMAL(6,2) NULL,
+     limiar_alerta DECIMAL(6,2) NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(100) NULL,
+     UNIQUE KEY uq_orcamento (periodo, classificacao_id)
+   ) ${OPCOES}`,
   // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)
   `CREATE TABLE IF NOT EXISTS \`web_custo_material\` (
      material_codigo INT NOT NULL PRIMARY KEY,
@@ -486,4 +514,7 @@ async function acrescentarPermissoesTintas(pool) {
   }
 }
 
-module.exports = { instalarTabelas, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
+const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
+
+module.exports = { instalarTabelas, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

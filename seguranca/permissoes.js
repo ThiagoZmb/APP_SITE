@@ -40,6 +40,8 @@ const CATALOGO = [
   { codigo: 'funcionarios.editar', nome: 'Cadastrar e editar funcionários (salário e encargos também exigem Valores financeiros)', area: 'Cadastros' },
   { codigo: 'tintas.ver', nome: 'Ver tintas (o valor também exige Valores financeiros)', area: 'Cadastros' },
   { codigo: 'tintas.editar', nome: 'Cadastrar, editar e excluir tintas (o valor também exige Valores financeiros)', area: 'Cadastros' },
+  { codigo: 'gestao.ver', nome: 'Ver a Central de Gestão: metas, caixa e orçamento (também exige Valores financeiros)', area: 'Gestão' },
+  { codigo: 'gestao.editar', nome: 'Definir metas e orçamentos na Central de Gestão (também exige Valores financeiros)', area: 'Gestão' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' }
 ];
@@ -48,7 +50,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

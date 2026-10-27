@@ -23,6 +23,7 @@
         fornecedores: ic('<path d="M3 21V9l6 4V9l6 4V4h6v17z"/><path d="M7 17h2M12 17h2M17 17h1"/>'),
         tintas: ic('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
         funcionarios: ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M17 8h4M17 12h4"/>'),
+        gestao: ic('<path d="M3 20h18"/><rect x="5" y="11" width="3.5" height="9"/><rect x="10.25" y="6" width="3.5" height="14"/><rect x="15.5" y="3" width="3.5" height="17"/>'),
         precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
     const MENU = [
@@ -42,6 +43,7 @@
         { href: 'fornecedores.html', texto: 'Fornecedores', icone: 'fornecedores' },
         { href: 'funcionarios.html', texto: 'Funcionários', icone: 'funcionarios' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
+        { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
     // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem é a da "primeira página permitida" depois do login.
@@ -62,6 +64,7 @@
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
         'custos.html': ['precos.ver', 'valores.ver'],
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
+        'gestao.html': ['gestao.ver', 'valores.ver'],
         'usuarios.html': ['admin.usuarios'],
         'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };

@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 38 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 38);
-  assert.equal(CODIGOS.size, 38);
+test('catálogo tem 40 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 40);
+  assert.equal(CODIGOS.size, 40);
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
@@ -19,7 +19,8 @@ test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e e
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil('Administrador').permissoes.length, 38);
+  assert.equal(perfil('Administrador').permissoes.length, 40);
+  assert.ok(!p.permissoes.includes('gestao.ver') && !p.permissoes.includes('gestao.editar')); // Central de Gestão: só o Administrador na migração
   assert.ok(!p.permissoes.includes('pedidos.situacao')); // mudar situação: só o Administrador
 });
 

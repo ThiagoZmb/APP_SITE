@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Central de Gestão</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
+            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
+        }
+        [hidden] { display: none !important; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; color: var(--text-dark); text-decoration: none; }
+        .menu-item.active { background: var(--gradient-primary); color: white; box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; padding: 22px; margin-bottom: 24px; }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel > h2 { font-size: 20px; margin-bottom: 12px; }
+        .painel h3 { font-size: 13px; text-transform: uppercase; color: var(--text-light); margin-bottom: 8px; letter-spacing: .4px; }
+        .painel h4 { font-size: 15px; margin-bottom: 4px; }
+        .cartoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+        .cartoes .painel { margin-bottom: 0; }
+        .grande { font-size: 30px; font-weight: 700; margin-bottom: 6px; }
+        .duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 12px; }
+        .bloco { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; }
+        .bloco.realizado { border-left: 5px solid var(--success-color); }
+        .bloco.previsto { border-left: 5px dashed var(--warning-color); background: var(--secondary-color); }
+        dl.info { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; margin-top: 10px; }
+        dl.info dt { color: var(--text-light); }
+        .vazio { text-align: center; padding: 28px; color: var(--text-light); }
+        .erro-estado { text-align: center; padding: 20px; color: var(--danger-color); font-weight: 600; }
+        .cinza { color: var(--text-light); font-size: 13px; margin-top: 2px; }
+        .fonte { color: var(--text-light); font-size: 12px; margin-top: 8px; }
+        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
+        .selo.aviso { background: #fff3cd; color: #8a6d00; }
+        .selo.info { background: #dbeafe; color: #1e40af; }
+        .selo.ok { background: #d4edda; color: #1b6b30; }
+        .selo.perigo { background: #f8d7da; color: #a12330; }
+        .selo.neutro { background: #e9ecef; color: #495057; }
+        .alertas { list-style: none; }
+        .alertas li { padding: 12px 4px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .aviso-periodo { background: #fff3cd; color: #6b5300; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        .barra-mes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+        .barra-mes input[type="month"] { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; min-height: 44px; }
+        .barra-mes h2 { font-size: 20px; text-transform: capitalize; margin-left: 8px; }
+        .tabela-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: var(--secondary-color); padding: 10px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        tbody td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: top; }
+        td.num { text-align: right; white-space: nowrap; }
+        td.barra-col { min-width: 150px; }
+        tr.sem-cat { background: var(--secondary-color); }
+        .trilho { height: 12px; border-radius: 8px; background: #e9ecef; overflow: hidden; margin-bottom: 4px; }
+        .enche { height: 100%; border-radius: 8px; background: var(--text-light); }
+        .enche.ok { background: var(--success-color); }
+        .enche.aviso { background: var(--warning-color); }
+        .enche.perigo { background: var(--danger-color); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input, .form-group select { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background: var(--white); min-height: 44px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary-color); }
+        .linha2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .linha3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .erro-form { color: var(--danger-color); font-size: 13px; min-height: 18px; margin: 4px 0; }
+        .dica { font-size: 12px; color: var(--text-light); margin: 0 0 12px; }
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn:disabled { opacity: .6; cursor: wait; }
+        details { font-size: 14px; } details summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; } details ul { padding-left: 20px; }
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (max-width: 1100px) { .cartoes, .duas { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .linha2, .linha3 { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610272100" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="gestao.js?v=202610272200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Central de Gestão</h1>
+            <p class="welcome-subtitle">Metas, caixa realizado e previsto, orçamento por categoria e alertas do mês. Os números vêm do sistema antigo (pedidos e fluxo de caixa); os alertas só informam, não bloqueiam nada.</p>
+
+            <div class="barra-mes">
+                <button type="button" class="btn btn-secondary" id="mes-ant" aria-label="Mês anterior">‹</button>
+                <label for="mes" class="cinza">Mês</label>
+                <input type="month" id="mes" aria-label="Mês">
+                <button type="button" class="btn btn-secondary" id="mes-prox" aria-label="Próximo mês">›</button>
+                <button type="button" class="btn btn-secondary" id="mes-hoje">Mês atual</button>
+                <h2 id="titulo-mes"></h2>
+            </div>
+            <p class="aviso-periodo" id="aviso-periodo" role="status" hidden></p>
+
+            <div class="cartoes">
+                <section class="painel" id="cartao-faturamento" aria-live="polite"><p class="vazio">Carregando…</p></section>
+                <section class="painel" id="cartao-despesa" aria-live="polite"><p class="vazio">Carregando…</p></section>
+            </div>
+
+            <section class="painel">
+                <h2>Caixa do mês</h2>
+                <div id="caixa" aria-live="polite"><p class="vazio">Carregando…</p></div>
+                <p class="cinza" id="vencidos"></p>
+            </section>
+
+            <section class="painel">
+                <h2>Alertas</h2>
+                <div id="alertas" aria-live="polite"><p class="vazio">Carregando…</p></div>
+            </section>
+
+            <section class="painel">
+                <h2>Orçamento por categoria</h2>
+                <p class="dica">Pago = despesas com situação Pago no mês. "Consumo" é o pago sobre o orçado; o que está A Pagar aparece à parte e não entra no consumo.</p>
+                <div class="tabela-wrap" id="orcamento" aria-live="polite"><p class="vazio">Carregando…</p></div>
+            </section>
+
+            <div id="forms" data-perm="gestao.editar">
+                <section class="painel">
+                    <h2>Definir meta do mês</h2>
+                    <form id="form-meta" novalidate>
+                        <div class="linha3">
+                            <div class="form-group"><label for="m-tipo">Meta de</label>
+                                <select id="m-tipo"><option value="faturamento">Faturamento</option><option value="despesa">Despesa (paga)</option></select></div>
+                            <div class="form-group"><label for="m-valor">Valor (R$)</label><input id="m-valor" inputmode="decimal" autocomplete="off" placeholder="ex.: 150000,00"></div>
+                            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-secondary" id="btn-vb">Ver sugestão do VB</button></div>
+                        </div>
+                        <p class="dica">A sugestão do VB (tabela de previsões) só preenche o campo; ela só vale depois que você confirmar com "Salvar meta". Meta zero é aceita, mas o percentual fica "não calculável".</p>
+                        <p class="erro-form" id="erro-meta" role="alert"></p>
+                        <button type="submit" class="btn btn-primary" id="btn-meta">Salvar meta</button>
+                    </form>
+                </section>
+                <section class="painel">
+                    <h2>Definir orçamento de uma categoria</h2>
+                    <form id="form-orc" novalidate>
+                        <div class="linha2">
+                            <div class="form-group"><label for="o-categoria">Categoria (saída)</label><select id="o-categoria"><option value=""></option></select></div>
+                            <div class="form-group"><label for="o-nivel">Vale para</label>
+                                <select id="o-nivel"><option value="1">A categoria inteira (nível 1)</option><option value="2">Categoria e subcategoria (nível 2)</option></select></div>
+                        </div>
+                        <div class="linha3">
+                            <div class="form-group"><label for="o-valor">Valor orçado (R$)</label><input id="o-valor" inputmode="decimal" autocomplete="off" placeholder="ex.: 20000,00"></div>
+                            <div class="form-group"><label for="o-atencao">Atenção a partir de (%)</label><input id="o-atencao" inputmode="decimal" autocomplete="off" placeholder="padrão 70"></div>
+                            <div class="form-group"><label for="o-alerta">Alerta a partir de (%)</label><input id="o-alerta" inputmode="decimal" autocomplete="off" placeholder="padrão 85"></div>
+                        </div>
+                        <p class="dica">Estouro é sempre a partir de 100%. Se já existir orçamento desta categoria no mês, ele é substituído e a troca fica registrada na auditoria.</p>
+                        <p class="erro-form" id="erro-orc" role="alert"></p>
+                        <button type="submit" class="btn btn-primary" id="btn-orc">Salvar orçamento</button>
+                    </form>
+                </section>
+            </div>
+
+            <section class="painel">
+                <details>
+                    <summary>O que esta tela ainda não resolve</summary>
+                    <ul id="limitacoes"></ul>
+                </details>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
