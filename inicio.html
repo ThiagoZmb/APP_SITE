@@ -453,7 +453,7 @@
         // pedido que já saiu da fábrica (ou foi cancelado) não entra em "Entregas da semana"
         const entregue = s => { const n = normalizar(s); return n.includes('entregue') || n.includes('retirad') || n.includes('cancel'); };
         // status interno de web_entregas -> rótulo; os três últimos tiram o pedido do painel
-        const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
+        const ROT_ENTREGA = { a_programar: 'A programar entrega', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
         const entregaEncerrada = st => st === 'entregue' || st === 'retirado' || st === 'cancelada';
         // data 'AAAA-MM-DD' da agenda de entregas -> Date local (null se vazia/inválida)
         const paraDataISO = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m && +m[1] >= 1900 ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
