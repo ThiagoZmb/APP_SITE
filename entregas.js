@@ -20,7 +20,7 @@
   const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
     retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
   const COR_STATUS = { a_programar: 'aviso', agendada: 'info', em_rota: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok', enviada: 'info', cancelada: 'neutro' };
-  const ROTULO_TIPO = { motorista: 'Motorista', retirada: 'Retirada', outro_estado: 'Outro estado' };
+  const ROTULO_TIPO = { motorista: 'Entrega', retirada: 'Retirado pelo cliente', outro_estado: 'Entrega em outro estado' };
   const ROTULO_EVENTO = { criada: 'Entrou na fila', agendada: 'Agendada', reagendada: 'Reagendada', saiu: 'Saiu para a entrega', entregue: 'Entregue',
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
     ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial' };

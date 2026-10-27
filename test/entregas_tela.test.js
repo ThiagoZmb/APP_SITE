@@ -46,8 +46,8 @@ test('rótulos e cores de status e tipo', () => {
   assert.equal(E.rotuloStatus('em_rota'), 'Em rota');
   assert.equal(E.rotuloStatus('ocorrencia'), 'Ocorrência');
   assert.equal(E.rotuloStatus('xyz'), 'xyz');
-  assert.equal(E.rotuloTipo('outro_estado'), 'Outro estado');
-  assert.equal(E.rotuloTipo('motorista'), 'Motorista');
+  assert.equal(E.rotuloTipo('outro_estado'), 'Entrega em outro estado');
+  assert.equal(E.rotuloTipo('motorista'), 'Entrega');
   assert.equal(E.rotuloTipo(null), '—');
   for (const s of ['a_programar', 'agendada', 'em_rota', 'ocorrencia', 'entregue', 'retirado', 'enviada', 'cancelada']) assert.match(E.corStatus(s), /^[a-z]+$/);
   assert.equal(E.corStatus('inexistente'), 'neutro');
@@ -81,7 +81,7 @@ test('agruparAgenda: por dia e, dentro do dia, por motorista', () => {
   ];
   const g = E.agruparAgenda(l);
   assert.deepEqual(g.map(d => d.dia), ['2026-10-28', '2026-10-29']);
-  assert.deepEqual(g[0].grupos.map(m => m.nome), ['Ana', 'Retirada', 'Zé']);
+  assert.deepEqual(g[0].grupos.map(m => m.nome), ['Ana', 'Retirado pelo cliente', 'Zé']);
   assert.deepEqual(g[0].grupos.find(m => m.nome === 'Zé').entregas.map(e => e.id), [2, 5]);
   assert.deepEqual(E.agruparAgenda([]), []);
 });
