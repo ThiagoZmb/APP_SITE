@@ -24,12 +24,12 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 23 tabelas web_', async () => {
+test('cria as 26 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos',
-    'web_perfil_permissoes', 'web_perfis', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_usuario_acesso', 'web_usuario_excecoes']);
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos',
+    'web_perfil_permissoes', 'web_perfis', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_retalhos', 'web_usuario_acesso', 'web_usuario_excecoes']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);
   assert.match(pool.chamadas.find(c => /`web_estoque_lancamentos`/.test(c.sql)).sql, /chave VARCHAR\(64\) NOT NULL PRIMARY KEY/);
@@ -309,4 +309,35 @@ test('gestão: tabelas de metas e orçamento (DECIMAL(14,2), UNIQUE, sem chave e
   assert.deepEqual(p.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params), [[1, 'gestao.ver'], [1, 'gestao.editar']]);
   assert.ok(p.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_gestao'));
   assert.deepEqual(await acrescentarPermissoesGestao(poolGestao({ jaFeito: true })), { feito: false });
+});
+
+test('plano de corte: tabelas em mm inteiros, UNIQUE por perfil, sem chave estrangeira; permissões por perfil, uma vez', async () => {
+  const { acrescentarPermissoesCorte } = require('../seguranca/instalacao');
+  const pool = criarPoolFalso([]);
+  await instalarTabelas(pool);
+  const sql = nome => pool.chamadas.find(c => new RegExp('`' + nome + '`').test(c.sql)).sql;
+  const cfg = sql('web_corte_config');
+  assert.ok(cfg.includes("perfil VARCHAR(190) NOT NULL DEFAULT ''"));
+  assert.ok(cfg.includes('comprimento_vara INT') && cfg.includes('serra INT') && cfg.includes('sobra_minima INT'));
+  assert.ok(cfg.includes('UNIQUE KEY uq_corte_config (perfil)'));
+  const ret = sql('web_retalhos');
+  assert.ok(ret.includes('comprimento INT NOT NULL'));
+  assert.ok(ret.includes("ENUM('disponivel','reservado','usado','descartado')"));
+  const pl = sql('web_corte_planos');
+  assert.ok(pl.includes('pedido INT NOT NULL') && pl.includes('impressao_pecas CHAR(64)'));
+  assert.ok(pl.includes("ENUM('gerado','conferido','desatualizado','cancelado')"));
+  assert.ok(/resultado (JSON|LONGTEXT)/.test(pl));
+  assert.doesNotMatch(cfg + ret + pl, /FOREIGN KEY|REFERENCES/);
+  const poolCorte = ({ jaFeito = false } = {}) => criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_corte'/, jaFeito ? [{ id: 9 }] : []],
+    [/SELECT id, nome FROM web_perfis WHERE nome IN/, [{ id: 1, nome: 'Administrador' }, { id: 2, nome: 'Interno completo' }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+  const p = poolCorte();
+  assert.deepEqual(await acrescentarPermissoesCorte(p), { feito: true });
+  assert.deepEqual(p.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params),
+    [[1, 'corte.ver'], [1, 'corte.planejar'], [1, 'corte.parametros'], [2, 'corte.ver'], [2, 'corte.planejar']]);
+  assert.ok(p.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_corte'));
+  assert.deepEqual(await acrescentarPermissoesCorte(poolCorte({ jaFeito: true })), { feito: false });
 });

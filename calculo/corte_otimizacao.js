@@ -14,8 +14,8 @@ const MAX_PECAS_EXATO = 12;      // busca exata só em grupos pequenos
 // linhasConfig: linhas de web_corte_config (perfil NULL = padrão). Cada campo cai para o padrão se estiver nulo.
 function resolverParametros(linhasConfig, perfil) {
   const linhas = linhasConfig || [];
-  const doPerfil = linhas.find(l => l.perfil === perfil && perfil != null) || {};
-  const geral = linhas.find(l => l.perfil == null) || {};
+  const doPerfil = (perfil && linhas.find(l => l.perfil === perfil)) || {};
+  const geral = linhas.find(l => !l.perfil) || {};   // perfil '' (ou nulo) = padrão
   const pega = (campo, padrao) => doPerfil[campo] ?? geral[campo] ?? padrao;
   return {
     comprimentoVara: Number(pega('comprimento_vara', PADRAO.comprimentoVara)),

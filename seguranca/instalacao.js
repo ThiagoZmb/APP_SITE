@@ -109,6 +109,46 @@ const TABELAS = [
      atualizado_por VARCHAR(100) NULL,
      UNIQUE KEY uq_orcamento (periodo, classificacao_id)
    ) ${OPCOES}`,
+  // Plano de corte: medidas em mm inteiros. perfil '' = padrão (UNIQUE não aceita vários NULL); campos NULL herdam o padrão.
+  // `pedido` é referência lógica a ped_orc.NUMERO (tabela do VB: sem chave estrangeira).
+  `CREATE TABLE IF NOT EXISTS \`web_corte_config\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     perfil VARCHAR(190) NOT NULL DEFAULT '',
+     comprimento_vara INT NULL,
+     serra INT NULL,
+     sobra_minima INT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(100) NULL,
+     UNIQUE KEY uq_corte_config (perfil)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_retalhos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     perfil VARCHAR(190) NOT NULL,
+     acabamento VARCHAR(190) NOT NULL,
+     cor VARCHAR(190) NOT NULL,
+     comprimento INT NOT NULL,
+     situacao ENUM('disponivel','reservado','usado','descartado') NOT NULL DEFAULT 'disponivel',
+     plano_origem INT NULL,
+     plano_reserva INT NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     KEY ix_retalho_grupo (situacao, perfil, acabamento, cor)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_corte_planos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     pedido INT NOT NULL,
+     situacao ENUM('gerado','conferido','desatualizado','cancelado') NOT NULL DEFAULT 'gerado',
+     impressao_pecas CHAR(64) NOT NULL,
+     parametros LONGTEXT NULL,
+     resultado LONGTEXT NOT NULL,
+     progresso LONGTEXT NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     conferido_por VARCHAR(100) NULL,
+     conferido_em DATETIME NULL,
+     KEY ix_plano_pedido (pedido, situacao)
+   ) ${OPCOES}`,
   // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)
   `CREATE TABLE IF NOT EXISTS \`web_custo_material\` (
      material_codigo INT NOT NULL PRIMARY KEY,
@@ -517,4 +557,30 @@ async function acrescentarPermissoesTintas(pool) {
 // Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
 const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
 
-module.exports = { instalarTabelas, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Plano de corte: ver e planejar para Administrador e Interno completo; parâmetros e retalhos manuais só para o Administrador
+const PERMISSOES_CORTE = { 'Administrador': ['corte.ver', 'corte.planejar', 'corte.parametros'], 'Interno completo': ['corte.ver', 'corte.planejar'] };
+async function acrescentarPermissoesCorte(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_corte' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of PERMISSOES_CORTE[p.nome] || []) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_corte', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { instalarTabelas, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
