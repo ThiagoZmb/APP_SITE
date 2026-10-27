@@ -2,9 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { prepararEntregas } = require('./apoio/bancoEntregas');
 
-function cenario(banco, { situacao = 'Pronto', dataEntrega = null } = {}) {
+function cenario(banco, { situacao = 'Pronto', dataEntrega = null, dataPedido = null } = {}) {
   banco.semear.cliente();
-  return banco.semear.pedido({ NUMERO: 501, SITUACAO: situacao, DATA_ENTREGA: dataEntrega });
+  return banco.semear.pedido({ NUMERO: 501, SITUACAO: situacao, DATA_PRONTO: dataEntrega, DATA: dataPedido });
 }
 
 test('pedido Pronto sem registro vira 1 entrega a_programar, sem data nem endereço', async t => {
@@ -78,15 +78,16 @@ test('perfil Somente ver lista (200)', async t => {
   assert.equal((await a.chamar('/entregas')).status, 200);
 });
 
-test('dataPrometida vem de DATA_ENTREGA e dataAgendada é texto AAAA-MM-DD', async t => {
+test('dataPrometida vem de DATA_PRONTO, dataPedido de DATA e dataAgendada é texto AAAA-MM-DD', async t => {
   const { banco, chamar } = await prepararEntregas(t);
-  cenario(banco, { situacao: 'Em Produção', dataEntrega: '2026-11-10' });
+  cenario(banco, { situacao: 'Em Produção', dataEntrega: '2026-11-10', dataPedido: '2026-10-20' });
   banco.semear.entrega({ numero: 501, status: 'agendada', data_agendada: '2026-11-03', tipo: 'motorista', motorista_codigo: 21 });
   banco.semear.evento({ entrega_id: 1, tipo: 'ausente' });
   banco.semear.evento({ entrega_id: 1, tipo: 'agendada' });
   const [e] = (await (await chamar('/entregas')).json()).entregas;
-  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'dataAgendada', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'status', 'tipo', 'uf'].sort());
+  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'dataAgendada', 'dataPedido', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'status', 'tipo', 'uf'].sort());
   assert.equal(e.dataPrometida, '2026-11-10');
+  assert.equal(e.dataPedido, '2026-10-20');
   assert.equal(e.dataAgendada, '2026-11-03');
   assert.equal(e.motorista, 'Motorista Um');
   assert.equal(e.qtdOcorrencias, 1);

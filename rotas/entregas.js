@@ -253,7 +253,7 @@ function registrarEntregas({ rota, pool }) {
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) { where.push(est.sql); params.push(...est.params); }
       const [linhas] = await pool.execute(
-        `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_ENTREGA AS CHAR) AS data_prometida,
+        `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
                 p.RAZAO_SOCIAL AS cliente, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
                 u.NOME AS motorista,
                 (SELECT COUNT(*) FROM web_entrega_eventos v WHERE v.entrega_id = e.id
@@ -266,7 +266,8 @@ function registrarEntregas({ rota, pool }) {
          ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero`, params);
       res.json({ entregas: linhas.map(l => ({
         id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null, cliente: l.cliente || '', cidade: l.cidade || '', uf: l.uf || '',
-        dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null,
+        dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
+        dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
         motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0
       })) });
@@ -296,7 +297,7 @@ function registrarEntregas({ rota, pool }) {
     try {
       const est = filtroEstados(req, 'c.ESTADO');
       const [[r]] = await pool.execute(
-        `SELECT e.*, p.RAZAO_SOCIAL AS cliente, p.DATA_ENTREGA AS prometida,
+        `SELECT e.*, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
                 c.ENDERECO AS cli_endereco, c.NUMERO AS cli_numero, c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade,
                 c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone
          FROM web_entregas e
@@ -310,7 +311,7 @@ function registrarEntregas({ rota, pool }) {
       const [anexos] = await pool.execute(
         'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND evento_id IS NOT NULL ORDER BY id', [id]);
       res.json({
-        entrega: { ...paraEntrega(r), cliente: r.cliente || '', dataPrometida: dia(r.prometida) },
+        entrega: { ...paraEntrega(r), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
         itens,

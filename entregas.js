@@ -208,7 +208,7 @@
     }
 
     function linha(e, aba) {
-      const tdBase = `<td>${esc(e.numero)}</td><td>${esc(e.cliente)}</td><td>${esc(local(e))}</td>`;
+      const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(local(e))}</td>`;
       let resto;
       if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td>${botaoAcao('reagendar', 'Reagendar')}</td>`;
@@ -217,7 +217,7 @@
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {
-      fila: ['Pedido', 'Cliente', 'Cidade/UF', 'Prometido', 'Status', ''],
+      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cidade/UF', 'Prometido', 'Status', ''],
       ocorrencias: ['Pedido', 'Cliente', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
       outras: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
       em_rota: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
@@ -300,7 +300,7 @@
       $('d-titulo').textContent = `Pedido ${e.numero}`;
       $('d-status').innerHTML = selo(e.status);
       $('d-info').innerHTML = linhaInfo('Cliente', e.cliente) + linhaInfo('Tipo', e.tipo ? rotuloTipo(e.tipo) : '') +
-        linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
+        linhaInfo('Data do pedido', dataBR(e.dataPedido)) + linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
         linhaInfo('Motorista', (estado.motoristas || []).find(m => m.codigo === e.motoristaCodigo)?.nome || (e.motoristaCodigo ? '#' + e.motoristaCodigo : '')) +
         linhaInfo('Endereço', enderecoTexto(e)) + linhaInfo('Contato no local', e.contatoLocal) + linhaInfo('Transportadora', e.transportadora) +
         linhaInfo('Rastreio', e.rastreio) + linhaInfo('Previsão', dataBR(e.previsao)) + linhaInfo('Observação', e.observacao);
