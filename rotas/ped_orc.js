@@ -7,6 +7,7 @@ const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcess
 const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const express = require('express');
+const { validarPng } = require('../calculo/png');
 const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 
@@ -412,7 +413,6 @@ function registrarPedOrc({ rota, pool }) {
 
   // Desenho da porta (PNG capturado na tela ao configurar o item) para a coluna Imagem do PDF. Sobe depois do salvar, separado do JSON
   // (o corpo do salvar é limitado a 100 kb). Guarda o carimbo do documento: se o VB mudar os itens depois, o PDF deixa de usar a imagem.
-  const PNG_ASSINATURA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const LIMITE_DESENHO = 150 * 1024;
   // erro do leitor de corpo (grande demais, etc.) vira JSON, não a página HTML padrão do Express
   const lerPng = (req, res, next) => express.raw({ type: 'image/png', limit: LIMITE_DESENHO })(req, res, err => {
@@ -423,9 +423,9 @@ function registrarPedOrc({ rota, pool }) {
       const tipo = req.params.tipo, numero = Number(req.params.numero), item = Number(req.params.item);
       if (!TIPOS.includes(tipo) || !(Number.isInteger(numero) && numero > 0) || !(Number.isInteger(item) && item > 0)) return res.status(400).json({ error: 'Documento ou item inválido.' });
       const png = req.body;
-      if (!Buffer.isBuffer(png) || png.length <= PNG_ASSINATURA.length || !png.subarray(0, PNG_ASSINATURA.length).equals(PNG_ASSINATURA)) {
-        return res.status(400).json({ error: 'Envie o desenho como imagem PNG.' });
-      }
+      // não basta a assinatura: o pdfkit decodifica o PNG de forma assíncrona e uma exceção ali derruba o servidor (ver calculo/png.js)
+      const v = validarPng(png);
+      if (!v.ok) return res.status(400).json({ error: 'Envie o desenho como imagem PNG válida.' });
       try {
         const linhas = await lerDocumento(pool, tipo, numero);
         const naoAchou = () => res.status(404).json({ error: 'Item não encontrado.' });

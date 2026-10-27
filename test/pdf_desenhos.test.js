@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { pngSolido } = require('./apoio/png');
+const { pngSolido, pngComIdatCorrompido } = require('./apoio/png');
 const pdf = require('../pdf/ped_orc');
 const { carimboItens } = require('../calculo/leitura_vb');
 
@@ -87,7 +87,8 @@ async function preparar(t, { carimbo, imagens = 'ok' } = {}) {
     [/SELECT MEDICAO FROM cadastro_clientes/, [{ MEDICAO: 'Vão' }]],
     [/FROM web_item_desenhos/, () => {
       if (imagens === 'erro') throw new Error('tabela inexistente');
-      return [{ item: 1, png: pngSolido(120, 240), carimbo: carimbo ?? certo }];
+      const png = imagens === 'corrompida' ? pngComIdatCorrompido(120, 240, 6) : pngSolido(120, 240);
+      return [{ item: 1, png, carimbo: carimbo ?? certo }];
     }]
   ]);
   pool.execute = f.execute; pool.getConnection = f.getConnection;
@@ -124,4 +125,13 @@ test('GET /dados_pdf?producao=1 (Guia de Produção) também usa o desenho', asy
   const sem = await (await preparar(t, { carimbo: 'x'.repeat(64) })).chamar(2, '/dados_pdf?numero=23425&tipo=Pedido&producao=1');
   assert.equal(com.r.status, 200);
   assert.equal(contarImagens(com.buf), contarImagens(sem.buf) + 1);
+});
+
+test('GET /dados_pdf: imagem já guardada com dados corrompidos (RGBA) é ignorada, o PDF sai e o servidor não cai', async t => {
+  const boa = await (await preparar(t, { carimbo: 'x'.repeat(64) })).chamar(1, '/dados_pdf?numero=23425&tipo=Pedido');
+  const r = await (await preparar(t, { imagens: 'corrompida' })).chamar(1, '/dados_pdf?numero=23425&tipo=Pedido');
+  assert.equal(r.r.status, 200);
+  assert.equal(r.buf.subarray(0, 4).toString(), '%PDF');
+  assert.equal(contarImagens(r.buf), contarImagens(boa.buf));
+  await new Promise(ok => setTimeout(ok, 100));   // o decodificador do pdfkit é assíncrono: se algo estivesse errado, a exceção apareceria aqui
 });

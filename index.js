@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pdfPedOrc = require('./pdf/ped_orc');
 const { carimboItens } = require('./calculo/leitura_vb');
+const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
@@ -745,7 +746,8 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
     try {
       const [guardados] = await pool.execute('SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [tipo, numero]);
       const carimbo = carimboItens({ lista: itens, itensV4: v4, furacao: furos });
-      for (const d of guardados) if (d.carimbo === carimbo) desenhos[Number(d.item)] = d.png;
+      // só entra imagem que ainda vale (carimbo) e que decodifica direito: PNG corrompido derrubaria o processo dentro do pdfkit
+      for (const d of guardados) if (d.carimbo === carimbo && validarPng(d.png).ok) desenhos[Number(d.item)] = d.png;
     } catch { desenhos = {}; }
     const doc = pdfPedOrc.novoDocumento();
     doc.pipe(res);

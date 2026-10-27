@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const { bancoPedOrc, prepararPedOrc } = require('./apoio/bancoPedOrc');
 const { carimboItens } = require('../calculo/leitura_vb');
 
-const ASSINATURA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const png = (extra = 40) => Buffer.concat([ASSINATURA, Buffer.alloc(extra, 7)]);
+const { pngSolido, pngComIdatCorrompido } = require('./apoio/png');
+const png = (largura = 40) => pngSolido(largura, 80);   // PNG de verdade: o servidor confere IHDR, CRC e se os dados descomprimem
 
 // pedido 23425 com 2 itens de porta (cliente "CLIENTE TESTE")
 function comPedido() {
@@ -41,8 +41,12 @@ test('desenho: arquivo que não é PNG, corpo vazio ou grande demais é recusado
   const c = await prepararPedOrc(t, { banco });
   assert.equal((await put(c, 1, Buffer.from('<html>oi</html>'))).status, 400);
   assert.equal((await put(c, 1, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(50)]))).status, 400);
+  // assinatura e IHDR válidos (até RGBA, o tipo do canvas), mas dados corrompidos: antes derrubava o servidor ao gerar o PDF
+  assert.equal((await put(c, 1, pngComIdatCorrompido(100, 200, 6))).status, 400);
+  assert.equal((await put(c, 1, pngComIdatCorrompido(100, 200, 0))).status, 400);
+  assert.equal((await put(c, 1, pngSolido(5000, 5000))).status, 400);
   assert.equal((await put(c, 1, Buffer.alloc(0))).status, 400);
-  const grande = await put(c, 1, png(150 * 1024 + 10));
+  const grande = await put(c, 1, Buffer.concat([png(), Buffer.alloc(150 * 1024)]));
   assert.ok([400, 413].includes(grande.status), 'status ' + grande.status);
   assert.match(grande.headers.get('content-type'), /json/);
   assert.match((await grande.json()).error, /150 kb/);

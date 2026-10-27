@@ -2810,6 +2810,8 @@
                 manterData = !confirm('Deseja alterar a data para hoje?');
             guardarRascunho();
             const tipo = tipoAtual();
+            // a lista pode mudar enquanto o salvar espera o servidor (remover/editar item): os desenhos sobem para os itens que FORAM salvos
+            const itensSalvos = itens.slice();
             const corpo = {
                 modo, tipo, ...(modo === 'atualizar' ? { numero: docAberto.numero, manterData } : {}),
                 ...(docAberto?.impressao ? { impressao: docAberto.impressao } : {}),
@@ -2842,8 +2844,8 @@
                 // desenhos das portas sobem agora, antes de reabrir (a reabertura reconstrói os itens); falha não desfaz o salvar
                 let falhasDesenho = 0;
                 try {
-                    await Promise.all(itens.map(it => it.desenhoPronto).filter(Boolean));
-                    falhasDesenho = (await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itens)).falhas;
+                    await Promise.all(itensSalvos.map(it => it.desenhoPronto).filter(Boolean));
+                    falhasDesenho = (await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itensSalvos)).falhas;
                 } catch { falhasDesenho = 0; }
                 // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });

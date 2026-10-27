@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const { prepararPedOrc, bancoPedOrc } = require('./apoio/bancoPedOrc');
 const { carimboItens } = require('../calculo/leitura_vb');
 
-const ASSINATURA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const png = marca => Buffer.concat([ASSINATURA, Buffer.alloc(30, marca)]);   // cada item recebe um PNG reconhecível pela "marca"
+const { pngSolido } = require('./apoio/png');
+const png = marca => pngSolido(10 + marca, 20);   // cada item recebe um PNG reconhecível pela "marca" (largura = 10 + marca)
 
 const giro = (mudar = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, largura: 500, profundidade: 0, soldas: 0, obs: '',
   furos: { lista: [100, 900], lados: ['Esquerdo', 'Esquerdo'] },
@@ -34,7 +34,7 @@ async function salvoComDesenhos(t, { perfil } = {}) {
   const aberto = await (await c.chamar(`/ped_orc/Pedido/${numero}`)).json();
   return { banco, chamar: c.chamar, numero, aberto };
 }
-const marcas = (banco, numero) => banco.desenhos.filter(d => d.numero === numero).sort((a, b) => a.item - b.item).map(d => [d.item, d.png[8]]);
+const marcas = (banco, numero) => banco.desenhos.filter(d => d.numero === numero).sort((a, b) => a.item - b.item).map(d => [d.item, d.png.readUInt32BE(16) - 10]);
 
 test('atualizar sem mexer nos itens: as imagens continuam, com o carimbo do documento regravado', async t => {
   const { banco, chamar, numero, aberto } = await salvoComDesenhos(t);

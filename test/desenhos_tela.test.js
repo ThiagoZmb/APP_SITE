@@ -64,3 +64,12 @@ test('orcamentos.html: carrega desenhos.js, captura ao adicionar o item e envia 
   assert.ok(envia > 0 && reabre > 0 && envia < reabre, 'enviar os desenhos antes de reabrir o documento');
   assert.match(h, /desenho\(s\) não foram enviados/);
 });
+
+test('orcamentos.html: os desenhos enviados são os dos itens que foram salvos (cópia da lista tirada ao montar o corpo), não os da lista de agora', () => {
+  const h = ler('orcamentos.html');
+  assert.match(h, /const itensSalvos = itens\.slice\(\);/);
+  assert.match(h, /Desenhos\.enviarDesenhos\(chamarDesenho, json\.tipo, json\.numero, itensSalvos\)/);
+  assert.match(h, /itensSalvos\.map\(it => it\.desenhoPronto\)/);
+  // a cópia é tirada antes do fetch do salvar
+  assert.ok(h.indexOf('const itensSalvos = itens.slice();') < h.indexOf('/ped_orc/salvar`, { method'));
+});
