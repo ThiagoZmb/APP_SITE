@@ -1922,7 +1922,7 @@
                 // no desenho limpo (PDF) os furos aparecem como círculos maiores (a imagem é pequena); os números das medidas ficam só na tela
                 if (ehPortaComFuros() && furosLista.length) {
                     const lado = ladoFuroDaFolha(f);
-                    const raio = Math.max(35 * esc, 12) / 2 * (limpo ? 1.6 : 1);
+                    const raio = Math.max(35 * esc, 12) / 2 * (limpo ? 2 : 1);
                     ctx.font = fonte(14); ctx.lineWidth = 2;
                     furosLista.forEach(m => {
                         let cx, cy;
@@ -1936,7 +1936,7 @@
                             cy = oy + (isReferenciaInvertida ? altura - m : m) * esc;
                             cx = lado === 'Direita' ? ox + largPx - perfilPx / 2 : ox + perfilPx / 2;
                         }
-                        ctx.fillStyle = '#f5f5f5'; ctx.strokeStyle = '#2f4f4f';
+                        ctx.fillStyle = limpo ? '#1f2d2d' : '#f5f5f5'; ctx.strokeStyle = '#2f4f4f';
                         ctx.beginPath(); ctx.arc(cx, cy, raio, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
                         if (limpo) return;
                         ctx.fillStyle = '#8b0000';

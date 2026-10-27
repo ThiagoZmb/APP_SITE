@@ -78,6 +78,7 @@ test('orcamentos.html: o desenho limpo do PDF mostra os furos (círculos, maiore
   const h = ler('orcamentos.html');
   assert.match(h, /if \(ehPortaComFuros\(\) && furosLista\.length\) \{/);       // sem "!limpo": os furos entram também no desenho limpo
   assert.doesNotMatch(h, /!limpo && ehPortaComFuros\(\)/);
-  assert.match(h, /const raio = Math\.max\(35 \* esc, 12\) \/ 2 \* \(limpo \? 1\.6 : 1\);/);
+  assert.match(h, /const raio = Math\.max\(35 \* esc, 12\) \/ 2 \* \(limpo \? 2 : 1\);/);
+  assert.match(h, /ctx\.fillStyle = limpo \? '#1f2d2d' : '#f5f5f5';/);   // escuro no PDF: o quadro da porta é fino e o furo claro sumia no cinza
   assert.match(h, /if \(limpo\) return;\s*\n\s*ctx\.fillStyle = '#8b0000';/);        // números das medidas só na tela
 });
