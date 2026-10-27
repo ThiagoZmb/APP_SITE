@@ -43,7 +43,7 @@ Pontos a confirmar na implementação (não verificados): o significado exato de
 
 Por grupo (perfil, acabamento, cor):
 1. Retalhos disponíveis do mesmo grupo são candidatos primeiro (menor retalho que comporte a peça).
-2. Cada peça consome `tamanho + serra` (um corte por peça, conservador e igual ao FFD do VB).
+2. Regra de encaixe igual à do VB: n peças usam n−1 serras; o corte final da ponta sai da sobra informada.
 3. Estratégias executadas: First-Fit Decreasing, Best-Fit Decreasing, e ordens alternativas (por tamanho crescente de retalho, desempate estável). Para grupos pequenos, busca exata limitada por tempo/nós.
 4. Escolhe o plano com **menos varas novas**; desempate: maior aproveitamento, depois menor número de retalhos pequenos gerados. Desempate final determinístico (ordem estável), para o mesmo pedido gerar sempre o mesmo plano.
 5. Invariante testada: o resultado nunca usa mais varas que o First-Fit Decreasing do VB.
@@ -55,7 +55,7 @@ Aproveitamento = soma dos tamanhos das peças ÷ soma dos comprimentos das varas
 
 Tabelas novas (nunca alteram tabelas do VB):
 
-- `web_corte_config`: `id`, `perfil` (NULL = padrão), `comprimento_vara` INT, `serra` INT, `sobra_minima` INT, auditoria de criação/alteração. UNIQUE em `perfil`. Linha padrão 6000 / 3 / 500 criada na instalação.
+- `web_corte_config`: `id`, `perfil` (vazio = padrão), `comprimento_vara` INT, `serra` INT, `sobra_minima` INT, auditoria de criação/alteração. UNIQUE em `perfil`. Sem linha semeada: o padrão 6000 / 3 / 500 vive no código e a linha de perfil vazio (padrão) só nasce quando alguém edita.
 - `web_retalhos`: `id`, `perfil`, `acabamento`, `cor`, `comprimento` INT, `situacao` (`disponivel`, `reservado`, `usado`, `descartado`), `plano_origem` (NULL se cadastro manual), `plano_reserva` (NULL se não reservado), `criado_em`, `atualizado_em`, `criado_por`.
 - `web_corte_planos`: `id`, `pedido`, `situacao` (`gerado`, `conferido`, `desatualizado`, `cancelado`), `impressao_pecas` (hash das peças), `parametros` JSON, `resultado` JSON, `criado_por/em`, `conferido_por/em`.
 

@@ -14,7 +14,7 @@
 
 - Medidas em **mm inteiros**; nenhum ponto flutuante nas contas de corte. Aproveitamento em % com 1 casa, calculado de inteiros.
 - Padrões: vara **6000 mm**, serra **3 mm**, sobra mínima **500 mm**, com exceção por perfil (`web_corte_config`).
-- Cada peça consome `tamanho + serra`. Peça só entra em retalho/vara do **mesmo perfil + acabamento + cor**.
+- Encaixe como no VB (n peças usam n−1 serras; o corte final sai da sobra). Peça só entra em retalho/vara do **mesmo perfil + acabamento + cor**.
 - Só tabelas `web_*` novas, criadas por `seguranca/instalacao.js`; **nunca** alterar tabelas do VB. Sem FK para tabelas do VB.
 - Só **Pedido** (a tabela `perfis` não existe para orçamento). Serralheria fora.
 - Toda rota por `registro.rota(...)` (`seguranca/rotas.js`); permissões `corte.ver`, `corte.planejar`, `corte.parametros` em `seguranca/permissoes.js`. Administrador e Interno completo recebem ver+planejar; só Administrador recebe parametros. Contagens com nomes `qtd*`.
