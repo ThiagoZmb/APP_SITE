@@ -876,6 +876,7 @@
         </div>
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
+    <script src="desenhos.js?v=202610272200"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
@@ -1759,8 +1760,11 @@
         // textos do desenho maiores: o canvas é desenhado em 2× e exibido numa coluna estreita
         const fonte = (px, peso = 600) => `${peso} ${Math.round(px * 1.6)}px 'Plus Jakarta Sans', 'Segoe UI', sans-serif`;
         // picDesenho_Paint — perfil, vidro, divisores, puxador + fantasmas e furos (geometria do VB)
-        function desenharVisualizacao() {
-            const cv = document.getElementById('cv-visualizacao');
+        // opcoes = { alvo, limpo }: sem opções desenha na tela como sempre. Com limpo + alvo desenha para o PDF num canvas fora da tela
+        // (já dimensionado): sem cotas em texto, sem rótulo de folha, sem furos e sem fantasmas/zonas de clique.
+        function desenharVisualizacao(opcoes = {}) {
+            const limpo = !!(opcoes && opcoes.limpo === true && opcoes.alvo);
+            const cv = limpo ? opcoes.alvo : document.getElementById('cv-visualizacao');
             if (!cv) return;
             // porta de correr com sistema: a medida digitada é o VÃO; as folhas são desenhadas com a medida da PORTA (frmPortasCorrer)
             const vaoA = parseFloat(val('f-altura')) || 0, vaoL = parseFloat(val('f-largura')) || 0;
@@ -1781,7 +1785,8 @@
             const ehPar = paresAtivo();
             const ctx = cv.getContext('2d');
             // a área cresce em altura conforme a proporção das portas (até 80% da janela): porta alta e estreita fica grande
-            if (altura > 0 && largura > 0) {
+            if (limpo) { /* canvas de captura: já vem com o tamanho certo */ }
+            else if (altura > 0 && largura > 0) {
                 garantirFolhas();
                 const n = Math.min(posicoesFolhas.length, 4);
                 const mmL = largura * n + (n > 1 ? Math.max(150, largura * 0.08) : 0) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
@@ -1789,15 +1794,16 @@
                 const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
                 if (Math.abs(cv.getBoundingClientRect().height - alvo) > 2) cv.style.height = alvo + 'px';
             } else cv.style.height = '';
-            const W = cv.width = Math.max(300, cv.clientWidth) * 2;
-            const H = cv.height = Math.max(300, cv.clientHeight) * 2;
+            const W = limpo ? cv.width : (cv.width = Math.max(300, cv.clientWidth) * 2);
+            const H = limpo ? cv.height : (cv.height = Math.max(300, cv.clientHeight) * 2);
             ctx.clearRect(0, 0, W, H);
             cv._zonas = [];
             cv._cotas = []; cv._coresCotas = {}; // textos e cores das cotas (também usados pelos testes)
             const COR_VAO = '#0077ff', COR_PORTA = '#e8590c'; // vão em azul, porta em laranja
-            const cota = (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
+            const cota = limpo ? () => {} : (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
             cv._generico = false;
             if (altura <= 0 || largura <= 0) {
+                if (limpo) return;
                 // sem medidas: porta genérica do produto (tracejada), só para orientar
                 const [gA, gL, gN] = ehCorrer() ? [2100, 900, 2] : ehBasculante() ? [450, 1000, 1] : frenteAtual === 'Frente de gaveta' ? [250, 600, 1] : [2100, 800, 1];
                 const gGap = 150, gW = gL * gN + gGap * (gN - 1), gEsc = Math.min((W - 160) / gW, (H - 200) / gA);
@@ -1847,7 +1853,7 @@
                 ctx.save(); ctx.translate(ox0 + tw + 46, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0, COR_PORTA); ctx.restore();
             }
             const perfilPx = Math.max(45 * esc, 8);
-            const configAtivo = modoPuxador && temPuxador();
+            const configAtivo = !limpo && modoPuxador && temPuxador();
             const tamDigitado = parseFloat(val('f-tamanho-pux'));
             const tamReal = tamDigitado > 0 ? tamDigitado : 120;
             // espessura do puxador pelo tipo (embutido mais fino e por dentro; sobreposto mais grosso e saliente)
@@ -1913,7 +1919,7 @@
                     });
                 }
                 // furos: mesma lista em todas as folhas, no lado de cada uma (centro do perfil)
-                if (ehPortaComFuros() && furosLista.length) {
+                if (!limpo && ehPortaComFuros() && furosLista.length) {
                     const lado = ladoFuroDaFolha(f);
                     const raio = Math.max(35 * esc, 12) / 2;
                     ctx.font = fonte(14); ctx.lineWidth = 2;
@@ -1949,7 +1955,7 @@
                     cota(`${altura} mm`, 0, 0, COR_PORTA);
                     ctx.restore();
                 }
-                if (qtdFolhas > 1) {
+                if (qtdFolhas > 1 && !limpo) {
                     ctx.font = fonte(15); ctx.fillStyle = '#8B0000'; ctx.textAlign = 'center';
                     ctx.fillText(ehPar && f % 2 === 1 ? `Folha ${f + 1} (espelhada)` : `Folha ${f + 1}`, ox + largPx / 2, correrSis ? oy + perfilPx + 26 : oy - topoExtra - 14);
                 }
@@ -2206,6 +2212,37 @@
             document.getElementById('calc-status').textContent = '';
         }
         // ============ LISTA DE ITENS ============
+        // Desenho limpo da porta (PNG) para a coluna Imagem do PDF. O canvas é desenhado agora, com o formulário ainda preenchido; o PNG sai em seguida.
+        // "desenho"/"desenhoPronto" ficam fora do JSON (rascunho do localStorage e corpo do salvar não levam o Blob).
+        function definirDesenho(item, promessa) {
+            Object.defineProperty(item, 'desenho', { value: null, writable: true, enumerable: false, configurable: true });
+            Object.defineProperty(item, 'desenhoPronto', { value: promessa.then(b => { item.desenho = b; }), writable: true, enumerable: false, configurable: true });
+        }
+        function capturarDesenho() {
+            if (!Desenhos.FRENTES_COM_DESENHO.includes(frenteAtual)) return Promise.resolve(null);
+            try {
+                const LADO = 1200, PAD = 12;
+                const grande = document.createElement('canvas'); grande.width = LADO; grande.height = LADO;
+                desenharVisualizacao({ alvo: grande, limpo: true });
+                const c = grande._caixa;
+                if (!c || !(c.w > 0) || !(c.h > 0)) return Promise.resolve(null);
+                const sx = Math.max(0, Math.floor(c.x - PAD)), sy = Math.max(0, Math.floor(c.y - PAD));
+                const sw = Math.min(LADO - sx, Math.ceil(c.w + 2 * PAD)), sh = Math.min(LADO - sy, Math.ceil(c.h + 2 * PAD));
+                const gerar = escala => new Promise(ok => {
+                    const { w, h } = Desenhos.caixaDoDesenho(sw, sh, { maxW: 300 * escala, maxH: 500 * escala });
+                    const saida = document.createElement('canvas'); saida.width = w; saida.height = h;
+                    const g = saida.getContext('2d');
+                    g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+                    g.drawImage(grande, sx, sy, sw, sh, 0, 0, w, h);
+                    saida.toBlob(b => ok(b), 'image/png');
+                });
+                return Desenhos.reduzirAteCaber(gerar, 150 * 1024);
+            } catch { return Promise.resolve(null); }
+        }
+        const chamarDesenho = async (caminho, { metodo, corpo, tipoConteudo }) => {
+            const r = await fetch(`${API_BASE}${caminho}`, { method: metodo, headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': tipoConteudo }, body: corpo });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+        };
         function adicionarItem() {
             if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
             if (frenteAtual === 'Serralheria') {
@@ -2218,6 +2255,7 @@
             item.valorBase = item.valor;
             item.historico = editandoIndex >= 0 ? (itens[editandoIndex].historico || '') : '';
             item.valor = Math.round(aplicarHistorico(item.valorBase, item.historico) * 100) / 100;
+            definirDesenho(item, capturarDesenho());
             if (editandoIndex >= 0) {
                 const antigo = itens[editandoIndex];
                 if (antigo.origem) item.origem = { item: antigo.origem.item, estado: 'editado' }; // o servidor recalcula com o preço de hoje
@@ -2801,10 +2839,17 @@
             }
             itens.forEach(it => { delete it.precoMudou; });
             if (res.ok && json.ok) {
+                // desenhos das portas sobem agora, antes de reabrir (a reabertura reconstrói os itens); falha não desfaz o salvar
+                let falhasDesenho = 0;
+                try {
+                    await Promise.all(itens.map(it => it.desenhoPronto).filter(Boolean));
+                    falhasDesenho = (await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itens)).falhas;
+                } catch { falhasDesenho = 0; }
                 // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
                 if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
-                mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.`, 'ok');
+                if (falhasDesenho) mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo, mas ${falhasDesenho} desenho(s) não foram enviados; abra o item e salve de novo.`, 'erro');
+                else mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.`, 'ok');
                 return;
             }
             if (res.status === 409 && json.erro === 'preco_mudou') (json.itens || []).forEach(i => { if (itens[i]) itens[i].precoMudou = true; });
