@@ -33,6 +33,21 @@
     return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : dataBR(q);
   };
 
+  // Resposta do ViaCEP -> rua, bairro, cidade e UF; null se o CEP não existe (a API devolve { erro: true })
+  function enderecoDoViaCep(r) {
+    if (!r || typeof r !== 'object' || r.erro) return null;
+    return { rua: txt(r.logradouro), bairro: txt(r.bairro), cidade: txt(r.localidade), uf: txt(r.uf).toUpperCase().slice(0, 2) };
+  }
+  const cepLimpo = v => String(v ?? '').replace(/\D/g, '');
+  // consulta o ViaCEP (liberado na CSP das telas); devolve o endereço, null se não existe, e lança Error em português se a consulta falhar
+  async function consultarCep(win, cep) {
+    const d = cepLimpo(cep);
+    if (d.length !== 8) throw new Error('Informe um CEP com 8 números.');
+    let dados;
+    try { dados = await (await win.fetch(`https://viacep.com.br/ws/${d}/json/`)).json(); } catch { throw new Error('Não foi possível consultar o CEP agora.'); }
+    return enderecoDoViaCep(dados);
+  }
+
   // maior lado limitado a `max`, sem ampliar
   function escalaImagem(w, h, max) {
     const f = Math.min(1, max / Math.max(w, h));
@@ -102,5 +117,5 @@
     throw new Error('A foto continua grande demais. Tente outra.');
   }
 
-  return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, criarApi, criarToast, reduzirImagem };
+  return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem };
 });

@@ -229,6 +229,15 @@ test('tabelas de entregas: número único, índice dos eventos, anexo em MEDIUMB
   }
 });
 
+function poolCadastros({ jaFeito = false } = {}) {
+  return criarPoolFalso([
+    [/FROM web_auditoria WHERE acao = 'permissoes_cadastros'/, jaFeito ? [{ id: 9 }] : []],
+    [/SELECT id, nome FROM web_perfis WHERE nome IN/, [{ id: 1, nome: 'Administrador' }, { id: 2, nome: 'Interno completo' }]],
+    [/INSERT IGNORE INTO web_perfil_permissoes/, () => ({ affectedRows: 1 })],
+    [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
+  ]);
+}
+
 function poolEntregas({ jaFeito = false } = {}) {
   return criarPoolFalso([
     [/FROM web_auditoria WHERE acao = 'permissoes_entregas'/, jaFeito ? [{ id: 9 }] : []],
@@ -237,6 +246,16 @@ function poolEntregas({ jaFeito = false } = {}) {
     [/INSERT INTO web_auditoria/, () => ({ insertId: 1 })]
   ]);
 }
+
+test('cadastros: Administrador recebe fornecedores e funcionários; Interno completo só fornecedores; uma vez', async () => {
+  const { acrescentarPermissoesCadastros } = require('../seguranca/instalacao');
+  const pool = poolCadastros();
+  assert.deepEqual(await acrescentarPermissoesCadastros(pool), { feito: true });
+  const ins = pool.chamadas.filter(c => /INSERT IGNORE INTO web_perfil_permissoes/.test(c.sql)).map(c => c.params);
+  assert.deepEqual(ins, [[1, 'fornecedores.ver'], [1, 'fornecedores.editar'], [1, 'funcionarios.ver'], [1, 'funcionarios.editar'], [2, 'fornecedores.ver'], [2, 'fornecedores.editar']]);
+  assert.ok(pool.chamadas.find(c => /INSERT INTO web_auditoria/.test(c.sql)).params.includes('permissoes_cadastros'));
+  assert.deepEqual(await acrescentarPermissoesCadastros(poolCadastros({ jaFeito: true })), { feito: false });
+});
 
 test('entregas: ver e programar para Administrador e Interno completo (nunca baixar), uma vez', async () => {
   const pool = poolEntregas();

@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 32 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 32);
-  assert.equal(CODIGOS.size, 32);
+test('catálogo tem 36 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 36);
+  assert.equal(CODIGOS.size, 36);
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
@@ -15,11 +15,11 @@ test('catálogo tem 32 permissões e códigos únicos', () => {
 
 test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e excluir', () => {
   const p = perfil('Interno completo');
-  assert.equal(p.permissoes.length, 24);
+  assert.equal(p.permissoes.length, 26); // + fornecedores.ver e fornecedores.editar
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil('Administrador').permissoes.length, 32);
+  assert.equal(perfil('Administrador').permissoes.length, 36);
   assert.ok(!p.permissoes.includes('pedidos.situacao')); // mudar situação: só o Administrador
 });
 
@@ -74,4 +74,18 @@ test('entregas: no catálogo (área Entregas); Interno completo não vira motori
   assert.ok(ic.includes('entregas.ver') && ic.includes('entregas.programar') && !ic.includes('entregas.baixar'));
   assert.ok(perfil('Administrador').permissoes.includes('entregas.baixar'));
   for (const n of ['Vendedor', 'Estoquista', 'Representante']) assert.ok(!perfil(n).permissoes.some(c => c.startsWith('entregas.')), n);
+});
+
+test('cadastros: fornecedores para Administrador e Interno completo; funcionários só para o Administrador; outros perfis nada', () => {
+  for (const c of ['fornecedores.ver', 'fornecedores.editar', 'funcionarios.ver', 'funcionarios.editar']) {
+    assert.ok(CODIGOS.has(c), c);
+    assert.equal(CATALOGO.find(p => p.codigo === c).area, 'Cadastros');
+    assert.ok(perfil('Administrador').permissoes.includes(c), c);
+  }
+  const ic = perfil('Interno completo').permissoes;
+  assert.ok(ic.includes('fornecedores.ver') && ic.includes('fornecedores.editar'));
+  assert.ok(!ic.includes('funcionarios.ver') && !ic.includes('funcionarios.editar'));
+  for (const n of ['Vendedor', 'Estoquista', 'Representante']) {
+    assert.ok(!perfil(n).permissoes.some(c => c.startsWith('fornecedores.') || c.startsWith('funcionarios.')), n);
+  }
 });

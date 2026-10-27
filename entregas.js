@@ -149,12 +149,7 @@
     return o;
   };
 
-  // Resposta do ViaCEP -> campos do endereço de entrega; null se o CEP não existe (a API devolve { erro: true })
-  function enderecoDoViaCep(r) {
-    if (!r || typeof r !== 'object' || r.erro) return null;
-    return { rua: txt(r.logradouro), bairro: txt(r.bairro), cidade: txt(r.localidade), uf: txt(r.uf).toUpperCase().slice(0, 2) };
-  }
-  const cepLimpo = v => String(v ?? '').replace(/\D/g, '');
+  const { enderecoDoViaCep, cepLimpo } = C; // busca de CEP compartilhada (entregas_comum.js)
   const validarRetirada = f => (txt(f.entregueA) ? null : 'Informe quem retirou.');
   const validarEnviada = f => (txt(f.transportadora) ? null : 'Informe a transportadora.');
   const validarComprovante = f => (f.temFoto ? null : 'Anexe a foto do comprovante.');

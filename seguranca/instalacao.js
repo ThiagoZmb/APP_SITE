@@ -424,4 +424,30 @@ const acrescentarPermissoesCancelarExcluir = pool => darAoAdministrador(pool, 'p
 // Mudar a situação do pedido pela tela de pedidos: só o Administrador recebe (como cancelar/excluir)
 const acrescentarPermissoesSituacao = pool => darAoAdministrador(pool, 'permissoes_situacao', ['pedidos.situacao']);
 
-module.exports = { instalarTabelas, acrescentarPermissoesSituacao, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Cadastros: fornecedores para Administrador e Interno completo; funcionários (dados pessoais e salários) só para o Administrador
+const PERMISSOES_CADASTROS = { 'Administrador': ['fornecedores.ver', 'fornecedores.editar', 'funcionarios.ver', 'funcionarios.editar'], 'Interno completo': ['fornecedores.ver', 'fornecedores.editar'] };
+async function acrescentarPermissoesCadastros(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_cadastros' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of PERMISSOES_CADASTROS[p.nome] || []) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_cadastros', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { instalarTabelas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

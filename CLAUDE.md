@@ -16,6 +16,7 @@ Funcionalidades (páginas HTML na raiz):
 - Financeiro / fluxo de caixa (`financeiro.html`) e gráficos de pedidos (`graficos_pedidos.html`).
 - Custos e **formação de preço** (`custos.html`, `custos_precos.js`, `rotas/custos.js`, `rotas/precos_formacao.js`): calcula custo real dos materiais pelas compras e sugere o `VALOR_FIXO`.
 - **Entregas** (`entregas.html`, `minhas_entregas.html`, `rotas/entregas.js`): fila de pedidos Pronto, agenda (motorista, retirada, outro estado), baixa pelo motorista no celular com foto do canhoto, ocorrências e histórico; também aparece em Início, Pedidos (selo) e Financeiro do cliente (somente leitura). Regras na seção 5, "Entregas".
+- **Fornecedores e funcionários** (`fornecedores.html`, `funcionarios.html`, `rotas/fornecedores.js`, `rotas/funcionarios.js`): cadastros das tabelas do VB `cadastro_fornecedores` e `funcionarios`, com busca e CEP (ViaCEP). Regras na seção 5, "Cadastros".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Leitura de projeto técnico em PDF** na tela de orçamentos (botão "📄 Ler projeto (PDF)", `leitura/`, `leitura_pdf.js`): o servidor lê o PDF pela API do Claude e o vendedor confere cada valor antes de importar (seção 5, "Leitura de PDF").
 
@@ -33,6 +34,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   nfe_xml.js             Leitura do XML da NF-e (recusa DOCTYPE)
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
+  fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
   entregas.js            Entregas: varredura da fila (`sincronizarFila`), agenda, anexos, rotas da equipe (`/entregas*`) e do motorista (`/minhas_entregas*`)
   transacao.js           Transação com nova tentativa em deadlock, `ErroUsuario`, hora local (compartilhado pelas rotas)
 calculo/                 Funções puras (testáveis sem banco)
@@ -111,6 +113,12 @@ Nunca colocar valores de senhas/tokens neste arquivo nem no git.
 - **Nomes de campo**: nada que case com `REGEX_VALOR` (por isso `entregue_a`, e não `recebedor`: "receb" é dinheiro). Contagens usam `qtd*`. Os campos `entregaStatus`, `dataAgendada` e `qtdEntregasPendentes` são seguros e aparecem em `/dados_lista`, `/dados_pedidos`, `/dados_pedidos_rj` (LEFT JOIN só para `TIPO='Pedido'`) e em `/clientes/financeiro/:codigo`.
 - **Permissões**: `entregas.ver`, `entregas.programar`, `entregas.baixar`. A migração dá ver+programar a Administrador e Interno completo; `baixar` a nenhum perfil.
 - **Testes**: `test/entregas_*.test.js`, `test/minhas_entregas_tela.test.js`; `test/entregas_ligacoes.test.js` cobre as ligações e confirma que o app sobe com as rotas novas (`registro.verificar()`).
+
+### Cadastros (fornecedores e funcionários)
+- **Tabelas do VB** (`cadastro_fornecedores`: COD, RAZAO_FABRICANTE, ..., CLASSE, CF_CV; `funcionarios`: CODIGO, NOME, CPF, CARGO, SALARIO_BASE, ..., SENHA, NIVEL, ADMISSAO, DEMISSAO). Códigos novos são AUTO_INCREMENT (o VB manda NULL/0). Regras tiradas de `frm_Cadastro_Fornecedores.vb` e `frm_Funcionários.vb`.
+- **Fornecedor**: classe obrigatória (Matéria prima, Insumos, Serviços, Geral); situação Ativo/Inativo; a razão social não muda depois de criada (estoque, compras e `fluxo_de_caixa.RAZAO_FABRICANTE` usam o nome como chave) e não pode repetir; o registro `.` do VB não aparece; sem exclusão (inativar). Permissões `fornecedores.ver`/`fornecedores.editar` (Administrador e Interno completo).
+- **Funcionário**: dados pessoais com `funcionarios.ver`/`funcionarios.editar` (**só Administrador** na migração); salário e encargos (SALARIO_BASE, FGTS, férias, 13º, almoço, transporte, plano, seguro, outros) só com `valores.ver` — sem ela a rota não devolve e, ao salvar, mantém o que está gravado (`preservarValores`). **SENHA, NIVEL e DARF do VB nunca saem nem são alterados pela web** (novo funcionário entra com SENHA vazia; NIVEL = cargo, como o VB). Como o VB, DEMISSAO sempre grava uma data (hoje se vazia); a tela só mostra para quem está Demitido. A auditoria (`funcionario_criado/alterado`) guarda só os nomes dos campos alterados, nunca CPF nem valores. Sem exclusão (Inativo/Demitido).
+- **Testes**: `test/cadastros_calculo.test.js`, `test/cadastros_rotas.test.js` (banco falso `test/apoio/bancoCadastros.js`), `test/cadastros_tela.test.js`.
 
 ### Outras regras não óbvias
 - **Fidelidade ao VB**: cálculos devem reproduzir o VB (comentários citam `MotorFinanceiro`, `MotorPrecificacaoSerralheria`, `frmPortasAbrir`, etc.). Antes de "corrigir" uma conta, confirme se é comportamento do VB.
