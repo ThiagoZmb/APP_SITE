@@ -94,3 +94,16 @@ test('excluir o pedido apaga as imagens dele (e só as dele)', async t => {
   assert.deepEqual(marcas(banco, numero), []);
   assert.equal(banco.desenhos.length, 1);
 });
+
+test('orçamento grava a data de entrega informada (válida); sem ela ou inválida, continua valendo hoje', async t => {
+  const banco = bancoPedOrc();
+  const c = await prepararPedOrc(t, { banco });
+  const orc = mudar => c.chamar('/ped_orc/salvar', 'POST', corpo({ tipo: 'Orçamento', situacao: undefined, financeiro: undefined, ...mudar }));
+  const r1 = await (await orc({ dataEntrega: '2026-12-20' })).json();
+  const r2 = await (await orc({ dataEntrega: '' })).json();
+  const r3 = await (await orc({ dataEntrega: 'lixo' })).json();
+  const abrir = async n => (await (await c.chamar(`/ped_orc/Orçamento/${n}`)).json()).cabecalho;
+  assert.equal((await abrir(r1.numero)).dataEntrega, '2026-12-20');
+  assert.match((await abrir(r2.numero)).dataEntrega, /^\d{4}-\d{2}-\d{2}$/);
+  assert.notEqual((await abrir(r3.numero)).dataEntrega, 'lixo');
+});

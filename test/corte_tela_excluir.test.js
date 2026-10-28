@@ -20,3 +20,14 @@ test('o botão existe no HTML, escondido até haver dado para excluir', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'corte.html'), 'utf8');
   assert.match(html, /id="btn-excluir-dados"[^>]*hidden/);
 });
+
+test('baixa local: a tela guarda os cliques e envia em lote; botões com ícone e sem botão sólido vermelho', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'corte.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'corte.html'), 'utf8');
+  assert.match(js, /marcas: lote\.map/);
+  assert.match(js, /localStorage/);
+  assert.doesNotMatch(js.slice(js.indexOf('function marcarPeca'), js.indexOf('// ---- retalhos ----')), /await chamar/);
+  for (const id of ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano', 'btn-excluir-dados', 'btn-retalho', 'btn-config'])
+    assert.match(html, new RegExp(`id="${id}"[^>]*>\s*<svg`), id);
+  assert.doesNotMatch(html, /btn-danger/);
+});

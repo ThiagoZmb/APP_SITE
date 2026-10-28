@@ -111,56 +111,101 @@
         }
 
         /* ---- plano de corte ---- */
-        .abas { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-        .abas button { padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--white); font-weight: 600; cursor: pointer; color: var(--text-dark); }
-        .abas button.ativa { background: var(--gradient-primary); color: #fff; border-color: transparent; }
-        .busca-pedido { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
-        .acoes-plano { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
-        dl.resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 18px; }
-        dl.resumo div { background: var(--secondary-color); border-radius: 12px; padding: 12px 14px; }
-        dl.resumo dt { font-size: 12px; color: var(--text-light); text-transform: uppercase; font-weight: 700; }
-        dl.resumo dd { font-size: 20px; font-weight: 700; margin-top: 4px; }
-        .aviso-pendencia { border: 1px solid var(--warning-color); background: #fff8e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        body .abas { display: flex; gap: 4px; margin: 0 0 20px; padding: 4px !important; border: 0 !important; border-radius: 12px; background: #ececf2; width: fit-content; max-width: 100%; flex-wrap: wrap; }
+        .abas button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 9px; border: 0; background: transparent; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--text-light); min-height: 40px; }
+        .abas button svg { width: 18px; height: 18px; flex: none; }
+        .abas button:hover { color: var(--primary-color); }
+        body .abas button.ativa { background: #fff; color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
+
+        /* botões: mesma altura, ícone à esquerda, uma única linguagem (primário, neutro, risco em tom suave) */
+        body .btn { min-height: 44px; white-space: nowrap; }
+        body .btn svg { width: 18px; height: 18px; flex: none; }
+        body .btn[hidden] { display: none !important; }
+        body .btn[disabled] { opacity: .5; cursor: not-allowed; transform: none !important; }
+        body .btn:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        body .btn.btn-perigo-suave { color: #8a5200 !important; }
+        body .btn.btn-perigo-suave:hover { background: #fff4e0 !important; border-color: #e8b35a !important; }
+        body .btn.btn-perigo { color: #a52a2a !important; }
+        body .btn.btn-perigo:hover { background: #fdecec !important; border-color: #e58a8a !important; }
+        .acoes-plano { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 20px; margin: 14px 0 18px; }
+        .acoes-plano:not(:has(.btn:not([hidden]))) { display: none; }
+        .acoes-grupo { display: flex; flex-wrap: wrap; gap: 8px; }
+        .acoes-grupo:not(:has(.btn:not([hidden]))) { display: none; }
+        .acoes-risco { padding-left: 20px; border-left: 1px solid var(--border-color); margin-left: auto; }
+        .acoes-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+        /* busca do pedido: campo e botão na mesma altura e alinhados pela base */
+        .busca-pedido { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border-color); }
+        .busca-pedido .form-group { margin: 0; }
+        .busca-pedido input { width: 180px; min-height: 44px; }
+        .cab-plano { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .cab-plano h2 { font-size: 22px; letter-spacing: -.02em; }
+        .sync { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: #e9ecef; color: #495057; }
+        .sync::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .sync.pendente { background: #fff3cd; color: #8a6d00; }
+        .sync.ok { background: #d4edda; color: #1b6b30; }
+        .sync.erro { background: #f8d7da; color: #a12330; }
+        #plano-status { margin: 4px 0 0; }
+
+        /* resumo: quatro cartões iguais, número em destaque */
+        dl.resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 14px 0 20px; }
+        dl.resumo > div { background: var(--surface-2, #f9f9fb); border: 1px solid var(--border-color); border-top: 3px solid var(--primary-color); border-radius: 12px; padding: 12px 16px; }
+        dl.resumo dt { font-size: 11.5px; letter-spacing: .5px; color: var(--text-light); text-transform: uppercase; font-weight: 700; }
+        dl.resumo dd { font-size: 24px; font-weight: 800; margin-top: 4px; letter-spacing: -.02em; }
+
+        .aviso-pendencia { border: 1px solid #f0d27a; border-left: 5px solid var(--warning-color); background: #fff8e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
         .aviso-pendencia ul { padding-left: 20px; margin-top: 6px; }
-        .grupo { margin-bottom: 26px; padding: 14px 16px 6px; border-radius: 14px; background: var(--g-fundo, #f5f7fa); border-left: 10px solid var(--g-solido, #444); }
-        .grupo h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .nome-perfil { background: var(--g-solido, #444); color: #fff; font-size: 22px; font-weight: 800; letter-spacing: .5px; padding: 4px 14px; border-radius: 10px; }
-        .chip { background: #fff; color: var(--g-solido, #444); border: 1px solid var(--g-borda, #999); font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+
+        /* perfil: cabeçalho em uma linha (nome, chips, andamento) e barras alinhadas */
+        .grupo { margin-bottom: 22px; padding: 16px 18px 8px; border-radius: 14px; background: var(--g-fundo, #f5f7fa); border: 1px solid var(--g-borda, #ddd); border-left: 10px solid var(--g-solido, #444); }
+        .grupo h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; text-transform: none; letter-spacing: 0; }
+        .nome-perfil { background: var(--g-solido, #444); color: #fff; font-size: 20px; font-weight: 800; letter-spacing: .3px; padding: 4px 14px; border-radius: 10px; line-height: 1.3; }
+        .chip { background: #fff; color: var(--g-solido, #444); border: 1px solid var(--g-borda, #999); font-size: 12.5px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
         .progresso-grupo { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--g-solido, #444); }
-        .selo-completa { background: #2e7d32; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
-        .barra.completa .faixa { border-color: #2e7d32; }
+        .selo-completa { display: inline-flex; align-items: center; background: #2e7d32; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
         .barra { margin-bottom: 14px; }
-        .barra-titulo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 4px; }
-        .faixa { display: flex; height: 54px; border: 2px solid var(--text-dark); border-radius: 6px; overflow: hidden; background: #eee; }
-        .peca { border: 0; border-right: 3px solid var(--text-dark); background: var(--g-peca, #cfe3ff); color: var(--text-dark); font-weight: 700; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; min-width: 0; padding: 0 2px; }
-        .peca small { font-weight: 400; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .barra-titulo { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px; }
+        .barra-titulo .cinza { margin: 0 0 0 auto; }
+        .faixa { display: flex; height: 56px; border: 2px solid var(--text-dark); border-radius: 8px; overflow: hidden; background: #eee; }
+        .barra.completa .faixa { border-color: #2e7d32; }
+        .peca { border: 0; border-right: 3px solid var(--text-dark); background: var(--g-peca, #cfe3ff); color: var(--text-dark); font-weight: 800; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; min-width: 0; padding: 0 2px; transition: filter .12s ease; }
+        .peca small { font-weight: 500; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .peca[disabled] { cursor: default; }
         .peca:not([disabled]):hover { filter: brightness(.93); outline: 2px solid var(--g-solido, #444); outline-offset: -2px; }
         .peca.cortada { background: #a5d6a7; color: #1b5e20; text-decoration: line-through; }
         .sobra { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; background: repeating-linear-gradient(45deg, #fff3cd, #fff3cd 6px, #ffe69c 6px, #ffe69c 12px); }
         .sobra.descartar { background: repeating-linear-gradient(45deg, #eee, #eee 6px, #ddd 6px, #ddd 12px); color: var(--text-light); }
-        .conf-linha { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 14px; }
-        .conf-linha input[type=text], .conf-linha .conf-medida { width: 110px; }
+        .conf-linha { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 14px; }
+        .conf-linha label { display: inline-flex; align-items: center; gap: 8px; }
+        .conf-linha .conf-medida { width: 110px; }
+
+        /* formulários e tabelas */
         .cinza, .dica { color: var(--text-light); font-size: 13px; }
         .vazio { color: var(--text-light); padding: 16px 0; }
         .erro-estado, .erro-form { color: var(--danger-color); font-size: 14px; min-height: 1em; }
-        .linha3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+        .linha3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: end; }
         .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-        .form-group label { font-size: 13px; font-weight: 600; color: var(--text-light); }
-        input, select { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; }
-        .btn { padding: 10px 18px; border-radius: 10px; border: 1px solid transparent; font-weight: 600; cursor: pointer; font-size: 14px; }
-        .btn-primary { background: var(--gradient-primary); color: #fff; }
-        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border-color: var(--border-color); }
-        .btn[disabled] { opacity: .6; cursor: default; }
-        .btn-danger { background: #b71c1c; color: #fff; }
+        .form-group label { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .3px; }
+        input, select { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; min-height: 44px; background: #fff; }
+        input:focus, select:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-ring, rgba(155,27,48,.16)); }
+        .painel > h2, .painel form > h2 { font-size: 18px; margin-bottom: 8px; }
+        .tabela-wrap { overflow-x: auto; }
+        td .btn { min-height: 34px; padding: 6px 12px !important; font-size: 13px !important; }
+        td.num { text-align: right; }
         .toast { padding: 12px 18px; border-radius: 10px; color: #fff; background: #333; box-shadow: var(--shadow-medium); }
         .toast.ok { background: var(--success-color); } .toast.erro { background: var(--danger-color); }
-        .tabela-wrap { overflow-x: auto; }
+        @media (max-width: 768px) {
+            .acoes-risco { margin-left: 0; padding-left: 0; border-left: 0; }
+            .acoes-grupo { width: 100%; }
+            .acoes-grupo .btn { flex: 1 1 140px; }
+            .progresso-grupo { margin-left: 0; width: 100%; }
+        }
+        @media (prefers-reduced-motion: reduce) { .peca { transition: none; } }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <script src="layout.js?v=202610272300" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="corte.js?v=202610281100" defer></script>
+    <script src="corte.js?v=202610281500" defer></script>
 </head>
 <body>
     <div class="container">
@@ -182,26 +227,33 @@
             <p class="welcome-subtitle">Distribui os perfis de um pedido em varas e retalhos para perder o mínimo. As medidas vêm do pedido gravado; peça com dado faltando aparece como pendência e fica fora do plano.</p>
 
             <div class="abas" role="tablist">
-                <button type="button" role="tab" data-aba="plano" aria-selected="true" class="ativa">Plano do pedido</button>
-                <button type="button" role="tab" data-aba="retalhos" aria-selected="false">Retalhos</button>
-                <button type="button" role="tab" data-aba="config" aria-selected="false">Parâmetros</button>
+                <button type="button" role="tab" data-aba="plano" aria-selected="true" class="ativa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>Plano do pedido</span></button>
+                <button type="button" role="tab" data-aba="retalhos" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M8 8v3M12 8v4M16 8v3"/></svg><span>Retalhos</span></button>
+                <button type="button" role="tab" data-aba="config" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Parâmetros</span></button>
             </div>
 
             <div id="painel-plano">
                 <section class="painel">
                     <form id="form-pedido" class="busca-pedido" novalidate>
                         <div class="form-group"><label for="numero">Número do pedido</label><input id="numero" inputmode="numeric" autocomplete="off" placeholder="ex.: 1234"></div>
-                        <button type="submit" class="btn btn-primary">Abrir</button>
+                        <button type="submit" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Abrir</span></button>
                     </form>
-                    <h2 id="plano-titulo"></h2>
+                    <div class="cab-plano">
+                        <h2 id="plano-titulo"></h2>
+                        <span class="sync" id="sync-estado" role="status" aria-live="polite" hidden></span>
+                    </div>
                     <p class="dica" id="plano-status" role="status"></p>
-                    <div class="acoes-plano" data-perm="corte.planejar">
-                        <button type="button" class="btn btn-primary" id="btn-salvar" hidden>Salvar plano e reservar retalhos</button>
-                        <button type="button" class="btn btn-secondary" id="btn-refazer" hidden>Refazer o plano</button>
-                        <button type="button" class="btn btn-secondary" id="btn-conferir" hidden>Conferir o corte</button>
-                        <button type="button" class="btn btn-primary" id="btn-confirmar" hidden>Confirmar o corte</button>
-                        <button type="button" class="btn btn-secondary" id="btn-cancelar-plano" hidden>Cancelar o plano</button>
-                        <button type="button" class="btn btn-danger" id="btn-excluir-dados" hidden title="Apaga todos os planos gravados deste pedido (inclusive cancelados) e solta os retalhos reservados">Excluir dados do pedido</button>
+                    <div class="acoes-plano" role="toolbar" aria-label="Ações do plano" data-perm="corte.planejar">
+                        <div class="acoes-grupo">
+                            <button type="button" class="btn btn-primary" id="btn-salvar" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg><span>Salvar plano</span></button>
+                            <button type="button" class="btn btn-secondary" id="btn-refazer" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg><span>Refazer</span></button>
+                            <button type="button" class="btn btn-secondary" id="btn-conferir" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg><span>Conferir corte</span></button>
+                            <button type="button" class="btn btn-primary" id="btn-confirmar" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg><span>Confirmar corte</span></button>
+                        </div>
+                        <div class="acoes-grupo acoes-risco">
+                            <button type="button" class="btn btn-secondary btn-perigo-suave" id="btn-cancelar-plano" hidden title="Cancela o plano e solta os retalhos reservados"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg><span>Cancelar plano</span></button>
+                            <button type="button" class="btn btn-secondary btn-perigo" id="btn-excluir-dados" hidden title="Apaga todos os planos gravados deste pedido (inclusive cancelados) e solta os retalhos reservados"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg><span>Excluir dados</span></button>
+                        </div>
                     </div>
                     <div id="plano-area" aria-live="polite"><p class="vazio">Informe o número de um pedido.</p></div>
                 </section>
@@ -226,8 +278,10 @@
                             <div class="form-group"><label for="r-comprimento">Comprimento (mm)</label><input id="r-comprimento" inputmode="numeric" autocomplete="off"></div>
                         </div>
                         <p class="erro-form" id="erro-retalho" role="alert"></p>
-                        <button type="submit" class="btn btn-primary" id="btn-retalho">Cadastrar retalho</button>
-                        <button type="button" class="btn btn-secondary" id="btn-retalho-limpar">Limpar</button>
+                        <div class="acoes-form">
+                            <button type="submit" class="btn btn-primary" id="btn-retalho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Cadastrar retalho</span></button>
+                            <button type="button" class="btn btn-secondary" id="btn-retalho-limpar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Limpar</span></button>
+                        </div>
                     </form>
                 </section>
             </div>
@@ -248,7 +302,7 @@
                             <div class="form-group"><label for="c-sobra">Sobra mínima (mm)</label><input id="c-sobra" inputmode="numeric" autocomplete="off" placeholder="ex.: 500"></div>
                         </div>
                         <p class="erro-form" id="erro-config" role="alert"></p>
-                        <button type="submit" class="btn btn-primary" id="btn-config">Gravar parâmetros</button>
+                        <div class="acoes-form"><button type="submit" class="btn btn-primary" id="btn-config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg><span>Gravar parâmetros</span></button></div>
                     </form>
                 </section>
             </div>

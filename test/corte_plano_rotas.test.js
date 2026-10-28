@@ -265,3 +265,18 @@ test('pedido real com acabamento sem cor (ex.: anodizado) gera plano normalmente
   assert.equal(j.plano.resumo.qtdRetalhosUsados, 1);
   assert.equal(j.plano.grupos[0].cor, '');
 });
+
+test('baixa em lote: várias marcas num PUT só, a última de cada peça vale e uma inválida recusa o lote inteiro', async t => {
+  const b = cenario();
+  const { chamar } = await prepararCorte(t, { banco: b });
+  const { id } = await salvar(chamar);
+  const grupo = (await (await chamar(`/corte/plano/${id}`)).json()).plano.grupos[0].chave;
+  const ok = await chamar(`/corte/plano/${id}/pecas`, 'PUT', { marcas: [
+    { grupo, barra: 0, peca: 0, cortada: true }, { grupo, barra: 0, peca: 1, cortada: true }, { grupo, barra: 0, peca: 0, cortada: false }] });
+  assert.equal(ok.status, 200);
+  assert.deepEqual((await (await chamar(`/corte/plano/${id}`)).json()).cortadas, [{ grupo, barra: 0, peca: 1 }]);
+  const ruim = await chamar(`/corte/plano/${id}/pecas`, 'PUT', { marcas: [{ grupo, barra: 0, peca: 0, cortada: true }, { grupo, barra: 99, peca: 0, cortada: true }] });
+  assert.equal(ruim.status, 400);
+  assert.deepEqual((await (await chamar(`/corte/plano/${id}`)).json()).cortadas, [{ grupo, barra: 0, peca: 1 }]);   // nada do lote inválido foi gravado
+  assert.equal((await chamar(`/corte/plano/${id}/pecas`, 'PUT', { marcas: [] })).status, 400);
+});

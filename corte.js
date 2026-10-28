@@ -81,7 +81,7 @@
     if (modo !== 'salvo') return planoSalvoConferido ? 'Este pedido já tem um plano conferido; abaixo está só uma simulação.'
       : 'Pré-visualização: nada foi gravado nem reservado. Salve o plano para marcar as peças cortadas e reservar os retalhos.';
     const aberto = salvo.situacao === 'gerado' || salvo.situacao === 'desatualizado';
-    return `Plano nº ${salvo.id}: ${rotuloSituacao(salvo.situacao)}. ${cortadas} de ${total} peças cortadas.` + (aberto ? ' Clique numa peça para dar baixa quando ela for cortada (clique de novo para desfazer).' : '');
+    return `Plano nº ${salvo.id}: ${rotuloSituacao(salvo.situacao)}. ${cortadas} de ${total} peças cortadas.` + (aberto ? ' Clique numa peça para dar baixa quando ela for cortada (clique de novo para desfazer). As baixas ficam salvas neste aparelho na hora e são enviadas ao servidor em lote.' : '');
   }
   function htmlResumo(r) {
     const cel = (t, v) => `<div><dt>${esc(t)}</dt><dd>${esc(v)}</dd></div>`;
@@ -138,6 +138,80 @@
     const pode = p => !!(win.Acesso && win.Acesso.pode(p));
     const ABERTO = s => s === 'gerado' || s === 'desatualizado';
 
+    // ---- baixa de peças "local": o clique só mexe na tela e no localStorage; o servidor recebe tudo junto (lote) ----
+    // pendentes: chave da peça -> { grupo, barra, peca, cortada } ainda não confirmado pelo servidor (guardado por plano)
+    const ESPERA_ENVIO_MS = 3000, ESPERA_REENVIO_MS = 15000;
+    const sync = { plano: null, pendentes: new Map(), timer: null, enviando: null, erro: false };
+    const chaveArmazem = id => 'corte_marcas_' + id;
+    function gravarPendentes() {
+      try {
+        if (!sync.plano) return;
+        if (sync.pendentes.size) win.localStorage.setItem(chaveArmazem(sync.plano), JSON.stringify([...sync.pendentes.values()]));
+        else win.localStorage.removeItem(chaveArmazem(sync.plano));
+      } catch { /* armazenamento bloqueado: segue só em memória */ }
+    }
+    function lerPendentes(id) {
+      try {
+        const lista = JSON.parse(win.localStorage.getItem(chaveArmazem(id)) || '[]');
+        return Array.isArray(lista) ? lista.filter(m => m && typeof m.grupo === 'string' && Number.isInteger(m.barra) && Number.isInteger(m.peca) && typeof m.cortada === 'boolean') : [];
+      } catch { return []; }
+    }
+    function mostrarSync() {
+      const el = $('sync-estado');
+      if (!el) return;
+      const n = sync.pendentes.size, s = n === 1 ? '' : 's';
+      el.hidden = !(sync.plano && (n || sync.erro || sync.enviando));
+      el.className = 'sync ' + (sync.erro ? 'erro' : n ? 'pendente' : 'ok');
+      el.textContent = sync.erro ? `Sem conexão: ${n} baixa${s} guardada${s} neste aparelho` : n ? `${n} baixa${s} a enviar` : 'Baixas salvas';
+    }
+    function agendarEnvio(ms) {
+      if (sync.timer) win.clearTimeout(sync.timer);
+      sync.timer = sync.pendentes.size ? win.setTimeout(() => { sync.timer = null; enviarPendentes(); }, ms) : null;
+    }
+    async function enviarPendentes() {
+      if (sync.timer) { win.clearTimeout(sync.timer); sync.timer = null; }
+      if (sync.enviando) return sync.enviando;
+      if (!sync.plano || !sync.pendentes.size) { mostrarSync(); return; }
+      const plano = sync.plano, lote = [...sync.pendentes.entries()];
+      sync.enviando = (async () => {
+        try {
+          await chamar(`/corte/plano/${plano}/pecas`, { metodo: 'PUT', corpo: { marcas: lote.map(([, m]) => m) } });
+          sync.erro = false;
+          // só tira do pendente o que não mudou durante o envio
+          if (sync.plano === plano) for (const [k, m] of lote) { const atual = sync.pendentes.get(k); if (atual && atual.cortada === m.cortada) sync.pendentes.delete(k); }
+          gravarPendentes();
+        } catch (err) {
+          if (err.status === 400 || err.status === 404 || err.status === 409) {
+            // o plano mudou (cancelado, conferido, refeito): as baixas guardadas não valem mais
+            sync.pendentes.clear(); gravarPendentes(); sync.erro = false; sync.enviando = null; mostrarSync();
+            toast('O plano mudou no servidor; recarregando.', 'erro');
+            await carregarPlano(estado.numero, { semEnviar: true });
+            return;
+          }
+          sync.erro = true;
+        }
+        sync.enviando = null; mostrarSync();
+        if (sync.pendentes.size) agendarEnvio(sync.erro ? ESPERA_REENVIO_MS : ESPERA_ENVIO_MS);
+      })();
+      mostrarSync();
+      return sync.enviando;
+    }
+    // abre um plano: baixas guardadas neste aparelho e ainda não enviadas valem por cima do que veio do servidor
+    function adotarPlano(id, cortadasServidor) {
+      sync.plano = id; sync.pendentes = new Map(); sync.erro = false;
+      const cortadas = new Set(cortadasServidor.map(c => chaveCortada(c.grupo, c.barra, c.peca)));
+      if (id) for (const m of lerPendentes(id)) {
+        const k = chaveCortada(m.grupo, m.barra, m.peca);
+        sync.pendentes.set(k, m);
+        if (m.cortada) cortadas.add(k); else cortadas.delete(k);
+      }
+      agendarEnvio(ESPERA_ENVIO_MS); mostrarSync();
+      return cortadas;
+    }
+    win.addEventListener('pagehide', () => { enviarPendentes(); });
+    doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'hidden') enviarPendentes(); });
+    win.addEventListener('online', () => { if (sync.pendentes.size) enviarPendentes(); });
+
     function mensagem(id, texto, tipo) { $(id).innerHTML = `<p class="${tipo === 'erro' ? 'erro-estado' : 'vazio'}" role="${tipo === 'erro' ? 'alert' : 'status'}">${esc(texto)}</p>`; }
     function aba(nome) {
       for (const b of doc.querySelectorAll('[data-aba]')) { const ativa = b.dataset.aba === nome; b.setAttribute('aria-selected', String(ativa)); b.classList.toggle('ativa', ativa); }
@@ -165,7 +239,8 @@
       $('btn-confirmar').hidden = !(editavel && estado.conferindo);
       $('btn-cancelar-plano').hidden = !editavel;
     }
-    async function carregarPlano(numero) {
+    async function carregarPlano(numero, { semEnviar = false } = {}) {
+      if (!semEnviar) await enviarPendentes();
       const seq = ++estado.seq;
       estado.numero = numero; estado.conferindo = false; estado.cortadas = new Set();
       mensagem('plano-area', 'Carregando…'); $('plano-titulo').textContent = ''; $('btn-excluir-dados').hidden = true;
@@ -175,7 +250,7 @@
         if (previa.planoSalvo && previa.planoSalvo.situacao !== 'cancelado') salvo = await chamar('/corte/plano/' + encodeURIComponent(previa.planoSalvo.id));
         if (seq !== estado.seq) return;
         estado.previa = previa; estado.salvo = salvo; estado.modo = salvo ? 'salvo' : 'previa';
-        estado.cortadas = new Set(((salvo && salvo.cortadas) || []).map(c => chaveCortada(c.grupo, c.barra, c.peca)));
+        estado.cortadas = adotarPlano(salvo ? salvo.id : null, (salvo && salvo.cortadas) || []);
         desenharPlano();
       } catch (err) {
         if (seq !== estado.seq) return;
@@ -186,7 +261,7 @@
     async function acao(botao, fazer, okMsg) {
       if (estado.ocupado) return;
       estado.ocupado = true; botao.disabled = true;
-      try { await fazer(); if (okMsg) toast(okMsg, 'ok'); await carregarPlano(estado.numero); }
+      try { await enviarPendentes(); await fazer(); if (okMsg) toast(okMsg, 'ok'); await carregarPlano(estado.numero); }
       catch (err) { toast(err.message, 'erro'); if (err.status === 409) await carregarPlano(estado.numero); }
       finally { estado.ocupado = false; botao.disabled = false; }
     }
@@ -206,14 +281,14 @@
       if (!win.confirm('Confirmar o corte? Os retalhos usados saem do estoque e as sobras conferidas entram como retalhos. Isto não pode ser desfeito.')) return;
       await acao($('btn-confirmar'), () => chamar(`/corte/plano/${estado.salvo.id}/confirmar`, { metodo: 'POST', corpo: corpoConferencia(linhas, naoUsados) }), 'Corte confirmado.');
     }
-    async function marcarPeca(botao) {
+    // clique na peça: atualiza a tela e o localStorage na hora; o envio ao servidor é adiado e feito em lote
+    function marcarPeca(botao) {
       const { grupo, barra, peca } = botao.dataset;
       const chave = chaveCortada(grupo, Number(barra), Number(peca)), feita = !estado.cortadas.has(chave);
-      try {
-        await chamar(`/corte/plano/${estado.salvo.id}/pecas`, { metodo: 'PUT', corpo: { grupo, barra: Number(barra), peca: Number(peca), cortada: feita } });
-        if (feita) estado.cortadas.add(chave); else estado.cortadas.delete(chave);
-        desenharPlano();
-      } catch (err) { toast(err.message, 'erro'); }
+      if (feita) estado.cortadas.add(chave); else estado.cortadas.delete(chave);
+      sync.pendentes.set(chave, { grupo, barra: Number(barra), peca: Number(peca), cortada: feita });
+      gravarPendentes(); agendarEnvio(ESPERA_ENVIO_MS);
+      desenharPlano(); mostrarSync();
     }
 
     // ---- retalhos ----
@@ -226,7 +301,7 @@
         $('retalhos-lista').innerHTML = htmlRetalhos(d.retalhos, pode('corte.parametros'), pode('corte.planejar'));
       } catch (err) { mensagem('retalhos-lista', err.status === 403 ? 'Você não tem permissão para ver os retalhos.' : 'Não foi possível carregar: ' + err.message, 'erro'); }
     }
-    function limparFormRetalho() { for (const id of ['r-id', 'r-perfil', 'r-acabamento', 'r-cor', 'r-comprimento']) $(id).value = ''; $('btn-retalho').textContent = 'Cadastrar retalho'; }
+    function limparFormRetalho() { for (const id of ['r-id', 'r-perfil', 'r-acabamento', 'r-cor', 'r-comprimento']) $(id).value = ''; $('btn-retalho').querySelector('span').textContent = 'Cadastrar retalho'; }
     async function salvarRetalho(ev) {
       ev.preventDefault();
       if (estado.ocupado) return;
@@ -252,7 +327,7 @@
       if (!r) return;
       if (b.dataset.acao === 'editar') {
         $('r-id').value = r.id; $('r-perfil').value = r.perfil; $('r-acabamento').value = r.acabamento; $('r-cor').value = r.cor; $('r-comprimento').value = r.comprimento;
-        $('btn-retalho').textContent = 'Salvar ajuste'; $('r-perfil').focus(); return;
+        $('btn-retalho').querySelector('span').textContent = 'Salvar ajuste'; $('r-perfil').focus(); return;
       }
       if (!win.confirm(`Descartar o retalho de ${mm(r.comprimento)} (${r.perfil})?`)) return;
       try { await chamar(`/corte/retalhos/${encodeURIComponent(r.id)}/descartar`, { metodo: 'POST' }); toast('Retalho descartado.', 'ok'); await carregarRetalhos(); }

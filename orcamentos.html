@@ -271,6 +271,7 @@
 
         /* barra de ações do documento (seção 1): botões do mesmo tamanho, ícone sobre o rótulo; risco separado à direita */
         html body .acoes-linha.acoes-topo { --bw: 118px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 20px; margin: 0 0 14px !important; }
+        html body .acoes-linha.acoes-topo.acoes-rodape { margin: 18px 0 0 !important; }
         html body .acoes-topo .acoes-grupo { display: grid; grid-auto-flow: column; grid-auto-columns: var(--bw); gap: 8px; }
         html body .acoes-topo .acoes-risco { padding-left: 20px; border-left: 1px solid var(--border-color); }
         html body .acoes-topo .btn {
@@ -542,13 +543,18 @@
                         <label for="ped-cliente-final">Cliente final</label>
                         <input type="text" id="ped-cliente-final" maxlength="190">
                     </div>
+                    <div class="form-group full">
+                        <div class="ped-pedido-grid">
+                            <div><label for="ped-data">Data</label><input type="date" id="ped-data" readonly title="Data do documento (gravada ao salvar)"></div>
+                            <div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
+                        </div>
+                    </div>
                     <div class="form-group full obs-geral">
                         <label for="ped-obs">Observação geral do pedido</label>
                         <textarea id="ped-obs" rows="2" maxlength="5000"></textarea>
                     </div>
                     <div class="form-group full" id="ped-campos-pedido" style="display:none">
                         <div class="ped-pedido-grid">
-                            <div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
                             <div><label for="ped-situacao">Situação</label><select id="ped-situacao"><option value="">—</option><option>Cancelado</option><option>Em Produção</option><option>Entregue</option><option>Retirado</option></select></div>
                             <div><label for="ped-financeiro">Financeiro</label><select id="ped-financeiro"><option value="">—</option><option>Recebido</option><option>A Receber</option><option>Atrasado</option><option>Sem custo</option></select></div>
                         </div>
@@ -805,14 +811,18 @@
                     <div class="grupo"><div class="rotulo">Total</div><div class="valor" id="tot-geral">R$ 0,00</div></div>
                 </div>
                 <div style="font-size:12px;color:var(--text-light);text-align:right;margin-top:6px;" id="desconto-aviso"></div>
-                <div class="acoes-linha">
-                    <button class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar">💾 Salvar</button>
-                    <button class="btn btn-secondary" id="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo">📄 PDF</button>
-                    <button class="btn btn-secondary btn-perigo-suave btn-cancelar-doc" id="btn-cancelar-doc" data-perm="pedidos.cancelar" title="Cancela o pedido aberto (a situação vira Cancelado)">🚫 Cancelar pedido</button>
-                    <button class="btn btn-secondary btn-perigo btn-excluir-doc" id="btn-excluir-doc" data-perm="pedidos.excluir" title="Apaga o documento aberto do banco">🗑️ Excluir</button>
-                    <button class="btn btn-secondary" id="btn-novo">📄 Novo</button>
-                    <button class="btn btn-secondary" id="btn-abrir">📂 Abrir</button>
-                    <button class="btn btn-secondary" id="btn-vazio">🗑️ Esvaziar lista</button>
+                <div class="acoes-linha acoes-topo acoes-rodape" role="toolbar" aria-label="Ações do documento">
+                    <div class="acoes-grupo">
+                        <button type="button" class="btn btn-secondary" id="btn-novo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/></svg><span>Novo</span></button>
+                        <button type="button" class="btn btn-secondary" id="btn-abrir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Abrir</span></button>
+                        <button type="button" class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg><span>Salvar</span></button>
+                        <button type="button" class="btn btn-secondary" id="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg><span>PDF</span></button>
+                    </div>
+                    <div class="acoes-grupo acoes-risco">
+                        <button type="button" class="btn btn-secondary btn-perigo-suave btn-cancelar-doc" id="btn-cancelar-doc" data-perm="pedidos.cancelar" title="Cancela o pedido aberto (a situação vira Cancelado)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg><span>Cancelar pedido</span></button>
+                        <button type="button" class="btn btn-secondary btn-perigo btn-excluir-doc" id="btn-excluir-doc" data-perm="pedidos.excluir" title="Apaga o documento aberto do banco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg><span>Excluir</span></button>
+                        <button type="button" class="btn btn-secondary btn-perigo-suave" id="btn-vazio" title="Remove todos os itens da lista (sem apagar o documento salvo)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg><span>Esvaziar lista</span></button>
+                    </div>
                 </div>
                 <div id="msg-salvar" class="msg-salvar" role="status" aria-live="polite"></div>
             </section>
@@ -2855,7 +2865,8 @@
                 ...(modo === 'novo' && docAberto?.impressao ? { origemDocumento: { tipo: docAberto.tipo, numero: docAberto.numero } } : {}),
                 clienteCodigo: $s('sel-cliente').value,
                 clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
-                ...(tipo === 'Pedido' ? { dataEntrega: $s('ped-entrega').value, situacao: $s('ped-situacao').value, financeiro: $s('ped-financeiro').value } : {}),
+                dataEntrega: $s('ped-entrega').value,
+                ...(tipo === 'Pedido' ? { situacao: $s('ped-situacao').value, financeiro: $s('ped-financeiro').value } : {}),
                 descontoPct: parseFloat($s('desconto').value) || 0,
                 totalTela: itens.reduce((t, it) => t + it.qtd * it.valor, 0),
                 itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
@@ -2907,6 +2918,7 @@
             limparForm(); // também zera o item em montagem (medidas, peças, complementos, acessórios, trilhos…) e sai do modo "Atualizar item"
             ['ped-cliente-final', 'ped-obs', 'ped-entrega', 'ped-situacao', 'ped-financeiro'].forEach(id => { $s(id).value = ''; });
             $s('desconto').value = 0;
+            $s('ped-data').value = hojeISO();
             $s('ped-tipo').value = 'Orçamento';
             configurarTipo();
             aplicarModoLeitura(false);
@@ -2945,8 +2957,9 @@
             $s('ped-cliente-final').value = c.clienteFinal || '';
             $s('ped-obs').value = c.obsGeral || '';
             $s('desconto').value = c.descontoPct || 0;
+            $s('ped-data').value = (c.data || '').slice(0, 10);
+            $s('ped-entrega').value = c.dataEntrega || '';
             if (c.tipo === 'Pedido') {
-                $s('ped-entrega').value = c.dataEntrega || '';
                 escolherOpcao('ped-situacao', c.situacao);
                 escolherOpcao('ped-financeiro', c.financeiro);
             }

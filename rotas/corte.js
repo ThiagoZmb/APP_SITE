@@ -251,18 +251,27 @@ function registrarCorte({ rota, pool }) {
   });
 
   // marcar / desmarcar uma peça como cortada (o progresso é só do plano; o estoque de retalhos só muda ao confirmar)
+  const MAX_MARCAS = 500;
   rota('put', '/corte/plano/:id/pecas', PLANEJAR, async (req, res) => {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
-    const { grupo, barra, peca, cortada } = req.body || {};
+    // uma marca ({grupo,barra,peca,cortada}) ou várias de uma vez ({marcas:[...]}): a tela junta os cliques e envia em lote
+    const corpo = req.body || {};
+    const marcas = Array.isArray(corpo.marcas) ? corpo.marcas : [corpo];
+    if (!marcas.length || marcas.length > MAX_MARCAS) return res.status(400).json({ error: 'Lista de peças inválida.' });
     const r = await emTransacao(pool, res, 'PUT /corte/plano/:id/pecas', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
-      const g = (lerJson(p.resultado, {}).plano?.grupos || []).find(x => x.chave === grupo);
-      const b = g && Number.isInteger(barra) ? g.barras[barra] : null;
-      if (!b || !Number.isInteger(peca) || peca < 0 || peca >= b.pecas.length || typeof cortada !== 'boolean') throw new ErroUsuario(400, 'Peça inexistente no plano.');
-      const lista = lerJson(p.progresso, []).filter(x => !(x.grupo === grupo && x.barra === barra && x.peca === peca));
-      if (cortada) lista.push({ grupo, barra, peca });
+      const grupos = lerJson(p.resultado, {}).plano?.grupos || [];
+      let lista = lerJson(p.progresso, []);
+      for (const m of marcas) {
+        const { grupo, barra, peca, cortada } = m || {};
+        const g = grupos.find(x => x.chave === grupo);
+        const b = g && Number.isInteger(barra) ? g.barras[barra] : null;
+        if (!b || !Number.isInteger(peca) || peca < 0 || peca >= b.pecas.length || typeof cortada !== 'boolean') throw new ErroUsuario(400, 'Peça inexistente no plano.');
+        lista = lista.filter(x => !(x.grupo === grupo && x.barra === barra && x.peca === peca));
+        if (cortada) lista.push({ grupo, barra, peca });
+      }
       await conn.execute("UPDATE web_corte_planos SET progresso = ? WHERE id = ? AND situacao = 'gerado'", [JSON.stringify(lista), id]);
       return { ok: true, qtdCortadas: lista.length };
     });

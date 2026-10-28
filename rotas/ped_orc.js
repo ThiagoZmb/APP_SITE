@@ -512,7 +512,7 @@ function registrarPedOrc({ rota, pool }) {
       const cab = {
         RAZAO_SOCIAL: cliente.razaoSocial, CLIENTE_FINAL: corta(b.clienteFinal, 190),
         DATA: b.modo === 'atualizar' && b.manterData && linhasSrc.cab.DATA ? linhasSrc.cab.DATA : agoraLocal(),
-        DATA_PRONTO: tipo === 'Pedido' ? b.dataEntrega : hojeLocal(), SUB_TOTAL: subTotal, DESCONTO: descontoPct, TOTAL: arred2(subTotal * (100 - descontoPct) / 100),
+        DATA_PRONTO: tipo === 'Pedido' || validarData(b.dataEntrega) ? b.dataEntrega : hojeLocal(), SUB_TOTAL: subTotal, DESCONTO: descontoPct, TOTAL: arred2(subTotal * (100 - descontoPct) / 100),
         OBS_GERAL: corta(b.obsGeral, 5000), SITUACAO: tipo === 'Pedido' ? b.situacao : 'Aguardando resposta',
         FINANCEIRO: tipo === 'Pedido' ? b.financeiro : '', REPRESENTANTE: cliente.representante, DATA_ENTREGA: null
       };
