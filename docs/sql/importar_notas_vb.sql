@@ -115,4 +115,5 @@ SELECT tipo, numero, contraparte_nome FROM web_notas_fiscais WHERE contraparte_c
 -- ============ BLOCO 6 (só para quem já rodou a versão antiga do bloco 3): limpa o texto "Importada do VB" das observações ============
 -- Só mexe nas notas copiadas pelo script (criado_por = 'importação do VB') cuja observação ainda tem exatamente esse texto.
 UPDATE web_notas_fiscais SET observacao = NULL
-WHERE observacao = 'Importada do VB' AND criado_por = 'importação do VB';
+WHERE id > 0 AND observacao = 'Importada do VB' AND criado_por = 'importação do VB';   -- "id > 0" é só para o safe update mode do Workbench aceitar
+COMMIT;
