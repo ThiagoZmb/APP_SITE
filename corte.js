@@ -27,6 +27,10 @@
   // acabamento/cor em branco são válidos no pedido: a tela diz isso em vez de deixar o espaço vazio
   const semAcab = v => txt(v) || '(sem acabamento)';
   const semCor = v => txt(v) || '(sem cor)';
+  // cada perfil do plano ganha uma cor própria (fundo, faixa, peça); verde fica reservado para "cortada" e amarelo para a sobra
+  const MATIZES = [212, 275, 24, 336, 190, 252, 8, 300];
+  const estiloGrupo = i => { const h = MATIZES[((i % MATIZES.length) + MATIZES.length) % MATIZES.length]; return `--g-solido:hsl(${h} 55% 30%);--g-fundo:hsl(${h} 60% 95%);--g-peca:hsl(${h} 70% 83%);--g-borda:hsl(${h} 50% 42%)`; };
+  const contarPecas = plano => ((plano && plano.grupos) || []).reduce((s, g) => s + g.barras.reduce((t, b) => t + b.pecas.length, 0), 0);
   const chaveCortada = (grupo, barra, peca) => `${grupo}\u0001${barra}\u0001${peca}`;
 
   // ---------- HTML do plano ----------
@@ -51,12 +55,26 @@
     }).join('');
     const sobra = b.sobra > 0 ? `<span class="sobra ${b.destinoSobra === 'guardar' ? 'guardar' : 'descartar'}" style="width:${larguraPct(b.sobra, b.comprimento)}%">Sobra ${esc(b.sobra)}</span>` : '';
     const destino = b.sobra > 0 ? ` — sobra de ${esc(mm(b.sobra))}: ${b.destinoSobra === 'guardar' ? 'guardar como retalho' : 'descartar (abaixo da sobra mínima)'}` : ' — sem sobra';
-    return `<div class="barra" role="group" aria-label="${titulo}"><div class="barra-titulo"><b>${titulo}</b><span class="cinza">${destino}</span></div>` +
+    const feitas = (b.pecas || []).filter((p, k) => cortadas.has(chaveCortada(chave, i, k))).length;
+    const completa = (b.pecas || []).length > 0 && feitas === b.pecas.length;
+    const selo = completa ? `<span class="selo-completa">✓ ${b.tipo === 'retalho' ? 'Retalho completo' : 'Vara completa'}</span>` : '';
+    return `<div class="barra${completa ? ' completa' : ''}" role="group" aria-label="${titulo}"><div class="barra-titulo"><b>${titulo}</b>${selo}<span class="cinza">${destino}</span></div>` +
       `<div class="faixa">${pecas}${sobra}</div>${opcoes.conferindo ? htmlConferencia(chave, b, i) : ''}</div>`;
   }
-  function htmlGrupo(g, opcoes) {
-    return `<section class="grupo"><h3>${esc(g.perfil)} <span class="cinza">· ${esc(semAcab(g.acabamento))} · ${esc(semCor(g.cor))}</span></h3>` +
+  function htmlGrupo(g, opcoes = {}, indice = 0) {
+    const cortadas = opcoes.cortadas || new Set();
+    const total = g.barras.reduce((s, b) => s + b.pecas.length, 0);
+    const feitas = g.barras.reduce((s, b, i) => s + b.pecas.filter((p, k) => cortadas.has(chaveCortada(g.chave, i, k))).length, 0);
+    return `<section class="grupo" style="${estiloGrupo(indice)}"><h3><span class="nome-perfil">${esc(g.perfil)}</span> <span class="chip">${esc(semAcab(g.acabamento))}</span> <span class="chip">${esc(semCor(g.cor))}</span>` +
+      `<span class="progresso-grupo">${feitas} de ${total} peças cortadas</span></h3>` +
       g.barras.map((b, i) => htmlBarra(g.chave, b, i, opcoes)).join('') + '</section>';
+  }
+  // linha de status acima do plano: explica quando dá para marcar peças e mostra o andamento
+  function textoStatusPlano({ modo, salvo, total = 0, cortadas = 0, planoSalvoConferido = false }) {
+    if (modo !== 'salvo') return planoSalvoConferido ? 'Este pedido já tem um plano conferido; abaixo está só uma simulação.'
+      : 'Pré-visualização: nada foi gravado nem reservado. Salve o plano para marcar as peças cortadas e reservar os retalhos.';
+    const aberto = salvo.situacao === 'gerado' || salvo.situacao === 'desatualizado';
+    return `Plano nº ${salvo.id}: ${rotuloSituacao(salvo.situacao)}. ${cortadas} de ${total} peças cortadas.` + (aberto ? ' Clique numa peça para dar baixa quando ela for cortada (clique de novo para desfazer).' : '');
   }
   function htmlResumo(r) {
     const cel = (t, v) => `<div><dt>${esc(t)}</dt><dd>${esc(v)}</dd></div>`;
@@ -128,12 +146,11 @@
       $('plano-titulo').textContent = `Pedido nº ${previa.pedido.numero} — ${previa.pedido.cliente}`;
       if (previa.vazio) { mensagem('plano-area', previa.mensagem); ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano'].forEach(id => { $(id).hidden = true; }); $('plano-status').textContent = ''; return; }
       const situacao = modo === 'salvo' ? salvo.situacao : null;
-      $('plano-status').textContent = modo === 'salvo' ? `Plano nº ${salvo.id}: ${rotuloSituacao(situacao)}.` : (previa.planoSalvo && previa.planoSalvo.situacao === 'conferido'
-        ? 'Este pedido já tem um plano conferido; abaixo está só uma simulação.' : 'Pré-visualização: nada foi gravado nem reservado. Salve para reservar os retalhos.');
+      $('plano-status').textContent = textoStatusPlano({ modo, salvo, total: contarPecas(fonte.plano), cortadas: estado.cortadas.size, planoSalvoConferido: !!(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido') });
       const editavel = modo === 'salvo' && ABERTO(situacao) && pode('corte.planejar');
       const opcoes = { cortadas: estado.cortadas, clicavel: editavel && !estado.conferindo, conferindo: editavel && estado.conferindo };
       $('plano-area').innerHTML = htmlResumo(fonte.plano.resumo) + htmlPendencias(fonte.pendencias) + htmlErros(fonte.plano.erros) +
-        (fonte.plano.grupos.length ? fonte.plano.grupos.map(g => htmlGrupo(g, opcoes)).join('') : '<p class="vazio">Nenhuma peça para cortar (veja as pendências).</p>');
+        (fonte.plano.grupos.length ? fonte.plano.grupos.map((g, i) => htmlGrupo(g, opcoes, i)).join('') : '<p class="vazio">Nenhuma peça para cortar (veja as pendências).</p>');
       $('btn-salvar').hidden = !(modo === 'previa' && pode('corte.planejar') && previa.qtdPecas > 0 && !(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido'));
       $('btn-refazer').hidden = !(modo === 'salvo' && editavel && !estado.conferindo);
       $('btn-conferir').hidden = !(editavel && !estado.conferindo);
@@ -272,6 +289,6 @@
     if (n && /^\d+$/.test(n)) { $('numero').value = n; carregarPlano(n); } else mensagem('plano-area', 'Informe o número de um pedido para ver ou gerar o plano de corte.');
   }
 
-  return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
+  return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
     corpoSalvar, corpoConferencia, validarConferenciaForm, htmlRetalhos, htmlConfig, iniciar };
 });

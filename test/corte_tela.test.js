@@ -106,3 +106,37 @@ test('grupo sem acabamento ou sem cor é rotulado em vez de ficar em branco', ()
   assert.match(html, /sem cor/);
   assert.match(T.htmlRetalhos([{ id: 1, perfil: 'P', acabamento: 'Anodizado', cor: '', comprimento: 900, situacao: 'disponivel', planoOrigem: null, planoReserva: null }], false), /sem cor/);
 });
+
+// ---- cores por perfil, andamento do corte ----
+test('cada perfil tem uma cor própria (fundo, faixa, peça), diferente da vizinha, e a paleta recomeça depois de 8', () => {
+  const estilos = [0, 1, 2, 3, 4, 5, 6, 7].map(T.estiloGrupo);
+  assert.equal(new Set(estilos).size, 8);
+  for (const e of estilos) { assert.match(e, /--g-solido:/); assert.match(e, /--g-fundo:/); assert.match(e, /--g-peca:/); }
+  assert.equal(T.estiloGrupo(8), T.estiloGrupo(0));
+});
+
+test('grupo: nome do perfil em destaque, cor do grupo aplicada e andamento "X de Y peças cortadas"', () => {
+  const g = { chave: 'P|A|C', perfil: 'P', acabamento: 'A', cor: 'C', barras: [barra({ pecas: [{ tamanho: 1000, item: 1, origem: 'porta-altura' }, { tamanho: 900, item: 1, origem: 'porta-largura' }] }),
+    barra({ pecas: [{ tamanho: 500, item: 2, origem: 'puxador' }] })] };
+  const cortadas = new Set([T.chaveCortada('P|A|C', 0, 0), T.chaveCortada('P|A|C', 1, 0)]);
+  const html = T.htmlGrupo(g, { cortadas }, 2);
+  assert.ok(html.includes(`style="${T.estiloGrupo(2)}"`));
+  assert.match(html, /<span class="nome-perfil">P<\/span>/);
+  assert.match(html, /2 de 3 peças cortadas/);
+  assert.match(html, /class="barra completa"/);                  // só a segunda vara está toda cortada
+  assert.equal((html.match(/class="barra completa"/g) || []).length, 1);
+  assert.match(html, /Vara completa/);
+});
+
+test('texto de status: pré-visualização explica que é preciso salvar para dar baixa; plano salvo mostra o andamento', () => {
+  assert.match(T.textoStatusPlano({ modo: 'previa', planoSalvoConferido: false }), /Salve o plano para marcar as peças cortadas/);
+  assert.match(T.textoStatusPlano({ modo: 'previa', planoSalvoConferido: true }), /já tem um plano conferido/);
+  const s = T.textoStatusPlano({ modo: 'salvo', salvo: { id: 5, situacao: 'gerado' }, total: 8, cortadas: 3 });
+  assert.match(s, /Plano nº 5/); assert.match(s, /3 de 8 peças cortadas/); assert.match(s, /clique numa peça/i);
+  assert.doesNotMatch(T.textoStatusPlano({ modo: 'salvo', salvo: { id: 5, situacao: 'conferido' }, total: 8, cortadas: 8 }), /clique numa peça/i);
+});
+
+test('contarPecas soma as peças de todas as varas do plano', () => {
+  assert.equal(T.contarPecas({ grupos: [{ barras: [barra(), barra({ pecas: [{ tamanho: 1, item: 1, origem: 'puxador' }] })] }] }), 3);
+  assert.equal(T.contarPecas({ grupos: [] }), 0);
+});
