@@ -141,3 +141,44 @@ test('excluir pedido libera o plano de corte e os retalhos reservados', async t 
   assert.equal(corte.planos[0].situacao, 'cancelado');
   assert.equal(corte.retalhos[0].situacao, 'disponivel');
 });
+
+// plano de corte de vidros: mesma ligação (cancela o gerado, solta retalhos; excluir desliga o conferido do número)
+function comPlanoDeVidros(banco, numero) {
+  const v = { planos: [{ id: 1, pedido: numero, situacao: 'gerado' }, { id: 2, pedido: numero, situacao: 'conferido' }], retalhos: [{ id: 9, situacao: 'reservado', plano_reserva: 1 }] };
+  banco.f.regras.unshift(
+    [/^SELECT id FROM web_vidro_planos WHERE pedido = ?/, (sql, [n]) => v.planos.filter(p => p.pedido === Number(n) && p.situacao === 'gerado').map(p => ({ id: p.id }))],
+    [/^UPDATE web_vidro_retalhos SET situacao = 'disponivel'/, (sql, [, id]) => { v.retalhos.filter(r => r.plano_reserva === id).forEach(r => { r.situacao = 'disponivel'; r.plano_reserva = null; }); return { affectedRows: 1 }; }],
+    [/^UPDATE web_vidro_planos SET situacao = 'cancelado'/, (sql, [id]) => { v.planos.find(p => p.id === id).situacao = 'cancelado'; return { affectedRows: 1 }; }],
+    [/^UPDATE web_vidro_planos SET excluido_em = ?/, (sql, [agora, n]) => { v.planos.filter(p => p.pedido === Number(n) && p.situacao === 'conferido' && !p.excluido_em).forEach(p => { p.excluido_em = agora; }); return { affectedRows: 1 }; }]);
+  return v;
+}
+
+test('cancelar pedido libera o plano de vidros e os retalhos reservados, na mesma transação; o conferido fica', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); const v = comPlanoDeVidros(banco, 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5/cancelar', 'POST')).status, 200);
+  assert.deepEqual(v.planos.map(p => p.situacao), ['cancelado', 'conferido']);
+  assert.equal(v.planos[1].excluido_em, undefined);
+  assert.deepEqual(v.retalhos[0], { id: 9, situacao: 'disponivel', plano_reserva: null });
+  assert.deepEqual(banco.auditoria.map(a => a.acao).sort(), ['corte_vidros_plano_cancelado_com_pedido', 'pedido_cancelado']);
+  const ordem = banco.f.chamadas.map(c => c.sql);
+  const iCommit = ordem.lastIndexOf('COMMIT');
+  assert.ok(ordem.findIndex(s => /web_vidro_planos SET situacao = 'cancelado'/.test(s)) < iCommit);
+});
+
+test('excluir pedido libera o plano de vidros e marca o conferido com excluido_em', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); const v = comPlanoDeVidros(banco, 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Pedido/5', 'DELETE')).status, 200);
+  assert.deepEqual(v.planos.map(p => p.situacao), ['cancelado', 'conferido']);
+  assert.ok(v.planos[1].excluido_em);
+  assert.equal(v.retalhos[0].situacao, 'disponivel');
+});
+
+test('excluir orçamento não mexe no plano de vidros do pedido de mesmo número', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5); comDocumento(banco, 'Orçamento', 5); const v = comPlanoDeVidros(banco, 5);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  assert.equal((await chamar('/ped_orc/Orçamento/5', 'DELETE')).status, 200);
+  assert.deepEqual(v.planos.map(p => p.situacao), ['gerado', 'conferido']);
+  assert.equal(v.retalhos[0].situacao, 'reservado');
+});

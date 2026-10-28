@@ -33,7 +33,7 @@ function bancoVidros() {
   ];
   const estado = { config: [], retalhos: [], auditoria: [], pedidos: [], vidros: [], itens: [], planos: [], estoque, saidas: [] };
   const { config, retalhos, auditoria, pedidos, vidros, itens, planos } = estado;
-  let proxRetalho = 1, proxVidro = 1;
+  let proxRetalho = 1, proxVidro = 1, proxPlano = 1;
   const formatarRetalho = r => ({ id: r.id, produto_codigo: r.produto_codigo, produto_nome: r.produto_nome, altura: r.altura, largura: r.largura, situacao: r.situacao,
     plano_origem: r.plano_origem ?? null, plano_reserva: r.plano_reserva ?? null, criado_em: r.criado_em ?? null });
   const candidato = e => e.CLASSE === 'Revestimento' && e.SITUACAO === 'Ativo' && Number(e.ALTURA) > 0 && Number(e.LARGURA) > 0;
@@ -57,7 +57,7 @@ function bancoVidros() {
 
     // ---- pedido, vidros e plano ----
     [/^SELECT NUMERO, RAZAO_SOCIAL, SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido'/, (sql, [n]) =>
-      pedidos.filter(p => p.NUMERO === Number(n)).map(p => ({ NUMERO: p.NUMERO, RAZAO_SOCIAL: p.RAZAO_SOCIAL, SITUACAO: p.SITUACAO }))],
+      pedidos.filter(p => p.NUMERO === Number(n) && p.TIPO === 'Pedido').map(p => ({ NUMERO: p.NUMERO, RAZAO_SOCIAL: p.RAZAO_SOCIAL, SITUACAO: p.SITUACAO }))],
     [/^SELECT id, MEDICAO, ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO FROM vidros WHERE NUMERO = \?/, (sql, [n]) =>
       vidros.filter(v => v.NUMERO === Number(n)).sort((a, b) => a.id - b.id).map(({ NUMERO, ...v }) => v)],
     [/^SELECT ITEM_PEDIDO, REVESTIMENTO, COR_REVESTIMENTO FROM ped_orc_itens_v4 WHERE NUMERO = \? AND TIPO = 'Pedido'/, (sql, [n]) =>
@@ -72,6 +72,32 @@ function bancoVidros() {
     [/^SELECT COUNT\(\*\) AS qtd, SUM\(situacao = 'conferido'\) AS conferidos FROM web_vidro_planos WHERE pedido = \?/, (sql, [n]) => {
       const meus = planos.filter(p => p.pedido === Number(n) && !p.excluido_em);
       return [{ qtd: meus.length, conferidos: meus.filter(p => p.situacao === 'conferido').length }];
+    }],
+
+    // ---- salvar, ler, marcar e cancelar plano ----
+    [/^SELECT id, pedido, situacao, impressao_pecas, parametros, resultado, progresso/, (sql, [id]) => planos.filter(p => p.id === Number(id)).map(p => ({ ...p }))],
+    [/^INSERT INTO web_vidro_planos/, (sql, [pedido, situacao, impressao_pecas, parametros, resultado, progresso, criado_por, criado_em]) => {
+      const p = { id: proxPlano++, pedido, situacao, impressao_pecas, parametros, resultado, progresso, criado_por, criado_em, conferido_por: null, conferido_em: null };
+      planos.push(p); return { insertId: p.id, affectedRows: 1 };
+    }],
+    [/^UPDATE web_vidro_retalhos SET situacao = 'reservado'/, (sql, [planoId, , id]) => {
+      const r = retalhos.find(x => x.id === id);
+      if (!r || r.situacao !== 'disponivel') return { affectedRows: 0 };
+      r.situacao = 'reservado'; r.plano_reserva = planoId; return { affectedRows: 1 };
+    }],
+    [/^UPDATE web_vidro_retalhos SET situacao = 'disponivel', plano_reserva = NULL, atualizado_em = \? WHERE plano_reserva = \? AND situacao = 'reservado'/, (sql, [, planoId]) => {
+      let n = 0; for (const r of retalhos) if (r.plano_reserva === planoId && r.situacao === 'reservado') { r.situacao = 'disponivel'; r.plano_reserva = null; n++; }
+      return { affectedRows: n };
+    }],
+    [/^UPDATE web_vidro_planos SET situacao = 'cancelado' WHERE id = \?/, (sql, [id]) => { planos.find(p => p.id === id).situacao = 'cancelado'; return { affectedRows: 1 }; }],
+    [/^UPDATE web_vidro_planos SET progresso = \?/, (sql, [progresso, id]) => {
+      const p = planos.find(x => x.id === id); if (!p || p.situacao !== 'gerado') return { affectedRows: 0 };
+      p.progresso = progresso; return { affectedRows: 1 };
+    }],
+    [/^SELECT id FROM web_vidro_planos WHERE pedido = \?/, (sql, [n]) => planos.filter(p => p.pedido === Number(n) && p.situacao === 'gerado').map(p => ({ id: p.id }))],
+    [/^UPDATE web_vidro_planos SET excluido_em = \?/, (sql, [agora, n]) => {
+      let c = 0; for (const p of planos) if (p.pedido === Number(n) && p.situacao === 'conferido' && !p.excluido_em) { p.excluido_em = agora; c++; }
+      return { affectedRows: c };
     }],
 
     // ---- retalhos ----
@@ -109,7 +135,7 @@ function bancoVidros() {
       } };
   };
   const semear = {
-    pedido: (x = {}) => { const r = { NUMERO: 100, RAZAO_SOCIAL: 'Cliente X', SITUACAO: 'Em Produção', ...x }; pedidos.push(r); return r; },
+    pedido: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', RAZAO_SOCIAL: 'Cliente X', SITUACAO: 'Em Produção', ...x }; pedidos.push(r); return r; },
     vidro: (x = {}) => { const r = { id: proxVidro++, NUMERO: 100, MEDICAO: 'M1', ITEM: 1, QTD: 2, MODELO: 'Incolor 4mm', COR_REVESTIMENTO: '', TAMANHO: '2000 x 800', ...x }; vidros.push(r); return r; },
     item: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', ITEM_PEDIDO: 1, ITEM: 1, REVESTIMENTO: 'Incolor 4mm', COR_REVESTIMENTO: '', ...x }; itens.push(r); return r; },
     retalho: (x = {}) => { const r = { id: proxRetalho++, produto_codigo: 10, produto_nome: 'Vidro Incolor 4mm', altura: 1500, largura: 1000, situacao: 'disponivel', ...x }; retalhos.push(r); return r; }

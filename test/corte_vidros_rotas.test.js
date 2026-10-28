@@ -187,7 +187,7 @@ test('pré-visualização: vidros de item que só existe como orçamento do mesm
   assert.equal(j.pendencias.length, 1);
 });
 
-test('pré-visualização: 404 para pedido inexistente/inválido e para pedido sem vidros (mensagem exata); orçamento não vale', async t => {
+test('pré-visualização: 404 para pedido inexistente/inválido e para pedido sem vidros (mensagem exata); orçamento: ver teste próprio', async t => {
   const b = bancoVidros(); b.semear.pedido({ NUMERO: 100 });
   const { chamar } = await prepararVidros(t, { banco: b });
   assert.equal((await prever(chamar, 999)).status, 404);
@@ -195,6 +195,17 @@ test('pré-visualização: 404 para pedido inexistente/inválido e para pedido s
   const r = await prever(chamar, 100);
   assert.equal(r.status, 404);
   assert.equal((await r.json()).error, 'Este pedido não tem vidros.');
+});
+
+test('pré-visualização: número que só existe como Orçamento dá 404 (mesmo com vidros gravados)', async t => {
+  const b = bancoVidros();
+  b.semear.pedido({ NUMERO: 200, TIPO: 'Orçamento' });
+  b.semear.item({ NUMERO: 200, ITEM_PEDIDO: 1, REVESTIMENTO: 'Incolor 4mm' });
+  b.semear.vidro({ NUMERO: 200, ITEM: 1, QTD: 2 });
+  const { chamar } = await prepararVidros(t, { banco: b });
+  const r = await prever(chamar, 200);
+  assert.equal(r.status, 404);
+  assert.equal((await r.json()).error, 'Pedido não encontrado.');
 });
 
 test('pré-visualização: escolhas ilegíveis dão 400', async t => {
