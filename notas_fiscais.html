@@ -131,6 +131,12 @@
         #form h2 { font-size: 22px; margin-bottom: 14px; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
+    <style>
+        /* aba ativa preenchida e com cor própria: verde = entrada, azul = saída */
+        .aba { border-radius: 10px 10px 0 0; }
+        .aba.ativo[data-tipo="entrada"] { background: #1b6b30; color: #fff; border-bottom-color: #1b6b30; }
+        .aba.ativo[data-tipo="saida"] { background: #1e40af; color: #fff; border-bottom-color: #1e40af; }
+    </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <script src="layout.js?v=202610281930" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>

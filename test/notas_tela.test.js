@@ -58,3 +58,9 @@ test('layout.js: Notas fiscais no menu entre Fornecedores e Funcionários e em P
   assert.ok(l.indexOf("href: 'notas_fiscais.html'") > l.indexOf("href: 'fornecedores.html'") && l.indexOf("href: 'notas_fiscais.html'") < l.indexOf("href: 'funcionarios.html'"));
   assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
 });
+
+test('página: aba ativa tem cor própria (entrada verde, saída azul)', () => {
+  const h = ler('notas_fiscais.html');
+  assert.match(h, /\.aba\.ativo\[data-tipo="entrada"\]\s*\{[^}]*background/);
+  assert.match(h, /\.aba\.ativo\[data-tipo="saida"\]\s*\{[^}]*background/);
+});
