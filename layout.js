@@ -146,10 +146,10 @@
         const css = document.createElement('style');
         css.textContent = `.${OCULTO} { display: none !important; }
             body.modo-atendimento .so-geral { display: none !important; }
-            .btn-atendimento { margin-left: auto; margin-right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+            .btn-atendimento { margin-left: auto; margin-right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #fff; background: #fff; color: #c62828; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
             .btn-atendimento svg { width: 18px; height: 18px; }
-            .btn-atendimento.ligado { background: #fff; color: var(--primary-color, #8B0000); border-color: #fff; }
-            .btn-atendimento.flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 60; background: var(--primary-color, #8B0000); margin: 0; }
+            .btn-atendimento.ligado { color: #1b7a3a; }
+            .btn-atendimento.flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 60; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,.25); border-color: #ddd; }
             @media (max-width: 768px) { .btn-atendimento span { display: none; } .btn-atendimento { margin-right: 8px; } }
             #sem-acesso-pagina { text-align: center; padding: 80px 20px; color: var(--text-light, #666); }
             #sem-acesso-pagina h2 { color: var(--text-dark, #222); margin-bottom: 8px; }
