@@ -157,6 +157,7 @@ const TABELAS = [
      numero VARCHAR(20) NOT NULL,
      serie VARCHAR(5) NOT NULL DEFAULT '1',
      chave CHAR(44) NULL,
+     chave_original CHAR(44) NULL,
      data_emissao DATE NOT NULL,
      contraparte_codigo INT NOT NULL,
      contraparte_nome VARCHAR(190) NOT NULL,

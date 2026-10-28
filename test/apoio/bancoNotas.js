@@ -48,7 +48,7 @@ function bancoNotas() {
     }],
     [/^UPDATE web_notas_fiscais SET situacao = 'cancelada'/, (sql, [motivo, quem, quando, id]) => {
       const n = notas.find(x => x.id === Number(id));
-      Object.assign(n, { situacao: 'cancelada', motivo_cancelamento: motivo, alterado_por: quem, alterado_em: quando });
+      Object.assign(n, { situacao: 'cancelada', chave_original: n.chave, chave: null, motivo_cancelamento: motivo, alterado_por: quem, alterado_em: quando });
       return { affectedRows: 1 };
     }],
     // lista: parâmetros na ordem tipo, de, ate, situacao, q (número e nome), estados do usuário

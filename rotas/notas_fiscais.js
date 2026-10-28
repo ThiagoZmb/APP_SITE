@@ -1,7 +1,8 @@
 // Notas fiscais de entrada (fornecedor) e de saída (cliente) só de cabeçalho, sem itens (tabela da web `web_notas_fiscais`).
 // Não mexe em estoque, em fluxo_de_caixa nem em nenhuma tabela do VB.
 // Depois de criada só mudam data, valor e observação; o resto se corrige cancelando e lançando de novo.
-// O número de uma nota cancelada continua ocupado (número fiscal não se reaproveita).
+// O número de uma nota cancelada continua ocupado (número fiscal não se reaproveita), mas a chave é liberada
+// (vai para chave_original) para que "cancelar e lançar de novo" funcione também para nota com chave.
 // valorTotal é dinheiro: sem `valores.ver` não sai, não se lança nota e, ao editar, o valor gravado é mantido.
 const { emTransacao, ErroUsuario, agoraLocal } = require('./transacao');
 const { validarNota, validarCancelamento, TIPOS_NOTA } = require('../calculo/notas_fiscais');
@@ -15,7 +16,7 @@ const DINHEIRO = ['valorTotal'];
 const like = s => '%' + String(s).replace(/[\\%_]/g, c => '\\' + c) + '%';
 const data = v => String(v ?? '').slice(0, 10);
 
-const nota = r => ({ id: Number(r.id), tipo: r.tipo, numero: r.numero, serie: r.serie, chave: r.chave || '', dataEmissao: data(r.data_emissao),
+const nota = r => ({ id: Number(r.id), tipo: r.tipo, numero: r.numero, serie: r.serie, chave: r.chave || r.chave_original || '', dataEmissao: data(r.data_emissao),
   contraparteCodigo: Number(r.contraparte_codigo), contraparteNome: r.contraparte_nome || '', valorTotal: Number(r.valor_total) || 0,
   observacao: r.observacao || '', situacao: r.situacao, motivoCancelamento: r.motivo_cancelamento || '', criadoPor: r.criado_por || '', criadoEm: r.criado_em || '' });
 
@@ -149,7 +150,7 @@ function registrarNotas({ rota, pool, foraDosEstados }) {
       if (!atual) throw new ErroUsuario(404, 'Nota não encontrada.');
       if (await bloqueadaPorEstado(conn, req, res, atual)) return null;
       if (atual.situacao === 'cancelada') throw new ErroUsuario(409, 'Esta nota já está cancelada.');
-      await conn.execute("UPDATE web_notas_fiscais SET situacao = 'cancelada', motivo_cancelamento = ?, alterado_por = ?, alterado_em = ? WHERE id = ?",
+      await conn.execute("UPDATE web_notas_fiscais SET situacao = 'cancelada', chave_original = chave, chave = NULL, motivo_cancelamento = ?, alterado_por = ?, alterado_em = ? WHERE id = ?",
         [motivo, req.acesso?.nome || '', agoraLocal(), id]);
       await auditar(conn, req, 'nota_fiscal_cancelada', alvoDe(atual), { id });
       return { id };

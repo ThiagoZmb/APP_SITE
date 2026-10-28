@@ -72,3 +72,13 @@ test('notas: validarCancelamento', () => {
   assert.equal(validarCancelamento({ motivo: 'a'.repeat(301) }).erros.length, 1);
   assert.deepEqual(validarCancelamento({ motivo: ' ok ' }), { erros: [], motivo: 'ok' });
 });
+
+test('notas: série normalizada ("01" = "1") e valor com no máximo 2 casas e teto do DECIMAL(14,2)', () => {
+  const v = (m, o = { podeValores: true, criando: true }) => validarNota({ ...OK, ...m }, o);
+  assert.equal(v({ serie: '001' }).dados.serie, '1');
+  assert.equal(v({ serie: '0' }).dados.serie, '0');
+  assert.equal(v({ serie: 'AB' }).dados.serie, 'AB');
+  assert.deepEqual(v({ valorTotal: '10,99' }).erros, []);
+  assert.deepEqual(v({ valorTotal: '999999999999,99' }).erros, []);
+  for (const valorTotal of ['10,999', '10.9999', '1000000000000', '1000000000000,00']) assert.ok(v({ valorTotal }).erros.join().includes('Valor'), valorTotal);
+});

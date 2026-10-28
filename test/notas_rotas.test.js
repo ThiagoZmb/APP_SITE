@@ -185,3 +185,17 @@ test('notas: contrapartes de saída respeitam os estados do usuário', async t =
   const j = await (await chamar('/notas_fiscais/contrapartes?tipo=saida')).json();
   assert.deepEqual(j.contrapartes.map(c => c.nome), ['Obras Beta']);
 });
+
+test('notas: cancelar libera a chave para relançar a nota corrigida; a nota cancelada continua mostrando a chave', async t => {
+  const base = '3326102345678900019055001000001234100000123';
+  let soma = 0, peso = 2;
+  for (let i = 42; i >= 0; i--) { soma += Number(base[i]) * peso; peso = peso === 9 ? 2 : peso + 1; }
+  const chave = base + String(soma % 11 < 2 ? 0 : 11 - (soma % 11));
+  const banco = bancoNotas(); banco.semear.fornecedor('Vidros Sul');
+  const { chamar } = await prepararNotas(t, { banco });
+  assert.equal((await criar(chamar, { ...ENTRADA, chave })).status, 200);
+  assert.equal((await chamar('/notas_fiscais/1/cancelar', 'POST', { motivo: 'fornecedor errado' })).status, 200);
+  assert.equal((await criar(chamar, { ...ENTRADA, contraparteCodigo: 2, chave })).status, 200);
+  assert.equal((await (await chamar('/notas_fiscais/1')).json()).nota.chave, chave);
+  assert.equal((await criar(chamar, { ...ENTRADA, numero: '555', chave })).status, 409);
+});

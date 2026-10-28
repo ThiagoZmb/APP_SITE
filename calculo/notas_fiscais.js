@@ -46,7 +46,7 @@ function validarNota(b = {}, { podeValores = false, criando = true } = {}) {
     if (!TIPOS_NOTA.includes(dados.tipo)) erros.push('Tipo inválido (entrada ou saída).');
     dados.numero = normalizarNumero(b.numero);
     if (!dados.numero) erros.push('Número da nota inválido (1 a 9 dígitos, maior que zero).');
-    dados.serie = t(b.serie) || '1';
+    dados.serie = t(b.serie).replace(/^0+(?=\d)/, '') || '1';   // "01" e "1" são a mesma série
     if (dados.serie.length > 5) erros.push('Série muito longa (máximo 5 caracteres).');
     const chave = t(b.chave).replace(/\s+/g, '');
     dados.chave = chave || null;
@@ -59,7 +59,9 @@ function validarNota(b = {}, { podeValores = false, criando = true } = {}) {
   if (!dataValida(dados.dataEmissao)) erros.push('Data de emissão inválida (use AAAA-MM-DD).');
   if (podeValores) {
     dados.valorTotal = numero(b.valorTotal);
-    if (!(dados.valorTotal > 0)) erros.push('Valor inválido (maior que zero, com vírgula ou ponto decimal).');
+    // até 2 casas (não arredonda em silêncio) e dentro do DECIMAL(14,2)
+    if (!(dados.valorTotal > 0) || /[.,]\d{3,}$/.test(t(b.valorTotal)) || dados.valorTotal > 999999999999.99)
+      erros.push('Valor inválido (maior que zero, até 2 casas decimais, com vírgula ou ponto decimal).');
   }
   dados.observacao = t(b.observacao);
   if (dados.observacao.length > 500) erros.push('Observação muito longa (máximo 500 caracteres).');
