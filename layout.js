@@ -43,6 +43,7 @@
         { href: 'tintas.html', texto: 'Tintas', icone: 'tintas', sub: true },   // subitem do Estoque (cadastro de tintas e insumos de pintura)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'fornecedores.html', texto: 'Fornecedores', icone: 'fornecedores' },
+        { href: 'notas_fiscais.html', texto: 'Notas fiscais', icone: 'fornecedores', sub: true },   // subitem de Fornecedores (notas de entrada e saída, só cabeçalho)
         { href: 'funcionarios.html', texto: 'Funcionários', icone: 'funcionarios' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
@@ -79,6 +80,7 @@
         'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
         'produtos.html': ['produtos.ver'],
         'fornecedores.html': ['fornecedores.ver'],
+        'notas_fiscais.html': ['notas.ver'],
         'tintas.html': ['tintas.ver'],
         'funcionarios.html': ['funcionarios.ver'],
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],
