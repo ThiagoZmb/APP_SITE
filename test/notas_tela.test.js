@@ -51,11 +51,14 @@ test('página: scripts, controles, permissão, sem handlers inline', () => {
   assert.doesNotMatch(h, /\son(click|change|submit|error)=/);
 });
 
-test('layout.js: Notas fiscais no menu entre Fornecedores e Funcionários e em PAGINAS com notas.ver', () => {
+test('layout.js: Notas fiscais no menu como subitem do Financeiro (logo abaixo dele) e em PAGINAS com notas.ver', () => {
   const l = ler('layout.js');
   assert.match(l, /href: 'notas_fiscais\.html', texto: 'Notas fiscais'/);
   assert.match(l, /'notas_fiscais\.html': \['notas\.ver'\]/);
-  assert.ok(l.indexOf("href: 'notas_fiscais.html'") > l.indexOf("href: 'fornecedores.html'") && l.indexOf("href: 'notas_fiscais.html'") < l.indexOf("href: 'funcionarios.html'"));
+  const pos = h => l.indexOf("href: '" + h + "'");
+  assert.ok(pos('notas_fiscais.html') > pos('financeiro.html') && pos('notas_fiscais.html') < pos('usuarios.html'));
+  assert.match(l, /href: 'notas_fiscais\.html'[^\n]*sub: true/);
+  assert.ok(pos('notas_fiscais.html') > pos('funcionarios.html'), 'não pode ficar sob Fornecedores');
   assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
 });
 
