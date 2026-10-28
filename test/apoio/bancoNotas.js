@@ -24,6 +24,10 @@ function bancoNotas() {
     [/INSERT INTO web_auditoria/, (sql, [quando, quem, acao, alvo, detalhe]) => { auditoria.push({ quando, quem, acao, alvo, detalhe: JSON.parse(detalhe) }); return { affectedRows: 1 }; }],
     [/^SELECT COD, RAZAO_FABRICANTE FROM cadastro_fornecedores WHERE COD = \?/, (sql, [cod]) =>
       fornecedores.filter(f => f.COD === Number(cod) && f.RAZAO_FABRICANTE !== '.').map(f => ({ ...f }))],
+    [/^SELECT COD, RAZAO_FABRICANTE FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE <> '\.' ORDER BY/, () =>
+      fornecedores.filter(f => f.RAZAO_FABRICANTE !== '.').sort((a, b) => a.RAZAO_FABRICANTE.localeCompare(b.RAZAO_FABRICANTE, 'pt-BR')).map(f => ({ ...f }))],
+    [/^SELECT CODIGO, RAZAO_SOCIAL FROM cadastro_clientes/, (sql, estados) =>
+      clientes.filter(c => !sql.includes('ESTADO IN') || estados.includes(c.ESTADO)).sort((a, b) => a.RAZAO_SOCIAL.localeCompare(b.RAZAO_SOCIAL, 'pt-BR')).map(c => ({ ...c }))],
     [/^SELECT CODIGO, RAZAO_SOCIAL, ESTADO FROM cadastro_clientes WHERE CODIGO = \?/, (sql, [cod]) =>
       clientes.filter(c => c.CODIGO === Number(cod)).map(c => ({ ...c }))],
     [/^SELECT \* FROM web_notas_fiscais WHERE id = \?/, (sql, [id]) => notas.filter(n => n.id === Number(id)).map(n => ({ ...n }))],

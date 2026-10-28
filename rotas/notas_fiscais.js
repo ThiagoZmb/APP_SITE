@@ -54,6 +54,21 @@ function registrarNotas({ rota, pool, foraDosEstados }) {
     } catch (err) { erro500(res, 'GET /notas_fiscais', err); }
   });
 
+  // opções do formulário (fornecedores ou clientes dos estados do usuário); fica antes de /:id e não exige clientes.ver
+  rota('get', '/notas_fiscais/contrapartes', VER, async (req, res) => {
+    const tipo = String(req.query.tipo ?? '');
+    if (!TIPOS_NOTA.includes(tipo)) return res.status(400).json({ error: 'Tipo inválido.' });
+    try {
+      if (tipo === 'entrada') {
+        const [f] = await pool.execute("SELECT COD, RAZAO_FABRICANTE FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE <> '.' ORDER BY RAZAO_FABRICANTE");
+        return res.json({ contrapartes: f.map(x => ({ codigo: Number(x.COD), nome: x.RAZAO_FABRICANTE })) });
+      }
+      const est = filtroEstados(req, 'ESTADO');
+      const [c] = await pool.execute(`SELECT CODIGO, RAZAO_SOCIAL FROM cadastro_clientes ${est.sql ? 'WHERE ' + est.sql : ''} ORDER BY RAZAO_SOCIAL`, est.params);
+      res.json({ contrapartes: c.map(x => ({ codigo: Number(x.CODIGO), nome: x.RAZAO_SOCIAL })) });
+    } catch (err) { erro500(res, 'GET /notas_fiscais/contrapartes', err); }
+  });
+
   rota('get', '/notas_fiscais/:id', VER, async (req, res) => {
     const id = idDe(req);
     if (!id) return res.status(404).json({ error: 'Nota não encontrada.' });

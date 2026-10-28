@@ -168,3 +168,20 @@ test('notas: nenhum campo da resposta além de valorTotal casa com REGEX_VALOR',
   varrer(await (await chamar('/notas_fiscais/1')).json());
   assert.deepEqual([...chaves].filter(k => REGEX_VALOR.test(k)), ['valorTotal']);
 });
+
+test('notas: contrapartes — fornecedores (sem ".") na entrada, clientes dos estados do usuário na saída', async t => {
+  const banco = bancoNotas(); banco.semear.fornecedor('.'); banco.semear.fornecedor('Vidros Sul');
+  let { chamar } = await prepararNotas(t, { banco });
+  let j = await (await chamar('/notas_fiscais/contrapartes?tipo=entrada')).json();
+  assert.deepEqual(j.contrapartes.map(c => c.nome), ['Alumínios Brasil', 'Vidros Sul']);
+  assert.deepEqual(Object.keys(j.contrapartes[0]).sort(), ['codigo', 'nome']);
+  j = await (await chamar('/notas_fiscais/contrapartes?tipo=saida')).json();
+  assert.deepEqual(j.contrapartes.map(c => c.nome), ['Construtora Alfa', 'Obras Beta']);
+  assert.equal((await chamar('/notas_fiscais/contrapartes?tipo=x')).status, 400);
+});
+
+test('notas: contrapartes de saída respeitam os estados do usuário', async t => {
+  const { chamar } = await prepararNotas(t, { estados: ['SP'] });
+  const j = await (await chamar('/notas_fiscais/contrapartes?tipo=saida')).json();
+  assert.deepEqual(j.contrapartes.map(c => c.nome), ['Obras Beta']);
+});
