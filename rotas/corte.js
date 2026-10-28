@@ -179,10 +179,12 @@ function registrarCorte({ rota, pool }) {
       if (!ped) return res.status(404).json({ error: 'Pedido não encontrado.' });
       const ativo = await planoAtivo(pool, numero);
       const calc = await calcularPlano(pool, numero, ativo && ativo.situacao === 'gerado' ? Number(ativo.id) : 0);
+      const [[cont]] = await pool.execute("SELECT COUNT(*) AS qtd, SUM(situacao = 'conferido') AS conferidos FROM web_corte_planos WHERE pedido = ? AND excluido_em IS NULL", [numero]);
       res.json({
         pedido: { numero, cliente: ped.RAZAO_SOCIAL || '', situacao: ped.SITUACAO || '' },
         vazio: calc.vazio,
         mensagem: calc.vazio ? 'Este pedido não tem perfis gravados (pedido antigo ou sem portas de alumínio): não há o que cortar.' : null,
+        qtdPlanosGravados: Number(cont && cont.qtd) || 0, qtdConferidos: Number(cont && cont.conferidos) || 0,
         qtdPecas: calc.pecas.length, pendencias: calc.pendencias, plano: calc.plano, impressao: calc.impressao, retalhosUsados: calc.retalhosUsados,
         planoSalvo: resumoPlanoSalvo(ativo, ativo && ativo.impressao_pecas !== calc.impressao)
       });
@@ -313,6 +315,37 @@ function registrarCorte({ rota, pool }) {
       if (!pl.affectedRows) throw new ErroUsuario(409, 'O plano já foi conferido.');
       await auditarConn(conn, quem, 'corte_plano_conferido', id, { campos: ['plano', 'retalhos'], pedido: Number(p.pedido), qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, qtdSobrasDescartadas: descartadas });
       return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos };
+    });
+    if (r) res.json(r);
+  });
+
+  // Excluir TODOS os dados de plano do pedido (gerado, cancelado ou conferido). Não exige que o pedido ainda exista: é também a saída
+  // para plano órfão de pedido apagado direto no VB. Retalho reservado volta a ficar disponível; o material físico de plano CONFERIDO
+  // não volta (retalho usado continua usado, sobra guardada continua no estoque), só perde a ligação com o plano apagado.
+  // Plano conferido exige confirmação reforçada (incluirConferidos) e a permissão corte.parametros.
+  rota('delete', '/corte/pedido/:numero', PLANEJAR, async (req, res) => {
+    const numero = inteiroPositivo(req.params.numero);
+    if (!numero) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const corpo = req.body || {};
+    const r = await emTransacao(pool, res, 'DELETE /corte/pedido/:numero', async conn => {
+      const [planos] = await conn.execute('SELECT id, situacao FROM web_corte_planos WHERE pedido = ? AND excluido_em IS NULL ORDER BY id FOR UPDATE', [numero]);
+      if (!planos.length) throw new ErroUsuario(404, 'Não há dados de plano de corte para este pedido.');
+      const conferidos = planos.filter(p => p.situacao === 'conferido').length;
+      if (conferidos) {
+        if (corpo.incluirConferidos !== true) throw new ErroUsuario(409, 'Este pedido tem plano conferido (corte já confirmado). Confirme a exclusão do histórico para continuar.', { exigeConfirmacaoConferido: true });
+        if (!(req.acesso && req.acesso.permissoes && req.acesso.permissoes.has('corte.parametros'))) throw new ErroUsuario(403, 'Só quem tem a permissão de parâmetros do corte pode excluir um plano já conferido.');
+      }
+      let liberados = 0;
+      for (const p of planos) {
+        const [lib] = await liberarReservas(conn, p.id);
+        liberados += Number(lib && lib.affectedRows) || 0;
+        await conn.execute('UPDATE web_retalhos SET plano_origem = NULL WHERE plano_origem = ?', [p.id]);
+        await conn.execute('UPDATE web_retalhos SET plano_reserva = NULL WHERE plano_reserva = ?', [p.id]);
+        await conn.execute('DELETE FROM web_corte_planos WHERE id = ?', [p.id]);
+      }
+      await auditarConn(conn, req.acesso?.nome, 'corte_dados_pedido_excluidos', numero,
+        { campos: ['planos', 'retalhos'], pedido: numero, planos: planos.map(p => Number(p.id)), qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados });
+      return { ok: true, pedido: numero, qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados };
     });
     if (r) res.json(r);
   });

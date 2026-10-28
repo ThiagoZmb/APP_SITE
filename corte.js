@@ -69,6 +69,13 @@
       `<span class="progresso-grupo">${feitas} de ${total} peças cortadas</span></h3>` +
       g.barras.map((b, i) => htmlBarra(g.chave, b, i, opcoes)).join('') + '</section>';
   }
+  // confirmação do botão "Excluir dados do pedido": mais forte quando há plano já conferido (corte real confirmado)
+  function textoConfirmarExclusao(previa) {
+    const n = previa.qtdPlanosGravados, base = `Excluir TODOS os dados de plano de corte do pedido nº ${previa.pedido.numero} (${n} plano${n === 1 ? '' : 's'})?\n\nOs retalhos reservados por esses planos voltam a ficar disponíveis. Isto não pode ser desfeito.`;
+    if (!(previa.qtdConferidos > 0)) return base;
+    return base + `\n\nATENÇÃO: ${previa.qtdConferidos} plano${previa.qtdConferidos === 1 ? ' JÁ CONFERIDO' : 's JÁ CONFERIDOS'} (corte real confirmado) serão apagados do histórico. ` +
+      'Os retalhos que esses cortes usaram ou criaram continuam no estoque de retalhos: o material físico não volta.';
+  }
   // linha de status acima do plano: explica quando dá para marcar peças e mostra o andamento
   function textoStatusPlano({ modo, salvo, total = 0, cortadas = 0, planoSalvoConferido = false }) {
     if (modo !== 'salvo') return planoSalvoConferido ? 'Este pedido já tem um plano conferido; abaixo está só uma simulação.'
@@ -144,6 +151,7 @@
       const { previa, salvo, modo } = estado;
       const fonte = modo === 'salvo' ? salvo : previa;
       $('plano-titulo').textContent = `Pedido nº ${previa.pedido.numero} — ${previa.pedido.cliente}`;
+      $('btn-excluir-dados').hidden = !(pode('corte.planejar') && previa.qtdPlanosGravados > 0);
       if (previa.vazio) { mensagem('plano-area', previa.mensagem); ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano'].forEach(id => { $(id).hidden = true; }); $('plano-status').textContent = ''; return; }
       const situacao = modo === 'salvo' ? salvo.situacao : null;
       $('plano-status').textContent = textoStatusPlano({ modo, salvo, total: contarPecas(fonte.plano), cortadas: estado.cortadas.size, planoSalvoConferido: !!(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido') });
@@ -160,7 +168,7 @@
     async function carregarPlano(numero) {
       const seq = ++estado.seq;
       estado.numero = numero; estado.conferindo = false; estado.cortadas = new Set();
-      mensagem('plano-area', 'Carregando…'); $('plano-titulo').textContent = '';
+      mensagem('plano-area', 'Carregando…'); $('plano-titulo').textContent = ''; $('btn-excluir-dados').hidden = true;
       try {
         const previa = await chamar('/corte/pedido/' + encodeURIComponent(numero));
         let salvo = null;
@@ -271,6 +279,13 @@
     $('form-pedido').addEventListener('submit', ev => { ev.preventDefault(); const n = txt($('numero').value); if (/^\d+$/.test(n)) carregarPlano(n); else toast('Informe o número do pedido.', 'erro'); });
     $('btn-salvar').addEventListener('click', () => acao($('btn-salvar'), () => chamar(`/corte/pedido/${estado.numero}/salvar`, { metodo: 'POST', corpo: corpoSalvar(estado.previa) }), 'Plano salvo e retalhos reservados.'));
     $('btn-refazer').addEventListener('click', () => { estado.modo = 'previa'; estado.conferindo = false; desenharPlano(); });
+    $('btn-excluir-dados').addEventListener('click', () => {
+      const previa = estado.previa;
+      if (!previa) return;
+      if (previa.qtdConferidos > 0 && !pode('corte.parametros')) { toast('Este pedido tem plano já conferido: só quem tem a permissão de parâmetros do corte pode excluí-lo.', 'erro'); return; }
+      if (!win.confirm(textoConfirmarExclusao(previa))) return;
+      acao($('btn-excluir-dados'), () => chamar('/corte/pedido/' + encodeURIComponent(estado.numero), { metodo: 'DELETE', corpo: previa.qtdConferidos > 0 ? { incluirConferidos: true } : {} }), 'Dados do plano excluídos.');
+    });
     $('btn-conferir').addEventListener('click', () => { estado.conferindo = true; desenharPlano(); });
     $('btn-confirmar').addEventListener('click', confirmar);
     $('btn-cancelar-plano').addEventListener('click', () => {
@@ -289,6 +304,6 @@
     if (n && /^\d+$/.test(n)) { $('numero').value = n; carregarPlano(n); } else mensagem('plano-area', 'Informe o número de um pedido para ver ou gerar o plano de corte.');
   }
 
-  return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
+  return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, textoConfirmarExclusao, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
     corpoSalvar, corpoConferencia, validarConferenciaForm, htmlRetalhos, htmlConfig, iniciar };
 });

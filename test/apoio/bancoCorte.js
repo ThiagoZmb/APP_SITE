@@ -46,6 +46,15 @@ function bancoCorte() {
       const p = planos.filter(x => x.pedido === Number(n) && x.situacao !== 'cancelado' && !x.excluido_em).sort((a, b) => b.id - a.id)[0];
       return p ? [{ id: p.id, situacao: p.situacao, impressao_pecas: p.impressao_pecas, criado_por: p.criado_por, criado_em: p.criado_em, conferido_em: p.conferido_em ?? null }] : [];
     }],
+    [/^SELECT COUNT\(\*\) AS qtd, SUM\(situacao = 'conferido'\) AS conferidos FROM web_corte_planos WHERE pedido = \?/, (sql, [n]) => {
+      const meus = planos.filter(p => p.pedido === Number(n) && !p.excluido_em);
+      return [{ qtd: meus.length, conferidos: meus.filter(p => p.situacao === 'conferido').length }];
+    }],
+    [/^SELECT id, situacao FROM web_corte_planos WHERE pedido = \? AND excluido_em IS NULL/, (sql, [n]) =>
+      planos.filter(p => p.pedido === Number(n) && !p.excluido_em).sort((a, b) => a.id - b.id).map(p => ({ id: p.id, situacao: p.situacao }))],
+    [/^UPDATE web_retalhos SET plano_origem = NULL WHERE plano_origem = \?/, (sql, [id]) => { let c = 0; for (const r of retalhos) if (r.plano_origem === id) { r.plano_origem = null; c++; } return { affectedRows: c }; }],
+    [/^UPDATE web_retalhos SET plano_reserva = NULL WHERE plano_reserva = \?/, (sql, [id]) => { let c = 0; for (const r of retalhos) if (r.plano_reserva === id) { r.plano_reserva = null; c++; } return { affectedRows: c }; }],
+    [/^DELETE FROM web_corte_planos WHERE id = \?/, (sql, [id]) => { const i = planos.findIndex(p => p.id === id); if (i >= 0) planos.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
     [/^SELECT id FROM web_corte_planos WHERE pedido = \?/, (sql, [n]) => planos.filter(p => p.pedido === Number(n) && p.situacao === 'gerado').map(p => ({ id: p.id }))],
     [/^UPDATE web_retalhos SET situacao = 'disponivel', plano_reserva = NULL, atualizado_em = \? WHERE plano_reserva = \? AND situacao = 'reservado'/, (sql, [, planoId]) => {
       let n = 0; for (const r of retalhos) if (r.plano_reserva === planoId && r.situacao === 'reservado') { r.situacao = 'disponivel'; r.plano_reserva = null; n++; }

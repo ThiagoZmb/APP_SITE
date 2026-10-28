@@ -152,6 +152,7 @@
         .btn-primary { background: var(--gradient-primary); color: #fff; }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border-color: var(--border-color); }
         .btn[disabled] { opacity: .6; cursor: default; }
+        .btn-danger { background: #b71c1c; color: #fff; }
         .toast { padding: 12px 18px; border-radius: 10px; color: #fff; background: #333; box-shadow: var(--shadow-medium); }
         .toast.ok { background: var(--success-color); } .toast.erro { background: var(--danger-color); }
         .tabela-wrap { overflow-x: auto; }
@@ -159,7 +160,7 @@
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <script src="layout.js?v=202610272300" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="corte.js?v=202610281000" defer></script>
+    <script src="corte.js?v=202610281100" defer></script>
 </head>
 <body>
     <div class="container">
@@ -200,6 +201,7 @@
                         <button type="button" class="btn btn-secondary" id="btn-conferir" hidden>Conferir o corte</button>
                         <button type="button" class="btn btn-primary" id="btn-confirmar" hidden>Confirmar o corte</button>
                         <button type="button" class="btn btn-secondary" id="btn-cancelar-plano" hidden>Cancelar o plano</button>
+                        <button type="button" class="btn btn-danger" id="btn-excluir-dados" hidden title="Apaga todos os planos gravados deste pedido (inclusive cancelados) e solta os retalhos reservados">Excluir dados do pedido</button>
                     </div>
                     <div id="plano-area" aria-live="polite"><p class="vazio">Informe o número de um pedido.</p></div>
                 </section>
