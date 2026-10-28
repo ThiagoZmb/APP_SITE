@@ -60,7 +60,7 @@ INSERT IGNORE INTO web_notas_fiscais
   (tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, observacao, situacao, criado_por, criado_em)
 SELECT 'entrada', x.numero, '1', x.data_emissao, COALESCE(f.codigo, 0),
        LEFT(COALESCE(f.nome, NULLIF(x.nome, ''), '(sem nome)'), 190),
-       x.valor, 'Importada do VB', 'ativa', 'importação do VB', NOW()
+       x.valor, NULL, 'ativa', 'importação do VB', NOW()
 FROM (
   SELECT CASE WHEN TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]+$' THEN TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) ELSE UPPER(TRIM(CAST(n.NUMERO AS CHAR))) END AS numero,
          DATE(n.DATA) AS data_emissao,
@@ -81,7 +81,7 @@ INSERT IGNORE INTO web_notas_fiscais
   (tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, observacao, situacao, criado_por, criado_em)
 SELECT 'saida', x.numero, '1', x.data_emissao, COALESCE(c.codigo, 0),
        LEFT(COALESCE(c.nome, NULLIF(x.nome, ''), '(sem nome)'), 190),
-       x.valor, 'Importada do VB', 'ativa', 'importação do VB', NOW()
+       x.valor, NULL, 'ativa', 'importação do VB', NOW()
 FROM (
   SELECT CASE WHEN TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]+$' THEN TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) ELSE UPPER(TRIM(CAST(n.NUMERO AS CHAR))) END AS numero,
          DATE(n.DATA) AS data_emissao,
@@ -110,3 +110,9 @@ COMMIT;
 
 -- ============ BLOCO 5 (opcional): notas copiadas cujo fornecedor/cliente não foi achado no cadastro ============
 SELECT tipo, numero, contraparte_nome FROM web_notas_fiscais WHERE contraparte_codigo = 0 ORDER BY tipo, contraparte_nome, numero;
+
+
+-- ============ BLOCO 6 (só para quem já rodou a versão antiga do bloco 3): limpa o texto "Importada do VB" das observações ============
+-- Só mexe nas notas copiadas pelo script (criado_por = 'importação do VB') cuja observação ainda tem exatamente esse texto.
+UPDATE web_notas_fiscais SET observacao = NULL
+WHERE observacao = 'Importada do VB' AND criado_por = 'importação do VB';

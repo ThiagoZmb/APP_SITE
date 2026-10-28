@@ -39,7 +39,7 @@ function registrarImportacaoNotas({ publica, pool }) {
       for (let i = 0; i < plano.entram.length; i += LOTE) {
         const lote = plano.entram.slice(i, i + LOTE);
         await conn.execute(
-          `INSERT INTO web_notas_fiscais (tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, observacao, situacao, criado_por, criado_em) VALUES ${lote.map(() => "(?, ?, ?, ?, ?, ?, ?, 'Importada do VB', 'ativa', ?, ?)").join(', ')}`,
+          `INSERT INTO web_notas_fiscais (tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, observacao, situacao, criado_por, criado_em) VALUES ${lote.map(() => "(?, ?, ?, ?, ?, ?, ?, NULL, 'ativa', ?, ?)").join(', ')}`,
           lote.flatMap(n => [n.tipo, n.numero, n.serie, n.dataEmissao, n.contraparteCodigo, n.contraparteNome, n.valorTotal, 'importação do VB', quando]));
       }
       await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',

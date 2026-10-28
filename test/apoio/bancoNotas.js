@@ -42,7 +42,7 @@ function bancoNotas() {
       for (let i = 0; i < p.length; i += 9) {
         const [tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, criado_por, criado_em] = p.slice(i, i + 9);
         notas.push({ id: proximoId++, tipo, numero, serie, chave: null, chave_original: null, data_emissao, contraparte_codigo, contraparte_nome, valor_total: Number(valor_total).toFixed(2),
-          observacao: 'Importada do VB', situacao: 'ativa', motivo_cancelamento: null, criado_por, criado_em, alterado_por: null, alterado_em: null });
+          observacao: sql.includes("'Importada do VB'") ? 'Importada do VB' : null, situacao: 'ativa', motivo_cancelamento: null, criado_por, criado_em, alterado_por: null, alterado_em: null });
       }
       return { affectedRows: p.length / 9 };
     }],

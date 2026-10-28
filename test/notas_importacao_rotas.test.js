@@ -45,6 +45,7 @@ test('importar notas: simular:false grava, audita só contagens e rodar de novo 
   const n = banco.notas.find(x => x.numero === '123');
   assert.deepEqual([n.tipo, n.serie, n.chave, n.data_emissao, n.contraparte_codigo, n.contraparte_nome, Number(n.valor_total), n.situacao, n.criado_por],
     ['entrada', '1', null, '2026-10-10', 1, 'Alumínios Brasil', 1500.5, 'ativa', 'importação do VB']);
+  assert.ok(banco.notas.every(x => x.observacao === null), 'a observação das notas importadas fica em branco');
   assert.equal(banco.notas.find(x => x.numero === '124').contraparte_codigo, 0);
   assert.equal(banco.notas.find(x => x.tipo === 'saida').contraparte_codigo, 1);
   const a = banco.auditoria.at(-1);
