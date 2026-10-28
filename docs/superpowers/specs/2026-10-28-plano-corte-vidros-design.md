@@ -32,7 +32,7 @@ A partir de um **Pedido**, distribuir as peças de vidro em **chapas** (corte 2D
 ## 3.2 Otimização (`calculo/vidro_otimizacao.js`, pura, determinística)
 
 - Entrada: peças do grupo, chapa `{altura, largura}`, retalhos disponíveis do **mesmo produto**, parâmetros `{ serraMm, sobraMinimaMm }`.
-- Guilhotina em níveis: primeiro heurística por faixas (shelf, com e sem rotação, peças em ordem decrescente), depois busca com teto de nós até um limite de peças por grupo; escolhe (menos chapas novas, menor área usada, menos sobras pequenas). Retalhos entram antes de chapa nova, em ordem crescente de área.
+- Guilhotina por heurísticas: retângulos livres com melhor encaixe e variante por faixas (shelf), com e sem rotação, em várias ordens decrescentes de peças (a busca exata com teto de nós ficou fora da v1, decisão do controlador na execução); escolhe (menos chapas novas, menor área usada, menos sobras pequenas). Retalhos entram antes de chapa nova, em ordem crescente de área.
 - A folga de serra (`serraMm`) é descontada entre cortes consecutivos; padrão 0.
 - Resultado por chapa: lista de peças `{x, y, largura, altura, girada, item}` em mm, e as **sobras retangulares** geradas pela guilhotina; sobra vira retalho candidato só se os dois lados forem ≥ `sobraMinimaMm` (padrão 300).
 - Nunca usa mais chapas novas do que a heurística de faixas (testado).
