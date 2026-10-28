@@ -1,11 +1,12 @@
 // Plano de corte de vidros (grava só em web_vidro_config, web_vidro_retalhos e web_vidro_planos; lê vidros, ped_orc_itens_v4 e estoque do VB).
 // Regras: calculo/vidro_pecas.js (peças), calculo/vidro_otimizacao.js (chapas e retalhos), calculo/vidro_validacao.js (entradas).
 // Nada aqui é dinheiro: as rotas não exigem valores.ver, então nenhum nome de campo pode casar com REGEX_VALOR (seguranca/valores.js).
-// Traz parâmetros, retalhos, produtos, pré-visualização, salvar/ler/marcar/cancelar plano e liberarPlanosVidroDoPedido (usada ao cancelar/excluir pedido); conferir vem depois.
+// Traz parâmetros, retalhos, produtos, pré-visualização, salvar/ler/marcar/cancelar plano e liberarPlanosVidroDoPedido (usada ao cancelar/excluir pedido), confirmar com baixa de chapas no estoque e excluir dados do pedido.
 const { emTransacao, ErroUsuario, agoraLocal } = require('./transacao');
 const { PADRAO, otimizarVidros } = require('../calculo/vidro_otimizacao');
 const { montarPecasVidro, chaveGrupoVidro, impressaoPecasVidro, normalizar } = require('../calculo/vidro_pecas');
-const { validarConfigVidros, validarRetalhoVidro } = require('../calculo/vidro_validacao');
+const { validarConfigVidros, validarRetalhoVidro, validarConferenciaVidros } = require('../calculo/vidro_validacao');
+const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');
 
 const VER = ['corte.ver'];
 const PARAMETROS = ['corte.ver', 'corte.parametros'];
@@ -367,6 +368,126 @@ function registrarCorteVidros({ rota, pool }) {
       }
       await conn.execute("UPDATE web_vidro_planos SET progresso = ? WHERE id = ? AND situacao = 'gerado'", [JSON.stringify(lista), id]);
       return { ok: true, qtdCortadas: lista.length };
+    });
+    if (r) res.json(r);
+  });
+
+  // Baixa no estoque das chapas NOVAS do plano (retalho não está em `estoque`). O produto de cada grupo é o que definiu a chapa no plano
+  // (grupo.produtoCodigo); a tela só o repete em baixas[]. Dois grupos com o mesmo produto somam (o saldo é conferido sobre a soma).
+  // Roda dentro da transação de confirmar; qualquer falha desfaz tudo. Devolve [{ produto, qtd }] para a auditoria.
+  async function baixarChapasNovas(conn, req, plano, corpo) {
+    const comChapas = plano.grupos.map(g => ({ g, chapas: g.chapas.filter(c => c.tipo === 'chapa').length })).filter(x => x.chapas > 0);
+    if (!comChapas.length) return [];
+    const permissoes = (req.acesso && req.acesso.permissoes) || new Set();
+    if (!BAIXAR_ESTOQUE.every(c => permissoes.has(c))) throw new ErroUsuario(403, 'Este plano usa chapas novas: dar baixa no estoque exige a permissão de dar saída no estoque.');
+    const rotulo = g => g.modelo + (g.cor ? ' / ' + g.cor : '');
+    if (!Array.isArray(corpo.baixas)) throw new ErroUsuario(400, 'Informe o produto do estoque de cada vidro com chapas novas (baixas).');
+    const porChave = new Map();
+    for (const b of corpo.baixas) {
+      const chave = b && typeof b.chave === 'string' ? b.chave : null;
+      const alvo = chave === null ? null : comChapas.find(x => x.g.chave === chave);
+      if (!alvo) throw new ErroUsuario(400, `Baixa informada para um grupo desconhecido ou sem chapas novas: ${chave === null ? '(sem chave)' : chave}.`);
+      if (porChave.has(chave)) throw new ErroUsuario(400, 'Grupo informado mais de uma vez nas baixas.');
+      const codigo = typeof b.produtoCodigo === 'number' || (typeof b.produtoCodigo === 'string' && /^\d+$/.test(b.produtoCodigo)) ? inteiroPositivo(b.produtoCodigo) : null;
+      if (!codigo) throw new ErroUsuario(400, 'Produto do estoque inválido na baixa.');
+      if (codigo !== Number(alvo.g.produtoCodigo)) throw new ErroUsuario(400, `O produto da baixa de ${rotulo(alvo.g)} não é o produto com que o plano foi gerado.`);
+      porChave.set(chave, codigo);
+    }
+    for (const { g } of comChapas) if (!porChave.has(g.chave)) throw new ErroUsuario(400, `Falta informar a baixa do produto do estoque de ${rotulo(g)}.`);
+    const somas = new Map();   // produto -> chapas novas de todos os grupos dele
+    for (const { g, chapas } of comChapas) somas.set(Number(g.produtoCodigo), (somas.get(Number(g.produtoCodigo)) || 0) + chapas);
+    const codigos = [...somas.keys()];
+    const produtos = await travarProdutos(conn, codigos);
+    const [situacoes] = await conn.execute(`SELECT CODIGO, NOME_PRODUTO, CLASSE, SITUACAO, ALTURA, LARGURA FROM estoque WHERE CODIGO IN (${codigos.map(() => '?').join(',')})`, codigos);
+    const itens = [...somas].map(([codigo, qtd]) => {
+      const prod = produtos.get(codigo);
+      if (!prod) throw new ErroUsuario(400, `Produto ${codigo} do estoque não encontrado.`);
+      const e = situacoes.find(x => Number(x.CODIGO) === codigo);
+      if (!e || e.SITUACAO !== 'Ativo') throw new ErroUsuario(400, `O produto ${prod.NOME_PRODUTO} está inativo no estoque; refaça o plano com outro vidro.`);
+      conferirSaldo(prod, qtd);
+      return { p: prod, qtd };
+    });
+    await gravarSaidas(conn, itens, { quando: agoraLocal(), usuario: (req.user && req.user.nome) || req.acesso?.nome || '' });
+    return itens.map(i => ({ produto: i.p.NOME_PRODUTO, qtd: i.qtd }));
+  }
+
+  // confirmar o corte real: chapas novas baixam do estoque (corpo.baixas); retalhos usados → usado; não usados → disponível;
+  // sobras guardadas (só as citadas em corpo.sobras) → retalhos novos; plano → conferido
+  rota('post', '/corte_vidros/plano/:id/confirmar', PLANEJAR, async (req, res) => {
+    const id = inteiroPositivo(req.params.id);
+    if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
+    const corpo = req.body || {};
+    const r = await emTransacao(pool, res, 'POST /corte_vidros/plano/:id/confirmar', async conn => {
+      const p = await travarPlano(conn, id);
+      exigirGerado(p);
+      const plano = lerJson(p.resultado, {}).plano || { grupos: [] };
+      const conf = validarConferenciaVidros(corpo, plano);
+      if (!conf.ok) throw new ErroUsuario(400, conf.erro);
+      const idsDoPlano = plano.grupos.flatMap(g => g.chapas).filter(c => c.tipo === 'retalho').map(c => c.retalhoId);
+      const naoUsados = Array.isArray(corpo.retalhosNaoUsados) ? corpo.retalhosNaoUsados.map(Number) : [];
+      if (naoUsados.some(x => !idsDoPlano.includes(x))) throw new ErroUsuario(400, 'Retalho informado como não usado não pertence a este plano.');
+      const grupoDe = chave => plano.grupos.find(g => g.chave === chave);
+      const parametros = lerJson(p.parametros, {});
+      const minima = Number.isInteger(parametros.sobraMinima) ? parametros.sobraMinima : PADRAO.sobraMinima;
+      const guardadas = [];
+      for (const s of conf.sobras) {
+        const g = grupoDe(s.grupo), c = g.chapas[s.chapa];
+        if (s.destino !== 'guardar' || (c.tipo === 'retalho' && naoUsados.includes(c.retalhoId))) continue;
+        if (s.altura < minima || s.largura < minima) throw new ErroUsuario(400, `Sobra de ${s.altura} x ${s.largura} mm abaixo da mínima (${minima} mm em cada lado) de ${g.modelo}: descarte.`);
+        guardadas.push({ g, s });
+      }
+      const agora = agoraLocal(), quem = req.acesso?.nome || '';
+      const baixadas = await baixarChapasNovas(conn, req, plano, corpo);
+      let usados = 0, novos = 0;
+      for (const g of plano.grupos) for (const c of g.chapas) {
+        if (c.tipo !== 'retalho') continue;
+        const livre = naoUsados.includes(c.retalhoId);
+        const [rr] = livre
+          ? await conn.execute("UPDATE web_vidro_retalhos SET situacao = 'disponivel', plano_reserva = NULL, atualizado_em = ? WHERE id = ? AND situacao = 'reservado' AND plano_reserva = ?", [agora, c.retalhoId, id])
+          : await conn.execute("UPDATE web_vidro_retalhos SET situacao = 'usado', atualizado_em = ? WHERE id = ? AND situacao = 'reservado' AND plano_reserva = ?", [agora, c.retalhoId, id]);
+        if (!rr.affectedRows) throw new ErroUsuario(409, `O retalho ${c.retalhoId} não está mais reservado para este plano.`);
+        if (!livre) usados++;
+      }
+      for (const { g, s } of guardadas) {
+        await conn.execute("INSERT INTO web_vidro_retalhos (produto_codigo, produto_nome, altura, largura, situacao, plano_origem, criado_por, criado_em, atualizado_em) VALUES (?, ?, ?, ?, 'disponivel', ?, ?, ?, ?)",
+          [g.produtoCodigo, g.produtoNome, s.altura, s.largura, id, quem, agora, agora]);
+        novos++;
+      }
+      const [pl] = await conn.execute("UPDATE web_vidro_planos SET situacao = 'conferido', conferido_por = ?, conferido_em = ? WHERE id = ? AND situacao = 'gerado'", [quem, agora, id]);
+      if (!pl.affectedRows) throw new ErroUsuario(409, 'O plano já foi conferido.');
+      await auditarConn(conn, quem, 'corte_vidros_conferido', id, { campos: ['plano', 'retalhos'], pedido: Number(p.pedido), qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, qtdChapasBaixadas: baixadas.reduce((t, b) => t + b.qtd, 0) });
+      if (baixadas.length) await auditarConn(conn, quem, 'corte_vidros_baixa_estoque', id, { campos: ['estoque'], pedido: Number(p.pedido), itens: baixadas });
+      return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, baixas: baixadas };
+    });
+    if (r) res.json(r);
+  });
+
+  // Excluir TODOS os dados de plano de vidro do pedido (gerado, cancelado ou conferido); não exige que o pedido ainda exista (plano órfão).
+  // Retalho reservado volta a ficar disponível; o material físico de plano CONFERIDO não volta, só perde a ligação com o plano apagado.
+  // Plano conferido exige confirmação reforçada (incluirConferidos) e a permissão corte.parametros.
+  rota('delete', '/corte_vidros/pedido/:numero', PLANEJAR, async (req, res) => {
+    const numero = inteiroPositivo(req.params.numero);
+    if (!numero) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const corpo = req.body || {};
+    const r = await emTransacao(pool, res, 'DELETE /corte_vidros/pedido/:numero', async conn => {
+      const [planos] = await conn.execute('SELECT id, situacao FROM web_vidro_planos WHERE pedido = ? AND excluido_em IS NULL ORDER BY id FOR UPDATE', [numero]);
+      if (!planos.length) throw new ErroUsuario(404, 'Não há dados de plano de corte de vidros para este pedido.');
+      const conferidos = planos.filter(p => p.situacao === 'conferido').length;
+      if (conferidos) {
+        if (corpo.incluirConferidos !== true) throw new ErroUsuario(409, 'Este pedido tem plano conferido (corte já confirmado). Confirme a exclusão do histórico para continuar.', { exigeConfirmacaoConferido: true });
+        if (!(req.acesso && req.acesso.permissoes && req.acesso.permissoes.has('corte.parametros'))) throw new ErroUsuario(403, 'Só quem tem a permissão de parâmetros do corte pode excluir um plano já conferido.');
+      }
+      let liberados = 0;
+      for (const p of planos) {
+        const [lib] = await liberarReservas(conn, p.id);
+        liberados += Number(lib && lib.affectedRows) || 0;
+        await conn.execute('UPDATE web_vidro_retalhos SET plano_origem = NULL WHERE plano_origem = ?', [p.id]);
+        await conn.execute('UPDATE web_vidro_retalhos SET plano_reserva = NULL WHERE plano_reserva = ?', [p.id]);
+        await conn.execute('DELETE FROM web_vidro_planos WHERE id = ?', [p.id]);
+      }
+      await auditarConn(conn, req.acesso?.nome, 'corte_vidros_dados_pedido_excluidos', numero,
+        { campos: ['planos', 'retalhos'], pedido: numero, planos: planos.map(p => Number(p.id)), qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados });
+      return { ok: true, pedido: numero, qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados };
     });
     if (r) res.json(r);
   });

@@ -32,7 +32,7 @@ function bancoVidros() {
     produto(15, 'Perfil P100', 6000, 0, { CLASSE: 'Perfil', UNIDADE: 'Barra' })
   ];
   const estado = { config: [], retalhos: [], auditoria: [], pedidos: [], vidros: [], itens: [], planos: [], estoque, saidas: [] };
-  const { config, retalhos, auditoria, pedidos, vidros, itens, planos } = estado;
+  const { config, retalhos, auditoria, pedidos, vidros, itens, planos, saidas } = estado;
   let proxRetalho = 1, proxVidro = 1, proxPlano = 1;
   const formatarRetalho = r => ({ id: r.id, produto_codigo: r.produto_codigo, produto_nome: r.produto_nome, altura: r.altura, largura: r.largura, situacao: r.situacao,
     plano_origem: r.plano_origem ?? null, plano_reserva: r.plano_reserva ?? null, criado_em: r.criado_em ?? null });
@@ -99,6 +99,36 @@ function bancoVidros() {
       let c = 0; for (const p of planos) if (p.pedido === Number(n) && p.situacao === 'conferido' && !p.excluido_em) { p.excluido_em = agora; c++; }
       return { affectedRows: c };
     }],
+
+    // ---- confirmar: baixa de chapas (estoque e saida_estoque do VB), retalhos e plano ----
+    [/^SELECT CODIGO, NOME_PRODUTO, QTD_ESTOQUE, VALOR, CODIGO_BARRA[\s\S]*FROM estoque WHERE CODIGO IN \([\s\S]*\) FOR UPDATE/, (sql, cods) =>
+      estoque.filter(e => cods.map(Number).includes(e.CODIGO)).map(e => ({ ...e }))],
+    [/^INSERT INTO saida_estoque \(CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO, STATUS\)/, (sql, [CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO]) => {
+      saidas.push({ ID: saidas.length + 1, CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO, STATUS: null }); return { affectedRows: 1 };
+    }],
+    [/^UPDATE estoque SET QTD_ESTOQUE = QTD_ESTOQUE - \? WHERE CODIGO = \?/, (sql, [q, c]) => { estoque.find(x => x.CODIGO === Number(c)).QTD_ESTOQUE -= Number(q); return { affectedRows: 1 }; }],
+    [/^UPDATE web_vidro_retalhos SET situacao = 'disponivel', plano_reserva = NULL, atualizado_em = \? WHERE id = \? AND situacao = 'reservado' AND plano_reserva = \?/, (sql, [, id, plano]) => {
+      const r = retalhos.find(x => x.id === id); if (!r || r.situacao !== 'reservado' || r.plano_reserva !== plano) return { affectedRows: 0 };
+      r.situacao = 'disponivel'; r.plano_reserva = null; return { affectedRows: 1 };
+    }],
+    [/^UPDATE web_vidro_retalhos SET situacao = 'usado', atualizado_em = \? WHERE id = \? AND situacao = 'reservado' AND plano_reserva = \?/, (sql, [, id, plano]) => {
+      const r = retalhos.find(x => x.id === id); if (!r || r.situacao !== 'reservado' || r.plano_reserva !== plano) return { affectedRows: 0 };
+      r.situacao = 'usado'; return { affectedRows: 1 };
+    }],
+    [/^INSERT INTO web_vidro_retalhos \(produto_codigo, produto_nome, altura, largura, situacao, plano_origem/, (sql, [produto_codigo, produto_nome, altura, largura, plano_origem, criado_por, criado_em]) => {
+      const r = { id: proxRetalho++, produto_codigo, produto_nome, altura, largura, situacao: 'disponivel', plano_origem, criado_por, criado_em };
+      retalhos.push(r); return { insertId: r.id, affectedRows: 1 };
+    }],
+    [/^UPDATE web_vidro_planos SET situacao = 'conferido'/, (sql, [quem, agora, id]) => {
+      const p = planos.find(x => x.id === id); if (!p || p.situacao !== 'gerado') return { affectedRows: 0 };
+      Object.assign(p, { situacao: 'conferido', conferido_por: quem, conferido_em: agora }); return { affectedRows: 1 };
+    }],
+    // ---- excluir dados do pedido ----
+    [/^SELECT id, situacao FROM web_vidro_planos WHERE pedido = \? AND excluido_em IS NULL/, (sql, [n]) =>
+      planos.filter(p => p.pedido === Number(n) && !p.excluido_em).sort((a, b) => a.id - b.id).map(p => ({ id: p.id, situacao: p.situacao }))],
+    [/^UPDATE web_vidro_retalhos SET plano_origem = NULL WHERE plano_origem = \?/, (sql, [id]) => { let c = 0; for (const r of retalhos) if (r.plano_origem === id) { r.plano_origem = null; c++; } return { affectedRows: c }; }],
+    [/^UPDATE web_vidro_retalhos SET plano_reserva = NULL WHERE plano_reserva = \?/, (sql, [id]) => { let c = 0; for (const r of retalhos) if (r.plano_reserva === id) { r.plano_reserva = null; c++; } return { affectedRows: c }; }],
+    [/^DELETE FROM web_vidro_planos WHERE id = \?/, (sql, [id]) => { const i = planos.findIndex(p => p.id === id); if (i >= 0) planos.splice(i, 1); return { affectedRows: i >= 0 ? 1 : 0 }; }],
 
     // ---- retalhos ----
     [/^SELECT id, produto_codigo, produto_nome, altura, largura, situacao, plano_origem, plano_reserva, criado_em FROM web_vidro_retalhos/, (sql, params) => {
