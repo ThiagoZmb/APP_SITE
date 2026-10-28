@@ -150,6 +150,28 @@ const TABELAS = [
      excluido_em DATETIME NULL,
      KEY ix_plano_pedido (pedido, situacao)
    ) ${OPCOES}`,
+  // notas fiscais só de cabeçalho (sem itens); contraparte = cadastro_fornecedores.COD (entrada) ou cadastro_clientes.CODIGO (saída), sem FK
+  `CREATE TABLE IF NOT EXISTS \`web_notas_fiscais\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     tipo ENUM('entrada','saida') NOT NULL,
+     numero VARCHAR(20) NOT NULL,
+     serie VARCHAR(5) NOT NULL DEFAULT '1',
+     chave CHAR(44) NULL,
+     data_emissao DATE NOT NULL,
+     contraparte_codigo INT NOT NULL,
+     contraparte_nome VARCHAR(190) NOT NULL,
+     valor_total DECIMAL(14,2) NOT NULL,
+     observacao VARCHAR(500) NULL,
+     situacao ENUM('ativa','cancelada') NOT NULL DEFAULT 'ativa',
+     motivo_cancelamento VARCHAR(300) NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     alterado_por VARCHAR(100) NULL,
+     alterado_em DATETIME NULL,
+     UNIQUE KEY ux_nota_numero (tipo, serie, numero, contraparte_codigo),
+     UNIQUE KEY ux_nota_chave (chave),
+     KEY ix_nota_data (tipo, data_emissao)
+   ) ${OPCOES}`,
   // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)
   `CREATE TABLE IF NOT EXISTS \`web_custo_material\` (
      material_codigo INT NOT NULL PRIMARY KEY,
@@ -555,6 +577,31 @@ async function acrescentarPermissoesTintas(pool) {
   }
 }
 
+// Notas fiscais: ver e editar para Administrador e Interno completo
+async function acrescentarPermissoesNotas(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_notas' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of ['notas.ver', 'notas.editar']) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_notas', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
 const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
 
@@ -605,4 +652,4 @@ async function acrescentarPermissoesAtendimento(pool) {
   }
 }
 
-module.exports = { instalarTabelas, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
