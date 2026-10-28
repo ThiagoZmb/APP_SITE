@@ -150,6 +150,44 @@ const TABELAS = [
      excluido_em DATETIME NULL,
      KEY ix_plano_pedido (pedido, situacao)
    ) ${OPCOES}`,
+  // Plano de corte de vidros: medidas em mm inteiros; `pedido` é referência lógica a ped_orc.NUMERO (tabela do VB: sem chave estrangeira).
+  // web_vidro_config tem linha única (id = 1); campos NULL herdam o padrão do código.
+  `CREATE TABLE IF NOT EXISTS \`web_vidro_config\` (
+     id INT NOT NULL PRIMARY KEY,
+     serra INT NULL,
+     sobra_minima INT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(100) NULL
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_vidro_retalhos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     produto_codigo INT NOT NULL,
+     produto_nome VARCHAR(190) NOT NULL,
+     altura INT NOT NULL,
+     largura INT NOT NULL,
+     situacao ENUM('disponivel','reservado','usado','descartado') NOT NULL DEFAULT 'disponivel',
+     plano_origem INT NULL,
+     plano_reserva INT NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     KEY ix_vretalho (situacao, produto_codigo)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_vidro_planos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     pedido INT NOT NULL,
+     situacao ENUM('gerado','conferido','cancelado') NOT NULL DEFAULT 'gerado',
+     impressao_pecas CHAR(64) NOT NULL,
+     parametros LONGTEXT NULL,
+     resultado LONGTEXT NOT NULL,
+     progresso LONGTEXT NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     conferido_por VARCHAR(100) NULL,
+     conferido_em DATETIME NULL,
+     excluido_em DATETIME NULL,
+     KEY ix_vplano_pedido (pedido, situacao)
+   ) ${OPCOES}`,
   // notas fiscais só de cabeçalho (sem itens); contraparte = cadastro_fornecedores.COD (entrada) ou cadastro_clientes.CODIGO (saída), sem FK
   `CREATE TABLE IF NOT EXISTS \`web_notas_fiscais\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
