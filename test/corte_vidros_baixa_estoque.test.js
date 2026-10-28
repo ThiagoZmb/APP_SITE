@@ -285,3 +285,19 @@ test('conferência inválida (sobra inexistente, medida real maior que a calcula
   assert.equal(b.estado.saidas.length, 0);
   assert.equal(b.estado.planos[0].situacao, 'gerado');
 });
+
+test('retalhosNaoUsados que não é lista de inteiros positivos: 400 e nada gravado; ausente vale lista vazia', async t => {
+  const b = cenario();
+  const ret = b.semear.retalho({ produto_codigo: 10, produto_nome: 'Vidro Incolor 4mm', altura: 2500, largura: 1000 });
+  const { chamar } = await prepararVidros(t, { banco: b });
+  const { id } = await salvar(chamar);
+  const antes = JSON.stringify([b.estado.estoque, b.estado.saidas, b.estado.retalhos, b.estado.planos]);
+  for (const invalido of ['texto', { 0: ret.id }, 7, null, ['a'], [1.5], [0], [-2], [ret.id, 'x']]) {
+    const r = await confirmar(chamar, id, { baixas: baixasDoCenario, retalhosNaoUsados: invalido });
+    assert.equal(r.status, 400, JSON.stringify(invalido));
+    assert.match((await r.json()).error, /Lista de retalhos não usados inválida/);
+    assert.equal(JSON.stringify([b.estado.estoque, b.estado.saidas, b.estado.retalhos, b.estado.planos]), antes, JSON.stringify(invalido));
+  }
+  const ok = await confirmar(chamar, id, { baixas: baixasDoCenario });   // ausente = []
+  assert.equal(ok.status, 200);
+});

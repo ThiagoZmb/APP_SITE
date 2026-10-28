@@ -240,3 +240,57 @@ test('menu: Corte de vidros no layout com a permissão corte.ver', () => {
   assert.match(layout, /\{ href: 'corte_vidros\.html', texto: 'Corte de vidros', icone: 'corte', sub: true \}/);
   assert.match(layout, /'corte_vidros\.html': \['corte\.ver'\]/);
 });
+
+// ---- avisos da conferência e do saldo ----
+test('retalhosNaoUsadosComPecas: só retalhos marcados como não usados que têm peças planejadas', () => {
+  const plano = { grupos: [grupo({ chapas: [chapa({ tipo: 'retalho', retalhoId: 3, pecas: [peca()] }), chapa({ tipo: 'retalho', retalhoId: 4, pecas: [] }),
+    chapa({ tipo: 'retalho', retalhoId: 5, pecas: [peca()] }), chapa()] })] };
+  assert.deepEqual(T.retalhosNaoUsadosComPecas(plano, [3, 4]), [3]);
+  assert.deepEqual(T.retalhosNaoUsadosComPecas(plano, []), []);
+  assert.deepEqual(T.retalhosNaoUsadosComPecas(plano, [99]), []);
+  assert.deepEqual(T.retalhosNaoUsadosComPecas(null, [3]), []);
+});
+
+test('textoAvisosConfirmacao: avisa retalho não usado com peças e plano desatualizado; sem motivo, vazio', () => {
+  const sem = T.textoAvisosConfirmacao({ retalhosComPecas: [], situacao: 'gerado' });
+  assert.equal(sem, '');
+  const ret = T.textoAvisosConfirmacao({ retalhosComPecas: [3], situacao: 'gerado' });
+  assert.match(ret, /As peças planejadas em retalho marcado como não usado NÃO terão baixa no estoque\. Se você cortou essas peças de uma chapa nova, cancele, refaça o plano ou lance a saída de estoque manualmente\./);
+  assert.doesNotMatch(ret, /pedido mudou/);
+  const des = T.textoAvisosConfirmacao({ retalhosComPecas: [], situacao: 'desatualizado' });
+  assert.match(des, /O pedido mudou depois que este plano foi gerado\. A baixa será feita pelo plano salvo\./);
+  const ambos = T.textoAvisosConfirmacao({ retalhosComPecas: [3], situacao: 'desatualizado' });
+  assert.match(ambos, /NÃO terão baixa/); assert.match(ambos, /pedido mudou/);
+});
+
+test('avisosSaldo: soma as chapas NOVAS por produto e avisa só quando excede o saldo', () => {
+  const candidatos = [{ codigo: 5, nome: 'Vidro A', qtdEstoque: 3 }, { codigo: 8, nome: 'Vidro C', qtdEstoque: 10 }];
+  const plano = { grupos: [
+    grupo({ chave: 'A|', modelo: 'A', produtoCodigo: 5, chapas: [chapa(), chapa(), chapa({ tipo: 'retalho', retalhoId: 1 })] }),
+    grupo({ chave: 'B|', modelo: 'B', produtoCodigo: 5, chapas: [chapa(), chapa()] }),
+    grupo({ chave: 'C|', modelo: 'C', produtoCodigo: 8, chapas: [chapa()] }),
+    grupo({ chave: 'D|', modelo: 'D', aguardandoProduto: true, produtoCodigo: null, chapas: [] })] };
+  const a = T.avisosSaldo(plano, candidatos);
+  assert.equal(a.length, 1);
+  assert.equal(a[0].produtoCodigo, 5);
+  assert.equal(a[0].necessarias, 4); assert.equal(a[0].saldo, 3);
+  assert.deepEqual(T.avisosSaldo(plano, [{ codigo: 5, nome: 'Vidro A', qtdEstoque: 4 }]), []);
+  assert.deepEqual(T.avisosSaldo(plano, []), []);   // sem saldo conhecido não avisa
+  assert.match(T.htmlAvisosSaldo(a), /4 chapas novas/);
+  assert.match(T.htmlAvisosSaldo(a), /3 no estoque/);
+  assert.equal(T.htmlAvisosSaldo([]), '');
+});
+
+test('seletor de produtos mostra "N chapas no estoque" por opção, com escape', () => {
+  const grupos = [{ chave: 'Incolor|', modelo: 'Incolor', cor: '', qtdPecas: 2, preSelecionado: 5,
+    candidatos: [{ codigo: 5, nome: 'Vidro <b>A</b>', altura: 2400, largura: 3210, qtdEstoque: 1 }, { codigo: 6, nome: 'Vidro B', altura: 2400, largura: 2200, qtdEstoque: 12 }] }];
+  const html = T.htmlSeletorProdutos(grupos, {});
+  assert.match(html, /1 chapa no estoque/);
+  assert.match(html, /12 chapas no estoque/);
+  assert.doesNotMatch(html, /<b>A<\/b>/);
+});
+
+test('confirmar usa os avisos puros (texto fixo do retalho não usado e do plano desatualizado)', () => {
+  const js = ler('corte_vidros.js');
+  assert.match(js, /textoAvisosConfirmacao/); assert.match(js, /retalhosNaoUsadosComPecas/); assert.match(js, /avisosSaldo/);
+});

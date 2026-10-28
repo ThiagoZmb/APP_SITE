@@ -241,3 +241,13 @@ test('pré-visualização: nada é escrito no banco e nenhum nome de campo é de
   assert.equal(b.f.chamadas.some(c => /BEGIN|ROLLBACK/.test(c.sql)), false);
   respostas.forEach((j, i) => semNomesDeDinheiro(j, 'resposta ' + i));
 });
+
+test('pré-visualização: cada candidato traz qtdEstoque numérico (saldo do estoque) e nenhum nome casa REGEX_VALOR', async t => {
+  const { chamar } = await prepararVidros(t, { banco: cenario() });
+  const j = await (await prever(chamar)).json();
+  const cand = j.grupos.find(x => x.chave === 'Incolor 4mm|').candidatos;
+  assert.equal(cand.length, 1);
+  assert.equal(typeof cand[0].qtdEstoque, 'number');
+  assert.equal(cand[0].qtdEstoque, 26);
+  semNomesDeDinheiro(j, 'previa com qtdEstoque');
+});

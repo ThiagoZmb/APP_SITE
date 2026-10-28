@@ -122,7 +122,7 @@
       const lista = g.candidatos.length ? g.candidatos : (todos || []);
       const escolhido = escolhas[g.chave] !== undefined ? Number(escolhas[g.chave]) : (g.preSelecionado ?? null);
       const opcoes = '<option value="">— escolha o produto —</option>' + lista.map(p =>
-        `<option value="${esc(p.codigo)}"${escolhido === p.codigo ? ' selected' : ''}>${esc(p.nome)} (${esc(medida(p.altura, p.largura))})</option>`).join('');
+        `<option value="${esc(p.codigo)}"${escolhido === p.codigo ? ' selected' : ''}>${esc(p.nome)} (${esc(medida(p.altura, p.largura))})${Number.isFinite(Number(p.qtdEstoque)) ? ' — ' + esc(chapasTxt(p.qtdEstoque)) + ' no estoque' : ''}</option>`).join('');
       const aviso = g.candidatos.length ? '' : `<p class="erro-form" role="status">Nenhum vidro do estoque tem o nome «Vidro ${esc(g.modelo)}»${todos && todos.length ? '; escolha na lista completa.' : '. Ajuste o cadastro no estoque.'}</p>`;
       return `<div class="escolha-linha"><div><b>${esc(g.modelo)}</b> <span class="chip">${esc(semCor(g.cor))}</span> <span class="cinza">${esc(g.qtdPecas)} peça${g.qtdPecas === 1 ? '' : 's'}</span></div>` +
         `<select class="escolha-produto" data-chave="${esc(g.chave)}" aria-label="Produto (chapa) para ${esc(g.modelo)} ${esc(semCor(g.cor))}">${opcoes}</select>${aviso}</div>`;
@@ -165,6 +165,41 @@
     for (const g of grupos) if (!Number.isInteger(Number(g.produtoCodigo)) || !(Number(g.produtoCodigo) > 0)) erros.push(`Escolha o produto do estoque para ${rotuloGrupo(g)} (refaça o plano).`);
     return erros;
   }
+
+  // ---------- avisos antes de confirmar e saldo de chapas ----------
+  const AVISO_RETALHO_NAO_USADO = 'As peças planejadas em retalho marcado como não usado NÃO terão baixa no estoque. Se você cortou essas peças de uma chapa nova, cancele, refaça o plano ou lance a saída de estoque manualmente.';
+  const AVISO_DESATUALIZADO = 'O pedido mudou depois que este plano foi gerado. A baixa será feita pelo plano salvo.';
+  // ids dos retalhos marcados como "não usado" que têm peças planejadas (essas peças não entram em nenhuma baixa de estoque)
+  function retalhosNaoUsadosComPecas(plano, naoUsados) {
+    const marcados = new Set((naoUsados || []).map(Number));
+    const ids = [];
+    for (const g of (plano && plano.grupos) || []) for (const c of g.chapas || []) if (c.tipo === 'retalho' && marcados.has(Number(c.retalhoId)) && (c.pecas || []).length) ids.push(Number(c.retalhoId));
+    return ids;
+  }
+  function textoAvisosConfirmacao({ retalhosComPecas = [], situacao = '' }) {
+    const avisos = [];
+    if (retalhosComPecas.length) avisos.push(AVISO_RETALHO_NAO_USADO);
+    if (situacao === 'desatualizado') avisos.push(AVISO_DESATUALIZADO);
+    return avisos.join('\n\n');
+  }
+  // chapas NOVAS planejadas por produto (grupos diferentes podem usar o mesmo produto) contra o saldo do estoque
+  function avisosSaldo(plano, candidatos) {
+    const saldo = new Map((candidatos || []).filter(c => c && Number.isFinite(Number(c.qtdEstoque))).map(c => [Number(c.codigo), c]));
+    const soma = new Map();
+    for (const g of (plano && plano.grupos) || []) {
+      const n = (g.chapas || []).filter(c => c.tipo === 'chapa').length;
+      if (n && g.produtoCodigo) soma.set(Number(g.produtoCodigo), (soma.get(Number(g.produtoCodigo)) || 0) + n);
+    }
+    const avisos = [];
+    for (const [codigo, necessarias] of soma) {
+      const c = saldo.get(codigo);
+      if (c && necessarias > Number(c.qtdEstoque)) avisos.push({ produtoCodigo: codigo, produtoNome: c.nome, necessarias, saldo: Number(c.qtdEstoque) });
+    }
+    return avisos;
+  }
+  const chapasTxt = n => `${num(n)} chapa${Number(n) === 1 ? '' : 's'}`;
+  const htmlAvisosSaldo = avisos => !avisos || !avisos.length ? '' :
+    `<div class="aviso-pendencia" role="status"><b>Estoque insuficiente (aviso, não bloqueia):</b><ul>${avisos.map(a => `<li>${esc(a.produtoNome ?? ('Produto ' + a.produtoCodigo))}: o plano usa ${esc(chapasTxt(a.necessarias))} novas e há ${esc(num(a.saldo))} no estoque.</li>`).join('')}</ul></div>`;
 
   // ---------- corpos de envio e validação ----------
   const corpoSalvar = (p, escolhas) => ({ impressao: p.impressao, retalhosUsados: p.retalhosUsados, escolhas: escolhas || {} });
@@ -306,6 +341,7 @@
       const resumo = { ...fonte.plano.resumo, aproveitamentoPct: aproveitamentoGeral(fonte.plano) };
       $('plano-area').innerHTML = (modo === 'previa' ? htmlSeletorProdutos(previa.grupos, estado.escolhas, estado.produtos) : '') +
         htmlResumo(resumo) + htmlPendencias(fonte.pendencias) + htmlBloqueios(motivos) +
+        (modo === 'previa' ? htmlAvisosSaldo(avisosSaldo(fonte.plano, (estado.produtos || []).concat(previa.grupos.flatMap(g => g.candidatos)))) : '') +
         (fonte.plano.grupos.length ? fonte.plano.grupos.map((g, i) => htmlGrupo(g, opcoes, i)).join('') : '<p class="vazio">Nenhuma peça para cortar (veja as pendências).</p>') +
         (opcoes.conferindo ? htmlBaixaEstoque(gruposComChapasNovas(fonte.plano)) : '');
       $('btn-salvar').hidden = !(modo === 'previa' && pode('corte.planejar') && previa.qtdPecas > 0 && !motivos.length && !(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido'));
@@ -388,6 +424,8 @@
         const errosBaixa = validarBaixas(grupos);
         if (errosBaixa.length) { toast(errosBaixa[0], 'erro'); return; }
       }
+      const avisos = textoAvisosConfirmacao({ retalhosComPecas: retalhosNaoUsadosComPecas(estado.salvo.plano, naoUsados), situacao: estado.salvo.situacao });
+      if (avisos && !win.confirm('ATENÇÃO\n\n' + avisos + '\n\nDeseja continuar mesmo assim?')) return;
       const resumoBaixa = produtosDaBaixa(grupos).map(p => `${p.chapas} × ${p.produtoNome ?? p.produtoCodigo}`).join(', ');
       if (!win.confirm('Confirmar o corte? Os retalhos usados saem do estoque de retalhos e as sobras guardadas entram como retalhos. Sobra que não for listada como guardada é descartada.' +
         (grupos.length ? `\n\nBaixa no estoque das chapas novas: ${resumoBaixa}.` : '') +
@@ -517,6 +555,7 @@
 
   return { mm, medida, pctTxt, pct, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, aproveitamentoGeral, textoStatusPlano, textoConfirmarExclusao,
     htmlChapa, htmlGrupo, htmlResumo, htmlPendencias, motivosBloqueio, htmlBloqueios, htmlSeletorProdutos, escolhasEfetivas, queryEscolhas,
+    retalhosNaoUsadosComPecas, textoAvisosConfirmacao, avisosSaldo, htmlAvisosSaldo,
     gruposComChapasNovas, produtosDaBaixa, htmlBaixaEstoque, corpoBaixas, validarBaixas, corpoSalvar, corpoConferencia, validarConferenciaForm,
     htmlRetalhos, htmlConfig, iniciar };
 });

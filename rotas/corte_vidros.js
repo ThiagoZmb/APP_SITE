@@ -264,7 +264,7 @@ function registrarCorteVidros({ rota, pool }) {
       }
       const grupos = [...porGrupo.values()].sort((a, b) => (a.chave < b.chave ? -1 : a.chave > b.chave ? 1 : 0)).map(g => {
         const doNome = candidatosDoModelo(calc.candidatos, g.modelo);
-        return { ...g, candidatos: doNome.map(c => ({ codigo: c.codigo, nome: c.nome, altura: c.altura, largura: c.largura })), preSelecionado: doNome.length === 1 ? doNome[0].codigo : null };
+        return { ...g, candidatos: doNome.map(c => ({ codigo: c.codigo, nome: c.nome, altura: c.altura, largura: c.largura, qtdEstoque: c.qtdEstoque })), preSelecionado: doNome.length === 1 ? doNome[0].codigo : null };
       });
       res.json({
         pedido: { numero, cliente: ped.RAZAO_SOCIAL || '', situacao: ped.SITUACAO || '' },
@@ -417,6 +417,9 @@ function registrarCorteVidros({ rota, pool }) {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
     const corpo = req.body || {};
+    // retalhos não usados: ausente = nenhum; presente e fora do formato = 400 antes de qualquer escrita
+    if (corpo.retalhosNaoUsados !== undefined && !(Array.isArray(corpo.retalhosNaoUsados) && corpo.retalhosNaoUsados.every(x => Number.isInteger(x) && x > 0)))
+      return res.status(400).json({ error: 'Lista de retalhos não usados inválida.' });
     const r = await emTransacao(pool, res, 'POST /corte_vidros/plano/:id/confirmar', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
@@ -424,7 +427,7 @@ function registrarCorteVidros({ rota, pool }) {
       const conf = validarConferenciaVidros(corpo, plano);
       if (!conf.ok) throw new ErroUsuario(400, conf.erro);
       const idsDoPlano = plano.grupos.flatMap(g => g.chapas).filter(c => c.tipo === 'retalho').map(c => c.retalhoId);
-      const naoUsados = Array.isArray(corpo.retalhosNaoUsados) ? corpo.retalhosNaoUsados.map(Number) : [];
+      const naoUsados = corpo.retalhosNaoUsados === undefined ? [] : corpo.retalhosNaoUsados;
       if (naoUsados.some(x => !idsDoPlano.includes(x))) throw new ErroUsuario(400, 'Retalho informado como não usado não pertence a este plano.');
       const grupoDe = chave => plano.grupos.find(g => g.chave === chave);
       const parametros = lerJson(p.parametros, {});
