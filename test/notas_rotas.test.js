@@ -27,7 +27,7 @@ test('notas: cria entrada e saída (nome copiado do cadastro, auditoria sem valo
 test('notas: 400 para contraparte inexistente, fornecedor "." e dados inválidos', async t => {
   const banco = bancoNotas(); banco.semear.fornecedor('.');
   const { chamar } = await prepararNotas(t, { banco });
-  for (const m of [{ contraparteCodigo: 99 }, { contraparteCodigo: 2 }, { tipo: 'saida', contraparteCodigo: 99 }, { numero: 'abc' }, { valorTotal: '1.234,56' }, { dataEmissao: '2026-02-30' }]) {
+  for (const m of [{ contraparteCodigo: 99 }, { contraparteCodigo: 2 }, { tipo: 'saida', contraparteCodigo: 99 }, { numero: 'a-c' }, { valorTotal: '1.234,56' }, { dataEmissao: '2026-02-30' }]) {
     assert.equal((await criar(chamar, { ...ENTRADA, ...m })).status, 400, JSON.stringify(m));
   }
   assert.equal(banco.notas.length, 0);

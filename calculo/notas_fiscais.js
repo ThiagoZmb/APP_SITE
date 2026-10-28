@@ -20,12 +20,11 @@ function chaveValida(chave) {
   return Number(s[43]) === (r < 2 ? 0 : 11 - r);
 }
 
-// só dígitos, sem zeros à esquerda, até 9 dígitos (padrão da NF-e); '' se inválido
+// letras e dígitos, até 20 (o VB usa números como 10M, 11L, 12888A); em maiúsculas; número só de dígitos perde os zeros à esquerda; '' se inválido
 function normalizarNumero(v) {
   const s = t(v);
-  if (!/^\d{1,9}$/.test(s)) return '';
-  const n = s.replace(/^0+/, '');
-  return n;
+  if (!/^[0-9A-Za-z]{1,20}$/.test(s)) return '';
+  return /^\d+$/.test(s) ? s.replace(/^0+/, '') : s.toUpperCase();
 }
 
 function dataValida(v) {
@@ -33,7 +32,7 @@ function dataValida(v) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (!m) return false;
   const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+  return +m[1] >= 1900 && d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
 }
 
 // criando=false: só dataEmissao, valorTotal e observacao (o resto não muda depois de criada)
@@ -45,7 +44,7 @@ function validarNota(b = {}, { podeValores = false, criando = true } = {}) {
     dados.tipo = t(b.tipo);
     if (!TIPOS_NOTA.includes(dados.tipo)) erros.push('Tipo inválido (entrada ou saída).');
     dados.numero = normalizarNumero(b.numero);
-    if (!dados.numero) erros.push('Número da nota inválido (1 a 9 dígitos, maior que zero).');
+    if (!dados.numero) erros.push('Número da nota inválido (letras e números, até 20 caracteres, sem espaços nem símbolos).');
     dados.serie = t(b.serie).replace(/^0+(?=\d)/, '') || '1';   // "01" e "1" são a mesma série
     if (dados.serie.length > 5) erros.push('Série muito longa (máximo 5 caracteres).');
     const chave = t(b.chave).replace(/\s+/g, '');

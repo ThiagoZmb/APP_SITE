@@ -34,21 +34,21 @@ CREATE TABLE IF NOT EXISTS `web_notas_fiscais` (
 SELECT 'nf_entrada (total no VB)' AS item, COUNT(*) AS qtd FROM nf_entrada
 UNION ALL SELECT 'nf_saida (total no VB)', COUNT(*) FROM nf_saida
 UNION ALL SELECT 'nf_entrada que NÃO podem entrar (problema)', COUNT(*) FROM nf_entrada n
-  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$' AND TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) <> ''
+  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
         AND DATE(n.DATA) >= '1900-01-01' AND COALESCE(n.VALOR_TOTAL, 0) BETWEEN 0 AND 999999999999.99, 0)
 UNION ALL SELECT 'nf_saida que NÃO podem entrar (problema)', COUNT(*) FROM nf_saida n
-  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$' AND TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) <> ''
+  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
         AND DATE(n.DATA) >= '1900-01-01' AND COALESCE(n.VALOR, 0) BETWEEN 0 AND 999999999999.99, 0)
 UNION ALL SELECT 'já existem na tela nova', COUNT(*) FROM web_notas_fiscais;
 
 
 -- ============ BLOCO 2: lista das notas COM problema (não serão copiadas) — corrija no VB se quiser que entrem ============
 SELECT 'entrada' AS tipo, n.NUMERO, n.DATA, n.VALOR_TOTAL AS valor, n.RAZAO_FABRICANTE AS nome FROM nf_entrada n
-  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$' AND TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) <> ''
+  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
         AND DATE(n.DATA) >= '1900-01-01' AND COALESCE(n.VALOR_TOTAL, 0) BETWEEN 0 AND 999999999999.99, 0)
 UNION ALL
 SELECT 'saida', n.NUMERO, n.DATA, n.VALOR, n.RAZAO_SOCIAL FROM nf_saida n
-  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$' AND TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) <> ''
+  WHERE NOT COALESCE(TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
         AND DATE(n.DATA) >= '1900-01-01' AND COALESCE(n.VALOR, 0) BETWEEN 0 AND 999999999999.99, 0);
 
 
@@ -62,12 +62,12 @@ SELECT 'entrada', x.numero, '1', x.data_emissao, COALESCE(f.codigo, 0),
        LEFT(COALESCE(f.nome, NULLIF(x.nome, ''), '(sem nome)'), 190),
        x.valor, 'Importada do VB', 'ativa', 'importação do VB', NOW()
 FROM (
-  SELECT TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) AS numero,
+  SELECT CASE WHEN TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]+$' THEN TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) ELSE UPPER(TRIM(CAST(n.NUMERO AS CHAR))) END AS numero,
          DATE(n.DATA) AS data_emissao,
          TRIM(n.RAZAO_FABRICANTE) AS nome,
          ROUND(COALESCE(n.VALOR_TOTAL, 0), 2) AS valor
   FROM nf_entrada n
-  WHERE TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$'
+  WHERE TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
     AND DATE(n.DATA) >= '1900-01-01'
     AND COALESCE(n.VALOR_TOTAL, 0) BETWEEN 0 AND 999999999999.99
 ) x
@@ -83,12 +83,12 @@ SELECT 'saida', x.numero, '1', x.data_emissao, COALESCE(c.codigo, 0),
        LEFT(COALESCE(c.nome, NULLIF(x.nome, ''), '(sem nome)'), 190),
        x.valor, 'Importada do VB', 'ativa', 'importação do VB', NOW()
 FROM (
-  SELECT TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) AS numero,
+  SELECT CASE WHEN TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]+$' THEN TRIM(LEADING '0' FROM TRIM(CAST(n.NUMERO AS CHAR))) ELSE UPPER(TRIM(CAST(n.NUMERO AS CHAR))) END AS numero,
          DATE(n.DATA) AS data_emissao,
          TRIM(n.RAZAO_SOCIAL) AS nome,
          ROUND(COALESCE(n.VALOR, 0), 2) AS valor
   FROM nf_saida n
-  WHERE TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9]{1,9}$'
+  WHERE TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^[0-9A-Za-z]{1,20}$' AND NOT TRIM(CAST(n.NUMERO AS CHAR)) REGEXP '^0+$'
     AND DATE(n.DATA) >= '1900-01-01'
     AND COALESCE(n.VALOR, 0) BETWEEN 0 AND 999999999999.99
 ) x

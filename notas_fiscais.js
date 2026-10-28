@@ -26,7 +26,7 @@
     const erros = [];
     if (!editando) {
       if (!txt(f.contraparteCodigo)) erros.push(`Escolha o ${rotuloContraparte(f.tipo)}.`);
-      if (!/^\d{1,9}$/.test(txt(f.numero)) || Number(txt(f.numero)) === 0) erros.push('Número da nota inválido (1 a 9 dígitos).');
+      if (!/^[0-9A-Za-z]{1,20}$/.test(txt(f.numero)) || /^0+$/.test(txt(f.numero))) erros.push('Número da nota inválido (letras e números, até 20, sem espaços).');
       if (txt(f.serie).length > 5) erros.push('Série muito longa.');
       const chave = txt(f.chave).replace(/\s+/g, '');
       if (chave && !/^\d{44}$/.test(chave)) erros.push('Chave de acesso deve ter 44 dígitos.');

@@ -28,7 +28,9 @@ test('notas: chaveValida confere 44 dígitos e o DV', () => {
 
 test('notas: normalizarNumero tira zeros à esquerda e recusa o inválido', () => {
   assert.equal(normalizarNumero('000123'), '123');
-  for (const v of ['12a', '', '0', '1234567890', null]) assert.equal(normalizarNumero(v), '', String(v));
+  for (const v of ['12-a', '12 3', '', '0', '000', 'a'.repeat(21), null]) assert.equal(normalizarNumero(v), '', String(v));
+  // o VB usa números com letras (10M, 11L, 12888A): ficam em maiúsculas; só número puro perde os zeros à esquerda
+  for (const [v, esperado] of [['10m', '10M'], ['86P ', '86P'], ['12888A', '12888A'], ['000123', '123'], ['0A', '0A'], ['1234567890', '1234567890']]) assert.equal(normalizarNumero(v), esperado, v);
 });
 
 test('notas: criando OK normaliza número, série e chave', () => {
@@ -44,7 +46,7 @@ test('notas: criando OK normaliza número, série e chave', () => {
 
 test('notas: erros de cada campo', () => {
   const casos = [
-    [{ tipo: 'x' }, 'Tipo'], [{ numero: 'abc' }, 'Número'], [{ dataEmissao: '2026-02-30' }, 'Data'], [{ dataEmissao: '' }, 'Data'],
+    [{ tipo: 'x' }, 'Tipo'], [{ numero: 'a-c' }, 'Número'], [{ dataEmissao: '2026-02-30' }, 'Data'], [{ dataEmissao: '' }, 'Data'],
     [{ dataEmissao: '20/10/2026' }, 'Data'], [{ contraparteCodigo: 0 }, 'fornecedor'], [{ contraparteCodigo: 'a' }, 'fornecedor'],
     [{ valorTotal: '1.234,56' }, 'Valor'], [{ valorTotal: '1.500' }, 'Valor'], [{ valorTotal: '0' }, 'Valor'], [{ valorTotal: '-5' }, 'Valor'],
     [{ valorTotal: '' }, 'Valor'], [{ chave: CHAVE.slice(0, 43) + String((Number(CHAVE[43]) + 1) % 10) }, 'Chave'],

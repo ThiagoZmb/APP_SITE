@@ -10,7 +10,7 @@ const importar = (chamar, corpo, chave = 'chave-de-teste') => fetch(chamar.url +
 async function cenario(t) {
   const banco = bancoNotas();
   banco.estado.nfEntrada.push({ NUMERO: '000123', RAZAO_FABRICANTE: 'Alumínios Brasil', DATA: '2026-10-10 00:00:00', VALOR_TOTAL: 1500.5 },
-    { NUMERO: '124', RAZAO_FABRICANTE: 'Fantasma', DATA: '2026-10-11', VALOR_TOTAL: 10 }, { NUMERO: 'x', RAZAO_FABRICANTE: 'Alumínios Brasil', DATA: '2026-10-11', VALOR_TOTAL: 10 });
+    { NUMERO: '124', RAZAO_FABRICANTE: 'Fantasma', DATA: '2026-10-11', VALOR_TOTAL: 10 }, { NUMERO: 'x-1', RAZAO_FABRICANTE: 'Alumínios Brasil', DATA: '2026-10-11', VALOR_TOTAL: 10 });
   banco.estado.nfSaida.push({ NUMERO: 77, RAZAO_SOCIAL: 'Construtora Alfa', DATA: '2026-10-12', VALOR: 900 });
   const { chamar, url } = await prepararNotas(t, { banco });
   chamar.url = url;
@@ -31,7 +31,7 @@ test('importar notas: por padrão só simula (relatório, nada gravado)', async 
   const j = await r.json();
   assert.equal(j.simulacao, true);
   assert.deepEqual([j.qtdEntrariam, j.qtdIgnoradas, j.qtdSemCadastro, j.qtdJaImportadas], [3, 1, 1, 0]);
-  assert.deepEqual(j.ignoradas, [{ tipo: 'entrada', numero: 'x', motivo: 'número inválido' }]);
+  assert.deepEqual(j.ignoradas, [{ tipo: 'entrada', numero: 'x-1', motivo: 'número inválido' }]);
   assert.deepEqual(j.semCadastro, [{ tipo: 'entrada', numero: '124', nome: 'Fantasma' }]);
   assert.equal(banco.notas.length, 0);
   assert.equal(banco.auditoria.length, 0);

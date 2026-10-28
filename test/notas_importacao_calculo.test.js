@@ -34,7 +34,7 @@ test('importação: valor nulo ou zero entra como 0 (contado); valor negativo ou
 });
 
 test('importação: ignora número inválido e data inválida (com o motivo)', () => {
-  const p = plano({ entradas: [ent({ NUMERO: 'abc' }), ent({ NUMERO: '0' }), ent({ NUMERO: '1234567890' }), ent({ NUMERO: '5', DATA: '0000-00-00' }),
+  const p = plano({ entradas: [ent({ NUMERO: 'a-c' }), ent({ NUMERO: '0' }), ent({ NUMERO: 'a'.repeat(21) }), ent({ NUMERO: '5', DATA: '0000-00-00' }),
     ent({ NUMERO: '6', DATA: null }), ent({ NUMERO: '7', DATA: '2026-02-30' })] });
   assert.deepEqual(p.entram, []);
   assert.deepEqual(p.ignoradas.map(i => i.motivo), ['número inválido', 'número inválido', 'número inválido', 'data inválida', 'data inválida', 'data inválida']);
@@ -56,4 +56,15 @@ test('importação: mesmo número com contrapartes diferentes são notas diferen
 test('importação: aceita VALOR_TOTAL na saída e VALOR na entrada; nome vazio vira "(sem nome)"; nome longo é cortado em 190', () => {
   const p = plano({ entradas: [ent({ NUMERO: '1', VALOR_TOTAL: undefined, VALOR: 7, RAZAO_FABRICANTE: '' })], saidas: [sai({ VALOR: undefined, VALOR_TOTAL: 8, RAZAO_SOCIAL: 'x'.repeat(300) })] });
   assert.deepEqual(p.entram.map(n => [n.valorTotal, n.contraparteNome.length]), [[7, '(sem nome)'.length], [8, 190]]);
+});
+
+test('importação: números com letras do VB (10m, 86P com espaço, 12888A) entram em maiúsculas; 10M e 10m são a mesma nota', () => {
+  const p = plano({ entradas: [ent({ NUMERO: '10m' }), ent({ NUMERO: '86P ' }), ent({ NUMERO: '12888A' }), ent({ NUMERO: '10M' })] });
+  assert.deepEqual(p.entram.map(n => n.numero), ['10M', '86P', '12888A']);
+  assert.deepEqual(p.ignoradas.map(i => [i.numero, i.motivo]), [['10M', 'repetida na origem']]);
+});
+
+test('importação: data com ano de 3 dígitos (0225-02-06) é ignorada como data inválida', () => {
+  const p = plano({ entradas: [ent({ NUMERO: '351568', DATA: '0225-02-06' })] });
+  assert.deepEqual([p.entram.length, p.ignoradas[0].motivo], [0, 'data inválida']);
 });
