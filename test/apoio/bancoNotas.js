@@ -15,8 +15,8 @@ const PERFIS = {
 };
 
 function bancoNotas() {
-  const estado = { notas: [], fornecedores: [], clientes: [], auditoria: [], falharInsertDuplicado: false };
-  const { notas, fornecedores, clientes, auditoria } = estado;
+  const estado = { notas: [], fornecedores: [], clientes: [], auditoria: [], falharInsertDuplicado: false, nfEntrada: [], nfSaida: [], falharLeituraNf: false };
+  const { notas, fornecedores, clientes, auditoria, nfEntrada, nfSaida } = estado;
   let proximoId = 1, proximoForn = 1, proximoCli = 1;
   const sqlLike = (v, ...campos) => { const t = String(v).replace(/^%|%$/g, '').replace(/\\(.)/g, '$1').toLowerCase(); return campos.some(c => String(c ?? '').toLowerCase().includes(t)); };
 
@@ -34,6 +34,18 @@ function bancoNotas() {
     [/^SELECT id FROM web_notas_fiscais WHERE tipo = \? AND serie = \? AND numero = \? AND contraparte_codigo = \?/, (sql, [tipo, serie, numero, cod]) =>
       notas.filter(n => n.tipo === tipo && n.serie === serie && n.numero === numero && n.contraparte_codigo === Number(cod)).map(n => ({ id: n.id }))],
     [/^SELECT id FROM web_notas_fiscais WHERE chave = \?/, (sql, [chave]) => notas.filter(n => n.chave === chave).map(n => ({ id: n.id }))],
+    [/^SELECT \* FROM nf_entrada/, () => { if (estado.falharLeituraNf) throw new Error("Table nf_entrada doesn't exist"); return nfEntrada.map(x => ({ ...x })); }],
+    [/^SELECT \* FROM nf_saida/, () => nfSaida.map(x => ({ ...x }))],
+    [/^SELECT COD, RAZAO_FABRICANTE FROM cadastro_fornecedores$/, () => fornecedores.map(f => ({ ...f }))],
+    [/^SELECT tipo, serie, numero, contraparte_codigo FROM web_notas_fiscais/, () => notas.map(n => ({ tipo: n.tipo, serie: n.serie, numero: n.numero, contraparte_codigo: n.contraparte_codigo }))],
+    [/^INSERT INTO web_notas_fiscais \(tipo, numero, serie, data_emissao/, (sql, p) => {
+      for (let i = 0; i < p.length; i += 9) {
+        const [tipo, numero, serie, data_emissao, contraparte_codigo, contraparte_nome, valor_total, criado_por, criado_em] = p.slice(i, i + 9);
+        notas.push({ id: proximoId++, tipo, numero, serie, chave: null, chave_original: null, data_emissao, contraparte_codigo, contraparte_nome, valor_total: Number(valor_total).toFixed(2),
+          observacao: 'Importada do VB', situacao: 'ativa', motivo_cancelamento: null, criado_por, criado_em, alterado_por: null, alterado_em: null });
+      }
+      return { affectedRows: p.length / 9 };
+    }],
     [/^INSERT INTO web_notas_fiscais/, (sql, p) => {
       if (estado.falharInsertDuplicado) { const e = new Error('Duplicate entry'); e.code = 'ER_DUP_ENTRY'; throw e; }
       const [tipo, numero, serie, chave, data_emissao, contraparte_codigo, contraparte_nome, valor_total, observacao, criado_por, criado_em] = p;
@@ -97,7 +109,7 @@ async function prepararNotas(t, { perfil = 'Notas com valores', usuario = { codi
   const chamar = (caminho, metodo = 'GET', corpo) => fetch(s.url + caminho, {
     method: metodo, headers: { Authorization: 'Bearer ' + token(usuario.codigo, usuario.nome), 'Content-Type': 'application/json' },
     body: corpo === undefined ? undefined : JSON.stringify(corpo) });
-  return { banco, chamar };
+  return { banco, chamar, url: s.url };
 }
 
 module.exports = { bancoNotas, prepararNotas, PERFIS };
