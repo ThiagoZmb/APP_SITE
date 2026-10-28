@@ -34,6 +34,7 @@
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
         { href: 'corte.html', texto: 'Plano de corte', icone: 'corte', sub: true },   // subitem de Pedidos (corte de perfis por pedido e retalhos)
+        { href: 'corte_vidros.html', texto: 'Corte de vidros', icone: 'corte', sub: true },   // subitem de Pedidos (corte de vidros por pedido, chapas e retalhos)
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },
         { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas', sub: true },   // subitem de Entregas (tela do motorista)
@@ -88,6 +89,7 @@
         'financeiro.html': ['financeiro.ver', 'valores.ver'],
         'gestao.html': ['gestao.ver', 'valores.ver'],
         'corte.html': ['corte.ver'],
+        'corte_vidros.html': ['corte.ver'],
         'usuarios.html': ['admin.usuarios'],
         'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };
