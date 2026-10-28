@@ -47,6 +47,8 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
     if (res.ok && data.success && data.token) {
       // primeira página que o perfil pode abrir (mapa no layout.js)
+      // cada login começa no Modo atendimento (para quem tem a permissão)
+      try { sessionStorage.removeItem('atendimento'); sessionStorage.removeItem('atendimento_cliente'); } catch { /* sem armazenamento */ }
       const destino = window.Acesso.primeiraPaginaDe(data.acesso);
       if (!destino) {
         resDiv.textContent = 'Seu usuário não tem nenhuma página liberada. Fale com o administrador.';

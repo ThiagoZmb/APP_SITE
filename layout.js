@@ -48,6 +48,24 @@
         { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
     ];
+    // ----- Modo atendimento: o cliente acompanha o orçamento na tela, então o vendedor não mostra dados gerais da empresa -----
+    // Quem tem 'atendimento.modo' começa cada sessão com o modo ligado e pode desligar/ligar a qualquer momento (botão no topo).
+    // É um recurso de tela (privacidade na frente do cliente), não uma barreira de segurança: quem decide o acesso continua sendo o servidor.
+    const ATEND_CHAVE = 'atendimento', ATEND_CLIENTE = 'atendimento_cliente';
+    const ATEND_BLOQUEADAS = ['inicio.html', 'graficos_pedidos.html', 'financeiro.html', 'custos.html', 'gestao.html'];
+    const ss = { ler: k => { try { return sessionStorage.getItem(k); } catch { return null; } },
+        gravar: (k, v) => { try { if (v === null || v === '') sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { /* sem armazenamento: vale só nesta página */ } } };
+    const atendTem = acesso => (acesso?.permissoes || []).includes('atendimento.modo');
+    const atendAtivoPara = acesso => atendTem(acesso) && ss.ler(ATEND_CHAVE) !== '0';
+    const atendBloqueia = arquivo => ATEND_BLOQUEADAS.includes(String(arquivo || '').toLowerCase());
+    window.Atendimento = {
+        disponivel: () => atendTem(auth()?.acesso),
+        ativo: () => atendAtivoPara(auth()?.acesso),
+        cliente: () => ss.ler(ATEND_CLIENTE) || '',
+        definirCliente: nome => ss.gravar(ATEND_CLIENTE, String(nome || '').trim()),
+        paginasBloqueadas: ATEND_BLOQUEADAS.slice(),
+        alternar: () => { ss.gravar(ATEND_CHAVE, atendAtivoPara(auth()?.acesso) ? '0' : '1'); }
+    };
     // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem é a da "primeira página permitida" depois do login.
     // Página nova: acrescentar aqui e no MENU.
     const PAGINAS = {
@@ -85,9 +103,11 @@
     const atendeItem = (item, tem) => typeof item === 'string' ? tem.includes(item) : (item?.algum || []).some(c => tem.includes(c));
     // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona); null = nenhuma
     const primeiraPaginaDe = acesso => Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
+        && !(atendAtivoPara(acesso) && atendBloqueia(p))
         && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
     const podePagina = arquivo => {
         const exige = PAGINAS[String(arquivo || '').toLowerCase()];
+        if (atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivo)) return false;
         return !exige || exige.every(item => atendeItem(item, auth()?.acesso?.permissoes || []));
     };
     // Permissões do usuário para a tela se montar (quem decide de verdade é o backend)
@@ -125,6 +145,12 @@
     function observar() {
         const css = document.createElement('style');
         css.textContent = `.${OCULTO} { display: none !important; }
+            body.modo-atendimento .so-geral { display: none !important; }
+            .btn-atendimento { margin-left: auto; margin-right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+            .btn-atendimento svg { width: 18px; height: 18px; }
+            .btn-atendimento.ligado { background: #fff; color: var(--primary-color, #8B0000); border-color: #fff; }
+            .btn-atendimento.flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 60; background: var(--primary-color, #8B0000); margin: 0; }
+            @media (max-width: 768px) { .btn-atendimento span { display: none; } .btn-atendimento { margin-right: 8px; } }
             #sem-acesso-pagina { text-align: center; padding: 80px 20px; color: var(--text-light, #666); }
             #sem-acesso-pagina h2 { color: var(--text-dark, #222); margin-bottom: 8px; }
             #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #8B0000); font-weight: 700; }`;
@@ -143,8 +169,10 @@
         const destino = window.Acesso.primeiraPagina();
         const bloco = document.createElement('section');
         bloco.id = 'sem-acesso-pagina';
-        bloco.innerHTML = '<h2>Sem acesso</h2><p>Seu usuário não tem permissão para esta página.</p>' +
+        const pelaModo = atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivoAtual());
+        bloco.innerHTML = (pelaModo ? '<h2>Modo atendimento ligado</h2><p>Esta tela mostra dados gerais da empresa e fica escondida enquanto há cliente acompanhando.</p><button type="button" class="btn btn-primary" id="atend-desligar">Desligar modo atendimento</button><br>' : '<h2>Sem acesso</h2><p>Seu usuário não tem permissão para esta página.</p>') +
             (destino ? `<a href="${destino}">Ir para o início</a>` : '<a href="login.html" class="sair">Sair</a>');
+        bloco.querySelector('#atend-desligar')?.addEventListener('click', () => { window.Atendimento.alternar(); location.reload(); });
         bloco.querySelector('.sair')?.addEventListener('click', () => localStorage.removeItem('auth'));
         main.appendChild(bloco);
     }
@@ -160,6 +188,7 @@
         const arquivo = arquivoAtual();
         const atual = PAGINA_PAI[arquivo] || arquivo;
         observar();
+        document.body.classList.toggle('modo-atendimento', window.Atendimento.ativo());
         if (!podePagina(arquivo)) semAcesso();
 
         // ----- menu lateral -----
@@ -174,6 +203,26 @@
             atualizarAcesso(nav, atual);
         }
         montarTopo(container, header, a);
+        montarBotaoAtendimento(container, header);
+    }
+
+    function montarBotaoAtendimento(container, header) {
+        if (!window.Atendimento.disponivel() || document.getElementById('btn-atendimento')) return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.id = 'btn-atendimento';
+        const ligado = window.Atendimento.ativo();
+        b.className = 'btn-atendimento' + (ligado ? ' ligado' : '');
+        b.setAttribute('aria-pressed', String(ligado));
+        b.title = ligado ? 'Há cliente acompanhando: dados gerais da empresa estão escondidos. Clique para desligar.' : 'Sem cliente acompanhando. Clique para esconder os dados gerais da empresa.';
+        b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ligado ? '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>' : '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>') + '</svg><span>Modo atendimento: ' + (ligado ? 'ligado' : 'desligado') + '</span>';
+        b.addEventListener('click', () => {
+            window.Atendimento.alternar();
+            // ligando numa tela que o modo esconde, vai para a primeira tela permitida
+            if (window.Atendimento.ativo() && !podePagina(arquivoAtual())) location.href = window.Acesso.primeiraPagina() || 'login.html';
+            else location.reload();
+        });
+        const perfil = header && header.querySelector('.user-profile');
+        if (perfil) perfil.before(b); else { b.classList.add('flutuante'); document.body.appendChild(b); }
     }
 
     function desenharMenu(nav, atual) {

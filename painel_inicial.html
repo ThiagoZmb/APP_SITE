@@ -158,6 +158,8 @@
         .filtros input { min-width: 260px; }
         .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
+        .aviso-atendimento { background: #fff8e1; border: 1px solid #f0d27a; border-left: 5px solid #d98a00; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        body.modo-atendimento #limpar-cliente { display: none; }
         .filtro-cliente.ativo { display: inline-flex; }
         .filtro-cliente button { border: none; background: none; color: inherit; font-weight: 800; cursor: pointer; font-size: 14px; }
 
@@ -244,7 +246,7 @@
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202610272200">
-    <script src="layout.js?v=202610272300" defer></script>
+    <script src="layout.js?v=202610281700" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>
 <body>
@@ -280,17 +282,18 @@
                 <span class="periodo-txt" id="periodo-txt"></span>
             </section>
 
+            <p class="aviso-atendimento" id="aviso-atendimento" hidden></p>
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
                 <!-- ===== OPERAÇÃO AGORA ===== -->
-                <section class="painel" style="margin-bottom:18px">
+                <section class="painel so-geral" style="margin-bottom:18px">
                     <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
                     <div class="operacao" id="operacao"></div>
                 </section>
 
                 <!-- ===== RESULTADO DO PERÍODO ===== -->
-                <div class="bloco-tit">Resultado do período</div>
-                <section class="kpis" id="kpis-periodo"></section>
+                <div class="bloco-tit so-geral">Resultado do período</div>
+                <section class="kpis so-geral" id="kpis-periodo"></section>
 
                 <!-- ===== LISTA ===== -->
                 <section class="painel" style="margin-bottom:18px">
@@ -314,7 +317,7 @@
                 </section>
 
                 <!-- ===== EVOLUÇÃO + LEITURA ===== -->
-                <section class="larga">
+                <section class="larga so-geral">
                     <div class="painel">
                         <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small><span data-valor>valores e % de fechamento</span><span data-sem-valor>quantidade emitida</span> · últimos 12 meses</small></div>
                         <div class="graf"><canvas id="g-mensal"></canvas></div>
@@ -325,7 +328,7 @@
                     </div>
                 </section>
 
-                <section class="duas">
+                <section class="duas so-geral">
                     <div class="painel">
                         <div class="cab"><h3>Situação dos pedidos</h3><small id="status-sub">no período</small></div>
                         <div class="graf baixo"><canvas id="g-status"></canvas></div>
@@ -337,8 +340,8 @@
                 </section>
 
                 <!-- ===== O QUE VENDE / QUEM COMPRA ===== -->
-                <section class="painel" id="ranking-produtos"></section>
-                <section class="painel" id="ranking-clientes"></section>
+                <section class="painel so-geral" id="ranking-produtos"></section>
+                <section class="painel so-geral" id="ranking-clientes"></section>
 
             </div>
         </main>
@@ -402,7 +405,9 @@
             const n = +v, ini = new Date(a, m - n + 1, 1);
             return { ini, fim, iniAnt: new Date(a, m - 2 * n + 1, 1), fimAnt: new Date(ini.getTime() - 1), nome: `últimos ${n} meses`, ref: `${n} meses anteriores` };
         }
-        const doCliente = l => cliente ? l.filter(x => x.cliente === cliente) : l;
+        // Modo atendimento: sem cliente escolhido a lista fica vazia (nunca mostra os outros clientes)
+        const atendimento = () => !!(window.Atendimento && window.Atendimento.ativo());
+        const doCliente = l => atendimento() ? (cliente ? l.filter(x => x.cliente === cliente) : []) : cliente ? l.filter(x => x.cliente === cliente) : l;
         const entre = (l, a, b) => a ? l.filter(x => x.dt && x.dt >= a && x.dt <= b) : [];
         const soma = l => l.reduce((s, x) => s + x.v, 0);
 
@@ -414,7 +419,7 @@
                 const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
                 pedidos = p.map(prep); orcamentos = o.map(prep);
                 const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-                $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
+                if (!atendimento()) $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
                 $('carregando').hidden = true; $('conteudo').hidden = false;
                 renderTudo();
             } catch (e) { $('carregando').textContent = '⚠️ Erro ao carregar: ' + e.message; }
@@ -831,6 +836,7 @@
 
         // ================= FILTROS =================
         function aplicarCliente(nome) {
+            if (atendimento()) return;   // no Modo atendimento o cliente é o do orçamento em andamento
             cliente = nome || '';
             $('f-cliente').value = cliente;
             const url = new URL(location.href);
@@ -855,6 +861,12 @@
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             cliente = new URLSearchParams(location.search).get('cliente') || '';
+            if (atendimento()) {
+                cliente = window.Atendimento.cliente();
+                $('f-cliente').readOnly = true; $('f-cliente').placeholder = 'Cliente do atendimento';
+                const av = $('aviso-atendimento'); av.hidden = false;
+                av.textContent = cliente ? 'Modo atendimento: mostrando só os pedidos e orçamentos de ' + cliente + '.' : 'Modo atendimento: nenhum cliente em atendimento. Escolha o cliente em Orçamentos para ver os pedidos e orçamentos dele.';
+            }
             $('f-cliente').value = cliente;
             carregar();
         });

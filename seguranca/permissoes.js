@@ -45,6 +45,7 @@ const CATALOGO = [
   { codigo: 'corte.ver', nome: 'Ver o plano de corte dos pedidos e os retalhos', area: 'Plano de corte' },
   { codigo: 'corte.planejar', nome: 'Gerar, salvar, conferir e confirmar o plano de corte', area: 'Plano de corte' },
   { codigo: 'corte.parametros', nome: 'Editar vara, serra e sobra mínima e cadastrar retalhos à mão', area: 'Plano de corte' },
+  { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos e Gestão; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' }
 ];
@@ -52,10 +53,10 @@ const CODIGOS = new Set(CATALOGO.map(p => p.codigo));
 const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
-  { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS },
+  { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS.filter(c => c !== 'atendimento.modo') },
   { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
-    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver'] },
+    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },
   { nome: 'Representante', descricao: 'Pedidos e clientes da sua região, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'clientes.ver', 'valores.ver'] }
