@@ -3416,8 +3416,6 @@
         document.addEventListener('DOMContentLoaded', configurarTipo); // layout.js (defer) já definiu o Acesso
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('sel-cliente').addEventListener('change', () => {
-            // Modo atendimento: a lista de pedidos passa a mostrar só este cliente
-            if (window.Atendimento) window.Atendimento.definirCliente(temClienteSelecionado() ? $s('sel-cliente').selectedOptions[0].text : '');
             descontoJaAplicado = false; // recém selecionado: reavalia após o 1º cálculo
             atualizarTravaDesconto();
             atualizarBloqueioCliente();

@@ -158,8 +158,6 @@
         .filtros input { min-width: 260px; }
         .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
-        .aviso-atendimento { background: #fff8e1; border: 1px solid #f0d27a; border-left: 5px solid #d98a00; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
-        body.modo-atendimento #limpar-cliente { display: none; }
         .filtro-cliente.ativo { display: inline-flex; }
         .filtro-cliente button { border: none; background: none; color: inherit; font-weight: 800; cursor: pointer; font-size: 14px; }
 
@@ -282,7 +280,6 @@
                 <span class="periodo-txt" id="periodo-txt"></span>
             </section>
 
-            <p class="aviso-atendimento" id="aviso-atendimento" hidden></p>
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
                 <!-- ===== OPERAÇÃO AGORA ===== -->
@@ -405,9 +402,7 @@
             const n = +v, ini = new Date(a, m - n + 1, 1);
             return { ini, fim, iniAnt: new Date(a, m - 2 * n + 1, 1), fimAnt: new Date(ini.getTime() - 1), nome: `últimos ${n} meses`, ref: `${n} meses anteriores` };
         }
-        // Modo atendimento: sem cliente escolhido a lista fica vazia (nunca mostra os outros clientes)
-        const atendimento = () => !!(window.Atendimento && window.Atendimento.ativo());
-        const doCliente = l => atendimento() ? (cliente ? l.filter(x => x.cliente === cliente) : []) : cliente ? l.filter(x => x.cliente === cliente) : l;
+        const doCliente = l => cliente ? l.filter(x => x.cliente === cliente) : l;
         const entre = (l, a, b) => a ? l.filter(x => x.dt && x.dt >= a && x.dt <= b) : [];
         const soma = l => l.reduce((s, x) => s + x.v, 0);
 
@@ -419,7 +414,7 @@
                 const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
                 pedidos = p.map(prep); orcamentos = o.map(prep);
                 const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-                if (!atendimento()) $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
+                $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
                 $('carregando').hidden = true; $('conteudo').hidden = false;
                 renderTudo();
             } catch (e) { $('carregando').textContent = '⚠️ Erro ao carregar: ' + e.message; }
@@ -836,7 +831,6 @@
 
         // ================= FILTROS =================
         function aplicarCliente(nome) {
-            if (atendimento()) return;   // no Modo atendimento o cliente é o do orçamento em andamento
             cliente = nome || '';
             $('f-cliente').value = cliente;
             const url = new URL(location.href);
@@ -861,12 +855,6 @@
             $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             cliente = new URLSearchParams(location.search).get('cliente') || '';
-            if (atendimento()) {
-                cliente = window.Atendimento.cliente();
-                $('f-cliente').readOnly = true; $('f-cliente').placeholder = 'Cliente do atendimento';
-                const av = $('aviso-atendimento'); av.hidden = false;
-                av.textContent = cliente ? 'Modo atendimento: mostrando só os pedidos e orçamentos de ' + cliente + '.' : 'Modo atendimento: nenhum cliente em atendimento. Escolha o cliente em Orçamentos para ver os pedidos e orçamentos dele.';
-            }
             $('f-cliente').value = cliente;
             carregar();
         });

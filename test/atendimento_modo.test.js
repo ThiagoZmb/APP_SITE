@@ -47,10 +47,10 @@ test('sem atendimento.modo nada muda (Administrador)', () => {
   assert.equal(window.Acesso.podePagina('gestao.html'), true);
 });
 
-test('páginas: seções gerais marcadas, filtro de cliente travado e login recomeça no modo', () => {
+test('páginas: seções gerais marcadas, ranking de clientes oculto e login recomeça no modo', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'painel_inicial.html'), 'utf8');
   assert.equal((html.match(/so-geral/g) || []).length >= 7, true);
-  assert.match(html, /atendimento\(\) \? \(cliente \? l\.filter/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'clientes.html'), 'utf8'), /so-geral" id="ranking-clientes"|id="ranking-clientes"[^>]*so-geral/);
+  assert.doesNotMatch(html, /aviso-atendimento/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'login.js'), 'utf8'), /removeItem\('atendimento'\)/);
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8'), /Atendimento\.definirCliente/);
 });
