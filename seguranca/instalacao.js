@@ -313,6 +313,10 @@ const TABELAS = [
 
 async function instalarTabelas(pool) {
   for (const sql of TABELAS) await pool.execute(sql);
+  // notas fiscais criadas antes da coluna chave_original (liberada ao cancelar): acrescenta na tabela da web
+  const [[nf] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_notas_fiscais' AND COLUMN_NAME = 'chave_original'");
+  if (!Number(nf?.n)) await pool.execute('ALTER TABLE web_notas_fiscais ADD COLUMN chave_original CHAR(44) NULL AFTER chave');
   // instalações anteriores à composição: acrescenta a coluna na tabela da web (nunca em tabela do VB)
   const [[c] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_custo_ligacoes' AND COLUMN_NAME = 'componente_id'");

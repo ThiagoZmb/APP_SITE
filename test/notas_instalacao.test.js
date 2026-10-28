@@ -33,3 +33,12 @@ test('notas: instalarTabelas cria web_notas_fiscais com os índices únicos', as
   assert.ok(ddl, 'DDL ausente');
   assert.ok(ddl.includes('ux_nota_numero') && ddl.includes('ux_nota_chave') && ddl.includes('DECIMAL(14,2)'));
 });
+
+test('notas: instalarTabelas acrescenta chave_original em tabela criada antes dela e não repete', async () => {
+  const sem = criarPoolFalso([[/information_schema\.COLUMNS.*web_notas_fiscais.*chave_original/, [{ n: 0 }]]]);
+  await instalarTabelas(sem);
+  assert.ok(sem.chamadas.some(c => /ALTER TABLE web_notas_fiscais ADD COLUMN chave_original/.test(c.sql)));
+  const com = criarPoolFalso([[/information_schema\.COLUMNS.*web_notas_fiscais.*chave_original/, [{ n: 1 }]]]);
+  await instalarTabelas(com);
+  assert.ok(!com.chamadas.some(c => /ALTER TABLE web_notas_fiscais/.test(c.sql)));
+});
