@@ -5,10 +5,12 @@ const { emTransacao, ErroUsuario, agoraLocal } = require('./transacao');
 const { PADRAO, resolverParametros, otimizar } = require('../calculo/corte_otimizacao');
 const { montarPecas, impressaoPecas } = require('../calculo/corte_pecas');
 const { validarConfig, validarRetalho, validarConferencia } = require('../calculo/corte_validacao');
+const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');   // mesma saída de estoque de POST /estoque/saida
 
 const VER = ['corte.ver'];
 const PARAMETROS = ['corte.ver', 'corte.parametros'];
 const PLANEJAR = ['corte.ver', 'corte.planejar'];
+const BAIXAR_ESTOQUE = ['estoque.ver', 'estoque.movimentar'];   // a baixa das varas novas exige também a permissão de dar saída no estoque
 const SITUACOES_RETALHO = ['disponivel', 'reservado', 'usado', 'descartado'];
 
 const paraNumeroOuNull = v => (v === null || v === undefined ? null : Number(v));
@@ -166,6 +168,46 @@ function registrarCorte({ rota, pool }) {
     if (r) res.json(r);
   });
 
+  // produtos do estoque para escolher na baixa das varas novas (só ativos; código, nome, unidade e quantidade — nada de dinheiro)
+  rota('get', '/corte/estoque/produtos', [...PLANEJAR, ...BAIXAR_ESTOQUE], async (req, res) => {
+    try {
+      const [linhas] = await pool.execute("SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE FROM estoque WHERE SITUACAO = 'Ativo' ORDER BY NOME_PRODUTO LIMIT 3000");
+      res.json({ produtos: linhas.map(l => ({ codigo: Number(l.CODIGO), nome: l.NOME_PRODUTO, unidade: l.UNIDADE || '', qtdEstoque: Number(l.QTD_ESTOQUE) || 0 })) });
+    } catch (err) { console.error('Erro GET /corte/estoque/produtos:', err.message); res.status(500).json({ error: 'Erro de servidor' }); }
+  });
+
+  // Baixa no estoque das varas NOVAS do plano (retalho não está em `estoque`): uma baixa por grupo, com o produto escolhido na tela.
+  // Roda dentro da transação de confirmar; qualquer falha desfaz tudo. Devolve a lista [{ produto, qtd }] para a auditoria.
+  async function baixarVarasNovas(conn, req, plano, corpo) {
+    const comVaras = plano.grupos.map(g => ({ g, varas: g.barras.filter(b => b.tipo === 'vara').length })).filter(x => x.varas > 0);
+    if (!comVaras.length) return [];
+    const permissoes = (req.acesso && req.acesso.permissoes) || new Set();
+    if (!BAIXAR_ESTOQUE.every(c => permissoes.has(c))) throw new ErroUsuario(403, 'Este plano usa varas novas: dar baixa no estoque exige a permissão de dar saída no estoque.');
+    const rotulo = g => `${g.perfil} (${g.acabamento || 'sem acabamento'} / ${g.cor || 'sem cor'})`;
+    if (!Array.isArray(corpo.baixas)) throw new ErroUsuario(400, 'Informe o produto do estoque de cada perfil com varas novas (baixas).');
+    const porChave = new Map();
+    for (const b of corpo.baixas) {
+      const chave = b && typeof b.chave === 'string' ? b.chave : null;
+      if (!chave || !comVaras.some(x => x.g.chave === chave)) throw new ErroUsuario(400, `Baixa informada para um grupo desconhecido ou sem varas novas: ${chave === null ? '(sem chave)' : chave}.`);
+      if (porChave.has(chave)) throw new ErroUsuario(400, 'Grupo informado mais de uma vez nas baixas.');
+      const codigo = inteiroPositivo(b.produtoCodigo);
+      if (!codigo) throw new ErroUsuario(400, 'Produto do estoque inválido na baixa.');
+      porChave.set(chave, codigo);
+    }
+    for (const { g } of comVaras) if (!porChave.has(g.chave)) throw new ErroUsuario(400, `Falta escolher o produto do estoque para ${rotulo(g)}.`);
+    const codigos = [...porChave.values()];
+    if (new Set(codigos).size !== codigos.length) throw new ErroUsuario(400, 'O mesmo produto do estoque foi escolhido para mais de um grupo. Escolha um produto por grupo.');
+    const produtos = await travarProdutos(conn, codigos);
+    const itens = comVaras.map(({ g, varas }) => {
+      const prod = produtos.get(porChave.get(g.chave));
+      if (!prod) throw new ErroUsuario(400, `Produto do estoque de ${rotulo(g)} não encontrado.`);
+      conferirSaldo(prod, varas);
+      return { p: prod, qtd: varas };
+    });
+    await gravarSaidas(conn, itens, { quando: agoraLocal(), usuario: (req.user && req.user.nome) || req.acesso?.nome || '' });
+    return itens.map(i => ({ produto: i.p.NOME_PRODUTO, qtd: i.qtd }));
+  }
+
   // ---------- plano de corte de um pedido ----------
   const resumoPlanoSalvo = (p, desatualizado) => p && ({ id: Number(p.id), situacao: desatualizado && p.situacao === 'gerado' ? 'desatualizado' : p.situacao,
     criadoPor: p.criado_por || '', criadoEm: p.criado_em || null, conferidoEm: p.conferido_em || null });
@@ -278,7 +320,7 @@ function registrarCorte({ rota, pool }) {
     if (r) res.json(r);
   });
 
-  // confirmar o corte real: retalhos usados → usado; não usados → disponível; sobras conferidas → retalhos novos; plano → conferido
+  // confirmar o corte real: varas novas baixam do estoque (corpo.baixas); retalhos usados → usado; não usados → disponível; sobras conferidas → retalhos novos; plano → conferido
   rota('post', '/corte/plano/:id/confirmar', PLANEJAR, async (req, res) => {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
@@ -301,6 +343,7 @@ function registrarCorte({ rota, pool }) {
         if (s.medidaReal < minima) throw new ErroUsuario(400, `Sobra de ${s.medidaReal} mm abaixo da mínima (${minima} mm) do perfil ${g.perfil}: descarte.`);
       }
       const agora = agoraLocal(), quem = req.acesso?.nome || '';
+      const baixadas = await baixarVarasNovas(conn, req, plano, corpo);
       let usados = 0, novos = 0, descartadas = 0;
       for (const g of plano.grupos) for (const b of g.barras) {
         if (b.tipo !== 'retalho') continue;
@@ -323,7 +366,8 @@ function registrarCorte({ rota, pool }) {
       const [pl] = await conn.execute("UPDATE web_corte_planos SET situacao = 'conferido', conferido_por = ?, conferido_em = ? WHERE id = ? AND situacao = 'gerado'", [quem, agora, id]);
       if (!pl.affectedRows) throw new ErroUsuario(409, 'O plano já foi conferido.');
       await auditarConn(conn, quem, 'corte_plano_conferido', id, { campos: ['plano', 'retalhos'], pedido: Number(p.pedido), qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, qtdSobrasDescartadas: descartadas });
-      return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos };
+      if (baixadas.length) await auditarConn(conn, quem, 'corte_baixa_estoque', id, { campos: ['estoque'], pedido: Number(p.pedido), itens: baixadas });
+      return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, baixas: baixadas };
     });
     if (r) res.json(r);
   });

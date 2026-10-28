@@ -1,7 +1,7 @@
 // Rotas do plano de corte de um pedido (banco simulado em test/apoio/bancoCorte.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bancoCorte, prepararCorte } = require('./apoio/bancoCorte');
+const { bancoCorte, prepararCorte, corpoConfirmacao } = require('./apoio/bancoCorte');
 const { REGEX_VALOR } = require('../seguranca/valores');
 
 const nomesDeCampo = dados => {
@@ -103,7 +103,7 @@ test('salvar de novo substitui o plano gerado e move a reserva; plano conferido 
   assert.notEqual(primeiro.id, segundo.id);
   assert.equal(b.estado.planos.find(p => p.id === primeiro.id).situacao, 'cancelado');
   assert.equal(b.estado.retalhos.find(x => x.id === ret.id).plano_reserva, segundo.id);
-  assert.equal((await chamar(`/corte/plano/${segundo.id}/confirmar`, 'POST', {})).status, 200);
+  assert.equal((await chamar(`/corte/plano/${segundo.id}/confirmar`, 'POST', await corpoConfirmacao(chamar, segundo.id))).status, 200);
   const r = await chamar('/corte/pedido/100/salvar', 'POST', corpoSalvar(await prever(chamar)));
   assert.equal(r.status, 409);
 });
@@ -148,7 +148,7 @@ test('confirmar: retalho usado vira usado, sobras que merecem viram retalhos nov
   const previa = await prever(chamar);
   const guardar = barrasDe(previa).filter(x => x.destinoSobra === 'guardar');
   const { id } = await (await chamar('/corte/pedido/100/salvar', 'POST', corpoSalvar(previa))).json();
-  const r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', {});
+  const r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id));
   assert.equal(r.status, 200);
   assert.equal(b.estado.retalhos.find(x => x.id === ret.id).situacao, 'usado');
   const novos = b.estado.retalhos.filter(x => x.plano_origem === id);
@@ -163,9 +163,9 @@ test('confirmar duas vezes: a segunda é recusada (409) e não duplica retalhos'
   const b = cenario();
   const { chamar } = await prepararCorte(t, { banco: b });
   const { id } = await salvar(chamar);
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', {})).status, 200);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id))).status, 200);
   const antes = b.estado.retalhos.length;
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', {})).status, 409);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id))).status, 409);
   assert.equal(b.estado.retalhos.length, antes);
 });
 
@@ -177,9 +177,9 @@ test('confirmar com medida real maior que a calculada, ou abaixo da sobra mínim
   const grupo = previa.plano.grupos[0].chave;
   const idx = previa.plano.grupos[0].barras.findIndex(x => x.destinoSobra === 'guardar');
   const sobra = previa.plano.grupos[0].barras[idx].sobra;
-  let r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', { sobras: [{ grupo, barra: idx, destino: 'guardar', medidaReal: sobra + 1 }] });
+  let r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id, { sobras: [{ grupo, barra: idx, destino: 'guardar', medidaReal: sobra + 1 }] }));
   assert.equal(r.status, 400);
-  r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', { sobras: [{ grupo, barra: idx, destino: 'guardar', medidaReal: 499 }] });   // sobra mínima padrão = 500
+  r = await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id, { sobras: [{ grupo, barra: idx, destino: 'guardar', medidaReal: 499 }] }));   // sobra mínima padrão = 500
   assert.equal(r.status, 400);
   assert.equal(b.estado.planos[0].situacao, 'gerado');
   assert.equal(b.estado.retalhos.find(x => x.id === ret.id).situacao, 'reservado');
@@ -190,8 +190,8 @@ test('confirmar: retalho informado como não usado volta a ficar disponível', a
   const b = cenario(); const ret = b.semear.retalho({ comprimento: 2200 });
   const { chamar } = await prepararCorte(t, { banco: b });
   const { id } = await salvar(chamar);
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', { retalhosNaoUsados: [999] })).status, 400);   // não pertence ao plano
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', { retalhosNaoUsados: [ret.id] })).status, 200);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id, { retalhosNaoUsados: [999] }))).status, 400);   // não pertence ao plano
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id, { retalhosNaoUsados: [ret.id] }))).status, 200);
   assert.equal(b.estado.retalhos.find(x => x.id === ret.id).situacao, 'disponivel');
   assert.equal(b.estado.retalhos.find(x => x.id === ret.id).plano_reserva, null);
 });
@@ -245,7 +245,7 @@ test('excluir o pedido solta o plano conferido (histórico preservado); cancelar
   const b = cenario(); b.semear.retalho({ comprimento: 2200 });
   const { chamar } = await prepararCorte(t, { banco: b });
   const { id } = await salvar(chamar);
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', {})).status, 200);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id))).status, 200);
   const conn = await b.f.getConnection();
   await liberarPlanosDoPedido(conn, 100, 'Caio');                          // cancelar o pedido: o plano conferido continua ligado
   assert.equal((await prever(chamar)).planoSalvo.id, id);

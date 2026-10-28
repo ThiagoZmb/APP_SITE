@@ -140,3 +140,69 @@ test('contarPecas soma as peças de todas as varas do plano', () => {
   assert.equal(T.contarPecas({ grupos: [{ barras: [barra(), barra({ pecas: [{ tamanho: 1, item: 1, origem: 'puxador' }] })] }] }), 3);
   assert.equal(T.contarPecas({ grupos: [] }), 0);
 });
+
+// ---- baixa no estoque das varas novas (bloco "Baixa no estoque" da conferência) ----
+const planoBaixa = () => ({ grupos: [
+  { chave: 'P100|Anodizado|Natural', perfil: 'P100', acabamento: 'Anodizado', cor: 'Natural', barras: [barra(), barra(), barra({ tipo: 'retalho', retalhoId: 3, comprimento: 2200 })] },
+  { chave: 'P200||', perfil: 'P200', acabamento: '', cor: '', barras: [barra({ tipo: 'retalho', retalhoId: 4, comprimento: 3000 })] }] });
+const produtosBaixa = [{ codigo: 1, nome: 'P100', unidade: 'Barra', qtdEstoque: 50 }, { codigo: 2, nome: '  p200 ', unidade: '', qtdEstoque: 7 }, { codigo: 3, nome: '<b>X</b>', unidade: 'Un', qtdEstoque: 1 }];
+
+test('baixa: só entram os grupos com vara nova, contando as varas (retalho não conta)', () => {
+  assert.deepEqual(T.gruposComVarasNovas(planoBaixa()), [{ chave: 'P100|Anodizado|Natural', perfil: 'P100', acabamento: 'Anodizado', cor: 'Natural', varas: 2 }]);
+  assert.deepEqual(T.gruposComVarasNovas({ grupos: [] }), []);
+  assert.deepEqual(T.gruposComVarasNovas(null), []);
+});
+
+test('baixa: produto pré-selecionado quando o nome bate com o perfil (sem caixa/espaços); sem nome igual ou ambíguo, o usuário escolhe', () => {
+  assert.equal(T.sugerirProduto('P100', produtosBaixa), 1);
+  assert.equal(T.sugerirProduto(' p200', produtosBaixa), 2);
+  assert.equal(T.sugerirProduto('P999', produtosBaixa), null);
+  assert.equal(T.sugerirProduto('', produtosBaixa), null);
+  assert.equal(T.sugerirProduto('A', [{ codigo: 1, nome: 'A' }, { codigo: 2, nome: 'a' }]), null);   // dois iguais: não adivinha
+});
+
+test('baixa: bloco com perfil, acabamento/cor, nº de varas e seletor de produto, tudo escapado', () => {
+  const grupos = T.gruposComVarasNovas(planoBaixa());
+  const html = T.htmlBaixaEstoque(grupos, produtosBaixa);
+  assert.match(html, /Baixa no estoque/);
+  assert.match(html, /<b>P100<\/b>/);
+  assert.match(html, /Anodizado/); assert.match(html, /Natural/);
+  assert.match(html, /2 varas novas/);
+  assert.match(html, /class="baixa-produto" data-chave="P100\|Anodizado\|Natural"/);
+  assert.match(html, /<option value="1" selected>P100 \(estoque: 50 Barra\)<\/option>/);   // pré-selecionado
+  assert.match(html, /<option value="">— escolha o produto —<\/option>/);
+  assert.doesNotMatch(html, /<b>X<\/b>/); assert.match(html, /&lt;b&gt;X/);
+  assert.match(T.htmlBaixaEstoque([{ chave: 'G', perfil: 'P', acabamento: '', cor: '', varas: 1 }], produtosBaixa), /1 vara nova/);
+  assert.match(T.htmlBaixaEstoque([{ chave: 'G', perfil: 'P', acabamento: '', cor: '', varas: 1 }], produtosBaixa), /sem acabamento/);
+  assert.equal(T.htmlBaixaEstoque([], produtosBaixa), '');
+  // escolha do usuário vale mais que a sugestão
+  assert.match(T.htmlBaixaEstoque(grupos, produtosBaixa, { 'P100|Anodizado|Natural': 2 }), /<option value="2" selected>/);
+  // lista não carregada: avisa em vez de oferecer seletor vazio
+  const semLista = T.htmlBaixaEstoque(grupos, null);
+  assert.match(semLista, /role="alert"/); assert.doesNotMatch(semLista, /<select/);
+});
+
+test('baixa: corpo de envio leva {chave, produtoCodigo}; a conferência só ganha "baixas" quando informadas', () => {
+  const baixas = T.corpoBaixas([{ chave: 'G', produtoCodigo: '7' }]);
+  assert.deepEqual(baixas, [{ chave: 'G', produtoCodigo: 7 }]);
+  assert.deepEqual(T.corpoConferencia([], [], baixas), { sobras: [], retalhosNaoUsados: [], baixas });
+  assert.deepEqual(T.corpoConferencia([], []), { sobras: [], retalhosNaoUsados: [] });
+});
+
+test('baixa: a tela recusa grupo sem produto e produto repetido, como o servidor', () => {
+  const grupos = [{ chave: 'A', perfil: 'P1', acabamento: '', cor: '', varas: 1 }, { chave: 'B', perfil: 'P2', acabamento: 'X', cor: 'Y', varas: 2 }];
+  assert.deepEqual(T.validarBaixasForm(grupos, [{ chave: 'A', produtoCodigo: '1' }, { chave: 'B', produtoCodigo: '2' }]), []);
+  assert.match(T.validarBaixasForm(grupos, [{ chave: 'A', produtoCodigo: '1' }, { chave: 'B', produtoCodigo: '' }])[0], /Escolha o produto do estoque para P2/);
+  assert.match(T.validarBaixasForm(grupos, [{ chave: 'A', produtoCodigo: '1' }])[0], /Escolha o produto/);
+  assert.match(T.validarBaixasForm(grupos, [{ chave: 'A', produtoCodigo: '1' }, { chave: 'B', produtoCodigo: '1' }])[0], /mais de um grupo/);
+});
+
+test('baixa: a tela usa a rota de produtos do corte e envia as baixas na confirmação', () => {
+  const js = ler('corte.js'), html = ler('corte.html');
+  assert.match(js, /chamar\('\/corte\/estoque\/produtos'\)/);
+  assert.match(js, /corpoConferencia\(linhas, naoUsados, grupos\.length \? corpoBaixas\(selecoes\) : \[\]\)/);
+  assert.match(js, /pode\('estoque\.movimentar'\)/);
+  assert.match(js, /class="baixa-produto"/);
+  assert.match(html, /\.baixa-estoque \{/);
+  assert.match(html, /\.baixa-linha \{/);
+});

@@ -1,7 +1,7 @@
 // Excluir os dados de plano de corte de um pedido (DELETE /corte/pedido/:numero) e o contador da pré-visualização.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bancoCorte, prepararCorte } = require('./apoio/bancoCorte');
+const { bancoCorte, prepararCorte, corpoConfirmacao } = require('./apoio/bancoCorte');
 
 // pedido 100: 2 portas de P100 Anodizado/Natural → 4 peças de 2100 e 4 de 900
 function cenario(b = bancoCorte()) { b.semear.pedido(); b.semear.perfil(); b.semear.item(); return b; }
@@ -18,7 +18,7 @@ test('pré-visualização informa quantos planos o pedido tem gravados (e quanto
   let j = await prever(chamar);
   assert.deepEqual([j.qtdPlanosGravados, j.qtdConferidos], [0, 0]);
   const { id } = await salvar(chamar);
-  await chamar(`/corte/plano/${id}/confirmar`, 'POST', {});
+  await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id));
   j = await prever(chamar);
   assert.deepEqual([j.qtdPlanosGravados, j.qtdConferidos], [1, 1]);
 });
@@ -74,7 +74,7 @@ test('plano conferido: exige confirmação reforçada e permissão de parâmetro
   const b = cenario(); b.semear.retalho({ comprimento: 2200 });
   const { chamar } = await prepararCorte(t, { banco: b });
   const { id } = await salvar(chamar);
-  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', {})).status, 200);
+  assert.equal((await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id))).status, 200);
   const antes = b.estado.retalhos.map(r => ({ ...r }));
   const sem = await excluir(chamar);                                   // sem a confirmação reforçada
   assert.equal(sem.status, 409);
@@ -94,7 +94,7 @@ test('plano conferido: quem só planeja (sem corte.parametros) recebe 403 e nada
   const b = cenario();
   const { chamar } = await prepararCorte(t, { perfil: 'Planeja', banco: b });
   const { id } = await salvar(chamar);
-  await chamar(`/corte/plano/${id}/confirmar`, 'POST', {});
+  await chamar(`/corte/plano/${id}/confirmar`, 'POST', await corpoConfirmacao(chamar, id));
   assert.equal((await excluir(chamar, 100, { incluirConferidos: true })).status, 403);
   assert.equal(b.estado.planos.length, 1);
 });

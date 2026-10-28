@@ -1,6 +1,6 @@
-// Banco simulado com estado para as rotas do plano de corte (rotas/corte.js).
-// Cada regra imita um SQL da rota; as listas em memória são o "banco". O rollback do pool falso não desfaz estas listas:
-// os testes de atomicidade conferem que a rota valida ANTES de gravar.
+// Banco simulado com estado para as rotas do plano de corte (rotas/corte.js), incluindo o estoque do VB (baixa das varas novas ao confirmar).
+// Cada regra imita um SQL da rota; as listas em memória são o "banco". Como no MySQL, o ROLLBACK volta o estado ao do BEGIN
+// (a foto guarda o conteúdo; os testes podem guardar referências aos objetos).
 process.env.JWT_SECRET = 'teste';
 process.env.NODE_ENV = 'test';
 const jwt = require('jsonwebtoken');
@@ -10,17 +10,26 @@ const transacao = require('../../rotas/transacao');
 const { app, pool, acesso } = require('../../index.js');
 
 const PERFIS = {
-  'Corte': ['corte.ver', 'corte.planejar', 'corte.parametros'],
+  'Corte': ['corte.ver', 'corte.planejar', 'corte.parametros', 'estoque.ver', 'estoque.movimentar'],
   'Só ver corte': ['corte.ver'],
-  'Planeja': ['corte.ver', 'corte.planejar'],
+  'Planeja': ['corte.ver', 'corte.planejar', 'estoque.ver', 'estoque.movimentar'],
+  'Planeja sem estoque': ['corte.ver', 'corte.planejar'],
+  'Planeja, estoque só ver': ['corte.ver', 'corte.planejar', 'estoque.ver'],
   'Só planejar': ['corte.planejar'],
   'Só parâmetros': ['corte.parametros'],
   'Sem acesso': ['pedidos.ver']
 };
 
 function bancoCorte() {
-  const estado = { config: [], retalhos: [], auditoria: [], pedidos: [], perfis: [], itens: [], planos: [] };
-  const { config, retalhos, auditoria, pedidos, perfis, itens, planos } = estado;
+  // estoque do VB: três produtos ativos (P100 e P200 têm o nome do perfil) e as saídas gravadas
+  const estoque = [
+    { CODIGO: 1, NOME_PRODUTO: 'P100', UNIDADE: 'Barra', QTD_ESTOQUE: 50, SITUACAO: 'Ativo', CODIGO_BARRA: '111', FORNECEDOR: 'FORN', NOME_PRODUTO_FORNECEDOR: 'PERFIL 100', VALOR: 10 },
+    { CODIGO: 2, NOME_PRODUTO: 'P200', UNIDADE: 'Barra', QTD_ESTOQUE: 50, SITUACAO: 'Ativo', CODIGO_BARRA: '222', FORNECEDOR: 'FORN', NOME_PRODUTO_FORNECEDOR: 'PERFIL 200', VALOR: 10 },
+    { CODIGO: 3, NOME_PRODUTO: 'Parafuso', UNIDADE: 'Un', QTD_ESTOQUE: 500, SITUACAO: 'Ativo', CODIGO_BARRA: '333', FORNECEDOR: 'FORN', NOME_PRODUTO_FORNECEDOR: 'PARAFUSO', VALOR: 1 },
+    { CODIGO: 4, NOME_PRODUTO: 'Antigo', UNIDADE: 'Un', QTD_ESTOQUE: 5, SITUACAO: 'Inativo', CODIGO_BARRA: '444', FORNECEDOR: 'FORN', NOME_PRODUTO_FORNECEDOR: 'ANTIGO', VALOR: 1 }
+  ];
+  const estado = { config: [], retalhos: [], auditoria: [], pedidos: [], perfis: [], itens: [], planos: [], estoque, saidas: [] };
+  const { config, retalhos, auditoria, pedidos, perfis, itens, planos, saidas } = estado;
   let proxConfig = 1, proxRetalho = 1, proxPlano = 1, proxPerfil = 1;
   const formatarRetalho = r => ({ id: r.id, perfil: r.perfil, acabamento: r.acabamento, cor: r.cor, comprimento: r.comprimento, situacao: r.situacao,
     plano_origem: r.plano_origem ?? null, plano_reserva: r.plano_reserva ?? null, criado_em: r.criado_em ?? null });
@@ -32,6 +41,14 @@ function bancoCorte() {
     [/^SELECT id FROM web_corte_config WHERE perfil = \?/, (sql, [perfil]) => config.filter(c => c.perfil === perfil).map(c => ({ id: c.id }))],
     [/^UPDATE web_corte_config SET/, (sql, [comprimento_vara, serra, sobra_minima, , , id]) => { Object.assign(config.find(c => c.id === id), { comprimento_vara, serra, sobra_minima }); return { affectedRows: 1 }; }],
     [/^INSERT INTO web_corte_config/, (sql, [perfil, comprimento_vara, serra, sobra_minima]) => { config.push({ id: proxConfig++, perfil, comprimento_vara, serra, sobra_minima }); return { affectedRows: 1 }; }],
+
+    // ---- estoque do VB (baixa das varas novas) ----
+    [/SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE FROM estoque WHERE SITUACAO = 'Ativo'/, () => estoque.filter(e => e.SITUACAO === 'Ativo').sort((a, b) => a.NOME_PRODUTO.localeCompare(b.NOME_PRODUTO)).map(e => ({ ...e }))],
+    [/FROM estoque WHERE CODIGO IN \([\s\S]*\) FOR UPDATE/, (sql, cods) => estoque.filter(e => cods.map(Number).includes(e.CODIGO)).map(e => ({ ...e }))],
+    [/INSERT INTO saida_estoque \(CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO, STATUS\)/, (sql, [CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO]) => {
+      saidas.push({ ID: saidas.length + 1, CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO, STATUS: null }); return { affectedRows: 1 };
+    }],
+    [/UPDATE estoque SET QTD_ESTOQUE = QTD_ESTOQUE - \? WHERE CODIGO = \?/, (sql, [q, c]) => { estoque.find(x => x.CODIGO === Number(c)).QTD_ESTOQUE -= Number(q); return { affectedRows: 1 }; }],
 
     // ---- pedido, peças e plano ----
     [/^SELECT NUMERO, RAZAO_SOCIAL, SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido'/, (sql, [n]) =>
@@ -110,6 +127,23 @@ function bancoCorte() {
     [/^UPDATE web_retalhos SET situacao = 'descartado'/, (sql, [, id]) => { retalhos.find(r => r.id === id).situacao = 'descartado'; return { affectedRows: 1 }; }]
   ];
   const f = criarPoolFalso(regras);
+  // como no MySQL: ROLLBACK desfaz o que a transação mudou (BEGIN tira uma foto do estado; ROLLBACK volta a ela)
+  const conectar = f.getConnection;
+  f.getConnection = async () => {
+    const c = await conectar();
+    let foto = null;
+    return { ...c,
+      beginTransaction: async () => { foto = JSON.parse(JSON.stringify(estado)); await c.beginTransaction(); },
+      rollback: async () => {
+        if (foto) for (const k of Object.keys(estado)) {
+          const atual = estado[k];
+          foto[k].forEach((o, i) => { if (atual[i] && typeof o === 'object') { for (const ch of Object.keys(atual[i])) delete atual[i][ch]; Object.assign(atual[i], o); } });
+          atual.splice(foto[k].length, atual.length - foto[k].length);
+          for (let i = atual.length; i < foto[k].length; i++) atual.push(foto[k][i]);
+        }
+        await c.rollback();
+      } };
+  };
   const semear = {
     pedido: (x = {}) => { const r = { NUMERO: 100, RAZAO_SOCIAL: 'Cliente X', SITUACAO: 'Em Produção', ...x }; pedidos.push(r); return r; },
     perfil: (x = {}) => { const r = { id: proxPerfil++, NUMERO: 100, ITEM: 1, QTD_PORTAS: 2, PERFIL: 'P100', QTD_ALTURA: 2, TAM_ALTURA: 2100, QTD_LARGURA: 2, TAM_LARGURA: 900,
@@ -139,4 +173,14 @@ async function prepararCorte(t, { perfil = 'Corte', usuario = { codigo: 7, nome:
   return { banco, chamar };
 }
 
-module.exports = { bancoCorte, prepararCorte, PERFIS };
+// corpo de confirmação com a baixa de cada grupo que tem vara nova: o produto do estoque é o de mesmo nome do perfil (P100 → 1, P200 → 2),
+// ou o escolhido em `produtos` ({ chaveDoGrupo: codigo }); `extra` entra por cima (sobras, retalhosNaoUsados, baixas…)
+async function corpoConfirmacao(chamar, planoId, extra = {}, produtos = {}) {
+  const plano = await (await chamar(`/corte/plano/${planoId}`)).json();
+  const porNome = { P100: 1, P200: 2 };
+  const baixas = plano.plano.grupos.filter(g => g.barras.some(b => b.tipo === 'vara'))
+    .map(g => ({ chave: g.chave, produtoCodigo: produtos[g.chave] || porNome[g.perfil] }));
+  return { baixas, ...extra };
+}
+
+module.exports = { bancoCorte, prepararCorte, corpoConfirmacao, PERFIS };

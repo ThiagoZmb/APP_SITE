@@ -7,6 +7,7 @@
 const express = require('express');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal, horaLocal } = require('./transacao');
 const { lerNFe, ErroNFe } = require('./nfe_xml');
+const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');   // saída compartilhada com a baixa do plano de corte (rotas/corte.js)
 
 const VER = 'estoque.ver';
 const MOVIMENTAR = [VER, 'estoque.movimentar'];
@@ -24,7 +25,6 @@ function validarData(texto) {
 }
 const inteiroPositivo = v => Number.isInteger(v) && v >= 1;
 const ehDuplicado = err => err?.code === 'ER_DUP_ENTRY' || err?.errno === 1062;
-const LIMITE_LINHA_SAIDA = 127; // saida_estoque.QTD é tinyint
 
 // Reserva a chave do lançamento (identificador gerado pela tela) gravando-a já no início da transação.
 // INSERT direto em vez de SELECT … FOR UPDATE: a chave repetida vira 409 e não há trava de intervalo
@@ -37,15 +37,6 @@ async function reservarChave(conn, { chave, tipo, quem, referencia }) {
     if (ehDuplicado(err)) throw new ErroUsuario(409, 'Este lançamento já foi gravado.');
     throw err;
   }
-}
-
-// trava e devolve os produtos pedidos, indexados pelo código
-async function travarProdutos(conn, codigos) {
-  const unicos = [...new Set(codigos.map(Number))];
-  const [linhas] = await conn.execute(
-    `SELECT CODIGO, NOME_PRODUTO, QTD_ESTOQUE, VALOR, CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, COD_FORNECEDOR
-     FROM estoque WHERE CODIGO IN (${unicos.map(() => '?').join(', ')}) FOR UPDATE`, unicos);
-  return new Map(linhas.map(l => [Number(l.CODIGO), l]));
 }
 
 // trava e devolve os produtos pelo nome (entrada_estoque e saida_estoque guardam o nome, não o código)
@@ -289,23 +280,9 @@ function registrarEstoqueMovimentos({ rota, pool }) {
         if (!p) throw new ErroUsuario(400, `Item ${i + 1}: produto não encontrado no estoque.`);
         if (vistos.has(p.CODIGO)) throw new ErroUsuario(400, `O produto '${p.NOME_PRODUTO}' já foi inserido !`);
         vistos.add(p.CODIGO);
-        const atual = Number(p.QTD_ESTOQUE) || 0;
-        if (atual - it.qtd < 0) throw new ErroUsuario(400, `A quantidade do item '${p.NOME_PRODUTO}' é menor que 0! (estoque: ${atual}, saída: ${it.qtd})`);
+        conferirSaldo(p, it.qtd);
       });
-      const resumo = [];
-      for (const it of itens) {
-        const p = produtos.get(Number(it.produtoCodigo));
-        for (let resta = it.qtd; resta > 0; resta -= LIMITE_LINHA_SAIDA) {
-          await conn.execute(
-            `INSERT INTO saida_estoque (CODIGO_BARRA, FORNECEDOR, NOME_PRODUTO_FORNECEDOR, NOME_PRODUTO, DATA, QTD, USUARIO, STATUS)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-            [p.CODIGO_BARRA || '', p.FORNECEDOR || '', p.NOME_PRODUTO_FORNECEDOR || '', p.NOME_PRODUTO, quando, Math.min(resta, LIMITE_LINHA_SAIDA), req.user.nome]);
-        }
-        await conn.execute('UPDATE estoque SET QTD_ESTOQUE = QTD_ESTOQUE - ? WHERE CODIGO = ?', [it.qtd, p.CODIGO]);
-        const antes = Number(p.QTD_ESTOQUE) || 0;
-        resumo.push({ produto: p.NOME_PRODUTO, antes, depois: antes - it.qtd });
-      }
-      return resumo;
+      return gravarSaidas(conn, itens.map(it => ({ p: produtos.get(Number(it.produtoCodigo)), qtd: it.qtd })), { quando, usuario: req.user.nome });
     });
     if (resultado) res.status(201).json({ itens: resultado });
   });

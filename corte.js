@@ -1,7 +1,7 @@
 // ==========================================================================
 // corte.html — Plano de corte de perfis de um Pedido (varas, retalhos, conferência do corte real) e parâmetros.
 // Rotas: GET /corte/pedido/:n, POST /corte/pedido/:n/salvar, GET /corte/plano/:id, PUT /corte/plano/:id/pecas,
-//        POST /corte/plano/:id/confirmar|cancelar, GET/PUT /corte/config, GET/POST/PUT /corte/retalhos, POST /corte/retalhos/:id/descartar.
+//        POST /corte/plano/:id/confirmar|cancelar, GET /corte/estoque/produtos (baixa das varas novas), GET/PUT /corte/config, GET/POST/PUT /corte/retalhos, POST /corte/retalhos/:id/descartar.
 // Funções puras testadas no Node (test/corte_tela.test.js); o desenho da tela fica no fim (só no navegador).
 // Dado vindo da API só entra na tela por esc() ou value/textContent. Quem decide o acesso é o servidor.
 // ==========================================================================
@@ -92,12 +92,54 @@
   const htmlErros = lista => !lista || !lista.length ? '' :
     `<div class="aviso-pendencia" role="alert"><b>Peças que não cabem em nenhuma vara:</b><ul>${lista.map(e => `<li>${esc(mm(e.peca.tamanho))} (${esc(e.peca.perfil)}, item ${esc(e.peca.item)}): ${esc(e.motivo)}</li>`).join('')}</ul></div>`;
 
+  // ---------- baixa no estoque das varas novas ----------
+  // um grupo (perfil + acabamento + cor) por linha, só os que usam vara nova (retalho não está no estoque)
+  const gruposComVarasNovas = plano => ((plano && plano.grupos) || [])
+    .map(g => ({ chave: g.chave, perfil: g.perfil, acabamento: g.acabamento, cor: g.cor, varas: g.barras.filter(b => b.tipo === 'vara').length }))
+    .filter(g => g.varas > 0);
+  const normalizarNomeProduto = v => txt(v).replace(/\s+/g, ' ').toLowerCase();
+  // pré-seleção: o produto de estoque de mesmo nome do perfil (sem diferenciar caixa nem espaços); se houver 0 ou mais de 1, o usuário escolhe
+  function sugerirProduto(perfil, produtos) {
+    const alvo = normalizarNomeProduto(perfil);
+    const iguais = alvo ? (produtos || []).filter(p => normalizarNomeProduto(p.nome) === alvo) : [];
+    return iguais.length === 1 ? iguais[0].codigo : null;
+  }
+  // produtos: lista de { codigo, nome, unidade, qtdEstoque } ou null (não carregada); escolhas: { chave: codigo } já feitas pelo usuário
+  function htmlBaixaEstoque(grupos, produtos, escolhas = {}) {
+    if (!grupos.length) return '';
+    const cabecalho = '<section class="baixa-estoque"><h3>Baixa no estoque</h3><p class="cinza">As varas novas usadas saem do estoque ao confirmar. Retalhos não entram. Confira o produto de cada perfil.</p>';
+    if (!produtos) return cabecalho + '<p class="erro-estado" role="alert">Não foi possível carregar a lista de produtos do estoque (ou você não tem permissão de dar saída no estoque). Sem ela o corte não pode ser confirmado.</p></section>';
+    const linhas = grupos.map(g => {
+      const escolhido = escolhas[g.chave] !== undefined ? Number(escolhas[g.chave]) : sugerirProduto(g.perfil, produtos);
+      const opcoes = '<option value="">— escolha o produto —</option>' + produtos.map(p =>
+        `<option value="${esc(p.codigo)}"${escolhido === p.codigo ? ' selected' : ''}>${esc(p.nome)} (estoque: ${esc(p.qtdEstoque)}${p.unidade ? ' ' + esc(p.unidade) : ''})</option>`).join('');
+      return `<div class="baixa-linha"><b>${esc(g.perfil)}</b> <span class="chip">${esc(semAcab(g.acabamento))}</span> <span class="chip">${esc(semCor(g.cor))}</span>` +
+        `<span>${esc(g.varas)} vara${g.varas === 1 ? '' : 's'} nova${g.varas === 1 ? '' : 's'}</span>` +
+        `<select class="baixa-produto" data-chave="${esc(g.chave)}" aria-label="Produto do estoque para ${esc(g.perfil)}">${opcoes}</select></div>`;
+    });
+    return cabecalho + linhas.join('') + '</section>';
+  }
+  // selecoes: [{ chave, produtoCodigo: texto do select }]
+  const corpoBaixas = selecoes => selecoes.map(s => ({ chave: s.chave, produtoCodigo: Number(s.produtoCodigo) }));
+  // mesmas regras do servidor: um produto por grupo com vara nova, sem repetir produto
+  function validarBaixasForm(grupos, selecoes) {
+    const erros = [], escolhidos = [];
+    for (const g of grupos) {
+      const s = selecoes.find(x => x.chave === g.chave);
+      const n = s ? Number(s.produtoCodigo) : NaN;
+      if (!Number.isInteger(n) || n <= 0) erros.push(`Escolha o produto do estoque para ${g.perfil} (${semAcab(g.acabamento)} / ${semCor(g.cor)}).`);
+      else escolhidos.push(n);
+    }
+    if (!erros.length && new Set(escolhidos).size !== escolhidos.length) erros.push('O mesmo produto do estoque foi escolhido para mais de um grupo. Escolha um produto por grupo.');
+    return erros;
+  }
+
   // ---------- corpos de envio e validação ----------
   const corpoSalvar = p => ({ impressao: p.impressao, retalhosUsados: p.retalhosUsados });
   const inteiroMm = v => /^\d+$/.test(txt(v)) ? Number(txt(v)) : NaN;
-  function corpoConferencia(linhas, naoUsados) {
+  function corpoConferencia(linhas, naoUsados, baixas) {
     return { sobras: linhas.map(l => l.destino === 'guardar' ? { grupo: l.grupo, barra: l.barra, destino: 'guardar', medidaReal: inteiroMm(l.medida) } : { grupo: l.grupo, barra: l.barra, destino: 'descartar' }),
-      retalhosNaoUsados: naoUsados };
+      retalhosNaoUsados: naoUsados, ...(Array.isArray(baixas) ? { baixas } : {}) };
   }
   // mesmas regras do servidor: guardar exige medida inteira > 0 e não maior que a sobra calculada
   function validarConferenciaForm(linhas, plano) {
@@ -132,7 +174,7 @@
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { numero: null, previa: null, salvo: null, modo: null, cortadas: new Set(), conferindo: false, ocupado: false, retalhos: [], seq: 0 };
+    const estado = { numero: null, previa: null, salvo: null, modo: null, cortadas: new Set(), conferindo: false, ocupado: false, retalhos: [], seq: 0, produtos: null };
     const { chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
     const pode = p => !!(win.Acesso && win.Acesso.pode(p));
@@ -232,7 +274,8 @@
       const editavel = modo === 'salvo' && ABERTO(situacao) && pode('corte.planejar');
       const opcoes = { cortadas: estado.cortadas, clicavel: editavel && !estado.conferindo, conferindo: editavel && estado.conferindo };
       $('plano-area').innerHTML = htmlResumo(fonte.plano.resumo) + htmlPendencias(fonte.pendencias) + htmlErros(fonte.plano.erros) +
-        (fonte.plano.grupos.length ? fonte.plano.grupos.map((g, i) => htmlGrupo(g, opcoes, i)).join('') : '<p class="vazio">Nenhuma peça para cortar (veja as pendências).</p>');
+        (fonte.plano.grupos.length ? fonte.plano.grupos.map((g, i) => htmlGrupo(g, opcoes, i)).join('') : '<p class="vazio">Nenhuma peça para cortar (veja as pendências).</p>') +
+        (opcoes.conferindo ? htmlBaixaEstoque(gruposComVarasNovas(fonte.plano), estado.produtos) : '');
       $('btn-salvar').hidden = !(modo === 'previa' && pode('corte.planejar') && previa.qtdPecas > 0 && !(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido'));
       $('btn-refazer').hidden = !(modo === 'salvo' && editavel && !estado.conferindo);
       $('btn-conferir').hidden = !(editavel && !estado.conferindo);
@@ -278,8 +321,20 @@
       const linhas = linhasConferencia().filter(l => !naoUsados.includes(idDaBarra(l)));
       const erros = validarConferenciaForm(linhas, estado.salvo.plano);
       if (erros.length) { toast(erros[0], 'erro'); return; }
-      if (!win.confirm('Confirmar o corte? Os retalhos usados saem do estoque e as sobras conferidas entram como retalhos. Isto não pode ser desfeito.')) return;
-      await acao($('btn-confirmar'), () => chamar(`/corte/plano/${estado.salvo.id}/confirmar`, { metodo: 'POST', corpo: corpoConferencia(linhas, naoUsados) }), 'Corte confirmado.');
+      // baixa no estoque: um produto por grupo que usa vara nova (o servidor confere de novo)
+      const grupos = gruposComVarasNovas(estado.salvo.plano);
+      const selecoes = [...doc.querySelectorAll('.baixa-produto')].map(el => ({ chave: el.dataset.chave, produtoCodigo: el.value }));
+      if (grupos.length) {
+        if (!pode('estoque.movimentar')) { toast('Este plano usa varas novas: dar baixa no estoque exige a permissão de dar saída no estoque.', 'erro'); return; }
+        const errosBaixa = validarBaixasForm(grupos, selecoes);
+        if (errosBaixa.length) { toast(errosBaixa[0], 'erro'); return; }
+      }
+      const nomeProduto = s => { const p = (estado.produtos || []).find(x => String(x.codigo) === String(s.produtoCodigo)); return p ? p.nome : s.produtoCodigo; };
+      const resumoBaixa = grupos.map(g => `${g.varas} × ${nomeProduto(selecoes.find(x => x.chave === g.chave))}`).join(', ');
+      if (!win.confirm('Confirmar o corte? Os retalhos usados saem do estoque de retalhos e as sobras conferidas entram como retalhos.' +
+        (grupos.length ? `\n\nBaixa no estoque das varas novas: ${resumoBaixa}.` : '') +
+        '\n\nIsto não pode ser desfeito por aqui (a saída de estoque só se desfaz pelo estorno em Movimentação de estoque).')) return;
+      await acao($('btn-confirmar'), () => chamar(`/corte/plano/${estado.salvo.id}/confirmar`, { metodo: 'POST', corpo: corpoConferencia(linhas, naoUsados, grupos.length ? corpoBaixas(selecoes) : []) }), 'Corte confirmado.');
     }
     // clique na peça: atualiza a tela e o localStorage na hora; o envio ao servidor é adiado e feito em lote
     function marcarPeca(botao) {
@@ -361,7 +416,15 @@
       if (!win.confirm(textoConfirmarExclusao(previa))) return;
       acao($('btn-excluir-dados'), () => chamar('/corte/pedido/' + encodeURIComponent(estado.numero), { metodo: 'DELETE', corpo: previa.qtdConferidos > 0 ? { incluirConferidos: true } : {} }), 'Dados do plano excluídos.');
     });
-    $('btn-conferir').addEventListener('click', () => { estado.conferindo = true; desenharPlano(); });
+    // ao conferir, carrega os produtos do estoque (uma vez) para a baixa das varas novas
+    async function carregarProdutosEstoque() {
+      if (estado.produtos || !pode('estoque.movimentar')) return;
+      try { estado.produtos = (await chamar('/corte/estoque/produtos')).produtos; } catch { estado.produtos = null; }
+    }
+    $('btn-conferir').addEventListener('click', async () => {
+      if (gruposComVarasNovas(estado.salvo && estado.salvo.plano).length) await carregarProdutosEstoque();
+      estado.conferindo = true; desenharPlano();
+    });
     $('btn-confirmar').addEventListener('click', confirmar);
     $('btn-cancelar-plano').addEventListener('click', () => {
       if (win.confirm('Cancelar este plano? Os retalhos reservados voltam a ficar disponíveis.')) acao($('btn-cancelar-plano'), () => chamar(`/corte/plano/${estado.salvo.id}/cancelar`, { metodo: 'POST' }), 'Plano cancelado.');
@@ -380,5 +443,5 @@
   }
 
   return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, textoConfirmarExclusao, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
-    corpoSalvar, corpoConferencia, validarConferenciaForm, htmlRetalhos, htmlConfig, iniciar };
+    corpoSalvar, corpoConferencia, validarConferenciaForm, gruposComVarasNovas, sugerirProduto, htmlBaixaEstoque, corpoBaixas, validarBaixasForm, htmlRetalhos, htmlConfig, iniciar };
 });
