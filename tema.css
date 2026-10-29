@@ -69,7 +69,7 @@ body {
 body .container {
     display: grid !important;
     grid-template-columns: 264px minmax(0, 1fr) !important;
-    grid-template-rows: 64px 1fr !important;
+    grid-template-rows: 48px 1fr !important;
     grid-template-areas: "sidebar header" "sidebar main" !important;
     min-height: 100vh !important;
     max-width: none !important;
@@ -84,7 +84,7 @@ body .container {
 body .container > header {
     grid-area: header;
     position: sticky; top: 0; z-index: 30;
-    height: 64px;
+    height: 48px;
     display: flex !important; align-items: center; justify-content: space-between; gap: 16px;
     padding: 0 32px !important;
     background: rgba(244, 244, 247, .78) !important;
@@ -106,13 +106,13 @@ body .container > header .logo::before {
 body .container > header .header-right { gap: 12px; }
 body .user-profile {
     display: flex !important; align-items: center; gap: 10px;
-    padding: 5px 14px 5px 5px !important; border-radius: 999px !important;
+    padding: 3px 12px 3px 4px !important; border-radius: 999px !important;
     background: var(--white) !important; border: 1px solid var(--border-color);
     box-shadow: var(--shadow-light); color: var(--text-dark) !important;
     font-size: 14px; font-weight: 600; flex-shrink: 0;
 }
 body .user-avatar {
-    width: 34px !important; height: 34px !important; border-radius: 50% !important;
+    width: 28px !important; height: 28px !important; border-radius: 50% !important;
     background: var(--gradient-primary) !important; color: #fff !important;
     font-weight: 700 !important; font-size: 14px !important;
     display: flex; align-items: center; justify-content: center;
@@ -122,7 +122,7 @@ body .user-info { line-height: 1.15; display: flex !important; flex-direction: c
 body .user-info span:first-child, body #user-name { font-weight: 700; font-size: 13.5px; }
 body .user-cargo { font-size: 11.5px !important; color: var(--text-light); opacity: 1 !important; font-weight: 500; }
 .btn-menu-mobile {
-    display: none; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border-color);
+    display: none; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border-color);
     background: var(--white); color: var(--text-dark); cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .btn-menu-mobile svg { width: 20px; height: 20px; }
