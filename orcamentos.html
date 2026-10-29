@@ -159,9 +159,9 @@
         .item-layout.frente-serr .item-dados > #quadro-complementos { order: 3; grid-column: 2; }
         .item-layout.frente-serr .item-dados > #quadro-pecas { order: 4; }
         .item-layout.frente-serr .item-dados > #quadro-valores { order: 5; }
-        /* card Valores: botões na extrema esquerda, campos de valor compactos ao lado */
+        /* card Valores: campos de valor compactos à esquerda, botões na extrema direita */
         .valores-linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 24px; }
-        html body .valores-linha .acoes-item { justify-content: flex-start; flex-wrap: wrap; align-items: center; margin: 0 !important; }
+        html body .valores-linha .acoes-item { order: 2; justify-content: flex-end; flex-wrap: wrap; align-items: center; margin: 0 0 0 auto !important; }
         html body .valores-linha .grid-valores { display: flex !important; flex-wrap: wrap; gap: 8px 12px !important; }
         html body .valores-linha .grid-valores .form-group { width: 130px; flex: none; }
         @media (max-width: 900px) { .item-layout.frente-serr .item-dados > #quadro-medidas, .item-layout.frente-serr .item-dados > #quadro-complementos { grid-column: 1 / -1; } }
