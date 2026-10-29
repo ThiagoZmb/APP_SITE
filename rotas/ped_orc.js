@@ -122,10 +122,13 @@ function entradaPreco(item, folhas) {
     pecas: pecasDoItem(item).map(p => ({ ...p, acabamento: p.acabSerr })) };
   if (item.frente === 'Avulso') return { frente: 'Avulso', categoria: d.categoria, produto: d.avProduto,
     acabamento: ['Perfil', 'Trilhos', 'Puxador'].includes(d.categoria) ? d.avAcab : '', altura: item.altura, largura: item.largura, qtd: item.qtd };
+  // cada folha com a sua largura e a sua posição do puxador (as mesmas que a gravação escreve por linha de itens_v4);
+  // folhas que dão a mesma conta seguem o preço de uma porta × qtd (calculo/precos.js)
   const f = folhas[0] || {};
   return { frente: item.frente, altura: f.altura, largura: f.largura, qtd: folhas.length,
+    largurasFolhas: folhas.map(x => x.largura), posicoesFolhas: folhas.map(x => x.posicaoPuxador || ''),
     perfil: d.perfil, acabPerfil: d.acabamento, puxador: d.puxador, acabPuxador: d.acabPux, tipoPuxador: d.tipoPuxador,
-    posicaoPuxador: (d.posicoesFolhas || [])[0] || '', tamanhoPuxador: d.tamanhoPux, revestimento: d.revestimento,
+    posicaoPuxador: f.posicaoPuxador || '', tamanhoPuxador: d.tamanhoPux, revestimento: d.revestimento,
     divisor: d.divisor, qtdDivH: parseInt(d.divH) || 0, qtdDivV: parseInt(d.divV) || 0 };
 }
 

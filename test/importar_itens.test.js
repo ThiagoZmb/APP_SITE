@@ -212,7 +212,10 @@ test('medida da folha e corpo do /calcular_preco iguais ao que o servidor refaz 
   assert.deepEqual(e, { frente: 'Porta de Correr', cliente: 'C', clienteCodigo: 7, altura: 2060, largura: 1525,
     acessorios: [{ nome: 'Trilho Sup', qtd: 2, tamanho: 3000, origem: 'SISTEMA DE CORRER' }], qtd: 2,
     perfil: 'Perfil P', acabPerfil: 'Anodizado', puxador: 'Puxador X', acabPuxador: '', tipoPuxador: 'Sobreposto',
-    posicaoPuxador: 'Lateral Direita Centro', tamanhoPuxador: 800, revestimento: 'Vidro V', divisor: '', qtdDivH: 0, qtdDivV: 0, percentuais: '' });
+    posicaoPuxador: 'Lateral Direita Centro', posicoesFolhas: ['Lateral Direita Centro', 'Lateral Esquerda Centro'],
+    tamanhoPuxador: 800, revestimento: 'Vidro V', divisor: '', qtdDivH: 0, qtdDivV: 0, percentuais: '' });
+  // a posição de cada folha é a mesma que o servidor usa ao refazer o preço (rotas/ped_orc.js entradaPreco)
+  assert.deepEqual(folhasDoItem(i, { descontoAlturaSistema: 40 }).map(f => f.posicaoPuxador), e.posicoesFolhas);
   // sem sistema a medida é a da porta
   const sem = Imp.normalizarItem(correr({}, { sistema: 'Sem sistema' })).item;
   assert.deepEqual(Imp.medidasFolha(sem, 40), { altura: 2100, largura: 3000 });

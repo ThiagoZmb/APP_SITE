@@ -340,7 +340,7 @@
       qtd: item.qtd,
       perfil: d.perfil, acabPerfil: d.acabamento,
       puxador: d.puxador, acabPuxador: d.acabPux, tipoPuxador: d.tipoPuxador,
-      posicaoPuxador: d.posicoesFolhas[0] || '', tamanhoPuxador: d.tamanhoPux,
+      posicaoPuxador: d.posicoesFolhas[0] || '', posicoesFolhas: d.posicoesFolhas.slice(0, item.qtd), tamanhoPuxador: d.tamanhoPux,
       revestimento: d.revestimento, divisor: d.divisor, qtdDivH: d.divH || 0, qtdDivV: d.divV || 0,
       percentuais: ''
     };

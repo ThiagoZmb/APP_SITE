@@ -121,6 +121,14 @@ function valoresAcessorio(dados, cliente, { qtd, tamanho }) {
   return { valorTabela: r2(tabela), valorUnitario: r2(tabela * fator), valorTotal: r2(qtd * fator * tabela) };
 }
 
+// O que a posição do puxador muda na conta da porta (bloco das portas abaixo): eixo (Topo/Base x lateral),
+// nº de puxadores (posições separadas por vírgula) e "Total". Lado (esquerda/direita) e altura (superior/centro)
+// não mudam o preço; por isso folhas espelhadas (pares) dão a mesma chave.
+function chavePosicaoPreco(pos) {
+  const u = String(pos || '').toUpperCase();
+  return `${u.includes('TOPO') || u.includes('BASE') ? 'TB' : 'L'}|${u.split(',').filter(p => p.trim()).length}|${u.includes('TOTAL') ? 'T' : ''}`;
+}
+
 async function calcularPrecoItem(b, cliente, leitor) {
   const isFixo = !!cliente?.isFixo;
   const descontoCliente = cliente ? (cliente.desconto || 0) : 0;
@@ -174,19 +182,35 @@ async function calcularPrecoItem(b, cliente, leitor) {
   }
 
   // ============ FRENTE PORTAS (MotorFinanceiro.CalcularValorVendaPorta) ============
-  // porta de correr com larguras diferentes: cada largura é uma porta; o total é a soma e o unitário a média
+  // Preço POR FOLHA (MotorFinanceiro.CalcularValorVendaPorta é por porta; frmPortasCorrer soma porta a porta).
+  // Cada folha pode ter largura própria (correr, LarguraEditada) e posição do puxador própria (`posicoesFolhas`,
+  // uma por folha, definida clicando no desenho). Quando todas as folhas dão a mesma conta, segue o caminho de sempre
+  // (preço de uma porta × qtd, sem mudar o arredondamento); quando alguma difere, cada configuração é calculada como
+  // uma porta e o total é a soma (unitário = média).
   const largs = Array.isArray(b.largurasFolhas) ? b.largurasFolhas.slice(0, 200).map(v => parseFloat(v) || 0) : [];
-  if (largs.length > 1 && new Set(largs).size > 1) {
-    const porLargura = new Map();
-    for (const w of largs) porLargura.set(w, (porLargura.get(w) || 0) + 1);
+  const poss = Array.isArray(b.posicoesFolhas) ? b.posicoesFolhas.slice(0, 200).map(p => String(p ?? '')) : [];
+  const nFolhas = largs.length > 1 ? largs.length : Math.min(200, Math.max(1, parseInt(b.qtd) || 1));
+  const posDaFolha = i => poss[i] ?? poss[0];   // como folhasDoItem (calculo/engenharia.js)
+  const largDaFolha = i => largs.length > 1 ? largs[i] : b.largura;
+  const largVaria = largs.length > 1 && new Set(largs).size > 1;
+  const posVaria = poss.length > 0 && new Set(Array.from({ length: nFolhas }, (_, i) => chavePosicaoPreco(posDaFolha(i)))).size > 1;
+  if (largVaria || posVaria) {
+    const grupos = new Map();
+    for (let i = 0; i < nFolhas; i++) {
+      const w = largDaFolha(i), p = poss.length ? posDaFolha(i) : b.posicaoPuxador;
+      const k = `${w}|${chavePosicaoPreco(p)}`;
+      if (grupos.has(k)) grupos.get(k).q++; else grupos.set(k, { w, p, q: 1 });
+    }
     let total = 0, ultimo = null;
-    for (const [w, q] of porLargura) {
-      ultimo = await calcularPrecoItem({ ...b, largura: w, largurasFolhas: null, qtd: 1 }, cliente, leitor);
+    for (const { w, p, q } of grupos.values()) {
+      ultimo = await calcularPrecoItem({ ...b, largura: w, posicaoPuxador: p, largurasFolhas: null, posicoesFolhas: null, qtd: 1 }, cliente, leitor);
       total += ultimo.total * q;
     }
     total = Math.round(total * 100) / 100;
-    return { unitario: Math.round(total / largs.length * 100) / 100, total, diag: { ...ultimo.diag, largurasFolhas: largs } };
+    return { unitario: Math.round(total / nFolhas * 100) / 100, total,
+      diag: { ...ultimo.diag, ...(largVaria ? { largurasFolhas: largs } : {}), ...(posVaria ? { posicoesFolhas: poss.slice(0, nFolhas) } : {}) } };
   }
+  if (poss.length) b = { ...b, posicaoPuxador: posDaFolha(0) }; // a lista por folha é a fonte; todas dão a mesma conta
   const altura = parseFloat(b.altura) || 0;
   const largura = parseFloat(b.largura) || 0;
 
@@ -324,4 +348,4 @@ async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
   return { unitario: Math.round(total / qtdItem * 100) / 100, total, pecas: r.total, pecasDetalhe: r.detalhe, complementos: precificados, diag: r.diag };
 }
 
-module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, precificarAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };
+module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, precificarAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais, chavePosicaoPreco };

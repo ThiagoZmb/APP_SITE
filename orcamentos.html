@@ -671,17 +671,6 @@
                         <h4>🟧 Puxador</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o puxador —</option></select></div>
-                            <div class="form-group" id="wrap-posicao"><label title="Posição do puxador da folha 1">Posição (folha 1)</label>
-                                <select id="f-posicao">
-                                    <option value="">—</option>
-                                    <option>Lateral Esquerda Inferior</option><option>Lateral Esquerda Superior</option>
-                                    <option>Lateral Direita Inferior</option><option>Lateral Direita Superior</option>
-                                    <option>Lateral Esquerda Centro</option><option>Lateral Direita Centro</option>
-                                    <option>Topo Esquerda</option><option>Topo Centro</option><option>Topo Direita</option>
-                                    <option>Base Esquerda</option><option>Base Centro</option><option>Base Direita</option>
-                                    <option>Topo Total</option><option>Base Total</option>
-                                </select>
-                            </div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Cor do puxador</label><select id="f-cor-pux" disabled><option value="">— escolha o acabamento —</option></select></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
@@ -771,9 +760,10 @@
                         <h4>🖥️ Visualização em tempo real</h4>
                         <canvas id="cv-visualizacao"></canvas>
                         <div class="viz-linha">
-                            <button class="btn-mini" id="btn-modo-pux">🎯 Configurar posição do puxador</button>
+                            <button class="btn-mini" id="btn-modo-pux" title="A posição do puxador é definida aqui, folha por folha: clique no botão e depois nas posições em laranja de cada folha no desenho">🎯 Posicionar puxador (clique no desenho)</button>
                         </div>
                         <div class="viz-status" id="viz-status"></div>
+                        <div class="viz-status" id="pux-resumo" aria-live="polite"></div>
                     </div>
                     <!-- 🔩 FURAÇÕES (fiel ao frmPortasAbrir.vb — região 5) -->
                     <div class="secao-item secao-furos">
@@ -1066,7 +1056,6 @@
                 sistemaPadraoCorrer(); renderAcessorios();
                 document.getElementById('frente-atual').textContent = rotuloFrente(frenteAtual);
                 posicoesFolhas = posicoesFolhas.map(() => '');
-                document.getElementById('f-posicao').value = '';
                 aplicarVisibilidadeCampos();
                 carregarPerfis();
                 calcularPrecoAutomatico();
@@ -1284,7 +1273,6 @@
         async function aoMudarPerfil() {
             await carregarDependentesPerfil(val('f-perfil'));
             posicoesFolhas = posicoesFolhas.map(() => '');
-            document.getElementById('f-posicao').value = '';
             document.getElementById('chk-toda-ext').checked = false;
             if (modoPuxador) { modoPuxador = false; atualizarVisualModoPux(); }
             sincronizarFurosComMemoria();
@@ -1537,7 +1525,8 @@
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
                             puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
                             tipoPuxador: tipoPuxadorDaPorta(),
-                            posicaoPuxador: posicaoParaCalculo(),
+                            posicaoPuxador: posicoesFolhas[0] || '',
+                            posicoesFolhas: posicoesParaCalculo(),           // posição de CADA folha (preço por folha)
                             tamanhoPuxador: g('f-tamanho-pux'),
                             revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
                             divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
@@ -1683,20 +1672,6 @@
             const bloq = ladoBloqueadoPorFuros(f, ignorarPuxador);
             return Object.entries(lados).filter(([l]) => l !== bloq).flatMap(([, v]) => v);
         }
-        function atualizarOpcoesPosicao() {
-            const sel = document.getElementById('f-posicao');
-            if (!sel) return;
-            const wrap = document.getElementById('wrap-posicao');
-            if (wrap) wrap.style.display = ehCorrer() ? 'none' : '';
-            const atual = posicoesFolhas[0] || '';
-            const nomes = posicoesPermitidas(0, true);
-            if (atual && !nomes.includes(atual)) nomes.push(atual);
-            sel.innerHTML = `<option value="">${temPuxador() ? '— clique no desenho ou escolha —' : '— escolha o puxador —'}</option>` +
-                nomes.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-            sel.value = atual;
-            sel.disabled = !temPuxador() || !temClienteSelecionado();
-        }
-
         // AplicarRegrasDeInterface: trava do "toda extensão" pelo tipo nativo + trava do tamanho
         function aplicarRegrasPuxador() {
             const chk = document.getElementById('chk-toda-ext');
@@ -1711,7 +1686,6 @@
             const btn = document.getElementById('btn-modo-pux');
             btn.disabled = !tem;
             if (!tem && modoPuxador) definirModoPuxador(false);
-            atualizarOpcoesPosicao();
             return atualizarTravaTamanhoPuxador();
         }
         // referência física do tamanho: basculante e Topo/Base = largura; laterais = altura
@@ -1773,7 +1747,6 @@
             const aviso = aplicarRegrasPuxador();
             aplicarEspelhamentoPuxadorNaMemoria();
             sincronizarFurosComMemoria();
-            atualizarOpcoesPosicao();
             desenharVisualizacao();
             calcularPrecoAutomatico();
             if (aviso) document.getElementById('calc-status').textContent = '⚠️ ' + aviso;
@@ -1800,7 +1773,8 @@
             posicoesFolhas[idx] = lista.join(', ');
             aposMudarPosicao();
         }
-        function posicaoParaCalculo() { return posicoesFolhas[0] || ''; }
+        // posição do puxador de cada folha, a mesma lista que vai no item salvo (o servidor refaz o preço por folha)
+        function posicoesParaCalculo() { return posicoesFolhas.slice(0, qtdFolhasAtual()); }
         function atualizarVisualModoPux() {
             document.getElementById('btn-modo-pux').classList.toggle('ativo', modoPuxador);
             document.getElementById('cv-visualizacao').classList.toggle('modo-pux', modoPuxador);
@@ -1913,7 +1887,6 @@
             if (resumo) resumo.textContent = furosLista.length
                 ? `${furosLista.length} furo(s) — lado: ${ladosFuros.map((l, i) => n > 1 ? `F${i + 1} ${l}` : l).join(' · ')}`
                 : '';
-            atualizarOpcoesPosicao();
         }
 
         // textos do desenho maiores: o canvas é desenhado em 2× e exibido numa coluna estreita
@@ -1921,8 +1894,22 @@
         // picDesenho_Paint — perfil, vidro, divisores, puxador + fantasmas e furos (geometria do VB)
         // opcoes = { alvo, limpo }: sem opções desenha na tela como sempre. Com limpo + alvo desenha para o PDF num canvas fora da tela
         // (já dimensionado): sem cotas em texto, sem rótulo de folha, sem furos e sem fantasmas/zonas de clique.
+        // Resumo em texto da posição do puxador de cada folha (a posição só se define clicando no desenho)
+        function atualizarResumoPuxador() {
+            const el = document.getElementById('pux-resumo');
+            if (!el) return;
+            if (!temPuxador() || frenteAtual === 'Serralheria' || frenteAtual === 'Avulso') { el.textContent = ''; return; }
+            const lista = Array.from({ length: qtdFolhasAtual() }, (_, i) => posicoesFolhas[i] || '');
+            const faltam = lista.filter(p => !p).length;
+            if (!ehCorrer() && faltam === lista.length) {
+                el.textContent = '⚠️ Puxador sem posição: clique em 🎯 e depois no desenho, em cada folha.';
+                return;
+            }
+            el.textContent = 'Puxador — ' + lista.map((p, i) => `F${i + 1}: ${p || (ehCorrer() ? 'sem puxador' : 'falta posicionar')}`).join(' · ');
+        }
         function desenharVisualizacao(opcoes = {}) {
             const limpo = !!(opcoes && opcoes.limpo === true && opcoes.alvo);
+            if (!limpo) atualizarResumoPuxador();
             const cv = limpo ? opcoes.alvo : document.getElementById('cv-visualizacao');
             if (!cv) return;
             // porta de correr com sistema: a medida digitada é o VÃO; as folhas são desenhadas com a medida da PORTA (frmPortasCorrer)
@@ -2430,6 +2417,11 @@
             if (frenteAtual === 'Serralheria') {
                 if (medidasSerrPreenchidas()) { alert('Há uma peça nas medidas que ainda não está na lista. Clique em "Inserir peça na lista" (ou limpe as medidas) antes de adicionar o conjunto.'); return; }
                 if (!pecasSerr.length) { alert('Insira ao menos uma peça na lista do conjunto.'); return; }
+            }
+            // a posição do puxador de cada folha só se define no desenho: avisa se alguma folha ficou sem (no correr, folha sem puxador é válida)
+            if (frenteAtual !== 'Serralheria' && frenteAtual !== 'Avulso' && !ehCorrer() && temPuxador()) {
+                const faltam = Array.from({ length: qtdFolhasAtual() }, (_, i) => posicoesFolhas[i] || '').filter(p => !p).length;
+                if (faltam && !confirm(`${faltam} folha(s) sem posição do puxador (o puxador dessas folhas não entra no preço nem no desenho).\n\nPara posicionar, clique em "🎯 Posicionar puxador" e depois no desenho, em cada folha.\n\nAdicionar mesmo assim?`)) return;
             }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
@@ -3663,7 +3655,6 @@
         document.getElementById('f-puxador').addEventListener('change', aoMudarPuxador);
         document.getElementById('f-acab-pux').addEventListener('change', aoMudarAcabPuxador);
         document.getElementById('f-revest').addEventListener('change', aoMudarRevestimento);
-        document.getElementById('f-posicao').addEventListener('change', e => definirPosicaoPuxador(0, e.target.value));
         // chkPuxadorTodaExtensao_CheckedChanged
         document.getElementById('chk-toda-ext').addEventListener('change', () => {
             const marcado = todaExtensao();
