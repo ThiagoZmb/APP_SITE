@@ -193,6 +193,8 @@
         .correr-larguras label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-weight: 700; color: var(--text-light); }
         .correr-larguras input { width: 64px; padding: 5px 6px; font-size: 13px; min-height: 32px; }
         .correr-larguras input.editada { border-color: #e8590c; background: #fff1e6; }
+        .peso-item { display: block; margin-top: 2px; font-size: 12px; color: var(--text-light); }
+        .peso-item.parcial { color: #9a5b00; cursor: help; }
         .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f2ff; color: #004a9f; border: 1px solid #0077ff; }
         .chip-sistema.sem { background: #fff1e6; color: #9a3a05; border-color: #e8590c; }
         /* ===== serralheria: peças do conjunto ===== */
@@ -747,6 +749,7 @@
                         <div class="grid-form">
                             <div class="form-group"><label>Valor unitário</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                             <div class="form-group"><label title="Unitário × quantidade">Total do item</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
+                            <div class="form-group" id="grupo-peso-item" hidden><label for="f-peso-item" title="Peso de perfil, divisor, puxador e vidro do item (quantidade incluída); acessórios e trilhos ficam fora">Peso do item</label><input type="text" id="f-peso-item" readonly></div>
                         </div>
                         <div class="nota-pct" id="nota-pct"></div>
                     </div>
@@ -816,6 +819,7 @@
                         <input type="number" id="desconto" min="0" max="100" value="0" style="width:90px;padding:8px;border:1px solid var(--border-color);border-radius:8px;text-align:right;">
                     </div>
                     <div class="grupo"><div class="rotulo">Total</div><div class="valor" id="tot-geral">R$ 0,00</div></div>
+                    <div class="grupo" id="grupo-peso-doc" hidden><div class="rotulo" title="Peso das portas do documento (acessórios e trilhos fora)">Peso</div><div class="valor" id="tot-peso" style="font-size:16px">—</div></div>
                 </div>
                 <div style="font-size:12px;color:var(--text-light);text-align:right;margin-top:6px;" id="desconto-aviso"></div>
                 <div class="acoes-linha acoes-topo acoes-rodape" role="toolbar" aria-label="Ações do documento">
@@ -927,6 +931,7 @@
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
     <script src="desenhos.js?v=202610272200"></script>
+    <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
@@ -1370,11 +1375,83 @@
             return `${cat}: ${val('f-av-produto')}` + (med ? ` | ${med}` : '') + (extra ? ` | ${extra}` : '') +
                    '';
         }
+        // ============ PESO DAS PORTAS (só leitura, só nesta tela: nunca vai no salvar nem no PDF) ============
+        // POST /peso/itens; falha de rede ou 403 só esconde o peso. Cache pela chave JSON dos itens enviados; seq descarta resposta velha.
+        let pesosItens = [], pesoTotalDoc = null, seqPesoLista = 0, timerPesoLista = null, seqPesoForm = 0, timerPesoForm = null;
+        const cachePeso = new Map();
+        function consultarPeso(corpo) {
+            const chave = PesoTela.chaveDe(corpo);
+            if (cachePeso.has(chave)) return Promise.resolve(cachePeso.get(chave));
+            return fetchAutenticado(`${API_BASE}/peso/itens`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+                .then(r => { if (cachePeso.size > 60) cachePeso.clear(); cachePeso.set(chave, r); return r; });
+        }
+        function desenharPeso() {
+            document.querySelectorAll('#itens-tbody [data-peso]').forEach(el => {
+                const r = pesosItens[Number(el.dataset.peso)];
+                const rot = r && r.kg !== null && r.kg !== undefined ? PesoTela.rotuloItem(r) : null;
+                el.hidden = !rot;
+                el.textContent = rot ? 'Peso: ' + rot.texto : '';
+                el.title = rot ? rot.titulo : '';
+                el.classList.toggle('parcial', !!(rot && rot.parcial));
+            });
+            const txt = PesoTela.rotuloTotal(pesoTotalDoc);
+            const grupo = document.getElementById('grupo-peso-doc');
+            if (grupo) { grupo.hidden = !txt; document.getElementById('tot-peso').textContent = txt || '—'; }
+        }
+        function atualizarPesoLista() {
+            const meu = ++seqPesoLista;
+            clearTimeout(timerPesoLista);
+            const c = PesoTela.prepararConsulta(itens);
+            const limpar = () => { pesosItens = []; pesoTotalDoc = null; desenharPeso(); };
+            if (!c.indices.length || c.longo) { limpar(); return; }
+            const itensConsulta = itens.slice();
+            const aplicar = resp => { pesosItens = PesoTela.resultadosDaLista(itensConsulta, c.indices, resp); pesoTotalDoc = PesoTela.totalDoDocumento(itensConsulta, resp); desenharPeso(); };
+            if (cachePeso.has(PesoTela.chaveDe(c.corpo))) { aplicar(cachePeso.get(PesoTela.chaveDe(c.corpo))); return; }
+            limpar();
+            timerPesoLista = setTimeout(async () => {
+                try { const resp = await consultarPeso(c.corpo); if (meu === seqPesoLista) aplicar(resp); }
+                catch { /* sem peso agora: some da tela, o resto segue igual */ }
+            }, 300);
+        }
+        // item em montagem: mesmos campos que a tela manda ao salvar, lidos do formulário sem mexer em nada
+        function itemFormPeso() {
+            const g = val;
+            return PesoTela.itemDoFormulario({ frente: frenteAtual, qtd: qtdEfetiva(), altura: parseFloat(g('f-altura')) || 0, largura: parseFloat(g('f-largura')) || 0,
+                furos: ehPortaComFuros() ? { lista: [...furosLista], lados: [...ladosFuros] } : { lista: [], lados: [] },
+                detalhes: { perfil: g('f-perfil'), acabamento: g('f-acab'), cor: g('f-cor'), puxador: g('f-puxador'), tipoPuxador: tipoPuxadorDaPorta(),
+                    posicoesFolhas: [...posicoesFolhas], acabPux: g('f-acab-pux'), corPux: g('f-cor-pux'), tamanhoPux: g('f-tamanho-pux'),
+                    revestimento: g('f-revest'), corRevest: g('f-cor-revest'), divisor: g('f-divisor'),
+                    divH: parseInt(g('f-div-h')) || 0, divV: parseInt(g('f-div-v')) || 0,
+                    sistema: g('f-sistema'), transpasse: g('f-transpasse'),
+                    largurasFolhas: temLarguraEditada() ? Array.from({ length: qtdEfetiva() }, (_, i) => larguraEditadaDe(i)) : [],
+                    desempenador: document.getElementById('chk-desempenador').checked } });
+        }
+        function atualizarPesoForm() {
+            const meu = ++seqPesoForm;
+            clearTimeout(timerPesoForm);
+            const grupo = document.getElementById('grupo-peso-item'), campo = document.getElementById('f-peso-item');
+            if (!grupo || !campo) return;
+            const mostrar = r => {
+                const rot = r && r.pesoKg !== null && r.pesoKg !== undefined ? PesoTela.rotuloItem({ kg: r.pesoKg, parcial: r.parcial, pendencias: r.pendencias }) : null;
+                grupo.hidden = !rot; campo.value = rot ? rot.texto : ''; campo.title = rot ? rot.titulo : '';
+            };
+            let item = null;
+            try { item = itemFormPeso(); } catch { item = null; }
+            if (!item) { mostrar(null); return; }
+            const corpo = { itens: [item] };
+            if (cachePeso.has(PesoTela.chaveDe(corpo))) { mostrar(cachePeso.get(PesoTela.chaveDe(corpo)).itens[0]); return; }
+            mostrar(null);
+            timerPesoForm = setTimeout(async () => {
+                try { const resp = await consultarPeso(corpo); if (meu === seqPesoForm) mostrar(resp.itens[0]); }
+                catch { /* sem peso agora */ }
+            }, 400);
+        }
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         let seqAcessoriosSo = 0;
         async function calcularPrecoAutomatico() {
             clearTimeout(timerPreco); // descarta cálculo pendente de um estado anterior do formulário
+            atualizarPesoForm();      // peso do item em montagem (consulta própria, nunca atrapalha o preço)
             if (!temClienteSelecionado()) return;
             const status = document.getElementById('calc-status');
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -2378,7 +2455,7 @@
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
-                        <td${it.desenho && it.desenho.size ? ` title="Desenho: ${Desenhos.formatarKb(it.desenho.size)}"` : ''}>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}${it.desenho && it.desenho.size ? `<small class="desenho-kb" style="display:block;color:var(--text-light)">Desenho: ${Desenhos.formatarKb(it.desenho.size)}</small>` : ''}</td>
+                        <td${it.desenho && it.desenho.size ? ` title="Desenho: ${Desenhos.formatarKb(it.desenho.size)}"` : ''}>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}<small class="peso-item" data-peso="${i}" hidden></small>${it.desenho && it.desenho.size ? `<small class="desenho-kb" style="display:block;color:var(--text-light)">Desenho: ${Desenhos.formatarKb(it.desenho.size)}</small>` : ''}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
@@ -2393,6 +2470,7 @@
                         </td>
                     </tr>`).join('');
             atualizarTotais();
+            atualizarPesoLista();
         }
         function editarItem(i) {
             const it = itens[i];

@@ -129,6 +129,23 @@ function entradaPreco(item, folhas) {
     divisor: d.divisor, qtdDivH: parseInt(d.divH) || 0, qtdDivV: parseInt(d.divV) || 0 };
 }
 
+// Folhas iguais agrupadas, com as medidas do vidro e do perfil já descontadas (as mesmas que o pedido grava em `vidros` e `perfis`).
+// Usada pela gravação (prepararItem) e pela consulta de peso (rotas/peso_itens.js): uma só montagem.
+async function gruposDoItem(leitor, item, folhas, n) {
+  const grupos = [];
+  for (const g of agruparFolhas(folhas)) {
+    const f = g.folha;
+    if (exigePerfil(item.frente) && !f.perfil) throw new ErroItem(422, `Item ${n}: Perfil não informado.`, { item: n });
+    const perfil = f.perfil ? await leitor.produto(f.perfil) : null;
+    if (f.perfil && !perfil && exigePerfil(item.frente)) throw new ErroItem(422, `Item ${n}: Dados do perfil não encontrados.`, { item: n });
+    const puxador = f.puxador ? await leitor.produto(f.puxador) : null;
+    if (f.puxador && !puxador) throw new ErroItem(422, `Item ${n}: Dados do puxador não encontrados.`, { item: n });
+    try { grupos.push({ folha: f, qtd: g.qtd, vidro: medidasVidro(f, perfil, puxador), perfil: f.perfil ? medidasPerfil(f, puxador) : null }); }
+    catch (err) { if (err instanceof ErroEngenharia) throw new ErroItem(422, `Item ${n}: ${err.message}`, { item: n }); throw err; }
+  }
+  return grupos;
+}
+
 // Preço + engenharia de um item, sem gravar nada. Erros viram ErroItem com o nº do item.
 async function prepararItem(db, leitor, cliente, item, n) {
   const d = item.detalhes || {};
@@ -186,16 +203,7 @@ async function prepararItem(db, leitor, cliente, item, n) {
 
   if (ehPorta) {
     for (const f of folhas) f.valorUnitario = valor;
-    for (const g of agruparFolhas(folhas)) {
-      const f = g.folha;
-      if (exigePerfil(item.frente) && !f.perfil) throw new ErroItem(422, `Item ${n}: Perfil não informado.`, { item: n });
-      const perfil = f.perfil ? await leitor.produto(f.perfil) : null;
-      if (f.perfil && !perfil && exigePerfil(item.frente)) throw new ErroItem(422, `Item ${n}: Dados do perfil não encontrados.`, { item: n });
-      const puxador = f.puxador ? await leitor.produto(f.puxador) : null;
-      if (f.puxador && !puxador) throw new ErroItem(422, `Item ${n}: Dados do puxador não encontrados.`, { item: n });
-      try { r.grupos.push({ folha: f, qtd: g.qtd, vidro: medidasVidro(f, perfil, puxador), perfil: f.perfil ? medidasPerfil(f, puxador) : null }); }
-      catch (err) { if (err instanceof ErroEngenharia) throw new ErroItem(422, `Item ${n}: ${err.message}`, { item: n }); throw err; }
-    }
+    r.grupos = await gruposDoItem(leitor, item, folhas, n);
   }
   r.linha = linhaComercial(item, { folhas, acessorios: preco.acessorios });
   return r;
@@ -649,4 +657,4 @@ function registrarPedOrc({ rota, pool }) {
   });
 }
 
-module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento };
+module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento, gruposDoItem, ErroItem, FRENTES_PORTA, MAX_QTD_ITEM };
