@@ -151,6 +151,14 @@
         .item-visual .secao-item { margin-bottom: 16px; }
         .item-visual #cv-visualizacao { max-width: none; height: 480px; }
         .item-layout.sem-visual { grid-template-columns: minmax(0, 1fr); }
+        /* serralheria: produto/obs em cima, Medidas da peça (esquerda) e Complementos (direita) lado a lado, peças embaixo */
+        .item-layout.frente-serr .item-dados { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: start; }
+        .item-layout.frente-serr .item-dados > .secao-item { grid-column: 1 / -1; }
+        .item-layout.frente-serr .item-dados > #quadro-serr-produto { order: 1; }
+        .item-layout.frente-serr .item-dados > #quadro-medidas { order: 2; grid-column: 1; }
+        .item-layout.frente-serr .item-dados > #quadro-complementos { order: 3; grid-column: 2; }
+        .item-layout.frente-serr .item-dados > #quadro-pecas { order: 4; }
+        @media (max-width: 900px) { .item-layout.frente-serr .item-dados > #quadro-medidas, .item-layout.frente-serr .item-dados > #quadro-complementos { grid-column: 1 / -1; } }
         .item-layout.sem-visual .item-visual { position: static; }
         @media (max-width: 1150px) {
             .item-layout { grid-template-columns: minmax(0, 1fr); }
@@ -408,8 +416,8 @@
         html body section.card { padding: 14px 18px !important; margin-bottom: 14px !important; }
         html body section.card > .card-title { font-size: 15px !important; margin-bottom: 10px !important; }
         html body .etapa { width: 22px; height: 22px; font-size: 12px; }
-        html body .frentes { margin-bottom: 10px !important; gap: 6px !important; }
-        html body .frente-btn { padding: 6px 12px !important; font-size: 13px !important; }
+        html body .frentes { margin-bottom: 10px !important; gap: 6px !important; padding: 6px !important; background: #e4e4ee !important; border: 1px solid var(--border-color) !important; box-shadow: inset 0 1px 2px rgba(20, 16, 28, .06), 0 1px 3px rgba(20, 16, 28, .06) !important; }
+        html body .frente-btn { padding: 12px 16px !important; font-size: 13px !important; }
         html body .secao-item { padding: 10px 12px 10px !important; margin-bottom: 8px !important; border-radius: 10px !important; }
         html body .secao-item h4 { font-size: 11px !important; margin-bottom: 6px !important; }
         /* padrão de bloco (tema): fundo branco, borda, cabeçalho em faixa — fica claro onde cada seção começa e termina */
@@ -543,7 +551,7 @@
                 </div>
                 <div class="grid-form">
                     <div class="form-group full">
-                        <label for="sel-cliente">Cliente (Razão Social) — define a tabela de preço e o desconto</label>
+                        <label for="sel-cliente">Nome do cliente</label>
                         <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
                     </div>
                     <div class="form-group dupla">
@@ -577,7 +585,7 @@
             </section>
             <!-- ═══════════ ETAPA 2: ITEM ═══════════ -->
             <section class="card">
-                <div class="card-title"><span class="etapa">2</span> Item — <span id="frente-atual">Porta de giro</span></div>
+                <div class="card-title"><span class="etapa">2</span> <span id="frente-prefixo">Item — </span><span id="frente-atual">Porta de giro</span></div>
                 <div id="bloqueio-msg">🔒 Selecione o cliente na etapa 1 para liberar a montagem dos itens</div>
                 <div id="form-item" class="bloqueado">
                     <div class="frentes">
@@ -602,17 +610,18 @@
                         <div id="correr-larguras" class="correr-larguras" hidden></div>
                     </div>
                     <!-- SERRALHERIA: produto e material da peça (antes das medidas) -->
-                    <div class="secao-item secao-serr" style="display:none">
-                        <h4>🔧 Serralheria — produto e material</h4>
+                    <div class="secao-item secao-serr" id="quadro-serr-produto" style="display:none">
+                        <h4>🔧 Materiais</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Produto (modelo)</label><select id="f-produto"><option value="">Carregando...</option></select></div>
                             <div class="form-group"><label>Material</label><select id="f-material"><option value="">— escolha o produto —</option></select></div>
                             <div class="form-group"><label>Acabamento</label><select id="f-acab-serr"><option value="">— escolha o material —</option></select></div>
                             <div class="form-group"><label>Cor</label><select id="f-cor-serr"><option value="">Carregando...</option></select></div>
+                            <div class="form-group" id="slot-obs-serr" style="display:none; grid-column: 1 / -1"><label for="f-obs">Observação do item</label></div>
                         </div>
                     </div>
                     <!-- MEDIDAS -->
-                    <div class="secao-item">
+                    <div class="secao-item" id="quadro-medidas">
                         <h4 id="tit-medidas">📐 Medidas e quantidade</h4>
                         <div class="grid-form">
                             <div class="form-group"><label for="f-qtd">Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
@@ -638,7 +647,6 @@
                                 <tfoot><tr><td colspan="4" class="total-rot"><span class="longo">Total de barra por peça</span><span class="curto">Total por peça</span></td><td class="metros total" id="m-total">—</td></tr></tfoot>
                             </table>
                             <div class="soldas-linha"><label for="f-soldas">Pontos de solda</label><input type="number" id="f-soldas" min="0" value="0"></div>
-                            <div class="dica-serr">💡 Ex.: portão com 2 barras verticais de 1000 mm → Altura 1000 × 2 barras.</div>
                             <div class="acoes-peca">
                                 <button type="button" class="btn btn-secondary" id="btn-peca-inserir">➕ Inserir peça na lista</button>
                                 <button type="button" class="btn-mini" id="btn-peca-cancelar" style="display:none">Cancelar edição</button>
@@ -648,7 +656,6 @@
                     <!-- PEÇAS DO CONJUNTO (frmSerralheria.listaItens): várias peças → uma linha no orçamento -->
                     <div class="secao-item secao-serr" id="quadro-pecas" style="display:none">
                         <h4>🧱 Peças do conjunto</h4>
-                        <p class="dica-serr">Monte o conjunto peça por peça (ex.: metalon 20x20 com 10 soldas, depois cantoneira com 20 soldas). No fim, "Adicionar item" leva o conjunto inteiro para os itens do orçamento.</p>
                         <div class="tab-acess-wrap">
                             <table class="tab-acess tab-pecas">
                                 <thead><tr><th>#</th><th>Produto / material</th><th>Acab. / cor</th><th>A × L × P (mm)</th><th>Barras</th><th>Metros</th><th>Soldas</th><th data-valor>Valor</th><th></th></tr></thead>
@@ -1055,8 +1062,10 @@
                 frenteAtual = btn.dataset.frente;
                 sistemaPadraoCorrer(); renderAcessorios();
                 document.getElementById('frente-atual').textContent = rotuloFrente(frenteAtual);
+                document.getElementById('frente-prefixo').hidden = frenteAtual === 'Serralheria';
                 posicoesFolhas = posicoesFolhas.map(() => '');
                 aplicarVisibilidadeCampos();
+                produtoPadraoSerr();
                 carregarPerfis();
                 calcularPrecoAutomatico();
             });
@@ -1078,6 +1087,14 @@
             document.querySelectorAll('.secao-furos').forEach(el => el.style.display = ehPortaComFuros() ? '' : 'none');
             atualizarModoCorrer();
             document.querySelector('.item-layout')?.classList.toggle('sem-visual', !ehPorta);
+            document.querySelector('.item-layout')?.classList.toggle('frente-serr', ehSerr);
+            // serralheria: a observação fica no card do produto (abaixo de acabamento e cor); nas demais frentes, abaixo do desenho
+            const obsTxt = document.getElementById('f-obs'), slotObs = document.getElementById('slot-obs-serr'), secObs = document.querySelector('.secao-obs-item');
+            if (obsTxt && slotObs && secObs) {
+                (ehSerr ? slotObs : secObs).appendChild(obsTxt);
+                slotObs.style.display = ehSerr ? '' : 'none';
+                secObs.style.display = ehSerr ? 'none' : '';
+            }
             // AplicarRegrasUsinagem: frente de gaveta não tem furação — limpa o que houver
             if (frenteAtual === 'Frente de gaveta') document.getElementById('pnl-furacoes').innerHTML = '';
             document.querySelectorAll('.secao-avulso').forEach(el => el.style.display = ehAvulso ? '' : 'none');
@@ -1108,6 +1125,14 @@
                 l.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
             if (l.length === 0) sel.innerHTML = `<option value="">${escapeHtml(msgVazio || '(nada encontrado para este filtro)')}</option>`;
         }
+        // serralheria sempre começa no "Produto editável" (não sobrescreve escolha feita nem a edição de um item salvo)
+        function produtoPadraoSerr() {
+            if (frenteAtual !== 'Serralheria' || isCarregandoEdicao) return;
+            const sel = document.getElementById('f-produto');
+            if (!sel || sel.value || ![...sel.options].some(o => o.value === 'Produto editável')) return;
+            sel.value = 'Produto editável';
+            sel.dispatchEvent(new Event('change'));
+        }
         function popularCores(id, grupos) {
             const sel = document.getElementById(id);
             if (!sel) return;
@@ -1134,6 +1159,7 @@
                 coresGrupos = cores || {};
                 popularCores('f-cor-serr', coresGrupos);
                 popularLista('f-produto', cat.produtos_serr);
+                produtoPadraoSerr();
                 popularLista('f-sistema', cat.sistemas);
             } catch (err) { console.error('Erro catálogos iniciais:', err); }
         }
@@ -2369,6 +2395,7 @@
             document.getElementById('viz-status').textContent = '';
             atualizarTotalItem();
             alternarCamposPuxador('');
+            produtoPadraoSerr();
             sincronizarFurosComMemoria();
             aplicarRegrasPuxador();
             desenharVisualizacao();
@@ -2486,6 +2513,7 @@
             });
             frenteAtual = it.frente;
             document.getElementById('frente-atual').textContent = rotuloFrente(it.frente);
+            document.getElementById('frente-prefixo').hidden = it.frente === 'Serralheria';
             aplicarVisibilidadeCampos();
             preencherForm(it);
             editandoIndex = i;
