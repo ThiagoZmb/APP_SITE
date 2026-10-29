@@ -85,14 +85,14 @@ test('validações com as mensagens do VB', async t => {
   assert.equal(banco.pedOrc.length, 0);
 });
 
-test('preço diferente do mostrado na tela: 409 e nada gravado', async t => {
+test('preço diferente do mostrado na tela: salva com o preço do servidor e devolve só um aviso', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const r = await salvar(chamar, corpo({ itens: [giro(), giro({ valorTela: 705.10 })] }));
-  assert.equal(r.status, 409);
+  assert.equal(r.status, 200);
   const j = await r.json();
-  assert.equal(j.erro, 'preco_mudou');
-  assert.deepEqual(j.itens, [1]);
-  assert.equal(banco.pedOrc.length, 0);
+  assert.equal(j.ok, true);
+  assert.deepEqual(j.avisos, { precoMudou: [2] });
+  assert.equal(banco.pedOrc.length, 1);
 });
 
 test('posição de puxador não reconhecida: 422 com o item, nada gravado', async t => {

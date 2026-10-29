@@ -472,10 +472,8 @@ function registrarPedOrc({ rota, pool }) {
       console.error('Erro POST /ped_orc/salvar (preparo):', err.message);
       return res.status(500).json({ error: 'Erro de servidor' });
     }
-    // o preço que a tela mostrou precisa ser o mesmo que o servidor calcula agora
-    const mudaram = preparados.filter(p => !p.copia && Math.abs(p.valor - (parseFloat(p.item.valorTela) || 0)) > 0.01).map(p => p.n - 1);
-    if (mudaram.length) return res.status(409).json({ erro: 'preco_mudou', itens: mudaram,
-      error: 'O preço de um ou mais itens mudou desde o cálculo. Confira e recalcule.' });
+    // preço da tela diferente do que o servidor calcula agora: NÃO impede o salvamento (grava o do servidor) e volta só como aviso
+    const mudaram = preparados.filter(p => !p.copia && Math.abs(p.valor - (parseFloat(p.item.valorTela) || 0)) > 0.01).map(p => p.n);
 
     // cliente com desconto fixo já tem o desconto no preço (a tela trava o desconto geral)
     // desconto adicional (txt_Desconto_Adicional do VB): sempre editável, por cima do desconto do cliente que já está nos itens
@@ -557,7 +555,7 @@ function registrarPedOrc({ rota, pool }) {
       }
       return { numero };
     });
-    if (resultado) res.json({ ok: true, tipo, numero: resultado.numero });
+    if (resultado) res.json({ ok: true, tipo, numero: resultado.numero, ...(mudaram.length ? { avisos: { precoMudou: mudaram } } : {}) });
   });
 
   // ---- cancelar / excluir (a tela sempre pergunta antes; aqui só o servidor decide e registra) ----

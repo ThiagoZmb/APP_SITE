@@ -140,8 +140,8 @@ test('editado é recalculado com o cadastro de hoje', async t => {
   const itens = comoTela(aberto);
   itens[0] = { ...itens[0], origem: { ...itens[0].origem, estado: 'editado' } };
   const r = await salvar(chamar, atualizar(aberto, { itens }));
-  assert.equal(r.status, 409); // a tela ainda mostra o preço antigo → recalcular
-  assert.equal((await r.json()).erro, 'preco_mudou');
+  assert.equal(r.status, 200); // a tela ainda mostra o preço antigo: salva com o de hoje e só avisa
+  assert.deepEqual((await r.json()).avisos, { precoMudou: [1] });
 });
 
 test('salvar com novo número a partir de um aberto: cópia nova, original intacto', async t => {

@@ -2995,10 +2995,13 @@
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
                 if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
                 if (falhasDesenho) mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo, mas ${falhasDesenho} desenho(s) não foram enviados; abra o item e salve de novo.`, 'erro');
-                else mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.${resumoDesenho ? ' ' + resumoDesenho : ''}`, 'ok');
+                else {
+                    const dif = (json.avisos && json.avisos.precoMudou) || [];
+                    mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.${resumoDesenho ? ' ' + resumoDesenho : ''}` +
+                        (dif.length ? ` Atenção: o preço do item ${dif.join(', ')} foi recalculado e ficou diferente do mostrado na tela; confira.` : ''), dif.length ? 'erro' : 'ok');
+                }
                 return;
             }
-            if (res.status === 409 && json.erro === 'preco_mudou') (json.itens || []).forEach(i => { if (itens[i]) itens[i].precoMudou = true; });
             renderItens();
             mostrarMsgSalvar(json.error || `Erro ao salvar (HTTP ${res.status}).`, 'erro');
             if (res.status === 409 && json.erro === 'alterado' && docAberto) {
