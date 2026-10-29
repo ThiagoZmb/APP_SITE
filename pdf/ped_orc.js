@@ -104,7 +104,7 @@ function descricaoItem(tipoProduto, grupos = {}) {
   const v4 = grupos.v4 || [];
   const blocos = blocosDeFuros(grupos.furos);
   const furosJaEscritos = new Set();
-  let idxFolha = 0;
+  let idxFolha = 0, folhaCorrer = 0;
 
   if (v4.length) {
     add('Tipo de produto: ' + tipoProduto, 'sublinhado');
@@ -141,26 +141,32 @@ function descricaoItem(tipoProduto, grupos = {}) {
       }
 
       if (tipoProduto === 'Porta de correr') {
-        if (porta === 'Folha 1') {
-          add(' ', 'negrito');
-          add(linhaPerfil, 'negrito');
-          if (revestimento !== '') add('Revestimento: ' + revestimento + (corRevest !== '' ? '(' + corRevest + ')' : ''), 'negrito');
-          add(' ', 'negrito');
-          add(porta + ': H = ' + altura + ' x L = ' + largura + ' mm', 'sublinhado');
-          if (temPuxador) {
-            add('Puxador: ' + qtdPuxador + ' - ' + puxador + ' ' + corPuxador, 'normal');
-            add('Posição: ' + posPuxador, 'normal');
-            add('Tamanho: ' + tamPuxador + ' mm', 'normal');
+        // a web grava UMA linha por grupo de folhas iguais (QTD = folhas do grupo); o PDF lista cada folha, numeradas em sequência
+        const folhasDoGrupo = Math.max(1, parseInt(d.QTD) || 1);
+        for (let k = 0; k < folhasDoGrupo; k++) {
+          const nomeFolha = 'Folha ' + (folhaCorrer + 1);
+          if (folhaCorrer === 0) {
+            add(' ', 'negrito');
+            add(linhaPerfil, 'negrito');
+            if (revestimento !== '') add('Revestimento: ' + revestimento + (corRevest !== '' ? '(' + corRevest + ')' : ''), 'negrito');
+            add(' ', 'negrito');
+            add(nomeFolha + ': H = ' + altura + ' x L = ' + largura + ' mm', 'sublinhado');
+            if (temPuxador) {
+              add('Puxador: ' + qtdPuxador + ' - ' + puxador + ' ' + corPuxador, 'normal');
+              add('Posição: ' + posPuxador, 'normal');
+              add('Tamanho: ' + tamPuxador + ' mm', 'normal');
+            }
+          } else {
+            add(' ', 'negrito');
+            add(nomeFolha + ': H = ' + altura + ' x L = ' + largura + ' mm', 'sublinhado');
+            if (temPuxador) {
+              add('Puxador: ' + qtdPuxador + ' - ' + puxador + ' ' + corPuxador, 'normal');
+              add('Posição: ' + posPuxador, 'normal');
+              add('Tamanho: ' + tamPuxador + ' mm', 'normal');
+            }
+            add(' ', 'negrito');
           }
-        } else {
-          add(' ', 'negrito');
-          add(porta + ': H = ' + altura + ' x L = ' + largura + ' mm', 'sublinhado');
-          if (temPuxador) {
-            add('Puxador: ' + qtdPuxador + ' - ' + puxador + ' ' + corPuxador, 'normal');
-            add('Posição: ' + posPuxador, 'normal');
-            add('Tamanho: ' + tamPuxador + ' mm', 'normal');
-          }
-          add(' ', 'negrito');
+          folhaCorrer++;
         }
       }
 

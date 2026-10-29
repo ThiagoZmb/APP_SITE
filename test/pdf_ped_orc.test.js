@@ -223,3 +223,13 @@ test('destinoPdf: pasta e nome iguais ao VB (Pedidos(PDF), Orçamentos(PDF), Pro
   // só caem os caracteres que o Windows não aceita (acentos ficam, como no VB)
   assert.equal(destinoPdf({ tipo: 'Pedido', numero: 1, razaoSocial: ' A/B: "C"? ' }).nome, '1_AB C.PDF');
 });
+
+test('porta de correr: linha de grupo (QTD > 1) lista cada folha, numerada em sequência', () => {
+  const v4 = [
+    { PORTA: 'Folha 1', QTD: 1, ALTURA: 2460, LARGURA: 918, PERFIL: '3345', ACABAMENTO_PERFIL: 'Pintura', PUXADOR: 'P', QTD_PUXADOR: 1, POSICAO_PUXADOR: 'E' },
+    { PORTA: 'Folha 2', QTD: 4, ALTURA: 2460, LARGURA: 918, PERFIL: '3345', PUXADOR: 'P', QTD_PUXADOR: 2, POSICAO_PUXADOR: 'E, D' },
+    { PORTA: 'Folha 3', QTD: 1, ALTURA: 2460, LARGURA: 918, PERFIL: '3345', PUXADOR: 'P', QTD_PUXADOR: 1, POSICAO_PUXADOR: 'D' }
+  ];
+  const folhas = textos(descricaoItem('Porta de correr', { v4 })).filter(t => t.startsWith('Folha'));
+  assert.deepEqual(folhas.map(t => t.split(':')[0]), ['Folha 1', 'Folha 2', 'Folha 3', 'Folha 4', 'Folha 5', 'Folha 6']);
+});
