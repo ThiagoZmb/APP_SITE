@@ -379,6 +379,8 @@
             if (!res.ok) throw new Error(d.error || `Erro HTTP: ${res.status}`);
             return d;
         }
+        // a tela de orçamentos volta para esta página (com o mesmo filtro da URL) depois de salvar um documento aberto daqui
+        const voltarParaEstaPagina = () => encodeURIComponent(location.pathname.split('/').pop() + location.search);
         const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const moedaK = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
@@ -688,7 +690,7 @@
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
                 <tr data-numero="${esc(x.numero)}" tabindex="0">
                     <td class="order-number">${esc(x.numero)} <a class="editar" data-perm="orcamentos.criar valores.ver" title="Abrir para editar"
-                        href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}">✏️</a>
+                        href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}&voltar=${voltarParaEstaPagina()}">✏️</a>
                         ${tipoLista === 'Pedido' && x.s !== 'cancelado' ? '<button type="button" class="acao-doc" data-acao="cancelar" data-perm="pedidos.cancelar" title="Cancelar este pedido">🚫</button>' : ''}
                         <button type="button" class="acao-doc" data-acao="excluir" data-perm="pedidos.excluir" title="Excluir este documento">🗑️</button>
                         <button type="button" class="acao-doc acao-menu" data-acao="menu" aria-label="Ações d${tipoLista === 'Pedido' ? 'o pedido' : 'o orçamento'} ${esc(x.numero)}" aria-haspopup="menu" aria-expanded="false" title="Mais ações">⋯</button></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
@@ -761,7 +763,7 @@
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Plano de corte', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
-                () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}`; });
+                () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });
             if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {
                 sep(); L.push({ titulo: 'Mudar situação para' });
                 for (const [chave, nome] of Object.entries(SITUACAO_NOME)) {

@@ -2980,6 +2980,11 @@
         // ============ SALVAR NO BANCO (ModPedOrc.Salvar_Ped_Orc_Blindado / frm_Opcao_Pedido) ============
         // docAberto: documento salvo/aberto na tela — { tipo, numero, impressao, data, podeEditar }
         let docAberto = null;
+        // ?voltar=painel_inicial.html?... (vem da lista de pedidos/orçamentos): só aceita páginas do próprio sistema, nunca outro endereço
+        let paginaDeRetorno = (() => {
+            const v = new URLSearchParams(location.search).get('voltar') || '';
+            return /^[a-z0-9_]+\.html(\?[^#\s]*)?$/i.test(v) && v !== 'orcamentos.html' ? v : '';
+        })();
         const $s = id => document.getElementById(id);
         const tipoAtual = () => $s('ped-tipo').value;
         const hojeISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -3086,6 +3091,13 @@
                     const env = await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itensSalvos);
                     falhasDesenho = env.falhas; resumoDesenho = Desenhos.resumoEnvio(env);
                 } catch { falhasDesenho = 0; }
+                // aberto pela lista ("Abrir para editar"): salvou sem pendências, volta para a mesma página da lista
+                const avisosPreco = (json.avisos && json.avisos.precoMudou) || [];
+                if (paginaDeRetorno && !falhasDesenho && !avisosPreco.length) {
+                    mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo. Voltando para a lista…`, 'ok');
+                    setTimeout(() => { window.location.href = paginaDeRetorno; }, 700);
+                    return;
+                }
                 // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
                 if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
@@ -3121,6 +3133,7 @@
         }
         function novoDocumento() {
             if (itens.length && !confirm('Começar um novo orçamento/pedido? Os itens da tela serão apagados.')) return;
+            paginaDeRetorno = ''; // documento novo: depois de salvar fica na tela, não volta para a lista
             limparDocumento();
         }
         // select com o valor gravado mesmo que ele não esteja na lista (dados antigos do VB)
