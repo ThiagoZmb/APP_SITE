@@ -46,7 +46,7 @@
     .marca-logo {
       width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,.16);
       border: 1px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+      object-fit: cover; font-weight: 800; font-size: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     }
     .marca b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; display: block; }
     .marca small { font-size: 12px; opacity: .75; font-weight: 600; }
@@ -128,7 +128,7 @@
 <body>
   <div class="login-shell">
     <aside class="brand-side">
-      <div class="marca"><div class="marca-logo">E</div><div><b>Elegance</b><small>Sistema de gestão</small></div></div>
+      <div class="marca"><img class="marca-logo" src="imagens/icone_elegance.png" alt="Elegance"><div><b>Elegance</b><small>Sistema de gestão</small></div></div>
       <div class="brand-texto">
         <h1>Da medida ao sonho, tudo em um só lugar.</h1>
         <p>Orçamentos com preço calculado na hora, acompanhamento da produção e o financeiro da fábrica sempre à mão.</p>
