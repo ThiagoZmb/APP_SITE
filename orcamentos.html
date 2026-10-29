@@ -750,10 +750,10 @@
                         </div>
                         <div class="nota-pct" id="nota-pct"></div>
                     </div>
-                    <div class="acoes-linha">
-                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
-                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                    <div class="acoes-linha" style="justify-content:flex-end">
                         <span class="calc-status" id="calc-status"></span>
+                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
                     </div>
                     </div>
                     <aside class="item-visual">
@@ -2370,6 +2370,7 @@
                         <td class="col-acoes">
                             ${it.precoMudou ? `<button class="btn-mini recalcular" title="O preço mudou: abrir o item para recalcular" onclick="editarItem(${i})">🔄</button>` : ''}
                             <button class="btn-mini" title="Alterar valores" onclick="abrirAlterarValor(${i})">💲</button>
+                            <button class="btn-mini" title="Copiar item (entra no fim da lista com número novo)" onclick="copiarItem(${i})">📋</button>
                             <button class="btn-mini" title="Editar item" onclick="editarItem(${i})">✏️</button>
                             <button class="btn-mini excluir" onclick="removerItem(${i})">🗑️</button>
                         </td>
@@ -2390,6 +2391,17 @@
             document.getElementById('nota-pct').textContent = it.historico
                 ? `Este item tem alteração de valor na lista (${textoHistorico(it.historico)}). Ela será reaplicada sobre o valor recalculado ao atualizar.` : '';
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        // Copia o item inteiro para o fim da lista; o nº do item é a posição, então a cópia recebe o próximo número.
+        // Sem "origem": a cópia é item novo (o servidor calcula do zero), não "intacto" do documento aberto.
+        function copiarItem(i) {
+            const it = itens[i];
+            if (!it || it.travado) return;
+            const copia = JSON.parse(JSON.stringify(it));
+            delete copia.origem; delete copia.precoMudou;
+            definirDesenho(copia, it.desenhoPronto ? it.desenhoPronto.then(() => it.desenho || null) : Promise.resolve(it.desenho || null));
+            itens.push(copia);
+            renderItens();
         }
         function removerItem(i) {
             if (!confirm('Remover este item do orçamento?')) return;
@@ -3479,6 +3491,7 @@
         document.getElementById('abrir-lista').addEventListener('click', escolherParaAbrir);
         document.getElementById('abrir-lista').addEventListener('keydown', e => { if (e.key === 'Enter') escolherParaAbrir(e); });
         document.getElementById('ped-tipo').addEventListener('change', atualizarCamposPedido);
+        document.addEventListener('DOMContentLoaded', () => { if (!$s('ped-data').value) $s('ped-data').value = hojeISO(); }); // documento novo nasce com a data de hoje
         document.addEventListener('DOMContentLoaded', configurarTipo); // layout.js (defer) já definiu o Acesso
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
         document.getElementById('sel-cliente').addEventListener('change', () => {
