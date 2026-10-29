@@ -246,7 +246,7 @@
                     <h2>Lista de Clientes</h2>
                     <div class="table-actions">
                         <div class="search-box">
-                            <input type="text" placeholder="Buscar clientes..." id="search-input">
+                            <input type="text" placeholder="Buscar clientes..." id="search-input" autofocus>
                         </div>
                         <button type="button" class="btn btn-primary btn-novo-cliente" id="btn-novo-cliente" data-perm="clientes.editar" hidden>＋ Novo cliente</button>
                         <button id="voltar-btn" class="menu-item" style="margin:0; padding:10px 20px; border:1px solid var(--border-color); display:none;">
@@ -270,6 +270,7 @@
     </div>
 
     <!-- ===== FICHA DO CLIENTE (frm_Clientes do VB) ===== -->
+    <iframe id="cf-fluxo-frame" title="Novo movimento financeiro" hidden style="position:fixed;inset:0;width:100%;height:100%;border:0;background:transparent;z-index:200"></iframe>
     <div class="cf-fundo" id="cf-fundo"></div>
     <aside class="cf" id="ficha" aria-label="Ficha do cliente">
         <div class="cf-topo">
@@ -503,6 +504,8 @@
         }
 
         // Busca em tempo real
+        // ao abrir a página o cursor já fica na pesquisa (o autofocus do HTML pode perder para o menu lateral, que é montado depois)
+        window.addEventListener('load', () => { if (!document.querySelector('.cf.aberta')) document.getElementById('search-input').focus(); });
         document.getElementById('search-input').addEventListener('input', function() {
             const term = this.value.toLowerCase();
             document.querySelectorAll('#clients-tbody tr').forEach(row => {
@@ -896,9 +899,22 @@
             try {
                 await api('/clientes/receber', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo, pedidos: nums, zerarCredito, marcarRecebido }) });
             } catch (e) { return toast(e.message, 'erro'); }
-            // abre o fluxo de caixa com a entrada já preenchida (como o VB faz com o frm_Fluxo_Caixa)
-            const q = new URLSearchParams({ novo: 'entrada', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido' });
-            window.location.href = 'financeiro.html?' + q;
+            // abre a gaveta do fluxo de caixa com a entrada já preenchida (como o VB faz com o frm_Fluxo_Caixa),
+            // por cima desta mesma tela: ao salvar ou fechar, o financeiro do cliente é atualizado e fica aberto
+            const q = new URLSearchParams({ novo: 'entrada', embed: '1', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido' });
+            const frame = $('cf-fluxo-frame');
+            frame.src = 'financeiro.html?' + q;
+            frame.hidden = false;
+            carregarFinanceiro(); // os pedidos já foram atualizados no servidor
+        });
+        window.addEventListener('message', e => {
+            if (e.origin !== location.origin || !e.data || e.data.origem !== 'elegance-fluxo') return;
+            const frame = $('cf-fluxo-frame');
+            if (e.data.tipo === 'fechado' || e.data.tipo === 'salvo') {
+                frame.hidden = true; frame.removeAttribute('src');
+                if (e.data.tipo === 'salvo' && e.data.mensagem) toast(String(e.data.mensagem), 'ok');
+                if (fichaAtual) carregarFinanceiro();
+            }
         });
 
         // ---------- histórico (Carrega_Grafico) ----------

@@ -6,7 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elegance Dashboard - Financeiro</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+    <script>
+        // ?embed=1: a ficha do cliente abre só a gaveta do movimento, por cima da própria tela (sem sair dela)
+        if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');
+    </script>
     <style>
+        html.embed, html.embed body { background: transparent !important; }
+        html.embed .container { display: none !important; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
             --primary-color: #8B0000;
@@ -1218,6 +1224,8 @@
         function marcarAlterado(sim = true) { alterado = sim; $('alteracoes').classList.toggle('visivel', sim); }
         $('form').addEventListener('input', () => marcarAlterado());
 
+        const EMBED = document.documentElement.classList.contains('embed');
+        const avisarPai = (tipo, mensagem) => { if (EMBED && window.parent !== window) window.parent.postMessage({ origem: 'elegance-fluxo', tipo, mensagem }, location.origin); };
         function abrirGaveta() {
             $('gaveta').classList.add('aberta');
             $('gaveta-fundo').classList.add('aberta');
@@ -1227,6 +1235,7 @@
             $('gaveta').classList.remove('aberta');
             $('gaveta-fundo').classList.remove('aberta');
             marcarAlterado(false);
+            avisarPai('fechado');
         }
         $('g-fechar').addEventListener('click', () => fecharGaveta());
         $('btn-cancelar').addEventListener('click', () => fecharGaveta());
@@ -1304,6 +1313,7 @@
             try {
                 const r = await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
                 toast(r.mensagem, 'ok');
+                avisarPai('salvo', r.mensagem);
                 fecharGaveta(true);
                 carregarOpcoes();
                 mesRef = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
