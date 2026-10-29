@@ -20,7 +20,7 @@
   const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) && !/^\d{1,3}(\.\d{3})+$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
   const paraTela = n => String(n ?? '').replace('.', ',');   // o brasileiro lê e digita a vírgula
   const moeda = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });   // "R$ 1.234,56"
-  const rotuloContraparte =tipo => tipo === 'saida' ? 'cliente' : 'fornecedor';
+  const rotuloContraparte = tipo => tipo === 'saida' ? 'cliente' : 'fornecedor';
 
   // espelha as regras do servidor (o servidor continua decidindo)
   function validarForm(f, { comValores = false, editando = false } = {}) {

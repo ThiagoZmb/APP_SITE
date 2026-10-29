@@ -19,7 +19,7 @@
   const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) && !/^\d{1,3}(\.\d{3})+$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
   const paraTela = n => String(n ?? '').replace('.', ',');   // o brasileiro lê e digita a vírgula
   const moeda = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });   // "R$ 1.234,56"
-  const corValida =argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb));
+  const corValida = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb));
 
   // cor do banco = ARGB de 8 dígitos (como o VB); o seletor de cor do navegador usa #rrggbb
   const corParaInput = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb)) ? '#' + txt(argb).slice(2).toLowerCase() : '#000000';
