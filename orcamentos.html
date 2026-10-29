@@ -159,6 +159,11 @@
         .item-layout.frente-serr .item-dados > #quadro-complementos { order: 3; grid-column: 2; }
         .item-layout.frente-serr .item-dados > #quadro-pecas { order: 4; }
         .item-layout.frente-serr .item-dados > #quadro-valores { order: 5; }
+        /* card Valores: botões na extrema esquerda, campos de valor compactos ao lado */
+        .valores-linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 24px; }
+        html body .valores-linha .acoes-item { justify-content: flex-start; flex-wrap: wrap; align-items: center; margin: 0 !important; }
+        html body .valores-linha .grid-valores { display: flex !important; flex-wrap: wrap; gap: 8px 12px !important; }
+        html body .valores-linha .grid-valores .form-group { width: 130px; flex: none; }
         @media (max-width: 900px) { .item-layout.frente-serr .item-dados > #quadro-medidas, .item-layout.frente-serr .item-dados > #quadro-complementos { grid-column: 1 / -1; } }
         .item-layout.sem-visual .item-visual { position: static; }
         @media (max-width: 1150px) {
@@ -754,17 +759,19 @@
                     <!-- VALORES -->
                     <div class="secao-item" id="quadro-valores">
                         <h4>💰 Valores</h4>
-                        <div class="grid-form">
+                        <div class="valores-linha">
+                        <div class="acoes-linha acoes-item">
+                            <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
+                            <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
+                            <span class="calc-status" id="calc-status"></span>
+                        </div>
+                        <div class="grid-form grid-valores">
                             <div class="form-group"><label>Valor unitário</label><input type="text" id="f-valor" placeholder="0,00" readonly></div>
                             <div class="form-group"><label title="Unitário × quantidade">Total do item</label><input type="text" id="f-total-item" placeholder="0,00" readonly></div>
                             <div class="form-group" id="grupo-peso-item" hidden><label for="f-peso-item" title="Peso de perfil, divisor, puxador e vidro do item (quantidade incluída); acessórios e trilhos ficam fora">Peso do item</label><input type="text" id="f-peso-item" readonly></div>
                         </div>
+                        </div>
                         <div class="nota-pct" id="nota-pct"></div>
-                    </div>
-                    <div class="acoes-linha" style="justify-content:flex-end">
-                        <span class="calc-status" id="calc-status"></span>
-                        <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
-                        <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
                     </div>
                     </div>
                     <aside class="item-visual">
