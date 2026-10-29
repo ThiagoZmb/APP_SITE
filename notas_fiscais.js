@@ -19,7 +19,8 @@
   // "1.500" (milhar ou decimal?) é ambíguo e recusado, como no servidor
   const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) && !/^\d{1,3}(\.\d{3})+$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
   const paraTela = n => String(n ?? '').replace('.', ',');   // o brasileiro lê e digita a vírgula
-  const rotuloContraparte = tipo => tipo === 'saida' ? 'cliente' : 'fornecedor';
+  const moeda = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });   // "R$ 1.234,56"
+  const rotuloContraparte =tipo => tipo === 'saida' ? 'cliente' : 'fornecedor';
 
   // espelha as regras do servidor (o servidor continua decidindo)
   function validarForm(f, { comValores = false, editando = false } = {}) {
@@ -94,7 +95,7 @@
       alvo.innerHTML = '<table><thead><tr><th>Número</th><th>Emissão</th><th>' + (estado.tipo === 'saida' ? 'Cliente' : 'Fornecedor') + '</th>' + (mostrarValor ? '<th>Valor</th>' : '') + '<th></th></tr></thead><tbody>' +
         estado.lista.map(n => `<tr data-id="${esc(n.id)}"${estado.atual && estado.atual.id === n.id ? ' class="selecionado"' : ''}>` +
           `<td><b>${esc(n.numero)}</b>/${esc(n.serie)}</td><td>${esc(dataBR(n.dataEmissao))}</td><td>${esc(n.contraparteNome)}</td>` +
-          (mostrarValor ? `<td>${esc(Number(n.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))}</td>` : '') +
+          (mostrarValor ? `<td>${esc(moeda(n.valorTotal))}</td>` : '') +
           `<td>${n.situacao === 'cancelada' ? '<span class="selo perigo">Cancelada</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
     }
 
@@ -198,5 +199,5 @@
     carregar();
   }
 
-  return { CAMPOS, paraTela, validarForm, corpoCriar, corpoEditar, iniciar };
+  return { CAMPOS, paraTela, moeda, validarForm, corpoCriar, corpoEditar, iniciar };
 });

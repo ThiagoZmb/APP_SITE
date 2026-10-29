@@ -18,7 +18,8 @@
   // "1.500" (milhar ou decimal?) é ambíguo e recusado, como no servidor
   const numero = v => /^\d+([.,]\d+)?$/.test(txt(v)) && !/^\d{1,3}(\.\d{3})+$/.test(txt(v)) ? Number(txt(v).replace(',', '.')) : NaN;
   const paraTela = n => String(n ?? '').replace('.', ',');   // o brasileiro lê e digita a vírgula
-  const corValida = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb));
+  const moeda = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });   // "R$ 1.234,56"
+  const corValida =argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb));
 
   // cor do banco = ARGB de 8 dígitos (como o VB); o seletor de cor do navegador usa #rrggbb
   const corParaInput = argb => /^[0-9A-Fa-f]{8}$/.test(txt(argb)) ? '#' + txt(argb).slice(2).toLowerCase() : '#000000';
@@ -86,7 +87,7 @@
         estado.lista.map(t => `<tr data-id="${esc(t.codigo)}"${estado.atual && estado.atual.codigo === t.codigo ? ' class="selecionado"' : ''}>` +
           `<td><span class="bola" style="background:${corParaInput(t.cor)}"></span></td><td><b>${esc(t.refFabricante)}</b></td><td>${esc(t.corElegance)}</td>` +
           `<td>${esc(t.classe)}</td><td>${esc(t.fabricante)}</td>` +
-          (mostrarValor ? `<td>${esc(Number(t.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))}</td>` : '') + '</tr>').join('') + '</tbody></table>';
+          (mostrarValor ? `<td>${esc(moeda(t.valor))}</td>` : '') + '</tr>').join('') + '</tbody></table>';
     }
 
     // ---------- formulário ----------
@@ -166,5 +167,5 @@
     carregar();
   }
 
-  return { CAMPOS, corParaInput, inputParaCor, corValida, paraTela, validarForm, corpoSalvar, iniciar };
+  return { CAMPOS, corParaInput, inputParaCor, corValida, paraTela, moeda, validarForm, corpoSalvar, iniciar };
 });
