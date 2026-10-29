@@ -129,10 +129,11 @@ function bancoPedOrc() {
       const [tipo, ...resto] = params;
       let lista = estado.pedOrc.filter(p => p.TIPO === tipo);
       if (/p\.NUMERO = \?/.test(sql)) { const n = Number(resto.shift()); lista = lista.filter(p => p.NUMERO === n); }
-      if (/LIKE \?/.test(sql)) { const q = String(resto.shift()).replace(/%/g, '').toLowerCase(); lista = lista.filter(p => String(p.RAZAO_SOCIAL).toLowerCase().includes(q)); }
+      if (/LIKE \?/.test(sql)) { const q = String(resto.shift()).replace(/%/g, '').toLowerCase(); resto.shift();
+        lista = lista.filter(p => String(p.RAZAO_SOCIAL).toLowerCase().includes(q) || String(p.CLIENTE_FINAL || '').toLowerCase().includes(q)); }
       if (/c\.ESTADO IN/.test(sql)) lista = lista.filter(p => resto.includes(estado.clientes.find(c => c.RAZAO_SOCIAL === p.RAZAO_SOCIAL)?.ESTADO));
       return lista.sort((a, b) => b.NUMERO - a.NUMERO).slice(0, 20)
-        .map(p => ({ tipo: p.TIPO, numero: p.NUMERO, cliente: p.RAZAO_SOCIAL, data: String(p.DATA || '').slice(0, 10), total: p.TOTAL })); }],
+        .map(p => ({ tipo: p.TIPO, numero: p.NUMERO, cliente: p.RAZAO_SOCIAL, data: String(p.DATA || '').slice(0, 10), clienteFinal: p.CLIENTE_FINAL ?? null })); }],
     [/^DELETE FROM (\w+) WHERE NUMERO = \?( AND TIPO = \?)?$/, (sql, [n, t]) => {
       const tabela = sql.match(/^DELETE FROM (\w+)/)[1], lista = estado[TABELA[tabela]];
       const fica = lista.filter(x => !(Number(x.NUMERO) === Number(n) && (t === undefined || x.TIPO === t)));

@@ -197,3 +197,25 @@ test('representante não copia itens de um documento de outra região (origem fo
   assert.equal(r.status, 403);
   assert.equal(banco.pedOrc.length, 1);
 });
+
+test('buscar devolve clienteFinal, sem total, e acha pelo cliente final', async t => {
+  const banco = bancoPedOrc();
+  banco.pedOrc.push({ id: 1, TIPO: 'Pedido', NUMERO: 1, RAZAO_SOCIAL: 'CLIENTE TESTE', CLIENTE_FINAL: 'Maria Souza', TOTAL: 10 },
+    { id: 2, TIPO: 'Pedido', NUMERO: 2, RAZAO_SOCIAL: 'LOJA PAULISTA', CLIENTE_FINAL: null, TOTAL: 20 });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  const achados = await (await chamar('/ped_orc/buscar?tipo=Pedido&q=souza')).json();
+  assert.deepEqual(achados.map(b => b.numero), [1]);
+  assert.equal(achados[0].clienteFinal, 'Maria Souza');
+  assert.ok(!('total' in achados[0]));
+  const todos = await (await chamar('/ped_orc/buscar?tipo=Pedido&q=')).json();
+  assert.equal(todos.find(b => b.numero === 2).clienteFinal, null);
+});
+
+test('tela: lista do diálogo Abrir mostra cliente final e não mostra valor', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'orcamentos.html'), 'utf8');
+  const i = html.indexOf('async function buscarParaAbrir');
+  const trecho = html.slice(i, html.indexOf('function abrirJanelaAbrir', i));
+  assert.match(trecho, /Cliente final: ' \+ escapeHtml\(d\.clienteFinal\)/);
+  assert.doesNotMatch(trecho, /formatCurrency|\.total/);
+  assert.match(html, /placeholder="Número, cliente ou cliente final"/);
+});

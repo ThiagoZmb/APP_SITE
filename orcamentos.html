@@ -861,11 +861,11 @@
     </dialog>
     <!-- ═══════════ ABRIR (frm_Lista_Pedidos_Orçamentos) ═══════════ -->
     <dialog id="dlg-abrir" class="dlg-salvar dlg-padrao" aria-labelledby="dlg-abrir-titulo">
-        <div class="dlg-cab"><h3 id="dlg-abrir-titulo">Abrir orçamento ou pedido</h3><p>Busque pelo número ou pelo nome do cliente.</p></div>
+        <div class="dlg-cab"><h3 id="dlg-abrir-titulo">Abrir orçamento ou pedido</h3><p>Busque pelo número, pelo cliente ou pelo cliente final.</p></div>
         <div class="dlg-corpo">
             <div class="abrir-filtros">
                 <select id="abrir-tipo" aria-label="Tipo"><option value="Orçamento">Orçamentos</option><option value="Pedido">Pedidos</option></select>
-                <input type="search" id="abrir-busca" placeholder="Número ou cliente" aria-label="Buscar">
+                <input type="search" id="abrir-busca" placeholder="Número, cliente ou cliente final" aria-label="Buscar">
             </div>
             <div class="bloco"><ul id="abrir-lista" class="abrir-lista"></ul></div>
         </div>
@@ -3171,7 +3171,7 @@
             try {
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/buscar?${q}`);
                 lista.innerHTML = r.length ? r.map(d => `<li tabindex="0" data-tipo="${escapeHtml(d.tipo)}" data-numero="${escapeHtml(d.numero)}">
-                    <b>nº ${escapeHtml(d.numero)}</b> · ${escapeHtml(d.cliente)} <small>· ${escapeHtml(d.data || '')}${d.total != null ? ' · ' + formatCurrency(d.total) : ''}</small></li>`).join('')
+                    <b>nº ${escapeHtml(d.numero)}</b> · ${escapeHtml(d.cliente)}${d.clienteFinal ? ' · Cliente final: ' + escapeHtml(d.clienteFinal) : ''} <small>· ${escapeHtml(d.data || '')}</small></li>`).join('')
                     : '<li class="vazio">Nada encontrado</li>';
             } catch {
                 lista.innerHTML = '<li class="vazio">Erro ao buscar</li>';

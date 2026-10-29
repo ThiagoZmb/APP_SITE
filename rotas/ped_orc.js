@@ -389,13 +389,13 @@ function registrarPedOrc({ rota, pool }) {
       const params = [tipo];
       let filtro = '';
       if (/^\d+$/.test(q)) { filtro += ' AND p.NUMERO = ?'; params.push(Number(q)); }
-      else if (q) { filtro += ' AND p.RAZAO_SOCIAL LIKE ?'; params.push(`%${q}%`); }
+      else if (q) { filtro += ' AND (p.RAZAO_SOCIAL LIKE ? OR p.CLIENTE_FINAL LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
       if (estados.length) { filtro += ` AND c.ESTADO IN (${estados.map(() => '?').join(',')})`; params.push(...estados); }
       const [rows] = await pool.execute(
-        `SELECT p.TIPO AS tipo, p.NUMERO AS numero, p.RAZAO_SOCIAL AS cliente, DATE_FORMAT(p.DATA, '%d/%m/%Y') AS data, p.TOTAL AS total
+        `SELECT p.TIPO AS tipo, p.NUMERO AS numero, p.RAZAO_SOCIAL AS cliente, DATE_FORMAT(p.DATA, '%d/%m/%Y') AS data, p.CLIENTE_FINAL AS clienteFinal
          FROM ped_orc p ${estados.length ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
          WHERE p.TIPO = ?${filtro} ORDER BY p.NUMERO DESC LIMIT 20`, params);
-      res.json(semValores(req, rows, ['total']));
+      res.json(rows);
     } catch (err) {
       console.error('Erro GET /ped_orc/buscar:', err.message);
       res.status(500).json({ error: 'Erro de servidor' });
