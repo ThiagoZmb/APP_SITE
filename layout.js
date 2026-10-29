@@ -496,3 +496,15 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
     else montar();
 })();
+
+// Campos com lista de opções (input + datalist): ao receber o foco ou o clique, a lista abre sozinha,
+// sem esperar digitar. showPicker só funciona com gesto do usuário; foco por script (ex.: autofocus) não abre e não dá erro.
+(function () {
+    function abrirLista(e) {
+        const el = e.target;
+        if (!el || el.tagName !== 'INPUT' || !el.getAttribute('list') || el.readOnly || el.disabled) return;
+        try { el.showPicker(); } catch { /* sem gesto do usuário ou navegador sem suporte: segue o comportamento normal */ }
+    }
+    document.addEventListener('focusin', abrirLista);
+    document.addEventListener('click', abrirLista);
+})();
