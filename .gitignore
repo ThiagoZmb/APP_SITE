@@ -5,3 +5,9 @@ node_modules/
 # amostras de projetos de clientes (decisão 2026-10-26: não versionar)
 amostras_pdf/
 .superpowers/
+
+# certificado digital e configuração da SEFAZ ficam só no PC da empresa (nunca no git)
+*.pfx
+*.p12
+sefaz.config.json
+sefaz.estado.json

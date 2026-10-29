@@ -319,6 +319,9 @@
         .abrir-filtros input { flex: 1; min-width: 0; }
         .abrir-lista { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow-y: auto; }
         .abrir-lista li { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+        .abrir-cab, .abrir-lista li:not(.vazio) { display: grid; grid-template-columns: 80px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: baseline; }
+        .abrir-cab { padding: 6px 14px 6px 10px; font-size: .8rem; font-weight: 600; color: var(--text-light); border-bottom: 1px solid var(--border, #e2e8f0); }
+        .abrir-lista li:not(.vazio) span, .abrir-cab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .abrir-lista li:hover, .abrir-lista li:focus { background: var(--hover-bg, #f1f5f9); outline: none; }
         .abrir-lista li small { color: var(--text-light); }
         .dlg-salvar { width: min(460px, calc(100vw - 32px)); }
@@ -867,7 +870,10 @@
                 <select id="abrir-tipo" aria-label="Tipo"><option value="Orçamento">Orçamentos</option><option value="Pedido">Pedidos</option></select>
                 <input type="search" id="abrir-busca" placeholder="Número, cliente ou cliente final" aria-label="Buscar">
             </div>
-            <div class="bloco"><ul id="abrir-lista" class="abrir-lista"></ul></div>
+            <div class="bloco">
+                <div class="abrir-cab" aria-hidden="true"><span>Número</span><span>Razão social</span><span>Cliente final</span></div>
+                <ul id="abrir-lista" class="abrir-lista"></ul>
+            </div>
         </div>
         <div class="dlg-rodape dlg-acoes"><button type="button" class="btn btn-secondary" id="btn-abrir-fechar">Fechar</button></div>
     </dialog>
@@ -3184,7 +3190,7 @@
             try {
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/buscar?${q}`);
                 lista.innerHTML = r.length ? r.map(d => `<li tabindex="0" data-tipo="${escapeHtml(d.tipo)}" data-numero="${escapeHtml(d.numero)}">
-                    <b>nº ${escapeHtml(d.numero)}</b> · ${escapeHtml(d.cliente)}${d.clienteFinal ? ' · Cliente final: ' + escapeHtml(d.clienteFinal) : ''} <small>· ${escapeHtml(d.data || '')}</small></li>`).join('')
+                    <b>${escapeHtml(d.numero)}</b><span>${escapeHtml(d.cliente)}</span><span>${escapeHtml(d.clienteFinal || '')}</span></li>`).join('')
                     : '<li class="vazio">Nada encontrado</li>';
             } catch {
                 lista.innerHTML = '<li class="vazio">Erro ao buscar</li>';

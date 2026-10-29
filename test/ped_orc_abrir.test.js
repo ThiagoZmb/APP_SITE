@@ -215,7 +215,8 @@ test('tela: lista do diálogo Abrir mostra cliente final e não mostra valor', (
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'orcamentos.html'), 'utf8');
   const i = html.indexOf('async function buscarParaAbrir');
   const trecho = html.slice(i, html.indexOf('function abrirJanelaAbrir', i));
-  assert.match(trecho, /Cliente final: ' \+ escapeHtml\(d\.clienteFinal\)/);
+  assert.match(trecho, /escapeHtml\(d\.clienteFinal \|\| ''\)/);
+  assert.match(html, /<span>Número<\/span><span>Razão social<\/span><span>Cliente final<\/span>/);
   assert.doesNotMatch(trecho, /formatCurrency|\.total/);
   assert.match(html, /placeholder="Número, cliente ou cliente final"/);
 });

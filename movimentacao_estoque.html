@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elegance Dashboard - Movimentação de estoque</title>
     <style>
@@ -140,7 +140,9 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="tema.css?v=202610251900">
-    <script src="layout.js?v=202610282000" defer></script>
+    <script src="layout.js?v=202610291200" defer></script>
+    <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
+    <script src="notas_compra.js?v=202610291200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -477,7 +479,8 @@
         //                   unitarioNota, totalNota, observacao, origem }]  — a importação do XML preenche a mesma lista
         let linhasEntrada = [];
         // avisos que impedem lançar: nota já lançada, fornecedor do XML não achado pelo CNPJ (nome do emitente)
-        const entrada = { notaLancada: false, emitenteSemCadastro: '' };
+        // chaveSefaz/numeroSefaz: nota trazida da tela "Notas de compra (SEFAZ)"; ao lançar, ela é marcada como importada no serviço local
+        const entrada = { notaLancada: false, emitenteSemCadastro: '', chaveSefaz: '', numeroSefaz: '' };
         const bloqueioEntrada = () => [entrada.notaLancada ? 'Esta nota já foi lançada.' : '',
             entrada.emitenteSemCadastro ? `Fornecedor não encontrado pelo CNPJ (${entrada.emitenteSemCadastro}). Escolha na lista.` : ''].filter(Boolean).join(' ');
         const centavos = n => Math.round(n * 100) / 100;
@@ -601,7 +604,7 @@
             $('e-itens').querySelector('tr[data-i]:last-child input.e-busca')?.focus();
         });
         function limparEntrada() {
-            linhasEntrada = []; entrada.notaLancada = false; entrada.emitenteSemCadastro = '';
+            linhasEntrada = []; entrada.notaLancada = false; entrada.emitenteSemCadastro = ''; entrada.chaveSefaz = ''; entrada.numeroSefaz = '';
             $('e-numero').value = ''; $('e-fornecedor').value = ''; $('e-data').value = hojeISO(); $('e-xml').value = '';
             renderEntrada();
         }
@@ -612,9 +615,15 @@
             $('e-xml').value = '';
             if (!arq) return;
             if (arq.size > LIMITE_XML) return toast('Arquivo grande demais (máximo 1 MB).', 'erro');
+            await importarXmlEntrada(await arq.text());
+        });
+        // o mesmo caminho para o arquivo escolhido e para o XML vindo da SEFAZ: o servidor lê a nota, nada é gravado aqui
+        async function importarXmlEntrada(xml, sefaz = null) {
             let n;
-            try { n = await api('/estoque/entrada/xml', { bruto: await arq.text(), tipo: 'application/xml' }); }
-            catch (e) { return toast(e.message, 'erro'); }
+            try { n = await api('/estoque/entrada/xml', { bruto: xml, tipo: 'application/xml' }); }
+            catch (e) { toast(e.message, 'erro'); return false; }
+            entrada.chaveSefaz = sefaz ? sefaz.chave : '';
+            entrada.numeroSefaz = sefaz ? String(n.numero || '') : '';
             $('e-numero').value = n.numero || '';
             $('e-data').value = n.data || hojeISO();
             $('e-fornecedor').value = n.fornecedor || '';
@@ -627,8 +636,17 @@
                 codigoAnterior: it.codigoAnterior || '', sugestoes: it.sugestoes || [] }));
             renderEntrada();
             buscarValoresCadastro();
-            toast(`Nota ${n.numero} carregada: ${linhasEntrada.length} item(ns). Confira antes de lançar.`, 'ok');
-        });
+            toast(`Nota ${n.numero} carregada${sefaz ? ' da SEFAZ' : ''}: ${linhasEntrada.length} item(ns). Confira antes de lançar.`, 'ok');
+            return true;
+        }
+        // nota de compra trazida pela tela "Notas de compra (SEFAZ)" (sessionStorage desta aba; lida uma vez só)
+        async function receberNotaSefaz() {
+            const NC = window.NotasCompra;
+            if (!NC) return;
+            let pacote = null;
+            try { pacote = NC.lerPacote(sessionStorage.getItem(NC.CHAVE_PACOTE)); sessionStorage.removeItem(NC.CHAVE_PACOTE); } catch { pacote = null; }
+            if (pacote) await importarXmlEntrada(pacote.xml, pacote);
+        }
         // valor do cadastro dos produtos já ligados pelo XML (só para quem vê valores), uma busca por produto
         async function buscarValoresCadastro() {
             if (!pode('valores.ver')) return;
@@ -742,6 +760,8 @@
             let r;
             try { r = await api('/estoque/entrada', { corpo: { numero, data, fornecedor: forn, itens } }); }
             catch (e) { return toast(e.status === 0 ? 'Sem resposta do servidor: não dá para saber se a nota foi gravada. Confira o histórico antes de lançar de novo.' : 'Nada foi gravado: ' + e.message, 'erro'); }
+            // veio da SEFAZ e o número não foi trocado: marca como importada no serviço local (sem resposta, fica pendente)
+            if (entrada.chaveSefaz && entrada.numeroSefaz === numero && window.NotasCompra) window.NotasCompra.marcarImportada(window, entrada.chaveSefaz);
             limparEntrada();
             listaEntradas.recarregar();
             if (r.codigosAtualizados?.length) toast('Código do fornecedor atualizado no cadastro: ' + r.codigosAtualizados.map(c => `${c.produto} (${c.de || 'vazio'} → ${c.para})`).join('; '), 'info');
@@ -757,6 +777,7 @@
             } catch (e) { toast(e.message, 'erro'); }
             listaEntradas.recarregar();
             $('e-numero').focus();
+            await receberNotaSefaz();
         };
 
         // ===================== SAÍDA =====================

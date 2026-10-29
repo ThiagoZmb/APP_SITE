@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <!-- connect-src libera o serviço local do PC (http://127.0.0.1:3917, o mesmo do salvador de PDF): por isso esta página NÃO tem upgrade-insecure-requests -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com http://127.0.0.1:3917; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Notas de compra (SEFAZ)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root {
+            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
+            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
+            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
+            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
+        }
+        [hidden] { display: none !important; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; margin-bottom: 20px; }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .painel-head { padding: 22px 22px 0; }
+        #nc-status { padding: 18px 22px 10px; font-size: 14px; }
+        #nc-status p { margin-bottom: 6px; }
+        .barra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+        .barra .busca { flex: 1; min-width: 200px; }
+        .barra input, .barra select { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; background: var(--white); min-height: 44px; }
+        .barra select { width: auto; }
+        .lista-wrap { max-height: 640px; overflow: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { position: sticky; top: 0; background: var(--secondary-color); padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: top; }
+        tbody tr:hover { background: var(--primary-light); }
+        th.num, td.num { text-align: right; white-space: nowrap; }
+        td.acoes-linha { white-space: nowrap; text-align: right; }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); }
+        .cinza { color: var(--text-light); font-size: 13px; }
+        .erro-form { color: var(--danger-color); font-size: 13px; }
+        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
+        .selo.aviso { background: #fff3cd; color: #8a6d00; }
+        .selo.info { background: #dbeafe; color: #1e40af; }
+        .selo.ok { background: #d4edda; color: #1b6b30; }
+        .selo.perigo { background: #f8d7da; color: #a12330; }
+        .selo.neutro { background: #e9ecef; color: #495057; }
+        .aviso-caixa { margin: 0 22px 14px; padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+        .aviso-caixa.erro { background: #f8d7da; color: #a12330; }
+        .aviso-caixa.aviso { background: #fff3cd; color: #8a6d00; }
+        .aviso-caixa.info { background: #dbeafe; color: #1e40af; }
+        .dica { font-size: 13px; color: var(--text-light); margin: 0 22px 14px; }
+
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; margin: 2px 0; }
+        .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 420px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .logo { font-size: 18px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            td.acoes-linha { white-space: normal; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202610251900">
+    <script src="layout.js?v=202610291200" defer></script>
+    <script src="notas_compra.js?v=202610291200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Notas de compra (SEFAZ)</h1>
+            <p class="welcome-subtitle">NF-e emitidas contra o CNPJ da empresa, buscadas na SEFAZ pelo serviço local deste PC, prontas para a entrada de estoque.</p>
+
+            <section class="painel">
+                <div id="nc-status"><p class="cinza">Consultando o serviço local deste PC…</p></div>
+                <p class="dica">O certificado digital e a senha ficam só no PC da empresa. A SEFAZ só aceita nova busca 1 hora depois de responder que não há nada novo.</p>
+            </section>
+
+            <section class="painel">
+                <div class="painel-head">
+                    <div class="barra">
+                        <div class="busca"><input type="search" id="nc-busca" placeholder="Buscar por emitente, CNPJ ou número" aria-label="Buscar por emitente, CNPJ ou número"></div>
+                        <select id="nc-filtro" aria-label="Filtro">
+                            <option value="importar" selected>Prontas para importar</option>
+                            <option value="pendentes">Esperando ciência ou XML</option>
+                            <option value="importadas">Importadas</option>
+                            <option value="canceladas">Canceladas</option>
+                            <option value="">Todas</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" id="btn-atualizar">Atualizar</button>
+                        <button type="button" class="btn btn-primary" id="btn-sincronizar" data-perm="compras_nfe.ver" disabled>Sincronizar com a SEFAZ</button>
+                        <button type="button" class="btn btn-secondary" id="btn-ciencia-lote" data-perm="compras_nfe.importar" disabled>Ciência das selecionadas</button>
+                    </div>
+                    <p class="cinza" id="nc-qtd" style="margin-bottom:10px"></p>
+                </div>
+                <div class="aviso-caixa info" id="nc-aviso" role="alert" hidden></div>
+                <div class="lista-wrap" id="nc-lista"><p class="vazio">Carregando…</p></div>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
