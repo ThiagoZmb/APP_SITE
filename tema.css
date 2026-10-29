@@ -69,7 +69,7 @@ body {
 body .container {
     display: grid !important;
     grid-template-columns: 264px minmax(0, 1fr) !important;
-    grid-template-rows: 48px 1fr !important;
+    grid-template-rows: 24px 1fr !important;
     grid-template-areas: "sidebar header" "sidebar main" !important;
     min-height: 100vh !important;
     max-width: none !important;
@@ -84,48 +84,46 @@ body .container {
 body .container > header {
     grid-area: header;
     position: sticky; top: 0; z-index: 30;
-    height: 48px;
+    height: 24px;
     display: flex !important; align-items: center; justify-content: space-between; gap: 16px;
     padding: 0 32px !important;
-    background: rgba(244, 244, 247, .78) !important;
-    -webkit-backdrop-filter: saturate(160%) blur(14px);
-    backdrop-filter: saturate(160%) blur(14px);
-    color: var(--text-dark) !important;
-    border-bottom: 1px solid rgba(231, 231, 238, .9);
+    background: linear-gradient(180deg, var(--side-bg) 0%, var(--side-bg-2) 100%) !important;
+    color: var(--side-text) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
     box-shadow: none !important;
 }
 body .container > header .logo {
-    font-size: 14px !important; font-weight: 600 !important; color: var(--text-light) !important;
-    letter-spacing: 0 !important; gap: 10px; min-width: 0;
+    font-size: 10px !important; font-weight: 600 !important; color: var(--side-text) !important;
+    letter-spacing: 0 !important; gap: 7px; min-width: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 body .container > header .logo::before {
-    content: "" !important; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    background: var(--success-color); box-shadow: 0 0 0 4px rgba(18, 161, 80, .15); opacity: 1 !important;
+    content: "" !important; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+    background: var(--success-color); box-shadow: 0 0 0 2px rgba(18, 161, 80, .15); opacity: 1 !important;
 }
-body .container > header .header-right { gap: 12px; }
+body .container > header .header-right { gap: 8px; }
 body .user-profile {
-    display: flex !important; align-items: center; gap: 10px;
-    padding: 3px 12px 3px 4px !important; border-radius: 999px !important;
+    display: flex !important; align-items: center; gap: 6px;
+    padding: 1px 8px 1px 2px !important; border-radius: 999px !important;
     background: var(--white) !important; border: 1px solid var(--border-color);
     box-shadow: var(--shadow-light); color: var(--text-dark) !important;
-    font-size: 14px; font-weight: 600; flex-shrink: 0;
+    font-size: 10px; font-weight: 600; flex-shrink: 0;
 }
 body .user-avatar {
-    width: 28px !important; height: 28px !important; border-radius: 50% !important;
+    width: 18px !important; height: 18px !important; border-radius: 50% !important;
     background: var(--gradient-primary) !important; color: #fff !important;
-    font-weight: 700 !important; font-size: 14px !important;
+    font-weight: 700 !important; font-size: 10px !important;
     display: flex; align-items: center; justify-content: center;
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .25);
 }
-body .user-info { line-height: 1.15; display: flex !important; flex-direction: column; }
-body .user-info span:first-child, body #user-name { font-weight: 700; font-size: 13.5px; }
-body .user-cargo { font-size: 11.5px !important; color: var(--text-light); opacity: 1 !important; font-weight: 500; }
+body .user-info { line-height: 1; display: flex !important; flex-direction: column; }
+body .user-info span:first-child, body #user-name { font-weight: 700; font-size: 9px; }
+body .user-cargo { font-size: 8px !important; color: var(--text-light); opacity: 1 !important; font-weight: 500; }
 .btn-menu-mobile {
-    display: none; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border-color);
+    display: none; width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--border-color);
     background: var(--white); color: var(--text-dark); cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.btn-menu-mobile svg { width: 20px; height: 20px; }
+.btn-menu-mobile svg { width: 12px; height: 12px; }
 
 /* sidebar */
 body .container > .sidebar, body .container > nav {
@@ -525,7 +523,7 @@ body .loading-spinner { border-color: rgba(155, 27, 48, .15) !important; border-
     body .container > header { padding: 0 16px !important; }
     body .container > main { padding: 22px 16px 40px !important; }
     body .user-info { display: none !important; }
-    body .user-profile { padding: 4px !important; }
+    body .user-profile { padding: 1px 2px !important; }
     body .user-profile #user-name { display: none; }
     .welcome-title { font-size: 24px !important; }
 }
