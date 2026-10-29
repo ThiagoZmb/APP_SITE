@@ -101,3 +101,16 @@ test('orcamentos.html: caixas por porta, preço, vão dos trilhos, desenho e ite
   assert.match(h, /largurasFolhas: temLarguraEditada\(\) \? Array\.from/);                                    // item enviado ao salvar
   assert.match(h, /largurasFolhas = Array\.isArray\(d\.largurasFolhas\)/);                                   // ao reabrir o item
 });
+
+test('uma porta só, mais estreita que o vão: porta com largura própria e trilho pelo vão', () => {
+  const { folhasDoItem, larguraRealDoVao } = require('../calculo/engenharia');
+  const item = { frente: 'Porta de Correr', qtd: 1, altura: 2500, largura: 1500,
+    detalhes: { sistema: 'S1', transpasse: '0', largurasFolhas: [800], puxador: '' } };
+  const folhas = folhasDoItem(item, { descontoAlturaSistema: 40 });
+  assert.equal(folhas.length, 1);
+  assert.deepEqual([folhas[0].largura, folhas[0].larguraVao, folhas[0].altura], [800, 1500, 2460]);
+  assert.equal(larguraRealDoVao(item, folhas), 1500); // o trilho cobre o vão digitado, não a porta
+  // sem largura própria: porta igual ao vão, como sempre
+  const igual = { ...item, detalhes: { ...item.detalhes, largurasFolhas: [] } };
+  assert.equal(folhasDoItem(igual, { descontoAlturaSistema: 40 })[0].largura, 1500);
+});

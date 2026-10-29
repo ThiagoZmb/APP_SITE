@@ -153,3 +153,11 @@ test('furos gravados fora de ordem pelo VB travam (a web regravaria em ordem)', 
   l.furacao = [furo(1, 1, 1, 900, 'Esquerdo'), furo(2, 1, 2, 100, 'Esquerdo'), furo(3, 1, 1, 900, 'Direito'), furo(4, 1, 2, 100, 'Direito')];
   assert.match(motivo(l), /não reproduz/);
 });
+
+test('porta de correr de uma folha mais estreita que o vão: reabre com a largura própria da porta e o vão na tela', () => {
+  const l = correr({ QTD: 1, LARGURA: 800, LARGURA_VAO: 1500 }, { DESCRICAO: 'Tam: 2100x1500mm | Per: Perfil P Anodizado | Sist: S1 | Pux:  | Rev:  | Portas: 1 | Furos: 0' });
+  l.complementos = [{ id: 1, TIPO: 'Pedido', NUMERO: 123, ITEM_PEDIDO: 1, ITEM: 1, QTD: 1, COMPLEMENTO: 'Trilho Sup', TAMANHO: 1500, UNITARIO: 40 }];
+  const [it] = traduzirDocumento(l, { sistemas: { S1 } }).itens;
+  assert.equal(it.travado, undefined, it.motivo);
+  assert.deepEqual([it.qtd, it.largura, it.detalhes.largurasFolhas], [1, 1500, [800]]);
+});
