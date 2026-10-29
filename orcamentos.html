@@ -1831,7 +1831,7 @@
             if (limpo) { /* canvas de captura: já vem com o tamanho certo */ }
             else if (altura > 0 && largura > 0) {
                 garantirFolhas();
-                const n = Math.min(posicoesFolhas.length, 4);
+                const n = posicoesFolhas.length;
                 const mmL = largura * n + (n > 1 ? Math.max(150, largura * 0.08) : 0) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
                 const cssW = Math.max(300, cv.clientWidth);
                 const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
@@ -1866,7 +1866,7 @@
                 return;
             }
             garantirFolhas();
-            const qtdFolhas = Math.min(posicoesFolhas.length, 4);
+            const qtdFolhas = posicoesFolhas.length;
             // correr com sistema: folhas sobrepostas pelo transpasse, trilho superior em cima
             // área máxima: só a margem das cotas (laterais para as alturas, topo/base para larguras e trilho)
             // SEMPRE afastadas (também com transpasse): cada folha e seus puxadores ficam separados para clicar
