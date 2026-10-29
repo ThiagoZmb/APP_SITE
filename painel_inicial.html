@@ -221,6 +221,21 @@
         .rodape-l b { color: var(--text-dark); }
         #carregando { padding: 60px 0; text-align: center; color: var(--text-light); font-weight: 600; }
 
+        /* versão compacta: ganha altura na parte de cima */
+        body .container > main { padding-top: 14px !important; }
+        .cab-pag { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 14px; margin-bottom: 10px; }
+        .cab-pag .welcome-title { font-size: 24px !important; margin: 0 !important; }
+        .cab-pag .welcome-subtitle { font-size: 13px !important; margin: 0 !important; }
+        .filtros { margin-bottom: 12px; padding: 8px 12px; gap: 8px; }
+        .filtros select, .filtros input { padding: 5px 10px; min-height: 34px; }
+        .painel .cab { padding: 12px 20px 0; }
+        .operacao { padding: 0 20px 10px; }
+        .op { padding: 4px 14px; }
+        .op b { font-size: 22px; margin-top: 0; }
+        .bloco-tit { margin: 0 0 6px; }
+        .kpis { margin-bottom: 12px; gap: 12px; }
+        .kpi { padding: 9px 14px; }
+        .kpi b { font-size: 20px; margin: 2px 0 0; }
         @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .operacao { grid-template-columns: 1fr 1fr !important; } .op { border-left: none; padding-left: 0; } }
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
         .ico { width: 15px; height: 15px; flex: none; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -258,8 +273,10 @@
         </header>
         <nav class="sidebar"></nav>
         <main>
-            <h1 class="welcome-title" id="titulo">Pedidos e Orçamentos</h1>
-            <p class="welcome-subtitle" id="subtitulo">Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.</p>
+            <div class="cab-pag">
+                <h1 class="welcome-title" id="titulo">Pedidos e Orçamentos</h1>
+                <p class="welcome-subtitle" id="subtitulo">Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.</p>
+            </div>
 
             <!-- ===== FILTROS ===== -->
             <section class="filtros">
@@ -283,7 +300,7 @@
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
                 <!-- ===== OPERAÇÃO AGORA ===== -->
-                <section class="painel so-geral" style="margin-bottom:18px">
+                <section class="painel so-geral" style="margin-bottom:12px">
                     <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
                     <div class="operacao" id="operacao"></div>
                 </section>
