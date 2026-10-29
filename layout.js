@@ -518,7 +518,7 @@
         }
         const fetchOriginal = window.fetch.bind(window);
         // consultas automáticas em segundo plano (preço, peso, ping do salvador de PDF) não mostram o ícone: aconteceriam a cada alteração do formulário
-        const SEGUNDO_PLANO = //(peso/itens|calcular_preco|ped_orc/sistema_correr)(?|$)|127.0.0.1:3917/;
+        const SEGUNDO_PLANO = /\/(peso\/itens|calcular_preco|ped_orc\/sistema_correr)(\?|$)|127\.0\.0\.1:3917/;
         window.fetch = (...args) => {
             const alvo = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
             if (SEGUNDO_PLANO.test(alvo)) return fetchOriginal(...args);
