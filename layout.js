@@ -442,17 +442,26 @@
     };
 
     // ----- indicação de processamento: vale para qualquer página e qualquer botão, sem mexer nas páginas -----
-    // Toda chamada ao servidor (fetch) é contada. Com espera > 0,3 s aparece a barra no topo; o elemento clicado
+    // Toda chamada ao servidor (fetch) é contada. Com espera > 0,3 s aparece o ícone animado no centro da tela; o elemento clicado
     // logo antes do pedido fica "ocupado" (indicador girando, desabilitado) até a resposta; espera > 5 s mostra
     // o aviso de servidor iniciando (o Render "dorme" e pode levar até 1 minuto para acordar).
     function iniciarIndicadores() {
         const ATRASO_BARRA = 300, ATRASO_AVISO = 5000, JANELA_CLIQUE = 400;
         const css = document.createElement('style');
         css.textContent = `
-            #carregando-global { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999; overflow: hidden; pointer-events: none; display: none; }
-            #carregando-global.ativo { display: block; }
-            #carregando-global::before { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--primary-color, #8B0000); animation: carregando-barra 1.1s ease-in-out infinite; }
-            @keyframes carregando-barra { from { left: -40%; } to { left: 100%; } }
+            #carregando-global { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: none; }
+            #carregando-global.ativo { display: block; animation: carregando-entrada .18s ease-out; }
+            /* disco branco com sombra + anel girando + miolo pulsando, no centro da tela (não bloqueia cliques) */
+            #carregando-global::before { content: ''; position: absolute; top: 50%; left: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
+                background: rgba(255,255,255,.92); box-shadow: 0 10px 34px rgba(0,0,0,.22); }
+            #carregando-global::after { content: ''; position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+                border: 5px solid rgba(139,0,0,.16); border-top-color: var(--primary-color, #8B0000); border-right-color: var(--primary-color, #8B0000);
+                animation: carregando-giro .8s linear infinite; }
+            #carregando-global i { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+                background: var(--primary-color, #8B0000); animation: carregando-pulso 1.1s ease-in-out infinite; }
+            @keyframes carregando-entrada { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes carregando-pulso { 0%, 100% { transform: scale(.55); opacity: .55; } 50% { transform: scale(1); opacity: 1; } }
+            @media (prefers-reduced-motion: reduce) { #carregando-global::after, #carregando-global i { animation-duration: 2.4s; } }
             .processando { cursor: progress !important; }
             button.processando, a.processando { position: relative; opacity: .75; }
             button.processando::after, a.processando::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -2px;
@@ -465,6 +474,7 @@
         const barra = document.createElement('div');
         barra.id = 'carregando-global';
         barra.setAttribute('role', 'progressbar'); barra.setAttribute('aria-label', 'Carregando');
+        barra.appendChild(document.createElement('i'));
         document.body.appendChild(barra);
         let aviso = null;
 
@@ -507,7 +517,11 @@
             aviso?.remove(); aviso = null;
         }
         const fetchOriginal = window.fetch.bind(window);
+        // consultas automáticas em segundo plano (preço, peso, ping do salvador de PDF) não mostram o ícone: aconteceriam a cada alteração do formulário
+        const SEGUNDO_PLANO = //(peso/itens|calcular_preco|ped_orc/sistema_correr)(?|$)|127.0.0.1:3917/;
         window.fetch = (...args) => {
+            const alvo = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+            if (SEGUNDO_PLANO.test(alvo)) return fetchOriginal(...args);
             const el = ultimoClique && Date.now() - quandoClique < JANELA_CLIQUE && ultimoClique.isConnected ? ultimoClique : null;
             comecou();
             if (el) ocupar(el);
