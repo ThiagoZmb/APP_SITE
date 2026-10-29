@@ -56,10 +56,11 @@ test('página: scripts, botões, permissão de editar, CSP e sem handlers inline
   assert.equal(csp, ler('tintas.html').match(/Content-Security-Policy" content="([^"]+)"/)[1]);
 });
 
-test('layout.js: Pesos no menu (subitem do Estoque, depois de Tintas) e em PAGINAS com pesos.ver', () => {
+test('layout.js: Pesos no menu (subitem de Produtos, logo depois dele) e em PAGINAS com pesos.ver', () => {
   const l = ler('layout.js');
   assert.match(l, /href: 'pesos\.html', texto: 'Pesos'/);
   assert.match(l, /'pesos\.html': \['pesos\.ver'\]/);
-  assert.ok(l.indexOf("href: 'pesos.html'") > l.indexOf("href: 'tintas.html'") && l.indexOf("href: 'pesos.html'") < l.indexOf("href: 'produtos.html'"));
+  assert.ok(l.indexOf("href: 'pesos.html'") > l.indexOf("href: 'produtos.html'") && l.indexOf("href: 'pesos.html'") < l.indexOf("href: 'fornecedores.html'"));
+  assert.match(l, /href: 'pesos\.html'.*sub: true/);
   assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
 });

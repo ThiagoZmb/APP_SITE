@@ -42,8 +42,8 @@
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
         { href: 'tintas.html', texto: 'Tintas', icone: 'tintas', sub: true },   // subitem do Estoque (cadastro de tintas e insumos de pintura)
-        { href: 'pesos.html', texto: 'Pesos', icone: 'produtos', sub: true },   // subitem do Estoque (peso por produto, para o peso das portas)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
+        { href: 'pesos.html', texto: 'Pesos', icone: 'produtos', sub: true },   // subitem de Produtos (peso por produto, para o peso das portas)
         { href: 'fornecedores.html', texto: 'Fornecedores', icone: 'fornecedores' },
         { href: 'funcionarios.html', texto: 'Funcionários', icone: 'funcionarios' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
