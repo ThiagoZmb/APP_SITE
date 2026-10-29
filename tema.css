@@ -714,3 +714,14 @@ body .card-header { margin-bottom: 6px !important; }
 body .card-icon { width: 32px !important; height: 32px !important; border-radius: 10px !important; font-size: 15px !important; }
 body .card-value { font-size: clamp(19px, 1.5vw, 24px) !important; }
 body .card-sub, body .card-change { margin-top: 3px !important; }
+
+/* ranking compacto ainda mais baixo (Maiores gastos / Clientes que mais compraram) */
+.rk-painel { margin-bottom: 12px; }
+.rk-topo { padding: 12px 20px 0; }
+.rk-seg button { padding: 5px 12px; }
+.rk-compacto .rk-corpo { padding: 2px 20px 8px; gap: 20px; grid-template-columns: minmax(0, 1fr) 150px; }
+.rk-compacto .rk-lista { gap: 0; }
+.rk-compacto .rk-lista li { padding: 2px 10px; }
+.rk-compacto .rk-pos { width: 20px; height: 20px; border-radius: 6px; font-size: 10.5px; }
+.rk-compacto .rk-rosca { height: 150px; }
+.rk-compacto .rk-centro b { font-size: 15px; }
