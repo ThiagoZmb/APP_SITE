@@ -42,6 +42,7 @@
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
         { href: 'tintas.html', texto: 'Tintas', icone: 'tintas', sub: true },   // subitem do Estoque (cadastro de tintas e insumos de pintura)
+        { href: 'notas_compra.html', texto: 'Notas de compra (SEFAZ)', icone: 'estoque', sub: true },   // subitem do Estoque (NF-e de compra pelo serviço local do PC)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'pesos.html', texto: 'Pesos', icone: 'produtos', sub: true },   // subitem de Produtos (peso por produto, para o peso das portas)
         { href: 'fornecedores.html', texto: 'Fornecedores', icone: 'fornecedores' },
@@ -84,6 +85,7 @@
         'fornecedores.html': ['fornecedores.ver'],
         'notas_fiscais.html': ['notas.ver'],
         'tintas.html': ['tintas.ver'],
+        'notas_compra.html': ['compras_nfe.ver'],
         'pesos.html': ['pesos.ver'],
         'funcionarios.html': ['funcionarios.ver'],
         'orcamentos.html': ['orcamentos.criar', 'valores.ver'],

@@ -89,7 +89,7 @@ test('menu: Corte de perfil no layout e no botão direito dos pedidos', () => {
   assert.match(layout, /href: 'corte\.html'/);
   assert.match(layout, /'corte\.html': \['corte\.ver'\]/);
   const painel = ler('painel_inicial.html');
-  assert.match(painel, /add\('corte\.ver'[^\n]*Plano de corte[^\n]*corte\.html\?numero=/);
+  assert.match(painel, /add\('corte\.ver'[^\n]*Corte de perfil[^\n]*corte\.html\?numero=/);
 });
 
 test('retalho reservado: quem planeja pode cancelar o plano que o prende (saída para reserva órfã)', () => {
