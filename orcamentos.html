@@ -1040,6 +1040,7 @@
                 document.querySelectorAll('.frente-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 frenteAtual = btn.dataset.frente;
+                sistemaPadraoCorrer(); renderAcessorios();
                 document.getElementById('frente-atual').textContent = rotuloFrente(frenteAtual);
                 posicoesFolhas = posicoesFolhas.map(() => '');
                 document.getElementById('f-posicao').value = '';
@@ -2216,6 +2217,13 @@
             desenharVisualizacao();
             if (ehCorrer()) atualizarSistemaCorrer(); else calcularPrecoAutomatico();
         }
+        // Porta de correr começa em "Sem sistema" (o vendedor troca se for usar trilhos)
+        function sistemaPadraoCorrer() {
+            const sel = document.getElementById('f-sistema');
+            if (!sel || !ehCorrer()) return;
+            if (![...sel.options].some(o => o.value === 'Sem sistema')) sel.add(new Option('Sem sistema', 'Sem sistema'), sel.options[1] || null);
+            sel.value = 'Sem sistema';
+        }
         function limparForm() {
             const catAvulso = val('f-av-cat');
             limparAcessorios();
@@ -2227,6 +2235,7 @@
             document.getElementById('f-qtd').value = 1;
             ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
             atualizarMetragemSerr();
+            sistemaPadraoCorrer();
             renderAcessorios(); // porta de correr: aviso do sistema e "Portas: A × L" são refeitos já com os campos limpos
             document.getElementById('f-soldas').value = 0;
             document.getElementById('chk-pares').checked = false;
