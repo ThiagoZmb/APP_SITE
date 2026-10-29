@@ -2002,7 +2002,7 @@
                 ctx.font = fonte(19);
                 cota(`${vaoL} mm (vão total)`, ox0 + tw / 2, oy - topoPx - 14, COR_VAO);
                 ctx.save(); ctx.translate(ox0 - 30, oy - topoPx + (altPx + topoPx + basePx) / 2); ctx.rotate(-Math.PI / 2); cota(`${vaoA} mm (vão)`, 0, 0, COR_VAO); ctx.restore();
-                ctx.save(); ctx.translate(ox0 + tw + 46, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0, COR_PORTA); ctx.restore();
+                ctx.save(); ctx.translate(ox0 + tw - sobraVaoMm * esc + 46, oy + altPx / 2); ctx.rotate(-Math.PI / 2); cota(`${altura} mm (porta)`, 0, 0, COR_PORTA); ctx.restore();
             }
             const perfilPx = Math.max(45 * esc, 8);
             const configAtivo = !limpo && modoPuxador && temPuxador();
@@ -2014,7 +2014,7 @@
             esp = Math.max(Math.min(esp, perfilPx * .55), 8);
             for (let f = 0; f < qtdFolhas; f++) {
                 const largura = lfs[f], largPx = largura * esc; // medida desta folha (sombreia a padrão)
-                const ox = ox0 + lfs.slice(0, f).reduce((a, w) => a + w * esc, 0) + f * gapPx + sobraVaoMm * esc / 2;
+                const ox = ox0 + lfs.slice(0, f).reduce((a, w) => a + w * esc, 0) + f * gapPx; // 1 porta menor que o vão: fica encostada na esquerda do trilho
                 // perfil + vidro
                 ctx.fillStyle = '#c3c8cd'; ctx.fillRect(ox, oy, largPx, altPx);
                 ctx.lineWidth = 2; ctx.strokeStyle = '#2b2f33'; ctx.strokeRect(ox, oy, largPx, altPx);
