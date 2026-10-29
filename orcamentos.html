@@ -2985,10 +2985,12 @@
             m.textContent = texto || '';
             m.className = 'msg-salvar' + (tipo ? ' ' + tipo : '');
         }
-        // número ao lado do tipo; com número o tipo fica travado (frm_Pedido2.txt_Numero_TextChanged)
+        // número ao lado do tipo; com número o tipo fica travado (frm_Pedido2.txt_Numero_TextChanged), EXCETO num orçamento aberto:
+        // ali dá para trocar para Pedido (salva um pedido novo a partir dele; o orçamento continua como está)
         function mostrarNumero() {
             $s('ped-numero').value = docAberto ? String(docAberto.numero) : '';
-            $s('ped-tipo').disabled = !!docAberto;
+            const podeVirarPedido = !!docAberto && docAberto.tipo === 'Orçamento' && docAberto.podeEditar && !!$s('ped-tipo').querySelector('option[value="Pedido"]');
+            $s('ped-tipo').disabled = !!docAberto && !podeVirarPedido;
         }
         function aplicarModoLeitura(soLeitura) {
             document.body.classList.toggle('so-leitura', soLeitura);
@@ -3014,9 +3016,11 @@
                 if (!$s('ped-financeiro').value) { alert('Favor escolher a situação financeira do pedido!'); return; }
             }
             const podeAtualizar = !!docAberto && docAberto.tipo === tipoAtual();
+            const viraPedido = !!docAberto && docAberto.tipo !== tipoAtual();
             $s('dlg-salvar-titulo').textContent = `Salvar ${tipoAtual().toLowerCase()}`;
             $s('dlg-salvar-texto').textContent = podeAtualizar
                 ? `Gravar por cima do ${docAberto.tipo.toLowerCase()} nº ${docAberto.numero} ou criar um com número novo?`
+                : viraPedido ? `Será criado um ${tipoAtual().toLowerCase()} com número novo a partir do ${docAberto.tipo.toLowerCase()} nº ${docAberto.numero} (o ${docAberto.tipo.toLowerCase()} continua como está).`
                 : `Será criado um ${tipoAtual().toLowerCase()} com número novo.`;
             $s('btn-atualizar').style.display = podeAtualizar ? '' : 'none';
             if (podeAtualizar) $s('btn-atualizar').querySelector('b').textContent = `Atualizar nº ${docAberto.numero}`;
@@ -3030,12 +3034,14 @@
                 manterData = !confirm('Deseja alterar a data para hoje?');
             guardarRascunho();
             const tipo = tipoAtual();
+            // orçamento aberto virando pedido: não é cópia do documento aberto (vidros e perfis do pedido são gerados do zero e os preços recalculados)
+            const converte = !!docAberto && docAberto.tipo !== tipo;
             // a lista pode mudar enquanto o salvar espera o servidor (remover/editar item): os desenhos sobem para os itens que FORAM salvos
             const itensSalvos = itens.slice();
             const corpo = {
                 modo, tipo, ...(modo === 'atualizar' ? { numero: docAberto.numero, manterData } : {}),
-                ...(docAberto?.impressao ? { impressao: docAberto.impressao } : {}),
-                ...(modo === 'novo' && docAberto?.impressao ? { origemDocumento: { tipo: docAberto.tipo, numero: docAberto.numero } } : {}),
+                ...(docAberto?.impressao && !converte ? { impressao: docAberto.impressao } : {}),
+                ...(modo === 'novo' && docAberto?.impressao && !converte ? { origemDocumento: { tipo: docAberto.tipo, numero: docAberto.numero } } : {}),
                 clienteCodigo: $s('sel-cliente').value,
                 clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
                 dataEntrega: $s('ped-entrega').value,
@@ -3048,7 +3054,7 @@
                     // serralheria: o conjunto inteiro (peças, barras por eixo e complementos) — o servidor recalcula o preço com tudo isso
                     ...(it.frente === 'Serralheria' ? { pecas: it.pecas || [], complementos: (it.complementos || []).map(c => ({ id: c.id, qtd: c.qtd })),
                         qtdAltura: it.qtdAltura, qtdLargura: it.qtdLargura, qtdProfundidade: it.qtdProfundidade } : {}),
-                    ...(it.origem ? { origem: it.origem } : {}) }))
+                    ...(it.origem && !converte ? { origem: it.origem } : {}) }))
             };
             let res, json = {};
             try {
