@@ -2457,7 +2457,7 @@
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
-                        <td${it.desenho && it.desenho.size ? ` title="Desenho: ${Desenhos.formatarKb(it.desenho.size)}"` : ''}>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}<small class="peso-item" data-peso="${i}" hidden></small>${it.desenho && it.desenho.size ? `<small class="desenho-kb" style="display:block;color:var(--text-light)">Desenho: ${Desenhos.formatarKb(it.desenho.size)}</small>` : ''}</td>
+                        <td>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}<small class="peso-item" data-peso="${i}" hidden></small></td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>

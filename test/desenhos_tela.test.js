@@ -91,9 +91,9 @@ test('formatarKb e resumoEnvio: tamanho legível e total enviado', async () => {
   assert.deepEqual(r, { enviados: 2, falhas: 0, bytes: 3072 });
   assert.equal(D.resumoEnvio(r), '2 desenho(s), 3,0 kb.');
 });
-test('orcamentos.html: tamanho do desenho aparece na lista e no aviso do salvar; o Blob continua fora do JSON', () => {
+test('orcamentos.html: o aviso do salvar traz o resumo dos desenhos enviados (a lista de itens não mostra o tamanho); o Blob continua fora do JSON', () => {
   const h = ler('orcamentos.html');
-  assert.match(h, /Desenhos\.formatarKb\(it\.desenho\.size\)/);
+  assert.ok(!h.includes('Desenho: ${Desenhos.formatarKb'), 'a lista de itens não mostra mais o tamanho do desenho');
   assert.match(h, /Desenhos\.resumoEnvio\(env\)/);
   assert.match(h, /Object\.defineProperty\(item, 'desenho', \{ value: null, writable: true, enumerable: false/);
 });
