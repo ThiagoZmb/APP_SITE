@@ -261,11 +261,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
 
 // Porta + acessórios (frmPortasAbrir.vb:2096-2110): base = portas + acessórios; unitário = base / folhas.
 // acessorios: [{ nome, qtd, tamanho?, origem }] já validados; devolve cada um com valorUnitario.
-async function precoComAcessorios(entrada, cliente, leitor, acessorios = []) {
-  const r = await calcularPrecoItem(entrada, cliente, leitor);
-  // sem acessórios: exatamente o que o /calcular_preco devolve à tela (mesmo arredondamento)
-  if (!acessorios.length) return { unitario: r.unitario, total: r.total, acessorios: [], diag: r.diag };
-  const qtd = parseFloat(entrada.qtd) > 0 ? parseFloat(entrada.qtd) : 1;
+async function precificarAcessorios(cliente, leitor, acessorios) {
   const precificados = [];
   let somaAc = 0;
   for (const a of acessorios) {
@@ -276,6 +272,15 @@ async function precoComAcessorios(entrada, cliente, leitor, acessorios = []) {
     somaAc += v.valorTotal;
     precificados.push({ ...a, tamanho, ...v });
   }
+  return { precificados, somaAc };
+}
+
+async function precoComAcessorios(entrada, cliente, leitor, acessorios = []) {
+  const r = await calcularPrecoItem(entrada, cliente, leitor);
+  // sem acessórios: exatamente o que o /calcular_preco devolve à tela (mesmo arredondamento)
+  if (!acessorios.length) return { unitario: r.unitario, total: r.total, acessorios: [], diag: r.diag };
+  const qtd = parseFloat(entrada.qtd) > 0 ? parseFloat(entrada.qtd) : 1;
+  const { precificados, somaAc } = await precificarAcessorios(cliente, leitor, acessorios);
   const base = Math.round((r.total + somaAc) * 100) / 100;
   return { unitario: Math.round(base / qtd * 100) / 100, total: base, acessorios: precificados, diag: r.diag };
 }
@@ -319,4 +324,4 @@ async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
   return { unitario: Math.round(total / qtdItem * 100) / 100, total, pecas: r.total, pecasDetalhe: r.detalhe, complementos: precificados, diag: r.diag };
 }
 
-module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };
+module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, precificarAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais };

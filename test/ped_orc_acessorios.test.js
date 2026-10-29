@@ -46,3 +46,11 @@ test('/calcular_preco soma os acessórios ao item (base = portas + acessórios; 
   assert.deepEqual([j.unitario, j.total], [320, 640]);
   assert.deepEqual(j.acessorios, [{ nome: 'Dobradiça', qtd: 2, tamanho: 0, origem: 'MANUAL', valorTabela: 20, valorUnitario: 20, valorTotal: 40 }]);
 });
+
+test('/calcular_preco somenteAcessorios: preço dos acessórios sem perfil nem medidas da porta', async t => {
+  const { chamar } = await prepararPedOrc(t);
+  const r = await chamar('/calcular_preco', 'POST', { frente: 'Porta de giro', clienteCodigo: 7, somenteAcessorios: true,
+    acessorios: [{ nome: 'Dobradiça', qtd: 2, origem: 'MANUAL' }] });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { acessorios: [{ nome: 'Dobradiça', qtd: 2, tamanho: 0, origem: 'MANUAL', valorTabela: 20, valorUnitario: 20, valorTotal: 40 }] });
+});

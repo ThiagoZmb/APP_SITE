@@ -1372,6 +1372,7 @@
         }
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
+        let seqAcessoriosSo = 0;
         async function calcularPrecoAutomatico() {
             clearTimeout(timerPreco); // descarta cálculo pendente de um estado anterior do formulário
             if (!temClienteSelecionado()) return;
@@ -1419,6 +1420,22 @@
                     document.getElementById('f-valor').value = '';
                     atualizarTotalItem();
                     status.textContent = '';
+                    // porta incompleta: ainda assim mostra o preço dos acessórios já escolhidos
+                    if (acessoriosItem.length) {
+                        const seq = ++seqAcessoriosSo;
+                        timerPreco = setTimeout(async () => {
+                            try {
+                                const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ frente: frenteAtual, cliente: clienteNome, clienteCodigo, somenteAcessorios: true,
+                                        acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })) })
+                                });
+                                if (seq !== seqAcessoriosSo || !Array.isArray(d.acessorios)) return;
+                                d.acessorios.forEach((a, i) => { if (acessoriosItem[i] && acessoriosItem[i].nome === a.nome) Object.assign(acessoriosItem[i], { valorUnitario: a.valorUnitario, valorTotal: a.valorTotal }); });
+                                renderAcessorios();
+                            } catch { /* sem preço agora: o motor completo tenta de novo quando a porta estiver preenchida */ }
+                        }, 400);
+                    }
                     return;
                 }
                 const mp = ehCorrer() && temSistemaCorrer() && sistemaCorrer ? medidasPortasCorrer() : null; // correr: preço pela medida da porta

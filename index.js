@@ -16,7 +16,7 @@ const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermis
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
-const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
+const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
 const { registrarFornecedores } = require('./rotas/fornecedores');
@@ -904,6 +904,11 @@ registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], as
       const pecas = Array.isArray(b.pecas) ? b.pecas.slice(0, 50).filter(p => p && typeof p === 'object') : undefined;
       const r = await precoSerralheria({ ...b, pecas }, cliente, leitorCadastro, comps);
       return res.json({ unitario: r.unitario, total: r.total, complementos: r.complementos, pecas: r.pecasDetalhe, ...(b.debug ? { diag: r.diag } : {}) });
+    }
+    // porta ainda incompleta (sem perfil/medidas): só o preço dos acessórios já escolhidos
+    if (b.somenteAcessorios === true && acessorios.length) {
+      const { precificados } = await precificarAcessorios(cliente, leitorCadastro, acessorios);
+      return res.json({ acessorios: precificados });
     }
     if (acessorios.length) {
       const r = await precoComAcessorios(b, cliente, leitorCadastro, acessorios);
