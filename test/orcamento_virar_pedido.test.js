@@ -18,3 +18,8 @@ test('ao virar pedido o salvar cria um pedido novo, sem tratar os itens como có
   assert.match(html, /modo === 'novo' && docAberto\?\.impressao && !converte \? \{ origemDocumento/);
   assert.match(html, /it\.origem && !converte \? \{ origem: it\.origem \}/);
 });
+
+test('sistema de correr: campo do sistema 4/5 e transpasse 1/5 (regra com !important, pois o grid-form geral também usa)', () => {
+  assert.match(html, /<div class="grid-form linha-sistema-correr">/);
+  assert.match(html, /html body \.grid-form\.linha-sistema-correr \{ grid-template-columns: minmax\(0, 4fr\) minmax\(90px, 1fr\) !important; \}/);
+});
