@@ -349,6 +349,7 @@
         .dlg-salvar { margin: auto; border: none; border-radius: 12px; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
         .dlg-salvar .abrir-lista { margin: 0; padding: 4px; max-height: 50vh; overflow: auto; }
         .dlg-salvar .abrir-lista:empty { display: none; }
+        #dlg-abrir.dlg-salvar { width: min(736px, calc(100vw - 32px)); max-width: min(736px, calc(100vw - 32px)); } /* 460px + 60% */
         .dlg-salvar::backdrop { background: rgba(15, 23, 42, .45); }
         .dlg-salvar h3 { margin: 0 0 8px; }
         .dlg-salvar p { margin: 0 0 16px; color: var(--text-light); }
@@ -1078,6 +1079,7 @@
         function aplicarVisibilidadeCampos() {
             const ehAvulso = frenteAtual === 'Avulso';
             const ehPorta = frenteAtual !== 'Serralheria' && !ehAvulso;
+            const ehSerr = frenteAtual === 'Serralheria';
             // Porta basculante: chkPares invisível (frmPortasAbrir_Load)
             const wrapPares = document.getElementById('wrap-pares');
             // basculante e frente de gaveta: o campo continua visível, mas inativo (não existe "par")
@@ -1104,7 +1106,6 @@
             document.querySelectorAll('.secao-avulso').forEach(el => el.style.display = ehAvulso ? '' : 'none');
             atualizarCamposAvulso();
             const ehCorrer = frenteAtual === 'Porta de Correr';
-            const ehSerr = frenteAtual === 'Serralheria';
             document.querySelectorAll('.secao-porta').forEach(el => el.style.display = ehPorta ? '' : 'none');
             document.querySelectorAll('.secao-correr').forEach(el => el.style.display = ehCorrer ? '' : 'none');
             document.querySelectorAll('.secao-serr').forEach(el => el.style.display = ehSerr ? '' : 'none');
