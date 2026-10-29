@@ -982,6 +982,7 @@
         let isReferenciaInvertida = false; // btnReferenciaFuros
         let isCarregandoEdicao = false;    // trava dos handlers durante a edição
         let tipoPuxadorAtual = '';         // Var_Loc.tipo_puxador
+        let pesoFormTexto = '';            // peso do item em montagem, escrito no desenho (declarado aqui no alto: o desenho pode rodar antes do cálculo)
         let largurasFolhas = [];           // porta de correr: largura própria de cada folha (0/vazio = automática), como a LarguraEditada do VB
         let posicoesFolhas = [''];         // PosicaoPuxador de CADA folha
         let furosLista = [];               // ListaFuros (mesma lista em todas as folhas)
@@ -1435,6 +1436,8 @@
             const mostrar = r => {
                 const rot = r && r.pesoKg !== null && r.pesoKg !== undefined ? PesoTela.rotuloItem({ kg: r.pesoKg, parcial: r.parcial, pendencias: r.pendencias }) : null;
                 grupo.hidden = !rot; campo.value = rot ? rot.texto : ''; campo.title = rot ? rot.titulo : '';
+                const novo = rot && rot.texto !== '—' ? rot.texto : '';
+                if (novo !== pesoFormTexto) { pesoFormTexto = novo; try { desenharVisualizacao(); } catch { /* o desenho se refaz na próxima alteração */ } } // peso no desenho
             };
             let item = null;
             try { item = itemFormPeso(); } catch { item = null; }
@@ -1951,6 +1954,8 @@
             const COR_VAO = '#0077ff', COR_PORTA = '#e8590c'; // vão em azul, porta em laranja
             const cota = limpo ? () => {} : (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
             cv._generico = false;
+            // peso do item em tempo real, só na tela (o modo limpo, que vira a imagem do PDF, não leva nenhuma cota)
+            if (!limpo && pesoFormTexto) { ctx.save(); ctx.font = fonte(22); ctx.textAlign = 'left'; cota('Peso: ' + pesoFormTexto, 24, 44, '#2b2f33'); ctx.restore(); }
             if (altura <= 0 || largura <= 0) {
                 if (limpo) return;
                 // sem medidas: porta genérica do produto (tracejada), só para orientar

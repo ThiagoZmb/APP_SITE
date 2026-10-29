@@ -106,3 +106,10 @@ test('PDF, gravação e outras telas não ganharam peso', () => {
   const ped = ler('rotas/ped_orc.js');
   assert.ok(!/web_pesos|pesoKg|bPESOb/.test(ped));
 });
+
+test('peso do item em montagem é escrito no desenho só na tela (nunca no modo limpo que vai para o PDF)', () => {
+  const h = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
+  assert.match(h, /if \(!limpo && pesoFormTexto\) \{[^}]*cota\('Peso: ' \+ pesoFormTexto/);
+  assert.match(h, /let pesoFormTexto = '';/);
+  assert.ok(h.indexOf("let pesoFormTexto") < h.indexOf("function desenharVisualizacao"), 'declarado antes do desenho');
+});
