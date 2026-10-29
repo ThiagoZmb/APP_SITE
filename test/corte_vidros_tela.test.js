@@ -294,3 +294,11 @@ test('confirmar usa os avisos puros (texto fixo do retalho não usado e do plano
   const js = ler('corte_vidros.js');
   assert.match(js, /textoAvisosConfirmacao/); assert.match(js, /retalhosNaoUsadosComPecas/); assert.match(js, /avisosSaldo/);
 });
+
+test('menu: Corte de vidros no botão direito dos pedidos, abaixo do Plano de corte', () => {
+  const html = ler('painel_inicial.html');
+  assert.match(html, /add\('corte\.ver'[^\n]*Corte de vidros[^\n]*corte_vidros\.html\?numero=/);
+  assert.ok(html.indexOf('Plano de corte') < html.indexOf('Corte de vidros'), 'Plano de corte deve vir antes de Corte de vidros');
+  const linhaVidros = html.split('\n').find(l => l.includes("'Corte de vidros'"));
+  assert.match(linhaVidros, /if \(ehPedido && !cancelado\) add\('corte\.ver'/);
+});
