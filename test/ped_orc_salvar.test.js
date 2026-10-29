@@ -95,17 +95,13 @@ test('preço diferente do mostrado na tela: salva com o preço do servidor e dev
   assert.equal(banco.pedOrc.length, 1);
 });
 
-test('posição de puxador não reconhecida: 422 com o item, nada gravado', async t => {
+test('posição de puxador não reconhecida: salva mesmo assim (sem bloquear)', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
-  // com puxador (mínimo R$ 20): 500 + 20 + 190,08 = 710,08
   const item = giro({ qtd: 1, acessorios: [], furos: { lista: [], lados: [] }, valorTela: 710.08,
     detalhes: { ...giro().detalhes, puxador: 'Puxador X', tipoPuxador: 'Sobreposto', posicoesFolhas: ['XYZ'] } });
   const r = await salvar(chamar, corpo({ itens: [item] }));
-  assert.equal(r.status, 422);
-  const j = await r.json();
-  assert.equal(j.item, 1);
-  assert.match(j.error, /cálculo do vidro/);
-  assert.equal(banco.pedOrc.length, 0);
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc.length, 1);
 });
 
 test('número tomado pelo VB no mesmo instante: usa o seguinte; 3 vezes seguidas → 409', async t => {

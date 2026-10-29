@@ -44,10 +44,10 @@ test('total topo', () => {
   assert.deepEqual(medidasPerfil(f, PUX), { qtdAltura: 2, tamAltura: 1970, qtdLargura: 2, tamLargura: 470 });
 });
 
-test('posição não reconhecida não grava 0×0', () => {
+test('posição não reconhecida não bloqueia: vale só o desconto do perfil (como sem puxador)', () => {
   const f = folha({ posicaoPuxador: 'XYZ' });
-  assert.throws(() => medidasVidro(f, PERFIL, PUX), e => e instanceof ErroEngenharia && /cálculo do vidro/.test(e.message));
-  assert.throws(() => medidasPerfil(f, PUX), e => e instanceof ErroEngenharia && /cálculo do perfil/.test(e.message));
+  assert.deepEqual(medidasVidro(f, PERFIL, PUX), medidasVidro(folha({ puxador: '' }), PERFIL, PUX));
+  assert.deepEqual(medidasPerfil(f, PUX), { qtdAltura: 2, tamAltura: f.altura, qtdLargura: 2, tamLargura: f.largura });
 });
 
 test('sem revestimento não há vidro', () => {

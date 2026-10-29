@@ -109,11 +109,6 @@ function situacao(f) {
   };
 }
 
-function naoReconhecido(oQue, f) {
-  return new ErroEngenharia(`Posição/tipo de puxador não reconhecido para cálculo do ${oQue}. ` +
-    `Tipo: ${f.tipoPuxador} · Posição: [${f.posicaoPuxador}] · QtdPuxador: ${f.qtdPuxador}`);
-}
-
 function medidasVidro(f, perfil, puxador) {
   if (!txt(f.revestimento)) return null;
   // ModPedOrc.vb:400-445: descontos e medidas são Integer no VB
@@ -124,14 +119,14 @@ function medidasVidro(f, perfil, puxador) {
   const A = cint(f.altura), L = cint(f.largura);
   f = { ...f, altura: A, largura: L };
   let a = 0, l = 0;
-  if (s.semPuxador) { a = f.altura - dvPerfil * 2; l = f.largura - dvPerfil * 2; }
+  // posição do puxador não reconhecida (nem lateral nem topo/base): não bloqueia, vale só o desconto do perfil
+  if (s.semPuxador || (!s.temLateral && !s.temTopoBase)) { a = f.altura - dvPerfil * 2; l = f.largura - dvPerfil * 2; }
   else {
     if (s.ehTotal) {
       if (s.temLateral) { a = f.altura - dvPerfil * 2; l = f.largura - dPerfPux - dvPux * s.fatorLateral; }
       if (s.temTopoBase) { a = f.altura - dvPerfil - dvPux * s.fatorTopoBase; l = f.largura - dvPerfil * 2; }
     } else if (s.temLateral) { a = f.altura - dvPerfil * 2; l = f.largura - dvPerfil * 2 - dvPux * s.fatorLateral; }
     else if (s.temTopoBase) { a = f.altura - dvPerfil * 2 - dvPux * s.fatorTopoBase; l = f.largura - dvPerfil * 2; }
-    if (a <= 0 || l <= 0) throw naoReconhecido('vidro', f);
   }
   return { altura: a, largura: l };
 }
@@ -140,13 +135,12 @@ function medidasPerfil(f, puxador) {
   const dPerfPux = puxador ? cint(puxador.descontoPerfilPux) : 0;
   const s = situacao(f);
   f = { ...f, altura: cint(f.altura), largura: cint(f.largura) };
-  if (s.semPuxador) return { qtdAltura: 2, tamAltura: f.altura, qtdLargura: 2, tamLargura: f.largura };
+  if (s.semPuxador || (!s.temLateral && !s.temTopoBase)) return { qtdAltura: 2, tamAltura: f.altura, qtdLargura: 2, tamLargura: f.largura };
   let r = { qtdAltura: 0, tamAltura: 0, qtdLargura: 0, tamLargura: 0 };
   if (s.ehTotal && s.temLateral) r = { qtdAltura: s.fatorLateral >= 2 ? 0 : 1, tamAltura: f.altura, qtdLargura: 2, tamLargura: f.largura - dPerfPux * s.fatorLateral };
   else if (s.ehTotal && s.temTopoBase) r = { qtdAltura: s.fatorTopoBase >= 2 ? 0 : 2, tamAltura: f.altura - dPerfPux * s.fatorTopoBase, qtdLargura: 2, tamLargura: f.largura - dPerfPux * s.fatorTopoBase };
   else if (s.temLateral) r = { qtdAltura: 2, tamAltura: f.altura, qtdLargura: 2, tamLargura: f.largura - dPerfPux * s.fatorLateral };
   else if (s.temTopoBase) r = { qtdAltura: 2, tamAltura: f.altura - dPerfPux * s.fatorTopoBase, qtdLargura: 2, tamLargura: f.largura };
-  if (r.tamAltura <= 0 || r.tamLargura <= 0) throw naoReconhecido('perfil', f);
   return r;
 }
 
