@@ -25,7 +25,9 @@ function descricaoPorta(item, folhas, acessorios) {
 function descricaoCorrer(item, folhas) {
   const d = item.detalhes || {};
   return `Tam: ${txt(item.altura)}x${txt(item.largura)}mm | Per: ${txt(d.perfil)} ${txt(d.acabamento)} | Sist: ${txt(d.sistema)} | ` +
-    `Pux: ${txt(d.puxador)} | Rev: ${txt(d.revestimento)} | Portas: ${folhas.length} | Furos: ${(folhas[0]?.furos || []).length}`;
+    `Pux: ${txt(d.puxador)} | Rev: ${txt(d.revestimento)} | Portas: ${folhas.length} | Furos: ${(folhas[0]?.furos || []).length}` +
+    // larguras diferentes: o transpasse digitado não se deduz das folhas, então vai na descrição (a leitura do pedido usa)
+    (new Set(folhas.map(f => f.largura)).size > 1 && folhas[0]?.larguraVao ? ` | Transp: ${parseFloat(d.transpasse) || 0}` : '');
 }
 
 // frmServicos.vb:634-640

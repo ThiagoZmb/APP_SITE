@@ -187,6 +187,12 @@
         .correr-modo.sem { background: #fff1e6; border-color: #e8590c; color: #9a3a05; }
         .correr-modo.pendente { background: #fff9db; border-color: #f2c200; color: #7a5d00; }
         .correr-modo:empty { display: none; }
+        .correr-larguras { margin: 6px 0 10px; padding: 8px 12px; border: 1px dashed var(--border-strong, #d9d9e3); border-radius: 8px; }
+        .correr-larguras > small { display: block; margin-bottom: 6px; color: var(--text-light); font-weight: 600; }
+        .correr-larguras .cl-linha { display: flex; flex-wrap: wrap; gap: 8px; }
+        .correr-larguras label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-weight: 700; color: var(--text-light); }
+        .correr-larguras input { width: 96px; padding: 5px 8px; min-height: 32px; }
+        .correr-larguras input.editada { border-color: #e8590c; background: #fff1e6; }
         .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f2ff; color: #004a9f; border: 1px solid #0077ff; }
         .chip-sistema.sem { background: #fff1e6; color: #9a3a05; border-color: #e8590c; }
         /* ===== serralheria: peças do conjunto ===== */
@@ -585,6 +591,7 @@
                             <div class="form-group"><label for="f-transpasse">Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
                         </div>
                         <div class="viz-status" id="correr-portas"></div>
+                        <div id="correr-larguras" class="correr-larguras" hidden></div>
                     </div>
                     <!-- SERRALHERIA: produto e material da peça (antes das medidas) -->
                     <div class="secao-item secao-serr" style="display:none">
@@ -969,6 +976,7 @@
         let isReferenciaInvertida = false; // btnReferenciaFuros
         let isCarregandoEdicao = false;    // trava dos handlers durante a edição
         let tipoPuxadorAtual = '';         // Var_Loc.tipo_puxador
+        let largurasFolhas = [];           // porta de correr: largura própria de cada folha (0/vazio = automática), como a LarguraEditada do VB
         let posicoesFolhas = [''];         // PosicaoPuxador de CADA folha
         let furosLista = [];               // ListaFuros (mesma lista em todas as folhas)
         let ladosFuros = ['Esquerdo'];     // PosicaoFuros de cada folha
@@ -1417,6 +1425,7 @@
                 payload = { frente: frenteAtual,
                             cliente: clienteNome, clienteCodigo,
                             altura: mp ? mp.altura : g('f-altura'), largura: mp ? mp.largura : g('f-largura'),
+                            ...(temLarguraEditada() ? { largurasFolhas: largurasDasFolhas() } : {}),
                             acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })),
                             qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
                             perfil: g('f-perfil'), acabPerfil: g('f-acab'),
@@ -1833,7 +1842,8 @@
             else if (altura > 0 && largura > 0) {
                 garantirFolhas();
                 const n = posicoesFolhas.length;
-                const mmL = largura * n + (n > 1 ? Math.max(150, largura * 0.08) : 0) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
+                const somaL = Array.from({ length: n }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || largura).reduce((a, w) => a + w, 0);
+                const mmL = somaL + (n > 1 ? Math.max(150, largura * 0.08) : 0) * (n - 1), mmA = altura + extraTopoMm + extraBaseMm;
                 const cssW = Math.max(300, cv.clientWidth);
                 const alvo = Math.round(Math.min(Math.max(cssW * mmA / mmL + 90, 360), window.innerHeight * 0.8));
                 if (Math.abs(cv.getBoundingClientRect().height - alvo) > 2) cv.style.height = alvo + 'px';
@@ -1873,7 +1883,9 @@
             // SEMPRE afastadas (também com transpasse): cada folha e seus puxadores ficam separados para clicar
             const gapMm = qtdFolhas > 1 ? Math.max(150, largura * 0.08) : 0;
             const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 70 : 50, mBase = correrSis ? 90 : 60;
-            const larguraTotal = largura * qtdFolhas + gapMm * (qtdFolhas - 1);
+            // porta de correr: cada folha pode ter a sua largura (LarguraEditada do VB)
+            const lfs = Array.from({ length: qtdFolhas }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || largura);
+            const larguraTotal = lfs.reduce((a, w) => a + w, 0) + gapMm * (qtdFolhas - 1);
             const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + extraTopoMm + extraBaseMm));
             const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc;
             const hb = Math.max(TRILHO_MM * esc, 30), folgaPx = Math.max(FOLGA_MM * esc, 14); // trilho com altura mínima para o nome caber
@@ -1905,7 +1917,8 @@
             let esp = emb ? Math.max(2.5 * esc, perfilPx * .28) : sob ? Math.max(4 * esc, perfilPx * .36) : Math.max(3.5 * esc, perfilPx * .34);
             esp = Math.max(Math.min(esp, perfilPx * .55), 8);
             for (let f = 0; f < qtdFolhas; f++) {
-                const ox = ox0 + f * (largPx + gapPx);
+                const largura = lfs[f], largPx = largura * esc; // medida desta folha (sombreia a padrão)
+                const ox = ox0 + lfs.slice(0, f).reduce((a, w) => a + w * esc, 0) + f * gapPx;
                 // perfil + vidro
                 ctx.fillStyle = '#c3c8cd'; ctx.fillRect(ox, oy, largPx, altPx);
                 ctx.lineWidth = 2; ctx.strokeStyle = '#2b2f33'; ctx.strokeRect(ox, oy, largPx, altPx);
@@ -2065,7 +2078,8 @@
                        ` | Divisor: ${g('f-divisor') || '-'} (${g('f-div-h') || 0}H/${g('f-div-v') || 0}V)` +
                        (ehPortaComFuros() && furosLista.length
                            ? ` | Furos: ${furosLista.join(', ')} mm (${[...new Set(ladosFuros)].join('/')})` : '') +
-                       (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` : '') +
+                       (frenteAtual === 'Porta de Correr' ? ` | Sistema: ${g('f-sistema') || '-'} / Transpasse: ${g('f-transpasse') || 0}mm` +
+                           (temLarguraEditada() ? ` | Larguras: ${largurasDasFolhas().join(', ')}mm` : '') : '') +
                        '';
             }
             const p0 = ehSerr ? (pecasSerr[0] || {}) : {};
@@ -2094,6 +2108,7 @@
                     pares: paresAtivo(),
                     todaExt,
                     sistema: g('f-sistema'), transpasse: g('f-transpasse'),
+                    largurasFolhas: temLarguraEditada() ? Array.from({ length: qtdEfetiva() }, (_, i) => larguraEditadaDe(i)) : [],
                     desempenador: document.getElementById('chk-desempenador').checked,
                     // serralheria: a 1ª peça vai nos campos do item (descrição e gravação da linha comercial)
                     produto: ehSerr ? (p0.produto || '') : g('f-produto'), material: ehSerr ? (p0.material || '') : g('f-material'),
@@ -2169,6 +2184,7 @@
                 const tam = document.getElementById('f-tamanho-pux');
                 tam.value = d.tamanhoPux || '';
                 set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
+                largurasFolhas = Array.isArray(d.largurasFolhas) ? d.largurasFolhas.map(v => Math.round(parseFloat(v) || 0)) : [];
                 set('f-produto', d.produto); set('f-material', d.material);
                 set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
                 if (item.frente === 'Serralheria') limparMedidasSerr();
@@ -2235,6 +2251,7 @@
             document.getElementById('f-qtd').value = 1;
             ['f-qtd-a', 'f-qtd-l', 'f-qtd-p'].forEach(id => { document.getElementById(id).value = 1; });
             atualizarMetragemSerr();
+            zerarLargurasFolhas();
             sistemaPadraoCorrer();
             renderAcessorios(); // porta de correr: aviso do sistema e "Portas: A × L" são refeitos já com os campos limpos
             document.getElementById('f-soldas').value = 0;
@@ -2668,6 +2685,45 @@
             const t = parseFloat(val('f-transpasse')) || 0;
             return { altura: Math.round(a - sistemaCorrer.descontoAltura), largura: Math.round(n > 1 ? (l + t * (n - 1)) / n : l), n };
         }
+        // larguras de cada folha de correr: a automática, trocada pela editada (frmPortasCorrer: LarguraEditada) quando houver
+        function larguraEditadaDe(i) { const v = Math.round(parseFloat(largurasFolhas[i]) || 0); return v > 0 ? v : 0; }
+        function temLarguraEditada() { return ehCorrer() && qtdEfetiva() > 1 && Array.from({ length: qtdEfetiva() }, (_, i) => larguraEditadaDe(i)).some(v => v > 0); }
+        function largurasDasFolhas() {
+            const m = medidasPortasCorrer();
+            return Array.from({ length: m.n }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || m.largura);
+        }
+        // com larguras editadas os trilhos cobrem a soma das folhas − transpasse × (n − 1); senão, o vão digitado
+        function vaoRealCorrer() {
+            const l = parseFloat(val('f-largura')) || 0;
+            if (!temLarguraEditada() || !temSistemaCorrer()) return l;
+            const n = qtdEfetiva(), t = parseFloat(val('f-transpasse')) || 0, auto = Math.round((l + t * (n - 1)) / n);
+            return Array.from({ length: n }, (_, i) => larguraEditadaDe(i) || auto).reduce((x, w) => x + w, 0) - t * (n - 1);
+        }
+        function zerarLargurasFolhas() { largurasFolhas = []; }
+        // uma caixa por folha; vazia = automática (mostrada como placeholder)
+        function renderLargurasFolhas() {
+            const box = document.getElementById('correr-larguras');
+            if (!box) return;
+            const n = qtdEfetiva(), m = medidasPortasCorrer();
+            if (!ehCorrer() || n < 2 || !(m.largura > 0)) { box.hidden = true; box.innerHTML = ''; return; }
+            box.hidden = false;
+            if (box.querySelectorAll('input').length !== n) {
+                box.innerHTML = '<small>Largura de cada porta (mm) — deixe em branco para a automática</small><div class="cl-linha">' +
+                    Array.from({ length: n }, (_, i) => `<label>Porta ${i + 1}<input type="number" min="1" step="1" data-i="${i}"></label>`).join('') + '</div>';
+            }
+            box.querySelectorAll('input').forEach((inp, i) => {
+                inp.placeholder = String(m.largura);
+                if (document.activeElement !== inp) inp.value = larguraEditadaDe(i) || '';
+                inp.classList.toggle('editada', larguraEditadaDe(i) > 0);
+            });
+        }
+        document.getElementById('correr-larguras').addEventListener('input', e => {
+            const i = parseInt(e.target.dataset.i);
+            if (!(i >= 0)) return;
+            largurasFolhas[i] = parseFloat(e.target.value) > 0 ? Math.round(parseFloat(e.target.value)) : 0;
+            e.target.classList.toggle('editada', largurasFolhas[i] > 0);
+            if (temSistemaCorrer()) atualizarSistemaCorrer(); else { desenharVisualizacao(); calcularPrecoAutomatico(); }
+        });
         // porta de correr: deixa claro se a medida é do VÃO (com sistema) ou de cada PORTA (sem sistema)
         function atualizarModoCorrer() {
             const modo = document.getElementById('correr-modo');
@@ -2702,6 +2758,7 @@
             const c = document.getElementById('correr-portas');
             const m = medidasPortasCorrer();
             c.textContent = ehCorrer() && m.altura && m.largura ? `Portas: ${m.altura} × ${m.largura} mm (${m.n} folhas)` : '';
+            renderLargurasFolhas();
             if (ehCorrer()) desenharVisualizacao(); // folhas com a medida da porta e o trilho dependem do sistema carregado
         }
         async function abrirListaAcessorios() {
@@ -2738,7 +2795,7 @@
                 renderAcessorios(); calcularPrecoAutomatico();
                 return;
             }
-            const q = new URLSearchParams({ nome: val('f-sistema'), folhas: qtdEfetiva(), larguraVao: parseFloat(val('f-largura')) || 0,
+            const q = new URLSearchParams({ nome: val('f-sistema'), folhas: qtdEfetiva(), larguraVao: vaoRealCorrer(),
                 desempenador: document.getElementById('chk-desempenador').checked ? '1' : '0', clienteCodigo: val('sel-cliente') });
             try {
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/sistema_correr?${q}`);
@@ -2792,11 +2849,11 @@
         });
         ['f-sistema', 'f-transpasse', 'f-largura', 'chk-desempenador'].forEach(id =>
             document.getElementById(id).addEventListener('change', () => {
-                if (id === 'f-sistema') trilhosReduzidos = {}; // outro sistema: volta à quantidade da tabela
+                if (id === 'f-sistema') { trilhosReduzidos = {}; zerarLargurasFolhas(); } // outro sistema: volta à quantidade da tabela e às larguras automáticas
                 if (ehCorrer()) atualizarSistemaCorrer();
             }));
         document.getElementById('f-altura').addEventListener('change', renderAcessorios);
-        document.getElementById('f-qtd').addEventListener('input', () => { trilhosReduzidos = {}; if (ehCorrer() && temSistemaCorrer()) atualizarSistemaCorrer(); else renderAcessorios(); });
+        document.getElementById('f-qtd').addEventListener('input', () => { trilhosReduzidos = {}; zerarLargurasFolhas(); if (ehCorrer() && temSistemaCorrer()) atualizarSistemaCorrer(); else renderAcessorios(); });
         // trocar de frente: os acessórios permitidos são outros
         document.querySelectorAll('.frente-btn').forEach(b => b.addEventListener('click', () => {
             limparAcessorios();

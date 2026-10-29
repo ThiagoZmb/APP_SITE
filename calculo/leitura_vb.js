@@ -54,7 +54,10 @@ function traduzirPorta(l, linhas, sistemas) {
   if (!cfgs.length) throw new Trava('item antigo, sem as folhas gravadas');
   if (cfgs.some(c => txt(c.USINAGEM_PERFIL) || txt(c.USINAGEM_PUXADOR))) throw new Trava('tem usinagem gravada');
   const c0 = cfgs[0];
-  if (cfgs.some(c => CAMPOS_COMUNS.some(k => !igual(c[k], c0[k])))) throw new Trava('folhas com medidas ou materiais diferentes entre si');
+  // porta de correr: cada folha pode ter largura própria (LarguraEditada do VB); o resto continua igual em todas
+  const correr = FRENTE_DA_TELA[l.TIPO_PRODUTO] === 'Porta de Correr';
+  const comuns = correr ? CAMPOS_COMUNS.filter(k => k !== 'LARGURA') : CAMPOS_COMUNS;
+  if (cfgs.some(c => comuns.some(k => !igual(c[k], c0[k])))) throw new Trava('folhas com medidas ou materiais diferentes entre si');
   const seqs = sequenciasDeFuros(porItem(linhas.furacao, n, 'ITEM'));
   if (seqs.length && (seqs.length !== cfgs.length || seqs.some(s => s.medidas.join() !== seqs[0].medidas.join())))
     throw new Trava('furos diferentes entre as folhas');
@@ -68,6 +71,8 @@ function traduzirPorta(l, linhas, sistemas) {
     tamanhoPux: num(c0.TAM_PUXADOR) ? String(num(c0.TAM_PUXADOR)) : '', revestimento: txt(c0.REVESTIMENTO), corRevest: txt(c0.COR_REVESTIMENTO),
     divisor: txt(c0.DIVISOR), divH: num(c0.QTD_HORIZONTAL), divV: num(c0.QTD_VERTICAL), todaExt: /total/i.test(txt(c0.TIPO_PUXADOR)) };
 
+  const larguras = cfgs.flatMap(c => Array.from({ length: num(c.QTD) }, () => num(c.LARGURA)));
+  const desiguais = correr && larguras.some(w => w !== larguras[0]);
   let altura = num(c0.ALTURA), largura = num(c0.LARGURA), sistema = null;
   if (frente === 'Porta de Correr') {
     if (num(c0.ALTURA_VAO) > 0 && num(c0.LARGURA_VAO) > 0) {
@@ -77,8 +82,19 @@ function traduzirPorta(l, linhas, sistemas) {
       if (!sistema) throw new Trava(`sistema de correr '${m[1]}' não está no cadastro`);
       d.sistema = m[1];
       altura = num(c0.ALTURA_VAO); largura = num(c0.LARGURA_VAO);
-      d.transpasse = String(qtd > 1 ? Math.round((num(c0.LARGURA) * qtd - largura) / (qtd - 1)) : 0);
-    } else d.sistema = 'Sem sistema';
+      if (!desiguais) d.transpasse = String(qtd > 1 ? Math.round((num(c0.LARGURA) * qtd - largura) / (qtd - 1)) : 0);
+      else {
+        // larguras diferentes: o transpasse não se deduz das folhas, a gravação o deixa na descrição ("Transp: N")
+        const t = /Transp:\s*(\d+(?:[.,]\d+)?)/.exec(txt(l.DESCRICAO));
+        if (!t) throw new Trava('larguras diferentes sem o transpasse na descrição');
+        d.transpasse = String(num(t[1].replace(',', '.')));
+        const auto = Math.round((largura + num(d.transpasse) * (qtd - 1)) / qtd);
+        d.largurasFolhas = larguras.map(w => w === auto ? 0 : w);
+      }
+    } else {
+      d.sistema = 'Sem sistema';
+      if (desiguais) { largura = larguras[0]; d.largurasFolhas = larguras.map(w => w === larguras[0] ? 0 : w); } // a da 1ª folha é a da tela
+    }
   }
   const doSistema = new Map((sistema?.itens || []).map(i => [i.modelo, i.classe]));
   const acessorios = porItem(linhas.complementos, n).sort((a, b) => num(a.ITEM) - num(b.ITEM)).map(a => ({

@@ -174,6 +174,19 @@ async function calcularPrecoItem(b, cliente, leitor) {
   }
 
   // ============ FRENTE PORTAS (MotorFinanceiro.CalcularValorVendaPorta) ============
+  // porta de correr com larguras diferentes: cada largura é uma porta; o total é a soma e o unitário a média
+  const largs = Array.isArray(b.largurasFolhas) ? b.largurasFolhas.slice(0, 200).map(v => parseFloat(v) || 0) : [];
+  if (largs.length > 1 && new Set(largs).size > 1) {
+    const porLargura = new Map();
+    for (const w of largs) porLargura.set(w, (porLargura.get(w) || 0) + 1);
+    let total = 0, ultimo = null;
+    for (const [w, q] of porLargura) {
+      ultimo = await calcularPrecoItem({ ...b, largura: w, largurasFolhas: null, qtd: 1 }, cliente, leitor);
+      total += ultimo.total * q;
+    }
+    total = Math.round(total * 100) / 100;
+    return { unitario: Math.round(total / largs.length * 100) / 100, total, diag: { ...ultimo.diag, largurasFolhas: largs } };
+  }
   const altura = parseFloat(b.altura) || 0;
   const largura = parseFloat(b.largura) || 0;
 

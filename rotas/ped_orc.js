@@ -4,7 +4,7 @@
 // ==========================================================================
 const { semValores } = require('../seguranca/valores');
 const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco } = require('../calculo/precos');
-const { acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
+const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const express = require('express');
 const { validarPng } = require('../calculo/png');
@@ -153,7 +153,8 @@ async function prepararItem(db, leitor, cliente, item, n) {
       const sis = await lerSistemaCorrer(db, String(d.sistema), n0);
       if (!sis) throw new ErroItem(422, `Item ${n}: sistema de correr '${d.sistema}' não encontrado.`, { item: n });
       descontoAlturaSistema = sis.descontoAltura;
-      const doSistema = acessoriosDoSistema(sis.itens, sis.config, { larguraVao: parseFloat(item.largura) || 0, folhas: n0, incluirDesempenador: !!d.desempenador });
+      const larguraVao = larguraRealDoVao(item, folhasDoItem(item, { descontoAlturaSistema: sis.descontoAltura }));
+      const doSistema = acessoriosDoSistema(sis.itens, sis.config, { larguraVao, folhas: n0, incluirDesempenador: !!d.desempenador });
       // trilhos: o usuário pode reduzir a quantidade (1 até o que a tabela do sistema dá para este nº de portas), nunca aumentar
       const reduzidos = new Map();
       for (const a of Array.isArray(item.acessorios) ? item.acessorios : []) {

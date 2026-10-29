@@ -23,18 +23,34 @@ const furosUnicos = lista => [...new Set((lista || []).map(Number).filter(f => f
 
 const temSistemaCorrer = sistema => !!txt(sistema) && txt(sistema) !== 'Sem sistema';
 
+// larguras individuais das portas de correr: n números inteiros (0 = automática)
+function larguraEditadas(lista, n) {
+  const l = Array.isArray(lista) ? lista : [];
+  return Array.from({ length: n }, (_, i) => { const v = Math.round(num(l[i])); return v > 0 ? v : 0; });
+}
+
+// Vão que os trilhos cobrem quando há largura editada (frmPortasCorrer.EditarTamanho: soma das folhas − transpasse × (n − 1));
+// sem edição vale o vão digitado
+function larguraRealDoVao(item, folhas) {
+  const d = item.detalhes || {};
+  if (!larguraEditadas(d.largurasFolhas, folhas.length).some(v => v > 0)) return num(item.largura);
+  return folhas.reduce((t, f) => t + f.largura, 0) - num(d.transpasse) * Math.max(folhas.length - 1, 0);
+}
+
 // Item da tela → uma Folha por porta (item.qtd folhas)
 function folhasDoItem(item, { descontoAlturaSistema = 0 } = {}) {
   const d = item.detalhes || {};
   const n = Math.max(1, parseInt(item.qtd) || 1);
-  let altura = num(item.altura), largura = num(item.largura), alturaVao = null, larguraVao = null;
+  let altura = num(item.altura), larguraPadrao = num(item.largura), alturaVao = null, larguraVao = null;
   if (item.frente === 'Porta de Correr' && temSistemaCorrer(d.sistema)) {
     // frmPortasCorrer: a medida é o vão; porta = vão − desconto do sistema; largura com transpasse
-    alturaVao = altura; larguraVao = largura;
+    alturaVao = altura; larguraVao = larguraPadrao;
     const transp = num(d.transpasse);
     altura = Math.round(alturaVao - num(descontoAlturaSistema));
-    largura = Math.round(n > 1 ? (larguraVao + transp * (n - 1)) / n : larguraVao);
+    larguraPadrao = Math.round(n > 1 ? (larguraVao + transp * (n - 1)) / n : larguraVao);
   }
+  // frmPortasCorrer (LarguraEditada): cada porta de correr pode ter largura própria; 0/ausente = a automática
+  const editadas = item.frente === 'Porta de Correr' ? larguraEditadas(d.largurasFolhas, n) : [];
   const furos = furosUnicos(item.furos?.lista);
   // divisor: acabamento/cor do perfil e tamanho da folha (frmPortasCorrer.vb:1519)
   const divH = parseInt(d.divH) || 0, divV = parseInt(d.divV) || 0, temDiv = divH > 0 || divV > 0;
@@ -44,6 +60,7 @@ function folhasDoItem(item, { descontoAlturaSistema = 0 } = {}) {
   for (let i = 0; i < n; i++) {
     const pos = txt(posicoes[i] ?? posicoes[0] ?? '');
     const puxador = txt(d.puxador);
+    const largura = editadas[i] > 0 ? editadas[i] : larguraPadrao;
     folhas.push({
       altura, largura, alturaVao, larguraVao,
       perfil: txt(d.perfil), acabPerfil: txt(d.acabamento), corPerfil: txt(d.cor), usinagemPerfil: '',
@@ -155,4 +172,4 @@ function acessoriosDoSistema(itensSistema, config, { larguraVao, folhas, incluir
   return saida;
 }
 
-module.exports = { cint, ErroEngenharia, exigePerfil, furosUnicos, temSistemaCorrer, folhasDoItem, chaveFolha, agruparFolhas, medidasVidro, medidasPerfil, acessoriosDoSistema };
+module.exports = { larguraEditadas, larguraRealDoVao, cint, ErroEngenharia, exigePerfil, furosUnicos, temSistemaCorrer, folhasDoItem, chaveFolha, agruparFolhas, medidasVidro, medidasPerfil, acessoriosDoSistema };
