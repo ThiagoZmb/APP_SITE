@@ -1914,7 +1914,7 @@
             const desenharTrilho = (y, a, padrao) => {
                 ctx.fillStyle = '#5f6670'; ctx.fillRect(ox0, y, tw, hb);
                 ctx.font = fonte(15); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-                cota(a ? a.nome : padrao, ox0 + tw / 2, y + hb / 2 + 6);
+                cota(a ? `${a.qtd} ${a.nome}` : padrao, ox0 + tw / 2, y + hb / 2 + 6);
                 return { x: ox0, y, w: tw, h: hb };
             };
             if (correrSis) {
