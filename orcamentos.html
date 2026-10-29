@@ -152,7 +152,7 @@
         .item-visual #cv-visualizacao { max-width: none; height: 480px; }
         .item-layout.sem-visual { grid-template-columns: minmax(0, 1fr); }
         /* serralheria: produto/obs em cima, Medidas da peça (esquerda) e Complementos (direita) lado a lado, peças embaixo */
-        .item-layout.frente-serr .item-dados { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: start; }
+        .item-layout.frente-serr .item-dados { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; align-items: stretch; }
         .item-layout.frente-serr .item-dados > .secao-item { grid-column: 1 / -1; }
         .item-layout.frente-serr .item-dados > #quadro-serr-produto { order: 1; }
         .item-layout.frente-serr .item-dados > #quadro-medidas { order: 2; grid-column: 1; }
@@ -190,11 +190,19 @@
         html body th { padding: 6px 8px !important; }
         html body .viz-linha { margin-top: 4px; }
         /* observação geral do pedido: destacada */
+        /* cabeçalho: tipo/cliente final/datas à esquerda, observação geral ocupando a metade direita */
+        .cab-meio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; align-items: stretch; }
+        .cab-esq { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px 14px; min-width: 0; }
+        .cab-esq .form-group.dupla { flex: 1 1 200px; min-width: 0; }
+        .cab-esq .form-group.full { flex: 1 1 100%; }
+        html body .cab-meio .obs-geral { display: flex; flex-direction: column; grid-column: auto; }
+        html body .cab-meio .obs-geral #ped-obs { flex: 1; height: auto; min-height: 90px; }
+        @media (max-width: 800px) { .cab-meio { grid-template-columns: minmax(0, 1fr); } }
         .obs-geral { background: #fff7e6; border: 1px solid #f5b041; border-left: 5px solid #e67e22; border-radius: 10px; padding: 6px 10px 8px; }
         html body .obs-geral label { color: #a04000 !important; font-weight: 800 !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: .5px; }
         #ped-obs { background: #fff; min-height: 52px; height: 52px; } /* começa baixa; dá para puxar o canto */
         /* observação do item (abaixo do desenho) */
-        #f-obs { width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; font-size: 13px; }
+        #f-obs { width: 100%; box-sizing: border-box; min-height: 36px; height: 36px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; font-size: 13px; }
         /* porta de correr: com × sem sistema bem visível */
         .correr-modo { margin: 2px 0 6px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 2px solid; }
         .correr-modo.com { background: #e6f2ff; border-color: #0077ff; color: #004a9f; }
@@ -565,6 +573,8 @@
                         <label for="sel-cliente">Nome do cliente</label>
                         <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
                     </div>
+                    <div class="form-group full cab-meio">
+                    <div class="cab-esq">
                     <div class="form-group dupla">
                         <label for="ped-tipo">Tipo e número</label>
                         <div class="tipo-numero">
@@ -582,9 +592,11 @@
                             <div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
                         </div>
                     </div>
+                    </div>
                     <div class="form-group full obs-geral">
                         <label for="ped-obs">Observação geral do pedido</label>
                         <textarea id="ped-obs" rows="2" maxlength="5000"></textarea>
+                    </div>
                     </div>
                     <div class="form-group full" id="ped-campos-pedido" style="display:none">
                         <div class="ped-pedido-grid">
@@ -800,7 +812,7 @@
                     <!-- 📝 OBSERVAÇÃO DO ITEM (abaixo do desenho, em todas as frentes) -->
                     <div class="secao-item secao-obs-item">
                         <h4>📝 Observação do item</h4>
-                        <textarea id="f-obs" rows="4" maxlength="500" placeholder="Detalhes deste item (vão para a lista e para o pedido)" aria-label="Observação do item"></textarea>
+                        <textarea id="f-obs" rows="1" maxlength="500" placeholder="Detalhes deste item (vão para a lista e para o pedido)" aria-label="Observação do item"></textarea>
                     </div>
                     </aside>
                     </div>
