@@ -602,6 +602,25 @@ function registrarPedOrc({ rota, pool }) {
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: 'Cancelado' });
   });
 
+  // situação do ORÇAMENTO (menu do botão direito da lista): Fechado / Aguardando resposta, como "Alterar situação para..." do VB
+  // (frm_Controle_de_Orçamentos). Registrada ANTES da rota genérica /ped_orc/:tipo/:numero/situacao, que é só de pedido.
+  const SITUACOES_ORCAMENTO = ['Fechado', 'Aguardando resposta'];
+  rota('post', '/ped_orc/orcamentos/:numero/situacao', ['orcamentos.salvar'], async (req, res) => {
+    const numero = Number(req.params.numero);
+    if (!(Number.isInteger(numero) && numero > 0)) return res.status(400).json({ error: 'Documento inválido.' });
+    const nova = String((req.body || {}).situacao ?? '');
+    if (!SITUACOES_ORCAMENTO.includes(nova)) return res.status(400).json({ error: `Situação inválida. Use: ${SITUACOES_ORCAMENTO.join(', ')}.` });
+    const r = await emTransacao(pool, res, 'POST /ped_orc/orcamentos/situacao', async conn => {
+      const linhas = await docParaAcao(conn, req, 'Orçamento', numero);
+      const antes = String(linhas.cab.SITUACAO || '');
+      if (antes === nova) throw new ErroUsuario(409, `O orçamento nº ${numero} já está "${nova}".`);
+      await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, numero, 'Orçamento']);
+      await auditarDoc(conn, req, 'orcamento_situacao', 'Orçamento', numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes, para: nova });
+      return { ok: true };
+    });
+    if (r) res.json({ ok: true, tipo: 'Orçamento', numero, situacao: nova });
+  });
+
   // mudar a situação do pedido (menu do botão direito da lista). Entregue/Retirado gravam DATA_ENTREGA = hoje, como Pedido_Entregue/Pedido_Retirado do VB;
   // sair de Entregue/Retirado limpa a data. Pedido Cancelado não muda por aqui. A fila de Entregas acompanha pela varredura (Pronto entra; sair de Pronto antes de agendar cancela).
   const SITUACOES_MUDAR = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];

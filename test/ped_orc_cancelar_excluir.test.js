@@ -182,3 +182,31 @@ test('excluir orçamento não mexe no plano de vidros do pedido de mesmo número
   assert.deepEqual(v.planos.map(p => p.situacao), ['gerado', 'conferido']);
   assert.equal(v.retalhos[0].situacao, 'reservado');
 });
+
+test('orçamento: Fechado / Aguardando resposta pela rota própria, auditado; outras situações e pedido não passam', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Orçamento', 6); comDocumento(banco, 'Pedido', 6);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  let r = await chamar('/ped_orc/orcamentos/6/situacao', 'POST', { situacao: 'Fechado' });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Orçamento').SITUACAO, 'Fechado');
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Pedido').SITUACAO, 'Em Produção'); // o pedido de mesmo número não é tocado
+  assert.equal((await chamar('/ped_orc/orcamentos/6/situacao', 'POST', { situacao: 'Fechado' })).status, 409);
+  r = await chamar('/ped_orc/orcamentos/6/situacao', 'POST', { situacao: 'Aguardando resposta' });
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Orçamento').SITUACAO, 'Aguardando resposta');
+  assert.deepEqual(banco.auditoria.map(a => a.acao), ['orcamento_situacao', 'orcamento_situacao']);
+  assert.equal((await chamar('/ped_orc/orcamentos/6/situacao', 'POST', { situacao: 'Cancelado' })).status, 400);
+  assert.equal((await chamar('/ped_orc/orcamentos/6/situacao', 'POST', {})).status, 400);
+  assert.equal((await chamar('/ped_orc/orcamentos/99/situacao', 'POST', { situacao: 'Fechado' })).status, 404);
+  assert.equal((await chamar('/ped_orc/orcamentos/abc/situacao', 'POST', { situacao: 'Fechado' })).status, 400);
+});
+
+test('lista: orçamento Fechado ganha a linha azul clara e o menu tem Fechado / Aguardando resposta', () => {
+  const h = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'painel_inicial.html'), 'utf8');
+  assert.match(h, /n === 'fechado' \? 'fechado' : 'outro'/);
+  assert.match(h, /#orders-tbody tr\.linha-fechada \{ background: #eaf3ff; \}/);
+  assert.match(h, /tipoLista === 'Orçamento' && x\.s === 'fechado' \? ' class="linha-fechada"'/);
+  assert.ok(h.indexOf('tr.linha-fechada {') < h.indexOf('#orders-tbody tr.ctx'), 'a regra do clique direito vence a da linha fechada');
+  assert.match(h, /mudarSituacaoOrcamento\(numero, 'Fechado'\)/);
+  assert.match(h, /\/ped_orc\/orcamentos\/\$\{encodeURIComponent\(numero\)\}\/situacao/);
+});

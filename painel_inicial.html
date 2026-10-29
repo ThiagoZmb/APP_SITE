@@ -214,6 +214,9 @@
         .st.retirado { color: #0f7f7f; border-color: #9fdcdc; background: #f0fbfb; }
         .st.entrega { color: #5b3f8c; border-color: #cdbfe6; background: #f7f3fd; margin-left: 4px; }
         .st.cancelado { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
+        .st.fechado { color: #1d5fb8; border-color: #a9c8f2; background: #e3efff; }
+        /* orçamento Fechado: a linha toda em azul bem claro (antes da regra .ctx, que continua valendo no clique direito) */
+        #orders-tbody tr.linha-fechada { background: #eaf3ff; }
         .st.fin-aberto { color: #a86d00; border-color: #f2d48a; }
         .st.fin-atraso { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
         .st.fin-ok { color: #127a3f; border-color: #a3d9b1; }
@@ -401,7 +404,7 @@
         // situações (mesmas regras usadas no resto do sistema)
         const sit = s => { const n = norm(s);
             return n.includes('cancel') ? 'cancelado' : n.includes('produ') ? 'producao' : (n.includes('pronto') || n.includes('finaliz') || n.includes('conclu') || n === 'ok') ? 'pronto'
-                : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : 'outro'; };
+                : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : n === 'fechado' ? 'fechado' : 'outro'; };
         const finClasse = f => { const n = norm(f); return n.includes('atras') || n.includes('protest') ? 'fin-atraso' : n.includes('receber') ? 'fin-aberto' : n.includes('recebid') ? 'fin-ok' : ''; };
 
         // ================= ESTADO =================
@@ -688,7 +691,7 @@
             $('lista-total').textContent = moeda(soma(lista));
             const MAX = 500;
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
-                <tr data-numero="${esc(x.numero)}" tabindex="0">
+                <tr data-numero="${esc(x.numero)}" tabindex="0"${tipoLista === 'Orçamento' && x.s === 'fechado' ? ' class="linha-fechada"' : ''}>
                     <td class="order-number">${esc(x.numero)} <a class="editar" data-perm="orcamentos.criar valores.ver" title="Abrir para editar"
                         href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}&voltar=${voltarParaEstaPagina()}">✏️</a>
                         ${tipoLista === 'Pedido' && x.s !== 'cancelado' ? '<button type="button" class="acao-doc" data-acao="cancelar" data-perm="pedidos.cancelar" title="Cancelar este pedido">🚫</button>' : ''}
@@ -752,6 +755,15 @@
                 await carregar();
             } catch (err) { alert(err.message); }
         }
+        // orçamento: Fechado / Aguardando resposta (como "Alterar situação para..." do VB)
+        async function mudarSituacaoOrcamento(numero, nome) {
+            const x = docDe(numero);
+            if (!confirm(`Mudar a situação do orçamento nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
+            try {
+                await api(`/ped_orc/orcamentos/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome }) });
+                await carregar();
+            } catch (err) { alert(err.message); }
+        }
         function itensDoMenu(x) {
             const numero = x.numero, ehPedido = tipoLista === 'Pedido', cancelado = x.s === 'cancelado';
             const L = [];
@@ -770,6 +782,12 @@
                     const atual = x.s === chave;
                     L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(numero, nome), desativado: atual });
                 }
+            }
+            if (!ehPedido && Acesso.pode('orcamentos.salvar')) {
+                sep(); L.push({ titulo: 'Situação do orçamento' });
+                const fechado = x.s === 'fechado', aguardando = norm(x.situacao).startsWith('aguard');
+                L.push({ icone: fechado ? '✔' : '', rotulo: 'Fechado', fn: () => mudarSituacaoOrcamento(numero, 'Fechado'), desativado: fechado });
+                L.push({ icone: aguardando ? '✔' : '', rotulo: 'Aguardando resposta', fn: () => mudarSituacaoOrcamento(numero, 'Aguardando resposta'), desativado: aguardando });
             }
             if (ehPedido && x.entregaStatus && Acesso.pode('entregas.ver')) {
                 sep();
