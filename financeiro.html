@@ -408,18 +408,21 @@
         @media (max-width: 1000px) { .gastos-corpo { grid-template-columns: minmax(0, 1fr); } }
         @media (max-width: 600px) { .ranking li { grid-template-columns: 26px minmax(0, 1fr) auto; } .ranking .info { grid-column: 2 / -1; text-align: left; } }
         /* compacto (−30% de altura, igual ao ranking de clientes): cada linha numa faixa só */
-        .gastos-topo { padding-top: 14px; }
-        .gastos-corpo { padding: 6px 24px 12px; gap: 24px; grid-template-columns: minmax(0, 1fr) 190px; }
-        .ranking { gap: 2px; }
-        .ranking li { grid-template-columns: 22px minmax(0, 1.25fr) minmax(0, 1fr) 118px 215px; grid-template-areas: "pos nome barra val info"; gap: 0 12px; padding: 5px 10px; }
-        .ranking .pos { grid-area: pos; grid-row: auto; width: 22px; height: 22px; border-radius: 7px; font-size: 11px; }
+        .gastos-topo { padding: 10px 20px 0; }
+        .gastos-topo .painel-titulo { font-size: 16px; }
+        .seg { padding: 3px; }
+        .seg button { padding: 4px 12px; }
+        .gastos-corpo { padding: 0 20px 6px; gap: 20px; grid-template-columns: minmax(0, 1fr) 130px; }
+        .ranking { gap: 0; }
+        .ranking li { grid-template-columns: 20px minmax(0, 1.25fr) minmax(0, 1fr) 118px 215px; grid-template-areas: "pos nome barra val info"; gap: 0 12px; padding: 1px 10px; }
+        .ranking .pos { grid-area: pos; grid-row: auto; width: 18px; height: 18px; border-radius: 5px; font-size: 10px; }
         .ranking .nome { grid-area: nome; font-size: 13.5px; }
         .ranking .barra-g { grid-area: barra; }
         .ranking .val { grid-area: val; font-size: 13.5px; }
         .ranking .info { grid-area: info; }
         .ranking .vazio-g { grid-template-areas: none; }
-        .rosca { height: 190px; }
-        .rosca-centro b { font-size: 16px; }
+        .rosca { height: 130px; }
+        .rosca-centro b { font-size: 14px; }
         @media (max-width: 1200px) {
             .ranking li { grid-template-columns: 22px minmax(0, 1fr) 118px; grid-template-areas: "pos nome val" "pos barra info"; gap: 2px 12px; }
         }
