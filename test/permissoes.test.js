@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 46 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 46);
-  assert.equal(CODIGOS.size, 46);
+test('catálogo tem 48 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 48);
+  assert.equal(CODIGOS.size, 48);
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
@@ -15,11 +15,11 @@ test('catálogo tem 46 permissões e códigos únicos', () => {
 
 test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e excluir', () => {
   const p = perfil('Interno completo');
-  assert.equal(p.permissoes.length, 33); // + notas.*, atendimento.modo, + fornecedores.*, tintas.* e corte.ver/planejar
+  assert.equal(p.permissoes.length, 35); // + pesos.*, notas.*, atendimento.modo, + fornecedores.*, tintas.* e corte.ver/planejar
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil('Administrador').permissoes.length, 45);
+  assert.equal(perfil('Administrador').permissoes.length, 47);
   assert.ok(p.permissoes.includes('corte.ver') && p.permissoes.includes('corte.planejar')); // plano de corte: Interno completo planeja
   assert.ok(!p.permissoes.includes('corte.parametros')); // parâmetros e retalhos manuais: só o Administrador
   assert.ok(!p.permissoes.includes('gestao.ver') && !p.permissoes.includes('gestao.editar')); // Central de Gestão: só o Administrador na migração

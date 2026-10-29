@@ -42,6 +42,8 @@ const CATALOGO = [
   { codigo: 'tintas.editar', nome: 'Cadastrar, editar e excluir tintas (o valor também exige Valores financeiros)', area: 'Cadastros' },
   { codigo: 'notas.ver', nome: 'Ver notas fiscais de entrada e saída (o valor também exige Valores financeiros)', area: 'Cadastros' },
   { codigo: 'notas.editar', nome: 'Lançar, editar e cancelar notas fiscais (o valor também exige Valores financeiros)', area: 'Cadastros' },
+  { codigo: 'pesos.ver', nome: 'Ver o peso cadastrado de perfis, puxadores, vidros e acessórios', area: 'Cadastros' },
+  { codigo: 'pesos.editar', nome: 'Cadastrar, editar e excluir o peso dos produtos', area: 'Cadastros' },
   { codigo: 'gestao.ver', nome: 'Ver a Central de Gestão: metas, caixa e orçamento (também exige Valores financeiros)', area: 'Gestão' },
   { codigo: 'gestao.editar', nome: 'Definir metas e orçamentos na Central de Gestão (também exige Valores financeiros)', area: 'Gestão' },
   { codigo: 'corte.ver', nome: 'Ver o plano de corte dos pedidos e os retalhos', area: 'Plano de corte' },

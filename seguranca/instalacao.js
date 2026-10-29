@@ -211,6 +211,18 @@ const TABELAS = [
      UNIQUE KEY ux_nota_chave (chave),
      KEY ix_nota_data (tipo, data_emissao)
    ) ${OPCOES}`,
+  // peso por produto (o banco do VB não tem peso): produto = nome usado no VB (MODELO, PERFIL, PUXADOR, REVESTIMENTO), sem FK
+  // unidade_peso: kg_m (kg por metro), kg_m2_mm (kg por m² por mm de espessura), kg_un (kg por unidade)
+  `CREATE TABLE IF NOT EXISTS \`web_pesos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     tipo ENUM('perfil','puxador','vidro','acessorio') NOT NULL,
+     produto VARCHAR(190) NOT NULL,
+     unidade_peso ENUM('kg_m','kg_m2_mm','kg_un') NOT NULL,
+     valor DECIMAL(12,4) NOT NULL,
+     atualizado_por VARCHAR(100) NULL,
+     atualizado_em DATETIME NULL,
+     UNIQUE KEY ux_peso_produto (tipo, produto)
+   ) ${OPCOES}`,
   // formação de preços — parte A: configuração por material de venda (cadastro_de_produtos.CODIGO)
   `CREATE TABLE IF NOT EXISTS \`web_custo_material\` (
      material_codigo INT NOT NULL PRIMARY KEY,
@@ -645,6 +657,31 @@ async function acrescentarPermissoesNotas(pool) {
   }
 }
 
+// Peso das portas: ver e editar para Administrador e Interno completo
+async function acrescentarPermissoesPesos(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_pesos' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of ['pesos.ver', 'pesos.editar']) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_pesos', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
 const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
 
@@ -695,4 +732,4 @@ async function acrescentarPermissoesAtendimento(pool) {
   }
 }
 
-module.exports = { instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesPesos, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
