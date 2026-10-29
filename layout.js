@@ -351,6 +351,25 @@
         return { suportado, pronta, escolher, salvar };
     })();
 
+    // Serviço local do PC (local/salvador_pdf.js): grava direto em C:\Programa Elegance\<pasta>, criando a pasta, sem perguntar.
+    // Se não estiver rodando, tudo cai na escolha de pasta do navegador (PastaPdf).
+    const SalvadorLocal = (() => {
+        const BASE = 'http://127.0.0.1:3917';
+        async function disponivel() {
+            try {
+                const r = await fetch(BASE + '/ping', { signal: AbortSignal.timeout(800) });
+                return r.ok;
+            } catch { return false; }
+        }
+        async function salvar(pasta, nome, blob) {
+            const r = await fetch(`${BASE}/pdf?pasta=${encodeURIComponent(pasta)}&nome=${encodeURIComponent(nome)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
+            return j.caminho;
+        }
+        return { disponivel, salvar };
+    })();
+
     // aviso discreto no canto da tela (some sozinho, ou fica até o clique quando traz botão)
     function avisoCanto(texto, { botao, aoClicar, tipo } = {}) {
         let el = document.getElementById('aviso-pdf');
@@ -376,8 +395,9 @@
         const aviso = t => { if (aba) aba.document.body.innerHTML = `<p style="font:15px sans-serif;padding:24px;color:#444">${esc(t)}</p>`; };
         aviso('Gerando PDF…');
         // a permissão de gravar na pasta só pode ser pedida enquanto o clique é recente: antes de esperar o servidor
+        const local = await SalvadorLocal.disponivel();
         let raiz = null;
-        try { raiz = await PastaPdf.pronta(); } catch { raiz = null; }
+        if (!local) { try { raiz = await PastaPdf.pronta(); } catch { raiz = null; } }
         try {
             const r = await fetch(url, { headers: { Authorization: 'Bearer ' + (auth()?.token || '') } });
             if (r.status === 401) {
@@ -397,7 +417,10 @@
             setTimeout(() => URL.revokeObjectURL(link), 120000);
             // nome e pasta vêm do servidor (mesma regra do VB)
             const nome = decodeURIComponent(r.headers.get('X-Pdf-Nome') || ''), pasta = decodeURIComponent(r.headers.get('X-Pdf-Pasta') || '');
-            if (nome && pasta && PastaPdf.suportado()) {
+            if (nome && pasta && local) {
+                try { avisoCanto('PDF salvo em ' + await SalvadorLocal.salvar(pasta, nome, pdf)); }
+                catch (e) { avisoCanto('O PDF abriu, mas não foi possível salvá-lo na pasta: ' + e.message, { tipo: 'erro' }); }
+            } else if (nome && pasta && PastaPdf.suportado()) {
                 if (raiz) {
                     try { avisoCanto('PDF salvo em ' + await PastaPdf.salvar(raiz, pasta, nome, pdf)); }
                     catch (e) { avisoCanto('O PDF abriu, mas não foi possível salvá-lo na pasta: ' + e.message, { tipo: 'erro' }); }
