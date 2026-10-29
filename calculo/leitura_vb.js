@@ -83,6 +83,8 @@ function traduzirPorta(l, linhas, sistemas) {
       d.sistema = m[1];
       altura = num(c0.ALTURA_VAO); largura = num(c0.LARGURA_VAO);
       if (!desiguais) d.transpasse = String(qtd > 1 ? Math.round((num(c0.LARGURA) * qtd - largura) / (qtd - 1)) : 0);
+      // uma porta só mais estreita que o vão (trilho pelo vão): a largura da porta volta como largura própria da folha
+      if (!desiguais && qtd === 1 && larguras[0] > 0 && larguras[0] !== largura) d.largurasFolhas = [larguras[0]];
       else {
         // larguras diferentes: o transpasse não se deduz das folhas, a gravação o deixa na descrição ("Transp: N")
         const t = /Transp:\s*(\d+(?:[.,]\d+)?)/.exec(txt(l.DESCRICAO));

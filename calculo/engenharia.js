@@ -33,7 +33,8 @@ function larguraEditadas(lista, n) {
 // sem edição vale o vão digitado
 function larguraRealDoVao(item, folhas) {
   const d = item.detalhes || {};
-  if (!larguraEditadas(d.largurasFolhas, folhas.length).some(v => v > 0)) return num(item.largura);
+  // uma porta só: os trilhos cobrem o vão digitado, mesmo com a porta menor (largura própria)
+  if (folhas.length === 1 || !larguraEditadas(d.largurasFolhas, folhas.length).some(v => v > 0)) return num(item.largura);
   return folhas.reduce((t, f) => t + f.largura, 0) - num(d.transpasse) * Math.max(folhas.length - 1, 0);
 }
 

@@ -187,6 +187,7 @@
         .correr-modo.sem { background: #fff1e6; border-color: #e8590c; color: #9a3a05; }
         .correr-modo.pendente { background: #fff9db; border-color: #f2c200; color: #7a5d00; }
         .correr-modo:empty { display: none; }
+        html body #sel-cliente { background-color: #fff6dc !important; border-color: #e6c36a !important; }
         .correr-larguras { margin: 6px 0 10px; padding: 8px 12px; border: 1px dashed var(--border-strong, #d9d9e3); border-radius: 8px; }
         .correr-larguras > small { display: block; margin-bottom: 6px; color: var(--text-light); font-weight: 600; }
         .correr-larguras .cl-linha { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1979,7 +1980,8 @@
             const mLado = correrSis ? 70 : 50, mTopo = correrSis ? 70 : 50, mBase = correrSis ? 90 : 60;
             // porta de correr: cada folha pode ter a sua largura (LarguraEditada do VB)
             const lfs = Array.from({ length: qtdFolhas }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || largura);
-            const larguraTotal = lfs.reduce((a, w) => a + w, 0) + gapMm * (qtdFolhas - 1);
+            const sobraVaoMm = correrSis && qtdFolhas === 1 ? Math.max(0, vaoL - lfs[0]) : 0; // 1 porta menor que o vão: o trilho cobre o vão
+            const larguraTotal = lfs.reduce((a, w) => a + w, 0) + gapMm * (qtdFolhas - 1) + sobraVaoMm;
             const esc = Math.min((W - mLado * 2) / larguraTotal, (H - mTopo - mBase) / (altura + extraTopoMm + extraBaseMm));
             const altPx = altura * esc, largPx = largura * esc, gapPx = gapMm * esc;
             const hb = Math.max(TRILHO_MM * esc, 30), folgaPx = Math.max(FOLGA_MM * esc, 14); // trilho com altura mínima para o nome caber
@@ -2012,7 +2014,7 @@
             esp = Math.max(Math.min(esp, perfilPx * .55), 8);
             for (let f = 0; f < qtdFolhas; f++) {
                 const largura = lfs[f], largPx = largura * esc; // medida desta folha (sombreia a padrão)
-                const ox = ox0 + lfs.slice(0, f).reduce((a, w) => a + w * esc, 0) + f * gapPx;
+                const ox = ox0 + lfs.slice(0, f).reduce((a, w) => a + w * esc, 0) + f * gapPx + sobraVaoMm * esc / 2;
                 // perfil + vidro
                 ctx.fillStyle = '#c3c8cd'; ctx.fillRect(ox, oy, largPx, altPx);
                 ctx.lineWidth = 2; ctx.strokeStyle = '#2b2f33'; ctx.strokeRect(ox, oy, largPx, altPx);
@@ -2790,11 +2792,11 @@
             const n = qtdEfetiva(), a = parseFloat(val('f-altura')) || 0, l = parseFloat(val('f-largura')) || 0;
             if (!(ehCorrer() && temSistemaCorrer() && sistemaCorrer)) return { altura: a, largura: l, n };
             const t = parseFloat(val('f-transpasse')) || 0;
-            return { altura: Math.round(a - sistemaCorrer.descontoAltura), largura: Math.round(n > 1 ? (l + t * (n - 1)) / n : l), n };
+            return { altura: Math.round(a - sistemaCorrer.descontoAltura), largura: Math.round(n > 1 ? (l + t * (n - 1)) / n : (larguraEditadaDe(0) || l)), n };
         }
         // larguras de cada folha de correr: a automática, trocada pela editada (frmPortasCorrer: LarguraEditada) quando houver
         function larguraEditadaDe(i) { const v = Math.round(parseFloat(largurasFolhas[i]) || 0); return v > 0 ? v : 0; }
-        function temLarguraEditada() { return ehCorrer() && qtdEfetiva() > 1 && Array.from({ length: qtdEfetiva() }, (_, i) => larguraEditadaDe(i)).some(v => v > 0); }
+        function temLarguraEditada() { return ehCorrer() && (qtdEfetiva() > 1 || temSistemaCorrer()) && Array.from({ length: qtdEfetiva() }, (_, i) => larguraEditadaDe(i)).some(v => v > 0); }
         function largurasDasFolhas() {
             const m = medidasPortasCorrer();
             return Array.from({ length: m.n }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || m.largura);
@@ -2802,7 +2804,7 @@
         // com larguras editadas os trilhos cobrem a soma das folhas − transpasse × (n − 1); senão, o vão digitado
         function vaoRealCorrer() {
             const l = parseFloat(val('f-largura')) || 0;
-            if (!temLarguraEditada() || !temSistemaCorrer()) return l;
+            if (!temLarguraEditada() || !temSistemaCorrer() || qtdEfetiva() === 1) return l; // 1 porta: o trilho cobre o vão digitado, a porta pode ser menor
             const n = qtdEfetiva(), t = parseFloat(val('f-transpasse')) || 0, auto = Math.round((l + t * (n - 1)) / n);
             return Array.from({ length: n }, (_, i) => larguraEditadaDe(i) || auto).reduce((x, w) => x + w, 0) - t * (n - 1);
         }
@@ -2812,14 +2814,16 @@
             const box = document.getElementById('correr-larguras');
             if (!box) return;
             const n = qtdEfetiva(), m = medidasPortasCorrer();
-            if (!ehCorrer() || n < 2 || !(m.largura > 0)) { box.hidden = true; box.innerHTML = ''; return; }
+            const umaPorta = n === 1 && temSistemaCorrer();
+            if (!ehCorrer() || (n < 2 && !umaPorta) || !(m.largura > 0)) { box.hidden = true; box.innerHTML = ''; return; }
             box.hidden = false;
-            if (box.querySelectorAll('input').length !== n) {
-                box.innerHTML = '<small>Largura de cada porta (mm) — deixe em branco para a automática</small><div class="cl-linha">' +
+            const textoBox = umaPorta ? 'Largura da porta (mm) — em branco = igual ao vão; se for menor, o trilho continua com o tamanho do vão' : 'Largura de cada porta (mm) — deixe em branco para a automática';
+            if (box.querySelectorAll('input').length !== n || box.querySelector('small')?.textContent !== textoBox) {
+                box.innerHTML = '<small>' + textoBox + '</small><div class="cl-linha">' +
                     Array.from({ length: n }, (_, i) => `<label>Porta ${i + 1}<input type="number" min="1" step="1" data-i="${i}"></label>`).join('') + '</div>';
             }
             box.querySelectorAll('input').forEach((inp, i) => {
-                inp.placeholder = String(m.largura);
+                inp.placeholder = String(umaPorta ? (parseFloat(val('f-largura')) || m.largura) : m.largura);
                 if (document.activeElement !== inp) inp.value = larguraEditadaDe(i) || '';
                 inp.classList.toggle('editada', larguraEditadaDe(i) > 0);
             });
