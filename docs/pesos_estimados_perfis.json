@@ -1,0 +1,19 @@
+[
+  {"tipo":"perfil","produto":"3345","kgPorMetro":0.412,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"3445","kgPorMetro":0.409,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"1036","kgPorMetro":0.364,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"3025","kgPorMetro":0.308,"unidade":"kg_m","origem":"estimado_desenho","confianca":"media"},
+  {"tipo":"perfil","produto":"3026","kgPorMetro":0.357,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"3042","kgPorMetro":0.434,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"3446","kgPorMetro":0.451,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"Thin LED 1805","kgPorMetro":0.350,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"perfil","produto":"Arezzo","kgPorMetro":0.207,"unidade":"kg_m","origem":"estimado_desenho","confianca":"media"},
+  {"tipo":"puxador","produto":"2018 E","kgPorMetro":0.222,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"puxador","produto":"2019","kgPorMetro":0.230,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"puxador","produto":"8015","kgPorMetro":0.193,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"puxador","produto":"Slim","kgPorMetro":0.230,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"puxador","produto":"5015","kgPorMetro":0.213,"unidade":"kg_m","origem":"estimado_desenho","confianca":"alta"},
+  {"tipo":"puxador","produto":"3180 T","kgPorMetro":0.713,"unidade":"kg_m","origem":"estimado_desenho","confianca":"media"},
+  {"tipo":"puxador","produto":"3186 T","kgPorMetro":0.673,"unidade":"kg_m","origem":"estimado_desenho","confianca":"media"},
+  {"tipo":"puxador","produto":"3180","kgPorMetro":0.738,"unidade":"kg_m","origem":"estimado_desenho","confianca":"media"}
+]
