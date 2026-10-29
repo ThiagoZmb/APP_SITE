@@ -33,7 +33,7 @@
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
-        { href: 'corte.html', texto: 'Plano de corte', icone: 'corte', sub: true },   // subitem de Pedidos (corte de perfis por pedido e retalhos)
+        { href: 'corte.html', texto: 'Corte de perfil', icone: 'corte', sub: true },   // subitem de Pedidos (corte de perfis por pedido e retalhos)
         { href: 'corte_vidros.html', texto: 'Corte de vidros', icone: 'corte', sub: true },   // subitem de Pedidos (corte de vidros por pedido, chapas e retalhos)
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },

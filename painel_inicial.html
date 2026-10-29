@@ -760,7 +760,7 @@
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
             if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
-            if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Plano de corte', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
+            if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });

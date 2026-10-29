@@ -84,7 +84,7 @@ test('HTML: todo id usado pelo JS existe, CSP presente, scripts carregados', () 
   assert.match(html, /<script src="layout\.js/);
 });
 
-test('menu: Plano de corte no layout e no botão direito dos pedidos', () => {
+test('menu: Corte de perfil no layout e no botão direito dos pedidos', () => {
   const layout = ler('layout.js');
   assert.match(layout, /href: 'corte\.html'/);
   assert.match(layout, /'corte\.html': \['corte\.ver'\]/);
@@ -205,4 +205,23 @@ test('baixa: a tela usa a rota de produtos do corte e envia as baixas na confirm
   assert.match(js, /class="baixa-produto"/);
   assert.match(html, /\.baixa-estoque \{/);
   assert.match(html, /\.baixa-linha \{/);
+});
+
+test('lista de pedidos: filtra por número ou cliente (sem acento), escapa HTML e traz o número em data-numero', () => {
+  const lista = [{ numero: 1234, cliente: 'Construtora São João', data: '01/10/2026', situacao: 'Em Produção' }, { numero: 99, cliente: '<b>Zé</b>', data: '', situacao: '' }];
+  assert.equal(T.filtrarPedidos(lista, '').length, 2);
+  assert.deepEqual(T.filtrarPedidos(lista, '123').map(p => p.numero), [1234]);
+  assert.deepEqual(T.filtrarPedidos(lista, 'sao joao').map(p => p.numero), [1234]);
+  const html = T.htmlListaPedidos(lista, '');
+  assert.match(html, /data-numero="1234"/);
+  assert.doesNotMatch(html, /<b>Z/);
+  assert.match(T.htmlListaPedidos(lista, 'xyz'), /Nenhum pedido/);
+  assert.match(T.htmlListaPedidos(null, ''), /Nenhum pedido/);
+});
+
+test('HTML: Abrir mostra a lista de pedidos, o campo de número continua digitável e o título é Corte de perfil', () => {
+  const html = ler('corte.html'), js = ler('corte.js');
+  assert.match(html, /id="btn-abrir"/); assert.match(html, /id="lista-pedidos"/); assert.match(html, /id="numero"/);
+  assert.match(html, /<title>[^<]*Corte de perfil<\/title>/); assert.doesNotMatch(html, /<h1[^>]*>Plano de corte/);
+  assert.match(js, /chamar\('\/corte\/pedidos'\)/);
 });

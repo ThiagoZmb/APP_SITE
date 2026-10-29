@@ -12,7 +12,7 @@ const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesPesos, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -1650,6 +1650,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesCadastros(pool)).feito) console.log('[permissões] fornecedores.* e funcionarios.* acrescentadas ao Administrador (fornecedores também ao Interno completo)');
   if ((await acrescentarPermissoesTintas(pool)).feito) console.log('[permissões] tintas.* acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesNotas(pool)).feito) console.log('[permissões] notas.* acrescentadas ao Administrador e Interno completo');
+  if ((await acrescentarPermissoesComprasNfe(pool)).feito) console.log('[permissões] compras_nfe.* acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesPesos(pool)).feito) console.log('[permissões] pesos.* acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesGestao(pool)).feito) console.log('[permissões] gestao.ver e gestao.editar acrescentadas ao Administrador');
   if ((await acrescentarPermissoesCorte(pool)).feito) console.log('[permissões] corte.* acrescentadas ao Administrador e ao Interno completo');

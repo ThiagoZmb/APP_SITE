@@ -113,3 +113,15 @@ test('app sobe com as rotas do plano de corte registradas (registro.verificar)',
   const { registro } = require('../index.js');
   assert.doesNotThrow(() => registro.verificar());
 });
+
+test('GET /corte/pedidos: exige corte.ver, lista só pedidos não cancelados e sem campos de dinheiro', async t => {
+  const sem = await prepararCorte(t, { perfil: 'Sem acesso' });
+  assert.equal((await sem.chamar('/corte/pedidos')).status, 403);
+  const { chamar, banco } = await prepararCorte(t, { perfil: 'Planeja' });
+  banco.estado.pedidos.push({ NUMERO: 10, RAZAO_SOCIAL: 'A', SITUACAO: 'Em Produção' }, { NUMERO: 11, RAZAO_SOCIAL: 'B', SITUACAO: 'Cancelado' }, { NUMERO: 12, RAZAO_SOCIAL: 'C', SITUACAO: 'Pronto' });
+  const r = await chamar('/corte/pedidos');
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.deepEqual(j.pedidos.map(p => p.numero), [12, 10]);
+  for (const n of nomesDeCampo(j)) assert.doesNotMatch(n, REGEX_VALOR, n);
+});

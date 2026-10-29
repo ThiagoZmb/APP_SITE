@@ -51,6 +51,8 @@ function bancoCorte() {
     [/UPDATE estoque SET QTD_ESTOQUE = QTD_ESTOQUE - \? WHERE CODIGO = \?/, (sql, [q, c]) => { estoque.find(x => x.CODIGO === Number(c)).QTD_ESTOQUE -= Number(q); return { affectedRows: 1 }; }],
 
     // ---- pedido, peças e plano ----
+    [/^SELECT NUMERO, RAZAO_SOCIAL, DATE_FORMAT\(DATA, '%d\/%m\/%Y'\) AS DATA_BR, SITUACAO FROM ped_orc/, () =>
+      pedidos.filter(p => p.SITUACAO !== 'Cancelado').sort((a, b) => b.NUMERO - a.NUMERO).map(p => ({ NUMERO: p.NUMERO, RAZAO_SOCIAL: p.RAZAO_SOCIAL, DATA_BR: '01/10/2026', SITUACAO: p.SITUACAO }))],
     [/^SELECT NUMERO, RAZAO_SOCIAL, SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido'/, (sql, [n]) =>
       pedidos.filter(p => p.NUMERO === Number(n)).map(p => ({ NUMERO: p.NUMERO, RAZAO_SOCIAL: p.RAZAO_SOCIAL, SITUACAO: p.SITUACAO }))],
     [/^SELECT id, ITEM, QTD_PORTAS, PERFIL, QTD_ALTURA/, (sql, [n]) => perfis.filter(p => p.NUMERO === Number(n)).sort((a, b) => a.id - b.id)],

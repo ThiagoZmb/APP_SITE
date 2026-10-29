@@ -295,10 +295,21 @@ test('confirmar usa os avisos puros (texto fixo do retalho não usado e do plano
   assert.match(js, /textoAvisosConfirmacao/); assert.match(js, /retalhosNaoUsadosComPecas/); assert.match(js, /avisosSaldo/);
 });
 
-test('menu: Corte de vidros no botão direito dos pedidos, abaixo do Plano de corte', () => {
+test('menu: Corte de vidros no botão direito dos pedidos, abaixo do Corte de perfil', () => {
   const html = ler('painel_inicial.html');
   assert.match(html, /add\('corte\.ver'[^\n]*Corte de vidros[^\n]*corte_vidros\.html\?numero=/);
-  assert.ok(html.indexOf('Plano de corte') < html.indexOf('Corte de vidros'), 'Plano de corte deve vir antes de Corte de vidros');
+  assert.ok(html.indexOf('Corte de perfil') < html.indexOf('Corte de vidros'), 'Corte de perfil deve vir antes de Corte de vidros');
   const linhaVidros = html.split('\n').find(l => l.includes("'Corte de vidros'"));
   assert.match(linhaVidros, /if \(ehPedido && !cancelado\) add\('corte\.ver'/);
+});
+
+test('lista de pedidos: filtro por número ou cliente e ligação do botão Abrir no HTML', () => {
+  const lista = [{ numero: 1234, cliente: 'Construtora São João', data: '01/10/2026', situacao: 'Pronto' }, { numero: 99, cliente: 'Outro', data: '', situacao: '' }];
+  assert.deepEqual(T.filtrarPedidos(lista, 'joao').map(p => p.numero), [1234]);
+  assert.deepEqual(T.filtrarPedidos(lista, '99').map(p => p.numero), [99]);
+  assert.match(T.htmlListaPedidos(lista, ''), /data-numero="99"/);
+  assert.match(T.htmlListaPedidos(lista, 'zzz'), /Nenhum pedido/);
+  const html = ler('corte_vidros.html'), js = ler('corte_vidros.js');
+  assert.match(html, /id="btn-abrir"/); assert.match(html, /id="lista-pedidos"/); assert.match(html, /id="numero"/);
+  assert.match(js, /chamar\('\/corte\/pedidos'\)/);
 });

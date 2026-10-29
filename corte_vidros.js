@@ -17,6 +17,19 @@
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const { esc, txt } = C;
 
+  // ---------- lista de pedidos para escolher ----------
+  const semAcento = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function filtrarPedidos(lista, busca) {
+    const q = semAcento(txt(busca)); const todos = Array.isArray(lista) ? lista : [];
+    if (!q) return todos;
+    return todos.filter(p => String(p.numero).includes(q) || semAcento(p.cliente).includes(q));
+  }
+  function htmlListaPedidos(lista, busca) {
+    const achados = filtrarPedidos(lista, busca).slice(0, 200);
+    if (!achados.length) return '<p class="vazio">Nenhum pedido encontrado.</p>';
+    return '<ul>' + achados.map(p => `<li><button type="button" data-numero="${esc(p.numero)}"><span class="p-num">${esc(p.numero)}</span><span class="p-cli">${esc(p.cliente)}</span><span class="p-meta">${esc(p.data)}${p.situacao ? ' · ' + esc(p.situacao) : ''}</span></button></li>`).join('') + '</ul>';
+  }
+
   // ---------- formatação ----------
   const mm = n => (n === null || n === undefined || !Number.isFinite(Number(n))) ? '—' : Number(n).toLocaleString('pt-BR') + ' mm';
   const num = n => Number(n).toLocaleString('pt-BR');
@@ -514,6 +527,26 @@
 
     for (const b of doc.querySelectorAll('[data-aba]')) b.addEventListener('click', () => aba(b.dataset.aba));
     $('form-pedido').addEventListener('submit', ev => { ev.preventDefault(); const n = txt($('numero').value); if (/^\d+$/.test(n)) carregarPlano(n); else toast('Informe o número do pedido.', 'erro'); });
+    // "Abrir" mostra a lista de pedidos (GET /corte/pedidos); escolher um preenche o número e abre o plano. O campo continua digitável (Enter abre direto).
+    const lista = { pedidos: null };
+    const desenharLista = () => { $('lista-pedidos-itens').innerHTML = htmlListaPedidos(lista.pedidos, $('busca-lista').value); };
+    const fecharLista = () => { $('lista-pedidos').hidden = true; $('btn-abrir').setAttribute('aria-expanded', 'false'); };
+    $('btn-abrir').addEventListener('click', async () => {
+      if (!$('lista-pedidos').hidden) { fecharLista(); return; }
+      $('lista-pedidos').hidden = false; $('btn-abrir').setAttribute('aria-expanded', 'true');
+      $('busca-lista').value = txt($('numero').value);
+      if (!lista.pedidos) {
+        $('lista-pedidos-itens').innerHTML = '<p class="vazio">Carregando…</p>';
+        try { lista.pedidos = (await chamar('/corte/pedidos')).pedidos; }
+        catch (err) { $('lista-pedidos-itens').innerHTML = '<p class="erro-estado" role="alert">' + esc(err.status === 403 ? 'Você não tem permissão para ver os pedidos.' : 'Não foi possível carregar a lista: ' + err.message) + '</p>'; return; }
+      }
+      desenharLista(); $('busca-lista').focus();
+    });
+    $('busca-lista').addEventListener('input', desenharLista);
+    $('lista-pedidos-itens').addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-numero]'); if (!b) return;
+      $('numero').value = b.dataset.numero; fecharLista(); carregarPlano(b.dataset.numero);
+    });
     $('btn-salvar').addEventListener('click', () => acao($('btn-salvar'), () =>
       chamar(`/corte_vidros/pedido/${encodeURIComponent(estado.numero)}/salvar`, { metodo: 'POST', corpo: corpoSalvar(estado.previa, escolhasEfetivas(estado.previa.grupos, estado.escolhas)) }), 'Plano salvo e retalhos reservados.'));
     // Refazer: volta à pré-visualização (já calculada com as escolhas do plano salvo); o plano salvo só é substituído ao salvar de novo
@@ -553,7 +586,7 @@
     if (n && /^\d+$/.test(n)) { $('numero').value = n; carregarPlano(n); } else mensagem('plano-area', 'Informe o número de um pedido para ver ou gerar o plano de corte de vidros.');
   }
 
-  return { mm, medida, pctTxt, pct, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, aproveitamentoGeral, textoStatusPlano, textoConfirmarExclusao,
+  return { filtrarPedidos, htmlListaPedidos, mm, medida, pctTxt, pct, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, aproveitamentoGeral, textoStatusPlano, textoConfirmarExclusao,
     htmlChapa, htmlGrupo, htmlResumo, htmlPendencias, motivosBloqueio, htmlBloqueios, htmlSeletorProdutos, escolhasEfetivas, queryEscolhas,
     retalhosNaoUsadosComPecas, textoAvisosConfirmacao, avisosSaldo, htmlAvisosSaldo,
     gruposComChapasNovas, produtosDaBaixa, htmlBaixaEstoque, corpoBaixas, validarBaixas, corpoSalvar, corpoConferencia, validarConferenciaForm,

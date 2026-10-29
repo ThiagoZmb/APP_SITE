@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elegance Dashboard - Plano de corte</title>
+    <title>Elegance Dashboard - Corte de perfil</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
@@ -138,6 +138,14 @@
         .busca-pedido { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border-color); }
         .busca-pedido .form-group { margin: 0; }
         .busca-pedido input { width: 180px; min-height: 44px; }
+        .lista-pedidos { margin: -6px 0 18px; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg, #fff); }
+        .lista-pedidos input { width: 100%; min-height: 44px; margin-bottom: 8px; box-sizing: border-box; }
+        .lista-pedidos ul { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+        .lista-pedidos li button { display: flex; gap: 12px; width: 100%; min-height: 44px; align-items: center; text-align: left; padding: 8px 10px; background: none; border: 0; border-bottom: 1px solid var(--border-color); cursor: pointer; font: inherit; color: inherit; }
+        .lista-pedidos li button:hover, .lista-pedidos li button:focus-visible { background: rgba(127,127,127,.12); }
+        .lista-pedidos .p-num { font-weight: 700; min-width: 64px; }
+        .lista-pedidos .p-cli { flex: 1; }
+        .lista-pedidos .p-meta { color: var(--text-light); font-size: 13px; }
         .cab-plano { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .cab-plano h2 { font-size: 22px; letter-spacing: -.02em; }
         .sync { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: #e9ecef; color: #495057; }
@@ -227,7 +235,7 @@
             <div class="menu-title">Menu Principal</div>
         </nav>
         <main>
-            <h1 class="welcome-title">Plano de corte</h1>
+            <h1 class="welcome-title">Corte de perfil</h1>
             <p class="welcome-subtitle">Distribui os perfis de um pedido em varas e retalhos para perder o mínimo. As medidas vêm do pedido gravado; peça com dado faltando aparece como pendência e fica fora do plano.</p>
 
             <div class="abas" role="tablist">
@@ -240,8 +248,12 @@
                 <section class="painel">
                     <form id="form-pedido" class="busca-pedido" novalidate>
                         <div class="form-group"><label for="numero">Número do pedido</label><input id="numero" inputmode="numeric" autocomplete="off" placeholder="ex.: 1234"></div>
-                        <button type="submit" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Abrir</span></button>
+                        <button type="button" class="btn btn-primary" id="btn-abrir" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Abrir</span></button>
                     </form>
+                    <div id="lista-pedidos" class="lista-pedidos" role="dialog" aria-label="Escolher pedido" hidden>
+                        <input id="busca-lista" type="search" autocomplete="off" placeholder="Buscar por número ou cliente" aria-label="Buscar pedido por número ou cliente">
+                        <div id="lista-pedidos-itens" aria-live="polite"></div>
+                    </div>
                     <div class="cab-plano">
                         <h2 id="plano-titulo"></h2>
                         <span class="sync" id="sync-estado" role="status" aria-live="polite" hidden></span>

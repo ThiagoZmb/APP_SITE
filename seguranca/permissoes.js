@@ -23,6 +23,8 @@ const CATALOGO = [
   { codigo: 'estoque.movimentar', nome: 'Dar entrada e saída', area: 'Estoque' },
   { codigo: 'estoque.desfazer', nome: 'Desfazer entrada/saída', area: 'Estoque' },
   { codigo: 'estoque.ajustar', nome: 'Ajustar estoque (inventário)', area: 'Estoque' },
+  { codigo: 'compras_nfe.ver', nome: 'Ver as notas de compra da SEFAZ e sincronizar (pelo serviço local do PC; o valor também exige Valores financeiros)', area: 'Estoque' },
+  { codigo: 'compras_nfe.importar', nome: 'Dar ciência da operação, baixar o XML e importar a nota de compra na entrada (também exige Dar entrada e saída)', area: 'Estoque' },
   { codigo: 'produtos.ver', nome: 'Ver cadastro de produtos', area: 'Produtos' },
   { codigo: 'produtos.editar', nome: 'Editar produto e imagem', area: 'Produtos' },
   { codigo: 'financeiro.ver', nome: 'Ver fluxo de caixa (também exige Valores financeiros)', area: 'Financeiro' },

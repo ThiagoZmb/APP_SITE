@@ -15,6 +15,19 @@
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const { esc, txt } = C;
 
+  // ---------- lista de pedidos para escolher ----------
+  const semAcento = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function filtrarPedidos(lista, busca) {
+    const q = semAcento(txt(busca)); const todos = Array.isArray(lista) ? lista : [];
+    if (!q) return todos;
+    return todos.filter(p => String(p.numero).includes(q) || semAcento(p.cliente).includes(q));
+  }
+  function htmlListaPedidos(lista, busca) {
+    const achados = filtrarPedidos(lista, busca).slice(0, 200);
+    if (!achados.length) return '<p class="vazio">Nenhum pedido encontrado.</p>';
+    return '<ul>' + achados.map(p => `<li><button type="button" data-numero="${esc(p.numero)}"><span class="p-num">${esc(p.numero)}</span><span class="p-cli">${esc(p.cliente)}</span><span class="p-meta">${esc(p.data)}${p.situacao ? ' · ' + esc(p.situacao) : ''}</span></button></li>`).join('') + '</ul>';
+  }
+
   // ---------- formatação ----------
   const mm = n => (n === null || n === undefined || !Number.isFinite(Number(n))) ? '—' : Number(n).toLocaleString('pt-BR') + ' mm';
   const pctTxt = n => (n === null || n === undefined || !Number.isFinite(Number(n))) ? '—' : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
@@ -71,7 +84,7 @@
   }
   // confirmação do botão "Excluir dados do pedido": mais forte quando há plano já conferido (corte real confirmado)
   function textoConfirmarExclusao(previa) {
-    const n = previa.qtdPlanosGravados, base = `Excluir TODOS os dados de plano de corte do pedido nº ${previa.pedido.numero} (${n} plano${n === 1 ? '' : 's'})?\n\nOs retalhos reservados por esses planos voltam a ficar disponíveis. Isto não pode ser desfeito.`;
+    const n = previa.qtdPlanosGravados, base = `Excluir TODOS os dados de corte de perfil do pedido nº ${previa.pedido.numero} (${n} plano${n === 1 ? '' : 's'})?\n\nOs retalhos reservados por esses planos voltam a ficar disponíveis. Isto não pode ser desfeito.`;
     if (!(previa.qtdConferidos > 0)) return base;
     return base + `\n\nATENÇÃO: ${previa.qtdConferidos} plano${previa.qtdConferidos === 1 ? ' JÁ CONFERIDO' : 's JÁ CONFERIDOS'} (corte real confirmado) serão apagados do histórico. ` +
       'Os retalhos que esses cortes usaram ou criaram continuam no estoque de retalhos: o material físico não volta.';
@@ -297,7 +310,7 @@
         desenharPlano();
       } catch (err) {
         if (seq !== estado.seq) return;
-        mensagem('plano-area', err.status === 403 ? 'Você não tem permissão para ver o plano de corte.' : err.status === 404 ? 'Pedido não encontrado.' : 'Não foi possível carregar: ' + err.message, 'erro');
+        mensagem('plano-area', err.status === 403 ? 'Você não tem permissão para ver o corte de perfil.' : err.status === 404 ? 'Pedido não encontrado.' : 'Não foi possível carregar: ' + err.message, 'erro');
         ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano'].forEach(id => { $(id).hidden = true; });
       }
     }
@@ -407,6 +420,26 @@
 
     for (const b of doc.querySelectorAll('[data-aba]')) b.addEventListener('click', () => aba(b.dataset.aba));
     $('form-pedido').addEventListener('submit', ev => { ev.preventDefault(); const n = txt($('numero').value); if (/^\d+$/.test(n)) carregarPlano(n); else toast('Informe o número do pedido.', 'erro'); });
+    // "Abrir" mostra a lista de pedidos (GET /corte/pedidos); escolher um preenche o número e abre o plano. O campo continua digitável (Enter abre direto).
+    const lista = { pedidos: null };
+    const desenharLista = () => { $('lista-pedidos-itens').innerHTML = htmlListaPedidos(lista.pedidos, $('busca-lista').value); };
+    const fecharLista = () => { $('lista-pedidos').hidden = true; $('btn-abrir').setAttribute('aria-expanded', 'false'); };
+    $('btn-abrir').addEventListener('click', async () => {
+      if (!$('lista-pedidos').hidden) { fecharLista(); return; }
+      $('lista-pedidos').hidden = false; $('btn-abrir').setAttribute('aria-expanded', 'true');
+      $('busca-lista').value = txt($('numero').value);
+      if (!lista.pedidos) {
+        $('lista-pedidos-itens').innerHTML = '<p class="vazio">Carregando…</p>';
+        try { lista.pedidos = (await chamar('/corte/pedidos')).pedidos; }
+        catch (err) { $('lista-pedidos-itens').innerHTML = '<p class="erro-estado" role="alert">' + esc(err.status === 403 ? 'Você não tem permissão para ver os pedidos.' : 'Não foi possível carregar a lista: ' + err.message) + '</p>'; return; }
+      }
+      desenharLista(); $('busca-lista').focus();
+    });
+    $('busca-lista').addEventListener('input', desenharLista);
+    $('lista-pedidos-itens').addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-numero]'); if (!b) return;
+      $('numero').value = b.dataset.numero; fecharLista(); carregarPlano(b.dataset.numero);
+    });
     $('btn-salvar').addEventListener('click', () => acao($('btn-salvar'), () => chamar(`/corte/pedido/${estado.numero}/salvar`, { metodo: 'POST', corpo: corpoSalvar(estado.previa) }), 'Plano salvo e retalhos reservados.'));
     $('btn-refazer').addEventListener('click', () => { estado.modo = 'previa'; estado.conferindo = false; desenharPlano(); });
     $('btn-excluir-dados').addEventListener('click', () => {
@@ -439,9 +472,9 @@
     $('form-config').hidden = !pode('corte.parametros');
     aba('plano');
     const n = new win.URLSearchParams(win.location.search).get('numero');
-    if (n && /^\d+$/.test(n)) { $('numero').value = n; carregarPlano(n); } else mensagem('plano-area', 'Informe o número de um pedido para ver ou gerar o plano de corte.');
+    if (n && /^\d+$/.test(n)) { $('numero').value = n; carregarPlano(n); } else mensagem('plano-area', 'Informe o número de um pedido para ver ou gerar o plano de corte de perfil.');
   }
 
-  return { mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, textoConfirmarExclusao, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
+  return { filtrarPedidos, htmlListaPedidos, mm, pctTxt, larguraPct, rotuloOrigem, rotuloSituacao, chaveCortada, estiloGrupo, contarPecas, textoStatusPlano, textoConfirmarExclusao, htmlBarra, htmlGrupo, htmlResumo, htmlPendencias, htmlErros,
     corpoSalvar, corpoConferencia, validarConferenciaForm, gruposComVarasNovas, sugerirProduto, htmlBaixaEstoque, corpoBaixas, validarBaixasForm, htmlRetalhos, htmlConfig, iniciar };
 });

@@ -169,6 +169,14 @@ function registrarCorte({ rota, pool }) {
   });
 
   // produtos do estoque para escolher na baixa das varas novas (só ativos; código, nome, unidade e quantidade — nada de dinheiro)
+  // Lista de pedidos para a tela escolher (corte de perfil e corte de vidros usam a mesma): só Pedido não cancelado, sem dinheiro.
+  rota('get', '/corte/pedidos', VER, async (req, res) => {
+    try {
+      const [linhas] = await pool.execute("SELECT NUMERO, RAZAO_SOCIAL, DATE_FORMAT(DATA, '%d/%m/%Y') AS DATA_BR, SITUACAO FROM ped_orc WHERE TIPO = 'Pedido' AND (SITUACAO IS NULL OR SITUACAO <> 'Cancelado') ORDER BY NUMERO DESC LIMIT 500");
+      res.json({ pedidos: linhas.map(l => ({ numero: Number(l.NUMERO), cliente: l.RAZAO_SOCIAL || '', data: l.DATA_BR || '', situacao: l.SITUACAO || '' })) });
+    } catch (err) { console.error('Erro GET /corte/pedidos:', err.message); res.status(500).json({ error: 'Erro de servidor' }); }
+  });
+
   rota('get', '/corte/estoque/produtos', [...PLANEJAR, ...BAIXAR_ESTOQUE], async (req, res) => {
     try {
       const [linhas] = await pool.execute("SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE FROM estoque WHERE SITUACAO = 'Ativo' ORDER BY NOME_PRODUTO LIMIT 3000");

@@ -1,0 +1,14 @@
+{
+  "name": "elegance-servico-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servico do PC da empresa: grava os PDFs (salvador_pdf.js) e busca as NF-e de compra na SEFAZ (sefaz.js). O certificado A1 e a senha ficam so neste PC.",
+  "main": "salvador_pdf.js",
+  "scripts": {
+    "start": "node salvador_pdf.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.11.2",
+    "node-forge": "1.4.2"
+  }
+}
