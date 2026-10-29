@@ -219,6 +219,8 @@ const TABELAS = [
      produto VARCHAR(190) NOT NULL,
      unidade_peso ENUM('kg_m','kg_m2_mm','kg_un') NOT NULL,
      valor DECIMAL(12,4) NOT NULL,
+     origem VARCHAR(30) NOT NULL DEFAULT 'manual',
+     confianca VARCHAR(10) NULL,
      atualizado_por VARCHAR(100) NULL,
      atualizado_em DATETIME NULL,
      UNIQUE KEY ux_peso_produto (tipo, produto)
@@ -363,6 +365,13 @@ const TABELAS = [
 
 async function instalarTabelas(pool) {
   for (const sql of TABELAS) await pool.execute(sql);
+  // web_pesos criada antes de origem/confianca (de onde veio o peso): acrescenta as colunas na tabela da web (nunca em tabela do VB)
+  const [[po] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_pesos' AND COLUMN_NAME = 'origem'");
+  if (!Number(po?.n)) await pool.execute("ALTER TABLE web_pesos ADD COLUMN origem VARCHAR(30) NOT NULL DEFAULT 'manual' AFTER valor");
+  const [[pc] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_pesos' AND COLUMN_NAME = 'confianca'");
+  if (!Number(pc?.n)) await pool.execute('ALTER TABLE web_pesos ADD COLUMN confianca VARCHAR(10) NULL AFTER origem');
   // notas fiscais criadas antes da coluna chave_original (liberada ao cancelar): acrescenta na tabela da web
   const [[nf] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_notas_fiscais' AND COLUMN_NAME = 'chave_original'");

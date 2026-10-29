@@ -32,16 +32,17 @@ function bancoPesos() {
       return pesos.filter(x => (tipo === null || x.tipo === tipo) && (q === null || sqlLike(q, x.produto)))
         .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.produto.localeCompare(b.produto, 'pt-BR')).map(linhaDe);
     }],
-    [/^SELECT id, unidade_peso, valor FROM web_pesos WHERE tipo = \? AND produto = \?/, (sql, [tipo, produto]) =>
+    [/^SELECT id, unidade_peso, valor(, origem, confianca)? FROM web_pesos WHERE tipo = \? AND produto = \?/, (sql, [tipo, produto]) =>
       pesos.filter(x => x.tipo === tipo && chave(x.produto) === chave(produto)).map(linhaDe)],
+    [/^SELECT tipo, produto FROM web_pesos/, () => pesos.map(x => ({ tipo: x.tipo, produto: x.produto }))],
     [/^SELECT id, tipo, produto FROM web_pesos WHERE id = \?/, (sql, [id]) => pesos.filter(x => x.id === Number(id)).map(linhaDe)],
-    [/^INSERT INTO web_pesos/, (sql, [tipo, produto, unidade_peso, valor, atualizado_por, atualizado_em]) => {
+    [/^INSERT INTO web_pesos/, (sql, [tipo, produto, unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em]) => {
       const id = proximoId++;
-      pesos.push({ id, tipo, produto, unidade_peso, valor, atualizado_por, atualizado_em });
+      pesos.push({ id, tipo, produto, unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em });
       return { affectedRows: 1, insertId: id };
     }],
-    [/^UPDATE web_pesos SET/, (sql, [unidade_peso, valor, atualizado_por, atualizado_em, id]) => {
-      Object.assign(pesos.find(x => x.id === id), { unidade_peso, valor, atualizado_por, atualizado_em });
+    [/^UPDATE web_pesos SET/, (sql, [unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em, id]) => {
+      Object.assign(pesos.find(x => x.id === id), { unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em });
       return { affectedRows: 1 };
     }],
     [/^DELETE FROM web_pesos WHERE id = \?/, (sql, [id]) => {
@@ -53,7 +54,7 @@ function bancoPesos() {
   const f = criarPoolFalso(regras);
   const semear = {
     produto: (MODELO, CLASSE, SITUACAO = 'Ativo') => { const r = { MODELO, CLASSE, SITUACAO }; produtos.push(r); return r; },
-    peso: (x = {}) => { const r = { id: proximoId++, tipo: 'perfil', produto: 'Perfil 30', unidade_peso: 'kg_m', valor: 1.2, atualizado_por: 'x', atualizado_em: '2026-10-01 10:00:00', ...x }; pesos.push(r); return r; }
+    peso: (x = {}) => { const r = { id: proximoId++, tipo: 'perfil', produto: 'Perfil 30', unidade_peso: 'kg_m', valor: 1.2, origem: 'manual', confianca: null, atualizado_por: 'x', atualizado_em: '2026-10-01 10:00:00', ...x }; pesos.push(r); return r; }
   };
   return { f, regras, estado, ...estado, semear };
 }
@@ -71,7 +72,7 @@ async function prepararPesos(t, { perfil = 'Pesos', usuario = { codigo: 7, nome:
   const chamar = (caminho, metodo = 'GET', corpo) => fetch(s.url + caminho, {
     method: metodo, headers: { Authorization: 'Bearer ' + token(usuario.codigo, usuario.nome), 'Content-Type': 'application/json' },
     body: corpo === undefined ? undefined : JSON.stringify(corpo) });
-  return { banco, chamar };
+  return { banco, chamar, url: s.url };
 }
 
 module.exports = { bancoPesos, prepararPesos, PERFIS };

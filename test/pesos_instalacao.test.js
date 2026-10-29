@@ -32,3 +32,17 @@ test('pesos: permissões existem no catálogo e a migração dá ver+editar a Ad
   assert.deepEqual(await acrescentarPermissoesPesos(pool), { feito: false });
   assert.equal(pool.chamadas.slice(antes).filter(c => /INSERT/.test(c.sql)).length, 0);
 });
+
+test('pesos: CREATE TABLE tem origem/confianca e a migração só acrescenta as colunas que faltam (nunca no VB)', async () => {
+  let pool = criarPoolFalso();
+  await instalarTabelas(pool);
+  const ddl = pool.chamadas.map(c => c.sql).find(s => /CREATE TABLE IF NOT EXISTS/.test(s) && s.includes('`web_pesos`'));
+  assert.ok(ddl.includes("origem VARCHAR(30) NOT NULL DEFAULT 'manual'") && ddl.includes('confianca VARCHAR(10) NULL'));
+  const alters = pool.chamadas.map(c => c.sql).filter(s => /^ALTER TABLE web_pesos/.test(s));
+  assert.equal(alters.length, 2);
+  assert.ok(alters[0].includes("ADD COLUMN origem VARCHAR(30) NOT NULL DEFAULT 'manual'") && alters[1].includes('ADD COLUMN confianca VARCHAR(10) NULL'));
+  // tabela que já tem as colunas: nenhum ALTER
+  pool = criarPoolFalso([[/information_schema\.COLUMNS.*web_pesos/, [{ n: 1 }]]]);
+  await instalarTabelas(pool);
+  assert.equal(pool.chamadas.filter(c => /^ALTER TABLE web_pesos/.test(c.sql)).length, 0);
+});

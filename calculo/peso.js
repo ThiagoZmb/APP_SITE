@@ -13,6 +13,9 @@ const TIPOS_PESO = ['perfil', 'puxador', 'vidro', 'acessorio'];
 const UNIDADES_PESO = ['kg_m', 'kg_m2_mm', 'kg_un'];
 // unidade aceita por tipo (acessório também pode ser vendido por metro)
 const UNIDADES_POR_TIPO = { perfil: ['kg_m'], puxador: ['kg_m'], vidro: ['kg_m2_mm'], acessorio: ['kg_un', 'kg_m'] };
+// origem do valor (de onde veio o número cadastrado) e confiança (só faz sentido nas estimativas)
+const ORIGENS_PESO = ['manual', 'pesado', 'fornecedor', 'estimado_desenho'];
+const CONFIANCAS_PESO = ['alta', 'media', 'baixa'];
 const LIMITE_PRODUTO = 190;
 const LIMITE_VALOR = 99999999; // DECIMAL(12,4)
 
@@ -30,7 +33,7 @@ function numeroPositivo(v) {
   return Number(s.replace(',', '.'));
 }
 
-// Valida um cadastro de peso. Entrada: { tipo, produto, unidadePeso, kgPorUnidade }
+// Valida um cadastro de peso. Entrada: { tipo, produto, unidadePeso, kgPorUnidade, origem?, confianca? } (origem vazia = 'manual'; confiança vazia = null)
 function validarPeso(b = {}) {
   const erros = [];
   const tipo = txt(b.tipo), produto = txt(b.produto), unidadePeso = txt(b.unidadePeso);
@@ -41,7 +44,10 @@ function validarPeso(b = {}) {
   else if (TIPOS_PESO.includes(tipo) && !UNIDADES_POR_TIPO[tipo].includes(unidadePeso)) erros.push(`A unidade ${unidadePeso} não vale para o tipo ${tipo}.`);
   const valor = numeroPositivo(b.kgPorUnidade);
   if (!(valor > 0) || valor > LIMITE_VALOR) erros.push('Peso inválido (número maior que zero, com vírgula ou ponto decimal).');
-  return { erros, dados: { tipo, produto, unidadePeso, kgPorUnidade: erros.length ? 0 : Math.round(valor * 10000) / 10000 } };
+  const origem = txt(b.origem) || 'manual', confianca = txt(b.confianca);
+  if (!ORIGENS_PESO.includes(origem)) erros.push('Origem inválida (manual, pesado, fornecedor ou estimado_desenho).');
+  if (confianca && !CONFIANCAS_PESO.includes(confianca)) erros.push('Confiança inválida (alta, media ou baixa).');
+  return { erros, dados: { tipo, produto, unidadePeso, kgPorUnidade: erros.length ? 0 : Math.round(valor * 10000) / 10000, origem, confianca: confianca || null } };
 }
 
 // Espessura em mm lida do nome: "Reflecta Bronze 4mm" -> 4; "Incolor 8,0 MM" -> 8; sem número seguido de mm = null
@@ -193,4 +199,4 @@ function pesoDocumento(itens = [], tabela) {
   return { ...consolidar(partes, pendencias), itens: porItem };
 }
 
-module.exports = { TIPOS_PESO, UNIDADES_PESO, UNIDADES_POR_TIPO, validarPeso, espessuraDoNome, montarTabela, pesoFolha, pesoItem, pesoDocumento };
+module.exports = { TIPOS_PESO, ORIGENS_PESO, CONFIANCAS_PESO, chaveProduto, UNIDADES_PESO, UNIDADES_POR_TIPO, validarPeso, espessuraDoNome, montarTabela, pesoFolha, pesoItem, pesoDocumento };

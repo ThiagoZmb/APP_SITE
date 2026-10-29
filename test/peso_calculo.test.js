@@ -116,7 +116,7 @@ test('pesoDocumento soma os itens, mostra o peso de cada um e marca parcial com 
 
 test('validarPeso: tipo/unidade, valor > 0 com vírgula ou ponto, recusa milhar e texto', () => {
   const ok = validarPeso({ tipo: 'perfil', produto: ' Perfil 30 ', unidadePeso: 'kg_m', kgPorUnidade: '1,2345' });
-  assert.deepEqual(ok, { erros: [], dados: { tipo: 'perfil', produto: 'Perfil 30', unidadePeso: 'kg_m', kgPorUnidade: 1.2345 } });
+  assert.deepEqual(ok, { erros: [], dados: { tipo: 'perfil', produto: 'Perfil 30', unidadePeso: 'kg_m', kgPorUnidade: 1.2345, origem: 'manual', confianca: null } });
   assert.equal(validarPeso({ tipo: 'vidro', produto: 'V 4mm', unidadePeso: 'kg_m2_mm', kgPorUnidade: 2.5 }).erros.length, 0);
   assert.equal(validarPeso({ tipo: 'acessorio', produto: 'Fecho', unidadePeso: 'kg_un', kgPorUnidade: '0.3' }).erros.length, 0);
   for (const ruim of [{ tipo: 'x' }, { produto: '' }, { unidadePeso: 'kg_un' }, { unidadePeso: 'g' }, { kgPorUnidade: 0 }, { kgPorUnidade: '-1' }, { kgPorUnidade: 'abc' },

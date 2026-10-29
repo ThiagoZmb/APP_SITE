@@ -97,3 +97,23 @@ test('pesos: permissões — só ver não grava; sem acesso recebe 403', async t
   assert.equal((await sem.chamar('/pesos')).status, 403);
   assert.equal((await sem.chamar('/pesos/produtos?tipo=perfil')).status, 403);
 });
+
+test('pesos: PUT grava origem e confiança, devolve no GET, audita só nomes e recusa valores inválidos', async t => {
+  const { banco, chamar } = await prepararPesos(t);
+  assert.equal((await salvar(chamar, { ...PESO, origem: 'estimado_desenho', confianca: 'media' })).status, 200);
+  assert.deepEqual([banco.pesos[0].origem, banco.pesos[0].confianca], ['estimado_desenho', 'media']);
+  let j = await (await chamar('/pesos')).json();
+  assert.deepEqual([j.pesos[0].origem, j.pesos[0].confianca], ['estimado_desenho', 'media']);
+  assert.ok(j.origens.includes('pesado'));
+  // valor novo digitado: passa a pesado, sem confiança
+  assert.equal((await salvar(chamar, { ...PESO, kgPorUnidade: '2', origem: 'pesado' })).status, 200);
+  assert.deepEqual([banco.pesos[0].origem, banco.pesos[0].confianca], ['pesado', null]);
+  assert.deepEqual(banco.auditoria.at(-1).detalhe.campos, ['kgPorUnidade', 'origem', 'confianca']);
+  // sem origem no corpo = manual
+  await salvar(chamar, { ...PESO, produto: 'Outro' });
+  assert.equal(banco.pesos.find(x => x.produto === 'Outro').origem, 'manual');
+  assert.equal((await salvar(chamar, { ...PESO, origem: 'chute' })).status, 400);
+  assert.equal((await salvar(chamar, { ...PESO, confianca: 'enorme' })).status, 400);
+  j = await (await chamar('/pesos')).json();
+  assert.deepEqual([...nomes(j)].filter(k => REGEX_VALOR.test(k)), []);
+});

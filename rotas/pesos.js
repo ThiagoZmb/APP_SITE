@@ -2,7 +2,7 @@
 // Peso NÃO é dinheiro: as rotas não exigem `valores.ver` e nenhum nome de campo pode casar com REGEX_VALOR (use kgPorUnidade, unidadePeso...).
 // Auditoria guarda só nomes de campos, nunca o peso.
 const { emTransacao, ErroUsuario, agoraLocal } = require('./transacao');
-const { TIPOS_PESO, UNIDADES_PESO, UNIDADES_POR_TIPO, validarPeso } = require('../calculo/peso');
+const { TIPOS_PESO, UNIDADES_PESO, UNIDADES_POR_TIPO, ORIGENS_PESO, validarPeso } = require('../calculo/peso');
 
 const VER = ['pesos.ver'];
 const EDITAR = ['pesos.editar'];
@@ -17,6 +17,7 @@ const CLASSES_POR_TIPO = {
 };
 
 const linha = r => ({ id: Number(r.id), tipo: r.tipo, produto: r.produto, unidadePeso: r.unidade_peso, kgPorUnidade: Number(r.valor) || 0,
+  origem: r.origem || 'manual', confianca: r.confianca || '',
   atualizadoPor: r.atualizado_por || '', atualizadoEm: r.atualizado_em ? String(r.atualizado_em) : '' });
 
 function registrarPesos({ rota, pool }) {
@@ -32,9 +33,9 @@ function registrarPesos({ rota, pool }) {
       if (TIPOS_PESO.includes(tipo)) { where.push('tipo = ?'); params.push(tipo); }
       if (q) { where.push('produto LIKE ?'); params.push(like(q)); }
       const [linhas] = await pool.execute(
-        `SELECT id, tipo, produto, unidade_peso, valor, atualizado_por, atualizado_em FROM web_pesos
+        `SELECT id, tipo, produto, unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em FROM web_pesos
          ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY tipo, produto LIMIT ${LIMITE_LISTA}`, params);
-      res.json({ pesos: linhas.map(linha), tipos: TIPOS_PESO, unidades: UNIDADES_PESO, unidadesPorTipo: UNIDADES_POR_TIPO, limitada: linhas.length >= LIMITE_LISTA });
+      res.json({ pesos: linhas.map(linha), tipos: TIPOS_PESO, unidades: UNIDADES_PESO, unidadesPorTipo: UNIDADES_POR_TIPO, origens: ORIGENS_PESO, limitada: linhas.length >= LIMITE_LISTA });
     } catch (err) { erro500(res, 'GET /pesos', err); }
   });
 
@@ -58,21 +59,23 @@ function registrarPesos({ rota, pool }) {
     const { erros, dados } = validarPeso(req.body || {});
     if (erros.length) return res.status(400).json({ error: erros.join(' ') });
     const r = await emTransacao(pool, res, 'PUT /pesos', async conn => {
-      const [[atual]] = await conn.execute('SELECT id, unidade_peso, valor FROM web_pesos WHERE tipo = ? AND produto = ? FOR UPDATE', [dados.tipo, dados.produto]);
+      const [[atual]] = await conn.execute('SELECT id, unidade_peso, valor, origem, confianca FROM web_pesos WHERE tipo = ? AND produto = ? FOR UPDATE', [dados.tipo, dados.produto]);
       const quando = agoraLocal(), quem = req.acesso?.nome || '';
       if (!atual) {
         const [ins] = await conn.execute(
-          'INSERT INTO web_pesos (tipo, produto, unidade_peso, valor, atualizado_por, atualizado_em) VALUES (?, ?, ?, ?, ?, ?)',
-          [dados.tipo, dados.produto, dados.unidadePeso, dados.kgPorUnidade, quem, quando]);
+          'INSERT INTO web_pesos (tipo, produto, unidade_peso, valor, origem, confianca, atualizado_por, atualizado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [dados.tipo, dados.produto, dados.unidadePeso, dados.kgPorUnidade, dados.origem, dados.confianca, quem, quando]);
         const id = Number(ins.insertId);
         await auditar(conn, req, 'peso_criado', dados.produto, { id, tipo: dados.tipo });
         return { id, criado: true };
       }
-      await conn.execute('UPDATE web_pesos SET unidade_peso = ?, valor = ?, atualizado_por = ?, atualizado_em = ? WHERE id = ?',
-        [dados.unidadePeso, dados.kgPorUnidade, quem, quando, atual.id]);
+      await conn.execute('UPDATE web_pesos SET unidade_peso = ?, valor = ?, origem = ?, confianca = ?, atualizado_por = ?, atualizado_em = ? WHERE id = ?',
+        [dados.unidadePeso, dados.kgPorUnidade, dados.origem, dados.confianca, quem, quando, atual.id]);
       const campos = [];
       if (atual.unidade_peso !== dados.unidadePeso) campos.push('unidadePeso');
       if (Number(atual.valor) !== dados.kgPorUnidade) campos.push('kgPorUnidade');
+      if ((atual.origem || 'manual') !== dados.origem) campos.push('origem');
+      if ((atual.confianca || null) !== dados.confianca) campos.push('confianca');
       await auditar(conn, req, 'peso_alterado', dados.produto, { id: Number(atual.id), tipo: dados.tipo, campos });
       return { id: Number(atual.id), criado: false };
     });
