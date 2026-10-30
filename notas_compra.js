@@ -130,7 +130,7 @@
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { notas: [], status: null, filtro: 'importar', busca: '', ocupado: false, temporizador: null };
+    const estado = { notas: [], status: null, filtro: '', busca: '', ocupado: false, temporizador: null };
     const pode = c => !!(win.Acesso && win.Acesso.pode(c));
     const perms = () => ({ comValores: pode('valores.ver'), importar: pode('compras_nfe.importar'), movimentar: pode('estoque.movimentar') });
     function toast(msg, tipo = 'info') {

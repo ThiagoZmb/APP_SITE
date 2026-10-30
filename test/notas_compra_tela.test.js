@@ -199,3 +199,12 @@ test('Ciência da operação desativada: botão em lote e por nota inativos, cai
   assert.match(linha, /data-acao="ciencia"[^>]*\bdisabled\b/);
   assert.match(linha, /class="nc-marcar"[^>]*\bdisabled\b/);
 });
+
+test('tela de notas de compra começa com o filtro "Todas" (no estado e no seletor)', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'notas_compra.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'notas_compra.html'), 'utf8');
+  assert.match(js, /const estado = \{ notas: \[\], status: null, filtro: '', busca: ''/);
+  assert.match(html, /<option value="" selected>Todas<\/option>/);
+  assert.equal((html.match(/<option value="[^"]*" selected>/g) || []).length, 1, 'só uma opção marcada');
+});
