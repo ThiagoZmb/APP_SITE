@@ -607,12 +607,15 @@ function registrarPedOrc({ rota, pool }) {
 
   // situação do ORÇAMENTO (menu do botão direito da lista): Fechado / Aguardando resposta, como "Alterar situação para..." do VB
   // (frm_Controle_de_Orçamentos). Registrada ANTES da rota genérica /ped_orc/:tipo/:numero/situacao, que é só de pedido.
-  const SITUACOES_ORCAMENTO = ['Fechado', 'Aguardando resposta'];
-  rota('post', '/ped_orc/orcamentos/:numero/situacao', ['orcamentos.salvar'], async (req, res) => {
+  // "Baixado" não existe no VB (pedido do dono): pode ser marcado por quem tem orcamentos.situacao (ex.: Representante, que não edita) ou orcamentos.salvar;
+  // Fechado / Aguardando resposta continuam exigindo orcamentos.salvar.
+  const SITUACOES_ORCAMENTO = ['Fechado', 'Aguardando resposta', 'Baixado'];
+  rota('post', '/ped_orc/orcamentos/:numero/situacao', [{ algum: ['orcamentos.salvar', 'orcamentos.situacao'] }], async (req, res) => {
     const numero = Number(req.params.numero);
     if (!(Number.isInteger(numero) && numero > 0)) return res.status(400).json({ error: 'Documento inválido.' });
     const nova = String((req.body || {}).situacao ?? '');
     if (!SITUACOES_ORCAMENTO.includes(nova)) return res.status(400).json({ error: `Situação inválida. Use: ${SITUACOES_ORCAMENTO.join(', ')}.` });
+    if (nova !== 'Baixado' && !req.acesso.permissoes.has('orcamentos.salvar')) return res.status(403).json({ error: MSG_SEM_ACESSO });
     const r = await emTransacao(pool, res, 'POST /ped_orc/orcamentos/situacao', async conn => {
       const linhas = await docParaAcao(conn, req, 'Orçamento', numero);
       const antes = String(linhas.cab.SITUACAO || '');

@@ -217,6 +217,7 @@
         .st.entrega { color: #5b3f8c; border-color: #cdbfe6; background: #f7f3fd; margin-left: 4px; }
         .st.cancelado { color: #b8283a; border-color: #f5a08a; background: #fff5f3; }
         .st.fechado { color: #1d5fb8; border-color: #a9c8f2; background: #e3efff; }
+        .st.baixado { color: #5f6368; border-color: #cfd3d8; background: #f1f3f4; }
         /* orçamento Fechado: a linha toda em azul bem claro (antes da regra .ctx, que continua valendo no clique direito) */
         #orders-tbody tr.linha-fechada { background: #eaf3ff; }
         .st.fin-aberto { color: #a86d00; border-color: #f2d48a; }
@@ -407,7 +408,7 @@
         // situações (mesmas regras usadas no resto do sistema)
         const sit = s => { const n = norm(s);
             return n.includes('cancel') ? 'cancelado' : n.includes('produ') ? 'producao' : (n.includes('pronto') || n.includes('finaliz') || n.includes('conclu') || n === 'ok') ? 'pronto'
-                : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : n === 'fechado' ? 'fechado' : 'outro'; };
+                : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : n === 'fechado' ? 'fechado' : n === 'baixado' ? 'baixado' : 'outro'; };
         const finClasse = f => { const n = norm(f); return n.includes('atras') || n.includes('protest') ? 'fin-atraso' : n.includes('receber') ? 'fin-aberto' : n.includes('recebid') ? 'fin-ok' : ''; };
 
         // ================= ESTADO =================
@@ -820,11 +821,14 @@
                     L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(numero, nome), desativado: atual });
                 }
             }
-            if (!ehPedido && Acesso.pode('orcamentos.salvar')) {
+            if (!ehPedido && (Acesso.pode('orcamentos.salvar') || Acesso.pode('orcamentos.situacao'))) {
                 sep(); L.push({ titulo: 'Situação do orçamento' });
-                const fechado = x.s === 'fechado', aguardando = norm(x.situacao).startsWith('aguard');
-                L.push({ icone: fechado ? '✔' : '', rotulo: 'Fechado', fn: () => mudarSituacaoOrcamento(numero, 'Fechado'), desativado: fechado });
-                L.push({ icone: aguardando ? '✔' : '', rotulo: 'Aguardando resposta', fn: () => mudarSituacaoOrcamento(numero, 'Aguardando resposta'), desativado: aguardando });
+                const fechado = x.s === 'fechado', aguardando = norm(x.situacao).startsWith('aguard'), baixado = x.s === 'baixado';
+                if (Acesso.pode('orcamentos.salvar')) {
+                    L.push({ icone: fechado ? '✔' : '', rotulo: 'Fechado', fn: () => mudarSituacaoOrcamento(numero, 'Fechado'), desativado: fechado });
+                    L.push({ icone: aguardando ? '✔' : '', rotulo: 'Aguardando resposta', fn: () => mudarSituacaoOrcamento(numero, 'Aguardando resposta'), desativado: aguardando });
+                }
+                L.push({ icone: baixado ? '✔' : '', rotulo: 'Marcar como Baixado', fn: () => mudarSituacaoOrcamento(numero, 'Baixado'), desativado: baixado });
             }
             if (ehPedido && x.entregaStatus && Acesso.pode('entregas.ver')) {
                 sep();

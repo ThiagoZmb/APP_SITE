@@ -9,6 +9,7 @@ const CATALOGO = [
   { codigo: 'pedidos.pdf', nome: 'Abrir PDF de pedido/orçamento', area: 'Pedidos' },
   { codigo: 'orcamentos.criar', nome: 'Montar orçamento (também exige Valores financeiros)', area: 'Pedidos' },
   { codigo: 'orcamentos.salvar', nome: 'Salvar orçamento', area: 'Pedidos' },
+  { codigo: 'orcamentos.situacao', nome: 'Marcar orçamento como Baixado (sem editar nem cancelar)', area: 'Pedidos' },
   { codigo: 'pedidos.criar', nome: 'Salvar como pedido', area: 'Pedidos' },
   { codigo: 'pedidos.cancelar', nome: 'Cancelar pedido', area: 'Pedidos' },
   { codigo: 'pedidos.situacao', nome: 'Mudar a situação do pedido (Em Produção, Pronto, Entregue, Retirado)', area: 'Pedidos' },
@@ -65,7 +66,7 @@ const PERFIS_INICIAIS = [
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },
   { nome: 'Representante', descricao: 'Pedidos e clientes da sua região, com valores',
-    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'clientes.ver', 'valores.ver'] }
+    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.situacao', 'clientes.ver', 'valores.ver'] }
 ];
 
 // perfil + exceções "liberar" − exceções "bloquear"; inativo = nada; códigos fora do catálogo são ignorados

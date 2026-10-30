@@ -17,7 +17,8 @@ const PERFIS = {
   'Estoquista': doPerfil('Estoquista'),
   'Monta sem valores': ['orcamentos.criar', 'orcamentos.salvar'],
   'Monta sem salvar': ['orcamentos.criar', 'valores.ver'],
-  'Representante SP': doPerfil('Administrador')
+  'Representante SP': doPerfil('Administrador'),
+  'Representante': doPerfil('Representante')
 };
 
 // o sistema web só usa o VALOR_FIXO (o VALOR_CHEIO saiu)
