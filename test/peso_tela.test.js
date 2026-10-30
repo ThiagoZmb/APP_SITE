@@ -107,9 +107,11 @@ test('PDF, gravação e outras telas não ganharam peso', () => {
   assert.ok(!/web_pesos|pesoKg|bPESOb/.test(ped));
 });
 
-test('peso do item em montagem é escrito no desenho só na tela (nunca no modo limpo que vai para o PDF)', () => {
+test('peso do item em montagem fica no título do card de visualização, na direita, e NÃO dentro do desenho (nem no PNG do PDF)', () => {
   const h = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
-  assert.match(h, /if \(!limpo && pesoFormTexto\) \{[^}]*cota\('Peso: ' \+ pesoFormTexto/);
-  assert.match(h, /let pesoFormTexto = '';/);
-  assert.ok(h.indexOf("let pesoFormTexto") < h.indexOf("function desenharVisualizacao"), 'declarado antes do desenho');
+  assert.ok(h.includes('<h4>🖥️ Visualização em tempo real<span id="peso-visualizacao" class="peso-visualizacao" hidden></span></h4>'));
+  assert.ok(h.includes('.peso-visualizacao { margin-left: auto;'));
+  assert.ok(h.includes("sp.textContent = novo ? 'Peso: ' + novo : ''"));
+  const desenho = h.slice(h.indexOf('function desenharVisualizacao'), h.indexOf('function desenharVisualizacao') + 6000);
+  assert.ok(!desenho.includes("'Peso: '"), 'o canvas não escreve mais o peso');
 });

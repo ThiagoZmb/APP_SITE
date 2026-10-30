@@ -75,6 +75,9 @@
             color: var(--primary-color); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
         }
         .secao-item h4::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+        /* peso do item em montagem: no título do card de visualização, encostado na direita */
+        html body .secao-item > h4 .peso-visualizacao { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700; color: #2b2f33; }
+        .peso-visualizacao[hidden] { display: none; }
         .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px; }
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 6px; }
         .form-group input, .form-group select {
@@ -789,7 +792,7 @@
                     <aside class="item-visual">
                     <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
                     <div class="secao-item secao-porta">
-                        <h4>🖥️ Visualização em tempo real</h4>
+                        <h4>🖥️ Visualização em tempo real<span id="peso-visualizacao" class="peso-visualizacao" hidden></span></h4>
                         <canvas id="cv-visualizacao"></canvas>
                         <div class="viz-linha">
                             <button class="btn-mini" id="btn-modo-pux" title="A posição do puxador é definida aqui, folha por folha: clique no botão e depois nas posições em laranja de cada folha no desenho">🎯 Posicionar puxador (clique no desenho)</button>
@@ -1484,7 +1487,10 @@
                 const rot = r && r.pesoKg !== null && r.pesoKg !== undefined ? PesoTela.rotuloItem({ kg: r.pesoKg, parcial: r.parcial, pendencias: r.pendencias }) : null;
                 grupo.hidden = !rot; campo.value = rot ? rot.texto : ''; campo.title = rot ? rot.titulo : '';
                 const novo = rot && rot.texto !== '—' ? rot.texto : '';
-                if (novo !== pesoFormTexto) { pesoFormTexto = novo; try { desenharVisualizacao(); } catch { /* o desenho se refaz na próxima alteração */ } } // peso no desenho
+                pesoFormTexto = novo;
+                // peso em tempo real no título do card de visualização, bem à direita (não vai mais dentro do desenho)
+                const sp = document.getElementById('peso-visualizacao');
+                if (sp) { sp.hidden = !novo; sp.textContent = novo ? 'Peso: ' + novo : ''; sp.title = campo.title || ''; }
             };
             let item = null;
             try { item = itemFormPeso(); } catch { item = null; }
@@ -2000,8 +2006,6 @@
             const COR_VAO = '#0077ff', COR_PORTA = '#e8590c'; // vão em azul, porta em laranja
             const cota = limpo ? () => {} : (t, x, y, cor) => { if (cor) ctx.fillStyle = cor; cv._cotas.push(t); cv._coresCotas[t] = ctx.fillStyle; ctx.fillText(t, x, y); };
             cv._generico = false;
-            // peso do item em tempo real, só na tela (o modo limpo, que vira a imagem do PDF, não leva nenhuma cota)
-            if (!limpo && pesoFormTexto) { ctx.save(); ctx.font = fonte(22); ctx.textAlign = 'left'; cota('Peso: ' + pesoFormTexto, 24, 44, '#2b2f33'); ctx.restore(); }
             if (altura <= 0 || largura <= 0) {
                 if (limpo) return;
                 // sem medidas: porta genérica do produto (tracejada), só para orientar
