@@ -3194,6 +3194,10 @@
             if (itens.length && !confirm('Começar um novo orçamento/pedido? Os itens da tela serão apagados.')) return;
             paginaDeRetorno = ''; // documento novo: depois de salvar fica na tela, não volta para a lista
             limparDocumento();
+            // "Novo" também limpa o cliente (volta ao "— escolha —", que trava a montagem de itens até escolher outro)
+            const selCliente = $s('sel-cliente');
+            selCliente.selectedIndex = 0;
+            selCliente.dispatchEvent(new Event('change'));
         }
         // select com o valor gravado mesmo que ele não esteja na lista (dados antigos do VB)
         function escolherOpcao(id, valor) {

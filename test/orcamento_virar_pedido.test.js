@@ -30,3 +30,10 @@ test('serralheria: inserir uma peça NOVA devolve a quantidade de conjuntos a 1;
   const a = html.indexOf('function inserirPecaSerr()'), b = html.indexOf("document.getElementById('f-qtd').value = 1;", a);
   assert.ok(b > a && b < html.indexOf('calcularPrecoAutomatico();', a), 'a quantidade volta a 1 antes do recálculo do preço');
 });
+
+test('botão Novo também limpa o campo do cliente (volta ao placeholder e avisa a tela, que trava os itens)', () => {
+  const trecho = html.slice(html.indexOf('function novoDocumento()'), html.indexOf('function novoDocumento()') + 900);
+  assert.ok(trecho.includes('limparDocumento();'));
+  assert.ok(trecho.includes("const selCliente = $s('sel-cliente');") && trecho.includes('selCliente.selectedIndex = 0;') && trecho.includes("selCliente.dispatchEvent(new Event('change'));"));
+  assert.ok(trecho.indexOf('limparDocumento();') < trecho.indexOf('selCliente.selectedIndex = 0;'), 'limpa o cliente depois do resto');
+});
