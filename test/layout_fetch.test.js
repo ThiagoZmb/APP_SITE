@@ -22,3 +22,9 @@ test('layout.js compila e o wrapper do fetch deixa as chamadas normais passarem'
   // o wrapper chama a regra com o endereço da chamada e devolve o fetch original nas consultas de segundo plano
   assert.match(fonte, /if \(SEGUNDO_PLANO\.test\(alvo\)\) return fetchOriginal\(\.\.\.args\);/);
 });
+
+test('menu lateral: sem o item "Início" nem o título "Visão geral"; o logo continua levando à primeira página liberada', () => {
+  assert.ok(!fonte.includes("texto: 'Início'") && !fonte.includes("{ secao: 'Visão geral' }"));
+  assert.ok(fonte.includes("'inicio.html': ['paineis.ver']"), 'a página Início continua existindo e protegida pela permissão');
+  assert.ok(fonte.includes("<a class=\"sb-marca\" href=\"${window.Acesso.primeiraPagina() || 'inicio.html'}\">"), 'o logo é o atalho para o início');
+});

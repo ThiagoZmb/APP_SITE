@@ -28,8 +28,7 @@
         precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
     const MENU = [
-        { secao: 'Visão geral' },
-        { href: 'inicio.html', texto: 'Início', icone: 'inicio' },
+        // "Início" saiu do menu: o logo "Elegance" do topo leva à primeira página liberada (inicio.html para quem vê os painéis)
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
