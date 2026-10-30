@@ -28,3 +28,12 @@ test('menu lateral: sem o item "Início" nem o título "Visão geral"; o logo co
   assert.ok(fonte.includes("'inicio.html': ['paineis.ver']"), 'a página Início continua existindo e protegida pela permissão');
   assert.ok(fonte.includes("<a class=\"sb-marca\" href=\"${window.Acesso.primeiraPagina() || 'inicio.html'}\">"), 'o logo é o atalho para o início');
 });
+
+test('indicador de carregamento: porta de correr em miniatura (trilho, duas folhas, sombra, texto), keyframes presentes e o giro dos botões preservado', () => {
+  for (const c of ['.cg-porta', '.cg-trilho', '.cg-folha', '.cg-f1', '.cg-f2', '.cg-sombra', '.cg-texto']) assert.ok(fonte.includes('#carregando-global ' + c), c);
+  for (const k of ['@keyframes cg-desliza', '@keyframes cg-brilho', '@keyframes cg-sombra', '@keyframes cg-ponto', '@keyframes carregando-entrada']) assert.ok(fonte.includes(k), k);
+  assert.ok(fonte.includes('@keyframes carregando-giro'), 'os botões ocupados ainda usam o giro');
+  assert.ok(fonte.includes('<div class="cg-porta"><span class="cg-trilho"></span><span class="cg-folha cg-f1"></span><span class="cg-folha cg-f2"></span><span class="cg-sombra"></span></div>'));
+  assert.ok(!fonte.includes('carregando-pulso') && !fonte.includes('#carregando-global i '), 'o anel antigo saiu');
+  assert.ok(fonte.includes('prefers-reduced-motion'), 'respeita quem pede menos movimento');
+});

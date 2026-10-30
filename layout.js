@@ -452,17 +452,32 @@
         css.textContent = `
             #carregando-global { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: none; }
             #carregando-global.ativo { display: block; animation: carregando-entrada .18s ease-out; }
-            /* disco branco com sombra + anel girando + miolo pulsando, no centro da tela (não bloqueia cliques) */
-            #carregando-global::before { content: ''; position: absolute; top: 50%; left: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
-                background: rgba(255,255,255,.92); box-shadow: 0 10px 34px rgba(0,0,0,.22); }
-            #carregando-global::after { content: ''; position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
-                border: 5px solid rgba(139,0,0,.16); border-top-color: var(--primary-color, #8B0000); border-right-color: var(--primary-color, #8B0000);
-                animation: carregando-giro .8s linear infinite; }
-            #carregando-global i { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
-                background: var(--primary-color, #8B0000); animation: carregando-pulso 1.1s ease-in-out infinite; }
+            /* uma PORTA DE CORRER em miniatura (a cara da fábrica): duas folhas de vidro deslizam no trilho, um brilho passa pelo vidro,
+               a sombra no chão acompanha e o "Carregando" ganha pontinhos. Cartão no centro da tela, sem bloquear cliques. */
+            #carregando-global::before { content: ''; position: absolute; top: 50%; left: 50%; width: 148px; height: 122px; margin: -61px 0 0 -74px; border-radius: 22px;
+                background: rgba(255,255,255,.95); box-shadow: 0 14px 44px rgba(0,0,0,.24), inset 0 0 0 1px rgba(139,0,0,.06); }
+            #carregando-global .cg-porta { position: absolute; top: 50%; left: 50%; width: 84px; height: 62px; margin: -46px 0 0 -42px; }
+            #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #7a828c, #4d545c); }
+            #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #b9bfc6; border-radius: 3px;
+                background: linear-gradient(115deg, rgba(255,255,255,0) 38%, rgba(255,255,255,.85) 50%, rgba(255,255,255,0) 62%) 130% 0 / 260% 100% no-repeat, linear-gradient(180deg, #eaf4fb, #d2e7f6);
+                box-shadow: 0 2px 6px rgba(0,0,0,.16); }
+            #carregando-global .cg-folha::after { content: ''; position: absolute; top: 12px; width: 3px; height: 20px; border-radius: 2px; background: var(--primary-color, #8B0000); }
+            #carregando-global .cg-f1 { left: 0; z-index: 1; animation: cg-brilho 2.6s ease-in-out infinite; }
+            #carregando-global .cg-f1::after { right: 2px; }
+            #carregando-global .cg-f2 { left: 42px; z-index: 2; animation: cg-desliza 2.6s ease-in-out infinite, cg-brilho 2.6s ease-in-out .18s infinite; }
+            #carregando-global .cg-f2::after { left: 2px; }
+            #carregando-global .cg-sombra { position: absolute; left: 50%; bottom: -8px; width: 72px; height: 7px; margin-left: -36px; border-radius: 50%; background: rgba(0,0,0,.13); animation: cg-sombra 2.6s ease-in-out infinite; }
+            #carregando-global .cg-texto { position: absolute; top: 50%; left: 50%; width: 148px; margin: 33px 0 0 -74px; text-align: center; font: 700 10.5px/1 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+                letter-spacing: .14em; text-transform: uppercase; color: #8a7d82; }
+            #carregando-global .cg-texto b { display: inline-block; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--primary-color, #8B0000); opacity: .25; animation: cg-ponto 1.2s ease-in-out infinite; }
+            #carregando-global .cg-texto b:nth-child(2) { animation-delay: .2s; }
+            #carregando-global .cg-texto b:nth-child(3) { animation-delay: .4s; }
             @keyframes carregando-entrada { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes carregando-pulso { 0%, 100% { transform: scale(.55); opacity: .55; } 50% { transform: scale(1); opacity: 1; } }
-            @media (prefers-reduced-motion: reduce) { #carregando-global::after, #carregando-global i { animation-duration: 2.4s; } }
+            @keyframes cg-desliza { 0%, 10% { transform: translateX(0); } 42%, 60% { transform: translateX(-34px); } 92%, 100% { transform: translateX(0); } }
+            @keyframes cg-brilho { 0%, 14% { background-position: 130% 0, 0 0; } 52%, 100% { background-position: -40% 0, 0 0; } }
+            @keyframes cg-sombra { 0%, 10%, 92%, 100% { transform: scaleX(1); opacity: .13; } 42%, 60% { transform: scaleX(.78); opacity: .2; } }
+            @keyframes cg-ponto { 0%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+            @media (prefers-reduced-motion: reduce) { #carregando-global .cg-f1, #carregando-global .cg-f2, #carregando-global .cg-sombra { animation-duration: 6s; } #carregando-global .cg-texto b { animation-duration: 3s; } }
             .processando { cursor: progress !important; }
             button.processando, a.processando { position: relative; opacity: .75; }
             button.processando::after, a.processando::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -2px;
@@ -475,7 +490,9 @@
         const barra = document.createElement('div');
         barra.id = 'carregando-global';
         barra.setAttribute('role', 'progressbar'); barra.setAttribute('aria-label', 'Carregando');
-        barra.appendChild(document.createElement('i'));
+        // porta de correr em miniatura (as classes cg-* estão no CSS acima); texto fixo, sem dados de fora
+        barra.innerHTML = '<div class="cg-porta"><span class="cg-trilho"></span><span class="cg-folha cg-f1"></span><span class="cg-folha cg-f2"></span><span class="cg-sombra"></span></div>' +
+            '<div class="cg-texto">Carregando<b></b><b></b><b></b></div>';
         document.body.appendChild(barra);
         let aviso = null;
 
