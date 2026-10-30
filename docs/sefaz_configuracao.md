@@ -77,11 +77,34 @@ computadores consultando a SEFAZ com o mesmo CNPJ fazem a SEFAZ bloquear **a emp
 A solução é uma **pasta compartilhada** na rede onde ficam, para todos os computadores: as notas (XML), a lista
 (`indice.json`), o ponteiro da fila e as esperas de 1 hora (`sefaz.estado.json`) e a trava (`sefaz.trava`).
 
+### Como a pasta fica organizada
+
+Chamando de `XML SEFAZ` a pasta configurada:
+
+```
+XML SEFAZ\
+  <chave>-nfe.xml                  XML das notas reais (produção); mesmo padrão de nome da contabilidade
+  _Homologacao\<chave>-nfe.xml     XML de teste (homologação), separado das notas reais
+  _controle\                       controle do sistema: NÃO mexer à mão
+      sefaz.estado.json            ponteiro da fila e esperas de 1 hora
+      sefaz.trava                  existe só enquanto um computador fala com a SEFAZ
+      indice.json                  lista de notas (produção)
+      indice_Homologacao.json      lista de notas (homologação)
+```
+
+- A pasta `XML SEFAZ` é **nova de propósito**: use uma pasta vazia, **não** as pastas por mês da contabilidade, para os
+  arquivos do sistema não se misturarem com os dela.
+- A pasta `_controle` não deve ser aberta, renomeada, movida nem apagada à mão (veja os cuidados mais abaixo). Os XML
+  podem ser consultados e copiados à vontade.
+- O serviço lê também XML com o nome antigo `<chave>.xml`, mas grava sempre `<chave>-nfe.xml`. Se já existir um
+  `<chave>-nfe.xml` válido (por exemplo, colocado pela contabilidade), ele é mantido e não é sobrescrito.
+
 ### Como configurar
 
-1. Escolha (ou crie) uma pasta no servidor que todos os computadores enxergam, por exemplo
-   `\\pc-serverdell\SERVIDOR ELEGANCE\SIMONE\CERTIFICADO DIGITAL NFE\NFE COMPRAS (SEFAZ)`. Os usuários do Windows que
-   usam o sistema precisam poder **ler e gravar** nela. Ela pode começar vazia; o serviço cria as subpastas.
+1. Crie uma pasta nova e vazia no servidor que todos os computadores enxergam, por exemplo
+   `\\pc-serverdell\SERVIDOR ELEGANCE\SIMONE\NFE ENTRADA Fornecedores\XML SEFAZ`. Os usuários do Windows que
+   usam o sistema precisam poder **ler e gravar** nela. Ela pode começar vazia; o serviço cria `_controle` e
+   `_Homologacao`.
 2. **Não** coloque o `.pfx`, a senha nem o `sefaz.config.json` dentro dessa pasta: ela guarda só notas, estado e trava.
 3. No `sefaz.config.json` de **cada** computador acrescente a linha `pastaCompartilhada` com **o mesmo caminho em
    todos**:
@@ -93,7 +116,7 @@ A solução é uma **pasta compartilhada** na rede onde ficam, para todos os com
   "ambiente": "producao",
   "certificado": "\\\\pc-serverdell\\SERVIDOR ELEGANCE\\SIMONE\\CERTIFICADO DIGITAL NFE\\empresa.pfx",
   "senha": "COLOQUE-A-SENHA-AQUI-SOMENTE-NESTE-PC",
-  "pastaCompartilhada": "\\\\pc-serverdell\\SERVIDOR ELEGANCE\\SIMONE\\CERTIFICADO DIGITAL NFE\\NFE COMPRAS (SEFAZ)"
+  "pastaCompartilhada": "\\\\pc-serverdell\\SERVIDOR ELEGANCE\\SIMONE\\NFE ENTRADA Fornecedores\\XML SEFAZ"
 }
 ```
 
@@ -101,7 +124,7 @@ A solução é uma **pasta compartilhada** na rede onde ficam, para todos os com
 > começa com duas barras (`\\pc-serverdell`), então no JSON ele começa com **quatro**: `"\\\\pc-serverdell\\..."`.
 > Escrever só duas no começo (`"\\pc-serverdell\\..."`) é o erro mais comum (já aconteceu): o Windows leria isso como
 > uma pasta do disco `C:`. O serviço recusa esse caminho e a tela mostra "o caminho de rede precisa começar com DUAS
-> barras invertidas". Uma letra de unidade mapeada também é aceita (`"Z:\\NFE COMPRAS (SEFAZ)"`), mas o caminho de rede
+> barras invertidas". Uma letra de unidade mapeada também é aceita (`"Z:\\NFE ENTRADA Fornecedores\\XML SEFAZ"`), mas o caminho de rede
 > é mais seguro, porque a letra pode não existir quando o serviço inicia.
 
 4. `cnpj`, `uf`, `ambiente`, `certificado` e `senha` também devem ser **iguais em todos** os computadores. O `.pfx`
@@ -115,7 +138,8 @@ A solução é uma **pasta compartilhada** na rede onde ficam, para todos os com
 
 1. **Primeiro**, ligue no computador que **já vinha sincronizando** (o que tem as notas no disco). Abra a tela
    **Notas de compra (SEFAZ)** nele: na primeira vez o serviço **copia** para a pasta compartilhada o ponteiro da fila,
-   a lista e os XML desse computador (não apaga nada do disco local e não sobrescreve arquivos que já estejam lá).
+   a lista e os XML desse computador (os XML passam a se chamar `<chave>-nfe.xml`; não apaga nada do disco local e não
+   sobrescreve arquivos que já estejam lá).
    A tela mostra "Notas compartilhadas com os outros computadores".
 2. **Depois**, ligue nos outros. Como a pasta compartilhada já tem dados, eles **não** copiam nada do disco deles (para
    não misturar duas filas): passam a usar a da pasta. As notas antigas que só estavam no disco desses outros
@@ -125,7 +149,7 @@ A solução é uma **pasta compartilhada** na rede onde ficam, para todos os com
 ### O que a trava faz
 
 - Antes de falar com a SEFAZ (sincronizar, baixar XML, ciência) ou de mexer na lista (marcar "Importada"), o serviço
-  cria o arquivo `sefaz.trava` na pasta compartilhada com o nome do computador, e apaga ao terminar (inclusive quando
+  cria o arquivo `sefaz.trava` na pasta `_controle` da pasta compartilhada com o nome do computador, e apaga ao terminar (inclusive quando
   dá erro ou quando a SEFAZ manda esperar).
 - Se outro computador estiver no meio de uma consulta, a tela mostra (em amarelo, não é erro) "Outro computador (NOME)
   está falando com a SEFAZ neste momento. Aguarde e tente de novo." Marcar "Importada" espera até uns 5 segundos antes
@@ -139,7 +163,7 @@ Se um computador desligar ou perder a rede no meio de uma consulta, a trava fica
 ela é considerada abandonada e o próximo computador a usa normalmente (a tela avisa "Uma trava abandonada do
 computador NOME foi retomada"). Se o próprio computador que caiu voltar antes disso, ele retoma a trava na hora.
 Não precisa fazer nada; só em último caso, com **todos** os computadores fora da tela de notas, apague o arquivo
-`sefaz.trava` da pasta compartilhada.
+`sefaz.trava` da pasta `_controle`.
 
 ### Se a pasta não estiver acessível
 
@@ -147,9 +171,10 @@ Se o servidor estiver desligado, a rede cair ou faltar permissão, a tela mostra
 compartilhada das notas…" e nada é feito. O serviço **nunca** usa o disco local no lugar dela (isso criaria duas filas
 e o bloqueio 656). Quando a pasta voltar, é só clicar em **Atualizar**.
 
-Se aparecer que `indice.json` ou `sefaz.estado.json` "está danificado", restaure o arquivo de uma cópia de segurança
-do servidor. Em último caso, apagar `sefaz.estado.json` faz a próxima sincronização buscar de novo todo o histórico
-(pode levar a uma espera de 1 hora da SEFAZ); apagar `indice.json` esvazia a lista até a próxima sincronização.
+Se aparecer que `indice.json` (ou `indice_Homologacao.json`) ou `sefaz.estado.json` "está danificado", restaure o
+arquivo de uma cópia de segurança do servidor (todos ficam em `_controle`). Em último caso, apagar `sefaz.estado.json`
+faz a próxima sincronização buscar de novo todo o histórico (pode levar a uma espera de 1 hora da SEFAZ); apagar o
+índice esvazia a lista até a próxima sincronização.
 
 ### Cuidados
 

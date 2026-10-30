@@ -18,8 +18,9 @@
 // Dependências (local/package.json): node-forge (só para abrir o .pfx, inclusive os antigos com RC2) e fast-xml-parser.
 //
 // Vários PCs: com "pastaCompartilhada" na config, o estado da fila (ponteiro NSU, esperas de 1 hora, bloqueio 656,
-// consultas por chave), o índice e os XML ficam numa pasta da rede, e toda operação que consulta a SEFAZ ou grava o
-// índice/estado pega antes a trava sefaz.trava dessa pasta (criada com 'wx'). Assim as regras de consumo valem para a
+// consultas por chave), o índice e os XML ficam numa pasta da rede (XML <chave>-nfe.xml na raiz dela; controle em
+// _controle\), e toda operação que consulta a SEFAZ ou grava o índice/estado pega antes a trava _controle\sefaz.trava
+// (criada com 'wx'). Assim as regras de consumo valem para a
 // empresa toda, não por PC. Sem o campo, nada muda: tudo fica neste PC, sem trava de arquivo.
 // ==========================================================================
 'use strict';
@@ -69,6 +70,9 @@ const TEMPO_LIMITE = 60 * 1000;
 const TRAVA_ABANDONADA = 20 * 60 * 1000;
 const ESPERA_TRAVA = { longa: 2000, curta: 5000 };   // ms esperando a trava: operações com a SEFAZ / operações curtas (importada)
 const NOME_TRAVA = 'sefaz.trava';
+const PASTA_CONTROLE = '_controle';          // dentro da pasta compartilhada: estado, trava e índice (não mexer à mão)
+const PASTA_HOMOLOGACAO = '_Homologacao';    // dentro da pasta compartilhada: XML de homologação
+const SUFIXO_XML = '-nfe.xml';               // nome do XML na pasta compartilhada: <chave>-nfe.xml (padrão da contabilidade)
 
 const UFS = { RO: 11, AC: 12, AM: 13, RR: 14, PA: 15, AP: 16, TO: 17, MA: 21, PI: 22, CE: 23, RN: 24, PB: 25, PE: 26, AL: 27,
   SE: 28, BA: 29, MG: 31, ES: 32, RJ: 33, SP: 35, PR: 41, SC: 42, RS: 43, MS: 50, MT: 51, GO: 52, DF: 53 };
@@ -504,11 +508,24 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
 
   // Onde ficam estado, índice e XML. Sem "pastaCompartilhada": tudo neste PC, como sempre. Com ela: tudo na pasta da
   // rede, com trava; o disco local NUNCA é usado como substituto (dois estados da fila = 656 para a empresa toda).
+  // Layout da pasta compartilhada P (a contabilidade também usa a pasta, por isso o nome dos XML segue o padrão dela):
+  //   P\<chave>-nfe.xml                 XML de produção
+  //   P\_Homologacao\<chave>-nfe.xml    XML de homologação (teste nunca se mistura com as notas reais)
+  //   P\_controle\sefaz.estado.json, sefaz.trava, indice.json (produção), indice_Homologacao.json (homologação)
+  // Leitura aceita também o nome antigo <chave>.xml; gravação nova usa sempre <chave>-nfe.xml.
   function locais(cfg) {
-    if (!cfg.pastaCompartilhada) return { compartilhada: false, estado: ESTADO, notas: pastaNotas(cfg.ambiente) };
+    if (!cfg.pastaCompartilhada) {
+      const notas = pastaNotas(cfg.ambiente);
+      return { compartilhada: false, estado: ESTADO, notas, indice: path.join(notas, 'indice.json'), nomesXml: c => [`${c}.xml`] };
+    }
     const P = cfg.pastaCompartilhada;
-    return { compartilhada: true, raiz: P, nome: path.basename(P.replace(/[\\/]+$/, '')) || 'pasta compartilhada',
-      estado: path.join(P, 'sefaz.estado.json'), notas: path.join(P, 'NFe', subpasta(cfg.ambiente)), trava: path.join(P, NOME_TRAVA) };
+    const controle = path.join(P, PASTA_CONTROLE);
+    const producao = cfg.ambiente === 'producao';
+    return { compartilhada: true, raiz: P, controle, nome: path.basename(P.replace(/[\\/]+$/, '')) || 'pasta compartilhada',
+      estado: path.join(controle, 'sefaz.estado.json'), trava: path.join(controle, NOME_TRAVA),
+      indice: path.join(controle, producao ? 'indice.json' : 'indice_Homologacao.json'),
+      notas: producao ? P : path.join(P, PASTA_HOMOLOGACAO),
+      nomesXml: c => [`${c}${SUFIXO_XML}`, `${c}.xml`] };      // o primeiro é o nome gravado; o segundo, compatibilidade
   }
   const erroPasta = L => new ErroSefaz(503, `Não consegui acessar a pasta compartilhada das notas ("${L.nome}"). Confira se o computador ` +
     'servidor está ligado, se a rede está funcionando e se este usuário do Windows pode gravar nessa pasta. Nada foi gravado neste PC.',
@@ -516,8 +533,8 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
   async function garantirPasta(L) {
     if (!L.compartilhada) return;
     try {
-      await fsp.mkdir(L.raiz, { recursive: true });
-      if (!(await fsp.stat(L.raiz)).isDirectory()) throw new Error('não é pasta');
+      await fsp.mkdir(L.controle, { recursive: true });      // cria P e P\_controle se faltarem
+      if (!(await fsp.stat(L.raiz)).isDirectory() || !(await fsp.stat(L.controle)).isDirectory()) throw new Error('não é pasta');
     } catch { throw erroPasta(L); }
   }
   // erro de arquivo na pasta compartilhada vira a mensagem clara (nunca 500)
@@ -607,34 +624,34 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
   async function planoMigracao(cfg, L) {
     const chave = `${L.raiz}|${chaveEstado(cfg)}`;
     if (migracaoConferida.has(chave)) return null;
+    // "a compartilhada já tem dados" = há estado desta empresa/ambiente ou índice deste ambiente em P\_controle
     const todos = await lerJson(L.estado, {}, true);
     const temEstado = !!(todos && typeof todos === 'object' && todos[chaveEstado(cfg)]);
-    const temIndice = await fsp.stat(path.join(L.notas, 'indice.json')).then(() => true, e => { if (e && e.code === 'ENOENT') return false; throw e; });
+    const temIndice = await fsp.stat(L.indice).then(() => true, e => { if (e && e.code === 'ENOENT') return false; throw e; });
+    if (temEstado || temIndice) { migracaoConferida.add(chave); return null; }   // a compartilhada já tem dados: usa os dela
     const localNotas = pastaNotas(cfg.ambiente);
-    const mesmaPasta = path.resolve(localNotas).toLowerCase() === path.resolve(L.notas).toLowerCase();
-    if (temEstado || (temIndice && !mesmaPasta)) { migracaoConferida.add(chave); return null; }   // a compartilhada já tem dados: usa os dela
     const estLocal = (await lerJson(ESTADO, {})) || {};
-    const estado = !temEstado && estLocal && typeof estLocal === 'object' && estLocal[chaveEstado(cfg)] && typeof estLocal[chaveEstado(cfg)] === 'object'
+    const estado = estLocal && typeof estLocal === 'object' && estLocal[chaveEstado(cfg)] && typeof estLocal[chaveEstado(cfg)] === 'object'
       ? estLocal[chaveEstado(cfg)] : null;
-    let indice = null, xmls = [];
-    if (!mesmaPasta) {
-      const ind = await lerJson(path.join(localNotas, 'indice.json'), null);
-      indice = ind && typeof ind === 'object' && ind.notas && typeof ind.notas === 'object' ? ind : null;
-      try { xmls = (await fsp.readdir(localNotas)).filter(n => /^\d{44}\.xml$/.test(n) && chaveValida(n.slice(0, 44))); } catch { xmls = []; }
-    }
+    const ind = await lerJson(path.join(localNotas, 'indice.json'), null);
+    const indice = ind && typeof ind === 'object' && ind.notas && typeof ind.notas === 'object' ? ind : null;
+    let xmls = [];
+    try { xmls = (await fsp.readdir(localNotas)).filter(n => /^\d{44}\.xml$/.test(n) && chaveValida(n.slice(0, 44))); } catch { xmls = []; }
     if (!estado && !indice && !xmls.length) { migracaoConferida.add(chave); return null; }
     return { chave, estado, indice, xmls, localNotas };
   }
-  // sob a trava: XML (sem sobrescrever), depois o índice, por último o ponteiro (se cair no meio, o pior caso é rebuscar)
+  // sob a trava: XML (renomeado para <chave>-nfe.xml, sem sobrescrever), depois o índice, por último o ponteiro
+  // (se cair no meio, o pior caso é rebuscar). O disco local nunca é apagado.
   async function migrarSePreciso(cfg, L) {
     const plano = await planoMigracao(cfg, L);
     if (!plano) return false;
     if (plano.xmls.length) await fsp.mkdir(L.notas, { recursive: true });
     for (const nome of plano.xmls) {
-      try { await fsp.copyFile(path.join(plano.localNotas, nome), path.join(L.notas, nome), fs.constants.COPYFILE_EXCL); }
-      catch (e) { if (!e || e.code !== 'EEXIST') throw e; }
+      const destino = path.join(L.notas, L.nomesXml(nome.slice(0, 44))[0]);
+      try { await fsp.copyFile(path.join(plano.localNotas, nome), destino, fs.constants.COPYFILE_EXCL); }
+      catch (e) { if (!e || e.code !== 'EEXIST') throw e; }     // já existe (a contabilidade pode ter posto): fica o de lá
     }
-    if (plano.indice) await gravarJson(path.join(L.notas, 'indice.json'), plano.indice);
+    if (plano.indice) await gravarJson(L.indice, plano.indice);
     if (plano.estado) {
       const todos = await lerJson(L.estado, {}, true);
       const base = todos && typeof todos === 'object' && !Array.isArray(todos) ? todos : {};
@@ -711,16 +728,40 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     base[chaveEstado(cfg)] = est;
     await gravarJson(L.estado, base);
   }
-  const arquivoIndice = L => path.join(L.notas, 'indice.json');
   async function lerIndice(L) {
-    const d = await lerJson(arquivoIndice(L), null, L.compartilhada);
+    const d = await lerJson(L.indice, null, L.compartilhada);
     return d && typeof d === 'object' && d.notas && typeof d.notas === 'object' ? d : { versao: 1, notas: {} };
   }
-  const gravarIndice = (L, ind) => gravarJson(arquivoIndice(L), ind);
-  const arquivoXml = (L, chave) => {
+  const gravarIndice = (L, ind) => gravarJson(L.indice, ind);
+  // nomes possíveis do XML da nota (o primeiro é o usado ao gravar); montados só com a chave validada
+  const arquivosXml = (L, chave) => {
     if (!chaveValida(chave)) throw new ErroSefaz(400, 'Chave de acesso inválida.');
-    return path.join(L.notas, `${chave}.xml`);      // nome montado só com a chave validada
+    return L.nomesXml(chave).map(n => path.join(L.notas, n));
   };
+  const semBom = s => s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+  // lê o XML pelo primeiro nome que existir e for válido: { conteudo } | { danificado: true } | null (nenhum arquivo)
+  async function lerXmlNota(L, chave) {
+    let achou = false;
+    for (const arq of arquivosXml(L, chave)) {
+      let s;
+      try { s = semBom(await fsp.readFile(arq, 'utf8')); } catch (e) { if (e && e.code === 'ENOENT') continue; throw e; }
+      achou = true;
+      if (xmlNFeValido(s, chave)) return { conteudo: s };
+    }
+    return achou ? { danificado: true } : null;
+  }
+  // grava o XML recebido da SEFAZ. Na pasta compartilhada, um <chave>-nfe.xml válido que já esteja lá (a contabilidade
+  // pode ter posto) é mantido; só um arquivo ausente ou danificado é (re)gravado. No disco local, como sempre.
+  async function gravarXmlNota(L, chave, xml) {
+    const [destino] = arquivosXml(L, chave);
+    if (L.compartilhada) {
+      let atual = null;
+      try { atual = semBom(await fsp.readFile(destino, 'utf8')); } catch (e) { if (!e || e.code !== 'ENOENT') throw e; }
+      if (atual != null && xmlNFeValido(atual, chave)) return false;
+    }
+    await gravarTexto(destino, xml);
+    return true;
+  }
 
   async function exclusivo(fn) {
     if (ocupado) throw new ErroSefaz(409, 'Já há uma operação com a SEFAZ em andamento. Aguarde terminar.');
@@ -744,7 +785,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
       if (doc.tipo === 'outro' || !chaveValida(doc.chave)) { ignorados.tipoDesconhecido++; continue; }
       if (doc.tipo === 'procNFe') {
         if (!xmlNFeValido(d.xml, doc.chave)) { ignorados.xmlInvalido++; continue; }
-        await gravarTexto(arquivoXml(L, doc.chave), d.xml);
+        await gravarXmlNota(L, doc.chave, d.xml);
       }
       const r = aplicarDocumento(ind.notas, doc, { cnpjEmpresa: cfg.cnpj, agoraIso });
       if (r === 'nova') novas++; else if (r === 'atualizada') atualizadas++;
@@ -828,7 +869,8 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
       bloqueado: e0.bloqueadoAte > t, consultasChaveNaHora: recentes.length, limiteConsultasChave: LIMITE_CONSULTAS_CHAVE,
       ocupado, qtdNotas: ind ? Object.keys(ind.notas).length : null,
       // compartilhada: só o nome final da pasta (nunca o caminho de rede inteiro)
-      pasta: L.compartilhada ? path.join(L.nome, 'NFe', subpasta(cfg.ambiente)) : pastaNotas(cfg.ambiente),
+      // (produção: "XML SEFAZ"; homologação: "XML SEFAZ\_Homologacao")
+      pasta: L.compartilhada ? (cfg.ambiente === 'producao' ? L.nome : path.join(L.nome, PASTA_HOMOLOGACAO)) : pastaNotas(cfg.ambiente),
       compartilhada
     };
   }
@@ -966,13 +1008,14 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     await garantirPasta(L);
     const n = (await protegido(L, () => lerIndice(L))).notas[chave];
     if (!n || (n.situacao !== 'completa' && n.situacao !== 'importada')) throw new ErroSefaz(404, 'O XML completo desta nota ainda não foi baixado.');
-    let conteudo;
-    try { conteudo = await fsp.readFile(arquivoXml(L, chave), 'utf8'); } catch (e) {
-      if (L.compartilhada && erroDeArquivo(e) && e.code !== 'ENOENT') throw erroPasta(L);
-      throw new ErroSefaz(404, 'O arquivo XML desta nota não está mais na pasta.');
+    let r;
+    try { r = await lerXmlNota(L, chave); } catch (e) {
+      if (L.compartilhada && erroDeArquivo(e)) throw erroPasta(L);
+      r = null;
     }
-    if (!xmlNFeValido(conteudo, chave)) throw new ErroSefaz(422, 'O arquivo XML desta nota está danificado. Baixe de novo.');
-    return conteudo;
+    if (!r) throw new ErroSefaz(404, 'O arquivo XML desta nota não está mais na pasta.');
+    if (r.danificado) throw new ErroSefaz(422, 'O arquivo XML desta nota está danificado. Baixe de novo.');
+    return r.conteudo;
   }
   // lê-modifica-grava o índice: na pasta compartilhada, sob a trava (espera até ~5 s se outro PC estiver com ela)
   async function importada(chave) {
@@ -1043,7 +1086,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
 
 module.exports = {
   criarSefaz, ErroSefaz, LEIAUTE, URLS, LIMITE_CONSULTAS_CHAVE, MAX_CHAVES_CIENCIA, HORA,
-  TRAVA_ABANDONADA, ESPERA_TRAVA, NOME_TRAVA, motivoPastaCompartilhada,
+  TRAVA_ABANDONADA, ESPERA_TRAVA, NOME_TRAVA, PASTA_CONTROLE, PASTA_HOMOLOGACAO, SUFIXO_XML, motivoPastaCompartilhada,
   chaveValida, cnpjValido, codigoUF, partesChave, horaBR, dhEventoBR, lerConfig, lerCertificado,
   montarDistDFe, envelopeDist, envelopeEvento, montarInfCiencia, canonicoInf, signedInfo, assinarEvento, montarEnvEvento,
   descompactarDocZip, interpretarRetDist, interpretarRetEvento, lerDocumento, xmlNFeValido, aplicarDocumento

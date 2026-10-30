@@ -16,8 +16,13 @@ const CHAVE_A = A.gerarChave({ numero: 601 });
 const CHAVE_B = A.gerarChave({ numero: 602 });
 const pfx = A.gerarPfx({ cnpj: CNPJ });
 const doc = (nsu, xml) => ({ nsu, schema: 'x.xsd', xml });
-const TRAVA = pasta => path.join(pasta, S.NOME_TRAVA);
-const NOTAS = pasta => path.join(pasta, 'NFe', 'Entrada_Homologacao');
+// layout novo: XML de homologação em P_Homologacao<chave>-nfe.xml; controle em P_controle (estado, trava, índice)
+const CONTROLE = pasta => path.join(pasta, S.PASTA_CONTROLE);
+const TRAVA = pasta => path.join(CONTROLE(pasta), S.NOME_TRAVA);
+const ESTADO = pasta => path.join(CONTROLE(pasta), 'sefaz.estado.json');
+const INDICE = pasta => path.join(CONTROLE(pasta), 'indice_Homologacao.json');
+const NOTAS = pasta => path.join(pasta, S.PASTA_HOMOLOGACAO);
+const XMLNOVO = (pasta, chave) => path.join(NOTAS(pasta), `${chave}${S.SUFIXO_XML}`);
 const lerJsonArq = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 
 function pastaComum(t) {
@@ -81,7 +86,7 @@ test('(a) A sincroniza e B enxerga as mesmas notas, o mesmo XML e o mesmo ultNSU
   assert.equal(st.ultNSU, '000000000000002'); assert.equal(st.qtdNotas, 2);
   assert.deepEqual(st.compartilhada, { ativa: true, acessivel: true, pasta: 'NFE COMPRAS (SEFAZ)' });
   assert.equal(b.falsa.pedidos.length, 0, 'B não chamou a SEFAZ');
-  assert.ok(fs.existsSync(path.join(pasta, 'sefaz.estado.json')) && fs.existsSync(path.join(NOTAS(pasta), 'indice.json')) && fs.existsSync(path.join(NOTAS(pasta), `${CHAVE_B}.xml`)));
+  assert.ok(fs.existsSync(ESTADO(pasta)) && fs.existsSync(INDICE(pasta)) && fs.existsSync(XMLNOVO(pasta, CHAVE_B)));
   assert.ok(!fs.existsSync(TRAVA(pasta)), 'trava solta depois do sucesso');
   semNadaLocal(a); semNadaLocal(b);
 });
@@ -112,7 +117,7 @@ test('(b) B logo depois do 137 de A: 429 sem chamar a SEFAZ; 656 de A bloqueia o
 // ---------------------------------------------------------------- (c) e (d): trava
 test('(c) trava de outro computador: 409 com o nome dele, sem chamar a SEFAZ; trava velha (20 min) é retomada e avisada', async t => {
   const { pasta, b } = await dois(t);
-  fs.mkdirSync(pasta, { recursive: true });
+  fs.mkdirSync(CONTROLE(pasta), { recursive: true });
   const travar = (dados) => fs.writeFileSync(TRAVA(pasta), JSON.stringify({ computador: 'PC-DO-ESTOQUE', pid: 4242, token: 'abc123', ...dados }));
   travar({ desde: b.relogio.t - 60 * 1000 });
   await assert.rejects(b.sefaz.sincronizar(), e => e.status === 409 && e.message === 'Outro computador (PC-DO-ESTOQUE) está falando com a SEFAZ neste momento. Aguarde e tente de novo.'
@@ -134,12 +139,12 @@ test('(c) trava de outro computador: 409 com o nome dele, sem chamar a SEFAZ; tr
   assert.equal(st2.compartilhada.travaRetomada, true);
   assert.ok(st2.avisos.some(a => /trava abandonada do computador PC-DO-ESTOQUE/.test(a)), st2.avisos.join(' | '));
   assert.ok(!(await b.sefaz.status()).avisos.some(a => /trava abandonada/.test(a)), 'avisa uma vez');
-  assert.ok(fs.readdirSync(pasta).every(n => !n.endsWith('.velha') && !n.endsWith('.tmp')), 'sem sobras de arquivos');
+  assert.ok([...fs.readdirSync(CONTROLE(pasta)), ...fs.readdirSync(pasta)].every(n => !n.endsWith('.velha') && !n.endsWith('.tmp')), 'sem sobras de arquivos');
 });
 
 test('(c) trava deste mesmo PC deixada por um processo que não existe mais é retomada sem esperar 20 min; trava ilegível recente segura', async t => {
   const { pasta, b } = await dois(t);
-  fs.mkdirSync(pasta, { recursive: true });
+  fs.mkdirSync(CONTROLE(pasta), { recursive: true });
   fs.writeFileSync(TRAVA(pasta), JSON.stringify({ computador: 'PC-B', pid: 2147483641, desde: b.relogio.t, token: 'zz' }));
   b.falsa.filas.dist.push({ corpo: A.retDist({ cStat: '137' }) });
   assert.equal((await b.sefaz.sincronizar()).ok, true);
@@ -186,10 +191,10 @@ test('(d) a trava é solta depois de sucesso, 429, 656, cStat inesperado e erro 
   a2.falsa.filas.dist.push({ corpo: A.retDist({ cStat: '593', xMotivo: 'Rejeicao' }) });
   await assert.rejects(a2.sefaz.sincronizar(), e => e.status === 502); solta();
   // erro de arquivo no meio (índice virou pasta): mensagem clara, nada de 500, trava solta, ponteiro não andou
-  fs.mkdirSync(path.join(NOTAS(pasta), 'indice.json'), { recursive: true });
+  fs.mkdirSync(INDICE(pasta), { recursive: true });
   a2.falsa.filas.dist.push({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000009', maxNSU: '000000000000009', docs: [doc('000000000000009', A.resNFe({ chave: CHAVE_A }))] }) });
   await assert.rejects(a2.sefaz.sincronizar(), e => e.status === 503 && /Não consegui acessar a pasta compartilhada das notas \("NFE COMPRAS \(SEFAZ\)"\)/.test(e.message)); solta();
-  assert.equal(lerJsonArq(path.join(pasta, 'sefaz.estado.json'))[`${CNPJ}-homologacao`].ultNSU, '000000000000000');
+  assert.equal(lerJsonArq(ESTADO(pasta))[`${CNPJ}-homologacao`].ultNSU, '000000000000000');
   // importada e ciência também soltam
   await assert.rejects(a2.sefaz.importada(CHAVE_A), e => e.status === 503); solta();
   a2.falsa.filas.evento.push({ corpo: A.retEvento({ cStat: '215' }) });
@@ -208,17 +213,19 @@ test('(e) migração: os dados locais do primeiro PC vão para a pasta compartil
   assert.ok(fs.existsSync(path.join(localNotas, `${CHAVE_B}.xml`)));
   // já existe na compartilhada um XML com o mesmo nome (não pode ser sobrescrito)
   fs.mkdirSync(NOTAS(pasta), { recursive: true });
-  fs.writeFileSync(path.join(NOTAS(pasta), `${CHAVE_B}.xml`), 'JA-ESTAVA-AQUI');
+  fs.writeFileSync(XMLNOVO(pasta, CHAVE_B), 'JA-ESTAVA-AQUI');
   // o dono liga a pasta compartilhada no PC A
   const cfg = lerJsonArq(a.config);
   fs.writeFileSync(a.config, JSON.stringify({ ...cfg, pastaCompartilhada: pasta }));
   const st = await a.sefaz.status();
   assert.equal(st.compartilhada.migrado, true);
   assert.equal(st.ultNSU, '000000000000003'); assert.equal(st.qtdNotas, 2); assert.equal(st.proximaConsultaHora, '11:00');
-  const est = lerJsonArq(path.join(pasta, 'sefaz.estado.json'))[`${CNPJ}-homologacao`];
+  const est = lerJsonArq(ESTADO(pasta))[`${CNPJ}-homologacao`];
   assert.equal(est.ultNSU, '000000000000003');
-  assert.deepEqual(Object.keys(lerJsonArq(path.join(NOTAS(pasta), 'indice.json')).notas).sort(), [CHAVE_A, CHAVE_B].sort());
-  assert.equal(fs.readFileSync(path.join(NOTAS(pasta), `${CHAVE_B}.xml`), 'utf8'), 'JA-ESTAVA-AQUI', 'não sobrescreve');
+  assert.deepEqual(Object.keys(lerJsonArq(INDICE(pasta)).notas).sort(), [CHAVE_A, CHAVE_B].sort());
+  assert.equal(fs.readFileSync(XMLNOVO(pasta, CHAVE_B), 'utf8'), 'JA-ESTAVA-AQUI', 'não sobrescreve');
+  assert.ok(fs.existsSync(XMLNOVO(pasta, CHAVE_A)) === false, 'resumo não tem XML');
+  assert.ok(!fs.existsSync(path.join(NOTAS(pasta), `${CHAVE_B}.xml`)), 'a migração não deixa o nome antigo');
   assert.ok(fs.existsSync(path.join(localNotas, 'indice.json')) && fs.existsSync(path.join(a.dir, 'Servico', 'sefaz.estado.json')), 'não apaga o local');
   assert.equal((await a.sefaz.status()).compartilhada.migrado, undefined, 'avisa uma vez');
   assert.ok(!fs.existsSync(TRAVA(pasta)));
@@ -244,8 +251,8 @@ test('(e) migração também acontece na primeira operação (sem abrir o status
   await assert.rejects(a.sefaz.sincronizar(), e => e.status === 429);
   fs.writeFileSync(a.config, JSON.stringify({ ...lerJsonArq(a.config), pastaCompartilhada: pasta }));
   assert.equal((await a.sefaz.importada(CHAVE_B)).nota.situacao, 'importada');
-  assert.equal(lerJsonArq(path.join(NOTAS(pasta), 'indice.json')).notas[CHAVE_B].situacao, 'importada');
-  assert.ok(lerJsonArq(path.join(pasta, 'sefaz.estado.json'))[`${CNPJ}-homologacao`].bloqueadoAte > a.relogio.t, 'o bloqueio 656 foi junto');
+  assert.equal(lerJsonArq(INDICE(pasta)).notas[CHAVE_B].situacao, 'importada');
+  assert.ok(lerJsonArq(ESTADO(pasta))[`${CNPJ}-homologacao`].bloqueadoAte > a.relogio.t, 'o bloqueio 656 foi junto');
   assert.equal(lerJsonArq(path.join(a.dir, 'NFe', 'Entrada_Homologacao', 'indice.json')).notas[CHAVE_B].situacao, 'completa', 'o local fica como estava');
 });
 
@@ -278,11 +285,11 @@ test('(f) pasta compartilhada inacessível: erro claro (503), status 200 com ace
 
 test('(f) índice danificado na pasta compartilhada não é tratado como vazio (não apaga as notas de todos)', async t => {
   const { pasta, a } = await dois(t);
-  fs.mkdirSync(NOTAS(pasta), { recursive: true });
-  fs.writeFileSync(path.join(NOTAS(pasta), 'indice.json'), '{"versao":1,"notas":{');
-  await assert.rejects(a.sefaz.notas(), e => e.status === 503 && /indice\.json da pasta compartilhada das notas está danificado/.test(e.message));
+  fs.mkdirSync(CONTROLE(pasta), { recursive: true });
+  fs.writeFileSync(INDICE(pasta), '{"versao":1,"notas":{');
+  await assert.rejects(a.sefaz.notas(), e => e.status === 503 && /indice_Homologacao\.json da pasta compartilhada das notas está danificado/.test(e.message));
   await assert.rejects(a.sefaz.importada(CHAVE_A), e => e.status === 503 && /danificado/.test(e.message));
-  assert.equal(fs.readFileSync(path.join(NOTAS(pasta), 'indice.json'), 'utf8'), '{"versao":1,"notas":{', 'intacto');
+  assert.equal(fs.readFileSync(INDICE(pasta), 'utf8'), '{"versao":1,"notas":{', 'intacto');
   assert.ok(!fs.existsSync(TRAVA(pasta)));
   const st = await a.sefaz.status();
   assert.equal(st.compartilhada.acessivel, false);
@@ -317,10 +324,10 @@ test('(h) "importada" em paralelo nos dois PCs: nenhuma atualização do índice
   for (const c of chaves) { pedidos.push(a.sefaz.importada(c)); pedidos.push(b.sefaz.importada(c)); }
   const r = await Promise.allSettled(pedidos);
   assert.deepEqual(r.filter(x => x.status === 'rejected').map(x => x.reason.message), []);
-  const ind = lerJsonArq(path.join(NOTAS(pasta), 'indice.json'));
+  const ind = lerJsonArq(INDICE(pasta));
   assert.deepEqual(chaves.map(c => ind.notas[c].situacao), chaves.map(() => 'importada'));
   assert.ok(!fs.existsSync(TRAVA(pasta)));
-  assert.ok(fs.readdirSync(NOTAS(pasta)).every(n => !n.endsWith('.tmp')));
+  assert.ok([...fs.readdirSync(NOTAS(pasta)), ...fs.readdirSync(CONTROLE(pasta))].every(n => !n.endsWith('.tmp')));
 });
 
 // ---------------------------------------------------------------- PC sem acesso ao certificado
@@ -360,4 +367,98 @@ test('(i) status com pasta compartilhada: sem senha, sem caminho do .pfx e sem o
   const e = await fora.sefaz.sincronizar().catch(x => x);
   assert.equal(e.status, 503);
   assert.ok(!e.message.includes(fora.dir) && !e.message.includes('empresa.pfx'));
+});
+
+// ---------------------------------------------------------------- layout novo da pasta (XML na raiz, controle em _controle)
+const procDoc = (nsu, chave) => doc(nsu, A.procNFe({ chave, dest: CNPJ }));
+const um138 = chave => ({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000001', maxNSU: '000000000000001', docs: [procDoc('000000000000001', chave)] }) });
+
+test('(layout) produção: XML como <chave>-nfe.xml na raiz da pasta; estado, índice e trava em _controle; nada de NFe\Entrada', async t => {
+  const pasta = pastaComum(t);
+  const a = await servico(t, pasta, 'PC-A');
+  fs.writeFileSync(a.config, JSON.stringify({ ...lerJsonArq(a.config), ambiente: 'producao' }));
+  const prod = S.criarSefaz({ raiz: a.dir, arquivoConfig: a.config, env: {}, agora: () => a.relogio.t, urls: { producao: a.falsa.urls },
+    computador: 'PC-A', esperaTrava: { longa: 150, curta: 400 } });
+  a.falsa.filas.dist.push(um138(CHAVE_B));
+  // enquanto a SEFAZ responde, a trava está em _controle
+  let travaVista = null;
+  const orig = a.falsa.servidor.listeners('request')[0];
+  a.falsa.servidor.removeAllListeners('request');
+  a.falsa.servidor.on('request', (req, res) => { travaVista = fs.existsSync(path.join(pasta, '_controle', 'sefaz.trava')); orig(req, res); });
+  assert.equal((await prod.sincronizar()).novas, 1);
+  assert.equal(travaVista, true, 'trava dentro de _controle enquanto ocupada');
+  assert.ok(fs.existsSync(path.join(pasta, `${CHAVE_B}-nfe.xml`)), 'XML na raiz da pasta');
+  assert.ok(!fs.existsSync(path.join(pasta, `${CHAVE_B}.xml`)));
+  assert.deepEqual(fs.readdirSync(path.join(pasta, '_controle')).sort(), ['indice.json', 'sefaz.estado.json']);
+  assert.ok(!fs.existsSync(path.join(pasta, 'NFe')) && !fs.existsSync(path.join(pasta, '_Homologacao')));
+  assert.ok(lerJsonArq(path.join(pasta, '_controle', 'sefaz.estado.json'))[`${CNPJ}-producao`]);
+  assert.ok(lerJsonArq(path.join(pasta, '_controle', 'indice.json')).notas[CHAVE_B]);
+  assert.match(await prod.xml(CHAVE_B), /<nfeProc/);
+  const st = await prod.status();
+  assert.equal(st.pasta, 'NFE COMPRAS (SEFAZ)');
+  semNadaLocal(a);
+});
+
+test('(layout) homologação: XML em _Homologacao\<chave>-nfe.xml e índice_Homologacao em _controle, fora da raiz das notas reais', async t => {
+  const { pasta, a } = await dois(t);
+  a.falsa.filas.dist.push(um138(CHAVE_B));
+  await a.sefaz.sincronizar();
+  assert.ok(fs.existsSync(path.join(pasta, '_Homologacao', `${CHAVE_B}-nfe.xml`)));
+  assert.deepEqual(fs.readdirSync(pasta).sort(), ['_Homologacao', '_controle'], 'a raiz não recebe nada de teste');
+  assert.deepEqual(fs.readdirSync(path.join(pasta, '_controle')).sort(), ['indice_Homologacao.json', 'sefaz.estado.json']);
+  const st = await a.sefaz.status();
+  assert.equal(st.pasta, path.join('NFE COMPRAS (SEFAZ)', '_Homologacao'));
+});
+
+test('(layout) leitura aceita o nome antigo <chave>.xml; gravação nova usa -nfe.xml; -nfe.xml válido existente é mantido; danificado é regravado', async t => {
+  const { pasta, a, b } = await dois(t);
+  a.falsa.filas.dist.push(um138(CHAVE_B));
+  await a.sefaz.sincronizar();
+  const novo = XMLNOVO(pasta, CHAVE_B), antigo = path.join(NOTAS(pasta), `${CHAVE_B}.xml`);
+  const conteudo = fs.readFileSync(novo, 'utf8');
+  // só o nome antigo existe: ainda é lido
+  fs.renameSync(novo, antigo);
+  assert.equal(await b.sefaz.xml(CHAVE_B), conteudo);
+  // um -nfe.xml válido que já esteja lá (contabilidade) NÃO é sobrescrito por um download novo (conteúdo marcado com comentário)
+  const colocado = conteudo.replace('<nfeProc', '<!--da contabilidade--><nfeProc');
+  fs.writeFileSync(novo, colocado);
+  a.relogio.t += S.HORA + 1000;
+  a.falsa.filas.dist.push({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000002', maxNSU: '000000000000002', docs: [procDoc('000000000000002', CHAVE_B)] }) });
+  await a.sefaz.sincronizar();
+  assert.equal(fs.readFileSync(novo, 'utf8'), colocado, 'XML válido existente mantido');
+  // -nfe.xml danificado é regravado, e o danificado sem outro nome dá 422 na leitura
+  fs.writeFileSync(novo, '<lixo');
+  fs.rmSync(antigo);
+  await assert.rejects(b.sefaz.xml(CHAVE_B), e => e.status === 422);
+  a.relogio.t += S.HORA + 1000;
+  a.falsa.filas.dist.push({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000003', maxNSU: '000000000000003', docs: [procDoc('000000000000003', CHAVE_B)] }) });
+  await a.sefaz.sincronizar();
+  assert.equal(await b.sefaz.xml(CHAVE_B), conteudo);
+});
+
+test('(layout) migração renomeia <chave>.xml local para <chave>-nfe.xml, índice e estado vão para _controle (homologação com sufixo)', async t => {
+  const pasta = pastaComum(t);
+  const a = await servico(t, undefined, 'PC-A');
+  a.falsa.filas.dist.push(um138(CHAVE_B));
+  await a.sefaz.sincronizar();
+  fs.writeFileSync(a.config, JSON.stringify({ ...lerJsonArq(a.config), pastaCompartilhada: pasta }));
+  assert.equal((await a.sefaz.status()).compartilhada.migrado, true);
+  assert.ok(fs.existsSync(XMLNOVO(pasta, CHAVE_B)));
+  assert.ok(!fs.existsSync(path.join(NOTAS(pasta), `${CHAVE_B}.xml`)), 'não copia com o nome antigo');
+  assert.ok(fs.existsSync(INDICE(pasta)) && fs.existsSync(ESTADO(pasta)));
+  assert.ok(!fs.existsSync(path.join(pasta, 'indice.json')) && !fs.existsSync(path.join(pasta, 'sefaz.estado.json')));
+  assert.match(await a.sefaz.xml(CHAVE_B), /<nfeProc/);
+  assert.ok(fs.existsSync(path.join(a.dir, 'NFe', 'Entrada_Homologacao', `${CHAVE_B}.xml`)), 'local intacto');
+});
+
+test('(layout) o status nunca mostra o caminho de rede inteiro, só o nome final da pasta', async t => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'elegance-sefaz-nome-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const pasta = path.join(base, 'SIMONE', 'NFE ENTRADA Fornecedores', 'XML SEFAZ');
+  const a = await servico(t, pasta, 'PC-A');
+  const st = await a.sefaz.status();
+  assert.equal(st.compartilhada.pasta, 'XML SEFAZ');
+  assert.equal(st.pasta, path.join('XML SEFAZ', '_Homologacao'));
+  const json = JSON.stringify(st);
+  assert.ok(!json.includes('SIMONE') && !json.includes('Fornecedores') && !json.includes(base) && !json.includes(base.replace(/\\/g, '\\\\')));
 });
