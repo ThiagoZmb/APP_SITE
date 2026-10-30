@@ -186,3 +186,16 @@ test('nenhum certificado, chave privada ou configuração real no repositório',
   assert.match(ler('.gitignore'), /\*\.pfx/);
   assert.match(ler('.gitignore'), /sefaz\.config\.json/);
 });
+
+test('Ciência da operação desativada: botão em lote e por nota inativos, caixas de seleção desabilitadas, sem chamada ao serviço', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'notas_compra.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'notas_compra.html'), 'utf8');
+  assert.match(js, /const CIENCIA_LIBERADA = false;/);
+  assert.match(js, /if \(!CIENCIA_LIBERADA \|\| !chaves\.length\) return;/);
+  assert.match(js, /disabled = !CIENCIA_LIBERADA \|\| !q \|\| estado\.ocupado/);
+  assert.match(html, /id="btn-ciencia-lote"[^>]*\bdisabled\b/);
+  const linha = N.linhaHtml({ chave: '3'.repeat(44), situacao: 'resumo', emitente: 'X' }, { importar: true });
+  assert.match(linha, /data-acao="ciencia"[^>]*\bdisabled\b/);
+  assert.match(linha, /class="nc-marcar"[^>]*\bdisabled\b/);
+});

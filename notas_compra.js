@@ -48,6 +48,9 @@
     importada: ['Importada', 'neutro', 'Já levada para a entrada de estoque.']
   };
   const rotulo = n => n && n.cancelada ? ['Cancelada', 'perigo', 'O emitente cancelou esta nota.'] : (SITUACOES[n && n.situacao] || ['?', 'neutro', '']);
+  // Ciência da Operação DESATIVADA a pedido do dono (é uma manifestação fiscal oficial da empresa). Para religar: true.
+  const CIENCIA_LIBERADA = false;
+  const MOTIVO_CIENCIA_OFF = 'Ciência da operação desativada.';
   const podeCiencia = n => !!n && !n.cancelada && n.situacao === 'resumo';
   const podeBaixar = n => !!n && !n.cancelada && (n.situacao === 'resumo' || n.situacao === 'ciencia');
   const podeImportar = n => !!n && !n.cancelada && n.situacao === 'completa';
@@ -66,10 +69,10 @@
     const [texto, classe, dica] = rotulo(n);
     const num = n.numero || numeroDaChave(n.chave).numero, serie = n.serie || numeroDaChave(n.chave).serie;
     const acoes = [];
-    if (perms.importar && podeCiencia(n)) acoes.push(`<button type="button" class="btn btn-secondary btn-mini" data-acao="ciencia" data-chave="${esc(n.chave)}">Ciência da operação</button>`);
+    if (perms.importar && podeCiencia(n)) acoes.push(`<button type="button" class="btn btn-secondary btn-mini" data-acao="ciencia" data-chave="${esc(n.chave)}"${CIENCIA_LIBERADA ? '' : ` disabled title="${MOTIVO_CIENCIA_OFF}"`}>Ciência da operação</button>`);
     if (perms.importar && podeBaixar(n)) acoes.push(`<button type="button" class="btn btn-secondary btn-mini" data-acao="baixar" data-chave="${esc(n.chave)}">Baixar XML</button>`);
     if (perms.importar && perms.movimentar && podeImportar(n)) acoes.push(`<button type="button" class="btn btn-primary btn-mini" data-acao="importar" data-chave="${esc(n.chave)}">Importar na entrada de estoque</button>`);
-    const marcar = perms.importar && podeCiencia(n) ? `<input type="checkbox" class="nc-marcar" data-chave="${esc(n.chave)}" aria-label="Selecionar a nota ${esc(num)}">` : '';
+    const marcar = perms.importar && podeCiencia(n) ? `<input type="checkbox" class="nc-marcar" data-chave="${esc(n.chave)}"${CIENCIA_LIBERADA ? '' : ' disabled'} aria-label="Selecionar a nota ${esc(num)}">` : '';
     return `<tr data-chave="${esc(n.chave)}"><td>${marcar}</td>` +
       `<td><b>${esc(n.emitente || '(emitente ainda não informado)')}</b><br><span class="cinza">${esc(cnpjBR(n.cnpjEmitente))}</span></td>` +
       `<td>${esc(num)}<span class="cinza"> / série ${esc(serie)}</span></td><td>${esc(dataBR(n.dataEmissao))}</td>` +
@@ -161,7 +164,7 @@
       atualizarLote();
     }
     const marcadas = () => [...doc.querySelectorAll('.nc-marcar:checked')].map(c => c.getAttribute('data-chave'));
-    function atualizarLote() { const q = marcadas().length; $('btn-ciencia-lote').disabled = !q || estado.ocupado; $('btn-ciencia-lote').textContent = q ? `Ciência das selecionadas (${q})` : 'Ciência das selecionadas'; }
+    function atualizarLote() { const q = marcadas().length; $('btn-ciencia-lote').disabled = !CIENCIA_LIBERADA || !q || estado.ocupado; $('btn-ciencia-lote').textContent = q ? `Ciência das selecionadas (${q})` : 'Ciência das selecionadas'; }
 
     async function enviarPendentes() {
       let l;
@@ -221,7 +224,7 @@
       });
     }
     async function ciencia(chaves) {
-      if (!chaves.length) return;
+      if (!CIENCIA_LIBERADA || !chaves.length) return;
       const texto = `Registrar a CIÊNCIA DA OPERAÇÃO na SEFAZ para ${chaves.length} nota(s)?\n\n` +
         'É uma manifestação oficial da empresa como destinatária (com o certificado digital). Ela libera o XML completo; ' +
         'não confirma nem recusa a compra.';
