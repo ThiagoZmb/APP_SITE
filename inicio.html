@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elegance Dashboard - Início</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
@@ -271,6 +271,17 @@
         .lista { list-style: none; border-top: 1px solid var(--border-color); flex: 1; }
         .lista li { display: flex; align-items: center; gap: 14px; padding: 13px 24px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
         .lista li:last-child { border-bottom: none; }
+        /* pedidos clicáveis com o botão direito: menu de ações (inicio_menu.js) */
+        .lista li[data-numero] { cursor: context-menu; }
+        .lista li.ctx { background: var(--primary-light); }
+        #menu-ctx { position: fixed; z-index: 1000; min-width: 240px; max-width: 320px; padding: 6px; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); font-size: 13.5px; animation: entra .12s ease-out; }
+        #menu-ctx .mc-cab { padding: 8px 10px 6px; font-size: 12px; font-weight: 700; color: var(--text-light); border-bottom: 1px solid var(--border-color); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #menu-ctx .mc-tit { padding: 6px 10px 2px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
+        #menu-ctx .mc-sep { height: 1px; background: var(--border-color); margin: 5px 4px; }
+        #menu-ctx button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+        #menu-ctx button:hover:not(:disabled), #menu-ctx button:focus-visible { background: var(--primary-light); outline: none; }
+        #menu-ctx button:disabled { opacity: .55; cursor: default; font-weight: 700; }
+        #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
         .lista .num-ped { font-weight: 700; color: var(--primary-color); min-width: 56px; font-variant-numeric: tabular-nums; }
         .lista .meio { flex: 1; min-width: 0; }
         .lista .meio b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -300,6 +311,7 @@
     </style>
     <link rel="stylesheet" href="tema.css?v=202610251900">
     <script src="layout.js?v=202610282000" defer></script>
+    <script src="inicio_menu.js?v=202610301200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -466,6 +478,7 @@
         }
 
         // ============ PEDIDOS E ORÇAMENTOS ============
+        let pedidosInicio = []; // pedidos da última carga (usado pelo menu do botão direito)
         async function carregarComercial() {
             if (!Acesso.pode('pedidos.ver')) return;
             let pedidos = [], orcamentos = [];
@@ -501,8 +514,9 @@
             $('k-prod-sub').innerHTML = `<b>${prontos.length}</b> pronto(s) aguardando entrega`;
 
             // últimos 6 pedidos (lista já vem ordenada por número desc)
+            pedidosInicio = pedidos; // o menu do botão direito procura o pedido aqui
             $('ultimos').innerHTML = pedidos.slice(0, 6).map(p => `
-                <li>
+                <li data-numero="${escapeHtml(p.numero)}">
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
                     <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${escapeHtml(p.data || '')}${p.clienteFinal ? ' · ' + escapeHtml(p.clienteFinal) : ''}</small></div>
                     <div class="dir">${vv ? moeda(p.valor) : ''}<small><span class="status ${classeStatus(p.situacao)}">${escapeHtml(p.situacao || '—')}</span></small></div>
@@ -527,7 +541,7 @@
                 const dias = Math.round((p.quando - zero) / 86400000);
                 const atrasado = dias < 0;
                 const quando = atrasado ? `atrasado ${-dias} dia${dias === -1 ? '' : 's'}` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
-                return `<li>
+                return `<li data-numero="${escapeHtml(p.numero)}">
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
                     <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${p.rotulo} ${escapeHtml(p.dataTxt)}${p.entregaStatus && !(p.entregaStatus === 'agendada' && p.rotulo === 'Agendada') ? ' · <span class="status">' + escapeHtml(ROT_ENTREGA[p.entregaStatus] || p.entregaStatus) + '</span>' : ''}</small></div>
                     <div class="dir"><span class="status ${atrasado ? 'atraso' : classeStatus(p.situacao)}">${quando}</span><small>${escapeHtml(p.situacao || '')}</small></div>
@@ -608,6 +622,10 @@
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             // painéis de financeiro/estoque somem pelo data-perm; o bloco some se nenhum couber
             $('bloco-interno').hidden = !Acesso.pode('financeiro.ver valores.ver') && !Acesso.pode('estoque.ver');
+            if (window.InicioMenu && Acesso.pode('pedidos.ver')) {
+                window.InicioMenu.iniciar({ apiBase: API_BASE, loginUrl: LOGIN_URL, token: () => (getAuth() ? getAuth().token : ''), pode: p => Acesso.pode(p),
+                    docDe: n => pedidosInicio.find(p => String(p.numero) === String(n)), recarregar: () => carregarComercial(), esc: escapeHtml });
+            }
             carregarComercial();
             carregarInterno();
             carregarGrafico();
