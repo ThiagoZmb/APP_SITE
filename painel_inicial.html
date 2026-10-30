@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedidos e Orçamentos - Elegance</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
@@ -757,6 +757,32 @@
                 await carregar();
             } catch (err) { alert(err.message); }
         }
+        // Imprimir sem sair da tela: baixa o PDF com o token, põe num iframe escondido (blob) e chama a impressão do navegador.
+        // O navegador sempre mostra a janela de impressão (nenhum site imprime em silêncio); com o Chrome aberto por um atalho com
+        // --kiosk-printing ela sai direto na impressora padrão.
+        async function imprimirPdf(url) {
+            let link = null, quadro = null;
+            const limpar = () => { if (quadro) quadro.remove(); if (link) URL.revokeObjectURL(link); };
+            try {
+                const r = await fetch(url, { headers: { Authorization: 'Bearer ' + getToken() } });
+                if (r.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; return; }
+                if (!r.ok) {
+                    let msg = ''; try { msg = (await r.json()).error || ''; } catch { /* sem corpo JSON */ }
+                    throw new Error(r.status === 404 ? (msg || 'Documento não encontrado.') : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
+                }
+                link = URL.createObjectURL(await r.blob());
+                quadro = document.createElement('iframe');
+                quadro.setAttribute('aria-hidden', 'true');
+                quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+                quadro.addEventListener('load', () => {
+                    // o visualizador de PDF do navegador precisa de um instante depois do load
+                    setTimeout(() => { try { quadro.contentWindow.focus(); quadro.contentWindow.print(); } catch { alert('Não foi possível abrir a impressão. Use "Abrir PDF" e imprima por lá.'); } }, 400);
+                });
+                quadro.src = link;
+                document.body.appendChild(quadro);
+                setTimeout(limpar, 5 * 60 * 1000);
+            } catch (err) { limpar(); alert('Não foi possível imprimir: ' + err.message); }
+        }
         // orçamento: Fechado / Aguardando resposta (como "Alterar situação para..." do VB)
         async function mudarSituacaoOrcamento(numero, nome) {
             const x = docDe(numero);
@@ -774,6 +800,12 @@
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
             if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
+            // imprimir direto desta tela: o PDF é baixado e vai para a janela de impressão, sem abrir outra aba nem outra página
+            sep();
+            add('pedidos.pdf', '🖨️', ehPedido ? 'Imprimir PDF' : 'Imprimir orçamento', () => imprimirPdf(urlPdf(numero, false)));
+            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)));
+            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
+            sep();
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
