@@ -20,3 +20,8 @@ test('orçamentos: só volta para páginas do próprio sistema e só quando o sa
   assert.match(h, /if \(paginaDeRetorno && !falhasDesenho && !avisosPreco\.length\)/);
   assert.match(h, /paginaDeRetorno = ''; \/\/ documento novo/);
 });
+
+test('lista de pedidos/orçamentos: botões Pedidos/Orçamentos ficam no canto esquerdo (antes do título)', () => {
+  const h = ler('painel_inicial.html');
+  assert.match(h, /\.lista-topo \.tipo-toggle \{ order: -1; \}/);
+});
