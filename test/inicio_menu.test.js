@@ -61,3 +61,10 @@ test('as listas do início (entregas da semana e últimos pedidos) e o menu usam
   assert.ok(idx.includes('WHERE p.TIPO = ?') && idx.includes("const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';"));
   assert.ok(ped.includes("if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'Só pedidos têm situação"));
 });
+
+test('"Entregas da semana" carrega todos os pedidos (sem o corte de 8) e rola dentro do card', () => {
+  const h = ler('inicio.html');
+  const trecho = h.slice(h.indexOf('const entregas = pedidos'), h.indexOf("$('entregas').innerHTML"));
+  assert.ok(trecho.includes('.sort((a, b) => a.quando - b.quando)') && !/\.slice\(/.test(trecho), 'sem slice: todos os pedidos');
+  assert.ok(h.includes('#entregas { max-height: 540px; overflow-y: auto;'));
+});

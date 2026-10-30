@@ -271,6 +271,8 @@
         .lista { list-style: none; border-top: 1px solid var(--border-color); flex: 1; }
         .lista li { display: flex; align-items: center; gap: 14px; padding: 13px 24px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
         .lista li:last-child { border-bottom: none; }
+        /* "Entregas da semana" mostra todos os pedidos e rola dentro do card (cerca de 9 linhas visíveis) */
+        #entregas { max-height: 540px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
         /* pedidos clicáveis com o botão direito: menu de ações (inicio_menu.js) */
         .lista li[data-numero] { cursor: pointer; }
         .lista li.ctx { background: var(--primary-light); }
@@ -536,8 +538,7 @@
                     return { ...p, quando: porEntrega || paraData(p.prontoEm), rotulo: porEntrega ? 'Entrega' : 'Pronto em', dataTxt: porEntrega ? p.dataEntrega : p.prontoEm };
                 })
                 .filter(p => p.quando && p.quando <= limite)
-                .sort((a, b) => a.quando - b.quando)
-                .slice(0, 8);
+                .sort((a, b) => a.quando - b.quando); // todos os atrasados e dos próximos 7 dias; a lista rola (#entregas)
             $('entregas').innerHTML = entregas.map(p => {
                 const dias = Math.round((p.quando - zero) / 86400000);
                 const atrasado = dias < 0;
