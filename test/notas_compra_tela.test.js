@@ -208,3 +208,9 @@ test('tela de notas de compra começa com o filtro "Todas" (no estado e no selet
   assert.match(html, /<option value="" selected>Todas<\/option>/);
   assert.equal((html.match(/<option value="[^"]*" selected>/g) || []).length, 1, 'só uma opção marcada');
 });
+
+test('botão que busca de novo todo o histórico se chama "Histórico completo"', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'notas_compra.html'), 'utf8');
+  assert.match(html, /id="btn-rebuscar"[^>]*>Histórico completo<\/button>/);
+  assert.ok(!html.includes('Rebuscar histórico'));
+});
