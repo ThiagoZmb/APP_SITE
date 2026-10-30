@@ -167,4 +167,14 @@ function acessoriosDoSistema(itensSistema, config, { larguraVao, folhas, incluir
   return saida;
 }
 
-module.exports = { larguraEditadas, larguraRealDoVao, cint, ErroEngenharia, exigePerfil, furosUnicos, temSistemaCorrer, folhasDoItem, chaveFolha, agruparFolhas, medidasVidro, medidasPerfil, acessoriosDoSistema };
+// O VB grava, nas portas de correr, QTD = nº de folhas em CADA linha (3 portas = 3 linhas, uma por folha, todas com QTD 3), quando o certo
+// é QTD 1 por linha. Reconhecido pela descrição "Portas: N": N linhas, todas com QTD = N. A web nunca grava assim (nos grupos de folhas
+// iguais a soma das QTD é N), então não há confusão. Devolve true quando as QTD devem ser lidas como 1.
+function qtdInfladaVB(linhas, descricao) {
+  const m = /Portas:\s*(\d+)/.exec(String(descricao ?? ''));
+  const n = m ? parseInt(m[1], 10) : 0;
+  const ls = Array.isArray(linhas) ? linhas : [];
+  return n > 1 && ls.length === n && ls.every(r => num(r.QTD) === n);
+}
+
+module.exports = { qtdInfladaVB, larguraEditadas, larguraRealDoVao, cint, ErroEngenharia, exigePerfil, furosUnicos, temSistemaCorrer, folhasDoItem, chaveFolha, agruparFolhas, medidasVidro, medidasPerfil, acessoriosDoSistema };

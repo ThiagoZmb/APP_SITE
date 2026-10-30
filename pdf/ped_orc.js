@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const { qtdInfladaVB } = require('../calculo/engenharia');
 
 const LOGO_PADRAO = path.join(__dirname, '..', 'imagens', 'logo_elegance.png');
 const MARGEM = 10, PAD = 2, BORDA = 0.5;
@@ -142,7 +143,8 @@ function descricaoItem(tipoProduto, grupos = {}) {
 
       if (tipoProduto === 'Porta de correr') {
         // a web grava UMA linha por grupo de folhas iguais (QTD = folhas do grupo); o PDF lista cada folha, numeradas em sequência
-        const folhasDoGrupo = Math.max(1, parseInt(d.QTD) || 1);
+        // pedidos gravados pelo VB trazem QTD = nº de folhas em cada linha (uma linha por folha): ali cada linha é 1 folha
+        const folhasDoGrupo = grupos.qtdInflada ? 1 : Math.max(1, parseInt(d.QTD) || 1);
         for (let k = 0; k < folhasDoGrupo; k++) {
           const nomeFolha = 'Folha ' + (folhaCorrer + 1);
           if (folhaCorrer === 0) {
@@ -449,7 +451,8 @@ function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo
     const id = String(it.ITEM ?? '').trim();
     const desc = descricaoItem(textoVB(it.TIPO_PRODUTO), {
       v4: g.v4[id], complementos: g.complementos[id], serralheria: g.serralheria[id],
-      compSerralheria: g.compSerralheria[id], furos: g.furos[id]
+      compSerralheria: g.compSerralheria[id], furos: g.furos[id],
+      qtdInflada: textoVB(it.TIPO_PRODUTO) === 'Porta de correr' && qtdInfladaVB(g.v4[id], it.DESCRICAO)
     });
     const linha = [cel7(textoVB(it.ITEM)), cel7(textoVB(it.QTD)), imagemDoItem(doc, dados.desenhos?.[Number(id)]),
       { paragrafos: desc.map(l => ({ ...l, tamanho: 7 })) }, cel7(textoVB(it.OBSERVACAO))];

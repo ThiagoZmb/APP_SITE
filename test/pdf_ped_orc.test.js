@@ -233,3 +233,11 @@ test('porta de correr: linha de grupo (QTD > 1) lista cada folha, numerada em se
   const folhas = textos(descricaoItem('Porta de correr', { v4 })).filter(t => t.startsWith('Folha'));
   assert.deepEqual(folhas.map(t => t.split(':')[0]), ['Folha 1', 'Folha 2', 'Folha 3', 'Folha 4', 'Folha 5', 'Folha 6']);
 });
+
+test('PDF de porta de correr gravada pelo VB com QTD inflada: uma folha por linha (3 folhas, não 9)', () => {
+  const v4 = ['E', 'E, D', 'D'].map((pos, k) => ({ PORTA: `Folha ${k + 1}`, QTD: 3, ALTURA: 2270, LARGURA: k === 1 ? 575 : 612, PERFIL: '3345', PUXADOR: 'P', QTD_PUXADOR: 1, POSICAO_PUXADOR: pos }));
+  const folhas = textos(descricaoItem('Porta de correr', { v4, qtdInflada: true })).filter(t => t.startsWith('Folha'));
+  assert.deepEqual(folhas.map(t => t.split(':')[0]), ['Folha 1', 'Folha 2', 'Folha 3']);
+  const web = textos(descricaoItem('Porta de correr', { v4 })).filter(t => t.startsWith('Folha'));
+  assert.equal(web.length, 9, 'sem o marcador (pedido da web) cada QTD continua valendo');
+});

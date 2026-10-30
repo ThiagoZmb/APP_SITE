@@ -4,7 +4,7 @@
 // Item que a tela não representa sem perder dado vem 🔒 travado e é copiado como está ao salvar.
 // ============================================================
 const crypto = require('crypto');
-const { folhasDoItem, agruparFolhas, furosUnicos } = require('./engenharia');
+const { folhasDoItem, agruparFolhas, furosUnicos, qtdInfladaVB } = require('./engenharia');
 const { fatorHistorico } = require('./precos');
 
 const FRENTE_DA_TELA = { 'Porta de giro': 'Porta de giro', 'Porta basculante': 'Porta basculante', 'Frente de gaveta': 'Frente de gaveta', 'Porta de correr': 'Porta de Correr' };
@@ -50,8 +50,10 @@ function sequenciasDeFuros(furacao) {
 
 function traduzirPorta(l, linhas, sistemas) {
   const n = Number(l.ITEM);
-  const cfgs = porItem(linhas.itensV4, n).sort((a, b) => num(a.ITEM) - num(b.ITEM));
-  if (!cfgs.length) throw new Trava('item antigo, sem as folhas gravadas');
+  const cfgsBanco = porItem(linhas.itensV4, n).sort((a, b) => num(a.ITEM) - num(b.ITEM));
+  if (!cfgsBanco.length) throw new Trava('item antigo, sem as folhas gravadas');
+  // porta de correr do VB com QTD = nº de folhas em cada linha (deveria ser 1): lê como uma folha por linha
+  const cfgs = FRENTE_DA_TELA[l.TIPO_PRODUTO] === 'Porta de Correr' && qtdInfladaVB(cfgsBanco, l.DESCRICAO) ? cfgsBanco.map(c => ({ ...c, QTD: 1 })) : cfgsBanco;
   if (cfgs.some(c => txt(c.USINAGEM_PERFIL) || txt(c.USINAGEM_PUXADOR))) throw new Trava('tem usinagem gravada');
   const c0 = cfgs[0];
   // porta de correr: cada folha pode ter largura própria (LarguraEditada do VB); o resto continua igual em todas

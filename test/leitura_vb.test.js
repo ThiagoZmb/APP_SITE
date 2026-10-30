@@ -161,3 +161,30 @@ test('porta de correr de uma folha mais estreita que o vão: reabre com a largur
   assert.equal(it.travado, undefined, it.motivo);
   assert.deepEqual([it.qtd, it.largura, it.detalhes.largurasFolhas], [1, 1500, [800]]);
 });
+
+test('porta de correr gravada pelo VB com QTD = nº de folhas em cada linha (pedido 23385): lê 3 folhas, não 9', () => {
+  const l = vazio();
+  l.lista.push(linha(1, { TIPO_PRODUTO: 'Porta de correr', PRODUTO: 'Porta de correr', QTD: 1,
+    DESCRICAO: 'Tam: 2270x0mm | Per: Perfil P Anodizado | Sist: Sem sistema | Pux: Puxador X | Rev: Vidro V | Portas: 3 | Furos: 0' }));
+  const base = { TIPO_PRODUTO: 'Porta de correr', QTD: 3, ALTURA: 2270, TIPO_PUXADOR: 'Total', TAM_PUXADOR: 2270 };
+  l.itensV4.push(cfg(1, 1, { ...base, LARGURA: 612, QTD_PUXADOR: 1, POSICAO_PUXADOR: 'LATERAL ESQUERDA TOTAL' }),
+    cfg(1, 2, { ...base, LARGURA: 575, QTD_PUXADOR: 2, POSICAO_PUXADOR: 'LATERAL ESQUERDA TOTAL, LATERAL DIREITA TOTAL' }),
+    cfg(1, 3, { ...base, LARGURA: 612, QTD_PUXADOR: 1, POSICAO_PUXADOR: 'LATERAL DIREITA TOTAL' }));
+  const [it] = traduzirDocumento(l, { sistemas: {} }).itens;
+  assert.equal(it.travado, undefined, it.motivo);
+  assert.equal(it.qtd, 3, 'são 3 portas (uma por linha), não 9');
+  assert.deepEqual(it.detalhes.posicoesFolhas, ['LATERAL ESQUERDA TOTAL', 'LATERAL ESQUERDA TOTAL, LATERAL DIREITA TOTAL', 'LATERAL DIREITA TOTAL']);
+  assert.deepEqual(it.detalhes.largurasFolhas, [0, 575, 0]);
+});
+
+test('QTD inflada do VB: só com "Portas: N", N linhas e todas com QTD = N; grupos da web (soma das QTD = N) seguem como estão', () => {
+  const { qtdInfladaVB } = require('../calculo/engenharia');
+  const L = (...q) => q.map(QTD => ({ QTD }));
+  assert.equal(qtdInfladaVB(L(3, 3, 3), 'Tam: 1x1mm | Portas: 3 | Furos: 0'), true);
+  assert.equal(qtdInfladaVB(L(2, 2), 'Portas: 2'), true);
+  assert.equal(qtdInfladaVB(L(1, 4, 1), 'Portas: 6'), false, 'grupos da web: 1 + 4 + 1 = 6 folhas');
+  assert.equal(qtdInfladaVB(L(1, 1, 1), 'Portas: 3'), false, 'QTD já é 1');
+  assert.equal(qtdInfladaVB(L(3, 3, 3), 'sem a contagem na descrição'), false);
+  assert.equal(qtdInfladaVB(L(3, 3), 'Portas: 3'), false, 'linhas diferentes de N');
+  assert.equal(qtdInfladaVB(L(1), 'Portas: 1'), false);
+});
