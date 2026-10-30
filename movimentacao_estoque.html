@@ -100,7 +100,15 @@
         tr.excede td, tr.pendente td { background: rgba(210,47,66,.06); }
         tr.pendente td { background: rgba(178,106,0,.08); }
         /* a célula do produto quebra linha (o tema corta texto com "…" nas tabelas) */
-        #e-itens td.e-prod { min-width: 240px; white-space: normal; overflow: visible; text-overflow: clip; }
+        #e-itens td.e-prod { min-width: 340px; white-space: normal; overflow: visible; text-overflow: clip; }
+        /* nomes dos produtos GRANDES; quantidade, fator e unitário são números curtos e ficam estreitos */
+        #e-itens input.e-nome { min-width: 360px; }
+        #e-itens td:nth-child(3) { min-width: 380px; }
+        #e-itens input.qtd { width: 76px; min-width: 60px; }
+        #e-itens input.e-obs { min-width: 150px; }
+        /* dois cards na aba de entrada: dados da nota e últimas notas */
+        #painel-entrada > .painel + .painel { margin-top: 18px; }
+        #e-historico { margin-top: 0; padding-top: 0; border-top: 0; }
         /* aviso de preço diferente do cadastro: grande e vermelho, explicação ao passar o mouse */
         .e-preco { color: var(--erro); font-size: 20px; font-weight: 800; line-height: 1; vertical-align: middle; margin-left: 4px; cursor: help; }
         .e-antes { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
@@ -164,7 +172,9 @@
             <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico dos movimentos</p>
 
             <!-- ===== ENTRADA ===== -->
-            <section class="painel" id="painel-entrada" hidden>
+            <!-- a aba vira DOIS cards: os dados da nota (em cima) e as últimas notas (embaixo); o div leva o hidden da aba -->
+            <div id="painel-entrada" hidden>
+            <section class="painel" id="e-card-nota">
                 <div class="aviso" id="e-aviso" hidden></div>
                 <div class="linha-campos">
                     <div class="campo"><label for="e-numero">Nº da nota</label><input id="e-numero" maxlength="60" autocomplete="off"></div>
@@ -186,6 +196,8 @@
                     <span data-valor>Total da nota: <b id="e-total">R$ 0,00</b></span>
                     <button type="button" class="btn btn-primario" id="e-conferir" disabled>Conferir e lançar</button>
                 </div>
+            </section>
+            <section class="painel" id="e-card-historico">
                 <div class="bloco-hist" id="e-historico">
                     <h3>Últimas notas <small class="dica">últimos 30 dias</small></h3>
                     <div class="linha-campos">
@@ -200,6 +212,8 @@
                     </div>
                 </div>
             </section>
+
+            </div><!-- /painel-entrada -->
 
             <!-- ===== SAÍDA ===== -->
             <section class="painel" id="painel-saida" hidden>

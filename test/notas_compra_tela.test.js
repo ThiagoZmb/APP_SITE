@@ -214,3 +214,17 @@ test('botão que busca de novo todo o histórico se chama "Histórico completo"'
   assert.match(html, /id="btn-rebuscar"[^>]*>Histórico completo<\/button>/);
   assert.ok(!html.includes('Rebuscar histórico'));
 });
+
+test('entrada de estoque: a aba tem dois cards (dados da nota e últimas notas) e os nomes dos produtos são largos', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const h = fs.readFileSync(path.join(__dirname, '..', 'movimentacao_estoque.html'), 'utf8');
+  const i = h.indexOf('id="painel-entrada"'), j = h.indexOf('<!-- ===== SAÍDA');
+  const aba = h.slice(i, j);
+  assert.ok(h.slice(i - 5, i + 30).startsWith('<div id="painel-entrada" hidden>'), 'o div leva o hidden que a troca de abas usa');
+  assert.equal((aba.match(/<section class="painel"/g) || []).length, 2, 'dois cards');
+  assert.ok(aba.indexOf('id="e-card-nota"') < aba.indexOf('id="e-itens"') && aba.indexOf('id="e-itens"') < aba.indexOf('id="e-card-historico"'));
+  assert.ok(aba.indexOf('id="e-card-historico"') < aba.indexOf('id="e-historico"') && aba.indexOf('Últimas notas') > aba.indexOf('id="e-card-historico"'), 'a lista fica no card de baixo');
+  const abre = s => (s.match(/<div\b/g) || []).length - (s.match(/<\/div>/g) || []).length;
+  assert.equal(abre(h.slice(i - 5, j)), 0, 'divs equilibrados na aba');
+  assert.ok(h.includes('#e-itens input.e-nome { min-width: 360px; }') && h.includes('#e-itens input.qtd { width: 76px;'));
+});
