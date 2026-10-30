@@ -35,3 +35,10 @@ test('formatadores das telas são monetários (currency BRL ou prefixo R$)', () 
   assert.match(ler('custos.html'), /const moeda = v => v == null \? '—' : 'R\$ '/);
   assert.match(ler('orcamentos.html'), /function formatCurrency[\s\S]{0,200}currency: 'BRL'/);
 });
+
+test('início: a faixa de atalhos fica dentro de um card com destaque mínimo, no mesmo lugar da página', () => {
+  const h = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inicio.html'), 'utf8');
+  const css = h.match(/\.atalhos \{[^}]*\}/)[0];
+  assert.ok(css.includes('padding: 12px') && css.includes('border-radius: 18px') && css.includes('background: #f8f5f6') && css.includes('box-shadow: var(--shadow-light)'));
+  assert.ok(h.indexOf('<section class="atalhos">') > h.indexOf('<!-- ===== ATALHOS =====') && h.indexOf('<section class="atalhos">') < h.indexOf('<!-- ===== INDICADORES DO MÊS ====='), 'mesma posição');
+});
