@@ -46,3 +46,18 @@ test('início: listas com data-numero, script e menu ligados, CSP libera iframe 
   assert.ok(/frame-src blob:/.test(csp) && /http:\/\/127\.0\.0\.1:3917/.test(csp) && !/upgrade-insecure-requests/.test(csp));
   assert.ok(h.includes('pedidosInicio = pedidos;'));
 });
+
+test('as listas do início (entregas da semana e últimos pedidos) e o menu usam SÓ pedidos (tipo Pedido), nunca orçamentos', () => {
+  const h = ler('inicio.html'), m = ler('inicio_menu.js');
+  // os dois cards saem da lista de pedidos; a de orçamentos só alimenta os indicadores
+  assert.ok(h.includes("api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=Orçamento')"));
+  assert.ok(h.includes("$('ultimos').innerHTML = pedidos.slice(0, 6)") && h.includes('const entregas = pedidos\n') || h.includes('const entregas = pedidos\r\n'));
+  assert.ok(!/const entregas = orcamentos|\$\('ultimos'\)\.innerHTML = orcamentos/.test(h));
+  // o menu só fala com o tipo Pedido
+  assert.ok(m.includes('tipo=Pedido') && m.includes('/ped_orc/Pedido/') && m.includes('orcamentos.html?abrir=Pedido/'));
+  assert.ok(!/Orçamento|Orcamento\//.test(m.replace(/orcamentos\.html|orcamentos\.criar/g, '')), 'nenhuma ação do menu aponta para orçamento');
+  // o servidor também filtra: /dados_lista tem WHERE p.TIPO = ? e a rota de situação recusa tipo diferente de Pedido
+  const idx = ler('index.js'), ped = ler('rotas/ped_orc.js');
+  assert.ok(idx.includes('WHERE p.TIPO = ?') && idx.includes("const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';"));
+  assert.ok(ped.includes("if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'Só pedidos têm situação"));
+});
