@@ -272,7 +272,7 @@
         .lista li { display: flex; align-items: center; gap: 14px; padding: 13px 24px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
         .lista li:last-child { border-bottom: none; }
         /* pedidos clicáveis com o botão direito: menu de ações (inicio_menu.js) */
-        .lista li[data-numero] { cursor: context-menu; }
+        .lista li[data-numero] { cursor: pointer; }
         .lista li.ctx { background: var(--primary-light); }
         #menu-ctx { position: fixed; z-index: 1000; min-width: 240px; max-width: 320px; padding: 6px; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); font-size: 13.5px; animation: entra .12s ease-out; }
         #menu-ctx .mc-cab { padding: 8px 10px 6px; font-size: 12px; font-weight: 700; color: var(--text-light); border-bottom: 1px solid var(--border-color); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

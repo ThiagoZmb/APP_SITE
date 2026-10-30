@@ -270,3 +270,39 @@ test('janela da data de entrega: sem data gravada o segundo botão usa a data de
     assert.ok(t.includes('dataPronto: ') && t.includes("usarDataPronto = escolha === 'pronto';") && t.includes('...(usarDataPronto ? { usarDataPronto: true } : {})'), f);
   }
 });
+
+test('situação Entregue/Retirado com data escolhida: grava a data (válida e não futura); inválida ou futura é recusada sem gravar; ignorada fora de Entregue/Retirado', async t => {
+  const { hojeLocal } = require('../rotas/transacao');
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5, { DATA_PRONTO: '2024-10-25 00:00:00', DATA_ENTREGA: '' });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  const futura = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
+  for (const ruim of [futura, '2026-02-30', '12/10/2026', '', 'abc']) {
+    const r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue', dataEntrega: ruim });
+    assert.equal(r.status, 400, `recusa ${JSON.stringify(ruim)}`);
+  }
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção', 'nada foi gravado');
+  const r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue', dataEntrega: '2026-10-12' });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, '2026-10-12');
+  assert.equal((await r.json()).dataEntrega, '2026-10-12');
+  assert.deepEqual(JSON.parse(banco.auditoria[0].detalhe), { cliente: 'CLIENTE TESTE', de: 'Em Produção', para: 'Entregue', dataEscolhida: true });
+  // hoje é aceito; fora de Entregue/Retirado o campo é ignorado
+  const r2 = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Retirado', dataEntrega: hojeLocal() });
+  assert.equal(r2.status, 200);
+  const r3 = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Em Produção', dataEntrega: '2026-10-12' });
+  assert.equal(r3.status, 200);
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, null);
+});
+
+test('janela da data de entrega: campo de data (máximo hoje) e botão "Usar a data escolhida"; menus enviam dataEntrega; ponteiro de mãozinha nos clicáveis', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  const js = ler('escolha_data_entrega.js');
+  assert.ok(js.includes("entrada.type = 'date'; entrada.max = maxISO;") && js.includes('Usar a data escolhida') && js.includes("fecha('data:' + entrada.value)"));
+  assert.ok(js.includes('cursor:pointer'), 'botões com a mãozinha');
+  for (const f of ['painel_inicial.html', 'inicio_menu.js']) {
+    const t = ler(f);
+    assert.ok(t.includes(String.raw`dataEscolhida = (/^data:(\d{4}-\d{2}-\d{2})$/.exec(escolha) || [])[1] || '';`) && t.includes('...(dataEscolhida ? { dataEntrega: dataEscolhida } : {})'), f);
+  }
+  assert.ok(ler('inicio.html').includes('.lista li[data-numero] { cursor: pointer; }'), 'linhas do início com a mãozinha');
+});
