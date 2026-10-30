@@ -2754,9 +2754,13 @@
                 altura: parseFloat(val('f-altura-serr')) || 0, largura: parseFloat(val('f-largura-serr')) || 0, profundidade: parseFloat(val('f-profundidade')) || 0,
                 qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'), soldas: Math.max(0, parseInt(val('f-soldas')) || 0) };
             if (!(metrosPeca(p) > 0) && !p.soldas) { alert('Informe ao menos uma medida (ou as soldas) da peça.'); return; }
-            if (pecaEditando >= 0) { pecasSerr[pecaEditando] = p; pecaEditando = -1; }
+            const atualizandoPeca = pecaEditando >= 0;
+            if (atualizandoPeca) { pecasSerr[pecaEditando] = p; pecaEditando = -1; }
             else pecasSerr.push(p);
             limparMedidasSerr(); // produto, material, acabamento e cor continuam para a próxima peça (btnNovo do VB)
+            // peça NOVA num item novo: a quantidade de conjuntos volta a 1 e é digitada de novo na hora de adicionar o item
+            // (não mexe ao atualizar uma peça nem ao editar um item já salvo, para não trocar o total sem querer)
+            if (!atualizandoPeca && editandoIndex < 0) document.getElementById('f-qtd').value = 1;
             renderPecas();
             calcularPrecoAutomatico();
         }

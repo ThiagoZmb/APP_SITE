@@ -23,3 +23,10 @@ test('sistema de correr: campo do sistema 4/5 e transpasse 1/5 (regra com !impor
   assert.match(html, /<div class="grid-form linha-sistema-correr">/);
   assert.match(html, /html body \.grid-form\.linha-sistema-correr \{ grid-template-columns: minmax\(0, 4fr\) minmax\(90px, 1fr\) !important; \}/);
 });
+
+test('serralheria: inserir uma peça NOVA devolve a quantidade de conjuntos a 1; atualizar peça ou editar item não mexe nela', () => {
+  assert.ok(html.includes("const atualizandoPeca = pecaEditando >= 0;"));
+  assert.ok(html.includes("if (!atualizandoPeca && editandoIndex < 0) document.getElementById('f-qtd').value = 1;"));
+  const a = html.indexOf('function inserirPecaSerr()'), b = html.indexOf("document.getElementById('f-qtd').value = 1;", a);
+  assert.ok(b > a && b < html.indexOf('calcularPrecoAutomatico();', a), 'a quantidade volta a 1 antes do recálculo do preço');
+});
