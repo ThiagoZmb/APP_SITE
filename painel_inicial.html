@@ -265,6 +265,7 @@
     </style>
     <link rel="stylesheet" href="tema.css?v=202610272200">
     <script src="layout.js?v=202610282000" defer></script>
+    <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>
 <body>
@@ -746,10 +747,15 @@
         const urlPdf = (numero, producao) => `${API_BASE}/dados_pdf?numero=${encodeURIComponent(numero)}&tipo=${encodeURIComponent(tipoLista)}${producao ? '&producao=1' : ''}`;
         async function mudarSituacao(numero, nome) {
             const x = docDe(numero);
-            const aviso = nome === 'Entregue' || nome === 'Retirado' ? '\n\nA data de entrega passa a ser hoje.' : '';
-            if (!confirm(`Mudar a situação do pedido nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?${aviso}`)) return;
+            let manterData = false;
+            if (nome === 'Entregue' || nome === 'Retirado') {
+                // escolha do usuário: atualizar a data de entrega para hoje ou manter a que já está gravada
+                const escolha = await window.EscolhaDataEntrega.perguntar({ numero, cliente: x && x.cliente, nome, dataAtual: x && x.dataEntrega });
+                if (!escolha) return;
+                manterData = escolha === 'manter';
+            } else if (!confirm(`Mudar a situação do pedido nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
             try {
-                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome }) });
+                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}) }) });
                 await carregar();
             } catch (err) { alert(err.message); }
         }

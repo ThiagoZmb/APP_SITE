@@ -210,3 +210,34 @@ test('lista: orçamento Fechado ganha a linha azul clara e o menu tem Fechado / 
   assert.match(h, /mudarSituacaoOrcamento\(numero, 'Fechado'\)/);
   assert.match(h, /\/ped_orc\/orcamentos\/\$\{encodeURIComponent\(numero\)\}\/situacao/);
 });
+
+test('situação Entregue/Retirado com manterData: a DATA_ENTREGA gravada NÃO muda (o usuário escolheu manter); sem o campo, vira hoje', async t => {
+  const { hojeLocal } = require('../rotas/transacao');
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5, { DATA_ENTREGA: '2026-10-12' });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  let r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue', manterData: true });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Entregue');
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, '2026-10-12', 'manteve a data');
+  assert.equal((await r.json()).dataEntrega, '2026-10-12');
+  assert.deepEqual(JSON.parse(banco.auditoria[0].detalhe), { cliente: 'CLIENTE TESTE', de: 'Em Produção', para: 'Entregue', manterData: true });
+  // sem manterData (ou diferente de true) continua atualizando para hoje, como o VB
+  r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Retirado', manterData: 'true' });
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc[0].DATA_ENTREGA, hojeLocal());
+});
+
+test('janela de escolha da data de entrega: lista e início usam a mesma janela e só enviam manterData quando o usuário escolheu manter', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  const js = ler('escolha_data_entrega.js');
+  assert.ok(js.includes('window.EscolhaDataEntrega = { perguntar, dataBR };'));
+  assert.ok(js.includes("'hoje'") && js.includes("'manter'") && js.includes('Atualizar a data para hoje'));
+  for (const f of ['painel_inicial.html', 'inicio.html']) assert.ok(ler(f).includes('<script src="escolha_data_entrega.js'), f);
+  for (const f of ['painel_inicial.html', 'inicio_menu.js']) {
+    const t = ler(f);
+    assert.ok(t.includes('window.EscolhaDataEntrega.perguntar('), f);
+    assert.ok(t.includes("manterData = escolha === 'manter';") && t.includes('...(manterData ? { manterData: true } : {})'), f);
+    assert.ok(!t.includes('A data de entrega passa a ser hoje.'), f + ': o aviso fixo saiu');
+  }
+});
