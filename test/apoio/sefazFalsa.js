@@ -107,4 +107,24 @@ async function criarSefazFalsa({ caCliente }) {
   };
 }
 
-module.exports = { gerarChave, gerarPfx, gerarServidor, retDist, retEvento, resNFe, procNFe, resEvento, zip, criarSefazFalsa };
+// Serviço local (criarSefaz) pronto para teste: pasta temporária com .pfx de teste, cadeia do servidor falso, config e
+// relógio injetável. `configExtra` entra no sefaz.config.json (ex.: pastaCompartilhada); `opcoes` vai para criarSefaz.
+async function prepararServico(t, { pfx, cnpj, configExtra = {}, opcoes = {} }) {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const S = require('../../local/sefaz');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'elegance-sefaz-'));
+  const falsa = await criarSefazFalsa({ caCliente: pfx.certPem });
+  const pfxArq = path.join(dir, 'empresa.pfx');
+  fs.writeFileSync(pfxArq, pfx.pfx);
+  const cadeia = path.join(dir, 'cadeia.pem');
+  fs.writeFileSync(cadeia, falsa.certServidorPem);
+  const config = path.join(dir, 'Servico', 'sefaz.config.json');
+  fs.mkdirSync(path.dirname(config), { recursive: true });
+  fs.writeFileSync(config, JSON.stringify({ cnpj, uf: 'RJ', ambiente: 'homologacao', certificado: pfxArq, senha: pfx.senha, cadeiaSefaz: cadeia, ...configExtra }));
+  const relogio = { t: Date.UTC(2026, 9, 29, 13, 0, 0) };
+  const sefaz = S.criarSefaz({ raiz: dir, arquivoConfig: config, env: {}, agora: () => relogio.t, urls: { homologacao: falsa.urls }, ...opcoes });
+  t.after(async () => { await falsa.fechar(); fs.rmSync(dir, { recursive: true, force: true }); });
+  return { dir, falsa, sefaz, relogio, config };
+}
+
+module.exports = { gerarChave, gerarPfx, gerarServidor, retDist, retEvento, resNFe, procNFe, resEvento, zip, criarSefazFalsa, prepararServico };

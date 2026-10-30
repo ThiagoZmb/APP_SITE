@@ -96,6 +96,38 @@ test('marcarImportada: serviço fora guarda a chave como pendente; serviço no a
   assert.equal(await N.marcarImportada(winOk, 'x'), false);
 });
 
+test('pasta compartilhada: linha discreta no status; 409 de trava é aviso (não erro); importada com trava/pasta fora fica pendente', async () => {
+  assert.equal(N.linhaCompartilhada({ compartilhada: { ativa: false } }), '');
+  assert.equal(N.linhaCompartilhada({}), '');
+  assert.equal(N.linhaCompartilhada(null), '');
+  assert.equal(N.linhaCompartilhada({ compartilhada: { ativa: true, acessivel: true, pasta: 'X' } }), '<p class="cinza">Notas compartilhadas com os outros computadores.</p>');
+  assert.match(N.linhaCompartilhada({ compartilhada: { ativa: true, acessivel: false } }), /não está acessível agora/);
+  const outro = N.linhaCompartilhada({ compartilhada: { ativa: true, acessivel: true, emUsoPor: '<b>PC</b>' } });
+  assert.ok(outro.includes('em uso agora pelo computador &lt;b&gt;PC&lt;/b&gt;'), 'nome do computador escapado');
+  const trava = { status: 409, dados: { error: 'Outro computador (PC-A) está falando com a SEFAZ neste momento.', trava: true, outroComputador: 'PC-A' } };
+  assert.equal(N.ehAviso(trava), true);
+  assert.equal(N.ehAviso({ status: 429 }), true);
+  assert.equal(N.ehAviso({ status: 409, dados: { error: 'Só nota com XML completo pode ser marcada como importada.' } }), false);
+  assert.equal(N.ehAviso({ status: 502 }), false);
+  assert.equal(N.tentarDepois(new N.ServicoFora()), true);
+  assert.equal(N.tentarDepois(trava), true);
+  assert.equal(N.tentarDepois({ status: 503 }), true);
+  assert.equal(N.tentarDepois({ status: 409, dados: {} }), false, 'nota sem XML completo: desiste');
+  // marcarImportada com 409 de trava guarda a chave para a tela de notas de compra tentar de novo
+  const guardado = {};
+  const win = { localStorage: { getItem: k => guardado[k] ?? null, setItem: (k, v) => { guardado[k] = v; } }, AbortSignal,
+    fetch: async () => ({ ok: false, status: 409, json: async () => trava.dados }) };
+  assert.equal(await N.marcarImportada(win, CHAVE), false);
+  assert.deepEqual(JSON.parse(guardado[N.CHAVE_PENDENTES]), [CHAVE]);
+  const js = ler('notas_compra.js');
+  assert.match(js, /const leve = ehAviso\(e\); aviso\(e\.message, leve \? 'aviso' : 'erro'\); toast\(e\.message, leve \? 'info' : 'erro'\);/);
+  assert.match(js, /linhaCompartilhada\(s\) \+/);
+  assert.match(js, /catch \(e\) \{ if \(tentarDepois\(e\)\) resta\.push\(chave\); \}/);
+  // PC sem o certificado (somente consulta): selo no status e botões de sincronizar travados
+  assert.match(js, /<span class="selo aviso">Somente consulta<\/span> certificado indisponível neste PC/);
+  assert.match(js, /travar\(!!estado\.status\.somenteConsulta\);/);
+});
+
 test('página: CSP libera o serviço local e não tem upgrade-insecure-requests; scripts, controles e permissões', () => {
   const h = ler('notas_compra.html');
   const csp = /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(h)[1];
@@ -166,6 +198,10 @@ test('instalador do serviço local: ASCII, copia o módulo da SEFAZ, instala só
   const exemplo = JSON.parse(ler('local/sefaz.config.exemplo.json'));
   assert.equal(exemplo.cnpj, '00000000000000');
   assert.equal(exemplo.ambiente, 'homologacao');
+  assert.equal(exemplo.pastaCompartilhada, '', 'pasta compartilhada vem vazia (desligada) no exemplo');
+  for (const linha of ps.split('\n').filter(l => /sefaz\.config\.json/.test(l))) {
+    assert.match(linha, /^\s*#|Test-Path|Write-Host/, 'o instalador só confere/avisa sobre o sefaz.config.json, nunca grava nele: ' + linha.trim());
+  }
   assert.ok(fs.existsSync(path.join(__dirname, '..', 'local', 'package-lock.json')));
 });
 

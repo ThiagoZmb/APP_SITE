@@ -97,8 +97,21 @@
     return Array.isArray(l) ? [...new Set(l.filter(chaveValida))].slice(-200) : [];
   }
 
+  // pasta compartilhada entre os PCs (status.compartilhada): linha discreta no quadro de status; vazio = desligada
+  function linhaCompartilhada(s) {
+    const c = s && s.compartilhada;
+    if (!c || !c.ativa) return '';
+    const extra = c.acessivel === false ? ' (a pasta não está acessível agora)'
+      : (c.emUsoPor ? ` · em uso agora pelo computador ${esc(c.emUsoPor)}` : '');
+    return `<p class="cinza">Notas compartilhadas com os outros computadores${extra}.</p>`;
+  }
+  // aviso (amarelo) e não erro: espera da SEFAZ (429) ou outro computador/operação com a trava (409)
+  const ehAviso = e => !!e && (e.status === 429 || (e.status === 409 && !!e.dados && e.dados.trava === true));
+
   // ---------- serviço local ----------
   class ServicoFora extends Error { constructor() { super(SERVICO_FORA); this.name = 'ServicoFora'; } }
+  // marcar "importada" que não deu certo agora mas pode dar depois: serviço fora, trava de outro PC, pasta fora do ar
+  const tentarDepois = e => e instanceof ServicoFora || (!!e && (e.status === 503 || (e.status === 409 && !!e.dados && e.dados.trava === true)));
   async function chamarLocal(win, caminho, { metodo = 'GET', corpo, texto = false, tempo = 120000 } = {}) {
     let res;
     try {
@@ -115,7 +128,7 @@
     if (!chaveValida(chave)) return false;
     try { await chamarLocal(win, '/sefaz/importada', { metodo: 'POST', corpo: { chave }, tempo: 5000 }); return true; }
     catch (e) {
-      if (e instanceof ServicoFora) {
+      if (tentarDepois(e)) {
         try {
           const l = lerPendentes(win.localStorage.getItem(CHAVE_PENDENTES));
           if (!l.includes(chave)) l.push(chave);
@@ -149,9 +162,12 @@
       if (!s.configurada) { caixa.innerHTML = `<p><span class="selo aviso">SEFAZ não configurada</span> ${esc(s.motivo)}</p>`; return; }
       const amb = s.ambiente === 'producao' ? '<span class="selo ok">Produção</span>' : '<span class="selo info">Homologação (teste)</span>';
       const prox = s.proximaConsultaHora ? `Próxima consulta liberada às <b>${esc(s.proximaConsultaHora)}</b>.` : 'Consulta liberada.';
-      caixa.innerHTML = `<p>${amb} CNPJ <b>${esc(cnpjBR(s.cnpj))}</b> · UF ${esc(s.uf)} · certificado válido até <b>${esc(dataBR(s.certificado && s.certificado.validoAte))}</b></p>` +
+      const cert = s.certificado ? `certificado válido até <b>${esc(dataBR(s.certificado.validoAte))}</b>`
+        : '<span class="selo aviso">Somente consulta</span> certificado indisponível neste PC';
+      caixa.innerHTML = `<p>${amb} CNPJ <b>${esc(cnpjBR(s.cnpj))}</b> · UF ${esc(s.uf)} · ${cert}</p>` +
         `<p class="cinza">${prox} Consultas por chave na última hora: ${esc(s.consultasChaveNaHora)} de ${esc(s.limiteConsultasChave)}.` +
         `${s.ultimaSincronizacao ? ` Última sincronização: ${esc(new Date(s.ultimaSincronizacao).toLocaleString('pt-BR'))}.` : ''}</p>` +
+        linhaCompartilhada(s) +
         (s.avisos || []).map(a => `<p class="erro-form">${esc(a)}</p>`).join('');
     }
     function desenharLista() {
@@ -173,7 +189,7 @@
       const resta = [];
       for (const chave of l) {
         try { await chamarLocal(win, '/sefaz/importada', { metodo: 'POST', corpo: { chave }, tempo: 5000 }); }
-        catch (e) { if (e instanceof ServicoFora) resta.push(chave); }   // outro erro (nota não está mais no índice): desiste dela
+        catch (e) { if (tentarDepois(e)) resta.push(chave); }   // outro erro (nota não está mais no índice): desiste dela
       }
       try { if (resta.length) win.localStorage.setItem(CHAVE_PENDENTES, JSON.stringify(resta)); else win.localStorage.removeItem(CHAVE_PENDENTES); } catch { /* nada */ }
     }
@@ -187,7 +203,7 @@
       await enviarPendentes();
       try { estado.notas = (await chamarLocal(win, '/sefaz/notas')).notas || []; }
       catch (e) { estado.notas = []; aviso(e.message, 'erro'); }
-      travar(false);
+      travar(!!estado.status.somenteConsulta);      // sem certificado neste PC: não sincroniza (a lista e a importação continuam)
       desenharLista();
     }
     function travar(sim) {
@@ -203,7 +219,7 @@
       $('btn-sincronizar').disabled = true;
       if ($('btn-rebuscar')) $('btn-rebuscar').disabled = true;
       try { await acao(); }
-      catch (e) { aviso(e.message, e.status === 429 ? 'aviso' : 'erro'); toast(e.message, 'erro'); }
+      catch (e) { const leve = ehAviso(e); aviso(e.message, leve ? 'aviso' : 'erro'); toast(e.message, leve ? 'info' : 'erro'); }
       finally {
         estado.ocupado = false;
         if (botao && botao.isConnected) { botao.disabled = false; botao.textContent = original; }
@@ -290,5 +306,6 @@
   }
 
   return { SERVICO, CHAVE_PACOTE, CHAVE_PENDENTES, LIMITE_XML, SERVICO_FORA, ServicoFora, esc, moeda, dataBR, cnpjBR, chaveValida, formatarChave, numeroDaChave,
-    rotulo, podeCiencia, podeBaixar, podeImportar, filtrar, linhaHtml, montarPacote, lerPacote, lerPendentes, chamarLocal, marcarImportada, iniciar };
+    rotulo, podeCiencia, podeBaixar, podeImportar, filtrar, linhaHtml, montarPacote, lerPacote, lerPendentes, chamarLocal, marcarImportada, iniciar,
+    linhaCompartilhada, ehAviso, tentarDepois };
 });

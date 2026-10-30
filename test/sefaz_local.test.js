@@ -178,21 +178,8 @@ test('assinatura conferida também pelo .NET (SignedXml do Windows), verificador
 });
 
 // ---------------------------------------------------------------- fluxo contra a SEFAZ falsa (HTTPS + certificado do cliente)
-async function preparar(t, { pfx = pfxTeste, configExtra = {} } = {}) {
-  const dir = pastaTemp();
-  const falsa = await A.criarSefazFalsa({ caCliente: pfx.certPem });
-  const pfxArq = path.join(dir, 'empresa.pfx');
-  fs.writeFileSync(pfxArq, pfx.pfx);
-  const cadeia = path.join(dir, 'cadeia.pem');
-  fs.writeFileSync(cadeia, falsa.certServidorPem);
-  const config = path.join(dir, 'Servico', 'sefaz.config.json');
-  fs.mkdirSync(path.dirname(config), { recursive: true });
-  fs.writeFileSync(config, JSON.stringify({ cnpj: CNPJ, uf: 'RJ', ambiente: 'homologacao', certificado: pfxArq, senha: pfx.senha, cadeiaSefaz: cadeia, ...configExtra }));
-  const relogio = { t: Date.UTC(2026, 9, 29, 13, 0, 0) };
-  const sefaz = S.criarSefaz({ raiz: dir, arquivoConfig: config, env: {}, agora: () => relogio.t, urls: { homologacao: falsa.urls } });
-  t.after(async () => { await falsa.fechar(); fs.rmSync(dir, { recursive: true, force: true }); });
-  return { dir, falsa, sefaz, relogio, config };
-}
+// o mesmo preparo é usado pelos testes da pasta compartilhada (test/sefaz_compartilhada.test.js)
+const preparar = (t, { pfx = pfxTeste, configExtra = {} } = {}) => A.prepararServico(t, { pfx, cnpj: CNPJ, configExtra });
 const doc = (nsu, xml) => ({ nsu, schema: 'x.xsd', xml });
 
 test('sincronizar: 138 em dois lotes até ultNSU = maxNSU, guarda resumo, XML completo e evento; depois espera 1 hora', async t => {

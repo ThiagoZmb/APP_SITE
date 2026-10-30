@@ -16,10 +16,16 @@
 // precisem de escape e já na forma canônica (tags de abertura e fechamento, atributos em ordem), então a forma
 // canônica C14N de infEvento é o próprio texto com o xmlns herdado na raiz. Os testes conferem a assinatura.
 // Dependências (local/package.json): node-forge (só para abrir o .pfx, inclusive os antigos com RC2) e fast-xml-parser.
+//
+// Vários PCs: com "pastaCompartilhada" na config, o estado da fila (ponteiro NSU, esperas de 1 hora, bloqueio 656,
+// consultas por chave), o índice e os XML ficam numa pasta da rede, e toda operação que consulta a SEFAZ ou grava o
+// índice/estado pega antes a trava sefaz.trava dessa pasta (criada com 'wx'). Assim as regras de consumo valem para a
+// empresa toda, não por PC. Sem o campo, nada muda: tudo fica neste PC, sem trava de arquivo.
 // ==========================================================================
 'use strict';
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const https = require('node:https');
 const http = require('node:http');
@@ -58,6 +64,11 @@ const LIMITE_DOC = 5 * 1024 * 1024;      // documento descompactado (docZip)
 const LIMITE_CORPO = 4 * 1024;           // corpo JSON vindo da página
 const LIMITE_CONFIG = 64 * 1024;
 const TEMPO_LIMITE = 60 * 1000;
+// Pasta compartilhada entre os PCs (opcional, "pastaCompartilhada" na config): estado, índice e XML ficam nela, com trava.
+// Uma sincronização dura no máximo ~11 min (10 lotes x 60 s); trava mais velha que 20 min = PC caiu no meio.
+const TRAVA_ABANDONADA = 20 * 60 * 1000;
+const ESPERA_TRAVA = { longa: 2000, curta: 5000 };   // ms esperando a trava: operações com a SEFAZ / operações curtas (importada)
+const NOME_TRAVA = 'sefaz.trava';
 
 const UFS = { RO: 11, AC: 12, AM: 13, RR: 14, PA: 15, AP: 16, TO: 17, MA: 21, PI: 22, CE: 23, RN: 24, PB: 25, PE: 26, AL: 27,
   SE: 28, BA: 29, MG: 31, ES: 32, RJ: 33, SP: 35, PR: 41, SC: 42, RS: 43, MS: 50, MT: 51, GO: 52, DF: 53 };
@@ -142,7 +153,35 @@ function lerConfig(arquivo, env = process.env) {
     cadeiaSefaz = String(c.cadeiaSefaz).trim();
     if (!path.isAbsolute(cadeiaSefaz)) return { ok: false, motivo: 'Em "cadeiaSefaz" informe o caminho completo do arquivo .pem.' };
   }
-  return { ok: true, config: { cnpj, cUF, uf: String(c.uf).trim().toUpperCase(), ambiente, tpAmb: ambiente === 'producao' ? 1 : 2, certificado, senha, cadeiaSefaz } };
+  let pastaCompartilhada = '';
+  if (c.pastaCompartilhada != null && c.pastaCompartilhada !== '') {
+    const motivo = motivoPastaCompartilhada(c.pastaCompartilhada);
+    if (motivo) return { ok: false, motivo };
+    pastaCompartilhada = c.pastaCompartilhada.trim();
+  }
+  return { ok: true, config: { cnpj, cUF, uf: String(c.uf).trim().toUpperCase(), ambiente, tpAmb: ambiente === 'producao' ? 1 : 2, certificado, senha, cadeiaSefaz, pastaCompartilhada } };
+}
+
+// "pastaCompartilhada": caminho absoluto de rede (\\servidor\compartilhamento\...) ou com letra de unidade (Z:\...).
+// Um caminho que começa com UMA barra só (erro comum ao escrever o JSON) seria lido pelo Windows como pasta do disco
+// local (C:\servidor\...): é recusado, para nunca criar em silêncio um segundo estado da fila neste PC.
+const EXEMPLO_PASTA = '"\\\\\\\\servidor\\\\pasta"';      // como fica no JSON: "\\\\servidor\\pasta"
+function motivoPastaCompartilhada(v) {
+  const geral = `Em "pastaCompartilhada" informe o caminho completo da pasta da rede, ex.: ${EXEMPLO_PASTA} (no arquivo JSON cada barra invertida é escrita duas vezes).`;
+  if (typeof v !== 'string') return geral;
+  const p = v.trim();
+  if (!p || p.length > 260 || /[\x00-\x1f"*?<>|]/.test(p)) return geral;
+  if (p.startsWith('\\\\')) {
+    // \\servidor\compartilhamento[\...]; recusa \\?\ e \\.\ (caminhos de dispositivo)
+    return /^\\\\[^\\/?.:][^\\/:]*[\\/][^\\/:]+([\\/][^:]*)?$/.test(p) ? '' : geral;
+  }
+  if (/^\\(?!\\)/.test(p)) {
+    return 'Em "pastaCompartilhada" o caminho de rede precisa começar com DUAS barras invertidas (\\\\servidor\\pasta). ' +
+      `No arquivo JSON cada barra é escrita duas vezes, então o começo fica com quatro: ${EXEMPLO_PASTA}.`;
+  }
+  if (/^[A-Za-z]:[\\/][^:]*$/.test(p)) return '';
+  if (process.platform !== 'win32' && /^\/[^:]*$/.test(p)) return '';
+  return geral;
 }
 
 // Abre o .pfx com node-forge (aceita os antigos com RC2/3DES, que o OpenSSL 3 do Node recusa) e devolve chave/cadeia em PEM.
@@ -342,16 +381,36 @@ function interpretarRetEvento(xmlResposta) {
 const CIENCIA_OK = new Set(['135', '136', '573']);
 
 // ---------------------------------------------------------------- arquivos locais (índice e estado)
-async function lerJson(arquivo, padrao) {
-  try { return JSON.parse(await fsp.readFile(arquivo, 'utf8')); } catch { return padrao; }
+// estrito (pasta compartilhada): só "arquivo não existe" vira o padrão; erro de rede/permissão sobe, e JSON danificado
+// também (tratá-lo como vazio apagaria o índice ou voltaria o ponteiro da fila para o começo, para todos os PCs).
+async function lerJson(arquivo, padrao, estrito = false) {
+  let bruto;
+  try { bruto = await fsp.readFile(arquivo, 'utf8'); } catch (e) { if (!estrito || (e && e.code === 'ENOENT')) return padrao; throw e; }
+  try { return JSON.parse(bruto); } catch {
+    if (!estrito) return padrao;
+    throw new ErroSefaz(503, `O arquivo ${path.basename(arquivo)} da pasta compartilhada das notas está danificado (não é um JSON válido). ` +
+      'Restaure uma cópia de segurança dele (veja docs/sefaz_configuracao.md).');
+  }
 }
-// grava num temporário e troca (o índice nunca fica pela metade se o PC desligar)
-async function gravarJson(arquivo, dados) {
+const esperar = ms => new Promise(ok => setTimeout(ok, ms));
+// rename com novas tentativas: no Windows, antivírus/indexador ou outro PC lendo pela rede seguram o arquivo por instantes
+async function renomear(de, para) {
+  for (let i = 0; ; i++) {
+    try { return await fsp.rename(de, para); }
+    catch (e) { if (i >= 5 || !['EPERM', 'EACCES', 'EBUSY'].includes(e && e.code)) throw e; await esperar(60 * (i + 1)); }
+  }
+}
+// grava num temporário e troca (o índice nunca fica pela metade se o PC desligar); o nome do temporário é único
+// (dois PCs podem ter o mesmo pid)
+async function gravarTexto(arquivo, conteudo) {
   await fsp.mkdir(path.dirname(arquivo), { recursive: true });
-  const tmp = `${arquivo}.${process.pid}.tmp`;
-  await fsp.writeFile(tmp, JSON.stringify(dados, null, 1));
-  await fsp.rename(tmp, arquivo);
+  const tmp = `${arquivo}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  try { await fsp.writeFile(tmp, conteudo, 'utf8'); await renomear(tmp, arquivo); }
+  catch (e) { try { await fsp.unlink(tmp); } catch { /* já não existe */ } throw e; }
 }
+const gravarJson = (arquivo, dados) => gravarTexto(arquivo, JSON.stringify(dados, null, 1));
+// erro de sistema de arquivos (ENOENT, EACCES, EPERM, EBUSY, UNKNOWN...), não erro de programação
+const erroDeArquivo = e => !!e && !(e instanceof ErroSefaz) && typeof e.code === 'string' && /^(E[A-Z0-9]+|UNKNOWN)$/.test(e.code);
 
 const SITUACOES = ['resumo', 'ciencia', 'completa', 'importada'];
 const ordem = s => SITUACOES.indexOf(s);
@@ -428,13 +487,175 @@ function conferirHttp(r) {
 }
 
 // ---------------------------------------------------------------- o serviço
-function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date.now(), urls = null, tempoLimite = TEMPO_LIMITE } = {}) {
+function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date.now(), urls = null, tempoLimite = TEMPO_LIMITE,
+  esperaTrava = ESPERA_TRAVA, computador = os.hostname() } = {}) {
   const RAIZ = raiz || 'C:\\Programa Elegance';
   const CONFIG = arquivoConfig || env.ELEGANCE_SEFAZ_CONFIG || path.join(RAIZ, 'Servico', 'sefaz.config.json');
   const ESTADO = path.join(path.dirname(CONFIG), 'sefaz.estado.json');
-  const pastaNotas = amb => path.join(RAIZ, 'NFe', amb === 'producao' ? 'Entrada' : 'Entrada_Homologacao');
+  const subpasta = amb => amb === 'producao' ? 'Entrada' : 'Entrada_Homologacao';
+  const pastaNotas = amb => path.join(RAIZ, 'NFe', subpasta(amb));
+  const ESPERA = { ...ESPERA_TRAVA, ...(esperaTrava || {}) };
+  const COMPUTADOR = String(computador || 'este computador').replace(/[\x00-\x1f]/g, '').slice(0, 64);
   let cache = null;      // { marca, cert, agente }
   let ocupado = false;
+  let migradoAgora = false;       // mostrado uma vez no status depois da migração
+  let travaRetomada = null;       // { computador, desde } da última trava abandonada retomada (aviso no status, uma vez)
+  const migracaoConferida = new Set();
+
+  // Onde ficam estado, índice e XML. Sem "pastaCompartilhada": tudo neste PC, como sempre. Com ela: tudo na pasta da
+  // rede, com trava; o disco local NUNCA é usado como substituto (dois estados da fila = 656 para a empresa toda).
+  function locais(cfg) {
+    if (!cfg.pastaCompartilhada) return { compartilhada: false, estado: ESTADO, notas: pastaNotas(cfg.ambiente) };
+    const P = cfg.pastaCompartilhada;
+    return { compartilhada: true, raiz: P, nome: path.basename(P.replace(/[\\/]+$/, '')) || 'pasta compartilhada',
+      estado: path.join(P, 'sefaz.estado.json'), notas: path.join(P, 'NFe', subpasta(cfg.ambiente)), trava: path.join(P, NOME_TRAVA) };
+  }
+  const erroPasta = L => new ErroSefaz(503, `Não consegui acessar a pasta compartilhada das notas ("${L.nome}"). Confira se o computador ` +
+    'servidor está ligado, se a rede está funcionando e se este usuário do Windows pode gravar nessa pasta. Nada foi gravado neste PC.',
+    { pastaCompartilhadaInacessivel: true });
+  async function garantirPasta(L) {
+    if (!L.compartilhada) return;
+    try {
+      await fsp.mkdir(L.raiz, { recursive: true });
+      if (!(await fsp.stat(L.raiz)).isDirectory()) throw new Error('não é pasta');
+    } catch { throw erroPasta(L); }
+  }
+  // erro de arquivo na pasta compartilhada vira a mensagem clara (nunca 500)
+  async function protegido(L, fn) {
+    try { return await fn(); } catch (e) { if (L.compartilhada && erroDeArquivo(e)) throw erroPasta(L); throw e; }
+  }
+
+  // ---------- trava entre PCs (arquivo criado com 'wx', atômico também no compartilhamento do Windows) ----------
+  const processoVivo = pid => { try { process.kill(pid, 0); return true; } catch (e) { return !!e && e.code === 'EPERM'; } };
+  const limpar = s => String(s ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 64);
+  async function lerTrava(L) {
+    let bruto;
+    try { bruto = await fsp.readFile(L.trava, 'utf8'); } catch (e) { if (e && e.code === 'ENOENT') return null; throw e; }
+    let d = null;
+    try { d = JSON.parse(bruto); } catch { d = null; }
+    if (!d || typeof d !== 'object' || !d.token) {
+      // vazia/pela metade: outro PC está criando agora, ou caiu no meio da criação (idade pelo horário do arquivo)
+      let mtime;
+      try { mtime = (await fsp.stat(L.trava)).mtimeMs; } catch (e) { if (e && e.code === 'ENOENT') return null; throw e; }
+      return { computador: '?', pid: 0, desde: 0, token: '', ilegivel: true, mtime };
+    }
+    return { computador: limpar(d.computador) || '?', pid: Number(d.pid) || 0, desde: Number(d.desde) || 0, token: limpar(d.token) };
+  }
+  const minha = t => t.computador === COMPUTADOR && t.pid === process.pid;
+  function abandonada(t) {
+    if (t.ilegivel) return Date.now() - t.mtime > TRAVA_ABANDONADA;
+    const idade = agora() - t.desde;
+    if (idade > TRAVA_ABANDONADA || idade < -TRAVA_ABANDONADA) return true;     // relógio muito diferente também não prende para sempre
+    // deste mesmo PC, de um processo que não existe mais (serviço reiniciou no meio): não precisa esperar 20 min
+    return t.computador === COMPUTADOR && t.pid > 0 && t.pid !== process.pid && !processoVivo(t.pid);
+  }
+  // retoma uma trava abandonada: move para um nome único e confere se o que foi movido é mesmo a trava velha
+  async function retomar(L, velha) {
+    const tmp = `${L.trava}.${crypto.randomBytes(6).toString('hex')}.velha`;
+    try { await fsp.rename(L.trava, tmp); } catch (e) { return !!e && e.code === 'ENOENT'; }
+    let movida = null;
+    try { movida = JSON.parse(await fsp.readFile(tmp, 'utf8')); } catch { movida = null; }
+    const mesma = velha.ilegivel ? !(movida && movida.token) : !!movida && limpar(movida.token) === velha.token;
+    if (mesma) { try { await fsp.unlink(tmp); } catch { /* fica um .velha esquecido; não atrapalha */ } return true; }
+    try { await fsp.rename(tmp, L.trava); } catch { /* outro PC criou nova trava no instante: a dele vale */ }
+    return false;
+  }
+  function erroOcupada(t) {
+    if (minha(t)) return new ErroSefaz(409, 'Já há uma operação com a SEFAZ em andamento neste computador. Aguarde terminar.', { trava: true });
+    const nome = t.computador && t.computador !== '?' ? t.computador : 'desconhecido';
+    return new ErroSefaz(409, `Outro computador (${nome}) está falando com a SEFAZ neste momento. Aguarde e tente de novo.`, { trava: true, outroComputador: nome });
+  }
+  async function adquirirTrava(L, esperaMs) {
+    const fim = Date.now() + Math.max(0, Number(esperaMs) || 0);
+    let ultima = null;
+    for (let volta = 0; volta < 1000; volta++) {
+      const token = crypto.randomBytes(12).toString('hex');
+      let fh = null;
+      try {
+        fh = await fsp.open(L.trava, 'wx');
+        try { await fh.writeFile(JSON.stringify({ computador: COMPUTADOR, pid: process.pid, desde: agora(), token })); }
+        finally { await fh.close(); }
+        return { token };
+      } catch (e) {
+        if (fh) { try { await fsp.unlink(L.trava); } catch { /* nada */ } throw e; }
+        if (!e || e.code !== 'EEXIST') throw e;
+      }
+      const atual = await lerTrava(L);
+      if (!atual) continue;                                   // liberada entre a tentativa e a leitura
+      ultima = atual;
+      if (abandonada(atual) && await retomar(L, atual)) {
+        travaRetomada = { computador: atual.computador, desde: atual.desde || atual.mtime || 0 };
+        continue;
+      }
+      if (Date.now() >= fim) break;
+      await esperar(60 + Math.floor(Math.random() * 90));
+    }
+    throw erroOcupada(ultima || { computador: '?' });
+  }
+  async function liberarTrava(L, trava) {
+    for (let i = 0; i < 4; i++) {
+      try {
+        const atual = await lerTrava(L);
+        if (atual && atual.token === trava.token) await fsp.unlink(L.trava);   // só apaga a própria trava
+        return;
+      } catch { await esperar(60 * (i + 1)); }
+    }
+    // a rede caiu na hora de soltar: a trava fica e é retomada quando passar de 20 minutos
+  }
+
+  // ---------- migração: dados que este PC tinha no disco local vão para a pasta compartilhada (uma vez) ----------
+  async function planoMigracao(cfg, L) {
+    const chave = `${L.raiz}|${chaveEstado(cfg)}`;
+    if (migracaoConferida.has(chave)) return null;
+    const todos = await lerJson(L.estado, {}, true);
+    const temEstado = !!(todos && typeof todos === 'object' && todos[chaveEstado(cfg)]);
+    const temIndice = await fsp.stat(path.join(L.notas, 'indice.json')).then(() => true, e => { if (e && e.code === 'ENOENT') return false; throw e; });
+    const localNotas = pastaNotas(cfg.ambiente);
+    const mesmaPasta = path.resolve(localNotas).toLowerCase() === path.resolve(L.notas).toLowerCase();
+    if (temEstado || (temIndice && !mesmaPasta)) { migracaoConferida.add(chave); return null; }   // a compartilhada já tem dados: usa os dela
+    const estLocal = (await lerJson(ESTADO, {})) || {};
+    const estado = !temEstado && estLocal && typeof estLocal === 'object' && estLocal[chaveEstado(cfg)] && typeof estLocal[chaveEstado(cfg)] === 'object'
+      ? estLocal[chaveEstado(cfg)] : null;
+    let indice = null, xmls = [];
+    if (!mesmaPasta) {
+      const ind = await lerJson(path.join(localNotas, 'indice.json'), null);
+      indice = ind && typeof ind === 'object' && ind.notas && typeof ind.notas === 'object' ? ind : null;
+      try { xmls = (await fsp.readdir(localNotas)).filter(n => /^\d{44}\.xml$/.test(n) && chaveValida(n.slice(0, 44))); } catch { xmls = []; }
+    }
+    if (!estado && !indice && !xmls.length) { migracaoConferida.add(chave); return null; }
+    return { chave, estado, indice, xmls, localNotas };
+  }
+  // sob a trava: XML (sem sobrescrever), depois o índice, por último o ponteiro (se cair no meio, o pior caso é rebuscar)
+  async function migrarSePreciso(cfg, L) {
+    const plano = await planoMigracao(cfg, L);
+    if (!plano) return false;
+    if (plano.xmls.length) await fsp.mkdir(L.notas, { recursive: true });
+    for (const nome of plano.xmls) {
+      try { await fsp.copyFile(path.join(plano.localNotas, nome), path.join(L.notas, nome), fs.constants.COPYFILE_EXCL); }
+      catch (e) { if (!e || e.code !== 'EEXIST') throw e; }
+    }
+    if (plano.indice) await gravarJson(path.join(L.notas, 'indice.json'), plano.indice);
+    if (plano.estado) {
+      const todos = await lerJson(L.estado, {}, true);
+      const base = todos && typeof todos === 'object' && !Array.isArray(todos) ? todos : {};
+      if (!base[chaveEstado(cfg)]) { base[chaveEstado(cfg)] = plano.estado; await gravarJson(L.estado, base); }
+    }
+    migracaoConferida.add(plano.chave);
+    migradoAgora = true;
+    return true;
+  }
+
+  // Executa fn(L) com o armazenamento certo. Compartilhado: confere a pasta, pega a trava, migra se for a primeira vez,
+  // e SEMPRE solta a trava no fim (sucesso, 429, 656 ou erro).
+  async function comArmazem(ctx, esperaMs, fn) {
+    const L = locais(ctx.cfg);
+    if (!L.compartilhada) return fn(L);
+    await garantirPasta(L);
+    const trava = await protegido(L, () => adquirirTrava(L, esperaMs));
+    try {
+      return await protegido(L, async () => { await migrarSePreciso(ctx.cfg, L); return fn(L); });
+    } finally { await liberarTrava(L, trava); }
+  }
 
   // configuração + certificado + agente mTLS (lido de novo só quando o arquivo de config ou o .pfx mudam)
   function contexto() {
@@ -461,34 +682,44 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     const url = (urls && urls[cfg.ambiente]) || URLS[cfg.ambiente];
     return { cfg, cert: cache.cert, agente: cache.agente, url };
   }
+  // Config para as leituras (notas, xml) e para "importada". Sem pasta compartilhada: exige o certificado, como sempre.
+  // Com ela: basta a config válida (um PC sem acesso ao .pfx ainda vê e importa as notas; não fala com a SEFAZ).
+  function configSomenteConsulta() {
+    const lida = lerConfig(CONFIG, env);
+    return lida.ok && lida.config.pastaCompartilhada ? lida.config : null;
+  }
+  function configLeitura() {
+    return configSomenteConsulta() || contexto().cfg;
+  }
   function conferirValidade(cert) {
     if (agora() > cert.validoAte) throw new ErroSefaz(503, `O certificado digital venceu em ${new Date(cert.validoAte).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.`, { configurada: false });
   }
 
   const chaveEstado = cfg => `${cfg.cnpj}-${cfg.ambiente}`;
-  async function lerEstado(cfg) {
-    const todos = await lerJson(ESTADO, {});
+  // L = locais(cfg): estado e índice deste PC ou da pasta compartilhada (lá, leitura estrita)
+  async function lerEstado(L, cfg) {
+    const todos = await lerJson(L.estado, {}, L.compartilhada);
     const e = (todos && typeof todos === 'object' && todos[chaveEstado(cfg)]) || {};
     return { ultNSU: nsuValido(e.ultNSU) ? nsu15(e.ultNSU) : nsu15(0), maxNSU: nsuValido(e.maxNSU) ? nsu15(e.maxNSU) : '',
       liberadoEm: Number(e.liberadoEm) || 0, bloqueadoAte: Number(e.bloqueadoAte) || 0, motivoBloqueio: String(e.motivoBloqueio || ''),
       consultasChave: Array.isArray(e.consultasChave) ? e.consultasChave.map(Number).filter(Number.isFinite) : [],
       ultimaSincronizacao: Number(e.ultimaSincronizacao) || 0 };
   }
-  async function gravarEstado(cfg, est) {
-    const todos = await lerJson(ESTADO, {});
+  async function gravarEstado(L, cfg, est) {
+    const todos = await lerJson(L.estado, {}, L.compartilhada);
     const base = todos && typeof todos === 'object' && !Array.isArray(todos) ? todos : {};
     base[chaveEstado(cfg)] = est;
-    await gravarJson(ESTADO, base);
+    await gravarJson(L.estado, base);
   }
-  const arquivoIndice = cfg => path.join(pastaNotas(cfg.ambiente), 'indice.json');
-  async function lerIndice(cfg) {
-    const d = await lerJson(arquivoIndice(cfg), null);
+  const arquivoIndice = L => path.join(L.notas, 'indice.json');
+  async function lerIndice(L) {
+    const d = await lerJson(arquivoIndice(L), null, L.compartilhada);
     return d && typeof d === 'object' && d.notas && typeof d.notas === 'object' ? d : { versao: 1, notas: {} };
   }
-  const gravarIndice = (cfg, ind) => gravarJson(arquivoIndice(cfg), ind);
-  const arquivoXml = (cfg, chave) => {
+  const gravarIndice = (L, ind) => gravarJson(arquivoIndice(L), ind);
+  const arquivoXml = (L, chave) => {
     if (!chaveValida(chave)) throw new ErroSefaz(400, 'Chave de acesso inválida.');
-    return path.join(pastaNotas(cfg.ambiente), `${chave}.xml`);      // nome montado só com a chave validada
+    return path.join(L.notas, `${chave}.xml`);      // nome montado só com a chave validada
   };
 
   async function exclusivo(fn) {
@@ -502,8 +733,8 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
   }
 
   // grava os documentos recebidos (XML completo no disco, resumo/eventos no índice)
-  async function guardarDocumentos(cfg, docs) {
-    const ind = await lerIndice(cfg);
+  async function guardarDocumentos(cfg, L, docs) {
+    const ind = await lerIndice(L);
     let novas = 0, atualizadas = 0;
     const ignorados = { ilegivel: 0, tipoDesconhecido: 0, xmlInvalido: 0 };   // nada é descartado em silêncio: a tela mostra a contagem
     const agoraIso = new Date(agora()).toISOString();
@@ -513,13 +744,12 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
       if (doc.tipo === 'outro' || !chaveValida(doc.chave)) { ignorados.tipoDesconhecido++; continue; }
       if (doc.tipo === 'procNFe') {
         if (!xmlNFeValido(d.xml, doc.chave)) { ignorados.xmlInvalido++; continue; }
-        await fsp.mkdir(pastaNotas(cfg.ambiente), { recursive: true });
-        await fsp.writeFile(arquivoXml(cfg, doc.chave), d.xml, 'utf8');
+        await gravarTexto(arquivoXml(L, doc.chave), d.xml);
       }
       const r = aplicarDocumento(ind.notas, doc, { cnpjEmpresa: cfg.cnpj, agoraIso });
       if (r === 'nova') novas++; else if (r === 'atualizada') atualizadas++;
     }
-    await gravarIndice(cfg, ind);
+    await gravarIndice(L, ind);
     return { novas, atualizadas, recebidos: docs.length, ignorados, indice: ind };
   }
 
@@ -532,27 +762,74 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
 
   // ---------- operações ----------
   async function status() {
-    let ctx;
+    let ctx, semCertificado = '';
     try { ctx = contexto(); }
-    catch (e) { if (e instanceof ErroSefaz) return { configurada: false, motivo: e.message, leiaute: LEIAUTE }; throw e; }
+    catch (e) {
+      if (!(e instanceof ErroSefaz)) throw e;
+      // com pasta compartilhada, um PC sem o certificado ainda consulta as notas (somente consulta)
+      const cfgLeitura = configSomenteConsulta();
+      if (!cfgLeitura) return { configurada: false, motivo: e.message, leiaute: LEIAUTE };
+      ctx = { cfg: cfgLeitura, cert: null }; semCertificado = e.message;
+    }
     const { cfg, cert } = ctx;
-    const est = await lerEstado(cfg);
-    const ind = await lerIndice(cfg);
-    const t = agora();
+    const L = locais(cfg);
     const avisos = [];
-    if (t > cert.validoAte) avisos.push('O certificado digital está vencido.');
+    let est, ind, compartilhada = { ativa: false };
+    if (!L.compartilhada) {
+      est = await lerEstado(L, cfg);
+      ind = await lerIndice(L);
+    } else {
+      // status nunca falha (200): pasta fora do ar vira aviso, e nada é lido do disco local no lugar dela
+      compartilhada = { ativa: true, acessivel: true, pasta: L.nome };
+      try {
+        await garantirPasta(L);
+        // migração na primeira abertura da tela: só pega a trava se houver mesmo o que migrar
+        if (await protegido(L, () => planoMigracao(cfg, L))) {
+          try { await comArmazem(ctx, ESPERA.curta, async () => null); }
+          catch (e) { if (!(e instanceof ErroSefaz) || e.status !== 409) throw e; }   // outro PC com a trava: migra na próxima operação
+        }
+        await protegido(L, async () => {
+          est = await lerEstado(L, cfg);
+          ind = await lerIndice(L);
+          const tr = await lerTrava(L);
+          if (tr && !minha(tr) && !abandonada(tr)) compartilhada.emUsoPor = tr.computador;
+        });
+      } catch (e) {
+        compartilhada.acessivel = false;
+        avisos.push(e instanceof ErroSefaz ? e.message : erroPasta(L).message);
+        est = null; ind = null;
+      }
+      if (migradoAgora) { compartilhada.migrado = true; migradoAgora = false; }
+      if (travaRetomada) {
+        const quem = travaRetomada.computador && travaRetomada.computador !== '?' ? `do computador ${travaRetomada.computador}` : 'de um computador';
+        avisos.push(`Uma trava abandonada ${quem}${travaRetomada.desde ? ` (desde ${horaBR(travaRetomada.desde)})` : ''} foi retomada: ` +
+          'aquele computador provavelmente desligou ou perdeu a rede no meio de uma consulta.');
+        compartilhada.travaRetomada = true;
+        travaRetomada = null;
+      }
+    }
+    const t = agora();
+    if (!cert) {
+      avisos.push(`Certificado indisponível neste computador: ${semCertificado} Daqui dá para ver e importar as notas da pasta compartilhada; ` +
+        'sincronizar, baixar XML e dar ciência só num computador que abra o certificado.');
+    } else if (t > cert.validoAte) avisos.push('O certificado digital está vencido.');
     else if (cert.validoAte - t < 30 * 24 * HORA) avisos.push('O certificado digital vence em menos de 30 dias.');
-    if (cert.cnpjCert && cert.cnpjCert.slice(0, 8) !== cfg.cnpj.slice(0, 8)) avisos.push('O CNPJ do certificado não é da mesma empresa do CNPJ configurado.');
-    const recentes = est.consultasChave.filter(x => x > t - HORA);
-    const proxima = Math.max(est.liberadoEm, est.bloqueadoAte);
+    if (cert && cert.cnpjCert && cert.cnpjCert.slice(0, 8) !== cfg.cnpj.slice(0, 8)) avisos.push('O CNPJ do certificado não é da mesma empresa do CNPJ configurado.');
+    const e0 = est || { ultNSU: null, maxNSU: null, liberadoEm: 0, bloqueadoAte: 0, consultasChave: [], ultimaSincronizacao: 0 };
+    const recentes = e0.consultasChave.filter(x => x > t - HORA);
+    const proxima = Math.max(e0.liberadoEm, e0.bloqueadoAte);
     return {
       configurada: true, ambiente: cfg.ambiente, cnpj: cfg.cnpj, uf: cfg.uf, leiaute: LEIAUTE,
-      certificado: { titular: cert.titular, validoAte: new Date(cert.validoAte).toISOString(), diasRestantes: Math.floor((cert.validoAte - t) / (24 * HORA)) },
-      avisos, ultNSU: est.ultNSU, maxNSU: est.maxNSU,
-      ultimaSincronizacao: est.ultimaSincronizacao ? new Date(est.ultimaSincronizacao).toISOString() : null,
+      certificado: cert ? { titular: cert.titular, validoAte: new Date(cert.validoAte).toISOString(), diasRestantes: Math.floor((cert.validoAte - t) / (24 * HORA)) } : null,
+      somenteConsulta: !cert,
+      avisos, ultNSU: e0.ultNSU, maxNSU: e0.maxNSU,
+      ultimaSincronizacao: e0.ultimaSincronizacao ? new Date(e0.ultimaSincronizacao).toISOString() : null,
       proximaConsulta: proxima > t ? new Date(proxima).toISOString() : null, proximaConsultaHora: proxima > t ? horaBR(proxima) : null,
-      bloqueado: est.bloqueadoAte > t, consultasChaveNaHora: recentes.length, limiteConsultasChave: LIMITE_CONSULTAS_CHAVE,
-      ocupado, qtdNotas: Object.keys(ind.notas).length, pasta: pastaNotas(cfg.ambiente)
+      bloqueado: e0.bloqueadoAte > t, consultasChaveNaHora: recentes.length, limiteConsultasChave: LIMITE_CONSULTAS_CHAVE,
+      ocupado, qtdNotas: ind ? Object.keys(ind.notas).length : null,
+      // compartilhada: só o nome final da pasta (nunca o caminho de rede inteiro)
+      pasta: L.compartilhada ? path.join(L.nome, 'NFe', subpasta(cfg.ambiente)) : pastaNotas(cfg.ambiente),
+      compartilhada
     };
   }
 
@@ -560,50 +837,53 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
   function sincronizar({ reiniciar = false } = {}) {
     return exclusivo(async () => {
       const ctx = contexto(); conferirValidade(ctx.cert);
-      const est = await lerEstado(ctx.cfg);
-      conferirBloqueio(est);
-      if (est.liberadoEm > agora()) {
-        throw new ErroSefaz(429, `A última consulta não trouxe nada novo; a SEFAZ exige esperar 1 hora. Próxima consulta liberada às ${horaBR(est.liberadoEm)}.`, { liberadaEm: est.liberadoEm });
-      }
-      if (reiniciar) { est.ultNSU = nsu15(0); est.maxNSU = ''; await gravarEstado(ctx.cfg, est); }
-      let novas = 0, atualizadas = 0, lotes = 0, ultimo = null, recebidos = 0;
-      const ignorados = { ilegivel: 0, tipoDesconhecido: 0, xmlInvalido: 0 };
-      while (lotes < MAX_LOTES_POR_SINCRONIZACAO) {
-        lotes++;
-        const r = await consultarDist(ctx, { ultNSU: est.ultNSU });
-        ultimo = r;
-        est.ultimaSincronizacao = agora();
-        if (r.cStat === '656') {
-          // NÃO adota o ultNSU que a SEFAZ devolve no 656: ele é a posição final da fila e pularia documentos que nunca foram baixados
-          est.bloqueadoAte = agora() + HORA; est.motivoBloqueio = r.xMotivo;
-          await gravarEstado(ctx.cfg, est);
-          throw new ErroSefaz(429, `A SEFAZ informou consumo indevido (656: ${r.xMotivo}). Novas consultas bloqueadas; próxima liberada às ${horaBR(est.bloqueadoAte)}.`, { liberadaEm: est.bloqueadoAte, novas, atualizadas });
+      // o estado é lido DENTRO da trava: se outro PC acabou de consultar, a espera de 1 hora vale aqui também
+      return comArmazem(ctx, ESPERA.longa, async L => {
+        const est = await lerEstado(L, ctx.cfg);
+        conferirBloqueio(est);
+        if (est.liberadoEm > agora()) {
+          throw new ErroSefaz(429, `A última consulta não trouxe nada novo; a SEFAZ exige esperar 1 hora. Próxima consulta liberada às ${horaBR(est.liberadoEm)}.`, { liberadaEm: est.liberadoEm });
         }
-        if (r.cStat === '137') {
+        if (reiniciar) { est.ultNSU = nsu15(0); est.maxNSU = ''; await gravarEstado(L, ctx.cfg, est); }
+        let novas = 0, atualizadas = 0, lotes = 0, ultimo = null, recebidos = 0;
+        const ignorados = { ilegivel: 0, tipoDesconhecido: 0, xmlInvalido: 0 };
+        while (lotes < MAX_LOTES_POR_SINCRONIZACAO) {
+          lotes++;
+          const r = await consultarDist(ctx, { ultNSU: est.ultNSU });
+          ultimo = r;
+          est.ultimaSincronizacao = agora();
+          if (r.cStat === '656') {
+            // NÃO adota o ultNSU que a SEFAZ devolve no 656: ele é a posição final da fila e pularia documentos que nunca foram baixados
+            est.bloqueadoAte = agora() + HORA; est.motivoBloqueio = r.xMotivo;
+            await gravarEstado(L, ctx.cfg, est);
+            throw new ErroSefaz(429, `A SEFAZ informou consumo indevido (656: ${r.xMotivo}). Novas consultas bloqueadas; próxima liberada às ${horaBR(est.bloqueadoAte)}.`, { liberadaEm: est.bloqueadoAte, novas, atualizadas });
+          }
+          if (r.cStat === '137') {
+            if (r.ultNSU) est.ultNSU = r.ultNSU;
+            if (r.maxNSU) est.maxNSU = r.maxNSU;
+            est.liberadoEm = agora() + HORA;
+            await gravarEstado(L, ctx.cfg, est);
+            break;
+          }
+          if (r.cStat !== '138') {
+            await gravarEstado(L, ctx.cfg, est);
+            throw new ErroSefaz(502, `A SEFAZ respondeu ${r.cStat || 'sem código'}: ${r.xMotivo || 'sem motivo'}.`);
+          }
+          const g = await guardarDocumentos(ctx.cfg, L, r.docs);
+          novas += g.novas; atualizadas += g.atualizadas; recebidos += g.recebidos;
+          for (const k of Object.keys(ignorados)) ignorados[k] += g.ignorados[k];
           if (r.ultNSU) est.ultNSU = r.ultNSU;
           if (r.maxNSU) est.maxNSU = r.maxNSU;
-          est.liberadoEm = agora() + HORA;
-          await gravarEstado(ctx.cfg, est);
-          break;
+          const fim = !r.ultNSU || !r.maxNSU || est.ultNSU >= est.maxNSU;
+          if (fim) est.liberadoEm = agora() + HORA;          // ultNSU = maxNSU: nada mais a buscar agora (NT 2014.002)
+          await gravarEstado(L, ctx.cfg, est);
+          if (fim) break;
         }
-        if (r.cStat !== '138') {
-          await gravarEstado(ctx.cfg, est);
-          throw new ErroSefaz(502, `A SEFAZ respondeu ${r.cStat || 'sem código'}: ${r.xMotivo || 'sem motivo'}.`);
-        }
-        const g = await guardarDocumentos(ctx.cfg, r.docs);
-        novas += g.novas; atualizadas += g.atualizadas; recebidos += g.recebidos;
-        for (const k of Object.keys(ignorados)) ignorados[k] += g.ignorados[k];
-        if (r.ultNSU) est.ultNSU = r.ultNSU;
-        if (r.maxNSU) est.maxNSU = r.maxNSU;
-        const fim = !r.ultNSU || !r.maxNSU || est.ultNSU >= est.maxNSU;
-        if (fim) est.liberadoEm = agora() + HORA;          // ultNSU = maxNSU: nada mais a buscar agora (NT 2014.002)
-        await gravarEstado(ctx.cfg, est);
-        if (fim) break;
-      }
-      const haMais = !!(est.maxNSU && est.ultNSU < est.maxNSU);
-      return { ok: true, cStat: ultimo.cStat, mensagem: ultimo.xMotivo, novas, atualizadas, recebidos, ignorados, reiniciado: !!reiniciar, ultNSU: est.ultNSU, maxNSU: est.maxNSU, haMais,
-        proximaConsulta: est.liberadoEm > agora() ? new Date(est.liberadoEm).toISOString() : null,
-        proximaConsultaHora: est.liberadoEm > agora() ? horaBR(est.liberadoEm) : null };
+        const haMais = !!(est.maxNSU && est.ultNSU < est.maxNSU);
+        return { ok: true, cStat: ultimo.cStat, mensagem: ultimo.xMotivo, novas, atualizadas, recebidos, ignorados, reiniciado: !!reiniciar, ultNSU: est.ultNSU, maxNSU: est.maxNSU, haMais,
+          proximaConsulta: est.liberadoEm > agora() ? new Date(est.liberadoEm).toISOString() : null,
+          proximaConsultaHora: est.liberadoEm > agora() ? horaBR(est.liberadoEm) : null };
+      });
     });
   }
 
@@ -611,29 +891,31 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     if (!chaveValida(chave)) return Promise.reject(new ErroSefaz(400, 'Chave de acesso inválida (44 números com dígito verificador).'));
     return exclusivo(async () => {
       const ctx = contexto(); conferirValidade(ctx.cert);
-      const est = await lerEstado(ctx.cfg);
-      conferirBloqueio(est);
-      const t = agora();
-      est.consultasChave = est.consultasChave.filter(x => x > t - HORA);
-      if (est.consultasChave.length >= LIMITE_CONSULTAS_CHAVE) {
-        const libera = Math.min(...est.consultasChave) + HORA;
-        throw new ErroSefaz(429, `Limite de ${LIMITE_CONSULTAS_CHAVE} consultas por chave em 1 hora atingido. Próxima consulta liberada às ${horaBR(libera)}.`, { liberadaEm: libera });
-      }
-      est.consultasChave.push(t);
-      await gravarEstado(ctx.cfg, est);
-      const r = await consultarDist(ctx, { chave });
-      if (r.cStat === '656') {
-        est.bloqueadoAte = agora() + HORA; est.motivoBloqueio = r.xMotivo;
-        await gravarEstado(ctx.cfg, est);
-        throw new ErroSefaz(429, `A SEFAZ informou consumo indevido (656: ${r.xMotivo}). Próxima consulta liberada às ${horaBR(est.bloqueadoAte)}.`, { liberadaEm: est.bloqueadoAte });
-      }
-      if (r.cStat === '137') throw new ErroSefaz(404, 'A SEFAZ ainda não tem documento desta nota para a empresa (137). Se acabou de dar a ciência, tente de novo em alguns minutos.');
-      if (r.cStat !== '138') throw new ErroSefaz(502, `A SEFAZ respondeu ${r.cStat || 'sem código'}: ${r.xMotivo || 'sem motivo'}.`);
-      const g = await guardarDocumentos(ctx.cfg, r.docs);
-      const nota = g.indice.notas[chave] || null;
-      const completa = !!nota && (nota.situacao === 'completa' || nota.situacao === 'importada');
-      return { ok: true, completa, nota,
-        mensagem: completa ? 'XML completo baixado.' : 'A SEFAZ só liberou o resumo: faça a Ciência da operação e tente de novo depois.' };
+      return comArmazem(ctx, ESPERA.longa, async L => {
+        const est = await lerEstado(L, ctx.cfg);
+        conferirBloqueio(est);
+        const t = agora();
+        est.consultasChave = est.consultasChave.filter(x => x > t - HORA);
+        if (est.consultasChave.length >= LIMITE_CONSULTAS_CHAVE) {
+          const libera = Math.min(...est.consultasChave) + HORA;
+          throw new ErroSefaz(429, `Limite de ${LIMITE_CONSULTAS_CHAVE} consultas por chave em 1 hora atingido. Próxima consulta liberada às ${horaBR(libera)}.`, { liberadaEm: libera });
+        }
+        est.consultasChave.push(t);
+        await gravarEstado(L, ctx.cfg, est);
+        const r = await consultarDist(ctx, { chave });
+        if (r.cStat === '656') {
+          est.bloqueadoAte = agora() + HORA; est.motivoBloqueio = r.xMotivo;
+          await gravarEstado(L, ctx.cfg, est);
+          throw new ErroSefaz(429, `A SEFAZ informou consumo indevido (656: ${r.xMotivo}). Próxima consulta liberada às ${horaBR(est.bloqueadoAte)}.`, { liberadaEm: est.bloqueadoAte });
+        }
+        if (r.cStat === '137') throw new ErroSefaz(404, 'A SEFAZ ainda não tem documento desta nota para a empresa (137). Se acabou de dar a ciência, tente de novo em alguns minutos.');
+        if (r.cStat !== '138') throw new ErroSefaz(502, `A SEFAZ respondeu ${r.cStat || 'sem código'}: ${r.xMotivo || 'sem motivo'}.`);
+        const g = await guardarDocumentos(ctx.cfg, L, r.docs);
+        const nota = g.indice.notas[chave] || null;
+        const completa = !!nota && (nota.situacao === 'completa' || nota.situacao === 'importada');
+        return { ok: true, completa, nota,
+          mensagem: completa ? 'XML completo baixado.' : 'A SEFAZ só liberou o resumo: faça a Ciência da operação e tente de novo depois.' };
+      });
     });
   }
 
@@ -644,52 +926,65 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     if (lista.some(c => !chaveValida(c))) return Promise.reject(new ErroSefaz(400, 'Chave de acesso inválida (44 números com dígito verificador).'));
     return exclusivo(async () => {
       const ctx = contexto(); conferirValidade(ctx.cert);
-      const dh = dhEventoBR(agora());
-      const eventos = lista.map(chave => assinarEvento(montarInfCiencia({ tpAmb: ctx.cfg.tpAmb, cnpj: ctx.cfg.cnpj, chave, dhEvento: dh }), ctx.cert));
-      const idLote = String(agora()).slice(-15);
-      const r = await postarSoap(ctx.url.evento, envelopeEvento(montarEnvEvento(idLote, eventos)), `${WSDL_EVENTO}/nfeRecepcaoEvento`, { agente: ctx.agente, tempoLimite });
-      conferirHttp(r);
-      const ret = interpretarRetEvento(r.corpo);
-      if (ret.cStat !== '128') throw new ErroSefaz(502, `A SEFAZ não processou o lote (${ret.cStat || 'sem código'}: ${ret.xMotivo || 'sem motivo'}).`);
-      const ind = await lerIndice(ctx.cfg);
-      const agoraIso = new Date(agora()).toISOString();
-      const resultados = lista.map(chave => {
-        const e = ret.eventos.find(x => x.chave === chave);
-        if (!e) return { chave, ok: false, mensagem: 'A SEFAZ não devolveu o resultado desta nota.' };
-        const ok = CIENCIA_OK.has(e.cStat);
-        if (ok) aplicarDocumento(ind.notas, { tipo: 'procEvento', chave, tpEvento: '210210', descricao: 'Ciencia da Operacao', data: dh.slice(0, 10) }, { cnpjEmpresa: ctx.cfg.cnpj, agoraIso });
-        return { chave, ok, cStat: e.cStat, mensagem: ok ? (e.cStat === '573' ? 'A ciência já estava registrada.' : 'Ciência registrada.') : `${e.cStat}: ${e.xMotivo}` };
+      return comArmazem(ctx, ESPERA.longa, async L => {
+        const dh = dhEventoBR(agora());
+        const eventos = lista.map(chave => assinarEvento(montarInfCiencia({ tpAmb: ctx.cfg.tpAmb, cnpj: ctx.cfg.cnpj, chave, dhEvento: dh }), ctx.cert));
+        const idLote = String(agora()).slice(-15);
+        const r = await postarSoap(ctx.url.evento, envelopeEvento(montarEnvEvento(idLote, eventos)), `${WSDL_EVENTO}/nfeRecepcaoEvento`, { agente: ctx.agente, tempoLimite });
+        conferirHttp(r);
+        const ret = interpretarRetEvento(r.corpo);
+        if (ret.cStat !== '128') throw new ErroSefaz(502, `A SEFAZ não processou o lote (${ret.cStat || 'sem código'}: ${ret.xMotivo || 'sem motivo'}).`);
+        const ind = await lerIndice(L);
+        const agoraIso = new Date(agora()).toISOString();
+        const resultados = lista.map(chave => {
+          const e = ret.eventos.find(x => x.chave === chave);
+          if (!e) return { chave, ok: false, mensagem: 'A SEFAZ não devolveu o resultado desta nota.' };
+          const ok = CIENCIA_OK.has(e.cStat);
+          if (ok) aplicarDocumento(ind.notas, { tipo: 'procEvento', chave, tpEvento: '210210', descricao: 'Ciencia da Operacao', data: dh.slice(0, 10) }, { cnpjEmpresa: ctx.cfg.cnpj, agoraIso });
+          return { chave, ok, cStat: e.cStat, mensagem: ok ? (e.cStat === '573' ? 'A ciência já estava registrada.' : 'Ciência registrada.') : `${e.cStat}: ${e.xMotivo}` };
       });
-      await gravarIndice(ctx.cfg, ind);
+      await gravarIndice(L, ind);
       return { ok: true, resultados };
+      });
     });
   }
 
+  // leituras (sem trava: a gravação é atômica, quem lê vê o índice anterior ou o novo, nunca pela metade)
   async function notas() {
-    const { cfg } = contexto();
-    const ind = await lerIndice(cfg);
+    const cfg = configLeitura();
+    const L = locais(cfg);
+    await garantirPasta(L);
+    const ind = await protegido(L, () => lerIndice(L));
     const lista = Object.values(ind.notas).filter(n => n && chaveValida(n.chave))
       .sort((a, b) => String(b.dataEmissao || '').localeCompare(String(a.dataEmissao || '')) || a.chave.localeCompare(b.chave));
     return { ambiente: cfg.ambiente, notas: lista };
   }
   async function xml(chave) {
     if (!chaveValida(chave)) throw new ErroSefaz(400, 'Chave de acesso inválida.');
-    const { cfg } = contexto();
-    const n = (await lerIndice(cfg)).notas[chave];
+    const cfg = configLeitura();
+    const L = locais(cfg);
+    await garantirPasta(L);
+    const n = (await protegido(L, () => lerIndice(L))).notas[chave];
     if (!n || (n.situacao !== 'completa' && n.situacao !== 'importada')) throw new ErroSefaz(404, 'O XML completo desta nota ainda não foi baixado.');
     let conteudo;
-    try { conteudo = await fsp.readFile(arquivoXml(cfg, chave), 'utf8'); } catch { throw new ErroSefaz(404, 'O arquivo XML desta nota não está mais na pasta.'); }
+    try { conteudo = await fsp.readFile(arquivoXml(L, chave), 'utf8'); } catch (e) {
+      if (L.compartilhada && erroDeArquivo(e) && e.code !== 'ENOENT') throw erroPasta(L);
+      throw new ErroSefaz(404, 'O arquivo XML desta nota não está mais na pasta.');
+    }
     if (!xmlNFeValido(conteudo, chave)) throw new ErroSefaz(422, 'O arquivo XML desta nota está danificado. Baixe de novo.');
     return conteudo;
   }
+  // lê-modifica-grava o índice: na pasta compartilhada, sob a trava (espera até ~5 s se outro PC estiver com ela)
   async function importada(chave) {
     if (!chaveValida(chave)) throw new ErroSefaz(400, 'Chave de acesso inválida.');
-    const { cfg } = contexto();
-    const ind = await lerIndice(cfg);
-    const n = ind.notas[chave];
-    if (!n || (n.situacao !== 'completa' && n.situacao !== 'importada')) throw new ErroSefaz(409, 'Só nota com XML completo pode ser marcada como importada.');
-    if (n.situacao !== 'importada') { n.situacao = 'importada'; n.importadaEm = new Date(agora()).toISOString(); await gravarIndice(cfg, ind); }
-    return { ok: true, nota: n };
+    const ctx = { cfg: configLeitura() };
+    return comArmazem(ctx, ESPERA.curta, async L => {
+      const ind = await lerIndice(L);
+      const n = ind.notas[chave];
+      if (!n || (n.situacao !== 'completa' && n.situacao !== 'importada')) throw new ErroSefaz(409, 'Só nota com XML completo pode ser marcada como importada.');
+      if (n.situacao !== 'importada') { n.situacao = 'importada'; n.importadaEm = new Date(agora()).toISOString(); await gravarIndice(L, ind); }
+      return { ok: true, nota: n };
+    });
   }
 
   // ---------- HTTP (chamado por salvador_pdf.js depois do controle de origem) ----------
@@ -748,6 +1043,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
 
 module.exports = {
   criarSefaz, ErroSefaz, LEIAUTE, URLS, LIMITE_CONSULTAS_CHAVE, MAX_CHAVES_CIENCIA, HORA,
+  TRAVA_ABANDONADA, ESPERA_TRAVA, NOME_TRAVA, motivoPastaCompartilhada,
   chaveValida, cnpjValido, codigoUF, partesChave, horaBR, dhEventoBR, lerConfig, lerCertificado,
   montarDistDFe, envelopeDist, envelopeEvento, montarInfCiencia, canonicoInf, signedInfo, assinarEvento, montarEnvEvento,
   descompactarDocZip, interpretarRetDist, interpretarRetEvento, lerDocumento, xmlNFeValido, aplicarDocumento

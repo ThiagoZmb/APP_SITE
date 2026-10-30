@@ -3,5 +3,6 @@
   "uf": "SP",
   "ambiente": "homologacao",
   "certificado": "C:\\Programa Elegance\\Certificado\\empresa.pfx",
-  "senha": "COLOQUE-A-SENHA-AQUI-SOMENTE-NESTE-PC"
+  "senha": "COLOQUE-A-SENHA-AQUI-SOMENTE-NESTE-PC",
+  "pastaCompartilhada": ""
 }
