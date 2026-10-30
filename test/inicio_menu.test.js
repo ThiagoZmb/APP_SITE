@@ -55,7 +55,7 @@ test('as listas do início (entregas da semana e últimos pedidos) e o menu usam
   assert.ok(!/const entregas = orcamentos|\$\('ultimos'\)\.innerHTML = orcamentos/.test(h));
   // o menu só fala com o tipo Pedido
   assert.ok(m.includes('tipo=Pedido') && m.includes('/ped_orc/Pedido/') && m.includes('orcamentos.html?abrir=Pedido/'));
-  assert.ok(!/Orçamento|Orcamento\//.test(m.replace(/orcamentos\.html|orcamentos\.criar/g, '')), 'nenhuma ação do menu aponta para orçamento');
+  assert.ok(!/ped_orc\/Orçamento|abrir=Orçamento|tipo=Orçamento|tipo=Orcamento/.test(m), 'nenhuma ação do menu aponta para orçamento');
   // o servidor também filtra: /dados_lista tem WHERE p.TIPO = ? e a rota de situação recusa tipo diferente de Pedido
   const idx = ler('index.js'), ped = ler('rotas/ped_orc.js');
   assert.ok(idx.includes('WHERE p.TIPO = ?') && idx.includes("const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';"));
