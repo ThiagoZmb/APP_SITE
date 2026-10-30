@@ -777,7 +777,7 @@
             // veio da SEFAZ e o número não foi trocado: marca como importada no serviço local (sem resposta, fica pendente)
             if (entrada.chaveSefaz && entrada.numeroSefaz === numero && window.NotasCompra) window.NotasCompra.marcarImportada(window, entrada.chaveSefaz);
             limparEntrada();
-            listaEntradas.recarregar();
+            atualizarHistoricos(listaEntradas);
             if (r.codigosAtualizados?.length) toast('Código do fornecedor atualizado no cadastro: ' + r.codigosAtualizados.map(c => `${c.produto} (${c.de || 'vazio'} → ${c.para})`).join('; '), 'info');
             analisesDesatualizadas = true;
             await mostrarResultado('Nota lançada', r.itens);
@@ -840,7 +840,7 @@
             } catch (e) { if (!tratarErroLancamento(e, 'saída')) return; } // a chave fica: reenviar não lança duas vezes
             saida.itens = []; saida.chave = novaChave();
             renderSaida();
-            listaSaidas.recarregar();
+            atualizarHistoricos(listaSaidas);
             analisesDesatualizadas = true;
             if (r) await mostrarResultado('Saída lançada', r.itens);
         });
@@ -884,6 +884,7 @@
             catch (e) { if (!tratarErroLancamento(e, 'contagem')) return; }
             ajuste.chave = novaChave();
             escolherAjuste(null);
+            atualizarHistoricos();
             analisesDesatualizadas = true;
             if (r) await mostrarResultado('Estoque ajustado', r.itens);
         });
@@ -894,6 +895,13 @@
 
         // ===================== HISTÓRICO e DESFAZER =====================
         const listasHistorico = []; // todas as listas montadas: um estorno recarrega as que já carregaram
+        // depois de lançar (entrada, saída, ajuste) ou desfazer: atualiza na hora a lista da própria aba (obrigatória) e todas as outras já abertas,
+        // inclusive a aba Histórico
+        function atualizarHistoricos(propria) {
+            const alvo = new Set(listasHistorico.filter(l => l.carregada));
+            if (propria) alvo.add(propria);
+            alvo.forEach(l => l.recarregar());
+        }
         const TIPO_NOME = { entrada: ['Entrada', 'ok'], saida: ['Saída', 'aviso'], ajuste: ['Ajuste', ''], estorno: ['Estorno', ''] };
         // 'AAAA-MM-DD HH:MM:SS' → 'dd/mm/aaaa hh:mm' (entrada do VB só tem a data)
         const dataHora = q => { const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/.exec(String(q || '')); if (!m) return esc(q);
@@ -960,7 +968,7 @@
                     : await api('/estoque/saida/desfazer', { corpo: { data: g.data, usuario: g.usuario, motivo: texto } });
             } catch (e) { return toast('Nada foi desfeito: ' + e.message, 'erro'); }
             await mostrarResultado(ehEntrada ? 'Entrada desfeita' : 'Saída desfeita', r.itens);
-            listasHistorico.filter(l => l.carregada).forEach(l => l.recarregar());
+            atualizarHistoricos();
             analisesDesatualizadas = true;
         }
         // aba Histórico: todos os tipos, com os filtros dela

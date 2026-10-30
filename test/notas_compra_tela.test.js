@@ -228,3 +228,14 @@ test('entrada de estoque: a aba tem dois cards (dados da nota e últimas notas) 
   assert.equal(abre(h.slice(i - 5, j)), 0, 'divs equilibrados na aba');
   assert.ok(h.includes('#e-itens input.e-nome { min-width: 360px; }') && h.includes('#e-itens input.qtd { width: 76px;'));
 });
+
+test('estoque: depois de lançar entrada, saída ou ajuste (ou desfazer) todas as listas de histórico já abertas atualizam na hora, inclusive a aba Histórico', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const h = fs.readFileSync(path.join(__dirname, '..', 'movimentacao_estoque.html'), 'utf8');
+  assert.ok(h.includes('function atualizarHistoricos(propria) {'));
+  assert.ok(h.includes('alvo.forEach(l => l.recarregar());'));
+  assert.equal((h.match(/atualizarHistoricos\(listaEntradas\);/g) || []).length, 1, 'entrada');
+  assert.equal((h.match(/atualizarHistoricos\(listaSaidas\);/g) || []).length, 1, 'saída');
+  assert.equal((h.match(/atualizarHistoricos\(\);/g) || []).length, 2, 'ajuste e desfazer');
+  assert.ok(!h.includes('limparEntrada();\n            listaEntradas.recarregar();'), 'a entrada não recarrega só a própria lista');
+});
