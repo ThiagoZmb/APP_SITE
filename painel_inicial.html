@@ -747,15 +747,15 @@
         const urlPdf = (numero, producao) => `${API_BASE}/dados_pdf?numero=${encodeURIComponent(numero)}&tipo=${encodeURIComponent(tipoLista)}${producao ? '&producao=1' : ''}`;
         async function mudarSituacao(numero, nome) {
             const x = docDe(numero);
-            let manterData = false;
+            let manterData = false, usarDataPronto = false;
             if (nome === 'Entregue' || nome === 'Retirado') {
                 // escolha do usuário: atualizar a data de entrega para hoje ou manter a que já está gravada
-                const escolha = await window.EscolhaDataEntrega.perguntar({ numero, cliente: x && x.cliente, nome, dataAtual: x && x.dataEntrega });
+                const escolha = await window.EscolhaDataEntrega.perguntar({ numero, cliente: x && x.cliente, nome, dataAtual: x && x.dataEntrega, dataPronto: x && x.prontoEm });
                 if (!escolha) return;
-                manterData = escolha === 'manter';
+                manterData = escolha === 'manter'; usarDataPronto = escolha === 'pronto';
             } else if (!confirm(`Mudar a situação do pedido nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
             try {
-                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}) }) });
+                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}) }) });
                 await carregar();
             } catch (err) { alert(err.message); }
         }

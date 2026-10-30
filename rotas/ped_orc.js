@@ -634,19 +634,26 @@ function registrarPedOrc({ rota, pool }) {
     const nova = String((req.body || {}).situacao ?? '');
     if (!SITUACOES_MUDAR.includes(nova)) return res.status(400).json({ error: `Situação inválida. Use: ${SITUACOES_MUDAR.join(', ')}.` });
     const manterData = (req.body || {}).manterData === true;
+    // `usarDataPronto: true` (só Entregue/Retirado): a data de entrega passa a ser a data de pronto do pedido (DATA_PRONTO), não a de hoje
+    const usarDataPronto = (req.body || {}).usarDataPronto === true && (nova === 'Entregue' || nova === 'Retirado');
     let dataEntrega = nova === 'Entregue' || nova === 'Retirado' ? hojeLocal() : null;
     const r = await emTransacao(pool, res, 'POST /ped_orc/situacao', async conn => {
       const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
       const antes = String(linhas.cab.SITUACAO || '');
       if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de situação.`);
       if (antes === nova) throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está "${nova}".`);
-      if (manterData) {
+      if (usarDataPronto) {
+        const pronto = String(linhas.cab.DATA_PRONTO ?? '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(pronto)) throw new ErroUsuario(400, `O pedido nº ${alvo.numero} não tem data de pronto.`);
+        dataEntrega = pronto;
+        await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
+      } else if (manterData) {
         await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
         dataEntrega = linhas.cab.DATA_ENTREGA ?? null;
       } else {
         await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
       }
-      await auditarDoc(conn, req, 'pedido_situacao', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes, para: nova, ...(manterData ? { manterData: true } : {}) });
+      await auditarDoc(conn, req, 'pedido_situacao', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes, para: nova, ...(usarDataPronto ? { usarDataPronto: true } : manterData ? { manterData: true } : {}) });
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });

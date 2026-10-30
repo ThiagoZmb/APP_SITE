@@ -40,16 +40,16 @@
     }
 
     async function mudarSituacao(x, nome) {
-      let manterData = false;
+      let manterData = false, usarDataPronto = false;
       if (nome === 'Entregue' || nome === 'Retirado') {
         // escolha do usuário: atualizar a data de entrega para hoje ou manter a que já está gravada
-        const escolha = await window.EscolhaDataEntrega.perguntar({ numero: x.numero, cliente: x.cliente, nome, dataAtual: x.dataEntrega });
+        const escolha = await window.EscolhaDataEntrega.perguntar({ numero: x.numero, cliente: x.cliente, nome, dataAtual: x.dataEntrega, dataPronto: x.prontoEm });
         if (!escolha) return;
-        manterData = escolha === 'manter';
+        manterData = escolha === 'manter'; usarDataPronto = escolha === 'pronto';
       } else if (!confirm(`Mudar a situação do pedido nº ${x.numero}${x.cliente ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
       try {
         const r = await fetch(`${cfg.apiBase}/ped_orc/Pedido/${enc(x.numero)}/situacao`, { method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token() }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}) }) });
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token() }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}) }) });
         if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || `Erro HTTP: ${r.status}`);

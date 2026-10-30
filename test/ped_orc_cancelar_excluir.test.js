@@ -241,3 +241,32 @@ test('janela de escolha da data de entrega: lista e início usam a mesma janela 
     assert.ok(!t.includes('A data de entrega passa a ser hoje.'), f + ': o aviso fixo saiu');
   }
 });
+
+test('situação Entregue/Retirado com usarDataPronto: a DATA_ENTREGA vira a data de pronto do pedido (não a de hoje); sem data de pronto recusa', async t => {
+  const banco = bancoPedOrc(); comDocumento(banco, 'Pedido', 5, { DATA_PRONTO: '2024-10-25 00:00:00', DATA_ENTREGA: '' });
+  comDocumento(banco, 'Pedido', 6, { DATA_PRONTO: '' });
+  const { chamar } = await prepararPedOrc(t, { banco });
+  let r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue', usarDataPronto: true });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc.find(p => p.NUMERO === 5).SITUACAO, 'Entregue');
+  assert.equal(banco.pedOrc.find(p => p.NUMERO === 5).DATA_ENTREGA, '2024-10-25');
+  assert.equal((await r.json()).dataEntrega, '2024-10-25');
+  assert.deepEqual(JSON.parse(banco.auditoria[0].detalhe), { cliente: 'CLIENTE TESTE', de: 'Em Produção', para: 'Entregue', usarDataPronto: true });
+  r = await chamar('/ped_orc/Pedido/6/situacao', 'POST', { situacao: 'Retirado', usarDataPronto: true });
+  assert.equal(r.status, 400);
+  assert.equal(banco.pedOrc.find(p => p.NUMERO === 6).SITUACAO, 'Em Produção', 'nada foi gravado');
+  // fora de Entregue/Retirado o campo é ignorado
+  r = await chamar('/ped_orc/Pedido/6/situacao', 'POST', { situacao: 'Pronto', usarDataPronto: true });
+  assert.equal(r.status, 200);
+});
+
+test('janela da data de entrega: sem data gravada o segundo botão usa a data de pronto e devolve "pronto"; os menus enviam usarDataPronto', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  const js = ler('escolha_data_entrega.js');
+  assert.ok(js.includes('Usar a data de pronto (') && js.includes("semDataGravada && temPronto ? 'pronto' : 'manter'") && js.includes('Manter sem data'));
+  for (const f of ['painel_inicial.html', 'inicio_menu.js']) {
+    const t = ler(f);
+    assert.ok(t.includes('dataPronto: ') && t.includes("usarDataPronto = escolha === 'pronto';") && t.includes('...(usarDataPronto ? { usarDataPronto: true } : {})'), f);
+  }
+});

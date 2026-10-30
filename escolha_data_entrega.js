@@ -8,7 +8,9 @@
   };
   const vazia = v => { const t = dataBR(v); return !t || t === '-' || t === '—'; };
 
-  function perguntar({ numero, cliente, nome, dataAtual }) {
+  // dataAtual = data de entrega já gravada; dataPronto = data de pronto do pedido. Sem data gravada, o segundo botão usa a data de pronto.
+  // Devolve 'hoje', 'manter', 'pronto' ou null (cancelou).
+  function perguntar({ numero, cliente, nome, dataAtual, dataPronto }) {
     return new Promise(resolver => {
       const hoje = new Date().toLocaleDateString('pt-BR');
       const fundo = document.createElement('div');
@@ -21,6 +23,7 @@
       const d = document.createElement('div'); d.style.cssText = 'margin-bottom:16px';
       d.append('Data de entrega gravada: ');
       const forte = document.createElement('b'); forte.textContent = vazia(dataAtual) ? 'nenhuma' : dataBR(dataAtual); d.append(forte);
+      if (!vazia(dataPronto)) { const pr = document.createElement('div'); pr.style.cssText = 'color:#555'; pr.textContent = `Data de pronto: ${dataBR(dataPronto)}`; d.append(pr); }
       const fecha = valor => { document.removeEventListener('keydown', teclas, true); fundo.remove(); resolver(valor); };
       const botao = (texto, estilo, valor) => {
         const b = document.createElement('button'); b.type = 'button'; b.textContent = texto;
@@ -28,7 +31,10 @@
         b.addEventListener('click', () => fecha(valor)); return b;
       };
       const bHoje = botao(`Atualizar a data para hoje (${hoje})`, 'border:none;background:#8B0000;color:#fff', 'hoje');
-      const bManter = botao(vazia(dataAtual) ? 'Manter sem data' : `Manter a data atual (${dataBR(dataAtual)})`, 'border:1px solid #c9ced6;background:#fff;color:#1c2230', 'manter');
+      const semDataGravada = vazia(dataAtual), temPronto = !vazia(dataPronto);
+      const textoSegundo = !semDataGravada ? `Manter a data atual (${dataBR(dataAtual)})`
+        : temPronto ? `Usar a data de pronto (${dataBR(dataPronto)})` : 'Manter sem data';
+      const bManter = botao(textoSegundo, 'border:1px solid #c9ced6;background:#fff;color:#1c2230', semDataGravada && temPronto ? 'pronto' : 'manter');
       const bCancelar = botao('Cancelar', 'border:none;background:transparent;color:#666;font-weight:600', null);
       const teclas = e => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecha(null); }
