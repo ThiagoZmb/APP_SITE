@@ -36,3 +36,8 @@ test('lista de pedidos/orçamentos: imprimir PDF direto (iframe com blob, sem ab
   for (const rotulo of ["'Imprimir guia de produção'", "'Imprimir vidros'", "'Imprimir orçamento'"]) assert.ok(h.includes(rotulo), rotulo);
   assert.ok(h.includes('imprimirPdf(urlPdf(numero, true))') && h.includes('imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero='));
 });
+
+test('menu do botão direito da lista não tem mais "Copiar nº" nem "Copiar nome do cliente"', () => {
+  const h = ler('painel_inicial.html');
+  assert.ok(!h.includes('Copiar nº') && !h.includes('Copiar nome do cliente') && !h.includes('copiarTexto'));
+});

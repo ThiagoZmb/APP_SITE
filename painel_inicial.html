@@ -744,10 +744,6 @@
         const SITUACAO_NOME = { producao: 'Em Produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado' };
         const docDe = numero => (tipoLista === 'Pedido' ? pedidos : orcamentos).find(d => String(d.numero) === String(numero));
         const urlPdf = (numero, producao) => `${API_BASE}/dados_pdf?numero=${encodeURIComponent(numero)}&tipo=${encodeURIComponent(tipoLista)}${producao ? '&producao=1' : ''}`;
-        async function copiarTexto(texto) {
-            try { await navigator.clipboard.writeText(String(texto)); }
-            catch { const t = document.createElement('textarea'); t.value = String(texto); document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch { /* sem área de transferência */ } t.remove(); }
-        }
         async function mudarSituacao(numero, nome) {
             const x = docDe(numero);
             const aviso = nome === 'Entregue' || nome === 'Retirado' ? '\n\nA data de entrega passa a ser hoje.' : '';
@@ -828,8 +824,6 @@
                 L.push({ icone: '🚚', rotulo: `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
             }
             sep();
-            L.push({ icone: '📋', rotulo: `Copiar nº ${ehPedido ? 'do pedido' : 'do orçamento'}`, fn: () => copiarTexto(numero) });
-            L.push({ icone: '📋', rotulo: 'Copiar nome do cliente', fn: () => copiarTexto(x.cliente || '') });
             const perigos = [];
             if (ehPedido && !cancelado && Acesso.pode('pedidos.cancelar')) perigos.push({ icone: '🚫', rotulo: 'Cancelar pedido', fn: () => acaoNoDocumento('cancelar', numero), perigo: true });
             if (Acesso.pode('pedidos.excluir')) perigos.push({ icone: '🗑️', rotulo: ehPedido ? 'Excluir pedido' : 'Excluir orçamento', fn: () => acaoNoDocumento('excluir', numero), perigo: true });
