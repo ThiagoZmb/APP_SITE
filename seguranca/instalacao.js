@@ -211,6 +211,33 @@ const TABELAS = [
      UNIQUE KEY ux_nota_chave (chave),
      KEY ix_nota_data (tipo, data_emissao)
    ) ${OPCOES}`,
+  // DANFE (nota fiscal em PDF) enviado pela tela "Enviar DANFEs": a chave de acesso (44 dígitos, nome do arquivo) é única; sem FK.
+  // cnpj_emitente/modelo/serie/numero_nf/data_emissao_aamm vêm da própria chave (conferida no envio). O vínculo manual (pedido x chave) vence a ligação automática pelo financeiro.
+  `CREATE TABLE IF NOT EXISTS \`web_danfe\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     chave CHAR(44) NOT NULL,
+     numero_nf INT NOT NULL,
+     serie INT NOT NULL,
+     modelo CHAR(2) NOT NULL,
+     cnpj_emitente CHAR(14) NOT NULL,
+     data_emissao_aamm CHAR(4) NOT NULL,
+     pdf MEDIUMBLOB NOT NULL,
+     tamanho INT NOT NULL,
+     sha256 CHAR(64) NOT NULL,
+     enviado_por VARCHAR(100) NULL,
+     enviado_em DATETIME NULL,
+     UNIQUE KEY ux_danfe_chave (chave),
+     KEY ix_danfe_numero (numero_nf)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_danfe_vinculos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     chave CHAR(44) NOT NULL,
+     pedido_numero INT NOT NULL,
+     criado_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     UNIQUE KEY ux_danfe_vinculo (chave, pedido_numero),
+     KEY ix_danfe_vinculo_pedido (pedido_numero)
+   ) ${OPCOES}`,
   // peso por produto (o banco do VB não tem peso): produto = nome usado no VB (MODELO, PERFIL, PUXADOR, REVESTIMENTO), sem FK
   // unidade_peso: kg_m (kg por metro), kg_m2_mm (kg por m² por mm de espessura), kg_un (kg por unidade)
   `CREATE TABLE IF NOT EXISTS \`web_pesos\` (
@@ -716,6 +743,30 @@ async function acrescentarPermissoesPesos(pool) {
   }
 }
 
+// DANFE: ver para Administrador e Interno completo; enviar e vincular só para o Administrador (um marcador só, roda uma vez)
+async function acrescentarPermissoesDanfe(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_danfe' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      const lista = p.nome === 'Administrador' ? ['danfe.ver', 'danfe.enviar', 'danfe.vincular'] : ['danfe.ver'];
+      for (const permissao of lista) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_danfe', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
 const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
 
@@ -787,4 +838,4 @@ async function acrescentarPermissoesOrcSituacao(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

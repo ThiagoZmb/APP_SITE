@@ -267,6 +267,7 @@
     <link rel="stylesheet" href="tema.css?v=202610272200">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
+    <script src="danfe_pedido.js?v=202610301500" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>
 <body>
@@ -804,6 +805,8 @@
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
             if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
+            // nota fiscal (DANFE) do pedido: só Pedido (orçamento não tem nota); o servidor confere a permissão e os estados do usuário
+            if (ehPedido) add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) }));
             // imprimir direto desta tela: o PDF é baixado e vai para a janela de impressão, sem abrir outra aba nem outra página
             sep();
             add('pedidos.pdf', '🖨️', ehPedido ? 'Imprimir PDF' : 'Imprimir orçamento', () => imprimirPdf(urlPdf(numero, false)));

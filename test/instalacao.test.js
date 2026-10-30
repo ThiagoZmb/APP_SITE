@@ -24,11 +24,11 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 31 tabelas web_', async () => {
+test('cria as 33 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_danfe', 'web_danfe_vinculos', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
     'web_perfil_permissoes', 'web_perfis', 'web_pesos', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_retalhos', 'web_usuario_acesso', 'web_usuario_excecoes', 'web_vidro_config', 'web_vidro_planos', 'web_vidro_retalhos']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);

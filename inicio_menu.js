@@ -65,6 +65,8 @@
       add('pedidos.pdf', '📄', 'Abrir PDF', () => window.abrirPdfAutenticado(urlPdf(n, false)));
       add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => window.abrirPdfAutenticado(urlPdf(n, true)));
       add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => window.abrirPdfAutenticado(urlVidros(n)));
+      // nota fiscal (DANFE) do pedido; o servidor confere a permissão e os estados do usuário
+      add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, pode: cfg.pode }));
       sep();
       add('pedidos.pdf', '🖨️', 'Imprimir PDF', () => imprimirPdf(urlPdf(n, false)));
       add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)));
