@@ -189,6 +189,7 @@
     }
     function travar(sim) {
       $('btn-sincronizar').disabled = sim || estado.ocupado;
+      if ($('btn-rebuscar')) $('btn-rebuscar').disabled = sim || estado.ocupado;
       atualizarLote();
     }
     async function ocupar(botao, acao) {
@@ -197,6 +198,7 @@
       const original = botao ? botao.textContent : '';
       if (botao) { botao.disabled = true; botao.textContent = 'Aguarde…'; }
       $('btn-sincronizar').disabled = true;
+      if ($('btn-rebuscar')) $('btn-rebuscar').disabled = true;
       try { await acao(); }
       catch (e) { aviso(e.message, e.status === 429 ? 'aviso' : 'erro'); toast(e.message, 'erro'); }
       finally {
@@ -206,10 +208,13 @@
       }
     }
 
-    async function sincronizar() {
+    async function sincronizar(reiniciarHistorico = false) {
       await ocupar($('btn-sincronizar'), async () => {
-        const r = await chamarLocal(win, '/sefaz/sincronizar', { metodo: 'POST', corpo: {}, tempo: 10 * 60 * 1000 });
+        const r = await chamarLocal(win, '/sefaz/sincronizar', { metodo: 'POST', corpo: reiniciarHistorico ? { reiniciarHistorico: true } : {}, tempo: 10 * 60 * 1000 });
         const partes = [`${r.novas} nota(s) nova(s), ${r.atualizadas} atualizada(s).`];
+        if (r.recebidos !== undefined) partes.push(`A SEFAZ entregou ${r.recebidos} documento(s).`);
+        const ig = r.ignorados ? r.ignorados.ilegivel + r.ignorados.tipoDesconhecido + r.ignorados.xmlInvalido : 0;
+        if (ig) partes.push(`${ig} não puderam ser lidos (ilegíveis: ${r.ignorados.ilegivel}, tipo desconhecido: ${r.ignorados.tipoDesconhecido}, XML inválido: ${r.ignorados.xmlInvalido}).`);
         if (r.haMais) partes.push('Ainda há documentos na SEFAZ: clique em Sincronizar de novo.');
         else if (r.proximaConsultaHora) partes.push(`A SEFAZ só aceita nova consulta às ${r.proximaConsultaHora}.`);
         toast(partes.join(' '), 'ok');
@@ -257,7 +262,15 @@
       else if (acao === 'importar') importar(chave, b);
     });
     $('nc-lista').addEventListener('change', ev => { if (ev.target.classList.contains('nc-marcar')) atualizarLote(); });
-    $('btn-sincronizar').addEventListener('click', sincronizar);
+    $('btn-sincronizar').addEventListener('click', () => sincronizar(false));
+    const rebuscar = $('btn-rebuscar');
+    if (rebuscar) rebuscar.addEventListener('click', () => {
+      const pergunta = 'Buscar de novo TODO o histórico que a SEFAZ ainda guarda?\n\n' +
+        'Volta o ponteiro para o início. Use quando faltarem notas antigas. ' +
+        'A SEFAZ limita as consultas: se ela responder "consumo indevido", é preciso esperar 1 hora.';
+      if (!win.confirm(pergunta)) return;
+      sincronizar(true);
+    });
     $('btn-atualizar').addEventListener('click', () => { if (!estado.ocupado) carregar(); });
     $('btn-ciencia-lote').addEventListener('click', () => {
       const m = marcadas();

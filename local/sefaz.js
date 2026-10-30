@@ -505,13 +505,14 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
   async function guardarDocumentos(cfg, docs) {
     const ind = await lerIndice(cfg);
     let novas = 0, atualizadas = 0;
+    const ignorados = { ilegivel: 0, tipoDesconhecido: 0, xmlInvalido: 0 };   // nada é descartado em silêncio: a tela mostra a contagem
     const agoraIso = new Date(agora()).toISOString();
     for (const d of docs) {
       let doc;
-      try { doc = lerDocumento(d.xml); } catch { continue; }       // documento ilegível: ignorado (não derruba o lote)
-      if (doc.tipo === 'outro' || !chaveValida(doc.chave)) continue;
+      try { doc = lerDocumento(d.xml); } catch { ignorados.ilegivel++; continue; }       // documento ilegível: ignorado (não derruba o lote)
+      if (doc.tipo === 'outro' || !chaveValida(doc.chave)) { ignorados.tipoDesconhecido++; continue; }
       if (doc.tipo === 'procNFe') {
-        if (!xmlNFeValido(d.xml, doc.chave)) continue;
+        if (!xmlNFeValido(d.xml, doc.chave)) { ignorados.xmlInvalido++; continue; }
         await fsp.mkdir(pastaNotas(cfg.ambiente), { recursive: true });
         await fsp.writeFile(arquivoXml(cfg, doc.chave), d.xml, 'utf8');
       }
@@ -519,7 +520,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
       if (r === 'nova') novas++; else if (r === 'atualizada') atualizadas++;
     }
     await gravarIndice(cfg, ind);
-    return { novas, atualizadas, indice: ind };
+    return { novas, atualizadas, recebidos: docs.length, ignorados, indice: ind };
   }
 
   async function consultarDist(ctx, pedido) {
@@ -555,7 +556,8 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
     };
   }
 
-  function sincronizar() {
+  // reiniciar = true: volta o ponteiro para o NSU 0 e busca de novo todo o histórico que a SEFAZ ainda guarda (só quando pedido de propósito)
+  function sincronizar({ reiniciar = false } = {}) {
     return exclusivo(async () => {
       const ctx = contexto(); conferirValidade(ctx.cert);
       const est = await lerEstado(ctx.cfg);
@@ -563,15 +565,17 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
       if (est.liberadoEm > agora()) {
         throw new ErroSefaz(429, `A última consulta não trouxe nada novo; a SEFAZ exige esperar 1 hora. Próxima consulta liberada às ${horaBR(est.liberadoEm)}.`, { liberadaEm: est.liberadoEm });
       }
-      let novas = 0, atualizadas = 0, lotes = 0, ultimo = null;
+      if (reiniciar) { est.ultNSU = nsu15(0); est.maxNSU = ''; await gravarEstado(ctx.cfg, est); }
+      let novas = 0, atualizadas = 0, lotes = 0, ultimo = null, recebidos = 0;
+      const ignorados = { ilegivel: 0, tipoDesconhecido: 0, xmlInvalido: 0 };
       while (lotes < MAX_LOTES_POR_SINCRONIZACAO) {
         lotes++;
         const r = await consultarDist(ctx, { ultNSU: est.ultNSU });
         ultimo = r;
         est.ultimaSincronizacao = agora();
         if (r.cStat === '656') {
+          // NÃO adota o ultNSU que a SEFAZ devolve no 656: ele é a posição final da fila e pularia documentos que nunca foram baixados
           est.bloqueadoAte = agora() + HORA; est.motivoBloqueio = r.xMotivo;
-          if (r.ultNSU) est.ultNSU = r.ultNSU;
           await gravarEstado(ctx.cfg, est);
           throw new ErroSefaz(429, `A SEFAZ informou consumo indevido (656: ${r.xMotivo}). Novas consultas bloqueadas; próxima liberada às ${horaBR(est.bloqueadoAte)}.`, { liberadaEm: est.bloqueadoAte, novas, atualizadas });
         }
@@ -587,7 +591,8 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
           throw new ErroSefaz(502, `A SEFAZ respondeu ${r.cStat || 'sem código'}: ${r.xMotivo || 'sem motivo'}.`);
         }
         const g = await guardarDocumentos(ctx.cfg, r.docs);
-        novas += g.novas; atualizadas += g.atualizadas;
+        novas += g.novas; atualizadas += g.atualizadas; recebidos += g.recebidos;
+        for (const k of Object.keys(ignorados)) ignorados[k] += g.ignorados[k];
         if (r.ultNSU) est.ultNSU = r.ultNSU;
         if (r.maxNSU) est.maxNSU = r.maxNSU;
         const fim = !r.ultNSU || !r.maxNSU || est.ultNSU >= est.maxNSU;
@@ -596,7 +601,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
         if (fim) break;
       }
       const haMais = !!(est.maxNSU && est.ultNSU < est.maxNSU);
-      return { ok: true, cStat: ultimo.cStat, mensagem: ultimo.xMotivo, novas, atualizadas, ultNSU: est.ultNSU, maxNSU: est.maxNSU, haMais,
+      return { ok: true, cStat: ultimo.cStat, mensagem: ultimo.xMotivo, novas, atualizadas, recebidos, ignorados, reiniciado: !!reiniciar, ultNSU: est.ultNSU, maxNSU: est.maxNSU, haMais,
         proximaConsulta: est.liberadoEm > agora() ? new Date(est.liberadoEm).toISOString() : null,
         proximaConsultaHora: est.liberadoEm > agora() ? horaBR(est.liberadoEm) : null };
     });
@@ -724,7 +729,7 @@ function criarSefaz({ raiz, arquivoConfig, env = process.env, agora = () => Date
         res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(conteudo);
       }
-      if (m === 'POST' && p === '/sefaz/sincronizar') { await lerCorpoJson(req); return responder(res, 200, await sincronizar()); }
+      if (m === 'POST' && p === '/sefaz/sincronizar') { const b = await lerCorpoJson(req); return responder(res, 200, await sincronizar({ reiniciar: !!b && b.reiniciarHistorico === true })); }
       if (m === 'POST' && p === '/sefaz/ciencia') {
         const b = await lerCorpoJson(req);
         return responder(res, 200, await ciencia(Array.isArray(b.chaves) ? b.chaves : [b.chave]));

@@ -244,11 +244,38 @@ test('656 (consumo indevido): bloqueia sincronizar e baixar por 1 hora e informa
   await assert.rejects(sefaz.baixar(CHAVE_A), e => e.status === 429);
   assert.equal(falsa.pedidos.length, 1);
   const st = await sefaz.status();
-  assert.equal(st.bloqueado, true); assert.equal(st.ultNSU, '000000000000010');
+  // o ultNSU devolvido no 656 é a posição FINAL da fila da SEFAZ: adotá-lo pularia documentos nunca baixados
+  assert.equal(st.bloqueado, true); assert.equal(st.ultNSU, '000000000000000');
   relogio.t += S.HORA + 1000;
   falsa.filas.dist.push({ corpo: A.retDist({ cStat: '137', ultNSU: '000000000000020', maxNSU: '000000000000020' }) });
   await sefaz.sincronizar();
-  assert.ok(falsa.pedidos[1].corpo.includes('<ultNSU>000000000000010</ultNSU>'));
+  assert.ok(falsa.pedidos[1].corpo.includes('<ultNSU>000000000000000</ultNSU>'), 'depois do 656 continua do NSU que o serviço de fato baixou');
+});
+
+test('sincronizar informa quantos documentos a SEFAZ entregou e quantos não puderam ser lidos (nada some em silêncio)', async t => {
+  const { falsa, sefaz } = await preparar(t);
+  falsa.filas.dist.push({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000003', maxNSU: '000000000000003',
+    docs: [doc('000000000000001', A.resNFe({ chave: CHAVE_A })), doc('000000000000002', '<outraCoisa xmlns="http://x"><a>1</a></outraCoisa>'),
+      doc('000000000000003', '<resNFe><chNFe>123</chNFe></resNFe>')] }) });
+  const r = await sefaz.sincronizar();
+  assert.equal(r.recebidos, 3); assert.equal(r.novas, 1);
+  assert.equal(r.ignorados.tipoDesconhecido, 2); assert.equal(r.ignorados.ilegivel, 0);
+  assert.equal(r.reiniciado, false);
+});
+
+test('rebuscar histórico: só com pedido explícito volta ao NSU 0; o ponteiro normal nunca volta sozinho', async t => {
+  const { falsa, sefaz, relogio } = await preparar(t);
+  falsa.filas.dist.push({ corpo: A.retDist({ cStat: '138', ultNSU: '000000000000002', maxNSU: '000000000000002', docs: [doc('000000000000001', A.resNFe({ chave: CHAVE_A })), doc('000000000000002', A.resNFe({ chave: CHAVE_B }))] }) });
+  await sefaz.sincronizar();
+  relogio.t += S.HORA + 1000;
+  falsa.filas.dist.push({ corpo: A.retDist({ cStat: '137', ultNSU: '000000000000002', maxNSU: '000000000000002' }) });
+  await sefaz.sincronizar();
+  assert.ok(falsa.pedidos[1].corpo.includes('<ultNSU>000000000000002</ultNSU>'), 'sincronização normal continua do último NSU');
+  relogio.t += S.HORA + 1000;
+  falsa.filas.dist.push({ corpo: A.retDist({ cStat: '137', ultNSU: '000000000000002', maxNSU: '000000000000002' }) });
+  const r = await sefaz.sincronizar({ reiniciar: true });
+  assert.equal(r.reiniciado, true);
+  assert.ok(falsa.pedidos[2].corpo.includes('<ultNSU>000000000000000</ultNSU>'), 'rebuscar começa do NSU 0');
 });
 
 test('outro cStat vira mensagem clara; erro HTTP 403 explica o certificado', async t => {
