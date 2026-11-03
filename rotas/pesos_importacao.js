@@ -4,6 +4,7 @@
 // Nunca sobrescreve: peso já cadastrado (qualquer origem) fica intacto e aparece como "já cadastrado".
 const fs = require('node:fs');
 const path = require('node:path');
+const { chaveAdminConfere, limitadorAdmin } = require('../seguranca/chave_admin');
 const { emTransacao, agoraLocal } = require('./transacao');
 const { ORIGEM_IMPORTADA, planejarImportacaoPesos } = require('../calculo/pesos_importacao');
 
@@ -11,9 +12,8 @@ const ARQUIVO_PADRAO = path.join(__dirname, '..', 'docs', 'pesos_estimados_perfi
 const POR = 'importação das estimativas';
 
 function registrarImportacaoPesos({ publica, pool, arquivo = ARQUIVO_PADRAO }) {
-  publica('post', '/admin/importar_pesos', async (req, res) => {
-    const chave = req.headers['x-admin-key'];
-    if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) return res.status(403).json({ error: 'Acesso negado' });
+  publica('post', '/admin/importar_pesos', limitadorAdmin, async (req, res) => {
+    if (!chaveAdminConfere(req)) return res.status(403).json({ error: 'Acesso negado' });
     const simular = req.body?.simular !== false;
     let estimativas;
     try { estimativas = JSON.parse(fs.readFileSync(arquivo, 'utf8')); }

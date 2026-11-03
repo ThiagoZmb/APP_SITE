@@ -11,6 +11,7 @@ const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
+const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
 const { acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
@@ -814,11 +815,8 @@ registro.rota('get', '/dados_pdf_vidros', ['pedidos.pdf'], async (req, res) => {
 });
 
 // ================= ADMIN: definir/trocar senha =================
-registro.publica('post', '/admin/definir_senha', async (req, res) => {
-  const chave = req.headers['x-admin-key'];
-  if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Acesso negado' });
-  }
+registro.publica('post', '/admin/definir_senha', limitadorAdmin, async (req, res) => {
+  if (!chaveAdminConfere(req)) return res.status(403).json({ error: 'Acesso negado' });
   const { username, novaSenha } = req.body;
   if (!username || !novaSenha || novaSenha.length < 8) {
     return res.status(400).json({ error: 'Usuário obrigatório e senha com no mínimo 8 caracteres' });
@@ -837,16 +835,15 @@ registro.publica('post', '/admin/definir_senha', async (req, res) => {
 
 // ================= MIGRAÇÃO DE SENHAS =================
 // Converte para bcrypt as senhas ainda em texto puro (ex.: usuário criado pelo VB).
-// POST com a chave no cabeçalho x-admin-key — nunca na URL.
-registro.publica('post', '/migrar_senhas', async (req, res) => {
-  const chave = req.headers['x-admin-key'];
-  if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Acesso negado' });
-  }
+// POST com a chave no cabeçalho x-admin-key — nunca na URL. Só funciona com ADMIN_ROTAS=1 (desligada por padrão).
+registro.publica('post', '/migrar_senhas', limitadorAdmin, async (req, res) => {
+  if (!chaveAdminConfere(req)) return res.status(403).json({ error: 'Acesso negado' });
   try {
     const [rows] = await pool.execute('SELECT CODIGO, SENHA FROM cliente_usuarios');
-    let convertidos = 0, jaHash = 0;
+    let convertidos = 0, jaHash = 0, ignorados = 0;
     for (const r of rows) {
+      // Senha nula ou vazia não é texto puro a converter: hashear "" ou "null" criaria uma senha válida.
+      if (r.SENHA === null || r.SENHA === undefined || r.SENHA === '') { ignorados++; continue; }
       if (!String(r.SENHA || '').startsWith('$2')) {
         const hash = await bcrypt.hash(String(r.SENHA), 12);
         await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
@@ -855,7 +852,7 @@ registro.publica('post', '/migrar_senhas', async (req, res) => {
         jaHash++;
       }
     }
-    res.json({ success: true, convertidos, jaHash, total: rows.length });
+    res.json({ success: true, convertidos, jaHash, ignorados, total: rows.length });
   } catch (err) {
     console.error('Erro /migrar_senhas:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });

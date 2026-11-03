@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { bancoNotas, prepararNotas } = require('./apoio/bancoNotas');
 
 process.env.ADMIN_KEY = 'chave-de-teste';
+process.env.ADMIN_ROTAS = '1';
 const importar = (chamar, corpo, chave = 'chave-de-teste') => fetch(chamar.url + '/admin/importar_notas', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(chave ? { 'x-admin-key': chave } : {}) }, body: JSON.stringify(corpo ?? {}) });
 

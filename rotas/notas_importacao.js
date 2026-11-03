@@ -2,6 +2,7 @@
 // POST /admin/importar_notas com a chave no cabeçalho x-admin-key (nunca na URL), como /migrar_senhas.
 // Por padrão SÓ SIMULA: devolve o relatório e não grava. Para gravar, o corpo precisa ter { "simular": false }.
 // Lê as tabelas do VB sem alterá-las; a gravação é uma transação só e pode rodar de novo sem duplicar.
+const { chaveAdminConfere, limitadorAdmin } = require('../seguranca/chave_admin');
 const { emTransacao, agoraLocal } = require('./transacao');
 const { planejarImportacao } = require('../calculo/notas_importacao');
 
@@ -9,9 +10,8 @@ const LIMITE_RELATORIO = 200;
 const LOTE = 100;
 
 function registrarImportacaoNotas({ publica, pool }) {
-  publica('post', '/admin/importar_notas', async (req, res) => {
-    const chave = req.headers['x-admin-key'];
-    if (!process.env.ADMIN_KEY || chave !== process.env.ADMIN_KEY) return res.status(403).json({ error: 'Acesso negado' });
+  publica('post', '/admin/importar_notas', limitadorAdmin, async (req, res) => {
+    if (!chaveAdminConfere(req)) return res.status(403).json({ error: 'Acesso negado' });
     const simular = req.body?.simular !== false;
     let plano;
     try {

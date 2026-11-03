@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { bancoPesos, prepararPesos } = require('./apoio/bancoPesos');
 
 process.env.ADMIN_KEY = 'chave-de-teste';
+process.env.ADMIN_ROTAS = '1';
 const importar = (url, corpo, chave = 'chave-de-teste') => fetch(url + '/admin/importar_pesos', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(chave ? { 'x-admin-key': chave } : {}) }, body: JSON.stringify(corpo ?? {}) });
 
