@@ -36,13 +36,20 @@ const SEGREDO_FICTICIO = totp.gerarSegredo();
 const QTD_CODIGOS_RECUPERACAO = 10;
 const LIMITE_IP = { janelaMs: 15 * 60 * 1000, falhas: 10 };
 
+// Consulta única que SEMPRE devolve 1 linha e roda o MESMO plano com ou sem conta: o derivado k fixa a linha, os LEFT JOINs
+// ficam nulos sem conta e a contagem do nome roda contra um valor sempre presente (COALESCE). Sem isso a conta real custaria
+// uma varredura em cadastro_clientes (tabela do VB, sem índice no nome) e a inexistente não: oráculo de existência por tempo.
+// u.id nulo = sem conta. Nome único: mesma comparação coluna-contra-coluna de empresaLiberavel (portal/acesso.js).
+const NOME_SEM_CONTA = '-sem-conta-';
 const SQL_LOGIN =
   `SELECT u.id, u.email, u.cliente_codigo, u.papel, u.situacao, u.senha_hash, u.totp_segredo_cifrado, u.totp_ativo,
           u.totp_ultimo_passo, e.situacao AS empresa_situacao, c.RAZAO_SOCIAL AS razao_social,
-          (SELECT COUNT(*) FROM cadastro_clientes d WHERE d.RAZAO_SOCIAL = c.RAZAO_SOCIAL) AS qtd_nome
-     FROM web_portal_usuarios u LEFT JOIN web_portal_empresas e ON e.cliente_codigo = u.cliente_codigo
+          (SELECT COUNT(*) FROM cadastro_clientes d WHERE d.RAZAO_SOCIAL = COALESCE(c.RAZAO_SOCIAL, '${NOME_SEM_CONTA}')) AS qtd_nome
+     FROM (SELECT ? AS em) k
+     LEFT JOIN web_portal_usuarios u ON u.email = k.em
+     LEFT JOIN web_portal_empresas e ON e.cliente_codigo = u.cliente_codigo
      LEFT JOIN cadastro_clientes c ON c.CODIGO = u.cliente_codigo
-    WHERE u.email = ? LIMIT 1`;
+    LIMIT 1`;
 
 // o mesmo objeto no login e no /eu (permissões em ordem fixa)
 const usuarioDe = ({ email, papel, empresaCodigo, razaoSocial, permissoes }) => ({
@@ -174,7 +181,7 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       // SEMPRE 1 consulta (e-mail inválido busca '', que nunca casa): empresa e unicidade do nome vêm no mesmo SELECT,
       // para o número de idas ao banco (e o tempo) não revelar se a conta existe
       const [rows] = await pool.execute(SQL_LOGIN, [email || '']);
-      const u = rows[0] || null;
+      const u = rows[0] && rows[0].id != null ? rows[0] : null;
       // conta real: pelo id; inexistente (ou e-mail inválido): pelo nome informado (com teto no limitador)
       const chave = u ? `c:${u.id}` : `n:${(email || bruto.trim().toLowerCase()).slice(0, 190)}`;
       const dadosAuditoria = u

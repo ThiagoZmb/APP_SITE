@@ -8,6 +8,10 @@
 // A Tarefa 6 acrescentou as regras do bloco "rotas da equipe" (convites, empresas, web_auditoria); as da Tarefa 5 não mudaram.
 const { criarPoolFalso } = require('./poolFalso');
 
+// a consulta de login devolve SEMPRE 1 linha (derivado k): sem usuário, a linha vem com tudo nulo
+const semLinhaSeVazio = linhas => (linhas.length ? linhas : [{ id: null, email: null, cliente_codigo: null, papel: null, situacao: null, senha_hash: null,
+  totp_segredo_cifrado: null, totp_ativo: null, totp_ultimo_passo: null, empresa_situacao: null, razao_social: null, qtd_nome: 0 }]);
+
 function criarBancoPortal(inicial = {}) {
   const dados = {
     sessoes: [],       // { id, usuario_id, criado_em, expira_em, ultimo_uso_em, ip, revogada }
@@ -31,14 +35,14 @@ function criarBancoPortal(inicial = {}) {
     // ---- Tarefa 7: autenticação (convite, login); vêm primeiro de propósito ----
     // login: busca por e-mail (a regra solta de acesso, mais abaixo, busca por id)
     [/^SELECT u\.id, u\.email, u\.cliente_codigo, u\.papel, u\.situacao, u\.senha_hash/, (sql, [email]) =>
-      dados.usuarios.filter(u => u.email === email).map(u => ({
+      semLinhaSeVazio(dados.usuarios.filter(u => u.email === email).map(u => ({
         id: u.id, email: u.email, cliente_codigo: u.cliente_codigo, papel: u.papel, situacao: u.situacao,
         senha_hash: u.senha_hash ?? null, totp_segredo_cifrado: u.totp_segredo_cifrado ?? null,
         totp_ativo: u.totp_ativo ?? 0, totp_ultimo_passo: u.totp_ultimo_passo ?? 0,
         empresa_situacao: sit(u.cliente_codigo) ?? null,
         razao_social: (dados.clientes.find(c => c.CODIGO === u.cliente_codigo) || {}).RAZAO_SOCIAL ?? null,
         qtd_nome: contar((dados.clientes.find(c => c.CODIGO === u.cliente_codigo) || {}).RAZAO_SOCIAL)
-      }))],
+      })))],
     // anti-replay atômico do TOTP: [passo, id, passo]
     [/^UPDATE web_portal_usuarios SET totp_ultimo_passo = \? WHERE id = \? AND totp_ultimo_passo < \?/, (sql, [passo, id, limite]) => {
       const u = dados.usuarios.find(x => x.id === id && Number(x.totp_ultimo_passo ?? 0) < Number(limite));

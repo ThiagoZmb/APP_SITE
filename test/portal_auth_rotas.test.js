@@ -694,20 +694,22 @@ test('app real: as rotas de autenticação estão no registro (listas EXATAS) e,
   assert.equal(r2.status, 503);
 });
 
-test('login: texto do SQL de busca (empresa e unicidade do nome no mesmo SELECT, WHERE u.email = ?)', async t => {
+test('login: o SQL de busca é uma consulta única com derivado, LEFT JOINs e COUNT contra COALESCE (mesmo plano com ou sem conta)', async t => {
   const c = await montar(t);
   await c.login(c.corretos());
-  const q = c.pool.chamadas.find(x => /^SELECT u\.id, u\.email/.test(x.sql));
-  const sql = q.sql.replace(/\s+/g, ' ');
-  assert.match(sql, /FROM web_portal_usuarios u LEFT JOIN web_portal_empresas e ON e\.cliente_codigo = u\.cliente_codigo/);
+  await c.login(c.corretos({ email: 'fantasma@acme.com' }));
+  const buscas = c.pool.chamadas.filter(x => /^SELECT u\.id, u\.email/.test(x.sql));
+  assert.equal(buscas.length, 2);
+  const sql = buscas[0].sql.replace(/\s+/g, ' ');
+  assert.match(sql, /FROM \(SELECT \? AS em\) k LEFT JOIN web_portal_usuarios u ON u\.email = k\.em/);
+  assert.match(sql, /LEFT JOIN web_portal_empresas e ON e\.cliente_codigo = u\.cliente_codigo/);
   assert.match(sql, /LEFT JOIN cadastro_clientes c ON c\.CODIGO = u\.cliente_codigo/);
-  assert.match(sql, /\(SELECT COUNT\(\*\) FROM cadastro_clientes d WHERE d\.RAZAO_SOCIAL = c\.RAZAO_SOCIAL\) AS qtd_nome/);
-  assert.match(sql, /WHERE u\.email = \? LIMIT 1$/);
-  assert.deepEqual(q.params, ['ana@acme.com']);
+  assert.match(sql, /\(SELECT COUNT\(\*\) FROM cadastro_clientes d WHERE d\.RAZAO_SOCIAL = COALESCE\(c\.RAZAO_SOCIAL, '[^']+'\)\) AS qtd_nome/);
+  assert.match(sql, /LIMIT 1$/);
+  assert.equal(buscas[1].sql, buscas[0].sql, 'o mesmo texto para qualquer e-mail');
+  assert.deepEqual(buscas[0].params, ['ana@acme.com']);
+  assert.deepEqual(buscas[1].params, ['fantasma@acme.com']);
 });
-
-// sequência de SQL de uma tentativa (prefixos normalizados)
-const sequencia = (c, de) => c.pool.chamadas.slice(de).map(x => x.sql.replace(/\s+/g, ' ').slice(0, 55));
 
 test('login: a SEQUÊNCIA de consultas ao banco é idêntica em todos os caminhos de falha (sem oráculo por nº de idas ao banco)', async t => {
   const c = await montar(t);
@@ -754,18 +756,68 @@ test('login: a SEQUÊNCIA de consultas ao banco é idêntica em todos os caminho
   }
 });
 
-test('login: o corpo com os DOIS campos roda os DOIS UPDATEs em qualquer caminho (a forma do corpo decide, não a conta)', async t => {
+// sequência de SQL de uma tentativa (prefixos normalizados)
+const sequencia = (c, de) => c.pool.chamadas.slice(de).map(x => x.sql.replace(/\s+/g, ' ').slice(0, 55));
+
+test('login: o corpo com os DOIS campos roda os DOIS UPDATEs nos MESMOS 8 caminhos de falha (a forma do corpo decide, não a conta)', async t => {
   const c = await montar(t);
-  const corpo = extra => ({ senha: SENHA, codigo: c.codigo(), codigoRecuperacao: c.recuperacao.codigos[0], ...extra });
-  const seqs = [];
-  for (const extra of [{ email: 'fantasma@acme.com' }, { email: 'ana@acme.com', senha: 'Senha-Errada-9999' }, { email: 'ivo@acme.com' }]) {
-    const de = c.pool.chamadas.length;
-    assert.equal((await c.login(corpo(extra))).status, 401);
-    seqs.push(sequencia(c, de));
+  const dup = await montar(t);
+  dup.d.clientes.push({ CODIGO: 99, RAZAO_SOCIAL: 'ACME LTDA' });
+  const corpo = (base, extra) => ({ senha: SENHA, codigo: base.codigo(), codigoRecuperacao: base.recuperacao.codigos[0], ...extra });
+  const casos = {
+    'e-mail inexistente': [c, { email: 'fantasma@acme.com' }],
+    'e-mail inválido': [c, { email: 'isto nao e email' }],
+    'senha errada': [c, { email: 'ana@acme.com', senha: 'Senha-Errada-9999' }],
+    'código errado': [c, { email: 'ana@acme.com', codigo: codigoErrado(c.segredo), codigoRecuperacao: 'ZZZZ-ZZZZ' }],
+    'usuário inativo': [c, { email: 'ivo@acme.com' }],
+    'usuário convidado': [c, { email: 'novo@acme.com' }],
+    'empresa suspensa': [c, { email: 'bia@beta.com' }],
+    'nome duplicado': [dup, { email: 'ana@acme.com' }]
+  };
+  const seqs = {};
+  for (const [nome, [base, extra]] of Object.entries(casos)) {
+    const de = base.pool.chamadas.length;
+    assert.equal((await base.login(corpo(base, extra))).status, 401, nome);
+    seqs[nome] = sequencia(base, de);
   }
-  assert.equal(seqs[0].length, 4);
-  seqs.forEach(sq => assert.deepEqual(sq, seqs[0]));
+  const ref = seqs['e-mail inexistente'];
+  assert.equal(ref.length, 4);
+  assert.match(ref[1], /^UPDATE web_portal_usuarios SET totp_ultimo_passo/);
+  assert.match(ref[2], /^UPDATE web_portal_recuperacao SET usado_em/);
+  for (const [nome, sq] of Object.entries(seqs)) assert.deepEqual(sq, ref, nome);
   assert.equal(c.d.recuperacao.filter(x => x.usado_em).length, 0, 'nada foi consumido');
+});
+
+test('login: UPDATEs de consumo SEM direito vão com alvo 0 (id 0, passo 0, usuario_id 0); COM direito, com os valores reais', async t => {
+  const c = await montar(t);
+  const updates = de => c.pool.chamadas.slice(de).filter(x => /^UPDATE/.test(x.sql));
+  const semDireito = [
+    { email: 'fantasma@acme.com' }, { email: 'ana@acme.com', senha: 'Senha-Errada-9999' },
+    { email: 'ivo@acme.com' }, { email: 'bia@beta.com' }, { email: 'ana@acme.com', codigo: codigoErrado(c.segredo), codigoRecuperacao: 'ZZZZ-ZZZZ' }
+  ];
+  for (const extra of semDireito) {
+    const de = c.pool.chamadas.length;
+    const r = await c.login({ senha: SENHA, codigo: c.codigo(), codigoRecuperacao: c.recuperacao.codigos[0], ...extra });
+    assert.equal(r.status, 401, JSON.stringify(extra));
+    const [tot, rec] = updates(de);
+    assert.deepEqual(tot.params, [0, 0, 0], 'TOTP sem direito: passo 0, id 0');
+    // com a senha certa e a conta ativa há direito de TENTAR a recuperação (alvo real, hash que não casa); nos demais, 0
+    const tentaReal = extra.email === 'ana@acme.com' && extra.codigo !== undefined;
+    assert.equal(rec.params[1], tentaReal ? 1 : 0, 'recuperação: usuario_id ' + (tentaReal ? 'real (hash não casa)' : '0'));
+    assert.ok(!c.recuperacao.codigos.some(x => JSON.stringify(rec.params).includes(x)), 'o código nunca vai em claro');
+  }
+  // com direito (TOTP): passo e id reais, e o UPDATE de recuperação continua com 0 quando o TOTP valeu
+  let de = c.pool.chamadas.length;
+  assert.equal((await c.login({ senha: SENHA, codigo: c.codigo(), codigoRecuperacao: c.recuperacao.codigos[0], email: 'ana@acme.com' })).status, 200);
+  let [tot, rec] = updates(de);
+  assert.deepEqual(tot.params, [PASSO, 1, PASSO]);
+  assert.equal(rec.params[1], 0);
+  // com direito (recuperação, sem codigo): usuario_id real
+  de = c.pool.chamadas.length;
+  assert.equal((await c.login({ senha: SENHA, codigoRecuperacao: c.recuperacao.codigos[1], email: 'ana@acme.com' })).status, 200);
+  [rec] = updates(de);
+  assert.equal(rec.params[1], 1);
+  assert.equal(rec.params[2], hashCodigoRecuperacao(c.recuperacao.codigos[1], CHAVE));
 });
 
 test('429: conta real e inexistente dão o mesmo corpo, Retry-After e cabeçalhos RateLimit-*', async t => {
@@ -791,4 +843,33 @@ test('429: conta real e inexistente dão o mesmo corpo, Retry-After e cabeçalho
     if (/reset/.test(k)) assert.ok(Math.abs(Number(ha[k]) - Number(hb[k])) <= 1, k);
     else assert.equal(ha[k], hb[k], k);
   }
+});
+
+test('429: o trabalho de banco é o mesmo para conta real e inexistente (SELECT único + auditoria, sem UPDATEs)', async t => {
+  const limite = () => criarLimiteLogin({ agora: () => T0 });
+  const real = await montar(t, { limite: limite() });
+  const falsa = await montar(t, { limite: limite() });
+  for (let i = 0; i < 5; i++) {
+    await real.login(real.corretos({ senha: 'Senha-Errada-9999' }));
+    await falsa.login(falsa.corretos({ email: 'fantasma@acme.com' }));
+  }
+  const dr = real.pool.chamadas.length, df = falsa.pool.chamadas.length;
+  assert.equal((await real.login(real.corretos())).status, 429);
+  assert.equal((await falsa.login(falsa.corretos({ email: 'fantasma@acme.com' }))).status, 429);
+  const a = sequencia(real, dr), b = sequencia(falsa, df);
+  assert.deepEqual(a, b);
+  assert.equal(a.length, 2);
+  assert.match(a[0], /^SELECT u\.id/);
+  assert.match(a[1], /^INSERT INTO web_portal_auditoria/);
+});
+
+test('razão social vazia: login e rotas do portal concordam em negar (não identifica a empresa nos pedidos)', async t => {
+  const c = await montar(t);
+  const cookie = cookieDe(await c.login(c.corretos()));
+  assert.equal((await c.get('/portal/api/eu', { cookie })).status, 200);
+  c.d.clientes.find(x => x.CODIGO === 40).RAZAO_SOCIAL = '';
+  assert.equal((await c.get('/portal/api/eu', { cookie })).status, 401);
+  const r = await c.login(c.corretos({ codigo: c.codigo(PASSO + 1) }));
+  assert.equal(r.status, 401);
+  assert.deepEqual(await r.json(), MSG_LOGIN);
 });
