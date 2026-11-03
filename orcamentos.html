@@ -1546,28 +1546,23 @@
             atualizarPesoForm();      // peso do item em montagem (consulta própria, nunca atrapalha o preço)
             if (!temClienteSelecionado()) return;
             const status = document.getElementById('calc-status');
+            if (frenteAtual === 'Serralheria') {
+                if (!pecasSerr.length) {
+                    document.getElementById('f-valor').value = '';
+                    atualizarTotalItem();
+                    status.textContent = '';
+                    return;
+                }
+                atualizarValorSerralheria();
+                precificarPecasSerrPendentes();
+                return;
+            }
             const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
             const cliente = document.getElementById('sel-cliente');
             const clienteNome = cliente.options[cliente.selectedIndex]?.text || '';
             const clienteCodigo = cliente.value || '';
             let payload = null;
-            if (frenteAtual === 'Serralheria') {
-                // o valor é do CONJUNTO: as peças já inseridas na lista + complementos (as medidas em edição ainda não contam)
-                if (!pecasSerr.length) {
-                    document.getElementById('f-valor').value = '';
-                    atualizarTotalItem();
-                    renderPecas();
-                    status.textContent = '';
-                    return;
-                }
-                payload = { frente: 'Serralheria',
-                            cliente: clienteNome, clienteCodigo,
-                            produto: pecasSerr[0].produto,
-                            pecas: pecasSerr.map(pecaParaEnvio),
-                            complementos: complementosSerr.map(c => ({ id: c.id, qtd: c.qtd })),
-                            qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
-                            percentuais: '' };
-            } else if (frenteAtual === 'Avulso') {
+            if (frenteAtual === 'Avulso') {
                 const cat = g('f-av-cat');
                 const alt = parseFloat(g('f-av-alt')) || 0, larg = parseFloat(g('f-av-larg')) || 0;
                 const faltaMedida = (AV_LINEAR.includes(cat) && !alt) || (cat === 'Revestimento' && (!alt || !larg));
@@ -1634,10 +1629,6 @@
                         body: JSON.stringify({ ...payload, debug: true })
                     });
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
-                    if (frenteAtual === 'Serralheria' && Array.isArray(d.pecas)) {
-                        d.pecas.forEach((pc, i) => { if (pecasSerr[i]) pecasSerr[i].valor = pc.total; });
-                        renderPecas();
-                    }
                     if (Array.isArray(d.complementos)) {
                         d.complementos.forEach((c, i) => { if (complementosSerr[i] && complementosSerr[i].id === c.id) Object.assign(complementosSerr[i], { valorUnitario: c.valorUnitario, valorTotal: c.valorTotal }); });
                         renderComplementos();
@@ -2783,7 +2774,63 @@
             document.getElementById('btn-peca-inserir').textContent = pecaEditando >= 0 ? `✔ Atualizar peça ${pecaEditando + 1}` : '➕ Inserir peça na lista';
             document.getElementById('btn-peca-cancelar').style.display = pecaEditando >= 0 ? '' : 'none';
         }
-        function inserirPecaSerr() {
+        const precificandoPecasSerr = new WeakSet();
+        function atualizarValorSerralheria() {
+            const qtd = qtdEfetiva();
+            const pecasPrecificadas = pecasSerr.every(p => Number.isFinite(p.valor));
+            const complementosPrecificados = complementosSerr.every(c => Number.isFinite(c.valorTotal));
+            const valor = document.getElementById('f-valor');
+            if (!pecasPrecificadas || !complementosPrecificados) {
+                valor.value = '';
+            } else {
+                const totalPecas = pecasSerr.reduce((soma, p) => soma + p.valor, 0);
+                const totalComplementos = complementosSerr.reduce((soma, c) => soma + c.valorTotal, 0);
+                valor.value = ((totalPecas + totalComplementos / qtd) || 0).toFixed(2);
+            }
+            atualizarTotalItem();
+            renderPecas();
+        }
+        function precificarPecasSerrPendentes() {
+            pecasSerr.filter(p => !Number.isFinite(p.valor)).forEach(precificarPecaSerr);
+        }
+        async function precificarPecaSerr(peca) {
+            if (precificandoPecasSerr.has(peca) || !pecasSerr.includes(peca) || !temClienteSelecionado()) return;
+            precificandoPecasSerr.add(peca);
+            const status = document.getElementById('calc-status');
+            const cliente = document.getElementById('sel-cliente');
+            try {
+                const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        frente: 'Serralheria',
+                        cliente: cliente.options[cliente.selectedIndex]?.text || '',
+                        clienteCodigo: cliente.value || '',
+                        produto: peca.produto,
+                        pecas: [pecaParaEnvio(peca)],
+                        complementos: [],
+                        qtd: qtdEfetiva(),
+                        percentuais: ''
+                    })
+                });
+                if (!pecasSerr.includes(peca)) return;
+                const detalhe = d.pecas?.[0];
+                if (!detalhe || detalhe.unitario == null || !Number.isFinite(Number(detalhe.unitario))) {
+                    throw new Error('Preço da peça não retornado pelo servidor.');
+                }
+                peca.valor = Number(detalhe.unitario);
+                atualizarValorSerralheria();
+                status.textContent = '✅ Peça calculada';
+                setTimeout(() => { if (status.textContent === '✅ Peça calculada') status.textContent = ''; }, 3000);
+            } catch {
+                if (!pecasSerr.includes(peca)) return;
+                peca.valor = null;
+                atualizarValorSerralheria();
+                status.textContent = '⚠️ Não foi possível calcular esta peça. Confira o material e tente novamente.';
+            } finally {
+                precificandoPecasSerr.delete(peca);
+            }
+        }
+        async function inserirPecaSerr() {
             if (!val('f-produto') || !val('f-material')) { alert('Escolha o produto e o material da peça.'); return; }
             const p = { produto: val('f-produto'), material: val('f-material'), acabSerr: val('f-acab-serr'), corSerr: val('f-cor-serr'),
                 altura: parseFloat(val('f-altura-serr')) || 0, largura: parseFloat(val('f-largura-serr')) || 0, profundidade: parseFloat(val('f-profundidade')) || 0,
@@ -2794,7 +2841,7 @@
             else pecasSerr.push(p);
             limparMedidasSerr(); // produto, material, acabamento e cor continuam para a próxima peça (btnNovo do VB)
             renderPecas();
-            calcularPrecoAutomatico();
+            if (temClienteSelecionado()) await precificarPecaSerr(p);
         }
         async function editarPecaSerr(i) {
             const p = pecasSerr[i];
@@ -3721,6 +3768,7 @@
             descontoJaAplicado = false; // recém selecionado: reavalia após o 1º cálculo
             atualizarTravaDesconto();
             atualizarBloqueioCliente();
+            if (frenteAtual === 'Serralheria') calcularPrecoAutomatico();
         });
         // txtQtd_TextChanged: alimenta as folhas na memória, recalcula e redesenha
         document.getElementById('f-qtd').addEventListener('input', () => {
@@ -3728,7 +3776,8 @@
             garantirFolhas();
             aplicarEspelhamentoPuxadorNaMemoria();
             sincronizarFurosComMemoria();
-            atualizarTotalItem();
+            if (frenteAtual === 'Serralheria') atualizarValorSerralheria();
+            else atualizarTotalItem();
             desenharVisualizacao();
         });
         // chkPares_CheckedChanged: escreve 2/1 no Qtd, espelha puxador e furos

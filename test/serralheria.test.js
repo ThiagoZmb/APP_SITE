@@ -84,6 +84,9 @@ test('conjunto: preço soma as peças e os complementos; devolve o valor de cada
   const j = await (await preco(chamar, { pecas: pecas(), complementos: [{ id: 11, qtd: 2 }] })).json();
   assert.deepEqual([j.unitario, j.total], [225, 225]);
   assert.deepEqual(j.pecas.map(p => p.total), [125, 80]);
+  const primeiro = await (await preco(chamar, { pecas: [pecas()[0]] })).json();
+  const segundo = await (await preco(chamar, { pecas: [pecas()[1]] })).json();
+  assert.deepEqual([primeiro.pecas[0].unitario, segundo.pecas[0].unitario], [125, 80]);
   const dois = await (await preco(chamar, { pecas: pecas(), complementos: [{ id: 11, qtd: 2 }], qtd: 2 })).json();
   assert.deepEqual([dois.total, dois.unitario, dois.pecas.map(p => p.total)], [430, 215, [250, 160]]);
   assert.equal((await preco(chamar, { pecas: [] , produto: '', material: '' })).status, 400);
