@@ -106,7 +106,7 @@ function bancoGestao() {
   return { f, regras, estado, ...estado, semear };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // hoje: data fixa de Brasília (AAAA-MM-DD) para os testes de mês em andamento
 async function prepararGestao(t, { perfil = 'Gestão', usuario = { codigo: 7, nome: 'Caio' }, banco = bancoGestao(), hoje = '2026-10-15' } = {}) {

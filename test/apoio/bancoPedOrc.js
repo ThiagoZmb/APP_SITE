@@ -156,7 +156,7 @@ function bancoPedOrc() {
   return { f, estado, falhas, dupNoCabecalho, ...estado };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // Sobe o app com o banco simulado; o usuário logado tem o perfil pedido.
 async function prepararPedOrc(t, { perfil = 'Administrador', banco = bancoPedOrc(), estados = perfil === 'Representante SP' ? ['SP'] : [] } = {}) {

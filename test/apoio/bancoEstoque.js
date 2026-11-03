@@ -157,7 +157,7 @@ function bancoEstoque() {
   return { f, regras, estado, ...estado, FORN };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // Sobe o app com o banco simulado; o usuário logado (Caio) tem o perfil pedido.
 async function prepararEstoque(t, { perfil = 'Interno completo', banco = bancoEstoque() } = {}) {

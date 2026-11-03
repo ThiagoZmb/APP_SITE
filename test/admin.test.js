@@ -65,7 +65,7 @@ function bancoComEstado() {
   return { f, usuarios, acessos, excecoes, perfis };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t) {
   const banco = bancoComEstado();

@@ -193,3 +193,14 @@ test('SENHA nula ou em texto puro: 401, conta a tentativa e compara com o hash f
     espiao.mock.restore();
   }
 });
+
+test('SENHA de 60 caracteres que não é hash bcrypt: 401 (nunca 500), conta a tentativa e compara com o hash falso', async t => {
+  const senha = 'x'.repeat(60);
+  const { post, f } = await preparar(t, 'Sessenta', { senha });
+  const espiao = t.mock.method(bcrypt, 'compare');
+  for (let i = 0; i < 5; i++) assert.equal((await post({ username: 'Sessenta', password: senha })).status, 401);
+  assert.equal(espiao.mock.callCount(), 5);
+  assert.equal(espiao.mock.calls[0].arguments[1], HASH_FALSO);
+  assert.equal((await post({ username: 'Sessenta', password: 'x' })).status, 429);
+  assert.equal(auditorias(f).filter(c => c.params[1] === 'login_falha').length, 5);
+});

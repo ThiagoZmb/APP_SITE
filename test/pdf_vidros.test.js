@@ -56,7 +56,7 @@ const USUARIOS = {
   2: { nome: 'Bia', permissoes: new Set(['pedidos.ver']), estados: [] },
   3: { nome: 'Caio', permissoes: new Set(['pedidos.pdf']), estados: ['SP'] }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t, { pedido = [{ RAZAO_SOCIAL: 'CLI Ltda' }], vidros = VIDROS, estado = 'RJ' } = {}) {
   const f = criarPoolFalso([

@@ -17,7 +17,7 @@ const USUARIOS = {
   3: { nome: 'Caio', perfil: 'Estoquista', permissoes: perms('Estoquista'), estados: [] },
   4: { nome: 'Edu', perfil: 'Estoque sem valores', permissoes: new Set(['estoque.ver', 'estoque.editar', 'produtos.ver', 'clientes.ver']), estados: [] }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t, regras = []) {
   const f = criarPoolFalso(regras);

@@ -51,3 +51,15 @@ test('JSON malformado responde 400 {error:\'Requisição inválida.\'}', async t
   assert.equal(r.status, 400);
   assert.deepEqual(await r.json(), { error: 'Requisição inválida.' });
 });
+
+test('o log leva só o código do erro, nunca o texto (que pode trazer valor do banco)', async t => {
+  const silencio = t.mock.method(console, 'error', () => {});
+  const s = await servidorCom(t, () => { throw Object.assign(new Error("SELECT secreto 'valor gravado'"), { code: 'ER_X' }); });
+  await fetch(s.url + '/boom');
+  const sem = await servidorCom(t, () => { throw new Error('texto interno'); });
+  await fetch(sem.url + '/boom');
+  const log = silencio.mock.calls.map(c => c.arguments.join(' ')).join('\n');
+  assert.match(log, /ER_X/);
+  assert.match(log, /sem código/);
+  assert.ok(!log.includes('secreto') && !log.includes('valor gravado') && !log.includes('texto interno'));
+});

@@ -250,7 +250,7 @@ function bancoEntregas() {
   return { f, regras, estado, ...estado, semear };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // Sobe o app com o banco simulado. `usuario` é quem está logado (padrão: Caio, código 7); `estados` restringe a região.
 async function prepararEntregas(t, { perfil = 'Programador', usuario = { codigo: 7, nome: 'Caio' }, estados = [], banco = bancoEntregas() } = {}) {

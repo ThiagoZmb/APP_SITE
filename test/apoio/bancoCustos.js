@@ -170,7 +170,7 @@ function bancoCustos() {
   return { f, estado, ...estado };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function prepararCustos(t, { perfil = 'Administrador', banco = bancoCustos() } = {}) {
   pool.execute = banco.f.execute; pool.getConnection = banco.f.getConnection;

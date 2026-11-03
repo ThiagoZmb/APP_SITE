@@ -107,6 +107,10 @@ const loginLimiter = rateLimit({
 const acesso = criarAcesso({ pool });
 const sessoes = criarSessoes({ pool });
 
+// Hash bcrypt completo (versão, custo e 53 caracteres); texto puro de 60 caracteres não passa.
+const REGEX_HASH_BCRYPT = /^\$2[aby]\$\d\d\$[./A-Za-z0-9]{53}$/;
+const ehHashBcrypt = v => typeof v === 'string' && REGEX_HASH_BCRYPT.test(v);
+
 function gerarToken(usuario, sid) {
   return jwt.sign(
     { id: usuario.CODIGO, nome: usuario.NOME, v: 2, tipo: 'funcionario', sid },
@@ -127,8 +131,8 @@ async function autenticar(req, res, next) {
     return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   }
   if (payload.v !== 2) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
-  // Token de outro tipo (ex.: cliente do portal) nunca vale aqui; sem `tipo` = emitido antes do campo existir.
-  if (payload.tipo !== undefined && payload.tipo !== 'funcionario') return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+  // Token de outro tipo (ex.: cliente do portal) nunca vale aqui; sem `tipo` também é recusado.
+  if (payload.tipo !== 'funcionario') return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   // Sessão conferida no banco a cada requisição (chave primária, sem cache): logout e troca de senha valem na hora.
   // Token sem `sid` (emitido antes das sessões) é recusado.
   try {
@@ -241,7 +245,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
       return res.status(429).json({ success: false, message: 'Muitas tentativas para este usuário. Aguarde alguns minutos.' });
     }
     // sempre compara (hash falso se não existe ou se a senha gravada não é bcrypt): o tempo não revela a conta
-    const hashReal = user && typeof user.SENHA === 'string' && user.SENHA.length === 60 ? user.SENHA : null;
+    const hashReal = user && ehHashBcrypt(user.SENHA) ? user.SENHA : null;
     const senhaOk = await bcrypt.compare(password, hashReal || HASH_FALSO);
     if (!hashReal || !senhaOk) {
       limiteLogin.falhou(chave);
@@ -933,9 +937,10 @@ registro.publica('post', '/admin/definir_senha', limitadorAdmin, async (req, res
     const [r] = await pool.execute(
       'UPDATE cliente_usuarios SET SENHA = ? WHERE NOME = ?', [hash, username]);
     if (r.affectedRows === 0) return res.status(404).json({ error: 'Usuário não encontrado' });
-    // senha nova derruba as sessões abertas do usuário (aqui ele vem pelo nome: busca o código)
-    const [alvo] = await pool.execute('SELECT CODIGO FROM cliente_usuarios WHERE NOME = ? LIMIT 1', [username]);
-    if (alvo[0]) await sessoes.revogarTodas(alvo[0].CODIGO);
+    // senha nova derruba as sessões abertas do usuário (aqui ele vem pelo nome: busca os códigos)
+    // o UPDATE acima vale para todas as linhas com o nome: revoga as sessões de cada uma
+    const [alvos] = await pool.execute('SELECT CODIGO FROM cliente_usuarios WHERE NOME = ?', [username]);
+    for (const alvo of alvos) await sessoes.revogarTodas(alvo.CODIGO);
     res.json({ success: true, message: 'Senha atualizada com hash bcrypt' });
   } catch (err) {
     console.error('Erro /admin/definir_senha:', err.message);

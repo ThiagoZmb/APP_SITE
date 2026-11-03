@@ -11,7 +11,8 @@ const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
 aceitarSidDeTeste(sessoes);
 
 const assinar = claims => jwt.sign(claims, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
-const tokenCliente = assinar({ id: 7, nome: 'Cliente', v: 2, tipo: 'cliente' });
+// Todos os tokens levam `sid` válido: só a regra de `tipo` de `autenticar` pode gerar o 401 destes testes.
+const tokenCliente = assinar({ id: 7, nome: 'Cliente', v: 2, tipo: 'cliente', sid: SID_TESTE });
 const usarPool = regras => { const f = criarPoolFalso(regras); pool.execute = f.execute; pool.getConnection = f.getConnection; return f; };
 
 test('token com tipo cliente é recusado em toda rota autenticada', async t => {
@@ -40,14 +41,37 @@ test('rotasAutenticadas devolve cópia e não inclui as públicas', () => {
   assert.ok(!registro.rotasAutenticadas().some(r => r.caminho === '/login'));
 });
 
-test('token sem tipo (emitido antes) continua valendo', async t => {
+const acessoCaio = async () => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', perfil: { id: 4, nome: 'X' }, estados: [], ativo: true, permissoes: new Set() });
+
+test('token com tipo funcionario e sid válido continua valendo (controle positivo)', async t => {
   const s = await subir(app);
   t.after(s.fechar);
   acesso.limpar();
-  t.mock.method(acesso, 'carregar', async () => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', perfil: { id: 4, nome: 'X' }, estados: [], ativo: true, permissoes: new Set() }));
-  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2, sid: SID_TESTE }) } });
+  t.mock.method(acesso, 'carregar', acessoCaio);
+  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2, tipo: 'funcionario', sid: SID_TESTE }) } });
   assert.equal(r.status, 200);
 });
+
+test('token sem tipo é recusado mesmo com sid válido', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  t.mock.method(acesso, 'carregar', acessoCaio);
+  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2, sid: SID_TESTE }) } });
+  assert.equal(r.status, 401);
+  assert.deepEqual(await r.json(), { error: 'Sessão expirada. Faça login novamente.' });
+});
+
+for (const [rotulo, tipo] of [['cliente', 'cliente'], ['null', null], ['string vazia', ''], ['zero', 0], ['false', false], ['array', ['funcionario']], ['caixa diferente', 'Funcionario']]) {
+  test(`tipo ${rotulo} com sid válido recebe 401`, async t => {
+    const s = await subir(app);
+    t.after(s.fechar);
+    acesso.limpar();
+    t.mock.method(acesso, 'carregar', acessoCaio);
+    const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2, tipo, sid: SID_TESTE }) } });
+    assert.equal(r.status, 401);
+  });
+}
 
 test('tipo diferente de funcionario recebe 401 com a mensagem de sessão expirada', async t => {
   const s = await subir(app);
