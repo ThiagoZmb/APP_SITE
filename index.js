@@ -125,7 +125,7 @@ async function autenticar(req, res, next) {
     req.sid = payload.sid;
     req.acesso = await acesso.carregar(payload.id);
   } catch (err) {
-    console.error('Erro ao carregar acesso:', err.message);
+    console.error('Erro ao carregar acesso:', err.code || 'sem código');
     return res.status(500).json({ error: 'Erro de servidor' });
   }
   if (!req.acesso || !req.acesso.ativo) return res.status(401).json({ error: 'Sessão encerrada. Faça login novamente.' });
@@ -252,7 +252,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
       acesso: resumoAcesso(a)
     });
   } catch (err) {
-    console.error('Erro no login:', err.message);
+    console.error('Erro no login:', err.code || 'sem código');
     res.status(500).json({ success: false, message: 'Erro de servidor.' });
   }
 });
@@ -579,7 +579,7 @@ registro.rota('get', '/clientes/nomes_duplicados', ['clientes.editar'], async (r
     }
     res.json({ duplicados });
   } catch (err) {
-    console.error('Erro /clientes/nomes_duplicados:', err.message);
+    console.error('Erro /clientes/nomes_duplicados:', err.code || 'sem código');
     res.status(500).json({ error: 'Erro ao procurar nomes duplicados' });
   }
 });
