@@ -242,13 +242,17 @@
                 const fim = MENU.findIndex((x, j) => j > i && x.secao);
                 visivel[i] = visivel.slice(i + 1, fim < 0 ? MENU.length : fim).some(Boolean);
             });
+            // linha divisória (classe "grupo") antes de cada item de 1º nível que vem depois de outro da mesma seção visível
+            let temTopoNaSecao = false;
             nav.innerHTML =
                 `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map((m, i) => {
                     const oculto = visivel[i] ? '' : ' hidden';
-                    if (m.secao) return `<div class="sb-secao"${oculto}>${m.secao}</div>`;
+                    if (m.secao) { temTopoNaSecao = false; return `<div class="sb-secao"${oculto}>${m.secao}</div>`; }
+                    const grupo = !m.sub && visivel[i] && temTopoNaSecao ? ' grupo' : '';
+                    if (!m.sub && visivel[i]) temTopoNaSecao = true;
                     const ativo = m.href === atual ? ' active' : '';
-                    return `<a class="menu-item${m.sub ? ' sub' : ''}${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
+                    return `<a class="menu-item${m.sub ? ' sub' : ''}${grupo}${ativo}" href="${m.href}"${oculto}${ativo ? ' aria-current="page"' : ''}>${ICONES[m.icone]}<span>${m.texto}</span></a>`;
                 }).join('') +
                 `<div class="sb-rodape"><button type="button" class="sb-sair">${ICONES.sair}<span>Sair</span></button></div>`;
             nav.querySelector('.sb-sair').addEventListener('click', () => {
