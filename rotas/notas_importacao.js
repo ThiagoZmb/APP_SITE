@@ -23,7 +23,7 @@ function registrarImportacaoNotas({ publica, pool }) {
       plano = planejarImportacao({ entradas, saidas, fornecedores, clientes, existentes });
     } catch (err) {
       console.error('Erro /admin/importar_notas:', err.message);
-      return res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+      return res.status(500).json({ error: 'Erro de servidor' });
     }
     const relatorio = {
       simulacao: simular,

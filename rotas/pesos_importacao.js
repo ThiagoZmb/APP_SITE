@@ -31,7 +31,7 @@ function registrarImportacaoPesos({ publica, pool, arquivo = ARQUIVO_PADRAO }) {
         return res.json(relatorioDe(planejarImportacaoPesos({ estimativas, existentes })));
       } catch (err) {
         console.error('Erro /admin/importar_pesos:', err.message);
-        return res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+        return res.status(500).json({ error: 'Erro de servidor' });
       }
     }
 

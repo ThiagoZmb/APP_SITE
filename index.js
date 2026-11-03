@@ -10,6 +10,7 @@ const { carimboItens } = require('./calculo/leitura_vb');
 const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
+const { tratadorDeErros } = require('./seguranca/erros');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
 const { acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
@@ -351,7 +352,7 @@ registro.rota('get', '/ranking_produtos', [{ algum: ['paineis.ver', 'pedidos.ver
     res.json(semValores(req, rows.map(r => ({ nome: r.nome, valor: numEstq(r.valor), qtd: numEstq(r.qtd), pedidos: Number(r.pedidos) || 0 })), ['valor']));
   } catch (err) {
     console.error('Erro /ranking_produtos:', err.message);
-    res.status(500).json({ error: 'Erro ao calcular os produtos mais vendidos', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro ao calcular os produtos mais vendidos' });
   }
 });
 
@@ -367,7 +368,7 @@ registro.rota('get', '/ranking_clientes', [{ algum: ['paineis.ver', 'pedidos.ver
     res.json(semValores(req, rows.map(r => ({ nome: r.nome || '—', valor: numEstq(r.valor), pedidos: Number(r.pedidos) || 0, ultimo: dataBRSegura(r.ultimo) })), ['valor']));
   } catch (err) {
     console.error('Erro /ranking_clientes:', err.message);
-    res.status(500).json({ error: 'Erro ao calcular os clientes que mais compraram', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro ao calcular os clientes que mais compraram' });
   }
 });
 
@@ -434,7 +435,7 @@ registro.rota('get', '/clientes/item/:codigo', ['clientes.ver'], async (req, res
     }, ['desconto', 'descontoAdicional', 'credito', 'comissao', 'fretePortas', 'freteMetalon']));
   } catch (err) {
     console.error('Erro /clientes/item:', err.message);
-    res.status(500).json({ error: 'Erro ao carregar o cliente', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro ao carregar o cliente' });
   }
 });
 
@@ -482,7 +483,7 @@ registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados
     res.json({ ok: true, codigo, mensagem: 'Cliente cadastrado com sucesso!' });
   } catch (err) {
     console.error('Erro /clientes/salvar:', err.code, err.message);
-    res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.', detalhe: err.code || err.message });
+    res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.' });
   }
 });
 
@@ -557,7 +558,7 @@ registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valor
     });
   } catch (err) {
     console.error('Erro /clientes/financeiro:', err.message);
-    res.status(500).json({ error: 'Erro ao carregar o financeiro do cliente', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro ao carregar o financeiro do cliente' });
   }
 });
 
@@ -646,7 +647,7 @@ registro.rota('get', '/clientes/analise/:codigo', ['clientes.ver'], async (req, 
     }, ['desconto', 'credito', 'totalVida', 'valor', 'pedidos12m', 'orcamentos12m', 'receber', 'recebido12m']));
   } catch (err) {
     console.error('Erro /clientes/analise:', err.code, err.message);
-    res.status(500).json({ error: 'Erro ao montar a análise do cliente', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro ao montar a análise do cliente' });
   }
 });
 
@@ -830,7 +831,7 @@ registro.publica('post', '/admin/definir_senha', async (req, res) => {
     res.json({ success: true, message: 'Senha atualizada com hash bcrypt' });
   } catch (err) {
     console.error('Erro /admin/definir_senha:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -857,7 +858,7 @@ registro.publica('post', '/migrar_senhas', async (req, res) => {
     res.json({ success: true, convertidos, jaHash, total: rows.length });
   } catch (err) {
     console.error('Erro /migrar_senhas:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -923,7 +924,7 @@ registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], as
   } catch (err) {
     if (err instanceof ErroPreco) return res.status(400).json({ error: err.message });
     console.error('Erro /calcular_preco:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -1016,7 +1017,7 @@ registro.rota('get', '/catalogos_filtro', ['orcamentos.criar'], async (req, res)
     res.json(lista);
   } catch (err) {
     console.error(`Erro /catalogos_filtro (${campo}):`, err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -1028,7 +1029,7 @@ registro.rota('get', '/dados_produto', ['orcamentos.criar'], async (req, res) =>
     res.json({ tipoPuxador: dados.tipoPuxador });
   } catch (err) {
     console.error('Erro /dados_produto:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -1044,7 +1045,7 @@ registro.rota('get', '/cores_por_tipo', ['orcamentos.criar'], async (req, res) =
     res.json(grupos);
   } catch (err) {
     console.error('Erro /cores_por_tipo:', err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -1280,7 +1281,7 @@ registro.rota('get', '/produtos/item/:codigo', ['produtos.ver'], async (req, res
     }, ['valorFixo']));
   } catch (err) {
     console.error('Erro /produtos/item:', err.code, err.message);
-    res.status(500).json({ error: 'Erro de servidor', detalhe: err.code || err.message });
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -1636,6 +1637,9 @@ registrarPrecosFormacao({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
 // leitura de projeto técnico em PDF pela API do Claude (ANTHROPIC_API_KEY; sem chave a rota responde 503 com mensagem clara)
 const leituraPdf = registrarLeituraPdf({ rota: registro.rota, pool });
+
+// tratador global: depois de todas as rotas (erro sem detalhe interno na resposta)
+app.use(tratadorDeErros);
 
 // ================= SUBIDA =================
 // Ordem: tabelas web_ → migração única dos usuários → todas as rotas precisam

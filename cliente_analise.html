@@ -433,7 +433,7 @@
             const res = await fetch(API_BASE + caminho, { headers: { 'Authorization': 'Bearer ' + (getAuth()?.token || '') } });
             if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             const d = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error((d.error || `Erro HTTP: ${res.status}`) + (d.detalhe ? ` (${d.detalhe})` : ''));
+            if (!res.ok) throw new Error((d.error || `Erro HTTP: ${res.status}`));
             return d;
         }
         const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
