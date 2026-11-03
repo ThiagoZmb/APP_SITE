@@ -20,6 +20,10 @@ const { redeDeValores, semValores, preservarValores, podeVerValores } = require(
 const { filtroEstados } = require('./seguranca/acesso');
 const { acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
+const { lerConfigPortal } = require('./portal/config');
+const { criarSessoesPortal } = require('./portal/sessoes');
+const { criarAcessoPortal } = require('./portal/acesso');
+const { cabecalhosPortal } = require('./portal/cabecalhos');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -81,16 +85,23 @@ const pool = mysql.createPool({
 });
 
 app.use(helmet());
-app.use(cors({
-  exposedHeaders: ['Content-Disposition', 'X-Pdf-Nome', 'X-Pdf-Pasta'], // a tela lê o nome/pasta do PDF para gravar o arquivo
-  origin(origin, callback) {
-    const origemLocal = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-    if (!origin || origin === 'https://thiagozmb.github.io' || origemLocal.test(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Origem não permitida pelo CORS'));
+// Configuração do portal do cliente: lida uma vez; sem ela o portal responde 503 e o resto não muda.
+const configPortal = lerConfigPortal();
+const origemLocal = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+app.use(cors((req, callback) => {
+  const origin = req.headers.origin;
+  // Só em /portal/ vale também a origem do próprio portal (POST same-origin manda Origin); nos demais caminhos nada muda.
+  const doPortal = configPortal.ativo && req.path.startsWith('/portal/') && origin === configPortal.baseUrl;
+  if (!origin || origin === 'https://thiagozmb.github.io' || origemLocal.test(origin) || doPortal) {
+    return callback(null, {
+      origin: true,
+      exposedHeaders: ['Content-Disposition', 'X-Pdf-Nome', 'X-Pdf-Pasta'] // a tela lê o nome/pasta do PDF para gravar o arquivo
+    });
   }
+  return callback(new Error('Origem não permitida pelo CORS'));
 }));
+// Cabeçalhos do portal (páginas e API em /portal): sem cache, sem referrer, CSP estrita (nada de script/estilo inline).
+app.use(cabecalhosPortal);
 app.use(express.json({ limit: '100kb' }));
 
 // ================= RATE LIMIT =================
@@ -107,6 +118,9 @@ const loginLimiter = rateLimit({
 // ativo vêm do banco a cada requisição (cache de 60 s, limpo pela administração).
 const acesso = criarAcesso({ pool });
 const sessoes = criarSessoes({ pool });
+// Sessões do portal do cliente: tabela, cookie e guardas próprios (não reaproveitam os de funcionário).
+const sessoesPortal = criarSessoesPortal({ pool });
+const acessoPortal = criarAcessoPortal({ pool, sessoes: sessoesPortal, config: configPortal });
 
 // Hash bcrypt completo (versão, custo e 53 caracteres); texto puro de 60 caracteres não passa.
 const REGEX_HASH_BCRYPT = /^\$2[aby]\$\d\d\$[./A-Za-z0-9]{53}$/;
@@ -148,7 +162,11 @@ async function autenticar(req, res, next) {
   req.user = { id: payload.id, nome: req.acesso.nome, cargo: req.acesso.cargo };
   next();
 }
-const registro = criarRegistro(app, { autenticado: [autenticar, redeDeValores] });
+const registro = criarRegistro(app, {
+  autenticado: [autenticar, redeDeValores],
+  portalPublico: [acessoPortal.portalAtivo],
+  portalAutenticado: [acessoPortal.portalAtivo, acessoPortal.portalAutenticar]
+});
 // Estados (região) do usuário decidem o filtro — o navegador não consegue ampliar.
 // Sem restrição, o ?estado= da tela ainda pode filtrar; com restrição, só os estados dele.
 function condicaoEstado(req, coluna) {
@@ -1797,4 +1815,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool, acesso, sessoes, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
+module.exports = { app, pool, acesso, sessoes, configPortal, sessoesPortal, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
