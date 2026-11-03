@@ -3,6 +3,8 @@
 //   rota('get', '/estoque', ['estoque.ver'], handler)
 //   rota('get', '/painel', [{ algum: ['paineis.ver', 'pedidos.ver'] }, 'valores.ver'], handler)
 //   publica('post', '/login', handler)   // só login e manutenção com chave
+//   portal('get', '/portal/pedidos', ['pedidos.ver'], handler)   // usuário externo do portal (cliente)
+//   portalPublica('post', '/portal/login', handler)              // portal sem sessão (login, ativação...)
 // Na subida, verificar() recusa o servidor se alguma rota foi criada fora daqui.
 // ==========================================================================
 const { atende } = require('./permissoes');
@@ -19,11 +21,26 @@ function exigir(exige) {
   return mw;
 }
 
-function criarRegistro(app, { autenticado }) {
+// Permissão do portal: lida de req.portal.permissoes (Set, preenchido pelo guarda do portal).
+// Lista vazia = qualquer usuário autenticado do portal. Permissão de funcionário nunca vale aqui.
+function exigirPortal(exige) {
+  const mw = (req, res, next) => {
+    const r = atende(req.portal?.permissoes || new Set(), exige);
+    if (!r.ok) return res.status(403).json({ error: 'Sem permissão para esta ação.', faltando: r.faltando });
+    next();
+  };
+  mw[MARCA] = true;
+  return mw;
+}
+
+function criarRegistro(app, { autenticado, portalPublico = [], portalAutenticado = [] }) {
   // Rotas que passam por `autenticado` (não inclui as públicas); o teste da barreira as percorre.
   const autenticadas = [];
   // Rotas públicas (sem JWT): lista fixa conferida em teste; uma nova precisa de decisão consciente.
   const publicas = [];
+  // Rotas do portal: listas SEPARADAS das de funcionário (a lista fixa das públicas não muda).
+  const portais = [];
+  const portaisPublicas = [];
 
   function rota(metodo, caminho, exige, ...handlers) {
     autenticadas.push({ metodo, caminho });
@@ -35,6 +52,18 @@ function criarRegistro(app, { autenticado }) {
     const marca = (req, res, next) => next();
     marca[MARCA] = true;
     app[metodo](caminho, marca, ...handlers);
+  }
+
+  function portal(metodo, caminho, exige, ...handlers) {
+    portais.push({ metodo, caminho });
+    app[metodo](caminho, ...portalAutenticado, exigirPortal(exige), ...handlers);
+  }
+
+  function portalPublica(metodo, caminho, ...handlers) {
+    portaisPublicas.push({ metodo, caminho });
+    const marca = (req, res, next) => next();
+    marca[MARCA] = true;
+    app[metodo](caminho, ...portalPublico, marca, ...handlers);
   }
 
   function verificar() {
@@ -55,7 +84,10 @@ function criarRegistro(app, { autenticado }) {
   const rotasAutenticadas = () => autenticadas.map(r => ({ ...r }));
   const rotasPublicas = () => publicas.map(r => ({ ...r }));
 
-  return { rota, publica, verificar, rotasAutenticadas, rotasPublicas };
+  const rotasPortal = () => portais.map(r => ({ ...r }));
+  const rotasPortalPublicas = () => portaisPublicas.map(r => ({ ...r }));
+
+  return { rota, publica, portal, portalPublica, verificar, rotasAutenticadas, rotasPublicas, rotasPortal, rotasPortalPublicas };
 }
 
 module.exports = { criarRegistro };

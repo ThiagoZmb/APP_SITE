@@ -91,3 +91,38 @@ test('gerarToken inclui tipo funcionario (token do /login)', async t => {
   assert.equal(r.status, 200);
   assert.equal(jwt.decode((await r.json()).token).tipo, 'funcionario');
 });
+
+// ---- Caminho inverso: credenciais do portal não autenticam rotas de funcionário ----
+const crypto = require('node:crypto');
+
+async function varrer(s, headers) {
+  const falhas = [];
+  for (const { metodo, caminho } of registro.rotasAutenticadas()) {
+    const url = s.url + caminho.replace(/:[A-Za-z_]+/g, '1');
+    const r = await fetch(url, { method: metodo.toUpperCase(), headers });
+    if (r.status !== 401) falhas.push(`${metodo.toUpperCase()} ${caminho} -> ${r.status}`);
+  }
+  return falhas;
+}
+
+test('Bearer de 32 hex (formato de sessão do portal) dá 401 em todas as rotas de funcionário', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  let chamadas = 0;
+  t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
+  const falhas = await varrer(s, { Authorization: 'Bearer ' + crypto.randomBytes(16).toString('hex') });
+  assert.deepEqual(falhas, []);
+  assert.equal(chamadas, 0);
+});
+
+test('cookie __Host-portal sozinho não autentica nenhuma rota de funcionário', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  let chamadas = 0;
+  t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
+  const falhas = await varrer(s, { Cookie: '__Host-portal=' + crypto.randomBytes(16).toString('hex') });
+  assert.deepEqual(falhas, []);
+  assert.equal(chamadas, 0);
+});
