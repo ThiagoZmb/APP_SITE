@@ -28,7 +28,9 @@ test('serralheria: inserir peça preserva a quantidade de conjuntos até adicion
   assert.ok(html.includes("const atualizandoPeca = pecaEditando >= 0;"));
   const a = html.indexOf('function inserirPecaSerr()'), b = html.indexOf('\n        async function editarPecaSerr', a);
   const inserir = html.slice(a, b);
-  assert.ok(inserir.includes('calcularPrecoAutomatico();'), 'recalcula o preço com a quantidade escolhida');
+  assert.ok(inserir.includes('qtd: qtdEfetiva()'), 'captura a quantidade escolhida na própria peça');
+  assert.ok(inserir.includes('await precificarPecaSerr(p)'), 'calcula somente o preço da peça inserida');
+  assert.ok(!inserir.includes('calcularPrecoAutomatico()'), 'não recalcula as peças já inseridas');
   assert.ok(!inserir.includes("document.getElementById('f-qtd').value"), 'não altera a quantidade ao inserir/atualizar peça');
   assert.ok(html.includes("document.getElementById('f-qtd').value = 1;"), 'limpa a quantidade quando o item é adicionado');
 });
