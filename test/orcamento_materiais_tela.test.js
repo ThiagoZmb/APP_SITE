@@ -6,8 +6,8 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
 
 test('campos de materiais usam duas colunas e se reorganizam em telas estreitas', () => {
-  assert.match(html, /#quadro-serr-produto \.grid-form \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(html, /@media \(max-width: 600px\) \{\s*#quadro-serr-produto \.grid-form \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  assert.match(html, /html body #quadro-serr-produto \.grid-form \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important; gap: 12px 18px !important; \}/);
+  assert.match(html, /@media \(max-width: 600px\) \{\s*html body #quadro-serr-produto \.grid-form \{ grid-template-columns: minmax\(0, 1fr\) !important; \}/);
 });
 
 test('combos de materiais expandem até a maior opção ao focar e restauram ao sair', () => {
