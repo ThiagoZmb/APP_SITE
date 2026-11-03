@@ -771,6 +771,35 @@
                             </table>
                         </div>
                     </div>
+                    <!-- 🔩 FURAÇÕES (fiel ao frmPortasAbrir.vb — região 5) -->
+                    <div class="secao-item secao-furos">
+                        <h4>🔩 Furações</h4>
+                        <div class="viz-linha">
+                            <button class="btn-mini" id="btn-adicionar-furo">＋ Adicionar furo</button>
+                            <button class="btn-mini" id="btn-dividir">⚖️ Dividir igual</button>
+                            <button class="btn-mini" id="btn-referencia-furos">↕️ Referência: TOPO → BASE</button>
+                            <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
+                        </div>
+                        <div id="pnl-furacoes"></div>
+                        <div class="viz-status" id="furos-resumo"></div>
+                    </div>
+                    </div>
+                    <aside class="item-visual">
+                    <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
+                    <div class="secao-item secao-porta">
+                        <h4>🖥️ Visualização em tempo real<span id="peso-visualizacao" class="peso-visualizacao" hidden></span></h4>
+                        <canvas id="cv-visualizacao"></canvas>
+                        <div class="viz-linha">
+                            <button class="btn-mini" id="btn-modo-pux" title="A posição do puxador é definida aqui, folha por folha: clique no botão e depois nas posições em laranja de cada folha no desenho">🎯 Posicionar puxador (clique no desenho)</button>
+                        </div>
+                        <div class="viz-status" id="viz-status"></div>
+                        <div class="viz-status" id="pux-resumo" aria-live="polite"></div>
+                    </div>
+                    <!-- 📝 OBSERVAÇÃO DO ITEM (abaixo do desenho, em todas as frentes) -->
+                    <div class="secao-item secao-obs-item">
+                        <h4>📝 Observação do item</h4>
+                        <textarea id="f-obs" rows="1" maxlength="500" placeholder="Detalhes deste item (vão para a lista e para o pedido)" aria-label="Observação do item"></textarea>
+                    </div>
                     <!-- VALORES -->
                     <div class="secao-item" id="quadro-valores">
                         <h4>💰 Valores</h4>
@@ -787,35 +816,6 @@
                         </div>
                         </div>
                         <div class="nota-pct" id="nota-pct"></div>
-                    </div>
-                    </div>
-                    <aside class="item-visual">
-                    <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
-                    <div class="secao-item secao-porta">
-                        <h4>🖥️ Visualização em tempo real<span id="peso-visualizacao" class="peso-visualizacao" hidden></span></h4>
-                        <canvas id="cv-visualizacao"></canvas>
-                        <div class="viz-linha">
-                            <button class="btn-mini" id="btn-modo-pux" title="A posição do puxador é definida aqui, folha por folha: clique no botão e depois nas posições em laranja de cada folha no desenho">🎯 Posicionar puxador (clique no desenho)</button>
-                        </div>
-                        <div class="viz-status" id="viz-status"></div>
-                        <div class="viz-status" id="pux-resumo" aria-live="polite"></div>
-                    </div>
-                    <!-- 🔩 FURAÇÕES (fiel ao frmPortasAbrir.vb — região 5) -->
-                    <div class="secao-item secao-furos">
-                        <h4>🔩 Furações</h4>
-                        <div class="viz-linha">
-                            <button class="btn-mini" id="btn-adicionar-furo">＋ Adicionar furo</button>
-                            <button class="btn-mini" id="btn-dividir">⚖️ Dividir igual</button>
-                            <button class="btn-mini" id="btn-referencia-furos">↕️ Referência: TOPO → BASE</button>
-                            <button class="btn-mini" id="btn-limpar-furos">🗑️ Limpar furos</button>
-                        </div>
-                        <div id="pnl-furacoes"></div>
-                        <div class="viz-status" id="furos-resumo"></div>
-                    </div>
-                    <!-- 📝 OBSERVAÇÃO DO ITEM (abaixo do desenho, em todas as frentes) -->
-                    <div class="secao-item secao-obs-item">
-                        <h4>📝 Observação do item</h4>
-                        <textarea id="f-obs" rows="1" maxlength="500" placeholder="Detalhes deste item (vão para a lista e para o pedido)" aria-label="Observação do item"></textarea>
                     </div>
                     </aside>
                     </div>
