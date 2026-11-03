@@ -50,7 +50,8 @@
         { href: 'notas_fiscais.html', texto: 'Notas fiscais', icone: 'financeiro', sub: true },   // subitem do Financeiro (notas de entrada e saída, só cabeçalho)
         { href: 'danfe_envio.html', texto: 'Enviar DANFEs', icone: 'financeiro', sub: true },   // subitem do Financeiro (envio dos PDFs das notas fiscais e vínculo com o pedido)
         { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
-        { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' }
+        { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' },
+        { href: 'portal_admin.html', texto: 'Portal do cliente', icone: 'usuarios', sub: true }   // subitem de Usuários (liberar empresas do portal e convidar)
     ];
     // ----- Modo atendimento: o cliente acompanha o orçamento na tela, então o vendedor não mostra dados gerais da empresa -----
     // Quem tem 'atendimento.modo' começa cada sessão com o modo ligado e pode desligar/ligar a qualquer momento (botão no topo).
@@ -96,6 +97,7 @@
         'corte.html': ['corte.ver'],
         'corte_vidros.html': ['corte.ver'],
         'usuarios.html': ['admin.usuarios'],
+        'portal_admin.html': ['portal.gerir'],
         'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };
     window.ACESSO_PAGINAS = PAGINAS;
