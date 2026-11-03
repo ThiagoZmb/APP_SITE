@@ -476,8 +476,6 @@
             #carregando-global.ativo { display: block; animation: carregando-entrada .18s ease-out; }
             /* uma PORTA DE CORRER em miniatura (a cara da fábrica): duas folhas de vidro deslizam no trilho, um brilho passa pelo vidro,
                a sombra no chão acompanha e o "Carregando" ganha pontinhos. Cartão no centro da tela, sem bloquear cliques. */
-            #carregando-global::before { content: ''; position: absolute; top: 50%; left: 50%; width: 148px; height: 122px; margin: -61px 0 0 -74px; border-radius: 22px;
-                background: transparent; box-shadow: inset 0 0 0 1px rgba(139,0,0,.06); }
             #carregando-global .cg-porta { position: absolute; top: 50%; left: 50%; width: 84px; height: 62px; margin: -46px 0 0 -42px; }
             #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #7a828c, #4d545c); }
             #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #b9bfc6; border-radius: 3px;
