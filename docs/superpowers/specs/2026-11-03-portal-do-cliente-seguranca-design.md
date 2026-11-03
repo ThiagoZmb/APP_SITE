@@ -58,7 +58,7 @@ Nenhum cliente real entra antes das etapas 1 a 3 e da seção 8.
 5. **Login:** tempo de resposta igual com usuário inexistente (hash falso), limite por conta e por IP, todo login (sucesso e falha) na auditoria.
 6. **Erros:** tratador global sem stack nem `err.message`; remover os `detalhe:`; `npm audit fix` e teste.
 7. **TLS no MySQL:** testar se o HostGator oferece e, só então, tornar obrigatório.
-8. **Serviço local 3917:** segredo de pareamento entre site e serviço.
+8. **Serviço local 3917 e origem compartilhada:** um segredo de pareamento **não resolve**, porque ficaria no `localStorage` da mesma origem `thiagozmb.github.io`, que todo site Pages da conta compartilha. A correção real é publicar o front numa origem própria (domínio ou subdomínio da empresa). Fica **fora do plano da etapa 1** e depende de decisão do dono.
 9. **Dados do VB:** conferir usuários que são clientes; corrigir perfil.
 10. **Fora do código (dono):** troca da senha do MySQL, restrição de IP, limpeza do histórico do git e remoção do `.rar` (reescrever histórico é destrutivo: só com confirmação explícita), conferir a visibilidade do repositório.
 
