@@ -1,0 +1,108 @@
+/* Estilo único das páginas do portal: sem fontes nem imagens externas (a CSP só aceita a própria origem). */
+:root {
+  --fundo: #f4f5f7;
+  --cartao: #ffffff;
+  --texto: #1c2430;
+  --suave: #5a6472;
+  --borda: #c3c9d2;
+  --destaque: #1f4e8c;
+  --erro: #a61b1b;
+  --aviso-fundo: #fff4cc;
+  --aviso-borda: #b58900;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 20px;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+}
+
+h1 { margin: 0 0 12px; font-size: 1.4rem; }
+h2 { margin: 20px 0 8px; font-size: 1.1rem; }
+p { margin: 0 0 12px; }
+
+label { display: block; margin: 12px 0 4px; font-weight: 600; }
+
+input[type="email"],
+input[type="password"],
+input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.linha-aceite { display: flex; gap: 8px; align-items: flex-start; margin: 16px 0; }
+.linha-aceite input { margin-top: 5px; }
+.linha-aceite label { margin: 0; font-weight: 400; }
+
+button {
+  padding: 10px 16px;
+  border: 1px solid var(--destaque);
+  border-radius: 6px;
+  background: var(--destaque);
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secundario { background: transparent; color: var(--destaque); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.acoes { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+a { color: var(--destaque); }
+
+/* foco sempre visível (teclado e leitor de tela) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #f5a623;
+  outline-offset: 2px;
+}
+
+.erro { min-height: 1.5em; margin: 12px 0 0; color: var(--erro); font-weight: 600; }
+.suave { color: var(--suave); font-size: 0.9rem; }
+.oculto { display: none; }
+
+.codigo-grande {
+  display: block;
+  padding: 10px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1.1rem;
+  word-break: break-all;
+}
+
+.aviso {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--aviso-fundo);
+  border: 2px solid var(--aviso-borda);
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+ul.codigos { padding: 0; list-style: none; columns: 2; }
+ul.codigos li {
+  margin: 4px 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1.05rem;
+}

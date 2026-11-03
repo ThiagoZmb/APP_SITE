@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ativar acesso</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main>
+    <h1>Ativar acesso</h1>
+    <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
+
+    <form id="form-convite" class="oculto" novalidate>
+      <p>Conta: <strong id="conta-email"></strong></p>
+
+      <h2>1. Aplicativo autenticador</h2>
+      <p>Abra um aplicativo autenticador no celular, adicione uma conta nova e digite a chave abaixo (ou o endereço otpauth, se o aplicativo pedir).</p>
+      <p class="suave">Chave:</p>
+      <code id="segredo" class="codigo-grande"></code>
+      <p class="suave">Endereço para o aplicativo (apenas texto):</p>
+      <code id="uri" class="codigo-grande"></code>
+
+      <h2>2. Senha e código</h2>
+      <label for="senha">Senha (mínimo de 12 caracteres)</label>
+      <input id="senha" type="password" autocomplete="new-password" required>
+
+      <label for="confirmacao">Repita a senha</label>
+      <input id="confirmacao" type="password" autocomplete="new-password" required>
+
+      <label for="codigo">Código do aplicativo (6 dígitos)</label>
+      <input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+
+      <div class="linha-aceite">
+        <input id="aceite" type="checkbox">
+        <label for="aceite">Li e aceito os <a href="/portal/termo.html" target="_blank" rel="noopener noreferrer">termos de uso</a> (versão <span id="termo-versao"></span>).</label>
+      </div>
+
+      <div class="acoes">
+        <button type="submit" id="concluir">Ativar acesso</button>
+      </div>
+    </form>
+
+    <section id="recuperacao" class="oculto">
+      <h2>Códigos de recuperação</h2>
+      <p class="aviso" role="alert">Guarde estes códigos agora, em local seguro. Eles aparecem uma única vez e não poderão ser vistos de novo. Cada código vale uma vez e substitui o aplicativo se você perder o celular.</p>
+      <ul id="lista-codigos" class="codigos"></ul>
+      <div class="acoes">
+        <button type="button" id="guardei">Já guardei</button>
+      </div>
+    </section>
+  </main>
+  <script src="portal.js"></script>
+  <script src="convite.js"></script>
+</body>
+</html>

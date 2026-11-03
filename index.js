@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const path = require('path');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pdfPedOrc = require('./pdf/ped_orc');
@@ -96,6 +97,11 @@ app.use(cors(criarOpcoesCors(configPortal)));
 // Cabeçalhos do portal (páginas e API em /portal): sem cache, sem referrer, CSP estrita (nada de script/estilo inline).
 app.use(cabecalhosPortal);
 app.use(express.json({ limit: '100kb' }));
+// Páginas do portal (login, convite, termo, início) na mesma origem da API. Só GET/HEAD; arquivo inexistente segue para as
+// rotas (/portal/api/*) e depois 404. cacheControl desligado: vale o no-store de cabecalhosPortal (o static poria max-age=0).
+app.use('/portal', express.static(path.join(__dirname, 'portal', 'public'), {
+  index: false, dotfiles: 'deny', redirect: false, fallthrough: true, cacheControl: false
+}));
 
 // ================= RATE LIMIT =================
 const loginLimiter = rateLimit({

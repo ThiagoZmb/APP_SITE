@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar no portal</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main>
+    <h1>Entrar no portal</h1>
+    <form id="form-login" novalidate>
+      <label for="email">E-mail</label>
+      <input id="email" name="email" type="email" autocomplete="username" required>
+
+      <label for="senha">Senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+
+      <label for="codigo" id="rotulo-codigo">Código do aplicativo (6 dígitos)</label>
+      <input id="codigo" name="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+
+      <div class="acoes">
+        <button type="submit" id="entrar">Entrar</button>
+        <button type="button" id="trocar-codigo" class="secundario">Usar código de recuperação</button>
+      </div>
+      <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
+    </form>
+    <p class="suave">Ainda não tem acesso? Use o link de convite enviado por e-mail.</p>
+  </main>
+  <script src="portal.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>
