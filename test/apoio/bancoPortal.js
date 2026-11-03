@@ -1,6 +1,9 @@
 // Banco falso do portal do cliente (tabelas web_portal_* e cadastro_clientes em memória).
 // Reconhece só o SQL de portal/sessoes.js, portal/acesso.js e portal/auditoria.js; SQL sem regra
 // devolve [] (como poolFalso.js). Os parâmetros de data chegam como Date (como em seguranca/sessoes.js).
+// ATENÇÃO: as regras reconhecem o SQL só pelo prefixo e aplicam a própria lógica (revogada, expiração, inatividade);
+// por isso quem testa o SQL de verdade confere texto e parâmetros em `pool.chamadas` (veja test/portal_sessoes.test.js).
+// A comparação de nomes/maiúsculas do MySQL (collation) NÃO é simulada: strings comparam por igualdade exata.
 // A Tarefa 6 estende este arquivo: acrescente regras em `regras` e tabelas em `dados`, sem mudar as existentes.
 const { criarPoolFalso } = require('./poolFalso');
 

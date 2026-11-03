@@ -10,7 +10,7 @@ const { NOME_COOKIE, lerCookie } = require('./cookie');
 const PERMISSOES_PORTAL = ['pedidos.ver', 'documentos.ver', 'financeiro.ver'];
 
 const NAO_AUTENTICADO = { error: 'Sessão expirada. Entre novamente.' };
-const METODOS_SEGUROS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const METODOS_SEGUROS = new Set(['GET', 'HEAD']);
 
 // Empresa pode ter acesso ao portal? O cadastro existe e a Razão Social é única em cadastro_clientes
 // (pedidos e financeiro se ligam ao cliente por esse nome, como no JOIN_CLIENTE do index.js).

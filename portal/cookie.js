@@ -22,7 +22,8 @@ function lerCookie(req, nome) {
 function cookieSessao(valor, { maxAgeSeg = 28800 } = {}) {
   // o valor é o token opaco (base64url); qualquer outra coisa poderia injetar atributos
   if (typeof valor !== 'string' || !/^[A-Za-z0-9_-]+$/.test(valor)) throw new TypeError('Valor de cookie inválido.');
-  return `${NOME_COOKIE}=${valor}; Max-Age=${Math.floor(maxAgeSeg)}; ${ATRIBUTOS}`;
+  if (!Number.isInteger(maxAgeSeg) || maxAgeSeg < 0) throw new TypeError('maxAgeSeg precisa ser um inteiro maior ou igual a zero.');
+  return `${NOME_COOKIE}=${valor}; Max-Age=${maxAgeSeg}; ${ATRIBUTOS}`;
 }
 
 function cookieLimpar() {

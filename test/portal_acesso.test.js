@@ -12,6 +12,8 @@ const { criarSessoesPortal } = require('../portal/sessoes');
 const { criarAcessoPortal, empresaLiberavel } = require('../portal/acesso');
 const { auditarPortal } = require('../portal/auditoria');
 const { cabecalhosPortal } = require('../portal/cabecalhos');
+const cors = require('cors');
+const { criarOpcoesCors } = require('../portal/cors');
 const { criarRegistro } = require('../seguranca/rotas');
 
 const BASE = 'https://portal.exemplo.com';
@@ -243,6 +245,7 @@ test('cabeçalhos do portal: middleware isolado, CSP exata e só em /portal', as
   const mini = express();
   mini.use(cabecalhosPortal);
   mini.get('/portal/x', (req, res) => res.json({}));
+  mini.get('/portal', (req, res) => res.json({}));
   mini.get('/portalx', (req, res) => res.json({}));
   mini.get('/fora', (req, res) => res.json({}));
   const s = await subir(mini);
@@ -252,6 +255,12 @@ test('cabeçalhos do portal: middleware isolado, CSP exata e só em /portal', as
   assert.equal(p.headers.get('cache-control'), 'no-store');
   assert.equal(p.headers.get('referrer-policy'), 'no-referrer');
   assert.equal(p.headers.get('x-content-type-options'), 'nosniff');
+  for (const dentro of ['/PORTAL/x', '/Portal/x', '/portal']) {
+    const d = await fetch(s.url + dentro);
+    assert.equal(d.headers.get('content-security-policy'), CSP_ESPERADA, dentro);
+    assert.equal(d.headers.get('cache-control'), 'no-store', dentro);
+    assert.equal(d.headers.get('referrer-policy'), 'no-referrer', dentro);
+  }
   for (const fora of ['/portalx', '/fora']) {
     const o = await fetch(s.url + fora);
     assert.equal(o.headers.get('content-security-policy'), null);
@@ -267,4 +276,38 @@ test('index.js instala os cabeçalhos do portal (Cache-Control em /portal/, não
   assert.equal(p.headers.get('referrer-policy'), 'no-referrer');
   const q = await fetch(s.url + '/portalx');
   assert.notEqual(q.headers.get('cache-control'), 'no-store');
+});
+
+// ---- exceção de CORS do portal (app de teste com rotas reais, ativa e inativa) ----
+async function appCors(config) {
+  const mini = express();
+  mini.use(cors(criarOpcoesCors(config)));
+  mini.use((req, res) => res.json({ ok: true }));
+  mini.use((err, req, res, next) => res.status(500).json({ erro: true }));
+  return subir(mini);
+}
+const post = (s, caminho, origin) => fetch(s.url + caminho, { method: 'POST', headers: { Origin: origin } });
+
+test('CORS do portal sem diferenciar maiúsculas, e nunca abre além de /portal/', async t => {
+  const s = await appCors({ ativo: true, baseUrl: BASE });
+  t.after(s.fechar);
+  for (const ok of ['/portal/x', '/PORTAL/x', '/Portal/api/y']) {
+    const r = await post(s, ok, BASE);
+    assert.equal(r.status, 200, ok);
+    assert.equal(r.headers.get('access-control-allow-origin'), BASE, ok);
+  }
+  for (const nao of ['/portalx', '/portal', '/clientes/salvar', '/x/portal/y']) {
+    const r = await post(s, nao, BASE);
+    assert.equal(r.status, 500, nao);
+    assert.equal(r.headers.get('access-control-allow-origin'), null, nao);
+  }
+});
+
+test('portal inativo desliga a exceção de CORS (mesmo em /portal/)', async t => {
+  const s = await appCors({ ativo: false, motivo: 'x' });
+  t.after(s.fechar);
+  const r = await post(s, '/portal/x', BASE);
+  assert.equal(r.status, 500);
+  assert.equal(r.headers.get('access-control-allow-origin'), null);
+  assert.equal((await post(s, '/portal/x', 'https://thiagozmb.github.io')).status, 200);
 });

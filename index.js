@@ -24,6 +24,7 @@ const { lerConfigPortal } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
 const { criarAcessoPortal } = require('./portal/acesso');
 const { cabecalhosPortal } = require('./portal/cabecalhos');
+const { criarOpcoesCors } = require('./portal/cors');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -87,19 +88,7 @@ const pool = mysql.createPool({
 app.use(helmet());
 // Configuração do portal do cliente: lida uma vez; sem ela o portal responde 503 e o resto não muda.
 const configPortal = lerConfigPortal();
-const origemLocal = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-app.use(cors((req, callback) => {
-  const origin = req.headers.origin;
-  // Só em /portal/ vale também a origem do próprio portal (POST same-origin manda Origin); nos demais caminhos nada muda.
-  const doPortal = configPortal.ativo && req.path.startsWith('/portal/') && origin === configPortal.baseUrl;
-  if (!origin || origin === 'https://thiagozmb.github.io' || origemLocal.test(origin) || doPortal) {
-    return callback(null, {
-      origin: true,
-      exposedHeaders: ['Content-Disposition', 'X-Pdf-Nome', 'X-Pdf-Pasta'] // a tela lê o nome/pasta do PDF para gravar o arquivo
-    });
-  }
-  return callback(new Error('Origem não permitida pelo CORS'));
-}));
+app.use(cors(criarOpcoesCors(configPortal)));
 // Cabeçalhos do portal (páginas e API em /portal): sem cache, sem referrer, CSP estrita (nada de script/estilo inline).
 app.use(cabecalhosPortal);
 app.use(express.json({ limit: '100kb' }));

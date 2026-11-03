@@ -43,6 +43,8 @@ test('cookieSessao e cookieLimpar têm todos os atributos', () => {
   assert.equal(cookieSessao('tok', { maxAgeSeg: 60 }), '__Host-portal=tok; Max-Age=60; HttpOnly; Secure; SameSite=Strict; Path=/');
   assert.equal(cookieLimpar(), '__Host-portal=; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Path=/');
   assert.throws(() => cookieSessao('a; Path=/x'), /inválido/);
+  for (const ruim of [NaN, -1, 1.5, '60', Infinity, null]) assert.throws(() => cookieSessao('tok', { maxAgeSeg: ruim }), TypeError);
+  assert.equal(cookieSessao('tok', { maxAgeSeg: 0 }), '__Host-portal=tok; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Path=/');
 });
 
 // ---- sessões ----
@@ -112,11 +114,11 @@ test('ultimo_uso_em é atualizado no máximo uma vez por minuto', async () => {
   passar(31 * 1000); // 61 s depois da criação
   await sessoes.valida(token);
   assert.equal(gravado(), T0.getTime() + 61 * 1000);
-  const depois = atualizacoes();
+  assert.equal(atualizacoes(), 2);
   passar(10 * 1000);
   await sessoes.valida(token);
   assert.equal(gravado(), T0.getTime() + 61 * 1000, 'segunda validação no mesmo minuto não regrava');
-  assert.ok(atualizacoes() >= depois);
+  assert.equal(atualizacoes(), 3, 'a UPDATE é emitida a cada validação, mas só grava se passou 1 minuto (WHERE no banco)');
   // a atividade renovada afasta a inatividade
   passar(59 * MIN);
   assert.ok(await sessoes.valida(token));
@@ -144,4 +146,38 @@ test('revogarEmpresa revoga por cliente_codigo via junção com os usuários', a
   assert.deepEqual(c.params, [40]);
   assert.equal(await sessoes.valida(a), null);
   assert.ok(await sessoes.valida(b));
+});
+
+// ---- texto e ordem dos parâmetros do SQL (o banco falso só reconhece o prefixo e aplica regras próprias) ----
+const unico = (banco, re) => { const l = banco.pool.chamadas.filter(c => re.test(c.sql)); assert.equal(l.length, 1); return l[0]; };
+
+test('valida emite a SELECT e a UPDATE com o texto e os parâmetros exatos', async () => {
+  const { banco, sessoes, passar } = montar();
+  const token = await sessoes.criar(5, null);
+  passar(2 * MIN);
+  const agora = new Date(T0.getTime() + 2 * MIN);
+  await sessoes.valida(token);
+  const sel = unico(banco, /^SELECT usuario_id FROM web_portal_sessoes/);
+  assert.match(sel.sql, /WHERE id = \? AND revogada = 0 AND expira_em > \? AND ultimo_uso_em >= \? LIMIT 1$/);
+  assert.deepEqual(sel.params, [hashToken(token), agora, new Date(agora.getTime() - 60 * MIN)]);
+  const upd = unico(banco, /^UPDATE web_portal_sessoes SET ultimo_uso_em/);
+  assert.equal(upd.sql, 'UPDATE web_portal_sessoes SET ultimo_uso_em = ? WHERE id = ? AND ultimo_uso_em < ?');
+  assert.deepEqual(upd.params, [agora, hashToken(token), new Date(agora.getTime() - MIN)]);
+});
+
+test('revogar, revogarUsuario e revogarEmpresa: texto e parâmetros exatos', async () => {
+  const { banco, sessoes } = montar();
+  const token = await sessoes.criar(5, null);
+  await sessoes.revogar(token);
+  await sessoes.revogarUsuario(5);
+  await sessoes.revogarEmpresa(40);
+  const r = unico(banco, /SET revogada = 1 WHERE id = \?/);
+  assert.equal(r.sql, 'UPDATE web_portal_sessoes SET revogada = 1 WHERE id = ?');
+  assert.deepEqual(r.params, [hashToken(token)]);
+  const u = unico(banco, /SET revogada = 1 WHERE usuario_id = \?/);
+  assert.equal(u.sql, 'UPDATE web_portal_sessoes SET revogada = 1 WHERE usuario_id = ? AND revogada = 0');
+  assert.deepEqual(u.params, [5]);
+  const e = unico(banco, /INNER JOIN web_portal_usuarios/);
+  assert.match(e.sql, /WHERE u\.cliente_codigo = \? AND s\.revogada = 0$/);
+  assert.deepEqual(e.params, [40]);
 });
