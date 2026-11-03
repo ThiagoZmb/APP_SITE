@@ -162,12 +162,14 @@ test('muitos itens: quebra de página repetindo o cabeçalho da tabela; item eno
 
 // ---------------- rota ----------------
 
-const { app, pool, acesso } = require('../index.js');
+const { app, pool, acesso, sessoes } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 const USUARIOS = {
   1: { nome: 'Ana', permissoes: new Set(['pedidos.pdf', 'valores.ver']) },
   2: { nome: 'Bia', permissoes: new Set(['pedidos.pdf']) }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t) {
   const d = dadosExemplo('Pedido', 2);

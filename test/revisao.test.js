@@ -6,7 +6,9 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso } = require('../index.js');
+const { app, pool, acesso, sessoes } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 const { migrarAcessos, garantirAdministrador } = require('../seguranca/instalacao');
 
 // ---------- Important 1: nunca ficar sem administrador por causa do WEB_ADMIN_INICIAL ----------
@@ -63,7 +65,7 @@ const USUARIOS = {
   2: { nome: 'Ana', permissoes: new Set(['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'clientes.ver', 'valores.ver']), estados: ['RJ'] },
   5: { nome: 'Vera', permissoes: new Set(['clientes.ver', 'clientes.editar', 'clientes.permissao', 'clientes.credito', 'clientes.receber', 'valores.ver']), estados: ['RJ'] }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 async function preparar(t, regras) {
   const f = criarPoolFalso(regras);
   pool.execute = f.execute; pool.getConnection = f.getConnection;

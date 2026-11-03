@@ -41,6 +41,15 @@ const TABELAS = [
      detalhe TEXT NULL,
      KEY idx_acao (acao)
    ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_sessoes\` (
+     id CHAR(32) NOT NULL PRIMARY KEY,
+     usuario_codigo INT NOT NULL,
+     criado_em DATETIME NOT NULL,
+     expira_em DATETIME NOT NULL,
+     ip VARCHAR(45) NULL,
+     revogada TINYINT NOT NULL DEFAULT 0,
+     KEY idx_sessao_usuario (usuario_codigo)
+   ) ${OPCOES}`,
   // ----- movimentação de estoque (as tabelas do VB continuam as mesmas) -----
   `CREATE TABLE IF NOT EXISTS \`web_estoque_ligacoes\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

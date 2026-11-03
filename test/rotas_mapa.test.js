@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso, registro, colunasPdf } = require('../index.js');
+const { app, pool, acesso, sessoes, registro, colunasPdf } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 const { PERFIS_INICIAIS } = require('../seguranca/permissoes');
 
 const perms = nome => new Set(PERFIS_INICIAIS.find(p => p.nome === nome).permissoes);
@@ -15,7 +17,7 @@ const USUARIOS = {
   3: { nome: 'Caio', perfil: 'Estoquista', permissoes: perms('Estoquista'), estados: [] },
   4: { nome: 'Edu', perfil: 'Estoque sem valores', permissoes: new Set(['estoque.ver', 'estoque.editar', 'produtos.ver', 'clientes.ver']), estados: [] }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t, regras = []) {
   const f = criarPoolFalso(regras);

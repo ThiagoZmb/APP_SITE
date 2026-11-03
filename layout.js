@@ -103,6 +103,14 @@
     function auth() {
         try { return JSON.parse(localStorage.getItem('auth') || 'null'); } catch { return null; }
     }
+    // Logout real: revoga a sessão no servidor (sem esperar a resposta; falha não impede a saída).
+    function encerrarSessao() {
+        try {
+            const token = auth()?.token;
+            if (!token) return;
+            fetch(API + '/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, keepalive: true }).catch(() => {});
+        } catch { /* sem rede ou sem fetch: a saída segue */ }
+    }
     const arquivoAtual = () => (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
     // pode('a') ou pode('a b'): todos os códigos exigidos
     const pode = codigos => {
@@ -182,7 +190,7 @@
         bloco.innerHTML = (pelaModo ? '<h2>Modo atendimento ligado</h2><p>Esta tela mostra dados gerais da empresa e fica escondida enquanto há cliente acompanhando.</p><button type="button" class="btn btn-primary" id="atend-desligar">Desligar modo atendimento</button><br>' : '<h2>Sem acesso</h2><p>Seu usuário não tem permissão para esta página.</p>') +
             (destino ? `<a href="${destino}">Ir para o início</a>` : '<a href="login.html" class="sair">Sair</a>');
         bloco.querySelector('#atend-desligar')?.addEventListener('click', () => { window.Atendimento.alternar(); location.reload(); });
-        bloco.querySelector('.sair')?.addEventListener('click', () => localStorage.removeItem('auth'));
+        bloco.querySelector('.sair')?.addEventListener('click', () => { encerrarSessao(); localStorage.removeItem('auth'); });
         main.appendChild(bloco);
     }
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -263,6 +271,7 @@
                 }).join('') +
                 `<div class="sb-rodape"><button type="button" class="sb-sair">${ICONES.sair}<span>Sair</span></button></div>`;
             nav.querySelector('.sb-sair').addEventListener('click', () => {
+                encerrarSessao();
                 localStorage.removeItem('auth');
                 location.href = LOGIN_URL;
             });

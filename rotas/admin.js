@@ -61,7 +61,7 @@ function travaAdmin(res, admins, editor, eraAdmin) {
   return false;
 }
 
-function registrarAdmin({ rota, pool, acesso, bcrypt }) {
+function registrarAdmin({ rota, pool, acesso, bcrypt, sessoes }) {
   const erro = (res, status, msg) => res.status(status).json({ error: msg });
   const falha = (res, rotaNome, err) => {
     console.error(`Erro ${rotaNome}:`, err.message);
@@ -245,6 +245,7 @@ function registrarAdmin({ rota, pool, acesso, bcrypt }) {
       const [[usuario]] = await pool.execute('SELECT CODIGO, NOME FROM cliente_usuarios WHERE CODIGO = ? LIMIT 1', [codigo]);
       if (!usuario) return erro(res, 404, 'Usuário não encontrado.');
       await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [await bcrypt.hash(senha, CUSTO_BCRYPT), codigo]);
+      await sessoes.revogarTodas(codigo); // senha nova derruba as sessões abertas do usuário
       await auditar(pool, { quem: req.user.nome, acao: 'senha_redefinida', alvo: usuario.NOME, detalhe: null });
       res.json({ ok: true });
     } catch (err) { falha(res, 'POST /admin/usuarios/:codigo/senha', err); }

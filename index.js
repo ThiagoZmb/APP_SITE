@@ -10,6 +10,7 @@ const pdfPedOrc = require('./pdf/ped_orc');
 const { carimboItens } = require('./calculo/leitura_vb');
 const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
+const { criarSessoes } = require('./seguranca/sessoes');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
 const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('./seguranca/login_limite');
@@ -93,10 +94,11 @@ const loginLimiter = rateLimit({
 // O token só identifica o usuário (v: 2). Perfil, permissões, estados e se está
 // ativo vêm do banco a cada requisição (cache de 60 s, limpo pela administração).
 const acesso = criarAcesso({ pool });
+const sessoes = criarSessoes({ pool });
 
-function gerarToken(usuario) {
+function gerarToken(usuario, sid) {
   return jwt.sign(
-    { id: usuario.CODIGO, nome: usuario.NOME, v: 2, tipo: 'funcionario' },
+    { id: usuario.CODIGO, nome: usuario.NOME, v: 2, tipo: 'funcionario', sid },
     JWT_SECRET,
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
@@ -116,7 +118,11 @@ async function autenticar(req, res, next) {
   if (payload.v !== 2) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   // Token de outro tipo (ex.: cliente do portal) nunca vale aqui; sem `tipo` = emitido antes do campo existir.
   if (payload.tipo !== undefined && payload.tipo !== 'funcionario') return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+  // Sessão conferida no banco a cada requisição (chave primária, sem cache): logout e troca de senha valem na hora.
+  // Token sem `sid` (emitido antes das sessões) é recusado.
   try {
+    if (!(await sessoes.valida(payload.sid, payload.id))) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    req.sid = payload.sid;
     req.acesso = await acesso.carregar(payload.id);
   } catch (err) {
     console.error('Erro ao carregar acesso:', err.message);
@@ -237,16 +243,29 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
       await auditarLogin('login_negado', user, req.ip, username);
       return res.status(403).json({ success: false, message: 'Acesso à web não liberado. Fale com o administrador.' });
     }
+    const sid = await sessoes.criar(user.CODIGO, req.ip);
     await auditarLogin('login_ok', user, req.ip, username);
     res.json({
       success: true,
-      token: gerarToken(user),
+      token: gerarToken(user, sid),
       user: { nome: user.NOME, empresa: user.RAZAO_SOCIAL, cargo: user.CARGO },
       acesso: resumoAcesso(a)
     });
   } catch (err) {
     console.error('Erro no login:', err.message);
     res.status(500).json({ success: false, message: 'Erro de servidor.' });
+  }
+});
+
+// ================= LOGOUT =================
+// Revoga a sessão do token. Token inválido, expirado ou já revogado nem chega aqui (401 do autenticar).
+registro.rota('post', '/logout', [], async (req, res) => {
+  try {
+    await sessoes.revogar(req.sid);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro no logout:', err.code || 'sem código');
+    res.status(500).json({ error: 'Erro de servidor' });
   }
 });
 
@@ -857,6 +876,9 @@ registro.publica('post', '/admin/definir_senha', limitadorAdmin, async (req, res
     const [r] = await pool.execute(
       'UPDATE cliente_usuarios SET SENHA = ? WHERE NOME = ?', [hash, username]);
     if (r.affectedRows === 0) return res.status(404).json({ error: 'Usuário não encontrado' });
+    // senha nova derruba as sessões abertas do usuário (aqui ele vem pelo nome: busca o código)
+    const [alvo] = await pool.execute('SELECT CODIGO FROM cliente_usuarios WHERE NOME = ? LIMIT 1', [username]);
+    if (alvo[0]) await sessoes.revogarTodas(alvo[0].CODIGO);
     res.json({ success: true, message: 'Senha atualizada com hash bcrypt' });
   } catch (err) {
     console.error('Erro /admin/definir_senha:', err.message);
@@ -1644,7 +1666,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 });
 
 // ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
-registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt });
+registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt, sessoes });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
@@ -1705,4 +1727,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool, acesso, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
+module.exports = { app, pool, acesso, sessoes, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };

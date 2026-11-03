@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso } = require('../index.js');
+const { app, pool, acesso, sessoes } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 const { PERFIS_INICIAIS } = require('../seguranca/permissoes');
 const { REGEX_VALOR } = require('../seguranca/valores');
 
@@ -14,7 +16,7 @@ const USUARIOS = {
   1: { nome: 'Admin', perfil: 'Administrador', permissoes: perms('Administrador'), estados: [] },
   2: { nome: 'Ana', perfil: 'Representante', permissoes: perms('Representante'), estados: ['RJ'] }
 };
-const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t, regras = []) {
   const f = criarPoolFalso(regras);

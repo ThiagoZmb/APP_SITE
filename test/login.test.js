@@ -6,13 +6,15 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso } = require('../index.js');
+const { app, pool, acesso, sessoes } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 
 const HASH = bcrypt.hashSync('segredo123', 4);
 const usarPool = regras => { const f = criarPoolFalso(regras); pool.execute = f.execute; pool.getConnection = f.getConnection; return f; };
 const acessoDe = (extra = {}) => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', empresa: 'ELEGANCE', perfil: { id: 4, nome: 'Estoquista' },
   estados: [], ativo: true, permissoes: new Set(['estoque.ver']), ...extra });
-const tokenV2 = (id = 7) => jwt.sign({ id, nome: 'Caio', v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const tokenV2 = (id = 7) => jwt.sign({ id, nome: 'Caio', v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function servidor(t) { const s = await subir(app); t.after(s.fechar); acesso.limpar(); return s; }
 const postLogin = (s, body) => fetch(s.url + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

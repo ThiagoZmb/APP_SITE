@@ -5,7 +5,9 @@ process.env.NODE_ENV = 'test';
 const jwt = require('jsonwebtoken');
 const { subir } = require('./servidor');
 const { criarPoolFalso } = require('./poolFalso');
-const { app, pool, acesso } = require('../../index.js');
+const { app, pool, acesso, sessoes } = require('../../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 
 const PERFIS = {
   'Notas': ['notas.ver', 'notas.editar'],
@@ -96,7 +98,7 @@ function bancoNotas() {
   return { f, regras, estado, ...estado, semear };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function prepararNotas(t, { perfil = 'Notas com valores', usuario = { codigo: 7, nome: 'Caio' }, banco = bancoNotas(), estados = [] } = {}) {
   pool.execute = banco.f.execute; pool.getConnection = banco.f.getConnection;

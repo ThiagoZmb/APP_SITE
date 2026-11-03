@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso } = require('../index.js');
+const { app, pool, acesso, sessoes } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 const { PERFIS_INICIAIS } = require('../seguranca/permissoes');
 
 // banco simulado com estado: 1 = Thiago (Administrador), 2 = Caio (Estoquista), 3 = Ana (Interno completo)
@@ -63,7 +65,7 @@ function bancoComEstado() {
   return { f, usuarios, acessos, excecoes, perfis };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 async function preparar(t) {
   const banco = bancoComEstado();

@@ -7,7 +7,9 @@ process.env.NODE_ENV = 'test';
 const jwt = require('jsonwebtoken');
 const { subir } = require('./servidor');
 const { criarPoolFalso } = require('./poolFalso');
-const { app, pool, acesso } = require('../../index.js');
+const { app, pool, acesso, sessoes } = require('../../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 
 const duplicado = () => Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 });
 const PERFIS = {
@@ -248,7 +250,7 @@ function bancoEntregas() {
   return { f, regras, estado, ...estado, semear };
 }
 
-const token = (id, nome) => jwt.sign({ id, nome, v: 2 }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const token = (id, nome) => jwt.sign({ id, nome, v: 2, sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
 // Sobe o app com o banco simulado. `usuario` é quem está logado (padrão: Caio, código 7); `estados` restringe a região.
 async function prepararEntregas(t, { perfil = 'Programador', usuario = { codigo: 7, nome: 'Caio' }, estados = [], banco = bancoEntregas() } = {}) {

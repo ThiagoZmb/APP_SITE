@@ -6,7 +6,9 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso, registro } = require('../index.js');
+const { app, pool, acesso, sessoes, registro } = require('../index.js');
+const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
+aceitarSidDeTeste(sessoes);
 
 const assinar = claims => jwt.sign(claims, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 const tokenCliente = assinar({ id: 7, nome: 'Cliente', v: 2, tipo: 'cliente' });
@@ -43,7 +45,7 @@ test('token sem tipo (emitido antes) continua valendo', async t => {
   t.after(s.fechar);
   acesso.limpar();
   t.mock.method(acesso, 'carregar', async () => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', perfil: { id: 4, nome: 'X' }, estados: [], ativo: true, permissoes: new Set() }));
-  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2 }) } });
+  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2, sid: SID_TESTE }) } });
   assert.equal(r.status, 200);
 });
 
