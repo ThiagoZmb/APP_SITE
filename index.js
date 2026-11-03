@@ -3,6 +3,7 @@ const mysql = require('mysql2/promise');
 const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pdfPedOrc = require('./pdf/ped_orc');
@@ -11,7 +12,7 @@ const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
-const { criarLimiteLogin, HASH_FALSO } = require('./seguranca/login_limite');
+const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('./seguranca/login_limite');
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
@@ -185,14 +186,19 @@ function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
 
 // ================= LOGIN =================
 const limiteLogin = criarLimiteLogin();
-// Auditoria do login: quem = nome tentado (até 100), detalhe só com o IP, nunca a senha.
-// Falha ao gravar não derruba o login.
-async function auditarLogin(acao, nome, ip) {
+// Nome tentado em forma canônica (o MySQL, utf8mb4_unicode_ci, ignora caixa, acento, largura e invisíveis).
+const nomeCanonico = s => s.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[­​-‏⁠﻿]/g, '').toLowerCase().trim();
+// Auditoria do login: quem = nome da conta no banco, ou '(inexistente)' (o texto digitado pode ser
+// uma senha, nunca é gravado; nome inexistente vai só como HMAC curto para agrupar tentativas).
+// detalhe só com IP. Falha ao gravar não derruba o login.
+async function auditarLogin(acao, user, ip, nomeDigitado) {
   try {
+    const detalhe = { ip };
+    if (!user) detalhe.nome = crypto.createHmac('sha256', JWT_SECRET).update(nomeCanonico(nomeDigitado)).digest('hex').slice(0, 12);
     await pool.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
-      [String(nome).slice(0, 100), acao, '', JSON.stringify({ ip })]);
+      [user ? String(user.NOME).slice(0, 100) : '(inexistente)', acao, '', JSON.stringify(detalhe)]);
   } catch (err) {
-    console.error('Erro ao auditar o login:', err.message);
+    console.error('Erro ao auditar o login:', err.code || 'sem código');
   }
 }
 registro.publica('post', '/login', loginLimiter, async (req, res) => {
@@ -201,32 +207,35 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
   if (!username || !password || username.length > 100 || password.length > 200) {
     return res.status(400).json({ success: false, message: 'Usuário ou senha inválidos.' });
   }
-  const chave = username.toLowerCase();
-  const bloqueio = limiteLogin.bloqueado(chave);
-  if (bloqueio.bloqueado) {
-    await auditarLogin('login_bloqueado', username, req.ip);
-    res.set('Retry-After', String(bloqueio.segundos));
-    return res.status(429).json({ success: false, message: 'Muitas tentativas para este usuário. Aguarde alguns minutos.' });
-  }
   try {
+    // o SELECT vem antes do limite: o banco resolve a equivalência de nomes (Caio = Cáio = Ｃａｉｏ)
     const [rows] = await pool.execute(
       'SELECT CODIGO, NOME, RAZAO_SOCIAL, CARGO, SENHA FROM cliente_usuarios WHERE NOME = ? LIMIT 1',
       [username]
     );
     const user = rows[0];
-    // sempre compara (com hash falso se o usuário não existe): o tempo não revela a conta
-    const senhaOk = await bcrypt.compare(password, user ? user.SENHA : HASH_FALSO);
-    if (!user || !senhaOk) {
+    const chave = user ? 'c:' + user.CODIGO : 'n:' + nomeCanonico(username);
+    const bloqueio = limiteLogin.bloqueado(chave);
+    if (bloqueio.bloqueado) {
+      await auditarLogin('login_bloqueado', user, req.ip, username);
+      res.set('Retry-After', String(bloqueio.segundos));
+      return res.status(429).json({ success: false, message: 'Muitas tentativas para este usuário. Aguarde alguns minutos.' });
+    }
+    // sempre compara (hash falso se não existe ou se a senha gravada não é bcrypt): o tempo não revela a conta
+    const hashReal = user && typeof user.SENHA === 'string' && user.SENHA.length === 60 ? user.SENHA : null;
+    const senhaOk = await bcrypt.compare(password, hashReal || HASH_FALSO);
+    if (!hashReal || !senhaOk) {
       limiteLogin.falhou(chave);
-      await auditarLogin('login_falha', username, req.ip);
+      await auditarLogin('login_falha', user, req.ip, username);
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
     limiteLogin.limpar(chave);
-    await auditarLogin('login_ok', username, req.ip);
     const a = await acesso.carregar(user.CODIGO);
     if (!a || !a.ativo) {
+      await auditarLogin('login_negado', user, req.ip, username);
       return res.status(403).json({ success: false, message: 'Acesso à web não liberado. Fale com o administrador.' });
     }
+    await auditarLogin('login_ok', user, req.ip, username);
     res.json({
       success: true,
       token: gerarToken(user),
@@ -842,7 +851,7 @@ registro.publica('post', '/admin/definir_senha', limitadorAdmin, async (req, res
     return res.status(400).json({ error: 'Usuário obrigatório e senha com no mínimo 8 caracteres' });
   }
   try {
-    const hash = await bcrypt.hash(novaSenha, 12);
+    const hash = await bcrypt.hash(novaSenha, CUSTO_BCRYPT);
     const [r] = await pool.execute(
       'UPDATE cliente_usuarios SET SENHA = ? WHERE NOME = ?', [hash, username]);
     if (r.affectedRows === 0) return res.status(404).json({ error: 'Usuário não encontrado' });
@@ -865,7 +874,7 @@ registro.publica('post', '/migrar_senhas', limitadorAdmin, async (req, res) => {
       // Senha nula ou vazia não é texto puro a converter: hashear "" ou "null" criaria uma senha válida.
       if (r.SENHA === null || r.SENHA === undefined || r.SENHA === '') { ignorados++; continue; }
       if (!String(r.SENHA || '').startsWith('$2')) {
-        const hash = await bcrypt.hash(String(r.SENHA), 12);
+        const hash = await bcrypt.hash(String(r.SENHA), CUSTO_BCRYPT);
         await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [hash, r.CODIGO]);
         convertidos++;
       } else {

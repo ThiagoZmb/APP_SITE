@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { criarLimiteLogin, HASH_FALSO } = require('../seguranca/login_limite');
+const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('../seguranca/login_limite');
 const { app, pool, acesso } = require('../index.js');
 
 const HASH = bcrypt.hashSync('segredo123', 4);
@@ -19,19 +19,23 @@ let seqIp = 0;
 const proximoIp = () => `10.9.${Math.floor(seqIp / 250)}.${(seqIp++ % 250) + 1}`;
 
 // Sobe o servidor com um banco falso em que só existe o usuário `nome` (sem diferenciar caixa, como o MySQL).
-async function preparar(t, nome, { auditoriaFalha = false } = {}) {
+let seqCodigo = 100; // cada teste tem a sua conta (o limite é por código)
+async function preparar(t, nome, { auditoriaFalha = false, senha = HASH } = {}) {
+  const codigo = ++seqCodigo;
   const s = await subir(app); t.after(s.fechar); acesso.limpar();
   t.mock.method(acesso, 'carregar', async () => acessoOk);
   const f = criarPoolFalso([
     [/INSERT INTO web_auditoria/, () => { if (auditoriaFalha) throw new Error('banco caiu'); return []; }],
-    [/FROM cliente_usuarios WHERE NOME/, (sql, p) => String(p[0]).toLowerCase() === nome.toLowerCase()
-      ? [{ CODIGO: 7, NOME: nome, RAZAO_SOCIAL: 'ELEGANCE', CARGO: 'Produção', SENHA: HASH }] : []]
+    [/FROM cliente_usuarios WHERE NOME/, (sql, p) => canon(p[0]) === canon(nome)
+      ? [{ CODIGO: codigo, NOME: nome, RAZAO_SOCIAL: 'ELEGANCE', CARGO: 'Produção', SENHA: senha }] : []]
   ]);
   pool.execute = f.execute; pool.getConnection = f.getConnection;
   const post = (body, ip = proximoIp()) => fetch(s.url + '/login', { method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip }, body: JSON.stringify(body) });
   return { s, f, post };
 }
+// imita a equivalência do MySQL utf8mb4_unicode_ci (caixa, acento, largura)
+const canon = x => String(x).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 const auditorias = f => f.chamadas.filter(c => /INSERT INTO web_auditoria/.test(c.sql));
 
 test('limite: 5 falhas bloqueiam, a janela libera e limpar zera', () => {
@@ -55,6 +59,8 @@ test('limite: 5 falhas bloqueiam, a janela libera e limpar zera', () => {
 test('HASH_FALSO é um hash bcrypt válido', async () => {
   assert.match(HASH_FALSO, /^\$2[aby]\$/);
   assert.equal(await bcrypt.compare('qualquer', HASH_FALSO), false);
+  assert.equal(CUSTO_BCRYPT, 12);
+  assert.equal(bcrypt.getRounds(HASH_FALSO), 12);
 });
 
 test('usuário inexistente também executa bcrypt.compare e responde igual à senha errada', async t => {
@@ -111,7 +117,7 @@ test('falha ao gravar a auditoria não derruba o login', async t => {
   assert.equal((await post({ username: 'SemAud', password: 'segredo123' })).status, 200);
   assert.equal((await post({ username: 'SemAud', password: 'errada' })).status, 401);
   const texto = erros.mock.calls.map(c => c.arguments.join(' ')).join('\n');
-  assert.match(texto, /banco caiu/);
+  assert.ok(!/banco caiu/.test(texto)); // não registra err.message de banco
   assert.ok(!texto.includes('segredo123'));
 });
 
@@ -123,6 +129,67 @@ test('usuário enorme, Unicode e aspas dão 400/401 uniforme, nunca 500', async 
     assert.ok([400, 401].includes(r.status), `status ${r.status} para ${username.slice(0, 10)}`);
     assert.equal((await r.json()).message, MSG);
   }
-  const longo = auditorias(f).map(c => c.params[0]);
-  assert.ok(longo.every(q => q.length <= 100));
+  assert.ok(auditorias(f).every(c => c.params[0] === '(inexistente)'));
+  assert.ok(!JSON.stringify(f.chamadas.filter(c => /web_auditoria/.test(c.sql))).includes("OR '1'='1"));
+});
+
+test('variações do nome (acento, largura, caixa) dividem o mesmo limite da conta', async t => {
+  const { post } = await preparar(t, 'Caio');
+  for (let i = 0; i < 5; i++) assert.equal((await post({ username: 'Caio', password: 'errada' })).status, 401);
+  for (const v of ['Cáio', 'Ｃaio', 'cAIO']) assert.equal((await post({ username: v, password: 'segredo123' })).status, 429, v);
+});
+
+test('o 429 de nome inexistente é igual ao de conta real (não revela a conta)', async t => {
+  const { post } = await preparar(t, 'Real429');
+  for (let i = 0; i < 5; i++) { await post({ username: 'Real429', password: 'x' }); await post({ username: 'Falso429', password: 'x' }); }
+  const a = await post({ username: 'Real429', password: 'x' });
+  const b = await post({ username: 'Falso429', password: 'x' });
+  assert.equal(a.status, 429);
+  assert.equal(b.status, 429);
+  assert.deepEqual(await a.json(), await b.json());
+});
+
+test('limite: nomes inexistentes têm teto e descartam o mais antigo; conta real nunca é expulsa', () => {
+  const l = criarLimiteLogin({ maxInexistentes: 100 });
+  for (let i = 0; i < 5; i++) l.falhou('c:7');
+  for (let i = 0; i < 5; i++) l.falhou('n:velho');
+  for (let i = 0; i < 10001; i++) l.falhou('n:falso' + i);
+  assert.equal(l.bloqueado('c:7').bloqueado, true);
+  assert.equal(l.bloqueado('n:velho').bloqueado, false); // o mais antigo saiu
+  for (let i = 0; i < 5; i++) l.falhou('c:9');            // conta real nova ainda é contada com o outro mapa cheio
+  assert.equal(l.bloqueado('c:9').bloqueado, true);
+  for (let i = 0; i < 5; i++) l.falhou('n:recente');       // e o nome novo também é contado (não para de contar)
+  assert.equal(l.bloqueado('n:recente').bloqueado, true);
+});
+
+test('auditoria de nome inexistente: quem fixo, só HMAC curto, sem o texto digitado', async t => {
+  const { post, f } = await preparar(t, 'Existe3');
+  await post({ username: 'SenhaDigitadaAqui1', password: 'x' }, '10.2.2.2');
+  const [c] = auditorias(f);
+  assert.equal(c.params[0], '(inexistente)');
+  const d = JSON.parse(c.params[3]);
+  assert.equal(d.ip, '10.2.2.2');
+  assert.match(d.nome, /^[0-9a-f]{12}$/);
+  assert.ok(!JSON.stringify(f.chamadas).includes('SenhaDigitadaAqui1') || f.chamadas.every(x => !/web_auditoria/.test(x.sql) || !JSON.stringify(x).includes('SenhaDigitadaAqui1')));
+});
+
+test('conta sem acesso à web: 403 e auditoria login_negado (não login_ok)', async t => {
+  const { post, f } = await preparar(t, 'Negada');
+  t.mock.method(acesso, 'carregar', async () => ({ ...acessoOk, ativo: false }));
+  assert.equal((await post({ username: 'Negada', password: 'segredo123' })).status, 403);
+  assert.deepEqual(auditorias(f).map(c => c.params[1]), ['login_negado']);
+});
+
+test('SENHA nula ou em texto puro: 401, conta a tentativa e compara com o hash falso', async t => {
+  for (const senha of [null, 'textoPuroNaoMigrado']) {
+    const { post, f } = await preparar(t, 'Velha' + String(senha).length, { senha });
+    const nome = 'Velha' + String(senha).length;
+    const espiao = t.mock.method(bcrypt, 'compare');
+    for (let i = 0; i < 5; i++) assert.equal((await post({ username: nome, password: 'textoPuroNaoMigrado' })).status, 401);
+    assert.equal(espiao.mock.callCount(), 5);
+    assert.equal(espiao.mock.calls[0].arguments[1], HASH_FALSO);
+    assert.equal((await post({ username: nome, password: 'x' })).status, 429);
+    assert.equal(auditorias(f).filter(c => c.params[1] === 'login_falha').length, 5);
+    espiao.mock.restore();
+  }
 });

@@ -6,35 +6,43 @@ const crypto = require('crypto');
 
 // Hash de um valor aleatório gerado na subida: usuário inexistente gasta o mesmo tempo
 // de bcrypt que usuário existente com senha errada (não revela quais contas existem).
-const HASH_FALSO = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10);
+// Custo do bcrypt: o mesmo dos hashes reais (senhas gravadas com 12), senão o tempo revela quem existe.
+const CUSTO_BCRYPT = 12;
+const HASH_FALSO = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), CUSTO_BCRYPT);
 
-const MAX_CHAVES = 10000; // teto de contas guardadas (nomes inventados não enchem a memória)
+const MAX_INEXISTENTES = 10000; // teto só dos nomes que não existem; o mais antigo sai quando enche
 
-function criarLimiteLogin({ maxFalhas = 5, janelaMs = 15 * 60 * 1000, agora = Date.now } = {}) {
-  const falhas = new Map(); // chave -> { qtd, desde }
+// Chaves: 'c:CODIGO' = conta real (sem teto nem expulsão: limitada pelo número de usuários);
+// 'n:nome' = nome inexistente (com teto; nomes falsos nunca expulsam a contagem de conta real).
+function criarLimiteLogin({ maxFalhas = 5, janelaMs = 15 * 60 * 1000, agora = Date.now, maxInexistentes = MAX_INEXISTENTES } = {}) {
+  const contas = new Map();       // chave -> { qtd, desde }
+  const inexistentes = new Map();
+  const mapaDe = chave => (String(chave).startsWith('n:') ? inexistentes : contas);
   const vivo = (f, t) => f && t - f.desde < janelaMs;
-
-  function podar(t) {
-    for (const [k, f] of falhas) if (!vivo(f, t)) falhas.delete(k);
-  }
 
   return {
     bloqueado(chave) {
       const t = agora();
-      const f = falhas.get(chave);
-      if (!vivo(f, t)) { falhas.delete(chave); return { bloqueado: false, segundos: 0 }; }
+      const m = mapaDe(chave);
+      const f = m.get(chave);
+      if (!vivo(f, t)) { m.delete(chave); return { bloqueado: false, segundos: 0 }; }
       if (f.qtd < maxFalhas) return { bloqueado: false, segundos: 0 };
       return { bloqueado: true, segundos: Math.max(1, Math.ceil((f.desde + janelaMs - t) / 1000)) };
     },
     falhou(chave) {
       const t = agora();
-      if (falhas.size >= MAX_CHAVES) podar(t);
-      const f = falhas.get(chave);
-      if (vivo(f, t)) f.qtd += 1;
-      else if (falhas.size < MAX_CHAVES) falhas.set(chave, { qtd: 1, desde: t });
+      const m = mapaDe(chave);
+      const f = m.get(chave);
+      if (vivo(f, t)) { f.qtd += 1; return; }
+      m.delete(chave);
+      if (m === inexistentes) {
+        for (const [k, v] of m) if (!vivo(v, t)) m.delete(k);
+        while (m.size >= maxInexistentes) m.delete(m.keys().next().value); // descarta o mais antigo
+      }
+      m.set(chave, { qtd: 1, desde: t });
     },
-    limpar(chave) { falhas.delete(chave); }
+    limpar(chave) { mapaDe(chave).delete(chave); }
   };
 }
 
-module.exports = { criarLimiteLogin, HASH_FALSO };
+module.exports = { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT };

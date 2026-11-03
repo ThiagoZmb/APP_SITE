@@ -5,6 +5,7 @@
 // ==========================================================================
 const { CATALOGO, CODIGOS, permissoesFinais } = require('../seguranca/permissoes');
 const { parseEstados } = require('../seguranca/acesso');
+const { CUSTO_BCRYPT } = require('../seguranca/login_limite');
 
 const ADMIN = ['admin.usuarios'];
 const MSG_PROPRIO = 'Você não pode remover o seu próprio acesso de administrador.';
@@ -127,7 +128,7 @@ function registrarAdmin({ rota, pool, acesso, bcrypt }) {
       if (!(await pool.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [empresa]))[0].length) return erro(res, 400, 'Empresa inexistente.');
       if (!(await pool.execute('SELECT id FROM web_perfis WHERE id = ? LIMIT 1', [perfilId]))[0].length) return erro(res, 400, 'Perfil inexistente.');
       if ((await pool.execute('SELECT CODIGO FROM cliente_usuarios WHERE NOME = ? LIMIT 1', [nome]))[0].length) return erro(res, 409, 'Já existe um usuário com este nome.');
-      const hash = await bcrypt.hash(senha, 12);
+      const hash = await bcrypt.hash(senha, CUSTO_BCRYPT);
       conn = await pool.getConnection();
       await conn.beginTransaction();
       // CODIGO não é auto-incremento: reserva o próximo com trava, para não colidir com o VB
@@ -243,7 +244,7 @@ function registrarAdmin({ rota, pool, acesso, bcrypt }) {
     try {
       const [[usuario]] = await pool.execute('SELECT CODIGO, NOME FROM cliente_usuarios WHERE CODIGO = ? LIMIT 1', [codigo]);
       if (!usuario) return erro(res, 404, 'Usuário não encontrado.');
-      await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [await bcrypt.hash(senha, 12), codigo]);
+      await pool.execute('UPDATE cliente_usuarios SET SENHA = ? WHERE CODIGO = ?', [await bcrypt.hash(senha, CUSTO_BCRYPT), codigo]);
       await auditar(pool, { quem: req.user.nome, acao: 'senha_redefinida', alvo: usuario.NOME, detalhe: null });
       res.json({ ok: true });
     } catch (err) { falha(res, 'POST /admin/usuarios/:codigo/senha', err); }
