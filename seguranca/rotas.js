@@ -20,7 +20,11 @@ function exigir(exige) {
 }
 
 function criarRegistro(app, { autenticado }) {
+  // Rotas que passam por `autenticado` (não inclui as públicas); o teste da barreira as percorre.
+  const autenticadas = [];
+
   function rota(metodo, caminho, exige, ...handlers) {
+    autenticadas.push({ metodo, caminho });
     app[metodo](caminho, ...autenticado, exigir(exige), ...handlers);
   }
 
@@ -41,7 +45,9 @@ function criarRegistro(app, { autenticado }) {
     if (soltas.length) throw new Error('Rotas sem permissão declarada: ' + soltas.join(', '));
   }
 
-  return { rota, publica, verificar };
+  const rotasAutenticadas = () => autenticadas.map(r => ({ ...r }));
+
+  return { rota, publica, verificar, rotasAutenticadas };
 }
 
 module.exports = { criarRegistro, exigir };

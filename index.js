@@ -96,7 +96,7 @@ const acesso = criarAcesso({ pool });
 
 function gerarToken(usuario) {
   return jwt.sign(
-    { id: usuario.CODIGO, nome: usuario.NOME, v: 2 },
+    { id: usuario.CODIGO, nome: usuario.NOME, v: 2, tipo: 'funcionario' },
     JWT_SECRET,
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
@@ -114,6 +114,8 @@ async function autenticar(req, res, next) {
     return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   }
   if (payload.v !== 2) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+  // Token de outro tipo (ex.: cliente do portal) nunca vale aqui; sem `tipo` = emitido antes do campo existir.
+  if (payload.tipo !== undefined && payload.tipo !== 'funcionario') return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   try {
     req.acesso = await acesso.carregar(payload.id);
   } catch (err) {

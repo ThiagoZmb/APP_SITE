@@ -1,0 +1,67 @@
+process.env.JWT_SECRET = 'teste';
+process.env.NODE_ENV = 'test';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { subir } = require('./apoio/servidor');
+const { criarPoolFalso } = require('./apoio/poolFalso');
+const { app, pool, acesso, registro } = require('../index.js');
+
+const assinar = claims => jwt.sign(claims, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+const tokenCliente = assinar({ id: 7, nome: 'Cliente', v: 2, tipo: 'cliente' });
+const usarPool = regras => { const f = criarPoolFalso(regras); pool.execute = f.execute; pool.getConnection = f.getConnection; return f; };
+
+test('token com tipo cliente é recusado em toda rota autenticada', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  // Se o token passasse da barreira, o acesso de funcionário viria daqui: nunca deve ser chamado.
+  let chamadas = 0;
+  t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
+  const rotas = registro.rotasAutenticadas();
+  assert.ok(rotas.length > 50, `lista de rotas autenticadas pequena demais: ${rotas.length}`);
+  const falhas = [];
+  for (const { metodo, caminho } of rotas) {
+    const url = s.url + caminho.replace(/:[A-Za-z_]+/g, '1');
+    const r = await fetch(url, { method: metodo.toUpperCase(), headers: { Authorization: 'Bearer ' + tokenCliente } });
+    if (r.status !== 401) falhas.push(`${metodo.toUpperCase()} ${caminho} -> ${r.status}`);
+  }
+  assert.deepEqual(falhas, []);
+  assert.equal(chamadas, 0);
+});
+
+test('rotasAutenticadas devolve cópia e não inclui as públicas', () => {
+  const a = registro.rotasAutenticadas();
+  a.length = 0;
+  assert.ok(registro.rotasAutenticadas().length > 50);
+  assert.ok(!registro.rotasAutenticadas().some(r => r.caminho === '/login'));
+});
+
+test('token sem tipo (emitido antes) continua valendo', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  t.mock.method(acesso, 'carregar', async () => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', perfil: { id: 4, nome: 'X' }, estados: [], ativo: true, permissoes: new Set() }));
+  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + assinar({ id: 7, nome: 'Caio', v: 2 }) } });
+  assert.equal(r.status, 200);
+});
+
+test('tipo diferente de funcionario recebe 401 com a mensagem de sessão expirada', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + tokenCliente } });
+  assert.equal(r.status, 401);
+  assert.deepEqual(await r.json(), { error: 'Sessão expirada. Faça login novamente.' });
+});
+
+test('gerarToken inclui tipo funcionario (token do /login)', async t => {
+  const s = await subir(app);
+  t.after(s.fechar);
+  acesso.limpar();
+  usarPool([[/FROM cliente_usuarios WHERE NOME/, [{ CODIGO: 7, NOME: 'Caio', RAZAO_SOCIAL: 'ELEGANCE', CARGO: 'Produção', SENHA: bcrypt.hashSync('segredo123', 4) }]]]);
+  t.mock.method(acesso, 'carregar', async () => ({ codigo: 7, nome: 'Caio', cargo: 'Produção', empresa: 'ELEGANCE', perfil: { id: 4, nome: 'X' }, estados: [], ativo: true, permissoes: new Set() }));
+  const r = await fetch(s.url + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Caio', password: 'segredo123' }) });
+  assert.equal(r.status, 200);
+  assert.equal(jwt.decode((await r.json()).token).tipo, 'funcionario');
+});
