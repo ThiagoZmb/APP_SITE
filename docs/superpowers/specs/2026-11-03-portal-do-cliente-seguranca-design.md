@@ -66,32 +66,36 @@ CSP sem `'unsafe-inline'` vale para as páginas novas; nas antigas é meta gradu
 
 ## 6. Etapa 2 — identidade externa
 
-### 6.1 Tabelas (todas `web_portal_*`, sem FK para o VB, o VB não é alterado)
-- `web_portal_empresas`: `cliente_codigo` único (= `cadastro_clientes.CODIGO`), situação `ativa|suspensa`, liberado_por/em.
-- `web_portal_usuarios`: e-mail único (minúsculo), hash bcrypt, `cliente_codigo`, papel `admin_geral|usuario`, situação, segredo TOTP **criptografado**, contadores de falha e bloqueio, `senha_alterada_em`, aceite do termo (versão e data).
-- `web_portal_permissoes`: usuário + código (`pedidos.ver`, `documentos.ver`, `financeiro.ver`).
-- `web_portal_convites`: **só o hash** do token, validade 48 h, uso único, quem convidou, papel.
-- `web_portal_sessoes`: id, usuário, criado, expira, IP, revogada.
-- `web_portal_auditoria`: tipo de evento, usuário, empresa, IP, objeto acessado; sem CPF, e-mail completo, valores nem tokens.
+### 6.1 Tabelas (7, todas `web_portal_*`, sem FK para o VB, o VB não é alterado)
+- `web_portal_empresas`: `cliente_codigo` único (= `cadastro_clientes.CODIGO`), situação `ativa|suspensa`, liberado_por/em, suspenso_em.
+- `web_portal_usuarios`: e-mail único (minúsculo, comparação exata), hash bcrypt, `cliente_codigo`, papel `admin_geral|usuario`, situação `convidado|ativo|inativo`, segredo TOTP **criptografado** (AES-256-GCM), `totp_ativo`, `totp_ultimo_passo` (anti-replay), `senha_alterada_em`, aceite do termo (versão e data). O bloqueio por falhas **não é gravado**: fica em memória (ver 6.2).
+- `web_portal_permissoes`: usuário + código (`pedidos.ver`, `documentos.ver`, `financeiro.ver`). Existe, mas nesta etapa só o administrador geral entra (com as três por papel); quem concede permissões é a etapa 4.
+- `web_portal_convites`: **só o hash** do token, validade 48 h, uso único (`usado_em`), quem convidou.
+- `web_portal_recuperacao`: usuário + **hash** (HMAC) de cada código de recuperação e `usado_em`; 10 códigos por usuário.
+- `web_portal_sessoes`: id (= hash SHA-256 do token), usuário, criado, expira, último uso, IP, revogada.
+- `web_portal_auditoria`: evento, usuário, empresa, IP, detalhe; sem CPF, e-mail completo, valores nem tokens (e-mail de conta inexistente só como HMAC curto).
 
 ### 6.2 Autenticação
-- Token com `tipo: 'cliente'`, `issuer` próprio e id de sessão; sessão conferida no banco a cada requisição; cookie `HttpOnly; Secure; SameSite=Strict`, sem token no `localStorage`.
-- Senha de 12 caracteres ou mais, bcrypt, bloqueio gradual, mesma mensagem para usuário inexistente e senha errada, tempo igual.
-- 2º fator TOTP obrigatório para todos; códigos de recuperação de uso único mostrados uma vez; reinício de 2º fator só pela equipe (administrador geral não reinicia o próprio).
-- Convite: a equipe cadastra o e-mail do administrador geral da empresa; link de uso único; o administrador geral convida os demais.
+- **Sessão opaca, sem JWT**: token aleatório de 256 bits no cookie `__Host-portal` (`HttpOnly; Secure; SameSite=Strict; Path=/`, sem Domain), só o **hash SHA-256** no banco; sessão conferida no banco a cada requisição (validade absoluta de 8 h e **inatividade máxima de 60 min**), revogável por token, usuário ou empresa; nada no `localStorage`. As páginas e a API do portal são servidas **na mesma origem** (ver 7). Esta forma substitui o plano inicial de um token com `tipo: 'cliente'` e `issuer` próprio: o cookie `__Host-` e a tabela própria de sessões separam o portal do sistema interno (o JWT de funcionário continua exigindo `tipo: 'funcionario'` e nunca vale no portal).
+- **CSRF**: além de `SameSite=Strict`, toda requisição que altera dados exige o cabeçalho `X-Portal: 1` e, quando o navegador envia `Origin`, ele tem de ser o do portal. As rotas públicas de POST exigem também corpo JSON.
+- Senha de 12 caracteres ou mais (limite de 72 bytes do bcrypt), bcrypt, bloqueio por conta (5 falhas em 15 min) e por IP (10 falhas em 15 min, ambos em memória), mesma mensagem para usuário inexistente e senha errada, e o **mesmo trabalho de banco e de verificação em todos os caminhos de falha** (tempo igual).
+- **Login em um passo**: e-mail, senha e código do aplicativo (ou código de recuperação) numa única chamada; nenhuma etapa intermediária revela se a senha estava certa.
+- 2º fator TOTP obrigatório para todos (passo de 30 s nunca reutilizável); **10 códigos de recuperação** de uso único mostrados uma vez e guardados com **HMAC** de uma chave derivada de `PORTAL_CHAVE_CRIPTO` (são só ~40 bits: um hash simples seria quebrável offline se o banco vazasse; perder a chave invalida os códigos); reinício de 2º fator só pela equipe (apaga também a senha e gera convite novo; administrador geral não reinicia o próprio).
+- Convite: a equipe cadastra o e-mail do administrador geral da empresa; link de uso único com o token no fragmento da URL; o administrador geral convida os demais (etapa 4).
 
 ### 6.3 Empresa só é liberada se
-o nome em `cadastro_clientes` for único e a empresa estiver `ativa`. Empresa `suspensa` derruba todas as sessões na hora.
+o nome em `cadastro_clientes` for único (e não vazio) e a empresa estiver `ativa`. Isso é conferido ao liberar **e a cada requisição** do portal. Empresa `suspensa` derruba todas as sessões na hora.
 
 ### 6.4 E-mail
-SMTP da conta `portal@elegancealuminio.com.br`; variáveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (e remetente) só no Render. Sem elas o portal avisa "convite por e-mail não configurado" e a equipe pode copiar o link manualmente. Nova dependência (cliente SMTP) com versão fixada.
+SMTP da conta `portal@elegancealuminio.com.br`; variáveis `SMTP_HOST`, `SMTP_PORT` (padrão 465), `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM` (remetente) só no Render. Sem elas (ou se o envio falhar) o convite é criado do mesmo jeito e a tela da equipe mostra o link para copiar manualmente (não existe um aviso de "não configurado" no lugar do convite). O link do convite nunca vai a log nem a auditoria. Dependência `nodemailer` com versão fixada (10.1.7). O portal em si exige `PORTAL_URL_BASE` e `PORTAL_CHAVE_CRIPTO`; sem elas responde "Portal não configurado." e a equipe não consegue convidar.
 
 ### 6.5 Etapa 4
 O administrador geral cria, edita, desativa usuários e escolhe as permissões da própria empresa; nunca concede além do que a empresa tem, nunca vê outra empresa, e não se rebaixa nem se desativa se for o último administrador geral. Toda mudança é auditada.
 
 ## 7. Etapa 3 — portal de leitura
 
-- Rotas `/portal/*`, uma por função, cada uma com consulta escrita só para o cliente e **lista fechada de campos**; `cliente_codigo` vem sempre da sessão, nunca da requisição.
+- **Páginas e API no mesmo servidor e na mesma origem.** As páginas do cliente (login, convite, termo, início e as próximas) são arquivos de `portal/public/`, servidos pelo servidor da API em `/portal/*` e não pelo GitHub Pages; assim o cookie `__Host-portal` é de primeira parte e **o portal e o sistema interno ficam em origens diferentes**: o JavaScript do sistema interno (que guarda o token de funcionário em `localStorage`) nunca roda na origem do cliente. Tudo em `/portal` leva CSP sem `'unsafe-inline'`, `no-store` e `no-referrer`; o CORS aceita a origem do portal só nesses caminhos.
+- Rotas `/portal/api/*`, uma por função, cada uma com consulta escrita só para o cliente e **lista fechada de campos**; `cliente_codigo` vem sempre da sessão (`req.portal.empresaCodigo`), nunca da requisição. Nascem por `registro.portal(...)`.
 - Pedidos e status: pedido (não orçamento), situação, datas, entrega (status e data), sem custo, comissão, crédito, observações internas ou dados de outros clientes.
 - Documentos: PDF do pedido e DANFE só se o pedido pertencer à empresa; outro dono e inexistente respondem **404 idêntico**. Cada abertura é auditada.
 - Financeiro: títulos do cliente (situação, vencimento, valor, pagamentos); permissão `financeiro.ver`.
@@ -126,3 +130,18 @@ Criar orçamento ou pedido pelo cliente, notificação por e-mail de pedido pron
 - Se o HostGator oferece TLS para MySQL remoto.
 - Visibilidade do repositório no GitHub.
 - Texto do termo de uso e do aviso de privacidade.
+
+## Estado após a etapa 2
+
+**Feito (identidade externa, só com banco, e-mail e navegador simulados nos testes):**
+- Sete tabelas `web_portal_*`, sessão opaca em cookie `__Host-portal` na mesma origem das páginas, inatividade de 60 min, CSRF por `X-Portal` + `Origin`, CSP rígida em `/portal`.
+- Empresa conferida a cada requisição (ativa, nome único e não vazio); login em um passo com resposta e trabalho de banco iguais em todas as falhas; limites por IP e por conta (em memória); TOTP com passo não reutilizável; 10 códigos de recuperação com HMAC.
+- Convite de 48 h, uso único, token no fragmento, e-mail por SMTP quando configurado (senão a equipe copia o link); termo versionado (texto ainda RASCUNHO).
+- Tela da equipe "Portal do cliente" (permissão `portal.gerir`, só Administrador): liberar, suspender, reativar, convidar, reenviar convite, reiniciar 2º fator. Auditoria do portal com retenção de 12 meses.
+- Passo a passo do dono em `docs/portal_configuracao.md`.
+
+**Falta:**
+- Etapa 3: tudo o que o cliente vê depois de entrar (pedidos e status, PDF e DANFE, financeiro), com lista fechada de campos, isolamento por empresa e 404 uniforme. Hoje a página inicial do portal só mostra e-mail e empresa.
+- Etapa 4: o administrador geral cria e desativa usuários da própria empresa e escolhe permissões (`web_portal_permissoes`); regra do último administrador geral.
+- Fora do código, do dono: senha do MySQL, IPs, histórico do git, visibilidade do repositório, `DB_SSL`, origem própria para o sistema interno, texto jurídico do termo, SMTP e variáveis do portal no Render.
+- Não testado: SMTP real, páginas e tela da equipe no navegador, aplicativo autenticador real, MySQL real (a consulta do login e a de clientes só rodaram contra banco falso), pasta `portal/public` no Render/Linux, concorrência real com `FOR UPDATE`.
