@@ -11,6 +11,7 @@ const { carimboItens } = require('./calculo/leitura_vb');
 const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarSessoes } = require('./seguranca/sessoes');
+const { opcoesSsl } = require('./seguranca/mysql_ssl');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
 const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('./seguranca/login_limite');
@@ -56,6 +57,15 @@ if (!JWT_SECRET || faltando.length > 0) {
   process.exit(1);
 }
 
+// TLS opcional (DB_SSL=1); padrão desligado. Falha ao ler o certificado = FATAL, sem o caminho na mensagem.
+let sslBanco;
+try {
+  sslBanco = opcoesSsl();
+} catch (e) {
+  console.error('FATAL:', e.message);
+  process.exit(1);
+}
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -65,7 +75,8 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   waitForConnections: true,
   dateStrings: true,
-  multipleStatements: false
+  multipleStatements: false,
+  ssl: sslBanco
 });
 
 app.use(helmet());
