@@ -136,17 +136,28 @@ test('convite.js (vm): códigos aparecem uma vez, recebem foco, e Já guardei / 
 });
 
 test('HTML do portal: formulários só por POST, sem input com name e botão de envio nasce desabilitado', () => {
+  const visto = { forms: 0, inputs: 0, envios: 0 };
   for (const nome of HTMLS) {
     const h = ler(nome);
-    for (const m of h.matchAll(/<form([^>]*)>/gi)) {
-      assert.match(m[1], /smethod="post"/, nome + ': form sem method=post');
-      assert.ok(!/sactions*=/i.test(m[1]), nome + ': form com action');
+    const forms = [...h.matchAll(/<form\b([^>]*)>/gi)];
+    if (nome === 'login.html' || nome === 'convite.html') assert.ok(forms.length >= 1, nome + ': nenhum <form> encontrado (teste vazio)');
+    for (const m of forms) {
+      visto.forms++;
+      assert.match(m[1], /\smethod="post"/, nome + ': form sem method=post');
+      assert.ok(!/\saction\s*=/i.test(m[1]), nome + ': form com action');
     }
-    for (const m of h.matchAll(/<input([^>]*)>/gi)) assert.ok(!/snames*=/i.test(m[1]), nome + ': input com name');
-    for (const m of h.matchAll(/<button([^>]*)>/gi)) {
-      if (/type="submit"/.test(m[1])) assert.match(m[1], /sdisabled/, nome + ': botão de envio habilitado');
+    for (const m of h.matchAll(/<input\b([^>]*)>/gi)) {
+      visto.inputs++;
+      assert.ok(!/\sname\s*=/i.test(m[1]), nome + ': input com name');
+    }
+    for (const m of h.matchAll(/<button\b([^>]*)>/gi)) {
+      if (/type="submit"/.test(m[1])) {
+        visto.envios++;
+        assert.match(m[1], /\sdisabled\b/, nome + ': botão de envio habilitado');
+      }
     }
   }
+  assert.ok(visto.forms >= 2 && visto.inputs > 0 && visto.envios >= 2, 'cobertura vazia: ' + JSON.stringify(visto));
 });
 
 test('termo.html traz o aviso RASCUNHO visível', () => {
