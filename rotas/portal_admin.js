@@ -8,6 +8,7 @@
 const { novoTokenOpaco } = require('../portal/tokens');
 const { empresaLiberavel } = require('../portal/acesso');
 const { ErroUsuario } = require('./transacao');
+const { emTransacaoPortal } = require('../portal/transacao');
 
 const GERIR = ['portal.gerir'];
 const VALIDADE_CONVITE_MS = 48 * 60 * 60 * 1000;
@@ -39,28 +40,7 @@ async function auditar(executor, { quem, acao, alvo, detalhe }) {
 }
 
 function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
-  // transação simples; ErroUsuario vira a resposta, o resto vira 500 genérico (log só com o código do erro)
-  async function emTransacao(res, nome, trabalho) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      await conn.beginTransaction();
-      const resultado = await trabalho(conn);
-      await conn.commit();
-      return resultado;
-    } catch (err) {
-      if (conn) await conn.rollback().catch(() => {});
-      if (err instanceof ErroUsuario) res.status(err.status).json({ error: err.message });
-      else if (err && err.code === 'ER_DUP_ENTRY') res.status(409).json({ error: 'Já existe um registro igual.' });
-      else {
-        console.error(`Erro ${nome}:`, (err && err.code) || 'sem código');
-        if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
-      }
-      return undefined;
-    } finally {
-      if (conn) conn.release();
-    }
-  }
+  const emTransacao = (res, nome, trabalho) => emTransacaoPortal(pool, res, nome, trabalho);
 
   const falha = (res, nome, err) => {
     console.error(`Erro ${nome}:`, (err && err.code) || 'sem código');

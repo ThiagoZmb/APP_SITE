@@ -28,6 +28,13 @@ async function empresaLiberavel(pool, clienteCodigo, { aoLiberar = false } = {})
   return { ok: true, razaoSocial };
 }
 
+// Permissões do usuário do portal: o administrador geral tem as três; os demais, as gravadas (só as conhecidas).
+async function carregarPermissoesPortal(pool, usuarioId, papel) {
+  if (papel === 'admin_geral') return new Set(PERMISSOES_PORTAL);
+  const [ps] = await pool.execute('SELECT permissao FROM web_portal_permissoes WHERE usuario_id = ?', [usuarioId]);
+  return new Set(ps.map(p => p.permissao).filter(p => PERMISSOES_PORTAL.includes(p)));
+}
+
 function criarAcessoPortal({ pool, sessoes, config }) {
   function portalAtivo(req, res, next) {
     if (!config.ativo) return res.status(503).json({ error: 'Portal não configurado.' });
@@ -49,13 +56,7 @@ function criarAcessoPortal({ pool, sessoes, config }) {
       const emp = await empresaLiberavel(pool, u.cliente_codigo);
       if (!emp.ok) return res.status(401).json(NAO_AUTENTICADO);
 
-      let permissoes;
-      if (u.papel === 'admin_geral') {
-        permissoes = new Set(PERMISSOES_PORTAL);
-      } else {
-        const [ps] = await pool.execute('SELECT permissao FROM web_portal_permissoes WHERE usuario_id = ?', [u.id]);
-        permissoes = new Set(ps.map(p => p.permissao).filter(p => PERMISSOES_PORTAL.includes(p)));
-      }
+      const permissoes = await carregarPermissoesPortal(pool, u.id, u.papel);
 
       // CSRF (depois da sessão, para quem não tem sessão ver sempre o mesmo 401): em método que altera
       // dados exige X-Portal: 1 e, se o navegador mandou Origin, tem de ser o do próprio portal.
@@ -84,4 +85,4 @@ function criarAcessoPortal({ pool, sessoes, config }) {
   return { portalAtivo, portalAutenticar };
 }
 
-module.exports = { criarAcessoPortal, empresaLiberavel, PERMISSOES_PORTAL };
+module.exports = { criarAcessoPortal, empresaLiberavel, carregarPermissoesPortal, PERMISSOES_PORTAL };

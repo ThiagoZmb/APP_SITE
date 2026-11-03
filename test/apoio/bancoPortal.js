@@ -4,6 +4,7 @@
 // ATENÇÃO: as regras reconhecem o SQL só pelo prefixo e aplicam a própria lógica (revogada, expiração, inatividade);
 // por isso quem testa o SQL de verdade confere texto e parâmetros em `pool.chamadas` (veja test/portal_sessoes.test.js).
 // A comparação de nomes/maiúsculas do MySQL (collation) NÃO é simulada: strings comparam por igualdade exata.
+// A Tarefa 7 acrescentou, NO INÍCIO da lista (a regra de acesso é solta e casaria antes), as regras de convite e login de portal/auth.
 // A Tarefa 6 acrescentou as regras do bloco "rotas da equipe" (convites, empresas, web_auditoria); as da Tarefa 5 não mudaram.
 const { criarPoolFalso } = require('./poolFalso');
 
@@ -27,6 +28,64 @@ function criarBancoPortal(inicial = {}) {
   let proximoConvite = 1;
 
   const regras = [
+    // ---- Tarefa 7: autenticação (convite, login); vêm primeiro de propósito ----
+    // login: busca por e-mail (a regra solta de acesso, mais abaixo, busca por id)
+    [/^SELECT u\.id, u\.email, u\.cliente_codigo, u\.papel, u\.situacao, u\.senha_hash/, (sql, [email]) =>
+      dados.usuarios.filter(u => u.email === email).map(u => ({
+        id: u.id, email: u.email, cliente_codigo: u.cliente_codigo, papel: u.papel, situacao: u.situacao,
+        senha_hash: u.senha_hash ?? null, totp_segredo_cifrado: u.totp_segredo_cifrado ?? null,
+        totp_ativo: u.totp_ativo ?? 0, totp_ultimo_passo: u.totp_ultimo_passo ?? 0,
+        empresa_situacao: sit(u.cliente_codigo) ?? null
+      }))],
+    // anti-replay atômico do TOTP: [passo, id, passo]
+    [/^UPDATE web_portal_usuarios SET totp_ultimo_passo = \? WHERE id = \? AND totp_ultimo_passo < \?/, (sql, [passo, id, limite]) => {
+      const u = dados.usuarios.find(x => x.id === id && Number(x.totp_ultimo_passo ?? 0) < Number(limite));
+      if (u) u.totp_ultimo_passo = passo;
+      return { affectedRows: u ? 1 : 0 };
+    }],
+    // código de recuperação usado uma vez: [quando, usuario_id, codigo_hash]
+    [/^UPDATE web_portal_recuperacao SET usado_em = \? WHERE usuario_id = \? AND codigo_hash = \? AND usado_em IS NULL/, (sql, [quando, uid, hash]) => {
+      const r = dados.recuperacao.find(x => x.usuario_id === uid && x.codigo_hash === hash && x.usado_em == null);
+      if (r) r.usado_em = quando;
+      return { affectedRows: r ? 1 : 0 };
+    }],
+    // convite, iniciar (valida tudo no WHERE): [token_hash, agora]
+    [/^SELECT c\.id, c\.usuario_id, u\.email, u\.cliente_codigo FROM web_portal_convites c/, (sql, [hash, agora]) =>
+      dados.convites.filter(c => c.token_hash === hash && c.usado_em == null && t(c.expira_em) > t(agora)).map(c => {
+        const u = dados.usuarios.find(x => x.id === c.usuario_id);
+        return u && u.situacao === 'convidado' && sit(u.cliente_codigo) === 'ativa'
+          ? { id: c.id, usuario_id: c.usuario_id, email: u.email, cliente_codigo: u.cliente_codigo } : null;
+      }).filter(Boolean)],
+    [/^UPDATE web_portal_usuarios SET totp_segredo_cifrado = \?, totp_ativo = 0 WHERE id = \?/, (sql, [cifrado, id]) => {
+      const u = dados.usuarios.find(x => x.id === id && x.situacao === 'convidado');
+      if (u) Object.assign(u, { totp_segredo_cifrado: cifrado, totp_ativo: 0 });
+      return { affectedRows: u ? 1 : 0 };
+    }],
+    // convite, concluir (travas FOR UPDATE): [token_hash, agora]
+    [/^SELECT id, usuario_id FROM web_portal_convites WHERE token_hash = \?/, (sql, [hash, agora]) =>
+      dados.convites.filter(c => c.token_hash === hash && c.usado_em == null && t(c.expira_em) > t(agora)).map(c => ({ id: c.id, usuario_id: c.usuario_id }))],
+    [/^SELECT id, email, cliente_codigo, situacao, totp_segredo_cifrado, totp_ultimo_passo FROM web_portal_usuarios WHERE id = \?/, (sql, [id]) =>
+      dados.usuarios.filter(u => u.id === id).map(u => ({
+        id: u.id, email: u.email, cliente_codigo: u.cliente_codigo, situacao: u.situacao,
+        totp_segredo_cifrado: u.totp_segredo_cifrado ?? null, totp_ultimo_passo: u.totp_ultimo_passo ?? 0
+      }))],
+    // marca o convite como usado só se ainda não foi: [quando, id]
+    [/^UPDATE web_portal_convites SET usado_em = \? WHERE id = \? AND usado_em IS NULL/, (sql, [quando, id]) => {
+      const c = dados.convites.find(x => x.id === id && x.usado_em == null);
+      if (c) c.usado_em = quando;
+      return { affectedRows: c ? 1 : 0 };
+    }],
+    // ativação da conta: [senha_hash, passo, termo_versao, termo_aceito_em, senha_alterada_em, id]
+    [/^UPDATE web_portal_usuarios SET senha_hash = \?/, (sql, [senha_hash, passo, termo_versao, termo_aceito_em, senha_alterada_em, id]) => {
+      const u = dados.usuarios.find(x => x.id === id && x.situacao === 'convidado');
+      if (u) Object.assign(u, { senha_hash, totp_ativo: 1, totp_ultimo_passo: passo, situacao: 'ativo', termo_versao, termo_aceito_em, senha_alterada_em });
+      return { affectedRows: u ? 1 : 0 };
+    }],
+    // códigos de recuperação em lote: pares (usuario_id, codigo_hash) achatados
+    [/^INSERT INTO web_portal_recuperacao/, (sql, params) => {
+      for (let i = 0; i < params.length; i += 2) dados.recuperacao.push({ usuario_id: params[i], codigo_hash: params[i + 1], usado_em: null });
+      return { affectedRows: params.length / 2 };
+    }],
     [/^INSERT INTO web_portal_sessoes/, (sql, [id, usuario_id, criado_em, expira_em, ultimo_uso_em, ip]) => {
       dados.sessoes.push({ id, usuario_id, criado_em, expira_em, ultimo_uso_em, ip, revogada: 0 });
       return { affectedRows: 1 };
