@@ -637,7 +637,7 @@
             <datalist id="lista-nomes"></datalist><datalist id="lista-formas"></datalist><datalist id="lista-bancos"></datalist>
         </form>
         <div class="acoes">
-            <button class="btn btn-primary" id="btn-salvar" data-perm="financeiro.lancar">💾 Salvar</button>
+            <button type="button" class="btn btn-primary" id="btn-salvar" data-perm="financeiro.lancar">💾 Salvar</button>
             <button class="btn btn-secondary" id="btn-cancelar">Cancelar</button>
             <span class="alteracoes" id="alteracoes">● não salvo</span>
         </div>
@@ -1226,6 +1226,7 @@
         }));
         function marcarAlterado(sim = true) { alterado = sim; $('alteracoes').classList.toggle('visivel', sim); }
         $('form').addEventListener('input', () => marcarAlterado());
+        $('form').addEventListener('submit', e => e.preventDefault());
 
         const EMBED = document.documentElement.classList.contains('embed');
         const avisarPai = (tipo, mensagem) => { if (EMBED && window.parent !== window) window.parent.postMessage({ origem: 'elegance-fluxo', tipo, mensagem }, location.origin); };
@@ -1259,6 +1260,7 @@
             definirCategoria(null, true, 'Informe o cliente ou fornecedor.');   // TreeView1.Enabled = False
             $('g-titulo').textContent = 'Novo movimento';
             $('g-sub').textContent = `Código ${opcoes.proximoId}`;
+            $('btn-salvar').textContent = '💾 Salvar';
             marcarAlterado(false);
             abrirGaveta();
         }
@@ -1278,6 +1280,7 @@
             $('f-valor').value = moeda(it.valor);
             $('g-titulo').textContent = 'Editar movimento';
             $('g-sub').textContent = `Código ${it.id} · ${dataBR(it.data)}`;
+            $('btn-salvar').textContent = '💾 Atualizar';
             definirCategoria(it.codClassificacao, true, 'Verificando categoria...');
             sugerirCategoria(true);
             marcarAlterado(false);
@@ -1328,7 +1331,7 @@
                 toast(e.message, 'erro');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '💾 Salvar';
+                btn.textContent = $('f-id').value ? '💾 Atualizar' : '💾 Salvar';
             }
         }
         $('btn-salvar').addEventListener('click', salvarMovimento);
@@ -1337,7 +1340,6 @@
                 if ($('modal').classList.contains('aberto')) $('modal').classList.remove('aberto');
                 else if ($('gaveta').classList.contains('aberta')) fecharGaveta();
             }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && $('gaveta').classList.contains('aberta')) { e.preventDefault(); salvarMovimento(); }
         });
 
         // ============ ATALHOS VINDOS DA FICHA DO CLIENTE ============
