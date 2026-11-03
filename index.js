@@ -11,6 +11,7 @@ const { validarPng } = require('./calculo/png');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
+const { criarLimiteLogin, HASH_FALSO } = require('./seguranca/login_limite');
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
@@ -183,26 +184,45 @@ function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
 }
 
 // ================= LOGIN =================
+const limiteLogin = criarLimiteLogin();
+// Auditoria do login: quem = nome tentado (até 100), detalhe só com o IP, nunca a senha.
+// Falha ao gravar não derruba o login.
+async function auditarLogin(acao, nome, ip) {
+  try {
+    await pool.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      [String(nome).slice(0, 100), acao, '', JSON.stringify({ ip })]);
+  } catch (err) {
+    console.error('Erro ao auditar o login:', err.message);
+  }
+}
 registro.publica('post', '/login', loginLimiter, async (req, res) => {
   const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   if (!username || !password || username.length > 100 || password.length > 200) {
     return res.status(400).json({ success: false, message: 'Usuário ou senha inválidos.' });
   }
+  const chave = username.toLowerCase();
+  const bloqueio = limiteLogin.bloqueado(chave);
+  if (bloqueio.bloqueado) {
+    await auditarLogin('login_bloqueado', username, req.ip);
+    res.set('Retry-After', String(bloqueio.segundos));
+    return res.status(429).json({ success: false, message: 'Muitas tentativas para este usuário. Aguarde alguns minutos.' });
+  }
   try {
     const [rows] = await pool.execute(
       'SELECT CODIGO, NOME, RAZAO_SOCIAL, CARGO, SENHA FROM cliente_usuarios WHERE NOME = ? LIMIT 1',
       [username]
     );
-    if (rows.length === 0) {
-      return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
-    }
     const user = rows[0];
-    console.log(`[login] ip=${req.ip} saltos_proxy=${String(req.headers['x-forwarded-for'] || '').split(',').filter(Boolean).length}`);
-    const senhaOk = await bcrypt.compare(password, user.SENHA);
-    if (!senhaOk) {
+    // sempre compara (com hash falso se o usuário não existe): o tempo não revela a conta
+    const senhaOk = await bcrypt.compare(password, user ? user.SENHA : HASH_FALSO);
+    if (!user || !senhaOk) {
+      limiteLogin.falhou(chave);
+      await auditarLogin('login_falha', username, req.ip);
       return res.status(401).json({ success: false, message: 'Usuário ou senha inválidos.' });
     }
+    limiteLogin.limpar(chave);
+    await auditarLogin('login_ok', username, req.ip);
     const a = await acesso.carregar(user.CODIGO);
     if (!a || !a.ativo) {
       return res.status(403).json({ success: false, message: 'Acesso à web não liberado. Fale com o administrador.' });
