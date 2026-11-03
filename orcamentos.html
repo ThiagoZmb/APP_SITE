@@ -162,6 +162,11 @@
         .item-layout.frente-serr .item-dados > #quadro-complementos { order: 3; grid-column: 2; }
         .item-layout.frente-serr .item-dados > #quadro-pecas { order: 4; }
         .item-layout.frente-serr .item-dados > #quadro-valores { order: 5; }
+        #quadro-serr-produto .grid-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+        #quadro-serr-produto .form-group { min-width: 0; }
+        @media (max-width: 600px) {
+            #quadro-serr-produto .grid-form { grid-template-columns: minmax(0, 1fr); }
+        }
         /* card Valores: campos de valor compactos à esquerda, botões na extrema direita */
         .valores-linha { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 24px; }
         html body .valores-linha .acoes-item { order: 2; justify-content: flex-end; flex-wrap: wrap; align-items: center; margin: 0 0 0 auto !important; }
@@ -1145,6 +1150,33 @@
             aplicarRegrasPuxador();
         }
         // ============ COMBOS ============
+        function expandirComboParaOpcoes(sel) {
+            const opcoes = Array.from(sel.options, opcao => opcao.textContent || '');
+            if (!opcoes.length) return;
+            const estilo = getComputedStyle(sel);
+            const canvas = document.createElement('canvas');
+            const contexto = canvas.getContext('2d');
+            contexto.font = estilo.font;
+            const maiorTexto = opcoes.reduce((maior, texto) => Math.max(maior, contexto.measureText(texto).width), 0);
+            const extras = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+                .reduce((total, propriedade) => total + (parseFloat(estilo[propriedade]) || 0), 0) + 12;
+            const caixa = sel.getBoundingClientRect();
+            const largura = Math.min(
+                Math.max(caixa.width, Math.ceil(maiorTexto + extras)),
+                Math.max(1, window.innerWidth - 32)
+            );
+            const deslocamento = Math.min(0, window.innerWidth - 16 - (caixa.left + largura));
+            sel.style.position = 'relative';
+            sel.style.zIndex = '5';
+            sel.style.width = `${largura}px`;
+            sel.style.transform = `translateX(${deslocamento}px)`;
+        }
+        function restaurarLarguraCombo(sel) {
+            sel.style.removeProperty('position');
+            sel.style.removeProperty('z-index');
+            sel.style.removeProperty('width');
+            sel.style.removeProperty('transform');
+        }
         function popularLista(id, lista, msgVazio) {
             const sel = document.getElementById(id);
             if (!sel) return;
@@ -3755,6 +3787,11 @@
         document.getElementById('f-av-acab').addEventListener('change', aoMudarAcabAvulso);
         ['f-av-cor', 'f-av-alt', 'f-av-larg'].forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
+        ['f-produto', 'f-material', 'f-acab-serr', 'f-cor-serr'].forEach(id => {
+            const combo = document.getElementById(id);
+            combo.addEventListener('focus', () => expandirComboParaOpcoes(combo));
+            combo.addEventListener('blur', () => restaurarLarguraCombo(combo));
+        });
         // Medidas: furos automáticos, trava do puxador total e redesenho
         ['f-altura', 'f-largura'].forEach(id => {
             const el = document.getElementById(id);
