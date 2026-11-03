@@ -2758,9 +2758,6 @@
             if (atualizandoPeca) { pecasSerr[pecaEditando] = p; pecaEditando = -1; }
             else pecasSerr.push(p);
             limparMedidasSerr(); // produto, material, acabamento e cor continuam para a próxima peça (btnNovo do VB)
-            // peça NOVA num item novo: a quantidade de conjuntos volta a 1 e é digitada de novo na hora de adicionar o item
-            // (não mexe ao atualizar uma peça nem ao editar um item já salvo, para não trocar o total sem querer)
-            if (!atualizandoPeca && editandoIndex < 0) document.getElementById('f-qtd').value = 1;
             renderPecas();
             calcularPrecoAutomatico();
         }
