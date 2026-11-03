@@ -18,6 +18,7 @@
   const MAX_PDF = 2 * 1024 * 1024;
   const LOTE_EXISTENTES = 500; // o servidor aceita até 500 chaves por consulta
   const TENTATIVAS = 3;
+  const ENVIOS_SIMULTANEOS = 6; // moderado: o servidor tem 10 conexões de banco e outras telas também usam
   const MODELO_NFE = '55';
 
   // DV da chave de acesso: módulo 11, pesos 2..9 da direita para a esquerda nos 43 primeiros dígitos
@@ -146,13 +147,20 @@
       estado.ocupado = true; estado.parar = false;
       $('btn-enviar').disabled = true; $('btn-parar').hidden = false; $('barra').hidden = false;
       const total = estado.novas.length, resultados = [];
-      for (let i = 0; i < total; i++) {
-        if (estado.parar) break;
-        $('texto-progresso').textContent = `Enviando ${i + 1} de ${total}…`;
-        $('barra-interna').style.width = Math.round((i / total) * 100) + '%';
-        resultados.push(await enviarUm(estado.novas[i]));
-        if (resultados[resultados.length - 1].situacao === 'erro' && /Sess[aã]o expirada/i.test(resultados[resultados.length - 1].motivo)) break;
-      }
+      // vários envios ao mesmo tempo (o servidor é idempotente por chave); cada "trabalhador" pega o próximo da fila
+      let proximo = 0, interromper = false;
+      const trabalhador = async () => {
+        while (!interromper && !estado.parar && proximo < total) {
+          const item = estado.novas[proximo++];
+          const r = await enviarUm(item);
+          resultados.push(r);
+          if (r.situacao === 'erro' && /Sess[aã]o expirada/i.test(r.motivo)) interromper = true;
+          $('texto-progresso').textContent = `Enviadas ${resultados.length} de ${total}…`;
+          $('barra-interna').style.width = Math.round((resultados.length / total) * 100) + '%';
+        }
+      };
+      $('texto-progresso').textContent = `Enviando 0 de ${total}…`;
+      await Promise.all(Array.from({ length: Math.min(ENVIOS_SIMULTANEOS, total) }, trabalhador));
       $('barra-interna').style.width = '100%';
       $('btn-parar').hidden = true; estado.ocupado = false;
       const r = resumir({ ignoradas: estado.selecao.ignoradas, jaExistiam: estado.jaExistiam, resultados });
