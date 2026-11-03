@@ -104,6 +104,14 @@ Variáveis de ambiente (apenas nomes):
 
 Nunca colocar valores de senhas/tokens neste arquivo nem no git.
 
+**Pendências de segurança FORA DO CÓDIGO (condição para o primeiro cliente real entrar; só o dono resolve):**
+- Trocar a senha do MySQL, no Render e no HostGator (a antiga está no histórico do git).
+- Restringir no HostGator os IPs com acesso remoto ao MySQL (hoje `%`).
+- Limpar o histórico do git (reescrita destrutiva: só com confirmação do dono) e confirmar a visibilidade do repositório no GitHub.
+- Ligar `DB_SSL=1` quando o HostGator confirmar TLS no MySQL.
+- Publicar o front numa origem própria (domínio ou subdomínio da empresa): todo site GitHub Pages da conta compartilha a origem `thiagozmb.github.io`, e nela o token em `localStorage`, o CORS e o serviço local da porta 3917 confiam.
+- Para o portal do cliente (etapa 2): o relatório `GET /clientes/nomes_duplicados` precisa estar vazio para a empresa.
+
 ## 5. Regras importantes do código
 
 ### VALOR_CHEIO x VALOR_FIXO (tabela `cadastro_de_produtos`)
