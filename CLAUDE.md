@@ -76,7 +76,7 @@ entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe
 *.html, layout.js, login.js, ranking.js, custos_precos.js, importar_itens.js, leitura_pdf.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
 test/                    Testes (node:test); test/apoio/ = banco/pool falsos, servidor de teste, XMLs de NF-e
 .gitignore               node_modules/, .env, *.log
-APP_SITE.rar             Arquivo compactado não rastreado (ignorar)
+APP_SITE.rar             Arquivo compactado, tirado do git (estava rastreado; `*.rar` agora no .gitignore). O histórico ainda contém a senha antiga do banco até a limpeza do histórico, que depende do dono
 ```
 
 ## 3. Como rodar

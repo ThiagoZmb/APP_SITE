@@ -11,3 +11,6 @@ amostras_pdf/
 *.p12
 sefaz.config.json
 sefaz.estado.json
+
+# arquivos compactados (o APP_SITE.rar já levou senha do banco ao histórico)
+*.rar
