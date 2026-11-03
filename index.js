@@ -523,9 +523,28 @@ registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados
       SITUACAO: b.situacao === 'Inativo' ? 'Inativo' : 'Ativo'
     };
     const cols = Object.keys(campos), vals = Object.values(campos);
-    const [ex] = await pool.execute('SELECT CODIGO FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
+    const [ex] = await pool.execute('SELECT CODIGO, RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
     if (ex.length) {
+      // Renomear: pedidos e lançamentos só guardam a razão social, então o histórico do nome antigo fica para trás.
+      // "Renomear" = texto diferente do gravado por igualdade estrita (após trim); só o booleano true confirma.
+      const antigo = String(ex[0].RAZAO_SOCIAL ?? '').trim();
+      const renomeando = antigo !== d.razao;
+      if (renomeando && b.confirmarRenomear !== true) {
+        const [ped] = await pool.execute('SELECT 1 AS x FROM ped_orc WHERE RAZAO_SOCIAL = ? LIMIT 1', [antigo]);
+        let historico = ped.length > 0;
+        if (!historico) {
+          const [fluxo] = await pool.execute('SELECT 1 AS x FROM fluxo_de_caixa WHERE RAZAO_SOCIAL = ? LIMIT 1', [antigo]);
+          historico = fluxo.length > 0;
+        }
+        if (historico) return res.status(409).json({ error: 'Este cliente tem histórico no nome atual. Confirme para renomear.', codigo: 'renomear_confirmar' });
+      }
       await pool.execute(`UPDATE cadastro_clientes SET ${cols.map(c => c + ' = ?').join(', ')} WHERE CODIGO = ?`, [...vals, codigo]);
+      if (renomeando) {
+        // auditoria sem os nomes (pode ser pessoa física); falha ao auditar não desfaz a gravação
+        await pool.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+          [String(req.acesso?.nome || '').slice(0, 100), 'cliente_renomeado', String(codigo), null])
+          .catch(e => console.error('Erro ao auditar a renomeação do cliente:', e.code || 'sem código'));
+      }
       return res.json({ ok: true, codigo, mensagem: 'Cliente atualizado com sucesso!' });
     }
     await pool.execute(
@@ -535,6 +554,33 @@ registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados
   } catch (err) {
     console.error('Erro /clientes/salvar:', err.code, err.message);
     res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.' });
+  }
+});
+
+// Relatório de nomes ambíguos: a ligação pedido/caixa <-> cliente é por Razão Social (JOIN_CLIENTE, mesma comparação do banco).
+// Etapa 2 (portal): só libera uma empresa que NÃO apareça aqui. Com estados restritos, só entram grupos com 2+ cadastros
+// DENTRO dos estados do usuário e só esses códigos: cadastro de outro estado nunca aparece (nem a contagem).
+registro.rota('get', '/clientes/nomes_duplicados', ['clientes.editar'], async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT MIN(RAZAO_SOCIAL) AS razao, COUNT(*) AS qtd, GROUP_CONCAT(CODIGO ORDER BY CODIGO) AS codigos,
+              GROUP_CONCAT(UPPER(TRIM(IFNULL(ESTADO, ''))) ORDER BY CODIGO) AS estados
+       FROM cadastro_clientes GROUP BY RAZAO_SOCIAL HAVING COUNT(*) > 1 ORDER BY razao`);
+    const estados = req.acesso?.estados || [];
+    const duplicados = [];
+    for (const r of rows) {
+      let codigos = String(r.codigos ?? '').split(',').map(Number).filter(Number.isInteger);
+      if (estados.length) {
+        const ufs = String(r.estados ?? '').split(',');
+        codigos = codigos.filter((_, i) => estados.includes(ufs[i]));
+        if (codigos.length < 2) continue;
+      }
+      duplicados.push({ razaoSocial: String(r.razao ?? ''), qtdCadastros: codigos.length, codigos });
+    }
+    res.json({ duplicados });
+  } catch (err) {
+    console.error('Erro /clientes/nomes_duplicados:', err.message);
+    res.status(500).json({ error: 'Erro ao procurar nomes duplicados' });
   }
 });
 

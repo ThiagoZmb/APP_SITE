@@ -574,7 +574,7 @@
             const res = await fetch(API_BASE + caminho, { ...opts, headers: { 'Authorization': 'Bearer ' + getToken(), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
             if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             const d = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error((d.error || `Erro HTTP: ${res.status}`));
+            if (!res.ok) { const e = new Error((d.error || `Erro HTTP: ${res.status}`)); e.codigo = d.codigo; throw e; }
             return d;
         }
         function toast(msg, tipo = 'info') {
@@ -792,7 +792,15 @@
             if (!d.telefone) return falha('Favor inserir o Telefone!', 'c-telefone');
             const btn = $('cf-salvar'); btn.disabled = true; btn.textContent = 'Salvando...';
             try {
-                const r = await api('/clientes/salvar', { method: 'POST', body: JSON.stringify(d) });
+                let r;
+                try { r = await api('/clientes/salvar', { method: 'POST', body: JSON.stringify(d) }); }
+                catch (e) {
+                    // renomear cliente com pedidos/lançamentos no nome atual: pergunta e reenvia confirmado
+                    if (e.codigo !== 'renomear_confirmar') throw e;
+                    if (!(await confirmar('Renomear cliente', e.message + ' Os pedidos e lançamentos antigos continuarão no nome atual.'))) return;
+                    d.confirmarRenomear = true;
+                    r = await api('/clientes/salvar', { method: 'POST', body: JSON.stringify(d) });
+                }
                 toast(r.mensagem, 'ok');
                 marcarAlterado(false);
                 opcoesCliente = null;
