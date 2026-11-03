@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const P = require('../peso_tela.js');
 
-const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n'); // autocrlf do Windows não pode quebrar as buscas por texto
 const porta = (mudar = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, largura: 500, furos: { lista: [], lados: [] }, detalhes: { perfil: 'P' },
   valor: 100, valorTela: 100, descricao: 'x', obs: 'y', historico: '+10', acessorios: [{ nome: 'A' }], ...mudar });
 
