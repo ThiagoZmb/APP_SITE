@@ -25,6 +25,8 @@ function exigir(exige) {
 // Lista vazia = qualquer usuário autenticado do portal. Permissão de funcionário nunca vale aqui.
 function exigirPortal(exige) {
   const mw = (req, res, next) => {
+    // Defesa em profundidade: sem sessão do portal nunca passa, mesmo se o guarda faltar.
+    if (!req.portal) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
     const r = atende(req.portal?.permissoes || new Set(), exige);
     if (!r.ok) return res.status(403).json({ error: 'Sem permissão para esta ação.', faltando: r.faltando });
     next();

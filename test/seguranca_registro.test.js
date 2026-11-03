@@ -61,7 +61,6 @@ test('exigir não é exportado: não dá para marcar uma rota fora do registro',
 
 // ---- Categorias do portal do cliente (listas separadas das rotas de funcionário) ----
 const http = require('node:http');
-const { atende } = require('../seguranca/permissoes');
 
 // Guardas falsos: portalAutenticado nega sem req.portal (401); portalPublico só deixa passar.
 const portalAutenticadoFalso = [(req, res, next) => {
@@ -122,8 +121,6 @@ test('rota portal: sem sessão 401, permissão faltando 403, com permissão 200;
   assert.equal((await fetch(s.url + '/portal/eu', { headers: { 'x-portal': 'financeiro.ver' } })).status, 200);
   assert.equal((await fetch(s.url + '/portal/eu')).status, 401);
   assert.deepEqual(await (await fetch(s.url + '/portal/aberta')).json(), { passou: true });
-  // Permissão do funcionário (req.acesso) NÃO vale no portal.
-  assert.ok(atende);
 });
 
 test('verificar() aceita as quatro categorias e continua recusando rota solta e Router', () => {
@@ -150,4 +147,33 @@ test('sem portalPublico/portalAutenticado informados, criarRegistro continua fun
   const reg = criarRegistro(app, { autenticado: autenticadoFalso });
   assert.deepEqual(reg.rotasPortal(), []);
   assert.deepEqual(reg.rotasPortalPublicas(), []);
+});
+
+test('portal(...) sem guarda de sessão e sem req.portal responde 401 e não chama o handler', async t => {
+  const app = express();
+  const reg = criarRegistro(app, { autenticado: autenticadoFalso });
+  let chamadas = 0;
+  const h = (req, res) => { chamadas++; res.json({ ok: true }); };
+  reg.portal('get', '/portal/x', [], h);
+  reg.portal('get', '/portal/y', ['pedidos.ver'], h);
+  const s = await subirApp(app);
+  t.after(s.fechar);
+  for (const caminho of ['/portal/x', '/portal/y']) {
+    const r = await fetch(s.url + caminho);
+    assert.equal(r.status, 401);
+    assert.equal((await r.json()).error, 'Sessão expirada. Entre novamente.');
+  }
+  assert.equal(chamadas, 0);
+});
+
+test('permissão de FUNCIONÁRIO (req.acesso) não vale no portal: sem req.portal responde 401', async t => {
+  const app = express();
+  app.use((req, res, next) => { req.acesso = { permissoes: new Set(['pedidos.ver']) }; next(); });
+  const reg = criarRegistro(app, { autenticado: autenticadoFalso });
+  let chamadas = 0;
+  reg.portal('get', '/portal/y', ['pedidos.ver'], (req, res) => { chamadas++; res.json({}); });
+  const s = await subirApp(app);
+  t.after(s.fechar);
+  assert.equal((await fetch(s.url + '/portal/y')).status, 401);
+  assert.equal(chamadas, 0);
 });

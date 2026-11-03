@@ -122,7 +122,8 @@ test('cookie __Host-portal sozinho não autentica nenhuma rota de funcionário',
   acesso.limpar();
   let chamadas = 0;
   t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
-  const falhas = await varrer(s, { Cookie: '__Host-portal=' + crypto.randomBytes(16).toString('hex') });
+  // Trava a regressão de alguém passar a ler o cookie do portal nas rotas de funcionário.
+  const falhas = await varrer(s, { Authorization: 'Bearer x', Cookie: '__Host-portal=' + crypto.randomBytes(16).toString('hex') });
   assert.deepEqual(falhas, []);
   assert.equal(chamadas, 0);
 });
