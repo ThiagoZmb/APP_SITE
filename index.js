@@ -26,6 +26,8 @@ const { criarAcessoPortal } = require('./portal/acesso');
 const { cabecalhosPortal } = require('./portal/cabecalhos');
 const { criarOpcoesCors } = require('./portal/cors');
 const { registrarAdmin } = require('./rotas/admin');
+const { registrarPortalAdmin } = require('./rotas/portal_admin');
+const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
@@ -110,6 +112,8 @@ const sessoes = criarSessoes({ pool });
 // Sessões do portal do cliente: tabela, cookie e guardas próprios (não reaproveitam os de funcionário).
 const sessoesPortal = criarSessoesPortal({ pool });
 const acessoPortal = criarAcessoPortal({ pool, sessoes: sessoesPortal, config: configPortal });
+// Envio do convite do portal por e-mail: criado uma vez (sem SMTP configurado, a equipe copia o link à mão).
+const emailPortal = criarEmail({ smtp: configPortal.smtp });
 
 // Hash bcrypt completo (versão, custo e 53 caracteres); texto puro de 60 caracteres não passa.
 const REGEX_HASH_BCRYPT = /^\$2[aby]\$\d\d\$[./A-Za-z0-9]{53}$/;
@@ -1737,6 +1741,7 @@ registro.rota('delete', '/fluxo/:id', ['financeiro.excluir', 'valores.ver'], asy
 
 // ================= ADMINISTRAÇÃO DE USUÁRIOS E PERMISSÕES =================
 registrarAdmin({ rota: registro.rota, pool, acesso, bcrypt, sessoes });
+registrarPortalAdmin({ rota: registro.rota, pool, sessoes: sessoesPortal, email: emailPortal, config: configPortal });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
@@ -1804,4 +1809,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, pool, acesso, sessoes, configPortal, sessoesPortal, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
+module.exports = { app, pool, acesso, sessoes, configPortal, sessoesPortal, emailPortal, registro, leituraPdf, colunasPdf: pdfPedOrc.colunasPdf };
