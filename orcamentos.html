@@ -692,7 +692,7 @@
                         <h4>🧱 Peças do conjunto</h4>
                         <div class="tab-acess-wrap">
                             <table class="tab-acess tab-pecas">
-                                <thead><tr><th>#</th><th>Produto / material</th><th>Acab. / cor</th><th>A × L × P (mm)</th><th>Barras</th><th>Metros</th><th>Soldas</th><th data-valor>Valor</th><th></th></tr></thead>
+                                <thead><tr><th>#</th><th>Produto / material</th><th>Acab. / cor</th><th>A × L × P (mm)</th><th>Conjuntos</th><th>Barras</th><th>Metros</th><th>Soldas</th><th data-valor>Valor total</th><th></th></tr></thead>
                                 <tbody></tbody>
                             </table>
                         </div>
@@ -2262,7 +2262,7 @@
             const p0 = ehSerr ? (pecasSerr[0] || {}) : {};
             return {
                 frente: frenteAtual,
-                qtd: qtdEfetiva(),
+                qtd: ehSerr ? qtdSerralheriaItem() : qtdEfetiva(),
                 ...(ehSerr ? { pecas: pecasSerr.map(pecaParaEnvio) } : {}),
                 altura: ehSerr ? (p0.altura || 0) : ehAv ? (parseFloat(g('f-av-alt')) || 0) : ehSerr ? (parseFloat(g('f-altura-serr')) || 0) : (parseFloat(g('f-altura')) || 0),
                 largura: ehAv ? (parseFloat(g('f-av-larg')) || 0) : ehSerr ? (p0.largura || 0) : (parseFloat(g('f-largura')) || 0),
@@ -2352,7 +2352,8 @@
                     // o conjunto inteiro volta para a lista; sem `pecas` (forma antiga), o próprio item é a única peça
                     pecasSerr = (Array.isArray(item.pecas) && item.pecas.length ? item.pecas : [{ produto: d.produto, material: d.material, acabSerr: d.acabSerr,
                         corSerr: d.corSerr, altura: item.altura, largura: item.largura, profundidade: item.profundidade, soldas: item.soldas,
-                        qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade }]).map(p => ({ ...p }));
+                        qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade }])
+                        .map(p => ({ ...p, qtd: p.qtd || item.qtd || 1 }));
                     pecaEditando = -1;
                 }
                 set('f-valor', item.valor);
@@ -2730,7 +2731,7 @@
                 </tr>`).join('');
         }
         // ---- peças do conjunto (frmSerralheria: Inserir / Atualizar / Remover) ----
-        const pecaParaEnvio = p => ({ produto: p.produto, material: p.material, acabSerr: p.acabSerr || '', corSerr: p.corSerr || '',
+        const pecaParaEnvio = p => ({ produto: p.produto, material: p.material, acabSerr: p.acabSerr || '', corSerr: p.corSerr || '', qtd: p.qtd || 1,
             altura: p.altura || 0, largura: p.largura || 0, profundidade: p.profundidade || 0,
             qtdAltura: p.qtdAltura || 1, qtdLargura: p.qtdLargura || 1, qtdProfundidade: p.qtdProfundidade || 1, soldas: p.soldas || 0 });
         const metrosPeca = p => ((p.altura || 0) * (p.qtdAltura || 1) + (p.largura || 0) * (p.qtdLargura || 1) + (p.profundidade || 0) * (p.qtdProfundidade || 1)) / 1000;
@@ -2760,14 +2761,15 @@
                     <td>${escapeHtml(p.produto)}<br><small>${escapeHtml(p.material)}</small></td>
                     <td>${escapeHtml([p.acabSerr, p.corSerr].filter(Boolean).join(' / ') || '—')}</td>
                     <td>${p.altura || 0} × ${p.largura || 0} × ${p.profundidade || 0}</td>
+                    <td>${p.qtd || 1}</td>
                     <td>${p.qtdAltura || 1}/${p.qtdLargura || 1}/${p.qtdProfundidade || 1}</td>
                     <td>${metrosBR(metrosPeca(p))}</td>
                     <td>${p.soldas || 0} soldas</td>
-                    <td data-valor>${p.valor != null ? formatCurrency(p.valor) : '—'}</td>
+                    <td data-valor>${p.valor != null ? formatCurrency(p.valor * (p.qtd || 1)) : '—'}</td>
                     <td><button type="button" class="btn-mini peca-editar" title="Editar peça">✏️</button>
                         <button type="button" class="btn-mini peca-remover" title="Remover peça">🗑️</button></td>
-                </tr>`).join('') : '<tr><td colspan="9" class="vazio-pecas">Nenhuma peça ainda: preencha produto, material e medidas e clique em "Inserir peça na lista".</td></tr>';
-            const somaPecas = pecasSerr.reduce((s, p) => s + (p.valor || 0), 0);
+                </tr>`).join('') : '<tr><td colspan="10" class="vazio-pecas">Nenhuma peça ainda: preencha produto, material e medidas e clique em "Inserir peça na lista".</td></tr>';
+            const somaPecas = pecasSerr.reduce((s, p) => s + (p.valor || 0) * (p.qtd || 1), 0);
             const somaComp = complementosSerr.reduce((s, c) => s + (c.valorTotal || 0), 0);
             document.getElementById('resumo-conjunto').innerHTML = pecasSerr.length
                 ? `<span>Peças: <b>${formatCurrency(somaPecas)}</b></span><span>Complementos: <b>${formatCurrency(somaComp)}</b></span><span>Conjunto: <b>${formatCurrency(somaPecas + somaComp)}</b></span>` : '';
@@ -2775,19 +2777,25 @@
             document.getElementById('btn-peca-cancelar').style.display = pecaEditando >= 0 ? '' : 'none';
         }
         const precificandoPecasSerr = new WeakSet();
+        function qtdSerralheriaItem() {
+            if (!pecasSerr.length) return qtdEfetiva();
+            const quantidades = pecasSerr.map(p => Math.max(1, parseInt(p.qtd) || 1));
+            return quantidades.every(q => q === quantidades[0]) ? quantidades[0] : 1;
+        }
         function atualizarValorSerralheria() {
-            const qtd = qtdEfetiva();
+            const qtd = qtdSerralheriaItem();
             const pecasPrecificadas = pecasSerr.every(p => Number.isFinite(p.valor));
             const complementosPrecificados = complementosSerr.every(c => Number.isFinite(c.valorTotal));
             const valor = document.getElementById('f-valor');
             if (!pecasPrecificadas || !complementosPrecificados) {
                 valor.value = '';
             } else {
-                const totalPecas = pecasSerr.reduce((soma, p) => soma + p.valor, 0);
+                const totalPecas = pecasSerr.reduce((soma, p) => soma + p.valor * (p.qtd || 1), 0);
                 const totalComplementos = complementosSerr.reduce((soma, c) => soma + c.valorTotal, 0);
                 valor.value = ((totalPecas + totalComplementos / qtd) || 0).toFixed(2);
             }
-            atualizarTotalItem();
+            const total = (parseFloat(valor.value.replace(',', '.')) || 0) * qtd;
+            document.getElementById('f-total-item').value = total.toFixed(2).replace('.', ',');
             renderPecas();
         }
         function precificarPecasSerrPendentes() {
@@ -2808,7 +2816,7 @@
                         produto: peca.produto,
                         pecas: [pecaParaEnvio(peca)],
                         complementos: [],
-                        qtd: qtdEfetiva(),
+                        qtd: peca.qtd,
                         percentuais: ''
                     })
                 });
@@ -2834,7 +2842,7 @@
             if (!val('f-produto') || !val('f-material')) { alert('Escolha o produto e o material da peça.'); return; }
             const p = { produto: val('f-produto'), material: val('f-material'), acabSerr: val('f-acab-serr'), corSerr: val('f-cor-serr'),
                 altura: parseFloat(val('f-altura-serr')) || 0, largura: parseFloat(val('f-largura-serr')) || 0, profundidade: parseFloat(val('f-profundidade')) || 0,
-                qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'), soldas: Math.max(0, parseInt(val('f-soldas')) || 0) };
+                qtd: qtdEfetiva(), qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'), soldas: Math.max(0, parseInt(val('f-soldas')) || 0) };
             if (!(metrosPeca(p) > 0) && !p.soldas) { alert('Informe ao menos uma medida (ou as soldas) da peça.'); return; }
             const atualizandoPeca = pecaEditando >= 0;
             if (atualizandoPeca) { pecasSerr[pecaEditando] = p; pecaEditando = -1; }
@@ -2846,6 +2854,7 @@
         async function editarPecaSerr(i) {
             const p = pecasSerr[i];
             if (!p) return;
+            document.getElementById('f-qtd').value = p.qtd || 1;
             isCarregandoEdicao = true;
             try {
                 if (val('f-produto') !== p.produto) { selecionarComboPorTexto('f-produto', p.produto); await carregarMateriais(p.produto); }

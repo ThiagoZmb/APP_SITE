@@ -99,6 +99,14 @@ function validar(b) {
     if (!it || typeof it !== 'object' || typeof it.detalhes !== 'object') return 'Item inválido.';
     const q = Number(it.qtd);
     if (!(Number.isInteger(q) && q >= 1 && q <= MAX_QTD_ITEM)) return `Item ${i + 1}: quantidade inválida (1 a ${MAX_QTD_ITEM}).`;
+    if (it.frente === 'Serralheria' && Array.isArray(it.pecas)) {
+      for (const [j, p] of it.pecas.entries()) {
+        if (p && p.qtd !== undefined && p.qtd !== null && p.qtd !== '' &&
+            !(Number.isInteger(Number(p.qtd)) && Number(p.qtd) >= 1 && Number(p.qtd) <= MAX_QTD_ITEM)) {
+          return `Item ${i + 1}, peça ${j + 1}: quantidade inválida (1 a ${MAX_QTD_ITEM}).`;
+        }
+      }
+    }
   }
   return null;
 }
@@ -112,6 +120,7 @@ function pecasDoItem(item) {
       profundidade: item.profundidade, soldas: item.soldas, qtdAltura: item.qtdAltura, qtdLargura: item.qtdLargura, qtdProfundidade: item.qtdProfundidade }];
   return lista.map(p => ({ produto: corta(p && p.produto, 190), material: corta(p && p.material, 190), acabSerr: corta(p && p.acabSerr, 190), corSerr: corta(p && p.corSerr, 190),
     altura: parseFloat(p && p.altura) || 0, largura: parseFloat(p && p.largura) || 0, profundidade: parseFloat(p && p.profundidade) || 0,
+    qtd: Math.max(1, parseInt(p && p.qtd) || parseInt(item.qtd) || 1),
     soldas: Math.max(0, parseInt(p && p.soldas) || 0), qtdAltura: p && p.qtdAltura, qtdLargura: p && p.qtdLargura, qtdProfundidade: p && p.qtdProfundidade }));
 }
 
@@ -266,11 +275,12 @@ async function gravarItem(conn, { tipo, numero, medicao }, p) {
     const valorProprio = !comps.length && pecas.length === 1;
     for (const [i, pc] of pecas.entries()) {
       const totalPeca = (p.pecasDetalhe[i] || {}).total || 0;
-      await inserir(conn, 'ped_orc_serralheria', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: i + 1, QTD_ITENS: linha.qtd,
+      const qtdPeca = Math.max(1, parseInt(pc.qtd) || linha.qtd);
+      await inserir(conn, 'ped_orc_serralheria', { TIPO: tipo, NUMERO: numero, ITEM_PEDIDO: n, ITEM: i + 1, QTD_ITENS: qtdPeca,
         PRODUTO: corta(pc.produto, 190), MATERIAL: corta(pc.material, 190), ACABAMENTO: corta(pc.acabSerr, 190), COR: corta(pc.corSerr, 190),
         QTD_ALTURA: qtdEixo(pc.qtdAltura), ALTURA: Math.round(pc.altura), QTD_LARGURA: qtdEixo(pc.qtdLargura), LARGURA: Math.round(pc.largura),
         QTD_PROFUNDIDADE: qtdEixo(pc.qtdProfundidade), PROFUNDIDADE: Math.round(pc.profundidade), QTD_SOLDAS: pc.soldas,
-        UNITARIO: valorProprio ? valor : arred2(totalPeca / linha.qtd * p.fator), TOTAL: valorProprio ? totalItem : arred2(totalPeca * p.fator), OBS: corta(item.obs, 2000) });
+        UNITARIO: valorProprio ? valor : arred2(totalPeca / qtdPeca * p.fator), TOTAL: valorProprio ? totalItem : arred2(totalPeca * p.fator), OBS: corta(item.obs, 2000) });
     }
     // frmSerralheria.EnviarParaPedido: complementos com a % do item aplicada no valor unitário
     let sub = 1;

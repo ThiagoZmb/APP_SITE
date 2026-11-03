@@ -92,6 +92,31 @@ test('conjunto: preço soma as peças e os complementos; devolve o valor de cada
   assert.equal((await preco(chamar, { pecas: [] , produto: '', material: '' })).status, 400);
 });
 
+test('quantidade é independente por peça, tanto no cálculo quanto ao salvar e reabrir', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const p = pecas()[0];
+  const lista = [{ ...p, qtd: 1 }, { ...p, qtd: 2 }];
+  const calculado = await (await preco(chamar, { qtd: 1, pecas: lista })).json();
+  assert.deepEqual([calculado.total, calculado.pecas.map(x => [x.unitario, x.total])], [375, [[125, 125], [125, 250]]]);
+
+  const r = await chamar('/ped_orc/salvar', 'POST', corpo({ itens: [serr({
+    qtd: 1, pecas: lista, complementos: [], valorTela: 375,
+    detalhes: { produto: 'Grade', material: p.material, acabSerr: '', corSerr: '' }
+  })] }));
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.deepEqual(banco.serralheria.map(s => [s.QTD_ITENS, s.UNITARIO, s.TOTAL]), [[1, 125, 125], [2, 125, 250]]);
+
+  const { numero } = await r.json();
+  const aberto = await (await chamar(`/ped_orc/${encodeURIComponent('Orçamento')}/${numero}`)).json();
+  const [item] = aberto.itens;
+  assert.deepEqual(item.pecas.map(x => [x.qtd, x.valor]), [[1, 125], [2, 125]]);
+  assert.equal(item.valor, 375);
+  const regravado = await chamar('/ped_orc/salvar', 'POST', corpo({ modo: 'atualizar', numero, impressao: aberto.impressao,
+    manterData: true, itens: [{ ...item, valorTela: item.valor, origem: { ...item.origem, estado: 'editado' } }] }));
+  assert.equal(regravado.status, 200, JSON.stringify(await regravado.clone().json()));
+  assert.deepEqual(banco.serralheria.map(s => [s.QTD_ITENS, s.UNITARIO, s.TOTAL]), [[1, 125, 125], [2, 125, 250]]);
+});
+
 test('conjunto: grava uma linha no pedido e uma linha por peça (ITEM 1, 2…), e reabre igual', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const item = serr({ pecas: pecas(), valorTela: 225, detalhes: { produto: 'Grade', material: 'Metalon 20', acabSerr: '', corSerr: '' } });

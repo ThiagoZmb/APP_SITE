@@ -319,7 +319,8 @@ async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
     const detalhe = [];
     for (const [i, p] of lista.entries()) {
       try {
-        const rp = await calcularPrecoItem({ ...p, frente: 'Serralheria', acabamento: p.acabamento ?? p.acabSerr, qtd: entrada.qtd, percentuais: entrada.percentuais }, cliente, leitor);
+        const qtdPeca = parseFloat(p.qtd) > 0 ? parseFloat(p.qtd) : entrada.qtd;
+        const rp = await calcularPrecoItem({ ...p, frente: 'Serralheria', acabamento: p.acabamento ?? p.acabSerr, qtd: qtdPeca, percentuais: entrada.percentuais }, cliente, leitor);
         detalhe.push({ unitario: rp.unitario, total: rp.total });
       } catch (err) { if (err instanceof ErroPreco) throw new ErroPreco(`Peça ${i + 1}: ${err.message}`); throw err; }
     }

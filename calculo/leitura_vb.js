@@ -136,6 +136,7 @@ function traduzirSerralheria(l, linhas, componentesSerr) {
   });
   const eixo = v => Math.max(1, num(v) || 1);
   const pecas = subs.map(x => ({ produto: txt(x.PRODUTO), material: txt(x.MATERIAL), acabSerr: txt(x.ACABAMENTO), corSerr: txt(x.COR),
+    qtd: Math.max(1, num(x.QTD_ITENS) || num(l.QTD) || 1), valor: arred2(num(x.UNITARIO) / fator),
     altura: num(x.ALTURA), largura: num(x.LARGURA), profundidade: num(x.PROFUNDIDADE), soldas: num(x.QTD_SOLDAS),
     qtdAltura: eixo(x.QTD_ALTURA), qtdLargura: eixo(x.QTD_LARGURA), qtdProfundidade: eixo(x.QTD_PROFUNDIDADE) }));
   return { frente: 'Serralheria', qtd: num(l.QTD), pecas, altura: num(s.ALTURA), largura: num(s.LARGURA), profundidade: num(s.PROFUNDIDADE), soldas: num(s.QTD_SOLDAS),
