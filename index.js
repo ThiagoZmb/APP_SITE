@@ -18,7 +18,8 @@ const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('./seguranca/logi
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { limparPortal } = require('./portal/limpeza');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -1777,7 +1778,14 @@ async function iniciar() {
   if ((await acrescentarPermissoesSituacao(pool)).feito) console.log('[permissões] pedidos.situacao acrescentada ao Administrador');
   if ((await acrescentarPermissoesEntregas(pool)).feito) console.log('[permissões] entregas.ver e entregas.programar acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesOrcSituacao(pool)).feito) console.log('[permissões] orcamentos.situacao acrescentada ao Administrador, Interno completo e Representante');
+  if ((await acrescentarPermissoesPortal(pool)).feito) console.log('[permissões] portal.gerir acrescentada ao Administrador');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
+  // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
+  if (process.env.NODE_ENV !== 'test') {
+    const limpar = () => limparPortal(pool).catch(err => console.error('[portal] limpeza falhou:', err.code || 'sem código'));
+    await limpar();
+    setInterval(limpar, 24 * 60 * 60 * 1000).unref();
+  }
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
 }

@@ -396,6 +396,76 @@ const TABELAS = [
      carimbo CHAR(64) NOT NULL,
      criado_em DATETIME NOT NULL,
      UNIQUE KEY uq_doc_item (tipo, numero, item)
+   ) ${OPCOES}`,
+  // portal do cliente (identidade externa; sem FK, cliente_codigo = cadastro_clientes.CODIGO só por referência lógica)
+  `CREATE TABLE IF NOT EXISTS \`web_portal_empresas\` (
+     cliente_codigo INT NOT NULL PRIMARY KEY,
+     situacao ENUM('ativa','suspensa') NOT NULL DEFAULT 'ativa',
+     liberado_por VARCHAR(100) NOT NULL,
+     liberado_em DATETIME NOT NULL,
+     suspenso_em DATETIME NULL
+   ) ${OPCOES}`,
+  // e-mail em utf8mb4_bin: comparação exata (o código normaliza para minúsculas antes de gravar)
+  `CREATE TABLE IF NOT EXISTS \`web_portal_usuarios\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     email VARCHAR(190) COLLATE utf8mb4_bin NOT NULL,
+     cliente_codigo INT NOT NULL,
+     papel ENUM('admin_geral','usuario') NOT NULL,
+     situacao ENUM('convidado','ativo','inativo') NOT NULL DEFAULT 'convidado',
+     senha_hash VARCHAR(100) NULL,
+     totp_segredo_cifrado VARCHAR(400) NULL,
+     totp_ativo TINYINT NOT NULL DEFAULT 0,
+     totp_ultimo_passo BIGINT NOT NULL DEFAULT 0,
+     senha_alterada_em DATETIME NULL,
+     termo_versao VARCHAR(30) NULL,
+     termo_aceito_em DATETIME NULL,
+     criado_em DATETIME NOT NULL,
+     criado_por VARCHAR(100) NOT NULL,
+     UNIQUE KEY ux_portal_usuario_email (email),
+     KEY idx_portal_usuario_empresa (cliente_codigo)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_portal_permissoes\` (
+     usuario_id INT NOT NULL,
+     permissao VARCHAR(60) NOT NULL,
+     PRIMARY KEY (usuario_id, permissao)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_portal_convites\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     token_hash CHAR(64) NOT NULL,
+     usuario_id INT NOT NULL,
+     expira_em DATETIME NOT NULL,
+     usado_em DATETIME NULL,
+     criado_por VARCHAR(100) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     UNIQUE KEY ux_portal_convite_token (token_hash),
+     KEY idx_portal_convite_usuario (usuario_id)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_portal_recuperacao\` (
+     usuario_id INT NOT NULL,
+     codigo_hash CHAR(64) NOT NULL,
+     usado_em DATETIME NULL,
+     PRIMARY KEY (usuario_id, codigo_hash)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_portal_sessoes\` (
+     id CHAR(64) NOT NULL PRIMARY KEY,
+     usuario_id INT NOT NULL,
+     criado_em DATETIME NOT NULL,
+     expira_em DATETIME NOT NULL,
+     ultimo_uso_em DATETIME NOT NULL,
+     ip VARCHAR(45) NULL,
+     revogada TINYINT NOT NULL DEFAULT 0,
+     KEY idx_portal_sessao_usuario (usuario_id)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_portal_auditoria\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     quando DATETIME NOT NULL,
+     evento VARCHAR(40) NOT NULL,
+     usuario_id INT NULL,
+     cliente_codigo INT NULL,
+     ip VARCHAR(45) NULL,
+     detalhe TEXT NULL,
+     KEY idx_portal_audit_evento (evento),
+     KEY idx_portal_audit_quando (quando)
    ) ${OPCOES}`
 ];
 
@@ -779,6 +849,9 @@ async function acrescentarPermissoesDanfe(pool) {
 // Central de Gestão: ver e editar só para o Administrador (os demais perfis o Thiago libera)
 const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes_gestao', ['gestao.ver', 'gestao.editar']);
 
+// Portal do cliente: gerenciar (liberar empresas, convidar, suspender, reiniciar o 2º fator) só para o Administrador
+const acrescentarPermissoesPortal = pool => darAoAdministrador(pool, 'permissoes_portal', ['portal.gerir']);
+
 // Plano de corte: ver e planejar para Administrador e Interno completo; parâmetros e retalhos manuais só para o Administrador
 const PERMISSOES_CORTE = { 'Administrador': ['corte.ver', 'corte.planejar', 'corte.parametros'], 'Interno completo': ['corte.ver', 'corte.planejar'] };
 async function acrescentarPermissoesCorte(pool) {
@@ -847,4 +920,4 @@ async function acrescentarPermissoesOrcSituacao(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

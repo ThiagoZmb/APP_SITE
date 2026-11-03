@@ -1,0 +1,48 @@
+// Configuração do portal do cliente, lida das variáveis de ambiente.
+// Sem URL base e chave de cifra válidas o portal fica inativo (o resto do sistema não é afetado).
+// O `motivo` nunca repete o valor de uma variável: só diz qual está faltando ou inválida.
+
+const TERMO_PADRAO = '2026-11-rascunho';
+
+// https://host[:porta], sem caminho, query, âncora nem barra final; http só para localhost fora de production
+function urlBaseValida(valor, env) {
+  if (/^https:\/\/[^/?#\s@]+$/.test(valor)) return true;
+  return env.NODE_ENV !== 'production' && /^http:\/\/localhost(:\d{1,5})?$/.test(valor);
+}
+
+// base64 canônico de exatamente 32 bytes (AES-256)
+function chaveValida(valor) {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(valor)) return false;
+  const bytes = Buffer.from(valor, 'base64');
+  return bytes.length === 32 && bytes.toString('base64') === valor;
+}
+
+function lerConfigPortal(env = process.env) {
+  const termoVersao = env.PORTAL_TERMO_VERSAO || TERMO_PADRAO;
+  const base = (env.PORTAL_URL_BASE || '').trim();
+  const chave = (env.PORTAL_CHAVE_CRIPTO || '').trim();
+
+  const config = { ativo: false, termoVersao };
+  if (!base) config.motivo = 'Portal do cliente desativado: falta definir PORTAL_URL_BASE.';
+  else if (!urlBaseValida(base, env)) config.motivo = 'Portal do cliente desativado: PORTAL_URL_BASE inválida (use https://dominio, sem caminho nem barra no final).';
+  else if (!chave) config.motivo = 'Portal do cliente desativado: falta definir PORTAL_CHAVE_CRIPTO.';
+  else if (!chaveValida(chave)) config.motivo = 'Portal do cliente desativado: PORTAL_CHAVE_CRIPTO inválida (precisa ser base64 de exatamente 32 bytes).';
+  else {
+    config.ativo = true;
+    config.baseUrl = base;
+    config.chaveCripto = chave;
+  }
+
+  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
+    config.smtp = {
+      host: env.SMTP_HOST,
+      port: Number(env.SMTP_PORT) || 465,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+      from: env.SMTP_FROM || env.SMTP_USER
+    };
+  }
+  return config;
+}
+
+module.exports = { lerConfigPortal };
