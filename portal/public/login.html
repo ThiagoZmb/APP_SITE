@@ -9,18 +9,18 @@
 <body>
   <main>
     <h1>Entrar no portal</h1>
-    <form id="form-login" novalidate>
+    <form id="form-login" method="post" novalidate>
       <label for="email">E-mail</label>
-      <input id="email" name="email" type="email" autocomplete="username" required>
+      <input id="email" type="email" autocomplete="username" required>
 
       <label for="senha">Senha</label>
-      <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      <input id="senha" type="password" autocomplete="current-password" required>
 
       <label for="codigo" id="rotulo-codigo">Código do aplicativo (6 dígitos)</label>
-      <input id="codigo" name="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+      <input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
 
       <div class="acoes">
-        <button type="submit" id="entrar">Entrar</button>
+        <button type="submit" id="entrar" disabled>Entrar</button>
         <button type="button" id="trocar-codigo" class="secundario">Usar código de recuperação</button>
       </div>
       <p id="erro" class="erro" role="alert" aria-live="assertive"></p>

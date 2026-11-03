@@ -11,6 +11,8 @@
   const botaoEntrar = document.getElementById('entrar');
   const erro = document.getElementById('erro');
   let modoRecuperacao = false;
+  // o botão nasce desabilitado no HTML: só com o script pronto o envio é tratado aqui (nunca um envio nativo com a senha na URL)
+  botaoEntrar.disabled = false;
 
   function aplicarModo() {
     if (modoRecuperacao) {

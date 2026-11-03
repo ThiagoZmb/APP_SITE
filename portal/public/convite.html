@@ -11,7 +11,7 @@
     <h1>Ativar acesso</h1>
     <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
 
-    <form id="form-convite" class="oculto" novalidate>
+    <form id="form-convite" class="oculto" method="post" novalidate>
       <p>Conta: <strong id="conta-email"></strong></p>
 
       <h2>1. Aplicativo autenticador</h2>
@@ -37,12 +37,12 @@
       </div>
 
       <div class="acoes">
-        <button type="submit" id="concluir">Ativar acesso</button>
+        <button type="submit" id="concluir" disabled>Ativar acesso</button>
       </div>
     </form>
 
     <section id="recuperacao" class="oculto">
-      <h2>Códigos de recuperação</h2>
+      <h2 id="titulo-codigos" tabindex="-1">Códigos de recuperação</h2>
       <p class="aviso" role="alert">Guarde estes códigos agora, em local seguro. Eles aparecem uma única vez e não poderão ser vistos de novo. Cada código vale uma vez e substitui o aplicativo se você perder o celular.</p>
       <ul id="lista-codigos" class="codigos"></ul>
       <div class="acoes">

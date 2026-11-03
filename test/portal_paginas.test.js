@@ -72,15 +72,81 @@ test('portal.js: helper chamar com credentials e os dois cabeçalhos', () => {
   assert.match(j, /'X-Portal':\s*'1'/);
 });
 
-test('convite.js apaga o fragmento antes da primeira chamada', () => {
-  const j = ler('convite.js');
-  const iSub = j.indexOf('history.replaceState');
-  const iChamar = j.indexOf('chamar(');
-  assert.ok(iSub > 0, 'sem replaceState');
-  assert.ok(iChamar > 0, 'sem chamar');
-  assert.ok(iSub < iChamar, 'replaceState depois da primeira chamada');
-  assert.match(j, /location\.hash/);
-  assert.match(ler('convite.html'), /src="portal\.js"/);
+// roda convite.js num vm com window/document falsos e registra a ordem das chamadas
+function rodarConvite({ hash, respostas = [] }) {
+  const eventos = [];
+  const elementos = {};
+  const el = id => (elementos[id] = elementos[id] || {
+    id, textContent: '', value: '', checked: false, disabled: id === 'concluir', children: [], ouvintes: {},
+    classList: { add() {}, remove() {} },
+    addEventListener(tipo, f) { this.ouvintes[tipo] = f; },
+    appendChild(f) { this.children.push(f); },
+    focus() { eventos.push('foco:' + id); }
+  });
+  const janela = {
+    location: { hash, pathname: '/portal/convite.html', search: '', assign: u => eventos.push('assign:' + u), replace: u => eventos.push('replace:' + u) },
+    history: { replaceState: () => eventos.push('replaceState') },
+    PortalApi: { chamar: async (caminho, corpo) => { eventos.push('chamar:' + caminho); return respostas.shift() || { status: 400, dados: {} }; } },
+    addEventListener(tipo, f) { janela['ev_' + tipo] = f; }
+  };
+  const documento = { getElementById: el, createElement: () => ({ textContent: '' }) };
+  vm.runInNewContext(ler('convite.js'), { window: janela, document: documento });
+  return { eventos, el, janela };
+}
+const TOKEN = 'A'.repeat(43);
+const esperar = () => new Promise(r => setImmediate(r));
+
+test('convite.js (vm): replaceState antes da primeira chamada, com o X-Portal vindo do helper', async () => {
+  const { eventos } = rodarConvite({ hash: '#' + TOKEN, respostas: [{ status: 400, dados: { error: 'Convite inválido ou expirado.' } }] });
+  await esperar();
+  assert.deepEqual(eventos.slice(0, 2), ['replaceState', 'chamar:/portal/api/convite/iniciar']);
+});
+
+test('convite.js (vm): fragmento malformado (URIError) é apagado e mostra convite inválido sem chamar a API', async () => {
+  const { eventos, el } = rodarConvite({ hash: '#%E0%A4%A' });
+  await esperar();
+  assert.deepEqual(eventos, ['replaceState']);
+  assert.equal(el('erro').textContent, 'Convite inválido ou expirado.');
+});
+
+test('convite.js (vm): sem token pede para abrir o link de novo', async () => {
+  const { eventos, el } = rodarConvite({ hash: '' });
+  await esperar();
+  assert.deepEqual(eventos, ['replaceState']);
+  assert.match(el('erro').textContent, /Abra de novo o link do convite/);
+});
+
+test('convite.js (vm): códigos aparecem uma vez, recebem foco, e Já guardei / pageshow os limpam', async () => {
+  const ini = { status: 200, dados: { email: 'a@b.c', segredo: 'ABCDEFGH', uri: 'otpauth://x', termoVersao: 'v1' } };
+  const fim = { status: 200, dados: { ok: true, codigosRecuperacao: ['c1', 'c2'] } };
+  const { eventos, el, janela } = rodarConvite({ hash: '#' + TOKEN, respostas: [ini, fim] });
+  await esperar();
+  assert.equal(el('concluir').disabled, false);
+  el('senha').value = 'uma senha bem longa'; el('confirmacao').value = 'uma senha bem longa'; el('aceite').checked = true; el('codigo').value = '123456';
+  await el('form-convite').ouvintes.submit({ preventDefault() {} });
+  assert.equal(el('lista-codigos').children.length, 2);
+  assert.ok(eventos.includes('foco:titulo-codigos'));
+  el('guardei').ouvintes.click();
+  assert.equal(el('lista-codigos').textContent, '');
+  assert.ok(eventos.includes('assign:/portal/login.html'));
+  el('lista-codigos').textContent = 'x';
+  janela.ev_pageshow({ persisted: true });
+  assert.equal(el('lista-codigos').textContent, '');
+  assert.ok(eventos.includes('replace:/portal/login.html'));
+});
+
+test('HTML do portal: formulários só por POST, sem input com name e botão de envio nasce desabilitado', () => {
+  for (const nome of HTMLS) {
+    const h = ler(nome);
+    for (const m of h.matchAll(/<form([^>]*)>/gi)) {
+      assert.match(m[1], /smethod="post"/, nome + ': form sem method=post');
+      assert.ok(!/sactions*=/i.test(m[1]), nome + ': form com action');
+    }
+    for (const m of h.matchAll(/<input([^>]*)>/gi)) assert.ok(!/snames*=/i.test(m[1]), nome + ': input com name');
+    for (const m of h.matchAll(/<button([^>]*)>/gi)) {
+      if (/type="submit"/.test(m[1])) assert.match(m[1], /sdisabled/, nome + ': botão de envio habilitado');
+    }
+  }
 });
 
 test('termo.html traz o aviso RASCUNHO visível', () => {
