@@ -179,6 +179,10 @@ body .container > .sidebar .menu-item.sub svg, body .container > nav .menu-item.
 body .container > .sidebar .menu-item.grupo, body .container > nav .menu-item.grupo { margin-top: 9px !important; }
 body .container > .sidebar .menu-item.grupo::before, body .container > nav .menu-item.grupo::before {
     content: ''; position: absolute; left: 12px; right: 12px; top: -5px; height: 1px; background: rgba(255, 255, 255, .08); pointer-events: none; }
+/* linha acima de um título de seção (ex.: GESTÃO), no meio do espaço entre o último subitem e o título; também posta por desenharMenu */
+body .container > .sidebar .sb-secao.grupo, body .container > nav .sb-secao.grupo { position: relative; }
+body .container > .sidebar .sb-secao.grupo::before, body .container > nav .sb-secao.grupo::before {
+    content: ''; position: absolute; left: 12px; right: 12px; top: 6px; height: 1px; background: rgba(255, 255, 255, .08); pointer-events: none; }
 .sb-rodape { margin-top: auto; padding: 16px 12px 20px; }
 .sb-sair {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 10px;

@@ -244,11 +244,18 @@
             });
             // linha divisória (classe "grupo") antes de cada item de 1º nível que vem depois de outro da mesma seção visível
             let temTopoNaSecao = false;
+            // linha acima do título de seção: só se já houve seção antes e a seção imediatamente anterior ficou visível
+            let secoesVistas = 0, secaoAnteriorVisivel = false;
             nav.innerHTML =
                 `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map((m, i) => {
                     const oculto = visivel[i] ? '' : ' hidden';
-                    if (m.secao) { temTopoNaSecao = false; return `<div class="sb-secao"${oculto}>${m.secao}</div>`; }
+                    if (m.secao) {
+                        temTopoNaSecao = false;
+                        const linha = secoesVistas > 0 && secaoAnteriorVisivel ? ' grupo' : '';
+                        secoesVistas++; secaoAnteriorVisivel = visivel[i];
+                        return `<div class="sb-secao${linha}"${oculto}>${m.secao}</div>`;
+                    }
                     const grupo = !m.sub && visivel[i] && temTopoNaSecao ? ' grupo' : '';
                     if (!m.sub && visivel[i]) temTopoNaSecao = true;
                     const ativo = m.href === atual ? ' active' : '';
