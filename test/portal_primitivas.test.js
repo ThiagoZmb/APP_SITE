@@ -31,7 +31,10 @@ test('senha: limite de 72 bytes UTF-8 (acentos contam 2 bytes)', () => {
 
 test('senha: 36 "é" = 72 bytes passa no tamanho; 37 passa de 72 bytes', () => {
   // só um caractere repetido é recusado por outro motivo; conferimos o motivo
-  assert.doesNotMatch(validarSenha('é'.repeat(36), { email: EMAIL }).motivo || '', /72/);
+  const r36 = validarSenha('é'.repeat(36), { email: EMAIL });
+  assert.equal(r36.ok, false);
+  assert.match(r36.motivo, /repet/);
+  assert.doesNotMatch(r36.motivo, /72/);
   assert.match(validarSenha('é'.repeat(37), { email: EMAIL }).motivo, /72/);
 });
 
@@ -65,6 +68,29 @@ test('senha: lista fixa de senhas fracas', () => {
     assert.match(r.motivo, /comum|fraca/i);
   }
   assert.equal(validarSenha('ELEGANCE2026', { email: EMAIL }).ok, false);
+});
+
+test('senha: espaço no início ou no fim é recusado', () => {
+  for (const s of [' 123456789012', 'cavalo-azul-37-Tijolo ', '	cavalo-azul-37-Tijolo']) {
+    const r = validarSenha(s, { email: EMAIL });
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /espaço/);
+  }
+});
+
+test('senha: lista e e-mail comparados sem caixa, acento nem pontuação', () => {
+  const a = validarSenha('Elegance2026!', { email: EMAIL });
+  assert.equal(a.ok, false);
+  assert.match(a.motivo, /comum/);
+  assert.equal(validarSenha('Elegance-2026#', { email: EMAIL }).ok, false);
+  const b = validarSenha('mariasouza1234', { email: 'maria.souza@x.com' });
+  assert.equal(b.ok, false);
+  assert.match(b.motivo, /e-mail/);
+  assert.equal(validarSenha('María_Sóuza-1234', { email: 'maria.souza@x.com' }).ok, false);
+});
+
+test('senha: só símbolos não é recusada por "estar no e-mail"', () => {
+  assert.equal(validarSenha('!@#$%^&*()_+=-[]', { email: EMAIL }).ok, true);
 });
 
 test('senha: aceita uma boa', () => {
@@ -131,6 +157,15 @@ test('totp: ignora espaços e recusa formatos inválidos', () => {
   }
 });
 
+test('totp: verificar não lança com segredo inválido nem com relógio inválido', () => {
+  assert.deepEqual(totp.verificar('segredo-inválido!', '123456', { agora: 59000 }), { ok: false });
+  assert.deepEqual(totp.verificar(undefined, '123456', { agora: 59000 }), { ok: false });
+  for (const agora of [NaN, Infinity, -1, '59', null]) {
+    assert.deepEqual(totp.verificar(SEGREDO_RFC, '287082', { agora }), { ok: false }, String(agora));
+  }
+  assert.throws(() => totp.codigoEm('segredo-inválido!', 1));
+});
+
 test('totp: uriOtpauth', () => {
   const uri = totp.uriOtpauth({ segredo: 'ABC234', email: 'a b@x.com' });
   assert.ok(uri.startsWith('otpauth://totp/Elegance:a%20b%40x.com?'));
@@ -181,6 +216,11 @@ test('cripto: chave que não tem 32 bytes lança', () => {
   assert.throws(() => criarCripto(undefined), /32/);
 });
 
+test('cripto: cifrar exige string', () => {
+  const c = criarCripto(CHAVE);
+  for (const ruim of [undefined, null, 123, {}, Buffer.from('a')]) assert.throws(() => c.cifrar(ruim), TypeError);
+});
+
 // ---------- tokens ----------
 test('tokens: opaco com 32 bytes base64url e hash SHA-256 hex', () => {
   const t = tokens.novoTokenOpaco();
@@ -191,17 +231,38 @@ test('tokens: opaco com 32 bytes base64url e hash SHA-256 hex', () => {
   assert.notEqual(t.token, tokens.novoTokenOpaco().token);
 });
 
+const CHAVE_REC = crypto.randomBytes(32).toString('base64');
+
 test('tokens: códigos de recuperação XXXX-XXXX, únicos, com hashes', () => {
-  const { codigos, hashes } = tokens.gerarCodigosRecuperacao();
+  const { codigos, hashes } = tokens.gerarCodigosRecuperacao(10, CHAVE_REC);
   assert.equal(codigos.length, 10);
   assert.equal(new Set(codigos).size, 10);
   for (const c of codigos) assert.match(c, /^[A-HJ-KM-NP-Z2-9]{4}-[A-HJ-KM-NP-Z2-9]{4}$/);
   assert.equal(hashes.length, 10);
-  codigos.forEach((c, i) => assert.equal(hashes[i], tokens.hashCodigoRecuperacao(c)));
-  assert.equal(tokens.gerarCodigosRecuperacao(3).codigos.length, 3);
+  codigos.forEach((c, i) => assert.equal(hashes[i], tokens.hashCodigoRecuperacao(c, CHAVE_REC)));
+  assert.equal(tokens.gerarCodigosRecuperacao(3, CHAVE_REC).codigos.length, 3);
 });
 
-test('tokens: hashCodigoRecuperacao normaliza caixa, hífen e espaço', () => {
-  assert.equal(tokens.hashCodigoRecuperacao('abcd efgh'), tokens.hashCodigoRecuperacao('ABCD-EFGH'));
-  assert.match(tokens.hashCodigoRecuperacao('ABCD-EFGH'), /^[0-9a-f]{64}$/);
+test('tokens: hash do código de recuperação é HMAC com chave do servidor', () => {
+  const h = tokens.hashCodigoRecuperacao('ABCD-EFGH', CHAVE_REC);
+  assert.match(h, /^[0-9a-f]{64}$/);
+  assert.equal(h, tokens.hashCodigoRecuperacao('ABCD-EFGH', CHAVE_REC));
+  assert.equal(tokens.hashCodigoRecuperacao('abcd efgh', CHAVE_REC), h);
+  const outra = crypto.randomBytes(32).toString('base64');
+  assert.notEqual(tokens.hashCodigoRecuperacao('ABCD-EFGH', outra), h);
+  assert.notEqual(h, crypto.createHash('sha256').update('ABCDEFGH').digest('hex'));
+});
+
+test('tokens: chave inválida do código de recuperação lança', () => {
+  for (const ruim of [undefined, '', 'curta', crypto.randomBytes(31).toString('base64'), 123]) {
+    assert.throws(() => tokens.hashCodigoRecuperacao('ABCD-EFGH', ruim), /32/);
+    assert.throws(() => tokens.gerarCodigosRecuperacao(2, ruim), /32/);
+  }
+});
+
+test('tokens: hashToken e hashCodigoRecuperacao recusam não-string ou vazio', () => {
+  for (const ruim of [undefined, null, 5, '', {}]) {
+    assert.throws(() => tokens.hashToken(ruim), TypeError);
+    assert.throws(() => tokens.hashCodigoRecuperacao(ruim, CHAVE_REC), TypeError);
+  }
 });

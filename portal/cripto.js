@@ -10,9 +10,10 @@ function criarCripto(chaveBase64) {
   if (chave.length !== 32) throw new Error('A chave de cifra precisa ter exatamente 32 bytes (base64).');
 
   function cifrar(texto) {
+    if (typeof texto !== 'string') throw new TypeError('O texto a cifrar precisa ser uma string.');
     const iv = crypto.randomBytes(12);
     const c = crypto.createCipheriv('aes-256-gcm', chave, iv);
-    const cifrado = Buffer.concat([c.update(String(texto), 'utf8'), c.final()]);
+    const cifrado = Buffer.concat([c.update(texto, 'utf8'), c.final()]);
     return ['v1', iv.toString('base64'), c.getAuthTag().toString('base64'), cifrado.toString('base64')].join(':');
   }
 

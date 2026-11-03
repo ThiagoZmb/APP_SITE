@@ -15,8 +15,13 @@ const SENHAS_FRACAS = [
   'elegance2026', 'elegance2025', 'elegance1234', 'elegancealuminio', 'eleganceesquadrias',
 ];
 
+// minúsculas, sem acento e só letras e dígitos: "Elegance-2026!" vira "elegance2026"
+const normalizar = t => String(t).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]/g, '');
+const FRACAS_NORMALIZADAS = new Set(SENHAS_FRACAS.map(normalizar));
+
 function validarSenha(senha, { email } = {}) {
   if (typeof senha !== 'string') return { ok: false, motivo: 'Informe a senha.' };
+  if (senha !== senha.trim()) return { ok: false, motivo: 'A senha não pode começar nem terminar com espaço.' };
   if ([...senha].length < MINIMO) return { ok: false, motivo: `A senha precisa ter pelo menos ${MINIMO} caracteres.` };
   if (Buffer.byteLength(senha, 'utf8') > MAXIMO_BYTES) {
     return { ok: false, motivo: `A senha é longa demais: o limite é ${MAXIMO_BYTES} bytes (letras acentuadas contam mais de um).` };
@@ -24,14 +29,18 @@ function validarSenha(senha, { email } = {}) {
   if (new Set(senha).size === 1) return { ok: false, motivo: 'A senha não pode ser um único caractere repetido.' };
 
   const baixa = senha.toLowerCase();
+  const norm = normalizar(senha);
   const mail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (mail) {
-    const local = mail.split('@')[0];
-    if (mail.includes(baixa) || (local.length >= MINIMO_PARTE_LOCAL && baixa.includes(local))) {
+    const nMail = normalizar(mail);
+    const nLocal = normalizar(mail.split('@')[0]);
+    // senha só de símbolos normaliza para '' e não pode "estar contida" em tudo
+    const contida = mail.includes(baixa) || (norm !== '' && nMail.includes(norm));
+    if (contida || (nLocal.length >= MINIMO_PARTE_LOCAL && norm.includes(nLocal))) {
       return { ok: false, motivo: 'A senha não pode conter o seu e-mail.' };
     }
   }
-  if (SENHAS_FRACAS.includes(baixa)) return { ok: false, motivo: 'Essa senha é muito comum. Escolha outra.' };
+  if (FRACAS_NORMALIZADAS.has(norm)) return { ok: false, motivo: 'Essa senha é muito comum. Escolha outra.' };
   return { ok: true };
 }
 

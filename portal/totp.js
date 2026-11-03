@@ -36,6 +36,7 @@ function base32Decodificar(texto) {
 
 const gerarSegredo = () => base32Codificar(crypto.randomBytes(20));
 
+// Lança Error se o segredo não for base32 válido (quem grava o segredo é o servidor).
 function codigoEm(segredo, passo) {
   const contador = Buffer.alloc(8);
   contador.writeBigUInt64BE(BigInt(passo));
@@ -45,17 +46,23 @@ function codigoEm(segredo, passo) {
   return String(n % 10 ** DIGITOS).padStart(DIGITOS, '0');
 }
 
+// Nunca lança: segredo inválido ou relógio inválido simplesmente não verificam.
 function verificar(segredo, codigo, { agora = Date.now(), ultimoPasso = 0 } = {}) {
   if (typeof codigo !== 'string') return { ok: false };
+  if (typeof agora !== 'number' || !Number.isFinite(agora) || agora < 0) return { ok: false };
   const limpo = codigo.replace(/\s+/g, '');
   if (!/^\d{6}$/.test(limpo)) return { ok: false };
   const recebido = Buffer.from(limpo);
   const atual = Math.floor(agora / 1000 / PASSO_SEGUNDOS);
   let aceito = null;
+  try {
   // percorre todas as janelas, sem parar no primeiro acerto; comparação em tempo constante
   for (let p = atual - JANELA; p <= atual + JANELA; p++) {
     const igual = crypto.timingSafeEqual(recebido, Buffer.from(codigoEm(segredo, p)));
     if (igual && p > ultimoPasso && aceito === null) aceito = p;
+  }
+  } catch {
+    return { ok: false };
   }
   return aceito === null ? { ok: false } : { ok: true, passo: aceito };
 }
