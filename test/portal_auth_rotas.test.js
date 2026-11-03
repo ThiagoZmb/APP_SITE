@@ -16,6 +16,7 @@ const { criarCripto } = require('../portal/cripto');
 const { novoTokenOpaco, hashToken, gerarCodigosRecuperacao, hashCodigoRecuperacao } = require('../portal/tokens');
 const totp = require('../portal/totp');
 const { registrarPortalAuth } = require('../rotas/portal_auth');
+const { criarLimiteLogin } = require('../seguranca/login_limite');
 
 const CHAVE = Buffer.alloc(32, 9).toString('base64');
 const BASE = 'https://portal.exemplo.com';
@@ -32,7 +33,7 @@ const TRES = ['documentos.ver', 'financeiro.ver', 'pedidos.ver'];
 // Usuários: 1 Ana (ativa, admin_geral, empresa 40), 3 Bia (ativa, empresa 41 suspensa), 4 Ivo (inativo),
 // 2 Novo e 6/7/9 (convidados, com convite válido / usado / expirado / de empresa suspensa), 8 (ativo, com convite pendente).
 // Por padrão o limite por IP é alto (vários testes provocam dezenas de falhas no mesmo app); o teste do limite usa 10, o valor real.
-function montar(t, { ativo = true, falhasPorIp = 100000 } = {}) {
+function montar(t, { ativo = true, falhasPorIp = 100000, limite } = {}) {
   const banco = criarBancoPortal();
   const d = banco.dados;
   const cripto = criarCripto(CHAVE);
@@ -71,7 +72,7 @@ function montar(t, { ativo = true, falhasPorIp = 100000 } = {}) {
   const sessoes = criarSessoesPortal({ pool: banco.pool });
   const { portalAtivo, portalAutenticar } = criarAcessoPortal({ pool: banco.pool, sessoes, config });
   const registro = criarRegistro(app, { autenticado: [], portalPublico: [portalAtivo], portalAutenticado: [portalAtivo, portalAutenticar] });
-  registrarPortalAuth({ portal: registro.portal, portalPublica: registro.portalPublica, pool: banco.pool, sessoes, cripto: ativo ? cripto : undefined, config, agora: () => T0, falhasPorIp });
+  registrarPortalAuth({ portal: registro.portal, portalPublica: registro.portalPublica, pool: banco.pool, sessoes, cripto: ativo ? cripto : undefined, config, agora: () => T0, falhasPorIp, ...(limite ? { limite } : {}) });
   registro.verificar();
   return subir(app).then(s => {
     t.after(s.fechar);
@@ -302,6 +303,13 @@ test('convite/concluir: transação com FOR UPDATE no convite e no usuário, e o
   assert.match(c.pool.chamadas.find(x => /^UPDATE web_portal_usuarios SET senha_hash/.test(x.sql)).sql, /situacao = 'convidado'/);
   assert.ok(idx(/^UPDATE web_portal_convites SET usado_em = \? WHERE id/) < idx(/^UPDATE web_portal_usuarios SET senha_hash/), 'reivindica o convite antes de gravar a conta');
   assert.ok(idx(/^COMMIT$/) > idx(/^INSERT INTO web_portal_recuperacao/));
+  const ativ = c.pool.chamadas.find(x => /^UPDATE web_portal_usuarios SET senha_hash/.test(x.sql));
+  const SET = /SET senha_hash = \?, totp_ativo = 1, totp_ultimo_passo = \?, situacao = 'ativo',\s+termo_versao = \?, termo_aceito_em = \?, senha_alterada_em = \? WHERE id = \? AND situacao = 'convidado'$/;
+  assert.match(ativ.sql, SET);
+  assert.match(ativ.params[0], /^\$2[aby]\$12\$/);
+  assert.deepEqual(ativ.params.slice(1, 3), [PASSO, 'T1']);
+  assert.ok(ativ.params[3] instanceof Date && ativ.params[4] instanceof Date);
+  assert.equal(ativ.params[5], 2);
 });
 
 test('convite/concluir: duas conclusões simultâneas, só uma vence e há um único conjunto de códigos', async t => {
@@ -572,7 +580,7 @@ test('portal inativo: as três rotas públicas e as autenticadas respondem 503, 
 
 // ===================== logout e /eu =====================
 
-test('logout: revoga a sessão, limpa o cookie, audita e a mesma sessão dá 401 depois; repetir não dá 5xx', async t => {
+test('logout: revoga a sessão, limpa o cookie, audita; a mesma sessão dá 401 depois e repetir é idempotente (200)', async t => {
   const c = await montar(t);
   const cookie = cookieDe(await c.login(c.corretos()));
   const r = await c.post('/portal/api/logout', {}, { cookie });
@@ -583,21 +591,52 @@ test('logout: revoga a sessão, limpa o cookie, audita e a mesma sessão dá 401
   const aud = c.d.auditoria.find(x => x.evento === 'logout');
   assert.equal(aud.usuario_id, 1);
   assert.equal(aud.cliente_codigo, 40);
-  const eu = await c.get('/portal/api/eu', { cookie });
-  assert.equal(eu.status, 401);
+  assert.equal((await c.get('/portal/api/eu', { cookie })).status, 401);
   const de_novo = await c.post('/portal/api/logout', {}, { cookie });
-  assert.ok(de_novo.status < 500);
-  assert.equal(de_novo.status, 401);
-  assert.equal(c.d.auditoria.filter(x => x.evento === 'logout').length, 1);
+  assert.equal(de_novo.status, 200);
+  assert.match(de_novo.headers.get('set-cookie'), /Max-Age=0/);
+  assert.equal(c.d.auditoria.filter(x => x.evento === 'logout').length, 1, 'só a sessão válida é auditada');
 });
 
-test('logout: sem X-Portal dá 403 e a sessão continua valendo; sem sessão dá 401', async t => {
+test('logout: sem sessão, cookie lixo ou JWT de funcionário também dá 200 e limpa o cookie, sem revogar a sessão de outra pessoa', async t => {
+  const c = await montar(t);
+  const outra = cookieDe(await c.login(c.corretos()));
+  const jwtFunc = jwt.sign({ id: 1, tipo: 'funcionario', v: 2, sid: 'x' }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
+  for (const cookie of [undefined, '__Host-portal=lixo', `__Host-portal=${jwtFunc}`, `__Host-portal=${novoTokenOpaco().token}`]) {
+    const r = await c.post('/portal/api/logout', {}, { cookie });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { ok: true });
+    assert.match(r.headers.get('set-cookie'), /^__Host-portal=; Max-Age=0;/);
+  }
+  assert.equal(c.d.sessoes[0].revogada, 0);
+  assert.equal((await c.get('/portal/api/eu', { cookie: outra })).status, 200);
+});
+
+test('logout: usuário de empresa suspensa ainda encerra a própria sessão (a sessão é revogada)', async t => {
+  const c = await montar(t);
+  const cookie = cookieDe(await c.login(c.corretos()));
+  c.d.empresas.find(e => e.cliente_codigo === 40).situacao = 'suspensa';
+  assert.equal((await c.get('/portal/api/eu', { cookie })).status, 401, 'as rotas do portal já recusam');
+  const r = await c.post('/portal/api/logout', {}, { cookie });
+  assert.equal(r.status, 200);
+  assert.equal(c.d.sessoes[0].revogada, 1);
+  assert.match(r.headers.get('set-cookie'), /Max-Age=0/);
+  // reativada a empresa, a sessão revogada continua morta
+  c.d.empresas.find(e => e.cliente_codigo === 40).situacao = 'ativa';
+  assert.equal((await c.get('/portal/api/eu', { cookie })).status, 401);
+});
+
+test('logout: sem X-Portal ou com Origin de outro site dá 403 e a sessão continua valendo', async t => {
   const c = await montar(t);
   const cookie = cookieDe(await c.login(c.corretos()));
   const sem = await c.post('/portal/api/logout', {}, { cookie, portal: false });
   assert.equal(sem.status, 403);
+  const outro = await fetch(c.s.url + '/portal/api/logout', { method: 'POST', headers: { 'X-Portal': '1', Cookie: cookie, Origin: 'https://malvado.exemplo' } });
+  assert.equal(outro.status, 403);
   assert.equal(c.d.sessoes[0].revogada, 0);
-  assert.equal((await c.post('/portal/api/logout', {})).status, 401);
+  const certo = await fetch(c.s.url + '/portal/api/logout', { method: 'POST', headers: { 'X-Portal': '1', Cookie: cookie, Origin: BASE } });
+  assert.equal(certo.status, 200);
+  assert.equal(c.d.sessoes[0].revogada, 1);
 });
 
 test('/eu: com sessão devolve o usuário; sem sessão dá 401', async t => {
@@ -625,7 +664,6 @@ test('cookie e Bearer cruzados: JWT de funcionário (ou qualquer token) como coo
   assert.equal((await c.get('/portal/api/eu', { cookie: `__Host-portal=${novoTokenOpaco().token}` })).status, 401);
   assert.equal((await c.get('/portal/api/eu', { cookie: `__Host-portal=${hashToken('x')}` })).status, 401);
   assert.equal((await c.get('/portal/api/eu', { headers: { Authorization: `Bearer ${jwtFunc}` } })).status, 401);
-  assert.equal((await c.post('/portal/api/logout', {}, { cookie: `__Host-portal=${jwtFunc}` })).status, 401);
 });
 
 test('o login não reaproveita sessão de funcionário: o token opaco do cookie é só o do portal', async t => {
@@ -636,12 +674,14 @@ test('o login não reaproveita sessão de funcionário: o token opaco do cookie 
   assert.throws(() => jwt.verify(token, 'teste'));
 });
 
-test('app real: as rotas de autenticação estão no registro e, com o portal inativo, respondem 503', async t => {
+test('app real: as rotas de autenticação estão no registro (listas EXATAS) e, com o portal inativo, respondem 503', async t => {
   const { app, registro, configPortal } = require('../index.js');
-  const publicas = registro.rotasPortalPublicas().map(r => `${r.metodo} ${r.caminho}`);
-  for (const r of ['post /portal/api/login', 'post /portal/api/convite/iniciar', 'post /portal/api/convite/concluir']) assert.ok(publicas.includes(r), r);
-  const privadas = registro.rotasPortal().map(r => `${r.metodo} ${r.caminho}`);
-  for (const r of ['post /portal/api/logout', 'get /portal/api/eu']) assert.ok(privadas.includes(r), r);
+  const lista = rs => rs.map(r => r.metodo + ' ' + r.caminho).sort();
+  // logout é público de propósito: precisa funcionar para conta/empresa já suspensa (guarda próprio de sessão + CSRF)
+  assert.deepEqual(lista(registro.rotasPortalPublicas()), [
+    'post /portal/api/convite/concluir', 'post /portal/api/convite/iniciar', 'post /portal/api/login', 'post /portal/api/logout'
+  ]);
+  assert.deepEqual(lista(registro.rotasPortal()), ['get /portal/api/eu']);
   assert.doesNotThrow(() => registro.verificar());
   const antes = configPortal.ativo;
   configPortal.ativo = false;
@@ -650,4 +690,105 @@ test('app real: as rotas de autenticação estão no registro e, com o portal in
   t.after(s.fechar);
   const r = await fetch(s.url + '/portal/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Portal': '1' }, body: '{}' });
   assert.equal(r.status, 503);
+  const r2 = await fetch(s.url + '/portal/api/logout', { method: 'POST', headers: { 'X-Portal': '1' } });
+  assert.equal(r2.status, 503);
+});
+
+test('login: texto do SQL de busca (empresa e unicidade do nome no mesmo SELECT, WHERE u.email = ?)', async t => {
+  const c = await montar(t);
+  await c.login(c.corretos());
+  const q = c.pool.chamadas.find(x => /^SELECT u\.id, u\.email/.test(x.sql));
+  const sql = q.sql.replace(/\s+/g, ' ');
+  assert.match(sql, /FROM web_portal_usuarios u LEFT JOIN web_portal_empresas e ON e\.cliente_codigo = u\.cliente_codigo/);
+  assert.match(sql, /LEFT JOIN cadastro_clientes c ON c\.CODIGO = u\.cliente_codigo/);
+  assert.match(sql, /\(SELECT COUNT\(\*\) FROM cadastro_clientes d WHERE d\.RAZAO_SOCIAL = c\.RAZAO_SOCIAL\) AS qtd_nome/);
+  assert.match(sql, /WHERE u\.email = \? LIMIT 1$/);
+  assert.deepEqual(q.params, ['ana@acme.com']);
+});
+
+// sequência de SQL de uma tentativa (prefixos normalizados)
+const sequencia = (c, de) => c.pool.chamadas.slice(de).map(x => x.sql.replace(/\s+/g, ' ').slice(0, 55));
+
+test('login: a SEQUÊNCIA de consultas ao banco é idêntica em todos os caminhos de falha (sem oráculo por nº de idas ao banco)', async t => {
+  const c = await montar(t);
+  const dup = await montar(t); // nome duplicado em cadastro_clientes
+  dup.d.clientes.push({ CODIGO: 99, RAZAO_SOCIAL: 'ACME LTDA' });
+  const corpos = {
+    codigo: (extra, base) => ({ senha: SENHA, codigo: base.codigo(), ...extra }),
+    codigoRecuperacao: (extra, base) => ({ senha: SENHA, codigoRecuperacao: base.recuperacao.codigos[0], ...extra })
+  };
+  for (const [forma, mk] of Object.entries(corpos)) {
+    const erradoDoCampo = forma === 'codigo' ? { codigo: codigoErrado(c.segredo) } : { codigoRecuperacao: 'ZZZZ-ZZZZ' };
+    const casos = {
+      'e-mail inexistente': [c, { email: 'fantasma@acme.com' }],
+      'e-mail inválido': [c, { email: 'isto nao e email' }],
+      'senha errada': [c, { email: 'ana@acme.com', senha: 'Senha-Errada-9999' }],
+      'código errado': [c, { email: 'ana@acme.com', ...erradoDoCampo }],
+      'usuário inativo': [c, { email: 'ivo@acme.com' }],
+      'usuário convidado': [c, { email: 'novo@acme.com' }],
+      'empresa suspensa': [c, { email: 'bia@beta.com' }],
+      'nome duplicado': [dup, { email: 'ana@acme.com' }]
+    };
+    const vistas = {};
+    for (const [nome, [base, extra]] of Object.entries(casos)) {
+      const de = base.pool.chamadas.length;
+      const r = await base.login(mk(extra, base));
+      assert.equal(r.status, 401, forma + ' / ' + nome);
+      vistas[nome] = sequencia(base, de);
+    }
+    const referencia = vistas['e-mail inexistente'];
+    // 1 busca + 1 UPDATE de consumo (do campo enviado) + 1 auditoria, SEMPRE
+    assert.equal(referencia.length, 3, forma);
+    assert.match(referencia[0], /^SELECT u\.id/);
+    assert.match(referencia[1], forma === 'codigo' ? /^UPDATE web_portal_usuarios SET totp_ultimo_passo/ : /^UPDATE web_portal_recuperacao SET usado_em/);
+    assert.match(referencia[2], /^INSERT INTO web_portal_auditoria/);
+    for (const [nome, seq] of Object.entries(vistas)) assert.deepEqual(seq, referencia, forma + ' / ' + nome);
+
+    // sucesso: a mesma sequência, só com a criação da sessão a mais (depois de decidida a resposta)
+    const de = c.pool.chamadas.length;
+    const ok = await c.login(mk({ email: 'ana@acme.com', ...(forma === 'codigo' ? { codigo: c.codigo(PASSO + 1) } : {}) }, c));
+    assert.equal(ok.status, 200, forma);
+    const sucesso = sequencia(c, de);
+    assert.deepEqual(sucesso.filter(x => !/^INSERT INTO web_portal_sessoes/.test(x)), referencia, forma);
+    assert.equal(sucesso.length, referencia.length + 1);
+  }
+});
+
+test('login: o corpo com os DOIS campos roda os DOIS UPDATEs em qualquer caminho (a forma do corpo decide, não a conta)', async t => {
+  const c = await montar(t);
+  const corpo = extra => ({ senha: SENHA, codigo: c.codigo(), codigoRecuperacao: c.recuperacao.codigos[0], ...extra });
+  const seqs = [];
+  for (const extra of [{ email: 'fantasma@acme.com' }, { email: 'ana@acme.com', senha: 'Senha-Errada-9999' }, { email: 'ivo@acme.com' }]) {
+    const de = c.pool.chamadas.length;
+    assert.equal((await c.login(corpo(extra))).status, 401);
+    seqs.push(sequencia(c, de));
+  }
+  assert.equal(seqs[0].length, 4);
+  seqs.forEach(sq => assert.deepEqual(sq, seqs[0]));
+  assert.equal(c.d.recuperacao.filter(x => x.usado_em).length, 0, 'nada foi consumido');
+});
+
+test('429: conta real e inexistente dão o mesmo corpo, Retry-After e cabeçalhos RateLimit-*', async t => {
+  const limite = () => criarLimiteLogin({ agora: () => T0 });
+  const real = await montar(t, { limite: limite() });
+  const falsa = await montar(t, { limite: limite() });
+  for (let i = 0; i < 5; i++) {
+    await real.login(real.corretos({ senha: 'Senha-Errada-9999' }));
+    await falsa.login(falsa.corretos({ email: 'fantasma@acme.com' }));
+  }
+  const a = await real.login(real.corretos());
+  const b = await falsa.login(falsa.corretos({ email: 'fantasma@acme.com' }));
+  assert.equal(a.status, 429);
+  assert.equal(b.status, 429);
+  assert.deepEqual(await a.json(), await b.json());
+  assert.equal(a.headers.get('retry-after'), b.headers.get('retry-after'));
+  assert.ok(a.headers.get('retry-after'));
+  const rl = r => Object.fromEntries([...r.headers.entries()].filter(([k]) => k.startsWith('ratelimit')));
+  const [ha, hb] = [rl(a), rl(b)];
+  assert.deepEqual(Object.keys(ha).sort(), Object.keys(hb).sort());
+  assert.ok(Object.keys(ha).length > 0);
+  for (const k of Object.keys(ha)) {
+    if (/reset/.test(k)) assert.ok(Math.abs(Number(ha[k]) - Number(hb[k])) <= 1, k);
+    else assert.equal(ha[k], hb[k], k);
+  }
 });

@@ -35,7 +35,9 @@ function criarBancoPortal(inicial = {}) {
         id: u.id, email: u.email, cliente_codigo: u.cliente_codigo, papel: u.papel, situacao: u.situacao,
         senha_hash: u.senha_hash ?? null, totp_segredo_cifrado: u.totp_segredo_cifrado ?? null,
         totp_ativo: u.totp_ativo ?? 0, totp_ultimo_passo: u.totp_ultimo_passo ?? 0,
-        empresa_situacao: sit(u.cliente_codigo) ?? null
+        empresa_situacao: sit(u.cliente_codigo) ?? null,
+        razao_social: (dados.clientes.find(c => c.CODIGO === u.cliente_codigo) || {}).RAZAO_SOCIAL ?? null,
+        qtd_nome: contar((dados.clientes.find(c => c.CODIGO === u.cliente_codigo) || {}).RAZAO_SOCIAL)
       }))],
     // anti-replay atômico do TOTP: [passo, id, passo]
     [/^UPDATE web_portal_usuarios SET totp_ultimo_passo = \? WHERE id = \? AND totp_ultimo_passo < \?/, (sql, [passo, id, limite]) => {

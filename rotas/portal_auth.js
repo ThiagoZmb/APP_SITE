@@ -38,8 +38,10 @@ const LIMITE_IP = { janelaMs: 15 * 60 * 1000, falhas: 10 };
 
 const SQL_LOGIN =
   `SELECT u.id, u.email, u.cliente_codigo, u.papel, u.situacao, u.senha_hash, u.totp_segredo_cifrado, u.totp_ativo,
-          u.totp_ultimo_passo, e.situacao AS empresa_situacao
+          u.totp_ultimo_passo, e.situacao AS empresa_situacao, c.RAZAO_SOCIAL AS razao_social,
+          (SELECT COUNT(*) FROM cadastro_clientes d WHERE d.RAZAO_SOCIAL = c.RAZAO_SOCIAL) AS qtd_nome
      FROM web_portal_usuarios u LEFT JOIN web_portal_empresas e ON e.cliente_codigo = u.cliente_codigo
+     LEFT JOIN cadastro_clientes c ON c.CODIGO = u.cliente_codigo
     WHERE u.email = ? LIMIT 1`;
 
 // o mesmo objeto no login e no /eu (permissões em ordem fixa)
@@ -169,11 +171,10 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       const ip = req.ip;
       const bruto = typeof b.email === 'string' ? b.email : '';
       const email = normalizarEmail(bruto); // inválido NUNCA vira 400: segue o mesmo caminho e termina na mesma 401
-      let u = null;
-      if (email) {
-        const [rows] = await pool.execute(SQL_LOGIN, [email]);
-        u = rows[0] || null;
-      }
+      // SEMPRE 1 consulta (e-mail inválido busca '', que nunca casa): empresa e unicidade do nome vêm no mesmo SELECT,
+      // para o número de idas ao banco (e o tempo) não revelar se a conta existe
+      const [rows] = await pool.execute(SQL_LOGIN, [email || '']);
+      const u = rows[0] || null;
       // conta real: pelo id; inexistente (ou e-mail inválido): pelo nome informado (com teto no limitador)
       const chave = u ? `c:${u.id}` : `n:${(email || bruto.trim().toLowerCase()).slice(0, 190)}`;
       const dadosAuditoria = u
@@ -189,7 +190,6 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       }
 
       // ---- o mesmo trabalho em todos os caminhos ----
-      const emp = await empresaLiberavel(pool, u ? u.cliente_codigo : 0);
       const senha = typeof b.senha === 'string' ? b.senha.slice(0, 1024) : '';
       let senhaOk = false;
       try { senhaOk = await bcrypt.compare(senha, (u && u.senha_hash) || HASH_FALSO); } catch { senhaOk = false; }
@@ -207,22 +207,30 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       const recuperacaoTxt = typeof b.codigoRecuperacao === 'string' ? b.codigoRecuperacao.trim().slice(0, 64) : '';
       const hashRecuperacao = hashCodigoRecuperacao(recuperacaoTxt || 'sem-codigo', config.chaveCripto);
 
-      // ---- decisão: só agora, e só com conta e senha certas gasta o código (TOTP ou recuperação) ----
-      const contaAtiva = !!u && u.situacao === 'ativo' && u.empresa_situacao === 'ativa' && emp.ok === true;
+      // ---- decisão ----
+      // Os UPDATEs de consumo rodam SEMPRE que o corpo traz o campo (a forma do corpo é a mesma para conta real e
+      // inexistente), com alvo id 0 quando não há direito (AUTO_INCREMENT começa em 1): o número de consultas
+      // nunca revela senha certa nem conta ativa. Só se age sobre o affectedRows quando há direito.
+      const contaAtiva = !!u && u.situacao === 'ativo' && u.empresa_situacao === 'ativa' && Number(u.qtd_nome) === 1 && !!u.razao_social;
+      const elegivel = senhaOk && contaAtiva && Number(u.totp_ativo) === 1;
       let ok = false;
-      if (senhaOk && contaAtiva && Number(u.totp_ativo) === 1) {
-        if (totpOk) {
-          // anti-replay atômico: dois logins simultâneos com o mesmo código, só um grava o passo
-          const [r] = await pool.execute(
-            'UPDATE web_portal_usuarios SET totp_ultimo_passo = ? WHERE id = ? AND totp_ultimo_passo < ?', [v.passo, u.id, v.passo]);
-          ok = r.affectedRows === 1;
-        } else if (recuperacaoTxt) {
-          const [r] = await pool.execute(
-            'UPDATE web_portal_recuperacao SET usado_em = ? WHERE usuario_id = ? AND codigo_hash = ? AND usado_em IS NULL',
-            [hora(), u.id, hashRecuperacao]);
-          ok = r.affectedRows === 1;
-        }
+      let totpGravado = false;
+      if (formatoOk) {
+        const dono = elegivel && totpOk;
+        const passo = dono ? v.passo : 0;
+        const [r] = await pool.execute(
+          'UPDATE web_portal_usuarios SET totp_ultimo_passo = ? WHERE id = ? AND totp_ultimo_passo < ?', [passo, dono ? u.id : 0, passo]);
+        totpGravado = dono && r.affectedRows === 1;
       }
+      let recuperacaoGasta = false;
+      if (recuperacaoTxt) {
+        const dono = elegivel && !totpOk;
+        const [r] = await pool.execute(
+          'UPDATE web_portal_recuperacao SET usado_em = ? WHERE usuario_id = ? AND codigo_hash = ? AND usado_em IS NULL',
+          [hora(), dono ? u.id : 0, hashRecuperacao]);
+        recuperacaoGasta = dono && r.affectedRows === 1;
+      }
+      ok = elegivel && (totpOk ? totpGravado : recuperacaoGasta);
 
       if (!ok) {
         limite.falhou(chave);
@@ -236,15 +244,30 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       const permissoes = await carregarPermissoesPortal(pool, u.id, u.papel);
       await auditarPortal(pool, { evento: 'login_ok', ip, ...dadosAuditoria });
       res.setHeader('Set-Cookie', cookieSessao(token));
-      res.json({ ok: true, usuario: usuarioDe({ email: u.email, papel: u.papel, empresaCodigo: u.cliente_codigo, razaoSocial: emp.razaoSocial, permissoes }) });
+      res.json({ ok: true, usuario: usuarioDe({ email: u.email, papel: u.papel, empresaCodigo: u.cliente_codigo, razaoSocial: u.razao_social, permissoes }) });
     } catch (err) { falhaInterna(res, 'POST /portal/api/login', err); }
   });
 
-  // ------------------------------------------------------------------ logout e /eu (exigem só a sessão)
-  portal('post', '/portal/api/logout', [], async (req, res) => {
+  // ------------------------------------------------------------------ logout e /eu
+  // Logout só precisa de sessão + CSRF (X-Portal e Origin do portal): não exige usuário/empresa ativos, senão quem teve a
+  // empresa suspensa não conseguiria encerrar a própria sessão. Idempotente: sem sessão (ou expirada) também responde 200
+  // e limpa o cookie. Por isso nasce por portalPublica (o guarda de sessão completo recusaria essas contas).
+  function exigirCsrf(req, res, next) {
+    const origem = req.headers.origin;
+    if (req.headers['x-portal'] !== '1' || (origem !== undefined && origem !== config.baseUrl)) {
+      return res.status(403).json({ error: MSG_RECUSADA });
+    }
+    next();
+  }
+  portalPublica('post', '/portal/api/logout', exigirCsrf, async (req, res) => {
     try {
-      await sessoes.revogar(lerCookie(req, NOME_COOKIE));
-      await auditarPortal(pool, { evento: 'logout', usuarioId: req.portal.usuarioId, clienteCodigo: req.portal.empresaCodigo, ip: req.ip });
+      const token = lerCookie(req, NOME_COOKIE);
+      const sessao = await sessoes.valida(token);
+      await sessoes.revogar(token);
+      if (sessao) {
+        const [us] = await pool.execute('SELECT id, email, cliente_codigo, situacao FROM web_portal_usuarios WHERE id = ? LIMIT 1', [sessao.usuarioId]);
+        await auditarPortal(pool, { evento: 'logout', usuarioId: sessao.usuarioId, clienteCodigo: us[0] ? us[0].cliente_codigo : null, ip: req.ip });
+      }
       res.setHeader('Set-Cookie', cookieLimpar());
       res.json({ ok: true });
     } catch (err) { falhaInterna(res, 'POST /portal/api/logout', err); }
