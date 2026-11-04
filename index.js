@@ -30,6 +30,7 @@ const { criarOpcoesCors } = require('./portal/cors');
 const { registrarAdmin } = require('./rotas/admin');
 const { registrarPortalAdmin } = require('./rotas/portal_admin');
 const { registrarPortalAuth } = require('./rotas/portal_auth');
+const { registrarPortalPedidos } = require('./rotas/portal_pedidos');
 const { criarCripto } = require('./portal/cripto');
 const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
@@ -1761,6 +1762,7 @@ registrarPortalAdmin({ rota: registro.rota, pool, sessoes: sessoesPortal, email:
 // Autenticação do portal (convite, login com 2º fator, logout, /eu). O cifrador só existe com o portal configurado; sem ele as rotas respondem 503.
 const cifraPortal = configPortal.ativo ? criarCripto(configPortal.chaveCripto) : null;
 registrarPortalAuth({ portal: registro.portal, portalPublica: registro.portalPublica, pool, sessoes: sessoesPortal, cripto: cifraPortal, config: configPortal });
+registrarPortalPedidos({ portal: registro.portal, pool });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
