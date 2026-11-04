@@ -52,6 +52,7 @@ const { registrarCorteVidros } = require('./rotas/corte_vidros');
 const { registrarFuncionarios } = require('./rotas/funcionarios');
 const { registrarCustos } = require('./rotas/custos');
 const { registrarPrecosFormacao } = require('./rotas/precos_formacao');
+const { registrarEtiquetas } = require('./rotas/etiquetas');
 const { registrarLeituraPdf } = require('./leitura/rotas');
 
 const app = express();
@@ -1775,6 +1776,7 @@ registrarImportacaoPesos({ publica: registro.publica, pool });
 registrarGestao({ rota: registro.rota, pool });
 registrarCorte({ rota: registro.rota, pool });
 registrarCorteVidros({ rota: registro.rota, pool });
+registrarEtiquetas({ rota: registro.rota, pool, foraDosEstados });
 registrarCustos({ rota: registro.rota, pool });
 registrarPrecosFormacao({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
