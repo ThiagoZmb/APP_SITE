@@ -21,14 +21,18 @@ const ALIQUOTA_FGTS = 0.08;
 const ALIQUOTA_INSALUBRIDADE = 0.2;
 const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Encargos calculados só a partir do salário base (nunca vêm do cliente):
-// FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; 13º (1/12) = salário/12; FGTS do 13º = 8% do 13º; insalubridade = 20% do salário.
-// A insalubridade só vale se o funcionário recebe (sinalizador 0/1 do VB, `recebeInsalubridade`); sem ele é 0.
-function calcularEncargos(salarioBase, recebeInsalubridade = false) {
+// Encargos calculados (nunca vêm do cliente):
+// FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; 13º (1/12) = salário/12; FGTS do 13º = 8% do 13º; insalubridade = 20% do SALÁRIO MÍNIMO (como o VB), não do salário base.
+// A insalubridade só vale se o funcionário recebe (sinalizador 0/1 do VB, `recebeInsalubridade`); sem ele é 0. Se recebe mas o salário mínimo não está
+// cadastrado (`dados_gerais`, NOME = 'Salário mínimo'), o valor é `null` = PENDÊNCIA (nunca 0 nem estimativa).
+const salarioMinimoValido = v => Number.isFinite(Number(v)) && Number(v) > 0 && v !== null && v !== '';
+// true quando o funcionário recebe insalubridade mas não há salário mínimo válido para calcular
+const insalubridadePendente = (recebeInsalubridade, salarioMinimo) => !!recebeInsalubridade && !salarioMinimoValido(salarioMinimo);
+function calcularEncargos(salarioBase, recebeInsalubridade = false, salarioMinimo = null) {
   const sb = Number(salarioBase) || 0;
   const ferias = arred(sb / 12 * 4 / 3), decimo = arred(sb / 12);
   return { fgts: arred(sb * ALIQUOTA_FGTS), ferias, feriasFgts: arred(ferias * ALIQUOTA_FGTS), decimo, decimoFgts: arred(decimo * ALIQUOTA_FGTS),
-    insalubridadeValor: recebeInsalubridade ? arred(sb * ALIQUOTA_INSALUBRIDADE) : 0 };
+    insalubridadeValor: !recebeInsalubridade ? 0 : salarioMinimoValido(salarioMinimo) ? arred(Number(salarioMinimo) * ALIQUOTA_INSALUBRIDADE) : null };
 }
 
 const t = v => String(v ?? '').trim();
@@ -104,11 +108,11 @@ function custoTotalMensal(v = {}) {
 }
 
 // Custo total mensal de um funcionário a partir do que o servidor guarda (salário e benefícios digitados); os encargos são recalculados, como no formulário.
-function custoTotalFuncionario(v = {}) {
-  return custoTotalMensal({ ...v, ...calcularEncargos(dinheiro(v.salarioBase) || 0, !!Number(v.insalubridade)) });
+function custoTotalFuncionario(v = {}, salarioMinimo = null) {
+  return custoTotalMensal({ ...v, ...calcularEncargos(dinheiro(v.salarioBase) || 0, !!Number(v.insalubridade), salarioMinimo) });
 }
 
-function validarFuncionario(b = {}, { podeValores = false } = {}) {
+function validarFuncionario(b = {}, { podeValores = false, salarioMinimo = null } = {}) {
   const erros = [];
   const dados = {
     nome: campo(erros, b.nome, 'Nome', 120, { obrigatorio: true }),
@@ -139,10 +143,10 @@ function validarFuncionario(b = {}, { podeValores = false } = {}) {
       const n = dinheiro(b[chave]);
       if (Number.isNaN(n)) erros.push(`${rotulo}: informe um número de 0 a ${LIMITE_DINHEIRO.toLocaleString('pt-BR')}.`); else dados[chave] = n;
     }
-    if (Number.isFinite(dados.salarioBase)) Object.assign(dados, calcularEncargos(dados.salarioBase, dados.insalubridade === 1));
+    if (Number.isFinite(dados.salarioBase)) Object.assign(dados, calcularEncargos(dados.salarioBase, dados.insalubridade === 1, salarioMinimo));
   }
   return { erros, dados };
 }
 
 module.exports = { CLASSES_FORNECEDOR, STATUS_FORNECEDOR, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO,
-  CALCULADOS, ALIQUOTA_FGTS, ALIQUOTA_INSALUBRIDADE, calcularEncargos, custoTotalMensal, custoTotalFuncionario, dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };
+  CALCULADOS, ALIQUOTA_FGTS, ALIQUOTA_INSALUBRIDADE, insalubridadePendente, salarioMinimoValido, calcularEncargos, custoTotalMensal, custoTotalFuncionario, dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };

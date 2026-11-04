@@ -27,7 +27,8 @@ function bancoCadastros() {
     fornecedores: [],  // cadastro_fornecedores
     funcionarios: [],  // funcionarios
     cargos: [{ CARGO: 'Auxiliar' }, { CARGO: 'Serralheiro' }],
-    auditoria: []
+    auditoria: [],
+    dadosGerais: [{ NOME: 'Salário mínimo', VALOR: 1621 }]  // dados_gerais do VB
   };
   const { fornecedores, funcionarios, auditoria } = estado;
   let proximoCod = 1, proximoFunc = 1;
@@ -35,6 +36,8 @@ function bancoCadastros() {
 
   const regras = [
     [/INSERT INTO web_auditoria/, (sql, [quando, quem, acao, alvo, detalhe]) => { auditoria.push({ quando, quem, acao, alvo, detalhe: JSON.parse(detalhe) }); return { affectedRows: 1 }; }],
+
+    [/^SELECT VALOR FROM dados_gerais WHERE NOME = 'Salário mínimo'/, () => estado.dadosGerais.filter(l => l.NOME === 'Salário mínimo').map(l => ({ VALOR: l.VALOR }))],
 
     // ---- fornecedores ----
     [/^SELECT COD, RAZAO_FABRICANTE, FANTASIA[\s\S]*FROM cadastro_fornecedores/, (sql, params) => {

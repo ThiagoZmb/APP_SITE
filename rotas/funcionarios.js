@@ -5,11 +5,18 @@
 // Não há exclusão pela web: o funcionário sai de uso pela situação (Inativo ou Demitido).
 const { emTransacao, ErroUsuario, agoraLocal, hojeLocal } = require('./transacao');
 const { semValores, podeVerValores, preservarValores } = require('../seguranca/valores');
-const { validarFuncionario, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO, calcularEncargos, custoTotalFuncionario } = require('../calculo/cadastros');
+const { validarFuncionario, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO, calcularEncargos, custoTotalFuncionario, insalubridadePendente, salarioMinimoValido } = require('../calculo/cadastros');
 
 const VER = ['funcionarios.ver'];
 const EDITAR = ['funcionarios.editar'];
 const like = s => '%' + String(s).replace(/[\\%_]/g, c => '\\' + c) + '%';
+// Salário mínimo: a mesma fonte do VB (frm_Funcionários.Carregar_Dados_Gerais) = tabela `dados_gerais`, linha NOME = 'Salário mínimo'. Só leitura.
+// Ausente ou inválido = null (a insalubridade vira pendência, nunca 0 nem estimativa).
+async function lerSalarioMinimo(exec) {
+  const [[l] = []] = await exec.execute("SELECT VALOR FROM dados_gerais WHERE NOME = 'Salário mínimo' LIMIT 1");
+  const v = Number(l && l.VALOR);
+  return salarioMinimoValido(v) ? v : null;
+}
 const dia = v => (v ? String(v).slice(0, 10) : null);
 const num = v => Math.round((Number(v) || 0) * 100) / 100;
 
@@ -36,6 +43,7 @@ function registrarFuncionarios({ rota, pool }) {
       if (SITUACOES_FUNCIONARIO.includes(situacao)) { where.push('SITUACAO = ?'); params.push(situacao); }
       if (busca) { where.push('(NOME LIKE ? OR CARGO LIKE ? OR CIDADE LIKE ?)'); params.push(like(busca), like(busca), like(busca)); }
       const comValores = podeVerValores(req);
+      const salarioMinimo = comValores ? await lerSalarioMinimo(pool) : null;
       // com valores.ver traz também as colunas de salário/benefícios só para somar no servidor (nenhuma vai na resposta por funcionário)
       const extra = comValores ? ', INSALUBRIDADE, ' + DINHEIRO_FUNCIONARIO.map(([, c]) => c).join(', ') : '';
       const [linhas] = await pool.execute(
@@ -43,7 +51,9 @@ function registrarFuncionarios({ rota, pool }) {
       const saida = { funcionarios: linhas.map(resumo) };
       if (comValores) { // soma do custo mensal dos listados (filtro e busca já aplicados), em centavos
         const dinheiroDe = l => ({ ...Object.fromEntries(DINHEIRO_FUNCIONARIO.map(([k, c]) => [k, num(l[c])])), insalubridade: Number(l.INSALUBRIDADE) ? 1 : 0 });
-        saida.custoTotal = linhas.reduce((t, l) => t + Math.round(custoTotalFuncionario(dinheiroDe(l)) * 100), 0) / 100;
+        saida.custoTotal = linhas.reduce((t, l) => t + Math.round(custoTotalFuncionario(dinheiroDe(l), salarioMinimo) * 100), 0) / 100;
+        saida.salarioMinimo = salarioMinimo;
+        saida.custoParcial = linhas.some(l => insalubridadePendente(Number(l.INSALUBRIDADE), salarioMinimo)); // há quem receba insalubridade sem salário mínimo para calcular
       }
       res.json(saida);
     } catch (err) {
@@ -70,8 +80,12 @@ function registrarFuncionarios({ rota, pool }) {
       const [[r]] = await pool.execute('SELECT * FROM funcionarios WHERE CODIGO = ? LIMIT 1', [codigo]);
       if (!r) return res.status(404).json({ error: 'Funcionário não encontrado.' });
       const f = completo(r);
-      if (podeVerValores(req)) f.insalubridadeValor = calcularEncargos(f.salarioBase, f.insalubridade === 1).insalubridadeValor; // derivado (20% do salário se tem o sinalizador), não gravado
-      res.json({ funcionario: semValores(req, f, CAMPOS_DINHEIRO_FUNCIONARIO) });
+      const saida = {};
+      if (podeVerValores(req)) { // derivado (20% do salário mínimo se tem o sinalizador; null = pendente), não gravado
+        saida.salarioMinimo = await lerSalarioMinimo(pool);
+        f.insalubridadeValor = calcularEncargos(f.salarioBase, f.insalubridade === 1, saida.salarioMinimo).insalubridadeValor;
+      }
+      res.json({ funcionario: semValores(req, f, CAMPOS_DINHEIRO_FUNCIONARIO), ...saida });
     } catch (err) {
       console.error('Erro GET /funcionarios/:codigo:', err.message);
       if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
@@ -81,7 +95,8 @@ function registrarFuncionarios({ rota, pool }) {
   // sem `codigo` no corpo cria; com `codigo` atualiza
   rota('post', '/funcionarios/salvar', EDITAR, async (req, res) => {
     const b = req.body || {};
-    const { erros, dados } = validarFuncionario(b, { podeValores: podeVerValores(req) });
+    const salarioMinimo = podeVerValores(req) ? await lerSalarioMinimo(pool).catch(() => null) : null;
+    const { erros, dados } = validarFuncionario(b, { podeValores: podeVerValores(req), salarioMinimo });
     if (erros.length) return res.status(400).json({ error: erros.join(' ') });
     const criando = b.codigo === undefined || b.codigo === null || b.codigo === '';
     const codigoAtual = criando ? null : Number(b.codigo);

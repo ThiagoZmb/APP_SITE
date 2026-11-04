@@ -180,15 +180,22 @@ test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º 
   assert.equal(f.DECIMO_1_12, 250); assert.equal(f.DECIMO_1_12_FGTS, 20);
   assert.equal(f.INSALUBRIDADE, 1, 'a coluna do VB continua sendo só o sinalizador 0/1');
   const det = (await (await chamar('/funcionarios/1')).json()).funcionario;
-  assert.equal(det.insalubridadeValor, 600);
+  assert.equal(det.insalubridadeValor, 324.2); // 20% do salário mínimo (1621), não do salário base
+  assert.equal((await (await chamar('/funcionarios/1')).json()).salarioMinimo, 1621);
   banco.funcionarios[0].INSALUBRIDADE = 0; // sem o sinalizador do VB: 0,00
   assert.equal((await (await chamar('/funcionarios/1')).json()).funcionario.insalubridadeValor, 0);
   banco.funcionarios[0].INSALUBRIDADE = 1;
+  banco.dadosGerais.length = 0; // salário mínimo não cadastrado: pendência (null), nunca 0
+  const pend = await (await chamar('/funcionarios/1')).json();
+  assert.equal(pend.funcionario.insalubridadeValor, null);
+  assert.equal(pend.salarioMinimo, null);
+  banco.dadosGerais.push({ NOME: 'Salário mínimo', VALOR: 1621 });
   assert.equal(det.fgts, 240);
   // sem valores.ver: não devolve a insalubridade em R$
   const { chamar: rh } = await prepararCadastros(t, { banco, perfil: 'RH' });
   const sem = (await (await rh('/funcionarios/1')).json()).funcionario;
   assert.equal('insalubridadeValor' in sem, false);
+  assert.ok(!('salarioMinimo' in (await (await rh('/funcionarios/1')).json())), 'salário mínimo é dinheiro: só com valores.ver');
   const r2 = await salvar(rh, 'funcionarios', { ...FUNC, codigo: 1, salarioBase: 1, insalubridadeValor: 1 });
   assert.equal(r2.status, 200);
   assert.equal(banco.funcionarios[0].FGTS, 240);
@@ -202,16 +209,22 @@ test('funcionários: lista traz custoTotal (soma dos listados, filtros aplicados
   banco.semear.funcionario({ NOME: 'Caio', ...zero, SITUACAO: 'Demitido', SALARIO_BASE: 5000 });
   const { chamar } = await prepararCadastros(t, { banco, perfil: 'RH com valores' });
   const { custoTotalFuncionario } = require('../calculo/cadastros');
-  const ana = custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5, insalubridade: 1 }), bruno = custoTotalFuncionario({ salarioBase: 1200 }), caio = custoTotalFuncionario({ salarioBase: 5000 });
-  assert.equal(ana, 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
+  const ana = custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5, insalubridade: 1 }, 1621), bruno = custoTotalFuncionario({ salarioBase: 1200 }, 1621), caio = custoTotalFuncionario({ salarioBase: 5000 }, 1621);
+  assert.equal(ana, 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 324.2 + 400 + 150.5);
   const todos = await (await chamar('/funcionarios')).json();
   assert.ok(Math.abs(todos.custoTotal - (ana + bruno + caio)) < 0.005, String(todos.custoTotal));
   const ativos = await (await chamar('/funcionarios?situacao=Ativo')).json();
   assert.equal(ativos.funcionarios.length, 2);
   assert.ok(Math.abs(ativos.custoTotal - (ana + bruno)) < 0.005, String(ativos.custoTotal));
+  assert.equal(ativos.salarioMinimo, 1621); assert.equal(ativos.custoParcial, false);
+  banco.dadosGerais.length = 0; // sem salário mínimo: a Ana (com sinalizador) fica sem a insalubridade e a lista avisa que o total é parcial
+  const parcial = await (await chamar('/funcionarios?situacao=Ativo')).json();
+  assert.equal(parcial.custoParcial, true); assert.equal(parcial.salarioMinimo, null);
+  assert.ok(Math.abs(parcial.custoTotal - (ana - 324.2 + bruno)) < 0.005, String(parcial.custoTotal));
+  banco.dadosGerais.push({ NOME: 'Salário mínimo', VALOR: 1621 });
   assert.ok(!Object.keys(ativos.funcionarios[0]).includes('salarioBase'));
   const { chamar: sem } = await prepararCadastros(t, { banco, perfil: 'Somente ver funcionários' });
   const r = await (await sem('/funcionarios')).json();
-  assert.equal('custoTotal' in r, false);
+  assert.equal('custoTotal' in r, false); assert.equal('salarioMinimo' in r, false);
   assert.ok(!JSON.stringify(r).includes('3000'));
 });

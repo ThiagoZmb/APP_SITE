@@ -54,6 +54,7 @@
         tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.12); }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); }
         .custo-total { margin-left: 10px; padding: 2px 10px; border-radius: 12px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; text-transform: none; }
+        .aviso-pendente { background: #fff3cd; color: #8a6d00; border: 1px solid #f0d98a; border-radius: 10px; padding: 8px 12px; font-size: 13px; margin-bottom: 10px; }
         .qtd-linha { margin-bottom: 10px; }
         .cinza { color: var(--text-light); font-size: 13px; }
         .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
@@ -135,7 +136,7 @@
     <link rel="stylesheet" href="tema.css?v=202611041500">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="funcionarios.js?v=202611041500" defer></script>
+    <script src="funcionarios.js?v=202611051000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -202,6 +203,7 @@
                         </fieldset>
                         <fieldset data-valor>
                             <legend>Salário e encargos (mensal) <span class="custo-total" id="custo-total" aria-live="polite"></span></legend>
+                            <p class="aviso-pendente" id="aviso-insalubridade" role="alert" hidden>Insalubridade pendente: o salário mínimo não está cadastrado (tabela dados_gerais, "Salário mínimo"). O valor não foi calculado e o custo total está parcial.</p>
                             <div class="linha2">
                                 <div class="form-group"><label for="f-salarioBase">Salário base (R$)</label><input type="number" id="f-salarioBase" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-fgts">FGTS (R$) — 8% do salário</label><input type="number" id="f-fgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
@@ -209,7 +211,7 @@
                                 <div class="form-group"><label for="f-feriasFgts">FGTS das férias (R$) — 8%</label><input type="number" id="f-feriasFgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
                                 <div class="form-group"><label for="f-decimo">13º (1/12) (R$) — salário/12</label><input type="number" id="f-decimo" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
                                 <div class="form-group"><label for="f-decimoFgts">FGTS do 13º (R$) — 8%</label><input type="number" id="f-decimoFgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
-                                <div class="form-group"><label for="f-insalubridadeValor">Insalubridade (R$) — 20% do salário</label><input type="number" id="f-insalubridadeValor" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
+                                <div class="form-group"><label for="f-insalubridadeValor">Insalubridade (R$) — 20% do salário mínimo</label><input type="number" id="f-insalubridadeValor" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
                                 <div class="form-group"><label for="f-almoco">Almoço (R$)</label><input type="number" id="f-almoco" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-transporte">Transporte (R$)</label><input type="number" id="f-transporte" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-planoSaude">Plano de saúde (R$)</label><input type="number" id="f-planoSaude" min="0" step="0.01" inputmode="decimal"></div>

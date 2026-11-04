@@ -24,11 +24,16 @@
   const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimo', 'decimoFgts', 'insalubridadeValor'];
   const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const numero = v => { const n = Number(String(v ?? '').trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
-  function calcularEncargos(salarioBase, recebeInsalubridade) {
+  // insalubridade = 20% do salário mínimo (vem do servidor, tabela dados_gerais do VB); sem salário mínimo = null (pendente)
+  const salarioMinimoValido = v => typeof v === 'number' && Number.isFinite(v) && v > 0;
+  function calcularEncargos(salarioBase, recebeInsalubridade, salarioMinimo) {
     const sb = numero(salarioBase);
     const ferias = arred(sb / 12 * 4 / 3), decimo = arred(sb / 12);
-    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimo, decimoFgts: arred(decimo * 0.08), insalubridadeValor: recebeInsalubridade ? arred(sb * 0.2) : 0 };
+    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimo, decimoFgts: arred(decimo * 0.08), insalubridadeValor: !recebeInsalubridade ? 0 : salarioMinimoValido(salarioMinimo) ? arred(salarioMinimo * 0.2) : null };
   }
+
+  // sinalizador 0/1 do VB: aceita true/false, número e texto ('0', '0.0', '1'); qualquer coisa que não seja positiva é "não"
+  const sinalizado = v => v === true || Number(v) > 0;
 
   // custo total mensal = soma de todos os campos de dinheiro (espelha custoTotalMensal de calculo/cadastros.js); só leitura
   function custoTotalMensal(v) {
@@ -55,13 +60,13 @@
     }
     return erros;
   }
-  function corpoSalvar(f, codigo, { comValores = false } = {}) {
+  function corpoSalvar(f, codigo, { comValores = false, salarioMinimo = null } = {}) {
     const b = {};
     for (const c of CAMPOS) b[c] = txt(f[c]);
-    b.insalubridade = !!f.insalubridade;
+    b.insalubridade = sinalizado(f.insalubridade);
     if (comValores) {
       for (const [k] of DINHEIRO) b[k] = txt(f[k]);
-      Object.assign(b, calcularEncargos(f.salarioBase, f.insalubridade)); // o servidor recalcula; isto só espelha o que a tela mostra
+      Object.assign(b, calcularEncargos(f.salarioBase, sinalizado(f.insalubridade), salarioMinimo)); // o servidor recalcula; isto só espelha o que a tela mostra
     }
     if (codigo) b.codigo = codigo;
     return b;
@@ -72,7 +77,7 @@
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { lista: [], situacao: 'Ativo', busca: '', atual: null, ocupado: false, temporizador: null };
+    const estado = { lista: [], situacao: 'Ativo', busca: '', atual: null, salarioMinimo: null, custoParcial: false, ocupado: false, temporizador: null };
     const { chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
     const pode = p => !!(win.Acesso && win.Acesso.pode(p));
@@ -86,6 +91,8 @@
         const d = await chamar('/funcionarios' + (q.toString() ? '?' + q : ''));
         estado.lista = Array.isArray(d.funcionarios) ? d.funcionarios : [];
         estado.custoTotal = typeof d.custoTotal === 'number' ? d.custoTotal : null;
+        if ('salarioMinimo' in d) estado.salarioMinimo = typeof d.salarioMinimo === 'number' ? d.salarioMinimo : null;
+        estado.custoParcial = !!d.custoParcial;
       } catch (err) { toast(err.message, 'erro'); estado.lista = []; estado.custoTotal = null; }
       desenharLista();
     }
@@ -93,7 +100,7 @@
       const alvo = $('lista');
       $('qtd').textContent = estado.lista.length ? `${estado.lista.length} funcionário(s)` : '';
       const cl = $('custo-lista'); // custo total mensal dos listados: o servidor só manda com valores.ver
-      cl.textContent = estado.lista.length && typeof estado.custoTotal === 'number' ? 'Custo total: ' + brl(estado.custoTotal) : '';
+      cl.textContent = estado.lista.length && typeof estado.custoTotal === 'number' ? 'Custo total: ' + brl(estado.custoTotal) + (estado.custoParcial ? ' (parcial: salário mínimo não cadastrado)' : '') : '';
       cl.hidden = !cl.textContent;
       if (!estado.lista.length) { alvo.innerHTML = '<p class="vazio">Nenhum funcionário encontrado.</p>'; return; }
       alvo.innerHTML = '<table><thead><tr><th>Nome</th><th>Cargo</th><th>Telefone</th><th>Admissão</th><th>Situação</th></tr></thead><tbody>' +
@@ -111,11 +118,14 @@
       $('btn-salvar').hidden = !ok;
     }
     function recalcular() {
-      const c = calcularEncargos($(ID('salarioBase')).value, $(ID('insalubridade')).checked);
-      for (const k of CALCULADOS) { const el = $(ID(k)); if (el) el.value = c[k].toFixed(2); }
+      const marcado = $(ID('insalubridade')).checked;
+      const c = calcularEncargos($(ID('salarioBase')).value, marcado, estado.salarioMinimo);
+      for (const k of CALCULADOS) { const el = $(ID(k)); if (el) el.value = c[k] === null ? '' : c[k].toFixed(2); }
+      const pendente = c.insalubridadeValor === null; // recebe insalubridade e não há salário mínimo cadastrado: pendência visível, nunca 0
+      $('aviso-insalubridade').hidden = !pendente;
       const v = {};
       for (const [k] of DINHEIRO) { const el = $(ID(k)); if (el) v[k] = el.value; }
-      $('custo-total').textContent = 'Custo total: ' + brl(custoTotalMensal(v));
+      $('custo-total').textContent = 'Custo total: ' + brl(custoTotalMensal(v)) + (pendente ? ' (parcial)' : '');
     }
     function ajustarDemissao() { $('w-demissao').hidden = $(ID('situacao')).value !== 'Demitido'; }
     function mostrarForm(f) {
@@ -127,7 +137,7 @@
         if (!el) continue;
         el.value = f ? (f[c] ?? '') : (c === 'situacao' ? 'Ativo' : '');
       }
-      $(ID('insalubridade')).checked = !!(f && f.insalubridade);
+      $(ID('insalubridade')).checked = !!f && sinalizado(f.insalubridade);
       recalcular();
       $('erro-form').textContent = '';
       ajustarDemissao();
@@ -135,7 +145,9 @@
       desenharLista();
     }
     async function abrir(codigo) {
-      try { const d = await chamar('/funcionarios/' + encodeURIComponent(codigo)); mostrarForm(d.funcionario); }
+      try { const d = await chamar('/funcionarios/' + encodeURIComponent(codigo));
+        if ('salarioMinimo' in d) estado.salarioMinimo = typeof d.salarioMinimo === 'number' ? d.salarioMinimo : null;
+        mostrarForm(d.funcionario); }
       catch (err) { toast(err.message, 'erro'); }
     }
     function lerForm() {
@@ -154,7 +166,7 @@
       if (erros.length) return;
       estado.ocupado = true; $('btn-salvar').disabled = true;
       try {
-        const r = await chamar('/funcionarios/salvar', { metodo: 'POST', corpo: corpoSalvar(f, estado.atual ? estado.atual.codigo : null, { comValores: cv }) });
+        const r = await chamar('/funcionarios/salvar', { metodo: 'POST', corpo: corpoSalvar(f, estado.atual ? estado.atual.codigo : null, { comValores: cv, salarioMinimo: estado.salarioMinimo }) });
         toast(r.criado ? 'Funcionário cadastrado.' : 'Funcionário atualizado.', 'ok');
         await carregar();
         await abrir(r.codigo);
@@ -200,5 +212,5 @@
     carregar();
   }
 
-  return { SITUACOES, CAMPOS, DINHEIRO, CALCULADOS, calcularEncargos, custoTotalMensal, brl, validarForm, corpoSalvar, iniciar };
+  return { SITUACOES, CAMPOS, DINHEIRO, CALCULADOS, calcularEncargos, salarioMinimoValido, custoTotalMensal, brl, validarForm, corpoSalvar, iniciar };
 });

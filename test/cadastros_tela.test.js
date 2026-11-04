@@ -126,9 +126,66 @@ test('funcionários (tela): CSS dos desabilitados vence a regra dos campos (espe
 
 test('funcionários (tela): insalubridade só com o checkbox marcado, igual ao servidor', () => {
   assert.equal(P.calcularEncargos(3000, false).insalubridadeValor, 0);
-  assert.equal(P.calcularEncargos(3000, true).insalubridadeValor, 600);
-  assert.deepEqual(P.calcularEncargos(2500, true), calcularEncargos(2500, true));
+  assert.equal(P.calcularEncargos(3000, true, 1621).insalubridadeValor, 324.2);
+  assert.equal(P.calcularEncargos(9999, true, 1621).insalubridadeValor, 324.2);
+  assert.equal(P.calcularEncargos(3000, true, null).insalubridadeValor, null, 'pendência, não zero');
+  assert.deepEqual(P.calcularEncargos(2500, true, 1621), calcularEncargos(2500, true, 1621));
   const ok = { nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000' };
-  assert.equal(P.corpoSalvar({ ...ok, insalubridade: true }, null, { comValores: true }).insalubridadeValor, 600);
-  assert.equal(P.corpoSalvar({ ...ok, insalubridade: false }, null, { comValores: true }).insalubridadeValor, 0);
+  assert.equal(P.corpoSalvar({ ...ok, insalubridade: true }, null, { comValores: true, salarioMinimo: 1621 }).insalubridadeValor, 324.2);
+  assert.equal(P.corpoSalvar({ ...ok, insalubridade: false }, null, { comValores: true, salarioMinimo: 1621 }).insalubridadeValor, 0);
+});
+
+const normal = t => String(t).replace(/[\s ]+/g, ' ');
+// Roda funcionarios.js de verdade com um DOM mínimo: lista -> clique -> GET /funcionarios/:codigo -> formulário preenchido
+async function abrirFuncionario(detalhe, salarioMinimo = 1621) {
+  const els = {};
+  const el = id => els[id] || (els[id] = { id, value: '', checked: false, hidden: false, disabled: false, textContent: '', innerHTML: '', ouvintes: {},
+    addEventListener(t, fn) { this.ouvintes[t] = fn; }, hasAttribute: () => false, getAttribute: () => null });
+  const doc = { getElementById: el, querySelectorAll: () => [], createElement: () => ({ remove() {} }), addEventListener() {} };
+  const resposta = corpo => ({ ok: true, status: 200, json: async () => corpo });
+  const win = { document: doc, setTimeout: (f) => 0, clearTimeout() {}, URLSearchParams,
+    localStorage: { getItem: () => JSON.stringify({ token: 't', user: { nome: 'x' }, exp: Date.now() + 1e6 }), removeItem() {} },
+    Acesso: { pode: () => true },
+    fetch: async url => resposta(url.includes('/funcionarios/cargos') ? { cargos: [] } : url.endsWith('/funcionarios/' + detalhe.codigo) ? { funcionario: detalhe, salarioMinimo }
+      : { funcionarios: [{ codigo: detalhe.codigo, nome: detalhe.nome, cargo: 'X', situacao: 'Ativo', telefone: '', admissao: '2024-01-01' }], custoTotal: 1, salarioMinimo }) };
+  P.iniciar(win);
+  for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+  els.lista.ouvintes.click({ target: { closest: () => ({ getAttribute: () => String(detalhe.codigo) }) } });
+  for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+  return els;
+}
+
+test('funcionários (tela): abrir quem NÃO recebe insalubridade (0, "0", "0.0", null) mostra 0,00 e o custo total sem ela; marcar recalcula', async () => {
+  const base = { codigo: 7, nome: 'Pedro Henrique', cargo: 'X', situacao: 'Ativo', admissao: '2024-01-01', salarioBase: 1650, insalubridadeValor: 330, fgts: 132, ferias: 183.33,
+    feriasFgts: 14.67, decimo: 137.5, decimoFgts: 11, almoco: 0, transporte: 0, planoSaude: 0, segVida: 0, outros: 0 };
+  for (const flag of [0, '0', '0.0', null, undefined, false]) {
+    const els = await abrirFuncionario({ ...base, insalubridade: flag });
+    assert.equal(els['f-insalubridade'].checked, false, String(flag));
+    assert.equal(els['f-insalubridadeValor'].value, '0.00', String(flag));
+    assert.equal(normal(els['custo-total'].textContent), 'Custo total: R$ 2.128,50', String(flag));
+    els['f-insalubridade'].checked = true; els['f-insalubridade'].ouvintes.change();
+    assert.equal(els['f-insalubridadeValor'].value, '324.20');
+    assert.equal(normal(els['custo-total'].textContent), 'Custo total: R$ 2.452,70');
+  }
+  for (const flag of [1, '1', true]) {
+    const els = await abrirFuncionario({ ...base, insalubridade: flag });
+    assert.equal(els['f-insalubridade'].checked, true);
+    assert.equal(els['f-insalubridadeValor'].value, '324.20');
+  }
+});
+
+test('funcionários (tela): o ?v= do funcionarios.js mudou junto com a lógica (senão o navegador usa o JS antigo em cache)', () => {
+  const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
+  assert.match(f, /funcionarios\.js\?v=202611051000/);
+});
+
+test('funcionários (tela): sem salário mínimo cadastrado, quem recebe insalubridade fica com pendência visível (campo vazio, aviso, custo parcial)', async () => {
+  const base = { codigo: 7, nome: 'Pedro', cargo: 'X', situacao: 'Ativo', admissao: '2024-01-01', salarioBase: 1650, insalubridade: 1, almoco: 0, transporte: 0, planoSaude: 0, segVida: 0, outros: 0 };
+  const els = await abrirFuncionario(base, null);
+  assert.equal(els['f-insalubridadeValor'].value, '');
+  assert.equal(els['aviso-insalubridade'].hidden, false);
+  assert.match(normal(els['custo-total'].textContent), /parcial/);
+  els['f-insalubridade'].checked = false; els['f-insalubridade'].ouvintes.change();
+  assert.equal(els['f-insalubridadeValor'].value, '0.00');
+  assert.equal(els['aviso-insalubridade'].hidden, true);
 });
