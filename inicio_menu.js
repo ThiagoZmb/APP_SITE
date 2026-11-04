@@ -71,6 +71,7 @@
       add('pedidos.pdf', '🖨️', 'Imprimir PDF', () => imprimirPdf(urlPdf(n, false)));
       add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)));
       add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(urlVidros(n)));
+      add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
       sep();
       add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=inicio.html`; });
       if (!cancelado) {
