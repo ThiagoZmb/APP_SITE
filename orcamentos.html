@@ -345,6 +345,7 @@
         #tab-itens .col-pct { white-space: nowrap; }
         #itens-tbody tr.travado td { background: #f8fafc; }
         .cadeado { cursor: help; margin-right: 4px; }
+        .detalhe-tecnico { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; word-break: break-word; }
         .abrir-filtros { display: flex; gap: 8px; margin-bottom: 10px; }
         .abrir-filtros input { flex: 1; min-width: 0; }
         .abrir-lista { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow-y: auto; }
@@ -2534,7 +2535,7 @@
                     <tr class="travado">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente bf-serralheria">${escapeHtml(it.frente)}</span></td>
-                        <td><span class="cadeado" title="${escapeHtml('Só o VB edita este item: ' + it.motivo)}">🔒</span>${escapeHtml(it.descricao)}</td>
+                        <td><span class="cadeado" title="${escapeHtml('Só o VB edita este item: ' + it.motivo + (it.detalheTecnico ? ' [' + it.detalheTecnico + ']' : ''))}">🔒</span>${escapeHtml(it.descricao)}${it.detalheTecnico ? `<div class="detalhe-tecnico">Detalhe técnico: ${escapeHtml(it.detalheTecnico)}</div>` : ''}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
@@ -3207,6 +3208,14 @@
             const converte = !!docAberto && docAberto.tipo !== tipo;
             // a lista pode mudar enquanto o salvar espera o servidor (remover/editar item): os desenhos sobem para os itens que FORAM salvos
             const itensSalvos = itens.slice();
+            // item 🔒 (só o VB edita) não tem os dados para o pedido ser gerado do zero: avisa qual é, em vez de o servidor recusar
+            if (converte) {
+                const presos = itens.map((it, i) => it.travado ? `Item ${i + 1} (${it.descricao || it.frente}): ${it.motivo}` : null).filter(Boolean);
+                if (presos.length) {
+                    mostrarMsgSalvar('Não dá para transformar em pedido: há item(ns) que só o VB edita (🔒). Exclua da lista ou finalize no VB. ' + presos.join(' | '), 'erro');
+                    return;
+                }
+            }
             const corpo = {
                 modo, tipo, ...(modo === 'atualizar' ? { numero: docAberto.numero, manterData } : {}),
                 ...(docAberto?.impressao && !converte ? { impressao: docAberto.impressao } : {}),

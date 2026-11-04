@@ -215,3 +215,17 @@ test('quantidade absurda no item é recusada (não monta milhões de folhas)', a
   assert.equal((await r.json()).error, 'Item 1: quantidade inválida (1 a 500).');
   assert.equal(banco.pedOrc.length, 0);
 });
+
+test('item sem detalhes (ex.: item 🔒 enviado ao virar pedido): a mensagem diz qual item e o campo', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const r = await salvar(chamar, pedido({ itens: [giro(), { frente: 'Porta de giro', qtd: 1, altura: 0, largura: 0, obs: '' }] }));
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /^Item 2: faltam os dados do item \(campo 'detalhes'\)/);
+  assert.equal(banco.pedOrc.length, 0);
+});
+
+test('cor do revestimento vazia não reprova o item', async t => {
+  const { chamar } = await prepararPedOrc(t);
+  const r = await salvar(chamar, pedido({ itens: [giro({ detalhes: { ...giro().detalhes, corRevest: '' } })] }));
+  assert.equal(r.status, 200);
+});

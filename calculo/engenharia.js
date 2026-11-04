@@ -19,7 +19,9 @@ function exigePerfil(tipoProduto) {
   return !['REVESTIMENTO', 'VIDRO', 'ACES', 'KIT', 'TRILHO'].some(p => t.includes(p));
 }
 
-const furosUnicos = lista => [...new Set((lista || []).map(Number).filter(f => f > 0))].sort((a, b) => a - b);
+// arredonda ANTES de tirar repetidos: a gravação grava Math.round(furo) (coluna inteira); sem isso 100,4 e 100,2 viravam dois furos 100
+// gravados e a leitura não reconhecia o item (🔒)
+const furosUnicos = lista => [...new Set((lista || []).map(f => Math.round(Number(f))).filter(f => f > 0))].sort((a, b) => a - b);
 
 const temSistemaCorrer = sistema => !!txt(sistema) && txt(sistema) !== 'Sem sistema';
 

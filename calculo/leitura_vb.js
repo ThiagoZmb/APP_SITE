@@ -25,7 +25,26 @@ const igual = (a, b) => (typeof a === 'number' || typeof b === 'number') ? num(a
 const arred2 = v => Math.round(v * 100) / 100;
 const porItem = (lista, n, campo = 'ITEM_PEDIDO') => lista.filter(r => Number(r[campo]) === n);
 
-class Trava extends Error {}
+// detalhe = texto técnico (só nomes de coluna e valores de cadastro, nunca dinheiro) para diagnosticar; o motivo mostrado ao usuário não muda
+class Trava extends Error { constructor(msg, detalhe = '') { super(msg); this.detalhe = detalhe; } }
+
+const mostra = v => JSON.stringify(v === undefined ? null : v);
+// Primeira diferença entre o que a gravação geraria (grupos regenerados) e o que está no banco (cfgs = linhas de itens_v4; seqs = furos); null = igual
+function divergenciaIdaVolta(grupos, cfgs, seqs) {
+  if (grupos.length !== cfgs.length) return `nº de linhas de folhas: gravado=${cfgs.length} regenerado=${grupos.length}`;
+  for (let k = 0; k < grupos.length; k++) {
+    const f = { ...grupos[k].folha, qtd: grupos[k].qtd };
+    for (const [col, campo] of Object.entries(IDA_VOLTA)) {
+      if (!igual(f[campo], cfgs[k][col])) return `linha ${k + 1} (ITEM ${cfgs[k].ITEM}), ${col}: gravado=${mostra(cfgs[k][col])} regenerado=${mostra(f[campo])}`;
+    }
+    if (seqs.length) {
+      const gravados = seqs[k].medidas.join(), gerados = f.furos.join();
+      if (gravados !== gerados) return `linha ${k + 1}, FUROS: gravado=[${gravados}] regenerado=[${gerados}]`;
+      if (f.posicaoFuros !== seqs[k].lado) return `linha ${k + 1}, LADO dos furos: gravado=${mostra(seqs[k].lado)} regenerado=${mostra(f.posicaoFuros)}`;
+    } else if (f.furos.length) return `linha ${k + 1}, FUROS: gravado=[] regenerado=[${f.furos.join()}]`;
+  }
+  return null;
+}
 
 function cabecalhoDe(c) {
   return {
@@ -111,12 +130,8 @@ function traduzirPorta(l, linhas, sistemas) {
 
   // ida e volta: o que a gravação geraria a partir da tradução precisa ser o que está no banco
   const grupos = agruparFolhas(folhasDoItem(item, { descontoAlturaSistema: sistema?.descontoAltura || 0 }));
-  const bate = grupos.length === cfgs.length && grupos.every((g, k) => {
-    const f = { ...g.folha, qtd: g.qtd };
-    return Object.entries(IDA_VOLTA).every(([col, campo]) => igual(f[campo], cfgs[k][col])) &&
-      (seqs.length ? f.furos.join() === furosUnicos(seqs[k].medidas).join() && seqs[k].medidas.join() === f.furos.join() && f.posicaoFuros === seqs[k].lado : !f.furos.length);
-  });
-  if (!bate) throw new Trava('a tradução não reproduz o que está gravado');
+  const divergencia = divergenciaIdaVolta(grupos, cfgs, seqs);
+  if (divergencia) throw new Trava('a tradução não reproduz o que está gravado', divergencia);
   return item;
 }
 
@@ -170,7 +185,7 @@ function traduzirDocumento(linhas, { sistemas = {}, componentesSerr = {} } = {})
       return { ...it, valor, valorBase: arred2(valor / fator), historico, descricao: String(l.DESCRICAO ?? ''), origem };
     } catch (err) {
       if (!(err instanceof Trava)) throw err;
-      return { travado: true, motivo: err.message, frente: l.TIPO_PRODUTO, qtd: num(l.QTD), descricao: String(l.DESCRICAO ?? ''),
+      return { travado: true, motivo: err.message, ...(err.detalhe ? { detalheTecnico: err.detalhe } : {}), frente: l.TIPO_PRODUTO, qtd: num(l.QTD), descricao: String(l.DESCRICAO ?? ''),
         valor: num(l.UNITARIO), historico, obs: txt(l.OBSERVACAO), origem: { ...origem, estado: 'travado' } };
     }
   });

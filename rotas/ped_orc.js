@@ -96,7 +96,11 @@ function validar(b) {
       if (!(Number.isInteger(it.origem.item) && it.origem.item > 0)) return `Item ${i + 1}: origem inválida.`;
       continue;
     }
-    if (!it || typeof it !== 'object' || typeof it.detalhes !== 'object') return 'Item inválido.';
+    if (!it || typeof it !== 'object') return `Item ${i + 1}: inválido.`;
+    if (!it.detalhes || typeof it.detalhes !== 'object') {
+      return `Item ${i + 1}: faltam os dados do item (campo 'detalhes'). ` +
+        (b.modo === 'novo' || b.tipo === 'Pedido' ? 'Se ele aparece com cadeado (🔒), só o VB o edita: o item não pode ser refeito aqui; exclua-o da lista ou use o VB.' : 'Reabra o documento e tente de novo.');
+    }
     const q = Number(it.qtd);
     if (!(Number.isInteger(q) && q >= 1 && q <= MAX_QTD_ITEM)) return `Item ${i + 1}: quantidade inválida (1 a ${MAX_QTD_ITEM}).`;
     if (it.frente === 'Serralheria' && Array.isArray(it.pecas)) {
