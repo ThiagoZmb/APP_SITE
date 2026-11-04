@@ -19,11 +19,20 @@
   function linha(p) {
     const tr = document.createElement('tr');
     const previsao = p.dataEntrega || p.dataAgendada;
-    for (const valor of [String(p.numero), formatarData(p.data), texto(p.situacao), texto(p.entrega), formatarData(previsao)]) {
+    const numero = String(p.numero);
+    [numero, formatarData(p.data), texto(p.situacao), texto(p.entrega), formatarData(previsao)].forEach((valor, i) => {
       const td = document.createElement('td');
-      td.textContent = valor;
+      if (i === 0 && /^\d{1,9}$/.test(numero)) {
+        // o href só nasce de número inteiro validado
+        const a = document.createElement('a');
+        a.textContent = numero;
+        a.href = 'pedido.html?numero=' + numero;
+        td.appendChild(a);
+      } else {
+        td.textContent = valor;
+      }
       tr.appendChild(td);
-    }
+    });
     return tr;
   }
 

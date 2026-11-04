@@ -16,8 +16,8 @@ const { CSP_PORTAL } = require('../portal/cabecalhos');
 const PASTA = path.join(__dirname, '..', 'portal', 'public');
 const arquivos = () => (fs.existsSync(PASTA) ? fs.readdirSync(PASTA) : []);
 const ler = nome => fs.readFileSync(path.join(PASTA, nome), 'utf8');
-const HTMLS = ['login.html', 'convite.html', 'inicio.html', 'termo.html', 'pedidos.html', 'financeiro.html'];
-const JSS = ['portal.js', 'login.js', 'convite.js', 'inicio.js', 'pedidos.js', 'financeiro.js'];
+const HTMLS = ['login.html', 'convite.html', 'inicio.html', 'termo.html', 'pedidos.html', 'financeiro.html', 'pedido.html'];
+const JSS = ['portal.js', 'login.js', 'convite.js', 'inicio.js', 'pedidos.js', 'financeiro.js', 'pedido.js'];
 
 test('os arquivos das páginas existem', () => {
   for (const f of [...HTMLS, ...JSS, 'portal.css']) assert.ok(arquivos().includes(f), `falta ${f}`);
@@ -175,7 +175,7 @@ test('convite.html: link do termo seguro', () => {
 test('HTTP: páginas, cabeçalhos, tipos e caminhos proibidos', async t => {
   const s = await subir(app);
   t.after(s.fechar);
-  for (const pagina of ['/portal/login.html', '/portal/pedidos.html', '/portal/financeiro.html']) {
+  for (const pagina of ['/portal/login.html', '/portal/pedidos.html', '/portal/financeiro.html', '/portal/pedido.html']) {
     const r = await fetch(s.url + pagina);
     assert.equal(r.status, 200, pagina);
     assert.equal(r.headers.get('content-security-policy'), CSP_PORTAL, pagina);

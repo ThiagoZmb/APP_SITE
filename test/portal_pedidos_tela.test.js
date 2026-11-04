@@ -58,7 +58,21 @@ function rodar(resposta) {
   return { get, chamadas };
 }
 const esperar = () => new Promise(r => setImmediate(r));
-const celulas = tr => tr.children.map(c => c.textContent);
+// a célula do número agora contém um <a>: o texto vem do link
+const celulas = tr => tr.children.map(c => (c.children.length ? c.children[0].textContent : c.textContent));
+
+test('pedidos.js (vm): o número é um link para pedido.html?numero=N e só com número inteiro', async () => {
+  const { get } = rodar({ status: 200, dados: { pagina: 1, temMais: false, pedidos: [
+    { numero: 12, data: '2026-03-09', situacao: 'Pronto', dataEntrega: null, entrega: null, dataAgendada: null },
+    { numero: '12abc', data: '2026-03-09', situacao: 'Pronto', dataEntrega: null, entrega: null, dataAgendada: null }] } });
+  await esperar();
+  const [l1, l2] = get('corpo').children;
+  const a = l1.children[0].children[0];
+  assert.equal(a.tag, 'a');
+  assert.equal(a.href, 'pedido.html?numero=12');
+  assert.equal(a.textContent, '12');
+  assert.equal(l2.children[0].children.length, 0, 'número inválido não vira link');
+});
 
 test('pedidos.js (vm): monta linhas com datas DD/MM/AAAA e "—" para nulos; Anterior desabilitado na página 1', async () => {
   const { get, chamadas } = rodar({ status: 200, dados: { pagina: 1, temMais: true, pedidos: [

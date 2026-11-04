@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detalhe do pedido</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main>
+    <h1>Pedido <span id="numero"></span></h1>
+    <p>Data: <strong id="data"></strong></p>
+    <p>Situação: <strong id="situacao"></strong></p>
+    <p>Entrega: <strong id="entrega"></strong></p>
+    <p>Previsão/Data: <strong id="previsao"></strong></p>
+    <section id="documentos" hidden>
+      <h2>Documentos</h2>
+      <div id="lista-documentos" class="acoes"></div>
+    </section>
+    <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
+    <p><a href="pedidos.html">Voltar aos pedidos</a></p>
+  </main>
+  <script src="portal.js"></script>
+  <script src="pedido.js"></script>
+</body>
+</html>
