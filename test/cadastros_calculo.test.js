@@ -88,23 +88,27 @@ test('dataIso e dinheiro', () => {
 });
 
 test('calcularEncargos / validarFuncionario: FGTS 8%, férias = salário/12 x 4/3, FGTS das férias e do 13º 8%; valores do cliente são ignorados', () => {
-  assert.deepEqual(calcularEncargos(3000), { fgts: 240, ferias: 333.33, feriasFgts: 26.67, decimo: 250, decimoFgts: 20, insalubridadeValor: 600 });
-  const { erros, dados } = validarFuncionario({ ...FUNC, salarioBase: '3000', decimo: 999, fgts: 1, ferias: 2, feriasFgts: 3, decimoFgts: 4, insalubridadeValor: 1 }, { podeValores: true });
+  assert.deepEqual(calcularEncargos(3000, true), { fgts: 240, ferias: 333.33, feriasFgts: 26.67, decimo: 250, decimoFgts: 20, insalubridadeValor: 600 });
+  assert.equal(calcularEncargos(3000).insalubridadeValor, 0, 'sem o sinalizador a insalubridade é 0');
+  const { erros, dados } = validarFuncionario({ ...FUNC, salarioBase: '3000', decimo: 999, fgts: 1, ferias: 2, feriasFgts: 3, decimoFgts: 4, insalubridadeValor: 1, insalubridade: true }, { podeValores: true });
   assert.deepEqual(erros, []);
   assert.equal(dados.fgts, 240); assert.equal(dados.ferias, 333.33); assert.equal(dados.feriasFgts, 26.67);
-  assert.equal(dados.decimo, 250); // 13º = salário/12, ignora o cliente assert.equal(dados.decimoFgts, 20); assert.equal(dados.insalubridadeValor, 600); // 20% do salário, ignora o cliente
+  assert.equal(dados.decimo, 250); // 13º = salário/12, ignora o cliente
+  assert.equal(dados.decimoFgts, 20); assert.equal(dados.insalubridadeValor, 600); // 20% do salário (tem o sinalizador), ignora o cliente
+  assert.equal(validarFuncionario({ ...FUNC, salarioBase: '3000', insalubridadeValor: 999 }, { podeValores: true }).dados.insalubridadeValor, 0); // sem o sinalizador
   assert.equal('insalubridadeValor' in validarFuncionario({ ...FUNC, insalubridadeValor: 100, salarioBase: 3000 }).dados, false); // sem valores.ver nada é calculado
 });
 
 test('custoTotalMensal: soma em centavos de todos os campos de dinheiro (vazio/inválido = 0)', () => {
   assert.equal(custoTotalMensal({ salarioBase: 0.1, fgts: 0.2 }), 0.3); // sem erro de ponto flutuante
-  const e = calcularEncargos(3000);
+  const e = calcularEncargos(3000, true);
   const total = custoTotalMensal({ salarioBase: 3000, ...e, almoco: 400, transporte: '150,5', planoSaude: '', segVida: 'x', outros: -5 });
   assert.equal(total, 3000 + 250 + 240 + 333.33 + 26.67 + 20 + 600 + 400 + 150.5);
   assert.equal(custoTotalMensal({}), 0);
 });
 
 test('custoTotalFuncionario: recalcula os encargos a partir do salário e soma com os benefícios', () => {
-  assert.equal(custoTotalFuncionario({ salarioBase: 3000, fgts: 1, decimo: 1, almoco: 400, transporte: 150.5 }), 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
+  assert.equal(custoTotalFuncionario({ salarioBase: 3000, fgts: 1, decimo: 1, almoco: 400, transporte: 150.5, insalubridade: 1 }), 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
+  assert.equal(custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5 }), 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 400 + 150.5, 'sem sinalizador: insalubridade 0');
   assert.equal(custoTotalFuncionario({}), 0);
 });

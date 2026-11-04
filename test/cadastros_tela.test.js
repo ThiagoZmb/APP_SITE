@@ -123,3 +123,12 @@ test('funcionários (tela): CSS dos desabilitados vence a regra dos campos (espe
   const versoes = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html')).map(n => /tema\.css\?v=(\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', n), 'utf8'))).filter(Boolean).map(m => m[1]);
   assert.equal(new Set(versoes).size, 1, 'todas as páginas com a mesma versão do tema.css (quebra o cache)');
 });
+
+test('funcionários (tela): insalubridade só com o checkbox marcado, igual ao servidor', () => {
+  assert.equal(P.calcularEncargos(3000, false).insalubridadeValor, 0);
+  assert.equal(P.calcularEncargos(3000, true).insalubridadeValor, 600);
+  assert.deepEqual(P.calcularEncargos(2500, true), calcularEncargos(2500, true));
+  const ok = { nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000' };
+  assert.equal(P.corpoSalvar({ ...ok, insalubridade: true }, null, { comValores: true }).insalubridadeValor, 600);
+  assert.equal(P.corpoSalvar({ ...ok, insalubridade: false }, null, { comValores: true }).insalubridadeValor, 0);
+});

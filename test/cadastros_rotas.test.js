@@ -181,6 +181,9 @@ test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º 
   assert.equal(f.INSALUBRIDADE, 1, 'a coluna do VB continua sendo só o sinalizador 0/1');
   const det = (await (await chamar('/funcionarios/1')).json()).funcionario;
   assert.equal(det.insalubridadeValor, 600);
+  banco.funcionarios[0].INSALUBRIDADE = 0; // sem o sinalizador do VB: 0,00
+  assert.equal((await (await chamar('/funcionarios/1')).json()).funcionario.insalubridadeValor, 0);
+  banco.funcionarios[0].INSALUBRIDADE = 1;
   assert.equal(det.fgts, 240);
   // sem valores.ver: não devolve a insalubridade em R$
   const { chamar: rh } = await prepararCadastros(t, { banco, perfil: 'RH' });
@@ -194,12 +197,12 @@ test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º 
 test('funcionários: lista traz custoTotal (soma dos listados, filtros aplicados) só com valores.ver; sem ela nada de dinheiro', async t => {
   const banco = bancoCadastros();
   const zero = { ALMOCO: 0, TRANSPORTE: 0, PLANO_SAUDE: 0, SEG_VIDA: 0, OCIOSIDADE: 0 };
-  banco.semear.funcionario({ NOME: 'Ana', ...zero, SALARIO_BASE: 3000, ALMOCO: 400, TRANSPORTE: 150.5 });
+  banco.semear.funcionario({ NOME: 'Ana', ...zero, INSALUBRIDADE: 1, SALARIO_BASE: 3000, ALMOCO: 400, TRANSPORTE: 150.5 });
   banco.semear.funcionario({ NOME: 'Bruno', ...zero, SALARIO_BASE: 1200 });
   banco.semear.funcionario({ NOME: 'Caio', ...zero, SITUACAO: 'Demitido', SALARIO_BASE: 5000 });
   const { chamar } = await prepararCadastros(t, { banco, perfil: 'RH com valores' });
   const { custoTotalFuncionario } = require('../calculo/cadastros');
-  const ana = custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5 }), bruno = custoTotalFuncionario({ salarioBase: 1200 }), caio = custoTotalFuncionario({ salarioBase: 5000 });
+  const ana = custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5, insalubridade: 1 }), bruno = custoTotalFuncionario({ salarioBase: 1200 }), caio = custoTotalFuncionario({ salarioBase: 5000 });
   assert.equal(ana, 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
   const todos = await (await chamar('/funcionarios')).json();
   assert.ok(Math.abs(todos.custoTotal - (ana + bruno + caio)) < 0.005, String(todos.custoTotal));

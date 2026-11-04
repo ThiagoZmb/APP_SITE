@@ -37,12 +37,12 @@ function registrarFuncionarios({ rota, pool }) {
       if (busca) { where.push('(NOME LIKE ? OR CARGO LIKE ? OR CIDADE LIKE ?)'); params.push(like(busca), like(busca), like(busca)); }
       const comValores = podeVerValores(req);
       // com valores.ver traz também as colunas de salário/benefícios só para somar no servidor (nenhuma vai na resposta por funcionário)
-      const extra = comValores ? ', ' + DINHEIRO_FUNCIONARIO.map(([, c]) => c).join(', ') : '';
+      const extra = comValores ? ', INSALUBRIDADE, ' + DINHEIRO_FUNCIONARIO.map(([, c]) => c).join(', ') : '';
       const [linhas] = await pool.execute(
         `SELECT CODIGO, NOME, CARGO, SITUACAO, TELEFONE, CIDADE, ESTADO, ADMISSAO${extra} FROM funcionarios WHERE ${where.join(' AND ')} ORDER BY NOME LIMIT 2000`, params);
       const saida = { funcionarios: linhas.map(resumo) };
       if (comValores) { // soma do custo mensal dos listados (filtro e busca já aplicados), em centavos
-        const dinheiroDe = l => Object.fromEntries(DINHEIRO_FUNCIONARIO.map(([k, c]) => [k, num(l[c])]));
+        const dinheiroDe = l => ({ ...Object.fromEntries(DINHEIRO_FUNCIONARIO.map(([k, c]) => [k, num(l[c])])), insalubridade: Number(l.INSALUBRIDADE) ? 1 : 0 });
         saida.custoTotal = linhas.reduce((t, l) => t + Math.round(custoTotalFuncionario(dinheiroDe(l)) * 100), 0) / 100;
       }
       res.json(saida);
@@ -70,7 +70,7 @@ function registrarFuncionarios({ rota, pool }) {
       const [[r]] = await pool.execute('SELECT * FROM funcionarios WHERE CODIGO = ? LIMIT 1', [codigo]);
       if (!r) return res.status(404).json({ error: 'Funcionário não encontrado.' });
       const f = completo(r);
-      if (podeVerValores(req)) f.insalubridadeValor = calcularEncargos(f.salarioBase).insalubridadeValor; // derivado (20% do salário), não gravado
+      if (podeVerValores(req)) f.insalubridadeValor = calcularEncargos(f.salarioBase, f.insalubridade === 1).insalubridadeValor; // derivado (20% do salário se tem o sinalizador), não gravado
       res.json({ funcionario: semValores(req, f, CAMPOS_DINHEIRO_FUNCIONARIO) });
     } catch (err) {
       console.error('Erro GET /funcionarios/:codigo:', err.message);

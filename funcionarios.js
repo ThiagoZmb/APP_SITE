@@ -24,10 +24,10 @@
   const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimo', 'decimoFgts', 'insalubridadeValor'];
   const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const numero = v => { const n = Number(String(v ?? '').trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
-  function calcularEncargos(salarioBase) {
+  function calcularEncargos(salarioBase, recebeInsalubridade) {
     const sb = numero(salarioBase);
     const ferias = arred(sb / 12 * 4 / 3), decimo = arred(sb / 12);
-    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimo, decimoFgts: arred(decimo * 0.08), insalubridadeValor: arred(sb * 0.2) };
+    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimo, decimoFgts: arred(decimo * 0.08), insalubridadeValor: recebeInsalubridade ? arred(sb * 0.2) : 0 };
   }
 
   // custo total mensal = soma de todos os campos de dinheiro (espelha custoTotalMensal de calculo/cadastros.js); só leitura
@@ -61,7 +61,7 @@
     b.insalubridade = !!f.insalubridade;
     if (comValores) {
       for (const [k] of DINHEIRO) b[k] = txt(f[k]);
-      Object.assign(b, calcularEncargos(f.salarioBase)); // o servidor recalcula; isto só espelha o que a tela mostra
+      Object.assign(b, calcularEncargos(f.salarioBase, f.insalubridade)); // o servidor recalcula; isto só espelha o que a tela mostra
     }
     if (codigo) b.codigo = codigo;
     return b;
@@ -111,7 +111,7 @@
       $('btn-salvar').hidden = !ok;
     }
     function recalcular() {
-      const c = calcularEncargos($(ID('salarioBase')).value);
+      const c = calcularEncargos($(ID('salarioBase')).value, $(ID('insalubridade')).checked);
       for (const k of CALCULADOS) { const el = $(ID(k)); if (el) el.value = c[k].toFixed(2); }
       const v = {};
       for (const [k] of DINHEIRO) { const el = $(ID(k)); if (el) v[k] = el.value; }
@@ -193,6 +193,7 @@
     $(ID('cep')).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); buscarCep(); } });
     $(ID('situacao')).addEventListener('change', ajustarDemissao);
     $(ID('salarioBase')).addEventListener('input', recalcular);
+    $(ID('insalubridade')).addEventListener('change', recalcular);
     for (const [k] of DINHEIRO) $(ID(k)).addEventListener('input', recalcular);
     $('btn-cancelar').addEventListener('click', () => { estado.atual = null; $('form').hidden = true; $('vazio-painel').hidden = false; desenharLista(); });
     carregarCargos();

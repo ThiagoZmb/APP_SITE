@@ -23,11 +23,12 @@ const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Encargos calculados só a partir do salário base (nunca vêm do cliente):
 // FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; 13º (1/12) = salário/12; FGTS do 13º = 8% do 13º; insalubridade = 20% do salário.
-function calcularEncargos(salarioBase) {
+// A insalubridade só vale se o funcionário recebe (sinalizador 0/1 do VB, `recebeInsalubridade`); sem ele é 0.
+function calcularEncargos(salarioBase, recebeInsalubridade = false) {
   const sb = Number(salarioBase) || 0;
   const ferias = arred(sb / 12 * 4 / 3), decimo = arred(sb / 12);
   return { fgts: arred(sb * ALIQUOTA_FGTS), ferias, feriasFgts: arred(ferias * ALIQUOTA_FGTS), decimo, decimoFgts: arred(decimo * ALIQUOTA_FGTS),
-    insalubridadeValor: arred(sb * ALIQUOTA_INSALUBRIDADE) };
+    insalubridadeValor: recebeInsalubridade ? arred(sb * ALIQUOTA_INSALUBRIDADE) : 0 };
 }
 
 const t = v => String(v ?? '').trim();
@@ -104,7 +105,7 @@ function custoTotalMensal(v = {}) {
 
 // Custo total mensal de um funcionário a partir do que o servidor guarda (salário e benefícios digitados); os encargos são recalculados, como no formulário.
 function custoTotalFuncionario(v = {}) {
-  return custoTotalMensal({ ...v, ...calcularEncargos(dinheiro(v.salarioBase) || 0) });
+  return custoTotalMensal({ ...v, ...calcularEncargos(dinheiro(v.salarioBase) || 0, !!Number(v.insalubridade)) });
 }
 
 function validarFuncionario(b = {}, { podeValores = false } = {}) {
@@ -138,7 +139,7 @@ function validarFuncionario(b = {}, { podeValores = false } = {}) {
       const n = dinheiro(b[chave]);
       if (Number.isNaN(n)) erros.push(`${rotulo}: informe um número de 0 a ${LIMITE_DINHEIRO.toLocaleString('pt-BR')}.`); else dados[chave] = n;
     }
-    if (Number.isFinite(dados.salarioBase)) Object.assign(dados, calcularEncargos(dados.salarioBase));
+    if (Number.isFinite(dados.salarioBase)) Object.assign(dados, calcularEncargos(dados.salarioBase, dados.insalubridade === 1));
   }
   return { erros, dados };
 }
