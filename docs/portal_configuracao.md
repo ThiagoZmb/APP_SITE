@@ -104,7 +104,7 @@ Nada disto é feito pelo código; só o dono resolve. Sem isso, qualquer pessoa 
 
 ## 11. O que ainda não foi testado
 
-Foi testado só com banco, e-mail e navegador simulados. Confira você, na primeira vez: o envio de e-mail pelo SMTP real, as páginas do cliente (login, início, **Meus pedidos**, com a paginação e o detalhe de um pedido, **Financeiro**, com as abas Em aberto e Pagos, e a tela do pedido com os botões **PDF do pedido** e **Nota fiscal**) a tela **Usuários** do administrador da empresa (convite por e-mail, permissões, trava do último administrador; roteiro no passo 10 da seção 12) e a tela da equipe no navegador, o aplicativo autenticador de verdade, e se a pasta de páginas do portal chega ao servidor do Render.
+Foi testado só com banco, e-mail e navegador simulados. Confira você, na primeira vez: o envio de e-mail pelo SMTP real, as páginas do cliente (login, início, **Meus pedidos**, com a paginação e o detalhe de um pedido, **Financeiro**, com as abas Em aberto e Pagos, e a tela do pedido com os botões **PDF do pedido** e **Nota fiscal**), a tela **Usuários** do administrador da empresa (convite por e-mail, permissões, trava do último administrador; roteiro no passo 10 da seção 12) e a tela da equipe no navegador, o aplicativo autenticador de verdade, e se a pasta de páginas do portal chega ao servidor do Render.
 
 ## 12. Conferir no MySQL do HostGator antes do primeiro uso
 
