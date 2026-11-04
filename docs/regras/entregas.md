@@ -1,0 +1,14 @@
+# Entregas (módulo web, tabelas `web_entregas`, `web_entrega_eventos`, `web_entrega_anexos`)
+
+_Movido do CLAUDE.md sem alteração; o CLAUDE.md guarda só o resumo._
+
+### Entregas (módulo web, tabelas `web_entregas`, `web_entrega_eventos`, `web_entrega_anexos`)
+- **Criação**: só a varredura idempotente (`sincronizarFila`) cria registros, para pedidos `SITUACAO='Pronto'`; não há gancho nas rotas da web. A web **nunca marca Pronto** (quem marca é o VB). Pedido que sai de Pronto antes de agendar é cancelado na varredura (e reaberto se voltar a Pronto, só quando foi a própria varredura que cancelou); entrega A programar/Agendada/Ocorrência de pedido `Cancelado` também é cancelada (Em rota não). A varredura roda em lote (um INSERT ... SELECT de entregas e um de eventos).
+- **Baixa**: grava `ped_orc.SITUACAO` (`'Entregue'` ou `'Retirado'`) **e** `DATA_ENTREGA` (data da baixa, Brasília), como `Pedido_Entregue`/`Pedido_Retirado` do VB (`Module1.vb`), na **mesma transação** do evento (`rotas/transacao.js`). Nunca sobrescreve pedido `Cancelado` (409, nada gravado). Nenhuma outra escrita em tabela do VB; nada de lançamento em `fluxo_de_caixa` (fase 2).
+- **Entrega Em rota**: só o motorista a conclui, mas a equipe pode Reagendar ou Cancelar uma entrega `em_rota` (para não ficar presa).
+- **Exclusão de pedido**: `DELETE /ped_orc/Pedido/:numero` apaga também a entrega do número (anexos, eventos, entrega) na mesma transação e audita `entrega_removida_com_pedido`, pois o NUMERO é reaproveitado (MAX+1). **Exclusões feitas direto pelo VB não passam por aqui** e deixam o registro de entrega órfão.
+- **Motorista**: perfil `Motorista` é criado pela administração (não vem nos perfis iniciais); só tem `entregas.baixar`. Vê e age apenas nas **próprias** entregas; entrega de outro motorista, inexistente ou em estado inválido responde **404 uniforme**.
+- **Anexos**: no MySQL (MEDIUMBLOB), ≤ 1 MB, enviados por PUT binário; só JPEG ou PNG (conferido pelos bytes, não só pelo mime). Foto do canhoto obrigatória na baixa; assinatura opcional. Dono, tipo e status do anexo são conferidos dentro da trava da transação.
+- **Nomes de campo**: nada que case com `REGEX_VALOR` (por isso `entregue_a`, e não `recebedor`: "receb" é dinheiro). Contagens usam `qtd*`. Os campos `entregaStatus`, `dataAgendada` e `qtdEntregasPendentes` são seguros e aparecem em `/dados_lista`, `/dados_pedidos`, `/dados_pedidos_rj` (LEFT JOIN só para `TIPO='Pedido'`) e em `/clientes/financeiro/:codigo`.
+- **Permissões**: `entregas.ver`, `entregas.programar`, `entregas.baixar`. A migração dá ver+programar a Administrador e Interno completo; `baixar` a nenhum perfil.
+- **Testes**: `test/entregas_*.test.js`, `test/minhas_entregas_tela.test.js`; `test/entregas_ligacoes.test.js` cobre as ligações e confirma que o app sobe com as rotas novas (`registro.verificar()`).
