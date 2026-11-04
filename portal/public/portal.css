@@ -100,6 +100,12 @@ input:focus-visible {
   font-weight: 700;
 }
 
+main.larga { max-width: 52rem; }
+.tabela-rolagem { overflow-x: auto; }
+table.pedidos { width: 100%; border-collapse: collapse; }
+table.pedidos th, table.pedidos td { padding: 8px; border-bottom: 1px solid var(--borda); text-align: left; }
+table.pedidos th { color: var(--suave); font-size: 0.9rem; }
+
 ul.codigos { padding: 0; list-style: none; columns: 2; }
 ul.codigos li {
   margin: 4px 0;

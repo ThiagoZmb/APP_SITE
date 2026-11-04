@@ -16,8 +16,8 @@ const { CSP_PORTAL } = require('../portal/cabecalhos');
 const PASTA = path.join(__dirname, '..', 'portal', 'public');
 const arquivos = () => (fs.existsSync(PASTA) ? fs.readdirSync(PASTA) : []);
 const ler = nome => fs.readFileSync(path.join(PASTA, nome), 'utf8');
-const HTMLS = ['login.html', 'convite.html', 'inicio.html', 'termo.html'];
-const JSS = ['portal.js', 'login.js', 'convite.js', 'inicio.js'];
+const HTMLS = ['login.html', 'convite.html', 'inicio.html', 'termo.html', 'pedidos.html'];
+const JSS = ['portal.js', 'login.js', 'convite.js', 'inicio.js', 'pedidos.js'];
 
 test('os arquivos das páginas existem', () => {
   for (const f of [...HTMLS, ...JSS, 'portal.css']) assert.ok(arquivos().includes(f), `falta ${f}`);

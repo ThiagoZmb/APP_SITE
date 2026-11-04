@@ -1,4 +1,4 @@
-// Início do portal (provisório até a etapa 3): confirma a sessão em /portal/api/eu e oferece o botão Sair.
+// Início do portal: confirma a sessão em /portal/api/eu e oferece o botão Sair.
 (function () {
   'use strict';
 
