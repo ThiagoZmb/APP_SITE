@@ -774,7 +774,10 @@ test('app real: as rotas de autenticação estão no registro (listas EXATAS) e,
   assert.deepEqual(lista(registro.rotasPortalPublicas()), [
     'post /portal/api/convite/concluir', 'post /portal/api/convite/iniciar', 'post /portal/api/login', 'post /portal/api/logout'
   ]);
-  assert.deepEqual(lista(registro.rotasPortal()), ['get /portal/api/eu', 'get /portal/api/financeiro', 'get /portal/api/pedidos', 'get /portal/api/pedidos/:numero']);
+  assert.deepEqual(lista(registro.rotasPortal()), [
+    'get /portal/api/eu', 'get /portal/api/financeiro', 'get /portal/api/pedidos', 'get /portal/api/pedidos/:numero',
+    'get /portal/api/pedidos/:numero/danfe/:chave', 'get /portal/api/pedidos/:numero/documentos', 'get /portal/api/pedidos/:numero/pdf'
+  ]);
   assert.doesNotThrow(() => registro.verificar());
   const antes = configPortal.ativo;
   configPortal.ativo = false;

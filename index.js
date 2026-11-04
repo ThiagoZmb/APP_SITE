@@ -31,6 +31,7 @@ const { registrarPortalAdmin } = require('./rotas/portal_admin');
 const { registrarPortalAuth } = require('./rotas/portal_auth');
 const { registrarPortalPedidos } = require('./rotas/portal_pedidos');
 const { registrarPortalFinanceiro } = require('./rotas/portal_financeiro');
+const { registrarPortalDocumentos } = require('./rotas/portal_documentos');
 const { criarCripto } = require('./portal/cripto');
 const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
@@ -1736,6 +1737,7 @@ const cifraPortal = configPortal.ativo ? criarCripto(configPortal.chaveCripto) :
 registrarPortalAuth({ portal: registro.portal, portalPublica: registro.portalPublica, pool, sessoes: sessoesPortal, cripto: cifraPortal, config: configPortal });
 registrarPortalPedidos({ portal: registro.portal, pool });
 registrarPortalFinanceiro({ portal: registro.portal, pool });
+registrarPortalDocumentos({ portal: registro.portal, pool });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
