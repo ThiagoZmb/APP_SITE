@@ -247,11 +247,6 @@ const TABELAS = [
      UNIQUE KEY ux_danfe_vinculo (chave, pedido_numero),
      KEY ix_danfe_vinculo_pedido (pedido_numero)
    ) ${OPCOES}`,
-  // valor da insalubridade (R$) do funcionário: a coluna funcionarios.INSALUBRIDADE do VB é só um sinalizador 0/1; tabela do VB nunca é alterada
-  `CREATE TABLE IF NOT EXISTS \`web_funcionarios_valores\` (
-     funcionario_codigo INT NOT NULL PRIMARY KEY,
-     insalubridade DECIMAL(12,2) NOT NULL DEFAULT 0
-   ) ${OPCOES}`,
   // peso por produto (o banco do VB não tem peso): produto = nome usado no VB (MODELO, PERFIL, PUXADOR, REVESTIMENTO), sem FK
   // unidade_peso: kg_m (kg por metro), kg_m2_mm (kg por m² por mm de espessura), kg_un (kg por unidade)
   `CREATE TABLE IF NOT EXISTS \`web_pesos\` (

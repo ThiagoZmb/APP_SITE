@@ -97,6 +97,17 @@ test('funcionários (tela): encargos calculados na tela batem com o servidor; ca
   const f = fs.readFileSync(require('node:path').join(__dirname, '..', 'funcionarios.html'), 'utf8');
   for (const k of P.CALCULADOS) assert.match(f, new RegExp(`<input[^>]*id="f-${k}"[^>]*required[^>]*disabled`), k);
   assert.ok(!/id="f-decimo"[^>]*disabled/.test(f), '13º continua editável');
-  assert.ok(f.includes('id="f-insalubridadeValor"'));
+  assert.match(f, /id="f-insalubridadeValor"[^>]*disabled/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'tema.css'), 'utf8'), /input:disabled, select:disabled, textarea:disabled { background-color: #f4f4f6/);
   assert.deepEqual(P.corpoSalvar({ nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000', decimo: '250', fgts: '9' }, null, { comValores: true }).fgts, 240);
+});
+
+test('funcionários (tela): custo total mensal espelha o servidor, formata em R$ e fica na seção data-valor', () => {
+  const v = { salarioBase: '3000', decimo: '250', ...P.calcularEncargos('3000', '250'), almoco: '400', transporte: '150,5' };
+  assert.equal(P.custoTotalMensal(v), require('../calculo/cadastros').custoTotalMensal(v));
+  assert.equal(P.brl(5000.5).replace(/[\s ]/g, ' '), 'R$ 5.000,50');
+  const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
+  const ini = f.indexOf('<fieldset data-valor>');
+  assert.ok(f.slice(ini, f.indexOf('</fieldset>', ini)).includes('id="custo-total"'));
+  assert.doesNotMatch(f.slice(ini, f.indexOf('</fieldset>', ini)), /style=/);
 });

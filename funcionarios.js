@@ -21,14 +21,20 @@
     ['decimoFgts', 'FGTS do 13º'], ['almoco', 'Almoço'], ['transporte', 'Transporte'], ['planoSaude', 'Plano de saúde'], ['segVida', 'Seguro de vida'], ['outros', 'Outros'], ['insalubridadeValor', 'Insalubridade']];
 
   // calculados na tela e recalculados pelo servidor (calculo/cadastros.js: calcularEncargos); desabilitados e obrigatórios
-  const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimoFgts'];
+  const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimoFgts', 'insalubridadeValor'];
   const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const numero = v => { const n = Number(String(v ?? '').trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
   function calcularEncargos(salarioBase, decimo) {
     const sb = numero(salarioBase), d = numero(decimo);
     const ferias = arred(sb / 12 * 4 / 3);
-    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimoFgts: arred(d * 0.08) };
+    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimoFgts: arred(d * 0.08), insalubridadeValor: arred(sb * 0.2) };
   }
+
+  // custo total mensal = soma de todos os campos de dinheiro (espelha custoTotalMensal de calculo/cadastros.js); só leitura
+  function custoTotalMensal(v) {
+    return DINHEIRO.reduce((t, [k]) => t + Math.round(numero(v[k]) * 100), 0) / 100;
+  }
+  const brl = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   // espelha as regras do servidor (o servidor continua decidindo)
   function validarForm(f, { comValores = false } = {}) {
@@ -103,6 +109,9 @@
     function recalcular() {
       const c = calcularEncargos($(ID('salarioBase')).value, $(ID('decimo')).value);
       for (const k of CALCULADOS) { const el = $(ID(k)); if (el) el.value = c[k].toFixed(2); }
+      const v = {};
+      for (const [k] of DINHEIRO) { const el = $(ID(k)); if (el) v[k] = el.value; }
+      $('custo-total').textContent = 'Custo total: ' + brl(custoTotalMensal(v));
     }
     function ajustarDemissao() { $('w-demissao').hidden = $(ID('situacao')).value !== 'Demitido'; }
     function mostrarForm(f) {
@@ -180,11 +189,11 @@
     $(ID('cep')).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); buscarCep(); } });
     $(ID('situacao')).addEventListener('change', ajustarDemissao);
     $(ID('salarioBase')).addEventListener('input', recalcular);
-    $(ID('decimo')).addEventListener('input', recalcular);
+    for (const [k] of DINHEIRO) $(ID(k)).addEventListener('input', recalcular);
     $('btn-cancelar').addEventListener('click', () => { estado.atual = null; $('form').hidden = true; $('vazio-painel').hidden = false; desenharLista(); });
     carregarCargos();
     carregar();
   }
 
-  return { SITUACOES, CAMPOS, DINHEIRO, CALCULADOS, calcularEncargos, validarForm, corpoSalvar, iniciar };
+  return { SITUACOES, CAMPOS, DINHEIRO, CALCULADOS, calcularEncargos, custoTotalMensal, brl, validarForm, corpoSalvar, iniciar };
 });

@@ -170,25 +170,23 @@ test('funcionários: sem permissão 403 (Compras não vê funcionários); só ve
   assert.equal(banco.funcionarios.length, 1);
 });
 
-test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º (ignora o cliente) e guarda a insalubridade em R$ na tabela da web', async t => {
+test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º (ignora o cliente) e deriva a insalubridade (20% do salário, não gravada)', async t => {
   const banco = bancoCadastros();
   const { chamar } = await prepararCadastros(t, { banco, perfil: 'RH com valores' });
-  const r = await salvar(chamar, 'funcionarios', { ...FUNC, salarioBase: 3000, decimo: 250, fgts: 1, ferias: 1, feriasFgts: 1, decimoFgts: 1, insalubridadeValor: 424.4, insalubridade: true });
+  const r = await salvar(chamar, 'funcionarios', { ...FUNC, salarioBase: 3000, decimo: 250, fgts: 1, ferias: 1, feriasFgts: 1, decimoFgts: 1, insalubridadeValor: 1, insalubridade: true });
   assert.equal(r.status, 200);
   const f = banco.funcionarios[0];
   assert.equal(f.FGTS, 240); assert.equal(f.FERIAS_1_12, 333.33); assert.equal(f.FERIAS_FGTS_1_12, 26.67);
   assert.equal(f.DECIMO_1_12, 250); assert.equal(f.DECIMO_1_12_FGTS, 20);
   assert.equal(f.INSALUBRIDADE, 1, 'a coluna do VB continua sendo só o sinalizador 0/1');
-  assert.equal(banco.valoresFunc[1], 424.4);
   const det = (await (await chamar('/funcionarios/1')).json()).funcionario;
-  assert.equal(det.insalubridadeValor, 424.4);
+  assert.equal(det.insalubridadeValor, 600);
   assert.equal(det.fgts, 240);
-  // sem valores.ver: nem devolve nem altera o valor da insalubridade
+  // sem valores.ver: não devolve a insalubridade em R$
   const { chamar: rh } = await prepararCadastros(t, { banco, perfil: 'RH' });
   const sem = (await (await rh('/funcionarios/1')).json()).funcionario;
   assert.equal('insalubridadeValor' in sem, false);
   const r2 = await salvar(rh, 'funcionarios', { ...FUNC, codigo: 1, salarioBase: 1, insalubridadeValor: 1 });
   assert.equal(r2.status, 200);
-  assert.equal(banco.valoresFunc[1], 424.4);
   assert.equal(banco.funcionarios[0].FGTS, 240);
 });
