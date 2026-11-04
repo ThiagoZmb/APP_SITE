@@ -3,6 +3,9 @@
 
 const TAMANHO_PAGINA = 50;
 
+// Teto de página: com 50 por página já passa de 5 milhões de pedidos e mantém o OFFSET longe de perder precisão.
+const PAGINA_MAXIMA = 100000;
+
 const ROTULO_SITUACAO = Object.freeze({
   'Em Produção': 'Em produção',
   'Pronto': 'Pronto',
@@ -53,4 +56,4 @@ function numeroValido(texto) {
   return n > 0 ? n : null;
 }
 
-module.exports = { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA };
+module.exports = { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA, PAGINA_MAXIMA };

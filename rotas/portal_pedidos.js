@@ -2,10 +2,7 @@
 // Portal do cliente, etapa 3a: pedidos e status (somente leitura).
 // A empresa vem SEMPRE da sessão (req.portal.empresaCodigo); nenhum parâmetro, cabeçalho ou corpo escolhe a empresa.
 // A consulta é fixa e seleciona só as 6 colunas da lista fechada (nunca valores, observações nem cliente final).
-const { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA } = require('../calculo/portal_pedidos');
-
-// Teto de página: com 50 por página já passa de 5 milhões de pedidos e mantém o OFFSET longe de perder precisão.
-const PAGINA_MAXIMA = 100000;
+const { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA, PAGINA_MAXIMA } = require('../calculo/portal_pedidos');
 
 const SELECIONAR = `SELECT p.NUMERO AS NUMERO, DATE_FORMAT(p.DATA, '%Y-%m-%d') AS DATA, p.SITUACAO AS SITUACAO,
        DATE_FORMAT(p.DATA_ENTREGA, '%Y-%m-%d') AS DATA_ENTREGA, en.status AS ENTREGA_STATUS,
