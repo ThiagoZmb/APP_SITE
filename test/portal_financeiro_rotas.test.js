@@ -28,6 +28,8 @@ function lancamentosPadrao() {
     lan('ACME LTDA', '2026-10-01', 'Atrasado', 300),
     lan('ACME LTDA', '2026-09-01', 'Protestado', 400),
     lan('ACME LTDA', '2026-06-10', 'Recebido', 500),
+    lan('ACME LTDA', '2025-11-04', 'Recebido', 11.11), // exatamente 12 meses: dentro do corte (>=)
+    lan('ACME LTDA', '2025-11-03', 'Recebido', 22.22), // um dia antes do corte: fora
     lan('ACME LTDA', '2025-10-01', 'Recebido', 123.45), // 13 meses: fora do corte
     lan('ACME LTDA', '2026-10-15', 'Cancelado', 999),
     lan('ACME LTDA', '2026-10-20', 'A Receber', 888, { RAZAO_FABRICANTE: FORN }),
@@ -122,10 +124,10 @@ test('resumo de ACME: aReceber 1000.5, emAtraso 900.5, igual nas duas visões e 
 test('pagos: só o recebido dos últimos 12 meses; resumo continua o dos abertos', async t => {
   const c = await montar(t);
   const corpo = await (await c.get('/portal/api/financeiro?visao=pagos', { cookie: await c.cookieDe(1) })).json();
-  assert.equal(corpo.titulos.length, 1);
-  assert.equal(corpo.titulos[0].vencimento, '2026-06-10');
-  assert.equal(corpo.titulos[0].situacao, 'Pago');
-  assert.equal(corpo.titulos[0].valor, 500);
+  // 2025-11-04 (exatamente 12 meses) entra; 2025-11-03 e 2025-10-01 ficam de fora.
+  assert.deepEqual(corpo.titulos.map(x => x.vencimento), ['2026-06-10', '2025-11-04']);
+  assert.deepEqual(corpo.titulos.map(x => x.valor), [500, 11.11]);
+  assert.ok(corpo.titulos.every(x => x.situacao === 'Pago'));
   assert.equal(corpo.visao, 'pagos');
   assert.equal(corpo.resumo.aReceber, 1000.5);
   const q = consultasTitulos(c.pool)[0];
@@ -142,11 +144,11 @@ test('lista fechada: cada título tem exatamente 5 chaves e nada sensível vaza 
     const corpo = JSON.parse(texto);
     assert.ok(corpo.titulos.length > 0);
     for (const x of corpo.titulos) { assert.deepEqual(Object.keys(x).sort(), CHAVES); total++; }
-    for (const proibido of [OBS, FORN, 'OBSERVACAO', 'RAZAO', 'ID', '7000', '7001', '999', '888', '123.45', 'ACME', 'BETA', 'Cancelado']) {
+    for (const proibido of [OBS, FORN, 'OBSERVACAO', 'RAZAO', 'ID', '7000', '7001', '999', '888', '123.45', '22.22', 'ACME', 'BETA', 'Cancelado']) {
       assert.ok(!texto.includes(proibido), `vazou ${proibido}`);
     }
   }
-  assert.equal(total, 5);
+  assert.equal(total, 6);
 });
 
 test('SQL fixo: SELECT só com as 5 colunas, filtro de empresa, fornecedor vazio, sem OR nos títulos; empresa só da sessão', async t => {
@@ -181,10 +183,59 @@ test('SQL fixo: SELECT só com as 5 colunas, filtro de empresa, fornecedor vazio
     assert.equal(q.params[1], 40); // [hoje, empresa]
     assert.equal(q.params[0], HOJE);
     assert.doesNotMatch(q.sql, /Recebido|Cancelado/);
+    // Fora da lista do SELECT, o resumo não pode ter nenhum OR (um OR solto abriria o filtro de empresa).
+    const resto = q.sql.slice(q.sql.search(/\bFROM\b/));
+    assert.equal((resto.match(/\bOR\b/gi) || []).length, 0);
+    // O único OR do resumo está dentro do IF() do SELECT, com este texto exato.
+    assert.ok(q.sql.includes("SUM(IF(f.SITUACAO IN ('Atrasado','Protestado') OR f.DATA < ?, f.VALOR, 0))"));
   }
   const lista = await (await c.get('/portal/api/financeiro?empresa=41', { cookie, headers: { 'X-Empresa': '41' } })).json();
   assert.equal(lista.titulos.length, 4);
   assert.equal(lista.resumo.aReceber, 1000.5);
+});
+
+test('grafias do VB (caixa mista, espaços): a lista de abertos soma o mesmo que o resumo e RECEBIDO aparece em pagos', async t => {
+  const lancamentos = [
+    lan('ACME LTDA', '2026-11-10', 'A receber', 10),
+    lan('ACME LTDA', '2026-10-05', ' Atrasado ', 20),
+    lan('ACME LTDA', '2026-11-01', 'a RECEBER', 5), // vencido: Em atraso
+    lan('ACME LTDA', '2026-07-01', 'RECEBIDO', 30)
+  ];
+  const c = await montar(t, { lancamentos });
+  const cookie = await c.cookieDe(1);
+  const ab = await (await c.get('/portal/api/financeiro', { cookie })).json();
+  assert.equal(ab.titulos.length, 3);
+  assert.equal(ab.resumo.aReceber, 35);
+  assert.equal(soma(ab.titulos), ab.resumo.aReceber);
+  assert.equal(ab.resumo.emAtraso, 25);
+  assert.equal(soma(ab.titulos.filter(x => x.situacao === 'Em atraso')), ab.resumo.emAtraso);
+  assert.deepEqual(ab.titulos.map(x => x.situacao), ['Em atraso', 'Em atraso', 'A receber']);
+  const pg = await (await c.get('/portal/api/financeiro?visao=pagos', { cookie })).json();
+  assert.deepEqual(pg.titulos.map(x => [x.valor, x.situacao]), [[30, 'Pago']]);
+});
+
+test('linha descartada pela projeção: console.warn só com a contagem, sem dados', async t => {
+  const lancamentos = [
+    lan('ACME LTDA', '2026-11-10', 'A Receber', 10),
+    lan('ACME LTDA', 'SEGREDO-DATA', 'A Receber', 777.77, { PEDIDO: 'SEGREDO-PED' })
+  ];
+  const c = await montar(t, { lancamentos });
+  const original = console.warn;
+  const avisos = [];
+  console.warn = (...a) => avisos.push(a.join(' '));
+  let corpo;
+  try {
+    corpo = await (await c.get('/portal/api/financeiro', { cookie: await c.cookieDe(1) })).json();
+  } finally { console.warn = original; }
+  assert.equal(corpo.titulos.length, 1);
+  assert.equal(avisos.length, 1);
+  assert.match(avisos[0], /\b1\b/);
+  assert.doesNotMatch(avisos[0], /SEGREDO|777|ACME|2026/);
+  // sem descarte, sem aviso
+  const ok = await montar(t);
+  console.warn = (...a) => avisos.push(a.join(' '));
+  try { await ok.get('/portal/api/financeiro', { cookie: await ok.cookieDe(1) }); } finally { console.warn = original; }
+  assert.equal(avisos.length, 1);
 });
 
 test('prova de mutação: sem "c.CODIGO = ?" (trocado por "1 = 1") o isolamento FALHA, logo o pool falso aplica o filtro de verdade', async t => {

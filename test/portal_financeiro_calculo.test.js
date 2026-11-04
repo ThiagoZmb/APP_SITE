@@ -44,6 +44,23 @@ test('projetarTitulo: situacao', () => {
   assert.deepStrictEqual(EM_ABERTO, ['A Receber', 'Atrasado', 'Protestado']);
 });
 
+test('projetarTitulo: grafias do VB (caixa mista, espaços, acento) são normalizadas', () => {
+  const sit = (s, d) => projetarTitulo({ ...linha, SITUACAO: s, DATA: d || linha.DATA }, HOJE);
+  assert.strictEqual(sit('A receber', '2026-11-03').situacao, 'Em atraso');
+  assert.strictEqual(sit('a  RECEBER', '2026-11-04').situacao, 'A receber');
+  assert.strictEqual(sit(' Atrasado ').situacao, 'Em atraso');
+  assert.strictEqual(sit('PROTESTADO').situacao, 'Protestado');
+  assert.strictEqual(sit('RECEBIDO', '2026-06-01').situacao, 'Pago');
+  assert.strictEqual(sit('Recebído').situacao, 'Pago');
+  assert.strictEqual(sit(' cancelado '), null);
+});
+
+test('projetarTitulo: pedido não numérico vira null', () => {
+  assert.strictEqual(projetarTitulo({ ...linha, PEDIDO: 'ABC-9' }, HOJE).pedido, null);
+  assert.strictEqual(projetarTitulo({ ...linha, PEDIDO: '12a' }, HOJE).pedido, null);
+  assert.strictEqual(projetarTitulo({ ...linha, PEDIDO: 77 }, HOJE).pedido, 77);
+});
+
 test('projetarTitulo: campos invalidos e normalizacao', () => {
   for (const DATA of [null, '04/11/2026']) assert.strictEqual(projetarTitulo({ ...linha, DATA }, HOJE), null);
   for (const VALOR of [null, 'x']) assert.strictEqual(projetarTitulo({ ...linha, VALOR }, HOJE), null);

@@ -62,7 +62,11 @@ function registrarPortalFinanceiro({ portal, pool, hoje = hojeLocal }) {
       const [resumoLinhas] = await pool.execute(SQL_RESUMO, [dia, empresa]);
       const r = (resumoLinhas && resumoLinhas[0]) || {};
 
-      const titulos = linhas.slice(0, TAMANHO_PAGINA).map(l => projetarTitulo(l, dia)).filter(Boolean);
+      const visiveis = linhas.slice(0, TAMANHO_PAGINA);
+      const titulos = visiveis.map(l => projetarTitulo(l, dia)).filter(Boolean);
+      // Linha que a consulta devolveu mas a projeção recusou (dado fora do padrão): avisa só a contagem, sem dados.
+      const descartadas = visiveis.length - titulos.length;
+      if (descartadas > 0) console.warn(`Financeiro do portal: ${descartadas} linha(s) descartada(s) pela projeção.`);
       const corpo = {
         resumo: { aReceber: dinheiro(r.A_RECEBER) ?? 0, emAtraso: dinheiro(r.EM_ATRASO) ?? 0 },
         titulos, visao, pagina, temMais: linhas.length > TAMANHO_PAGINA

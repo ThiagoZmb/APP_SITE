@@ -4,14 +4,17 @@ const { paginaValida, TAMANHO_PAGINA, PAGINA_MAXIMA } = require('./portal_pedido
 
 const EM_ABERTO = ['A Receber', 'Atrasado', 'Protestado'];
 
+// O VB grava a situação com caixa mista ('A receber', 'A Receber') e o MySQL compara sem distinguir caixa,
+// então a projeção normaliza como calculo/gestao_caixa.js (trim, sem acento, minúsculas) antes de consultar o mapa.
 const SITUACOES = Object.freeze({
-  'A Receber': 'A receber',
-  'Atrasado': 'Em atraso',
-  'Protestado': 'Protestado',
-  'Recebido': 'Pago',
+  'a receber': 'A receber',
+  'atrasado': 'Em atraso',
+  'protestado': 'Protestado',
+  'recebido': 'Pago',
 });
 
-const tem = (mapa, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(mapa, k);
+const normalizar = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+const tem = (mapa, k) => Object.prototype.hasOwnProperty.call(mapa, k);
 
 function visaoValida(valor) {
   if (valor === undefined) return 'abertos';
@@ -40,14 +43,15 @@ function docesMesesAtras(hoje) {
 
 function projetarTitulo(linha, hoje) {
   const l = linha || {};
-  if (!tem(SITUACOES, l.SITUACAO)) return null;
+  const chave = typeof l.SITUACAO === 'string' ? normalizar(l.SITUACAO) : '';
+  if (!tem(SITUACOES, chave)) return null;
   if (typeof l.DATA !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(l.DATA)) return null;
   const valor = dinheiro(l.VALOR);
   if (valor === null) return null;
-  let situacao = SITUACOES[l.SITUACAO];
-  if (l.SITUACAO === 'A Receber' && l.DATA < hoje) situacao = 'Em atraso';
+  let situacao = SITUACOES[chave];
+  if (chave === 'a receber' && l.DATA < hoje) situacao = 'Em atraso';
   const pedTxt = l.PEDIDO === null || l.PEDIDO === undefined ? '' : String(l.PEDIDO).trim();
-  const pedido = pedTxt === '' ? null : (/^\d+$/.test(pedTxt) ? Number(pedTxt) : pedTxt);
+  const pedido = /^\d+$/.test(pedTxt) ? Number(pedTxt) : null; // número ou null
   const nf = l.NOTA_FISCAL === null || l.NOTA_FISCAL === undefined ? '' : String(l.NOTA_FISCAL).trim();
   return {
     vencimento: l.DATA,

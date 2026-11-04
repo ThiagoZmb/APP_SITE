@@ -6,7 +6,9 @@
 // lancamentos: { ID, RAZAO_SOCIAL, RAZAO_FABRICANTE, DATA ('YYYY-MM-DD'|null), PEDIDO, NOTA_FISCAL, SITUACAO, VALOR (number|null), OBSERVACAO_GERAL }
 // clientes: { CODIGO, RAZAO_SOCIAL }
 // Como o banco real, VALOR sai como string com 2 casas; e só as colunas selecionadas saem (o resto nunca sai do "banco").
-const SITUACOES_ABERTAS = ['A Receber', 'Atrasado', 'Protestado'];
+const SITUACOES_ABERTAS = ['a receber', 'atrasado', 'protestado'];
+// Como o MySQL: comparação sem distinção de caixa e sem espaços nas pontas.
+const norm = s => String(s ?? '').trim().toLowerCase();
 
 function criarPoolFinanceiro({ lancamentos = [], clientes = [] } = {}) {
   const chamadas = [];
@@ -31,8 +33,8 @@ function criarPoolFinanceiro({ lancamentos = [], clientes = [] } = {}) {
       if (filtraEmpresa && cli.CODIGO !== empresa) return false;
       if (soFornecedorVazio && (l.RAZAO_FABRICANTE ?? '') !== '') return false;
       if (naoNulos && (l.DATA == null || l.VALOR == null)) return false;
-      if (abertos && !SITUACOES_ABERTAS.includes(l.SITUACAO)) return false;
-      if (recebido && l.SITUACAO !== 'Recebido') return false;
+      if (abertos && !SITUACOES_ABERTAS.includes(norm(l.SITUACAO))) return false;
+      if (recebido && norm(l.SITUACAO) !== 'recebido') return false;
       if (filtraCorte && !(l.DATA >= corte)) return false;
       return true;
     });
@@ -53,7 +55,7 @@ function criarPoolFinanceiro({ lancamentos = [], clientes = [] } = {}) {
       let aReceber = 0; let emAtraso = 0;
       for (const l of linhas) {
         aReceber += l.VALOR;
-        if (l.SITUACAO === 'Atrasado' || l.SITUACAO === 'Protestado' || l.DATA < hoje) emAtraso += l.VALOR;
+        if (norm(l.SITUACAO) === 'atrasado' || norm(l.SITUACAO) === 'protestado' || l.DATA < hoje) emAtraso += l.VALOR;
       }
       return [[{ A_RECEBER: aReceber.toFixed(2), EM_ATRASO: emAtraso.toFixed(2) }], []];
     }
