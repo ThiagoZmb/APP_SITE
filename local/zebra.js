@@ -66,14 +66,20 @@ $b64 = [Console]::In.ReadToEnd().Trim()
 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 `;
 
-function powershell(args, { entrada, env } = {}) {
+// Roda um programa e devolve o texto da saída. Se o filho sair sem ler a entrada (Add-Type falhou, timeout), a escrita no
+// stdin dá EPIPE/EOF; sem este tratador isso seria um 'error' sem dono e derrubaria o serviço inteiro (PDF e SEFAZ junto).
+// O erro de verdade chega pelo callback do execFile.
+function executar(exe, args, { entrada, env } = {}) {
   return new Promise((ok, falha) => {
-    const filho = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-ExecutionPolicy', 'Bypass', ...args],
+    const filho = execFile(exe, args,
       { windowsHide: true, timeout: 30000, env: { ...process.env, ...env } },
       (erro, saida, saidaErro) => (erro ? falha(new Error((String(saidaErro).trim() || erro.message).split('\n')[0])) : ok(String(saida))));
+    filho.stdin.on('error', () => {});
     if (entrada !== undefined) filho.stdin.end(entrada); else filho.stdin.end();
   });
 }
+const powershell = (args, opcoes) => executar('powershell.exe',
+  ['-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-ExecutionPolicy', 'Bypass', ...args], opcoes);
 
 // o ZPL vai por stdin em base64 (UTF-8) e o nome da impressora por variável de ambiente: nada do site vira linha de comando
 const enviarPadrao = (impressora, zpl) => powershell(
@@ -125,4 +131,4 @@ function criarZebra() {
   return api;
 }
 
-module.exports = { criarZebra, validarZpl, escolherImpressora };
+module.exports = { criarZebra, validarZpl, escolherImpressora, executar };

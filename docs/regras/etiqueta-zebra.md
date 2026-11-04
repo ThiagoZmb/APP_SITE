@@ -11,7 +11,7 @@ Uma etiqueta de 100 × 60 mm (203 dpi, `^PW800 ^LL480`, UTF-8 `^CI28`) **por ite
 ## Regras
 - **Só Pedido**; só leitura; respeita os estados do usuário (`foraDosEstados`) como `/dados_pdf`. Pedido sem itens = 404 com mensagem própria.
 - **Sem dinheiro**: nenhum campo de valor na etiqueta nem na resposta (a contagem se chama `quantidade`, nunca `total`).
-- **Saneamento**: todo texto do banco perde `^`, `~` e `\` e caracteres de controle (`sanearZpl`); o conteúdo do pedido nunca vira comando da impressora. Cliente é cortado em 50 caracteres, descrição em 300, medidas em 80.
+- **Saneamento**: todo texto do banco perde `^`, `~` e `\` e caracteres de controle (`sanearZpl`); o conteúdo do pedido nunca vira comando da impressora. Cliente é cortado em 50 caracteres, descrição em 240, medidas em 80.
 - **Medida ausente = "—"**, nunca estimada (item sem linha em `ped_orc_itens_v4`, como serralheria e avulso). Folhas aparecem como `ALTURAxLARGURA | …`.
 - **Entrega** na etiqueta é `ped_orc.DATA_PRONTO` (a previsão, a mesma do PDF). `DATA_ENTREGA` só é preenchida ao entregar, então não serve na produção. Decisão a confirmar com o dono.
 - **A impressora nunca vem da requisição**: só de `zebra.config.json` (`{ "impressora": "nome no Windows" }`, ao lado de `zebra.js`; exemplo em `local/zebra.config.exemplo.json`) ou, sem ele, a primeira cujo nome contenha "zebra" ou "zdesigner". Sem impressora, o serviço responde 500 com a lista encontrada.

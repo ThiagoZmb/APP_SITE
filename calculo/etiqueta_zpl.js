@@ -2,7 +2,7 @@
 // Uma etiqueta por item do Pedido. Nenhum campo de dinheiro. Todo texto do banco passa por sanearZpl: ^, ~ e \ são
 // caracteres de comando do ZPL, então o conteúdo do pedido nunca pode chegar à impressora com eles.
 const MAX_CLIENTE = 50;
-const MAX_DESCRICAO = 300;
+const MAX_DESCRICAO = 240; // cabe nas 5 linhas do ^FB (fonte 28 em 760 dots); acima disso o ZPL imprime a 6ª linha por cima da 5ª
 const MAX_MEDIDAS = 80;
 
 // remove ^ ~ \ e troca caracteres de controle por espaço
@@ -36,7 +36,7 @@ function montarEtiquetas({ numero, cliente, dataEntrega, itens }) {
       '^XA^CI28^PW800^LL480',
       campo(20, 15, 44, quem),
       campo(20, 70, 36, `Pedido nº ${num}`),
-      campo(450, 70, 36, `Item ${i + 1}/${lista.length}  Qtd ${sanearZpl(it.QTD).trim() || '1'}`),
+      campo(450, 70, 36, `Item ${sanearZpl(it.ITEM).trim() || i + 1} (${i + 1}/${lista.length})  Qtd ${sanearZpl(it.QTD).trim() || '1'}`),
       `^FO20,120^A0N,28,28^FB760,5,4,L,0^FD${desc}^FS`,
       campo(20, 290, 30, `Medidas: ${medidas}`),
       campo(20, 330, 30, `Entrega: ${entrega}`),

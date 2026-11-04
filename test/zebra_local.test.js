@@ -9,7 +9,7 @@ const path = require('node:path');
 const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'elegance-zebra-'));
 process.env.ELEGANCE_RAIZ = path.join(raiz, 'Programa Elegance');
 const { servidor, zebra } = require('../local/salvador_pdf');
-const { validarZpl, escolherImpressora } = require('../local/zebra');
+const { validarZpl, escolherImpressora, executar } = require('../local/zebra');
 
 const ZPL = '^XA^FDteste^FS^XZ';
 let base;
@@ -79,4 +79,11 @@ test('origem estranha é 403 e o ping informa zebra', async () => {
   const r = await fetch(base + '/etiqueta', { method: 'OPTIONS', headers: { Origin: 'https://thiagozmb.github.io' } });
   assert.equal(r.status, 204);
   assert.match(r.headers.get('access-control-allow-headers'), /Content-Type/);
+});
+
+test('filho que sai sem ler a entrada não derruba o processo (EPIPE/EOF no stdin)', async () => {
+  assert.equal(typeof executar, 'function');
+  const grande = 'x'.repeat(5 * 1024 * 1024);
+  // o erro do filho (saída 1) é esperado e chega pela promessa; o que não pode acontecer é um 'error' sem tratador no stdin
+  await assert.rejects(executar(process.execPath, ['-e', 'process.exit(1)'], { entrada: grande }));
 });

@@ -26,7 +26,7 @@ test('montarEtiquetas gera uma etiqueta por item com o layout 100x60', () => {
   for (const b of blocos(zpl)) {
     for (const c of ['^PW800', '^LL480', '^CI28', '^BC', '23425']) assert.ok(b.includes(c), c);
   }
-  assert.ok(blocos(zpl)[1].includes('Item 2/3'));
+  assert.ok(blocos(zpl)[1].includes('Item 2 (2/3)'));
 });
 
 test('cliente malicioso não injeta comando e mantém acentos', () => {
@@ -45,4 +45,18 @@ test('sem dinheiro e sem medida vira —', () => {
   const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { v4: [] })]));
   assert.ok(!zpl.includes('R$'));
   assert.ok(zpl.includes('Medidas: —'));
+});
+
+test('descrição cabe no bloco de 5 linhas: no máximo 240 caracteres, terminando em …', () => {
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { descricao: 'x'.repeat(5000) })]));
+  const marca = '^FB760,5,4,L,0^FD';
+  const ini = zpl.indexOf(marca) + marca.length;
+  const desc = zpl.slice(ini, zpl.indexOf('^FS', ini));
+  assert.ok(desc.length <= 240, String(desc.length));
+  assert.ok(desc.endsWith('…'));
+});
+
+test('o número do item é o ITEM do pedido, mesmo com buraco na numeração', () => {
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1), ITEM(3)]));
+  assert.ok(blocos(zpl)[1].includes('Item 3 (2/2)'));
 });
