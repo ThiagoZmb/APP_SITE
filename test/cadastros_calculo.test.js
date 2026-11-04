@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { cpfValido, cnpjValido, documentoFormatado, formatarCpf, formatarCnpj } = require('../calculo/documentos');
-const { custoTotalMensal, calcularEncargos, validarFornecedor, validarFuncionario, dinheiro, dataIso } = require('../calculo/cadastros');
+const { custoTotalFuncionario, custoTotalMensal, calcularEncargos, validarFornecedor, validarFuncionario, dinheiro, dataIso } = require('../calculo/cadastros');
 
 test('CPF: dígitos verificadores; repetidos e tamanho errado são inválidos; aceita máscara', () => {
   assert.equal(cpfValido('529.982.247-25'), true);
@@ -65,8 +65,8 @@ test('validarFuncionario: com valores.ver lê o dinheiro (vazio = 0, vírgula de
   assert.equal(ok.dados.transporte, 150.46);
   assert.equal(ok.dados.fgts, 240.04); // 8% de 3000,50
   assert.equal(ok.dados.insalubridade, 1);
-  const ruim = validarFuncionario({ ...FUNC, salarioBase: -1, decimo: 'abc', almoco: 1e12 }, { podeValores: true }).erros.join(' | ');
-  for (const t of ['Salário base', '13º', 'Almoço']) assert.ok(ruim.includes(t), t);
+  const ruim = validarFuncionario({ ...FUNC, salarioBase: -1, planoSaude: 'abc', almoco: 1e12 }, { podeValores: true }).erros.join(' | ');
+  for (const t of ['Salário base', 'Plano de saúde', 'Almoço']) assert.ok(ruim.includes(t), t);
 });
 
 test('validarFuncionario: erros de nome, cargo, admissão, CPF, situação e demissão', () => {
@@ -88,18 +88,23 @@ test('dataIso e dinheiro', () => {
 });
 
 test('calcularEncargos / validarFuncionario: FGTS 8%, férias = salário/12 x 4/3, FGTS das férias e do 13º 8%; valores do cliente são ignorados', () => {
-  assert.deepEqual(calcularEncargos(3000, 250), { fgts: 240, ferias: 333.33, feriasFgts: 26.67, decimoFgts: 20, insalubridadeValor: 600 });
-  const { erros, dados } = validarFuncionario({ ...FUNC, salarioBase: '3000', decimo: '250', fgts: 1, ferias: 2, feriasFgts: 3, decimoFgts: 4, insalubridadeValor: 1 }, { podeValores: true });
+  assert.deepEqual(calcularEncargos(3000), { fgts: 240, ferias: 333.33, feriasFgts: 26.67, decimo: 250, decimoFgts: 20, insalubridadeValor: 600 });
+  const { erros, dados } = validarFuncionario({ ...FUNC, salarioBase: '3000', decimo: 999, fgts: 1, ferias: 2, feriasFgts: 3, decimoFgts: 4, insalubridadeValor: 1 }, { podeValores: true });
   assert.deepEqual(erros, []);
   assert.equal(dados.fgts, 240); assert.equal(dados.ferias, 333.33); assert.equal(dados.feriasFgts, 26.67);
-  assert.equal(dados.decimo, 250); assert.equal(dados.decimoFgts, 20); assert.equal(dados.insalubridadeValor, 600); // 20% do salário, ignora o cliente
+  assert.equal(dados.decimo, 250); // 13º = salário/12, ignora o cliente assert.equal(dados.decimoFgts, 20); assert.equal(dados.insalubridadeValor, 600); // 20% do salário, ignora o cliente
   assert.equal('insalubridadeValor' in validarFuncionario({ ...FUNC, insalubridadeValor: 100, salarioBase: 3000 }).dados, false); // sem valores.ver nada é calculado
 });
 
 test('custoTotalMensal: soma em centavos de todos os campos de dinheiro (vazio/inválido = 0)', () => {
   assert.equal(custoTotalMensal({ salarioBase: 0.1, fgts: 0.2 }), 0.3); // sem erro de ponto flutuante
-  const e = calcularEncargos(3000, 250);
-  const total = custoTotalMensal({ salarioBase: 3000, decimo: 250, ...e, almoco: 400, transporte: '150,5', planoSaude: '', segVida: 'x', outros: -5 });
+  const e = calcularEncargos(3000);
+  const total = custoTotalMensal({ salarioBase: 3000, ...e, almoco: 400, transporte: '150,5', planoSaude: '', segVida: 'x', outros: -5 });
   assert.equal(total, 3000 + 250 + 240 + 333.33 + 26.67 + 20 + 600 + 400 + 150.5);
   assert.equal(custoTotalMensal({}), 0);
+});
+
+test('custoTotalFuncionario: recalcula os encargos a partir do salário e soma com os benefícios', () => {
+  assert.equal(custoTotalFuncionario({ salarioBase: 3000, fgts: 1, decimo: 1, almoco: 400, transporte: 150.5 }), 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
+  assert.equal(custoTotalFuncionario({}), 0);
 });

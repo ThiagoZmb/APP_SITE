@@ -374,8 +374,13 @@ body .form-group input[readonly] { background: var(--surface-2) !important; colo
 body .form-group select:disabled, body .form-group input:disabled {
     background: #f1f1f5 !important; color: #a5a0ad !important; border-style: dashed !important; box-shadow: none !important;
 }
-/* qualquer campo desabilitado da tela: fundo cinza bem clarinho (só a cor de fundo; setas e imagens dos selects ficam) */
-input:disabled, select:disabled, textarea:disabled { background-color: #f4f4f6 !important; cursor: not-allowed; }
+/* Campo desabilitado: fundo cinza bem clarinho. A regra de cima (input:not([type=checkbox])...) tem especificidade maior que `.form-group input:disabled`
+   e vencia com background branco !important; por isso os seletores aqui repetem os :not() e vêm depois. Só background-color (a seta do select fica). */
+body input:not([type=checkbox]):not([type=radio]):disabled, body select:disabled, body textarea:disabled,
+body .form-group input:not([type=checkbox]):not([type=radio]):disabled, body .form-group select:disabled, body .form-group textarea:disabled,
+body .ferr-select:disabled, body .search-box input:disabled, body .busca input:disabled {
+    background-color: #f4f4f6 !important; cursor: not-allowed;
+}
 body .form-group select, body .ferr-select {
     -webkit-appearance: none; appearance: none; padding-right: 36px !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2377707f' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;

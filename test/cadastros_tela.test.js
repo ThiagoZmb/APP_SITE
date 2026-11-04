@@ -89,25 +89,37 @@ test('nomes de campo da API de funcionários e fornecedores não casam com REGEX
 });
 
 test('funcionários (tela): encargos calculados na tela batem com o servidor; campos calculados ficam desabilitados e obrigatórios', () => {
-  for (const [sb, d] of [[3000, 250], [1518, 126.5], [0, 0], ['2500,75', '']]) {
-    const t = P.calcularEncargos(sb, d), sv = calcularEncargos(Number(String(sb).replace(',', '.')), Number(d) || 0);
+  for (const [sb, d] of [[3000, 0], [1518, 0], [0, 0], ['2500,75', 0]]) {
+    const t = P.calcularEncargos(sb), sv = calcularEncargos(Number(String(sb).replace(',', '.')));
     assert.deepEqual(t, sv);
   }
   assert.equal(P.calcularEncargos(1200, 0).ferias, 133.33); // 1200/12 = 100; + 1/3 = 133,33
   const f = fs.readFileSync(require('node:path').join(__dirname, '..', 'funcionarios.html'), 'utf8');
   for (const k of P.CALCULADOS) assert.match(f, new RegExp(`<input[^>]*id="f-${k}"[^>]*required[^>]*disabled`), k);
-  assert.ok(!/id="f-decimo"[^>]*disabled/.test(f), '13º continua editável');
+  assert.equal(P.calcularEncargos(3000).decimo, 250);
   assert.match(f, /id="f-insalubridadeValor"[^>]*disabled/);
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'tema.css'), 'utf8'), /input:disabled, select:disabled, textarea:disabled { background-color: #f4f4f6/);
-  assert.deepEqual(P.corpoSalvar({ nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000', decimo: '250', fgts: '9' }, null, { comValores: true }).fgts, 240);
+  assert.deepEqual(P.corpoSalvar({ nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000', fgts: '9' }, null, { comValores: true }).fgts, 240);
 });
 
 test('funcionários (tela): custo total mensal espelha o servidor, formata em R$ e fica na seção data-valor', () => {
-  const v = { salarioBase: '3000', decimo: '250', ...P.calcularEncargos('3000', '250'), almoco: '400', transporte: '150,5' };
+  const v = { salarioBase: '3000', ...P.calcularEncargos('3000'), almoco: '400', transporte: '150,5' };
   assert.equal(P.custoTotalMensal(v), require('../calculo/cadastros').custoTotalMensal(v));
   assert.equal(P.brl(5000.5).replace(/[\s ]/g, ' '), 'R$ 5.000,50');
   const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
   const ini = f.indexOf('<fieldset data-valor>');
   assert.ok(f.slice(ini, f.indexOf('</fieldset>', ini)).includes('id="custo-total"'));
   assert.doesNotMatch(f.slice(ini, f.indexOf('</fieldset>', ini)), /style=/);
+});
+
+test('funcionários (tela): CSS dos desabilitados vence a regra dos campos (especificidade) e layout Cidade/Bairro/UF', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'tema.css'), 'utf8');
+  assert.match(css, /body \.form-group input:not\(\[type=checkbox\]\):not\(\[type=radio\]\):disabled[\s\S]*?background-color: #f4f4f6 !important/);
+  assert.ok(css.indexOf(':not([type=radio]):disabled') > css.indexOf('body .form-group input:not([type=checkbox]):not([type=radio]),'), 'vem depois da regra geral');
+  const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
+  assert.match(f, /\.linha3b \{[^}]*minmax\(0, 1\.3fr\) minmax\(0, 1\.7fr\) 84px/);
+  assert.match(f, /id="f-decimo"[^>]*required[^>]*disabled/);
+  assert.match(f, /id="custo-lista"/);
+  assert.doesNotMatch(f.slice(f.indexOf('id="qtd"') - 80, f.indexOf('id="qtd"') + 200), /style=/);
+  const versoes = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html')).map(n => /tema\.css\?v=(\d+)/.exec(fs.readFileSync(path.join(__dirname, '..', n), 'utf8'))).filter(Boolean).map(m => m[1]);
+  assert.equal(new Set(versoes).size, 1, 'todas as páginas com a mesma versão do tema.css (quebra o cache)');
 });

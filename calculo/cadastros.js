@@ -16,17 +16,18 @@ const DINHEIRO_FUNCIONARIO = [
 // Insalubridade (R$): a coluna `funcionarios.INSALUBRIDADE` do VB é só um sinalizador 0/1 (o VB calcula o valor como salário mínimo x 20%), então o
 // valor em reais fica na tabela da web `web_funcionarios_valores`; a web nunca grava valor na coluna do VB.
 const CAMPOS_DINHEIRO_FUNCIONARIO = [...DINHEIRO_FUNCIONARIO.map(([k]) => k), 'insalubridadeValor'];
-const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimoFgts', 'insalubridadeValor'];
+const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimo', 'decimoFgts', 'insalubridadeValor'];
 const ALIQUOTA_FGTS = 0.08;
 const ALIQUOTA_INSALUBRIDADE = 0.2;
 const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Encargos calculados a partir do salário base e do 13º (nunca vêm do cliente):
-// FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; FGTS do 13º = 8% do 13º (1/12, editável).
-function calcularEncargos(salarioBase, decimo = 0) {
-  const sb = Number(salarioBase) || 0, d = Number(decimo) || 0;
-  const ferias = arred(sb / 12 * 4 / 3);
-  return { fgts: arred(sb * ALIQUOTA_FGTS), ferias, feriasFgts: arred(ferias * ALIQUOTA_FGTS), decimoFgts: arred(d * ALIQUOTA_FGTS), insalubridadeValor: arred(sb * ALIQUOTA_INSALUBRIDADE) };
+// Encargos calculados só a partir do salário base (nunca vêm do cliente):
+// FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; 13º (1/12) = salário/12; FGTS do 13º = 8% do 13º; insalubridade = 20% do salário.
+function calcularEncargos(salarioBase) {
+  const sb = Number(salarioBase) || 0;
+  const ferias = arred(sb / 12 * 4 / 3), decimo = arred(sb / 12);
+  return { fgts: arred(sb * ALIQUOTA_FGTS), ferias, feriasFgts: arred(ferias * ALIQUOTA_FGTS), decimo, decimoFgts: arred(decimo * ALIQUOTA_FGTS),
+    insalubridadeValor: arred(sb * ALIQUOTA_INSALUBRIDADE) };
 }
 
 const t = v => String(v ?? '').trim();
@@ -101,6 +102,11 @@ function custoTotalMensal(v = {}) {
   return CAMPOS_DINHEIRO_FUNCIONARIO.reduce((t, k) => t + centavos(v[k]), 0) / 100;
 }
 
+// Custo total mensal de um funcionário a partir do que o servidor guarda (salário e benefícios digitados); os encargos são recalculados, como no formulário.
+function custoTotalFuncionario(v = {}) {
+  return custoTotalMensal({ ...v, ...calcularEncargos(dinheiro(v.salarioBase) || 0) });
+}
+
 function validarFuncionario(b = {}, { podeValores = false } = {}) {
   const erros = [];
   const dados = {
@@ -132,10 +138,10 @@ function validarFuncionario(b = {}, { podeValores = false } = {}) {
       const n = dinheiro(b[chave]);
       if (Number.isNaN(n)) erros.push(`${rotulo}: informe um número de 0 a ${LIMITE_DINHEIRO.toLocaleString('pt-BR')}.`); else dados[chave] = n;
     }
-    if (Number.isFinite(dados.salarioBase) && Number.isFinite(dados.decimo)) Object.assign(dados, calcularEncargos(dados.salarioBase, dados.decimo));
+    if (Number.isFinite(dados.salarioBase)) Object.assign(dados, calcularEncargos(dados.salarioBase));
   }
   return { erros, dados };
 }
 
 module.exports = { CLASSES_FORNECEDOR, STATUS_FORNECEDOR, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO,
-  CALCULADOS, ALIQUOTA_FGTS, ALIQUOTA_INSALUBRIDADE, calcularEncargos, custoTotalMensal, dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };
+  CALCULADOS, ALIQUOTA_FGTS, ALIQUOTA_INSALUBRIDADE, calcularEncargos, custoTotalMensal, custoTotalFuncionario, dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };

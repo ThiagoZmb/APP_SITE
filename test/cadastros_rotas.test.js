@@ -173,7 +173,7 @@ test('funcionários: sem permissão 403 (Compras não vê funcionários); só ve
 test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º (ignora o cliente) e deriva a insalubridade (20% do salário, não gravada)', async t => {
   const banco = bancoCadastros();
   const { chamar } = await prepararCadastros(t, { banco, perfil: 'RH com valores' });
-  const r = await salvar(chamar, 'funcionarios', { ...FUNC, salarioBase: 3000, decimo: 250, fgts: 1, ferias: 1, feriasFgts: 1, decimoFgts: 1, insalubridadeValor: 1, insalubridade: true });
+  const r = await salvar(chamar, 'funcionarios', { ...FUNC, salarioBase: 3000, decimo: 1, fgts: 1, ferias: 1, feriasFgts: 1, decimoFgts: 1, insalubridadeValor: 1, insalubridade: true });
   assert.equal(r.status, 200);
   const f = banco.funcionarios[0];
   assert.equal(f.FGTS, 240); assert.equal(f.FERIAS_1_12, 333.33); assert.equal(f.FERIAS_FGTS_1_12, 26.67);
@@ -189,4 +189,26 @@ test('funcionários: servidor recalcula FGTS/férias/FGTS das férias e do 13º 
   const r2 = await salvar(rh, 'funcionarios', { ...FUNC, codigo: 1, salarioBase: 1, insalubridadeValor: 1 });
   assert.equal(r2.status, 200);
   assert.equal(banco.funcionarios[0].FGTS, 240);
+});
+
+test('funcionários: lista traz custoTotal (soma dos listados, filtros aplicados) só com valores.ver; sem ela nada de dinheiro', async t => {
+  const banco = bancoCadastros();
+  const zero = { ALMOCO: 0, TRANSPORTE: 0, PLANO_SAUDE: 0, SEG_VIDA: 0, OCIOSIDADE: 0 };
+  banco.semear.funcionario({ NOME: 'Ana', ...zero, SALARIO_BASE: 3000, ALMOCO: 400, TRANSPORTE: 150.5 });
+  banco.semear.funcionario({ NOME: 'Bruno', ...zero, SALARIO_BASE: 1200 });
+  banco.semear.funcionario({ NOME: 'Caio', ...zero, SITUACAO: 'Demitido', SALARIO_BASE: 5000 });
+  const { chamar } = await prepararCadastros(t, { banco, perfil: 'RH com valores' });
+  const { custoTotalFuncionario } = require('../calculo/cadastros');
+  const ana = custoTotalFuncionario({ salarioBase: 3000, almoco: 400, transporte: 150.5 }), bruno = custoTotalFuncionario({ salarioBase: 1200 }), caio = custoTotalFuncionario({ salarioBase: 5000 });
+  assert.equal(ana, 3000 + 240 + 333.33 + 26.67 + 250 + 20 + 600 + 400 + 150.5);
+  const todos = await (await chamar('/funcionarios')).json();
+  assert.ok(Math.abs(todos.custoTotal - (ana + bruno + caio)) < 0.005, String(todos.custoTotal));
+  const ativos = await (await chamar('/funcionarios?situacao=Ativo')).json();
+  assert.equal(ativos.funcionarios.length, 2);
+  assert.ok(Math.abs(ativos.custoTotal - (ana + bruno)) < 0.005, String(ativos.custoTotal));
+  assert.ok(!Object.keys(ativos.funcionarios[0]).includes('salarioBase'));
+  const { chamar: sem } = await prepararCadastros(t, { banco, perfil: 'Somente ver funcionários' });
+  const r = await (await sem('/funcionarios')).json();
+  assert.equal('custoTotal' in r, false);
+  assert.ok(!JSON.stringify(r).includes('3000'));
 });

@@ -5,7 +5,7 @@
 // Não há exclusão pela web: o funcionário sai de uso pela situação (Inativo ou Demitido).
 const { emTransacao, ErroUsuario, agoraLocal, hojeLocal } = require('./transacao');
 const { semValores, podeVerValores, preservarValores } = require('../seguranca/valores');
-const { validarFuncionario, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO, calcularEncargos } = require('../calculo/cadastros');
+const { validarFuncionario, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO, calcularEncargos, custoTotalFuncionario } = require('../calculo/cadastros');
 
 const VER = ['funcionarios.ver'];
 const EDITAR = ['funcionarios.editar'];
@@ -35,9 +35,17 @@ function registrarFuncionarios({ rota, pool }) {
       const where = ['1 = 1'], params = [];
       if (SITUACOES_FUNCIONARIO.includes(situacao)) { where.push('SITUACAO = ?'); params.push(situacao); }
       if (busca) { where.push('(NOME LIKE ? OR CARGO LIKE ? OR CIDADE LIKE ?)'); params.push(like(busca), like(busca), like(busca)); }
+      const comValores = podeVerValores(req);
+      // com valores.ver traz também as colunas de salário/benefícios só para somar no servidor (nenhuma vai na resposta por funcionário)
+      const extra = comValores ? ', ' + DINHEIRO_FUNCIONARIO.map(([, c]) => c).join(', ') : '';
       const [linhas] = await pool.execute(
-        `SELECT CODIGO, NOME, CARGO, SITUACAO, TELEFONE, CIDADE, ESTADO, ADMISSAO FROM funcionarios WHERE ${where.join(' AND ')} ORDER BY NOME LIMIT 2000`, params);
-      res.json({ funcionarios: linhas.map(resumo) });
+        `SELECT CODIGO, NOME, CARGO, SITUACAO, TELEFONE, CIDADE, ESTADO, ADMISSAO${extra} FROM funcionarios WHERE ${where.join(' AND ')} ORDER BY NOME LIMIT 2000`, params);
+      const saida = { funcionarios: linhas.map(resumo) };
+      if (comValores) { // soma do custo mensal dos listados (filtro e busca já aplicados), em centavos
+        const dinheiroDe = l => Object.fromEntries(DINHEIRO_FUNCIONARIO.map(([k, c]) => [k, num(l[c])]));
+        saida.custoTotal = linhas.reduce((t, l) => t + Math.round(custoTotalFuncionario(dinheiroDe(l)) * 100), 0) / 100;
+      }
+      res.json(saida);
     } catch (err) {
       console.error('Erro GET /funcionarios:', err.message);
       if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
