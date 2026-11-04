@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { cpfValido, cnpjValido, documentoFormatado, formatarCpf, formatarCnpj } = require('../calculo/documentos');
-const { validarFornecedor, validarFuncionario, dinheiro, dataIso } = require('../calculo/cadastros');
+const { calcularEncargos, validarFornecedor, validarFuncionario, dinheiro, dataIso } = require('../calculo/cadastros');
 
 test('CPF: dígitos verificadores; repetidos e tamanho errado são inválidos; aceita máscara', () => {
   assert.equal(cpfValido('529.982.247-25'), true);
@@ -63,10 +63,10 @@ test('validarFuncionario: com valores.ver lê o dinheiro (vazio = 0, vírgula de
   assert.equal(ok.dados.salarioBase, 3000.5);
   assert.equal(ok.dados.almoco, 0);
   assert.equal(ok.dados.transporte, 150.46);
-  assert.equal(ok.dados.fgts, 0);
+  assert.equal(ok.dados.fgts, 240.04); // 8% de 3000,50
   assert.equal(ok.dados.insalubridade, 1);
-  const ruim = validarFuncionario({ ...FUNC, salarioBase: -1, fgts: 'abc', almoco: 1e12 }, { podeValores: true }).erros.join(' | ');
-  for (const t of ['Salário base', 'FGTS', 'Almoço']) assert.ok(ruim.includes(t), t);
+  const ruim = validarFuncionario({ ...FUNC, salarioBase: -1, decimo: 'abc', almoco: 1e12 }, { podeValores: true }).erros.join(' | ');
+  for (const t of ['Salário base', '13º', 'Almoço']) assert.ok(ruim.includes(t), t);
 });
 
 test('validarFuncionario: erros de nome, cargo, admissão, CPF, situação e demissão', () => {
@@ -85,4 +85,14 @@ test('dataIso e dinheiro', () => {
   assert.equal(dinheiro(undefined), 0);
   assert.equal(dinheiro('1234,56'), 1234.56);
   assert.ok(Number.isNaN(dinheiro('1.234,56'))); // milhar com ponto + vírgula: ambíguo, recusa
+});
+
+test('calcularEncargos / validarFuncionario: FGTS 8%, férias = salário/12 x 4/3, FGTS das férias e do 13º 8%; valores do cliente são ignorados', () => {
+  assert.deepEqual(calcularEncargos(3000, 250), { fgts: 240, ferias: 333.33, feriasFgts: 26.67, decimoFgts: 20 });
+  const { erros, dados } = validarFuncionario({ ...FUNC, salarioBase: '3000', decimo: '250', fgts: 1, ferias: 2, feriasFgts: 3, decimoFgts: 4, insalubridadeValor: 424.556 }, { podeValores: true });
+  assert.deepEqual(erros, []);
+  assert.equal(dados.fgts, 240); assert.equal(dados.ferias, 333.33); assert.equal(dados.feriasFgts, 26.67);
+  assert.equal(dados.decimo, 250); assert.equal(dados.decimoFgts, 20); assert.equal(dados.insalubridadeValor, 424.56);
+  assert.equal(validarFuncionario({ ...FUNC, insalubridadeValor: -1 }, { podeValores: true }).erros.join().includes('Insalubridade'), true);
+  assert.equal('insalubridadeValor' in validarFuncionario({ ...FUNC, insalubridadeValor: 100 }).dados, false);
 });

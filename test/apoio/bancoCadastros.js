@@ -27,7 +27,8 @@ function bancoCadastros() {
     fornecedores: [],  // cadastro_fornecedores
     funcionarios: [],  // funcionarios
     cargos: [{ CARGO: 'Auxiliar' }, { CARGO: 'Serralheiro' }],
-    auditoria: []
+    auditoria: [],
+    valoresFunc: {}  // web_funcionarios_valores: codigo -> insalubridade (R$)
   };
   const { fornecedores, funcionarios, auditoria } = estado;
   let proximoCod = 1, proximoFunc = 1;
@@ -35,6 +36,9 @@ function bancoCadastros() {
 
   const regras = [
     [/INSERT INTO web_auditoria/, (sql, [quando, quem, acao, alvo, detalhe]) => { auditoria.push({ quando, quem, acao, alvo, detalhe: JSON.parse(detalhe) }); return { affectedRows: 1 }; }],
+
+    [/^SELECT insalubridade FROM web_funcionarios_valores/, (sql, [cod]) => (cod in estado.valoresFunc ? [{ insalubridade: estado.valoresFunc[cod] }] : [])],
+    [/^INSERT INTO web_funcionarios_valores/, (sql, [cod, v]) => { estado.valoresFunc[cod] = v; return { affectedRows: 1 }; }],
 
     // ---- fornecedores ----
     [/^SELECT COD, RAZAO_FABRICANTE, FANTASIA[\s\S]*FROM cadastro_fornecedores/, (sql, params) => {

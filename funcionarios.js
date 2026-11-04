@@ -18,7 +18,17 @@
   const CAMPOS = ['nome', 'situacao', 'cargo', 'cpf', 'identidade', 'telefone', 'admissao', 'demissao', 'cep', 'endereco', 'bairro', 'cidade', 'uf'];
   // chave da API -> rótulo (mesmos campos de DINHEIRO_FUNCIONARIO em calculo/cadastros.js)
   const DINHEIRO = [['salarioBase', 'Salário base'], ['fgts', 'FGTS'], ['ferias', 'Férias (1/12)'], ['feriasFgts', 'FGTS das férias'], ['decimo', '13º (1/12)'],
-    ['decimoFgts', 'FGTS do 13º'], ['almoco', 'Almoço'], ['transporte', 'Transporte'], ['planoSaude', 'Plano de saúde'], ['segVida', 'Seguro de vida'], ['outros', 'Outros']];
+    ['decimoFgts', 'FGTS do 13º'], ['almoco', 'Almoço'], ['transporte', 'Transporte'], ['planoSaude', 'Plano de saúde'], ['segVida', 'Seguro de vida'], ['outros', 'Outros'], ['insalubridadeValor', 'Insalubridade']];
+
+  // calculados na tela e recalculados pelo servidor (calculo/cadastros.js: calcularEncargos); desabilitados e obrigatórios
+  const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimoFgts'];
+  const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
+  const numero = v => { const n = Number(String(v ?? '').trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
+  function calcularEncargos(salarioBase, decimo) {
+    const sb = numero(salarioBase), d = numero(decimo);
+    const ferias = arred(sb / 12 * 4 / 3);
+    return { fgts: arred(sb * 0.08), ferias, feriasFgts: arred(ferias * 0.08), decimoFgts: arred(d * 0.08) };
+  }
 
   // espelha as regras do servidor (o servidor continua decidindo)
   function validarForm(f, { comValores = false } = {}) {
@@ -32,6 +42,7 @@
     if (txt(f.uf) && !/^[A-Za-z]{2}$/.test(txt(f.uf))) erros.push('UF deve ter 2 letras.');
     if (comValores) {
       for (const [k, rotulo] of DINHEIRO) {
+        if (CALCULADOS.includes(k)) continue;
         const v = txt(f[k]);
         if (v !== '' && !(Number.isFinite(Number(v)) && Number(v) >= 0)) erros.push(`${rotulo}: informe um número maior ou igual a zero.`);
       }
@@ -42,7 +53,10 @@
     const b = {};
     for (const c of CAMPOS) b[c] = txt(f[c]);
     b.insalubridade = !!f.insalubridade;
-    if (comValores) for (const [k] of DINHEIRO) b[k] = txt(f[k]);
+    if (comValores) {
+      for (const [k] of DINHEIRO) b[k] = txt(f[k]);
+      Object.assign(b, calcularEncargos(f.salarioBase, f.decimo)); // o servidor recalcula; isto só espelha o que a tela mostra
+    }
     if (codigo) b.codigo = codigo;
     return b;
   }
@@ -82,9 +96,13 @@
     const todosOsCampos = () => [...CAMPOS, ...DINHEIRO.map(([k]) => k)];
     function travarForm() {
       const ok = pode('funcionarios.editar');
-      doc.querySelectorAll('#form input, #form select').forEach(el => { el.disabled = !ok; });
+      doc.querySelectorAll('#form input, #form select').forEach(el => { el.disabled = !ok || el.hasAttribute('data-calc'); });
       $('btn-cep').disabled = !ok;
       $('btn-salvar').hidden = !ok;
+    }
+    function recalcular() {
+      const c = calcularEncargos($(ID('salarioBase')).value, $(ID('decimo')).value);
+      for (const k of CALCULADOS) { const el = $(ID(k)); if (el) el.value = c[k].toFixed(2); }
     }
     function ajustarDemissao() { $('w-demissao').hidden = $(ID('situacao')).value !== 'Demitido'; }
     function mostrarForm(f) {
@@ -97,6 +115,7 @@
         el.value = f ? (f[c] ?? '') : (c === 'situacao' ? 'Ativo' : '');
       }
       $(ID('insalubridade')).checked = !!(f && f.insalubridade);
+      recalcular();
       $('erro-form').textContent = '';
       ajustarDemissao();
       travarForm();
@@ -160,10 +179,12 @@
     $('btn-cep').addEventListener('click', buscarCep);
     $(ID('cep')).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); buscarCep(); } });
     $(ID('situacao')).addEventListener('change', ajustarDemissao);
+    $(ID('salarioBase')).addEventListener('input', recalcular);
+    $(ID('decimo')).addEventListener('input', recalcular);
     $('btn-cancelar').addEventListener('click', () => { estado.atual = null; $('form').hidden = true; $('vazio-painel').hidden = false; desenharLista(); });
     carregarCargos();
     carregar();
   }
 
-  return { SITUACOES, CAMPOS, DINHEIRO, validarForm, corpoSalvar, iniciar };
+  return { SITUACOES, CAMPOS, DINHEIRO, CALCULADOS, calcularEncargos, validarForm, corpoSalvar, iniciar };
 });

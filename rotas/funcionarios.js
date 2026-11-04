@@ -10,6 +10,11 @@ const { validarFuncionario, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_
 const VER = ['funcionarios.ver'];
 const EDITAR = ['funcionarios.editar'];
 const like = s => '%' + String(s).replace(/[\\%_]/g, c => '\\' + c) + '%';
+// valor da insalubridade em R$ (tabela da web; a coluna INSALUBRIDADE do VB é só 0/1)
+const valorInsalubridade = async (exec, codigo) => {
+  const [[v] = []] = await exec.execute('SELECT insalubridade FROM web_funcionarios_valores WHERE funcionario_codigo = ?', [codigo]);
+  return num(v && v.insalubridade);
+};
 const dia = v => (v ? String(v).slice(0, 10) : null);
 const num = v => Math.round((Number(v) || 0) * 100) / 100;
 
@@ -61,7 +66,9 @@ function registrarFuncionarios({ rota, pool }) {
     try {
       const [[r]] = await pool.execute('SELECT * FROM funcionarios WHERE CODIGO = ? LIMIT 1', [codigo]);
       if (!r) return res.status(404).json({ error: 'Funcionário não encontrado.' });
-      res.json({ funcionario: semValores(req, completo(r), CAMPOS_DINHEIRO_FUNCIONARIO) });
+      const f = completo(r);
+      if (podeVerValores(req)) f.insalubridadeValor = await valorInsalubridade(pool, codigo);
+      res.json({ funcionario: semValores(req, f, CAMPOS_DINHEIRO_FUNCIONARIO) });
     } catch (err) {
       console.error('Erro GET /funcionarios/:codigo:', err.message);
       if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
@@ -83,7 +90,10 @@ function registrarFuncionarios({ rota, pool }) {
         if (!atual) throw new ErroUsuario(404, 'Funcionário não encontrado.');
       }
       // sem valores.ver: mantém o dinheiro já gravado (ou 0 em cadastro novo)
-      const d = preservarValores(req, dados, atual ? completo(atual) : Object.fromEntries(CAMPOS_DINHEIRO_FUNCIONARIO.map(k => [k, 0])), CAMPOS_DINHEIRO_FUNCIONARIO);
+      const antesValores = atual ? { ...completo(atual), insalubridadeValor: await valorInsalubridade(conn, codigoAtual) } : Object.fromEntries(CAMPOS_DINHEIRO_FUNCIONARIO.map(k => [k, 0]));
+      const d = preservarValores(req, dados, antesValores, CAMPOS_DINHEIRO_FUNCIONARIO);
+      const gravarInsalubridade = codigo => podeVerValores(req) && conn.execute(
+        'INSERT INTO web_funcionarios_valores (funcionario_codigo, insalubridade) VALUES (?, ?) ON DUPLICATE KEY UPDATE insalubridade = VALUES(insalubridade)', [codigo, d.insalubridadeValor]);
       // como o VB, a demissão sempre grava uma data (hoje, se ninguém informou); a tela só mostra para quem está Demitido
       const demissao = d.demissao || (atual && dia(atual.DEMISSAO)) || hojeLocal();
       const colunasTexto = [d.situacao, d.nome, d.endereco, d.bairro, d.cidade, d.uf, d.cep, d.telefone, d.identidade, d.cpf, d.cargo];
@@ -94,6 +104,7 @@ function registrarFuncionarios({ rota, pool }) {
              DARF, SENHA, NIVEL, ADMISSAO, DEMISSAO) VALUES (${'?, '.repeat(11 + 1 + colunasDinheiro.length)}0, '', ?, ?, ?)`,
           [...colunasTexto, d.insalubridade, ...colunasDinheiro, d.cargo, d.admissao, demissao]);
         const codigo = Number(ins.insertId);
+        await gravarInsalubridade(codigo);
         await auditar(conn, req, 'funcionario_criado', d.nome, { codigo, cargo: d.cargo, situacao: d.situacao });
         return { codigo, criado: true };
       }
@@ -101,8 +112,9 @@ function registrarFuncionarios({ rota, pool }) {
         `UPDATE funcionarios SET SITUACAO = ?, NOME = ?, ENDERECO = ?, BAIRRO = ?, CIDADE = ?, ESTADO = ?, CEP = ?, TELEFONE = ?, IDENTIDADE = ?, CPF = ?, CARGO = ?,
            INSALUBRIDADE = ?, ${DINHEIRO_FUNCIONARIO.map(([, c]) => c + ' = ?').join(', ')}, NIVEL = ?, ADMISSAO = ?, DEMISSAO = ? WHERE CODIGO = ?`,
         [...colunasTexto, d.insalubridade, ...colunasDinheiro, d.cargo, d.admissao, demissao, codigoAtual]);
+      await gravarInsalubridade(codigoAtual);
       // na auditoria só vão os NOMES dos campos que mudaram (nunca CPF nem valores)
-      const antes = completo(atual);
+      const antes = antesValores;
       const mudou = Object.keys(d).filter(k => k in antes && String(d[k] ?? '') !== String(antes[k] ?? ''));
       await auditar(conn, req, 'funcionario_alterado', d.nome, { codigo: codigoAtual, campos: mudou });
       return { codigo: codigoAtual, criado: false };

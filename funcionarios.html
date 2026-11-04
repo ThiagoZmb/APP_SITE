@@ -202,11 +202,12 @@
                             <legend>Salário e encargos (mensal)</legend>
                             <div class="linha2">
                                 <div class="form-group"><label for="f-salarioBase">Salário base (R$)</label><input type="number" id="f-salarioBase" min="0" step="0.01" inputmode="decimal"></div>
-                                <div class="form-group"><label for="f-fgts">FGTS (R$)</label><input type="number" id="f-fgts" min="0" step="0.01" inputmode="decimal"></div>
-                                <div class="form-group"><label for="f-ferias">Férias (1/12) (R$)</label><input type="number" id="f-ferias" min="0" step="0.01" inputmode="decimal"></div>
-                                <div class="form-group"><label for="f-feriasFgts">FGTS das férias (R$)</label><input type="number" id="f-feriasFgts" min="0" step="0.01" inputmode="decimal"></div>
+                                <div class="form-group"><label for="f-fgts">FGTS (R$) — 8% do salário</label><input type="number" id="f-fgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
+                                <div class="form-group"><label for="f-ferias">Férias (1/12) (R$) — salário/12 + 1/3</label><input type="number" id="f-ferias" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
+                                <div class="form-group"><label for="f-feriasFgts">FGTS das férias (R$) — 8%</label><input type="number" id="f-feriasFgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
                                 <div class="form-group"><label for="f-decimo">13º (1/12) (R$)</label><input type="number" id="f-decimo" min="0" step="0.01" inputmode="decimal"></div>
-                                <div class="form-group"><label for="f-decimoFgts">FGTS do 13º (R$)</label><input type="number" id="f-decimoFgts" min="0" step="0.01" inputmode="decimal"></div>
+                                <div class="form-group"><label for="f-decimoFgts">FGTS do 13º (R$) — 8%</label><input type="number" id="f-decimoFgts" min="0" step="0.01" inputmode="decimal" required disabled data-calc title="Calculado automaticamente"></div>
+                                <div class="form-group"><label for="f-insalubridadeValor">Insalubridade (R$)</label><input type="number" id="f-insalubridadeValor" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-almoco">Almoço (R$)</label><input type="number" id="f-almoco" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-transporte">Transporte (R$)</label><input type="number" id="f-transporte" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="form-group"><label for="f-planoSaude">Plano de saúde (R$)</label><input type="number" id="f-planoSaude" min="0" step="0.01" inputmode="decimal"></div>

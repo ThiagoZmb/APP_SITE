@@ -13,7 +13,20 @@ const DINHEIRO_FUNCIONARIO = [
   ['almoco', 'ALMOCO', 'Almoço'], ['transporte', 'TRANSPORTE', 'Transporte'], ['planoSaude', 'PLANO_SAUDE', 'Plano de saúde'],
   ['segVida', 'SEG_VIDA', 'Seguro de vida'], ['outros', 'OCIOSIDADE', 'Outros']
 ];
-const CAMPOS_DINHEIRO_FUNCIONARIO = DINHEIRO_FUNCIONARIO.map(([k]) => k);
+// Insalubridade (R$): a coluna `funcionarios.INSALUBRIDADE` do VB é só um sinalizador 0/1 (o VB calcula o valor como salário mínimo x 20%), então o
+// valor em reais fica na tabela da web `web_funcionarios_valores`; a web nunca grava valor na coluna do VB.
+const CAMPOS_DINHEIRO_FUNCIONARIO = [...DINHEIRO_FUNCIONARIO.map(([k]) => k), 'insalubridadeValor'];
+const CALCULADOS = ['fgts', 'ferias', 'feriasFgts', 'decimoFgts'];
+const ALIQUOTA_FGTS = 0.08;
+const arred = n => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// Encargos calculados a partir do salário base e do 13º (nunca vêm do cliente):
+// FGTS = 8% do salário; férias (1/12) = salário/12 + 1/3 disso; FGTS das férias = 8% das férias; FGTS do 13º = 8% do 13º (1/12, editável).
+function calcularEncargos(salarioBase, decimo = 0) {
+  const sb = Number(salarioBase) || 0, d = Number(decimo) || 0;
+  const ferias = arred(sb / 12 * 4 / 3);
+  return { fgts: arred(sb * ALIQUOTA_FGTS), ferias, feriasFgts: arred(ferias * ALIQUOTA_FGTS), decimoFgts: arred(d * ALIQUOTA_FGTS) };
+}
 
 const t = v => String(v ?? '').trim();
 const LIMITE_DINHEIRO = 9999999.99;
@@ -108,12 +121,16 @@ function validarFuncionario(b = {}, { podeValores = false } = {}) {
   if (dados.admissao && dados.demissao && dados.demissao < dados.admissao) erros.push('A demissão não pode ser anterior à admissão.');
   if (podeValores) {
     for (const [chave, , rotulo] of DINHEIRO_FUNCIONARIO) {
+      if (CALCULADOS.includes(chave)) continue; // vêm do cálculo abaixo, nunca do cliente
       const n = dinheiro(b[chave]);
       if (Number.isNaN(n)) erros.push(`${rotulo}: informe um número de 0 a ${LIMITE_DINHEIRO.toLocaleString('pt-BR')}.`); else dados[chave] = n;
     }
+    const insal = dinheiro(b.insalubridadeValor);
+    if (Number.isNaN(insal)) erros.push(`Insalubridade: informe um número de 0 a ${LIMITE_DINHEIRO.toLocaleString('pt-BR')}.`); else dados.insalubridadeValor = insal;
+    if (Number.isFinite(dados.salarioBase) && Number.isFinite(dados.decimo)) Object.assign(dados, calcularEncargos(dados.salarioBase, dados.decimo));
   }
   return { erros, dados };
 }
 
 module.exports = { CLASSES_FORNECEDOR, STATUS_FORNECEDOR, SITUACOES_FUNCIONARIO, DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO,
-  dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };
+  CALCULADOS, ALIQUOTA_FGTS, calcularEncargos, dataIso, dinheiro, validarFornecedor, validarFuncionario, soDigitos };

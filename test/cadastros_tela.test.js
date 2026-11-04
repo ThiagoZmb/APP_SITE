@@ -6,7 +6,7 @@ const path = require('node:path');
 const F = require('../fornecedores.js');
 const P = require('../funcionarios.js');
 const Comum = require('../entregas_comum.js');
-const { DINHEIRO_FUNCIONARIO } = require('../calculo/cadastros');
+const { DINHEIRO_FUNCIONARIO, CAMPOS_DINHEIRO_FUNCIONARIO, calcularEncargos } = require('../calculo/cadastros');
 const { REGEX_VALOR } = require('../seguranca/valores');
 
 const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
@@ -40,7 +40,7 @@ test('funcionários: validarForm (valores só validados para quem tem valores.ve
 });
 
 test('funcionários: os campos de dinheiro da tela são os mesmos do servidor', () => {
-  assert.deepEqual(P.DINHEIRO.map(([k]) => k), DINHEIRO_FUNCIONARIO.map(([k]) => k));
+  assert.deepEqual(P.DINHEIRO.map(([k]) => k), CAMPOS_DINHEIRO_FUNCIONARIO);
 });
 
 test('busca de CEP compartilhada: enderecoDoViaCep e consultarCep', async () => {
@@ -67,7 +67,7 @@ test('páginas: CSP com ViaCEP, scripts, botão do CEP, sem handlers inline; sal
   }
   const f = ler('funcionarios.html');
   const secao = f.slice(f.indexOf('<fieldset data-valor>'), f.indexOf('</fieldset>', f.indexOf('<fieldset data-valor>')));
-  for (const [k] of DINHEIRO_FUNCIONARIO) assert.ok(secao.includes(`id="f-${k}"`), k + ' dentro da seção data-valor');
+  for (const k of CAMPOS_DINHEIRO_FUNCIONARIO) assert.ok(secao.includes(`id="f-${k}"`), k + ' dentro da seção data-valor');
   assert.ok(!f.slice(0, f.indexOf('<fieldset data-valor>')).includes('id="f-salarioBase"'));
 });
 
@@ -82,8 +82,21 @@ test('layout.js: Fornecedores e Funcionários no menu (Gestão) e em PAGINAS com
 });
 
 test('nomes de campo da API de funcionários e fornecedores não casam com REGEX_VALOR (exceto o dinheiro, que é filtrado por semValores)', () => {
-  const dinheiro = new Set(DINHEIRO_FUNCIONARIO.map(([k]) => k));
+  const dinheiro = new Set(CAMPOS_DINHEIRO_FUNCIONARIO);
   const chaves = ['codigo', 'nome', 'cargo', 'situacao', 'telefone', 'cidade', 'uf', 'admissao', 'endereco', 'bairro', 'cep', 'identidade', 'cpf', 'insalubridade', 'demissao',
     'razao', 'fantasia', 'classe', 'status', 'email', 'cnpj', 'numero', 'inscricaoEstadual'];
   for (const k of chaves) if (!dinheiro.has(k)) assert.ok(!REGEX_VALOR.test(k), k);
+});
+
+test('funcionários (tela): encargos calculados na tela batem com o servidor; campos calculados ficam desabilitados e obrigatórios', () => {
+  for (const [sb, d] of [[3000, 250], [1518, 126.5], [0, 0], ['2500,75', '']]) {
+    const t = P.calcularEncargos(sb, d), sv = calcularEncargos(Number(String(sb).replace(',', '.')), Number(d) || 0);
+    assert.deepEqual(t, sv);
+  }
+  assert.equal(P.calcularEncargos(1200, 0).ferias, 133.33); // 1200/12 = 100; + 1/3 = 133,33
+  const f = fs.readFileSync(require('node:path').join(__dirname, '..', 'funcionarios.html'), 'utf8');
+  for (const k of P.CALCULADOS) assert.match(f, new RegExp(`<input[^>]*id="f-${k}"[^>]*required[^>]*disabled`), k);
+  assert.ok(!/id="f-decimo"[^>]*disabled/.test(f), '13º continua editável');
+  assert.ok(f.includes('id="f-insalubridadeValor"'));
+  assert.deepEqual(P.corpoSalvar({ nome: 'Ana', situacao: 'Ativo', cargo: 'Auxiliar', admissao: '2025-01-10', salarioBase: '3000', decimo: '250', fgts: '9' }, null, { comValores: true }).fgts, 240);
 });
