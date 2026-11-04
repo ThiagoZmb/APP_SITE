@@ -10,7 +10,7 @@
 //    (e-mail inexistente na auditoria = HMAC curto com subchave da chave do servidor; erro de banco = só err.code).
 // ==========================================================================
 const crypto = require('node:crypto');
-const bcrypt = require('bcryptjs');
+const { bcryptLimitado, ErroOcupado, responderOcupado } = require('../seguranca/limite_bcrypt');
 const rateLimit = require('express-rate-limit');
 const totp = require('../portal/totp');
 const { validarSenha } = require('../portal/senha');
@@ -60,6 +60,7 @@ const usuarioDe = ({ email, papel, empresaCodigo, razaoSocial, permissoes }) => 
 function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, config, limite = criarLimiteLogin(), agora = Date.now, falhasPorIp = LIMITE_IP.falhas }) {
   const hora = () => new Date(agora());
   const falhaInterna = (res, nome, err) => {
+    if (err instanceof ErroOcupado) return responderOcupado(res);
     console.error(`Erro ${nome}:`, (err && err.code) || 'sem código');
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
   };
@@ -158,7 +159,7 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       const v = totp.verificar(segredo, typeof b.codigo === 'string' ? b.codigo : '', { agora: agora(), ultimoPasso: Number(u.totp_ultimo_passo) || 0 });
       if (!v.ok) throw new ErroUsuario(400, 'Código do autenticador inválido. Confira o aplicativo e tente de novo.');
 
-      const senhaHash = await bcrypt.hash(b.senha, CUSTO_BCRYPT);
+      const senhaHash = await bcryptLimitado.hash(b.senha, CUSTO_BCRYPT);
       const recuperacao = gerarCodigosRecuperacao(QTD_CODIGOS_RECUPERACAO, config.chaveCripto);
 
       // reivindica o convite ANTES de gravar a conta: duas conclusões simultâneas, só uma passa
@@ -210,7 +211,8 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       // ---- o mesmo trabalho em todos os caminhos ----
       const senha = typeof b.senha === 'string' ? b.senha.slice(0, 1024) : '';
       let senhaOk = false;
-      try { senhaOk = await bcrypt.compare(senha, (u && u.senha_hash) || HASH_FALSO); } catch { senhaOk = false; }
+      // servidor ocupado (limite global de bcrypt) NÃO é senha errada: sobe como 503, sem contar falha
+      try { senhaOk = await bcryptLimitado.compare(senha, (u && u.senha_hash) || HASH_FALSO); } catch (e) { if (e instanceof ErroOcupado) throw e; senhaOk = false; }
 
       let segredo = SEGREDO_FICTICIO;
       let segredoReal = false;

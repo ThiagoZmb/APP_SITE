@@ -90,10 +90,29 @@
     // ---------- enviar ----------
     function resumoSelecao(texto) { $('resumo-selecao').textContent = texto; }
 
+    // Linha "Pasta selecionada: <nome>" / "N arquivo(s) selecionado(s)" logo abaixo dos botões.
+    // O navegador só expõe o nome da pasta raiz (webkitRelativePath), nunca o caminho absoluto.
+    function mostrarOrigem(origemEl, arquivos, ehPasta) {
+      if (!origemEl) return;
+      origemEl.textContent = '';
+      if (ehPasta) {
+        const rel = arquivos[0] && arquivos[0].webkitRelativePath ? String(arquivos[0].webkitRelativePath) : '';
+        const nomePasta = rel.split('/')[0] || '(sem nome)';
+        const pdfs = arquivos.filter(f => /\.pdf$/i.test(f.name || '')).length;
+        const b = doc.createElement('strong');
+        b.textContent = nomePasta;
+        origemEl.append('Pasta selecionada: ', b, ` · ${pdfs} arquivos PDF encontrados`);
+      } else {
+        origemEl.textContent = `${arquivos.length} arquivo(s) selecionado(s)`;
+      }
+    }
+
     async function aoEscolher(ev) {
       const arquivos = Array.from(ev.target.files || []);
+      const ehPasta = ev.target.id === 'entrada-pasta';
       ev.target.value = '';
       if (!arquivos.length) return;
+      mostrarOrigem($('origem-selecao'), arquivos, ehPasta);
       $('relatorio').hidden = true; $('barra').hidden = true; $('texto-progresso').textContent = '';
       const sel = classificarArquivos(arquivos);
       estado.selecao = sel; estado.novas = []; estado.jaExistiam = 0;

@@ -39,8 +39,9 @@ test('http em production é recusado; em desenvolvimento só localhost', () => {
   assert.equal(lerConfigPortal(base({ PORTAL_URL_BASE: 'http://localhost', NODE_ENV: 'test' })).ativo, true);
 });
 
-test('barra final, caminho e query são recusados', () => {
-  for (const u of ['https://portal.exemplo.com.br/', 'https://portal.exemplo.com.br/portal', 'https://portal.exemplo.com.br?a=1', 'portal.exemplo.com.br', 'ftp://portal.exemplo.com.br']) {
+// a barra final agora é tolerada e normalizada (test/portal_config_normaliza.test.js); caminho, query e esquema ruim seguem recusados
+test('caminho e query são recusados', () => {
+  for (const u of ['https://portal.exemplo.com.br/portal', 'https://portal.exemplo.com.br?a=1', 'portal.exemplo.com.br', 'ftp://portal.exemplo.com.br']) {
     const c = lerConfigPortal(base({ PORTAL_URL_BASE: u }));
     assert.equal(c.ativo, false, u);
     assert.match(c.motivo, /PORTAL_URL_BASE/);

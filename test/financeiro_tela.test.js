@@ -23,3 +23,15 @@ test('o botão deixa claro quando está editando e não submete o formulário im
   assert.match(html, /\$\('btn-salvar'\)\.textContent = '💾 Atualizar'/);
   assert.match(html, /btn\.textContent = \$\('f-id'\)\.value \? '💾 Atualizar' : '💾 Salvar'/);
 });
+
+test('banco e forma de pagamento mostram todas as opções ao focar (editar banco já preenchido) e restauram o valor se nada for escolhido', () => {
+  assert.match(html, /\['f-banco', 'f-forma'\]\.forEach\(id => \{/);
+  assert.match(html, /campo\.dataset\.anterior = campo\.value;[\s\S]*campo\.value = '';/);
+  assert.match(html, /campo\.value === '' && campo\.dataset\.anterior\) campo\.value = campo\.dataset\.anterior/);
+});
+
+test('o servidor grava o banco enviado ao atualizar um movimento (ON DUPLICATE KEY UPDATE BANCO=VALUES(BANCO))', () => {
+  const idx = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
+  assert.match(idx, /BANCO=VALUES\(BANCO\)/);
+  assert.match(idx, /formaPgto, txtEstq\(b\.banco, 100\)/);
+});

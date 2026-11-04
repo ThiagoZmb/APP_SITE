@@ -16,6 +16,7 @@ const { opcoesSsl } = require('./seguranca/mysql_ssl');
 const { criarRegistro } = require('./seguranca/rotas');
 const { tratadorDeErros } = require('./seguranca/erros');
 const { criarLimiteLogin, HASH_FALSO, CUSTO_BCRYPT } = require('./seguranca/login_limite');
+const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/limite_bcrypt');
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
@@ -267,7 +268,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
     }
     // sempre compara (hash falso se não existe ou se a senha gravada não é bcrypt): o tempo não revela a conta
     const hashReal = user && ehHashBcrypt(user.SENHA) ? user.SENHA : null;
-    const senhaOk = await bcrypt.compare(password, hashReal || HASH_FALSO);
+    const senhaOk = await bcryptLimitado.compare(password, hashReal || HASH_FALSO);
     if (!hashReal || !senhaOk) {
       limiteLogin.falhou(chave);
       await auditarLogin('login_falha', user, req.ip, username);
@@ -288,6 +289,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
       acesso: resumoAcesso(a)
     });
   } catch (err) {
+    if (err instanceof ErroOcupado) return responderOcupado(res, 'login'); // limite global de bcrypt: não conta como falha de senha
     console.error('Erro no login:', err.code || 'sem código');
     res.status(500).json({ success: false, message: 'Erro de servidor.' });
   }

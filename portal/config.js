@@ -17,9 +17,19 @@ function chaveValida(valor) {
   return bytes.length === 32 && bytes.toString('base64') === valor;
 }
 
+// O navegador sempre manda o Origin em minúsculas e sem a porta padrão; a base é comparada com ele letra por letra.
+// Por isso aceitamos maiúsculas, a barra final e :443 (https) / :80 (http) e guardamos a forma canônica.
+// Não há caminho na base, então minúsculas no valor todo é seguro.
+function normalizarUrlBase(valor) {
+  let v = String(valor || '').trim().toLowerCase().replace(/\/+$/, '');
+  if (v.startsWith('https://')) v = v.replace(/:443$/, '');
+  else if (v.startsWith('http://')) v = v.replace(/:80$/, '');
+  return v;
+}
+
 function lerConfigPortal(env = process.env) {
   const termoVersao = env.PORTAL_TERMO_VERSAO || TERMO_PADRAO;
-  const base = (env.PORTAL_URL_BASE || '').trim();
+  const base = normalizarUrlBase(env.PORTAL_URL_BASE);
   const chave = (env.PORTAL_CHAVE_CRIPTO || '').trim();
 
   const config = { ativo: false, termoVersao };

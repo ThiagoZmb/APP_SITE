@@ -414,17 +414,17 @@
         .seg button { padding: 4px 12px; }
         .gastos-corpo { padding: 0 20px 6px; gap: 20px; grid-template-columns: minmax(0, 1fr) 130px; }
         .ranking { gap: 0; }
-        .ranking li { grid-template-columns: 20px minmax(0, 1.25fr) minmax(0, 1fr) 118px 215px; grid-template-areas: "pos nome barra val info"; gap: 0 12px; padding: 1px 10px; }
-        .ranking .pos { grid-area: pos; grid-row: auto; width: 18px; height: 18px; border-radius: 5px; font-size: 10px; }
-        .ranking .nome { grid-area: nome; font-size: 13.5px; }
-        .ranking .barra-g { grid-area: barra; }
-        .ranking .val { grid-area: val; font-size: 13.5px; }
-        .ranking .info { grid-area: info; }
+        .ranking li { grid-template-columns: 20px minmax(0, 1.25fr) minmax(0, 1fr) 118px 215px; grid-template-areas: "pos nome barra val info"; gap: 0 12px; padding: 2px 10px; }
+        .ranking .pos { grid-area: pos; grid-row: auto; width: 14px; height: 14px; border-radius: 4px; font-size: 9px; }
+        .ranking .nome { grid-area: nome; font-size: 13.5px; line-height: 14px; }
+        .ranking .barra-g { grid-area: barra; height: 4px; }
+        .ranking .val { grid-area: val; font-size: 13.5px; line-height: 14px; }
+        .ranking .info { grid-area: info; line-height: 14px; }
         .ranking .vazio-g { grid-template-areas: none; }
         .rosca { height: 130px; }
         .rosca-centro b { font-size: 14px; }
         @media (max-width: 1200px) {
-            .ranking li { grid-template-columns: 22px minmax(0, 1fr) 118px; grid-template-areas: "pos nome val" "pos barra info"; gap: 2px 12px; }
+            .ranking li { grid-template-columns: 22px minmax(0, 1fr) 118px; grid-template-areas: "pos nome val" "pos barra info"; gap: 1px 12px; padding: 1px 10px; }
         }
         @media (max-width: 600px) { .ranking li { grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-areas: "pos nome val" "pos barra barra" "pos info info"; } }
         .categoria { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; background: var(--secondary-color); }
@@ -1286,6 +1286,22 @@
             marcarAlterado(false);
             abrirGaveta();
         }
+        // Banco/Forma com datalist: o navegador só lista as opções que casam com o texto atual, então com um banco já
+        // preenchido (edição) não dava para escolher outro. Ao focar, esvazia para mostrar todas; se nada for escolhido, volta o valor.
+        ['f-banco', 'f-forma'].forEach(id => {
+            const campo = $(id);
+            campo.addEventListener('focus', () => {
+                if (!campo.value) return;
+                campo.dataset.anterior = campo.value;
+                campo.placeholder = campo.value;
+                campo.value = '';
+            });
+            campo.addEventListener('blur', () => {
+                if (campo.value === '' && campo.dataset.anterior) campo.value = campo.dataset.anterior;
+                delete campo.dataset.anterior;
+                campo.placeholder = '';
+            });
+        });
         $('link-hoje').addEventListener('click', () => { $('f-data').value = hojeISO(); marcarAlterado(); });
 
         // KeyPress do VB: valor [0-9,], pedido/PDV [0-9/,]
