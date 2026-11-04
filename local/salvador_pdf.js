@@ -18,6 +18,10 @@ const ORIGENS = new Set(['https://thiagozmb.github.io', 'http://localhost:3000',
 let sefaz = null;
 try { sefaz = require('./sefaz').criarSefaz({ raiz: RAIZ }); } catch { sefaz = null; }
 
+// Etiquetas na Zebra (local/zebra.js, rota POST /etiqueta). Mesma regra: se o módulo faltar, o resto continua e /etiqueta responde 503.
+let zebra = null;
+try { zebra = require('./zebra').criarZebra(); } catch { zebra = null; }
+
 function nomeValido(nome) {
   return typeof nome === 'string' && nome.length > 4 && nome.length <= 200 && /\.pdf$/i.test(nome)
     && !/[\\/:*?"<>|\x00-\x1f]/.test(nome) && nome !== '.' && !nome.startsWith('..');
@@ -60,7 +64,11 @@ const servidor = http.createServer(async (req, res) => {
       if (!sefaz) return responder(res, 503, { error: 'O módulo da SEFAZ não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await sefaz.tratar(req, res, url, { origemPermitida: !!origem && ORIGENS.has(origem) });
     }
-    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz });
+    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra });
+    if (req.method === 'POST' && url.pathname === '/etiqueta') {
+      if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
+      return await zebra.tratar(req, res);
+    }
     if (req.method === 'PUT' && url.pathname === '/pdf') {
       const pasta = url.searchParams.get('pasta'), nome = url.searchParams.get('nome');
       if (!PASTAS.has(pasta)) return responder(res, 400, { error: 'Pasta não permitida' });
@@ -84,4 +92,4 @@ if (require.main === module) {
   servidor.listen(PORTA, '127.0.0.1', () => console.log(`Salvador de PDF ativo em http://127.0.0.1:${PORTA} → ${RAIZ}`));
 }
 
-module.exports = { servidor, nomeValido, PASTAS, RAIZ, sefaz };
+module.exports = { servidor, nomeValido, PASTAS, RAIZ, sefaz, zebra };
