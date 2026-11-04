@@ -32,6 +32,7 @@ const { registrarPortalAuth } = require('./rotas/portal_auth');
 const { registrarPortalPedidos } = require('./rotas/portal_pedidos');
 const { registrarPortalFinanceiro } = require('./rotas/portal_financeiro');
 const { registrarPortalDocumentos } = require('./rotas/portal_documentos');
+const { registrarPortalUsuarios } = require('./rotas/portal_usuarios');
 const { criarCripto } = require('./portal/cripto');
 const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
@@ -1738,6 +1739,7 @@ registrarPortalAuth({ portal: registro.portal, portalPublica: registro.portalPub
 registrarPortalPedidos({ portal: registro.portal, pool });
 registrarPortalFinanceiro({ portal: registro.portal, pool });
 registrarPortalDocumentos({ portal: registro.portal, pool });
+registrarPortalUsuarios({ portal: registro.portal, pool, sessoes: sessoesPortal, email: emailPortal, config: configPortal });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });

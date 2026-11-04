@@ -232,6 +232,38 @@ function criarBancoPortal(inicial = {}) {
     }]
   ];
 
+  // ---- Etapa 4: rotas do administrador da empresa (rotas/portal_usuarios.js). Entram no INÍCIO da lista só para que a regra
+  // de INSERT de usuário (papel 'usuario') case antes da da equipe (papel admin_geral); as regras existentes não mudam.
+  // O filtro de empresa é aplicado pelo TEXTO do SQL: se a condição `cliente_codigo = ?` sumir (mutação), a linha de outra empresa passa.
+  const pessoa = u => ({ id: u.id, email: u.email, papel: u.papel, situacao: u.situacao, termo_aceito_em: u.termo_aceito_em ?? null });
+  regras.unshift(
+    [/^SELECT id FROM web_portal_usuarios WHERE cliente_codigo = \? ORDER BY id FOR UPDATE/, (sql, [codigo]) =>
+      dados.usuarios.filter(u => u.cliente_codigo === codigo).sort((a, b) => a.id - b.id).map(u => ({ id: u.id }))],
+    [/^SELECT id, email, papel, situacao, termo_aceito_em FROM web_portal_usuarios WHERE id = \?/, (sql, [id, codigo]) =>
+      dados.usuarios.filter(u => u.id === id && (!sql.includes('cliente_codigo = ?') || u.cliente_codigo === codigo)).map(pessoa)],
+    [/^SELECT COUNT\(\*\) AS n FROM web_portal_usuarios WHERE cliente_codigo = \? AND papel = 'admin_geral' AND situacao = 'ativo' AND id <> \?/, (sql, [codigo, id]) =>
+      [{ n: dados.usuarios.filter(u => u.cliente_codigo === codigo && u.papel === 'admin_geral' && u.situacao === 'ativo' && u.id !== id).length }]],
+    [/^SELECT p\.usuario_id, p\.permissao FROM web_portal_permissoes p INNER JOIN web_portal_usuarios u ON u\.id = p\.usuario_id WHERE u\.cliente_codigo = \?/, (sql, [codigo]) => {
+      const ids = new Set(dados.usuarios.filter(u => u.cliente_codigo === codigo).map(u => u.id));
+      return dados.permissoes.filter(p => ids.has(p.usuario_id)).map(p => ({ usuario_id: p.usuario_id, permissao: p.permissao }));
+    }],
+    [/^INSERT INTO web_portal_usuarios \(email, cliente_codigo, papel, situacao, criado_em, criado_por\) VALUES \(\?, \?, 'usuario', 'convidado'/, (sql, [email, codigo, quando, quem]) => {
+      const id = proximoUsuario++;
+      dados.usuarios.push({ id, email, cliente_codigo: codigo, papel: 'usuario', situacao: 'convidado', senha_hash: null,
+        totp_segredo_cifrado: null, totp_ativo: 0, totp_ultimo_passo: 0, criado_em: quando, criado_por: quem });
+      return { insertId: id, affectedRows: 1 };
+    }],
+    [/^INSERT INTO web_portal_permissoes \(usuario_id, permissao\) VALUES \(\?, \?\)/, (sql, [usuario_id, permissao]) => {
+      dados.permissoes.push({ usuario_id, permissao });
+      return { affectedRows: 1 };
+    }],
+    [/^UPDATE web_portal_usuarios SET papel = \? WHERE id = \?/, (sql, [papel, id, codigo]) => {
+      const u = dados.usuarios.find(x => x.id === id && (!sql.includes('cliente_codigo = ?') || x.cliente_codigo === codigo));
+      if (u) u.papel = papel;
+      return { affectedRows: u ? 1 : 0 };
+    }]
+  );
+
   const pool = criarPoolFalso(regras);
   return { pool, dados, regras };
 }
