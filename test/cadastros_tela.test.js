@@ -176,7 +176,7 @@ test('funcionários (tela): abrir quem NÃO recebe insalubridade (0, "0", "0.0",
 
 test('funcionários (tela): o ?v= do funcionarios.js mudou junto com a lógica (senão o navegador usa o JS antigo em cache)', () => {
   const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
-  assert.match(f, /funcionarios\.js\?v=202611051000/);
+  assert.match(f, /funcionarios\.js\?v=202611051200/);
 });
 
 test('funcionários (tela): sem salário mínimo cadastrado, quem recebe insalubridade fica com pendência visível (campo vazio, aviso, custo parcial)', async () => {
@@ -188,4 +188,21 @@ test('funcionários (tela): sem salário mínimo cadastrado, quem recebe insalub
   els['f-insalubridade'].checked = false; els['f-insalubridade'].ouvintes.change();
   assert.equal(els['f-insalubridadeValor'].value, '0.00');
   assert.equal(els['aviso-insalubridade'].hidden, true);
+});
+
+test('funcionários (tela): Cargo com texto mostra TODAS as opções ao focar/clicar; digitar filtra; sair sem escolher restaura o texto', async () => {
+  const base = { codigo: 7, nome: 'Pedro', cargo: 'Pintor', situacao: 'Ativo', admissao: '2024-01-01', salarioBase: 1650 };
+  const els = await abrirFuncionario(base);
+  const c = els['f-cargo'];
+  assert.equal(c.value, 'Pintor');
+  c.ouvintes.focus();                      // foco: esvazia para o datalist listar tudo
+  assert.equal(c.value, '');
+  c.ouvintes.blur();                       // saiu sem escolher: volta o texto
+  assert.equal(c.value, 'Pintor');
+  c.ouvintes.click();                      // clique na seta com o campo já focado
+  assert.equal(c.value, '');
+  c.value = 'Serralheiro'; c.ouvintes.input(); c.ouvintes.blur(); // escolheu uma opção: vale o novo
+  assert.equal(c.value, 'Serralheiro');
+  c.ouvintes.focus(); c.value = 'Pi'; c.ouvintes.input(); c.ouvintes.blur(); // digitou para filtrar
+  assert.equal(c.value, 'Pi');
 });

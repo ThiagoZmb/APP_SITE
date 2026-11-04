@@ -208,6 +208,16 @@
     $(ID('insalubridade')).addEventListener('change', recalcular);
     for (const [k] of DINHEIRO) $(ID(k)).addEventListener('input', recalcular);
     $('btn-cancelar').addEventListener('click', () => { estado.atual = null; $('form').hidden = true; $('vazio-painel').hidden = false; desenharLista(); });
+    // Cargo: o <datalist> do navegador só mostra as opções que casam com o texto já escrito. Ao focar/clicar no campo (ou na seta) com texto,
+    // guarda o texto e esvazia o campo para a lista mostrar TODAS as opções; ao digitar, filtra normal; sem escolher nada, o texto volta ao sair.
+    const cargo = $(ID('cargo'));
+    let cargoGuardado = null;
+    const mostrarTodosCargos = () => { if (cargo.value && !cargo.disabled) { cargoGuardado = cargo.value; cargo.value = ''; } };
+    const restaurarCargo = () => { if (cargoGuardado !== null && !cargo.value) cargo.value = cargoGuardado; cargoGuardado = null; };
+    cargo.addEventListener('focus', mostrarTodosCargos);
+    cargo.addEventListener('click', mostrarTodosCargos);
+    cargo.addEventListener('input', () => { cargoGuardado = null; }); // digitou ou escolheu uma opção: vale o que está no campo
+    cargo.addEventListener('blur', restaurarCargo);
     carregarCargos();
     carregar();
   }
