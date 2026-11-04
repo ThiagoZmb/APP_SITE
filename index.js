@@ -46,6 +46,7 @@ const { registrarNotas } = require('./rotas/notas_fiscais');
 const { registrarImportacaoNotas } = require('./rotas/notas_importacao');
 const { registrarImportacaoPesos } = require('./rotas/pesos_importacao');
 const { registrarGestao } = require('./rotas/gestao');
+const { criarDisparador: criarMarcadorAtrasados } = require('./rotas/recebimentos_atrasados');
 const { registrarCorte } = require('./rotas/corte');
 const { registrarCorteVidros } = require('./rotas/corte_vidros');
 const { registrarFuncionarios } = require('./rotas/funcionarios');
@@ -231,6 +232,8 @@ function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
 
 // ================= LOGIN =================
 const limiteLogin = criarLimiteLogin();
+// recebimentos A Receber vencidos -> Atrasado (escrita em fluxo_de_caixa do VB); no máx. 1x por hora, sem await
+const marcarAtrasados = criarMarcadorAtrasados(pool);
 // Nome tentado em forma canônica (o MySQL, utf8mb4_unicode_ci, ignora caixa, acento, largura e invisíveis).
 const nomeCanonico = s => s.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[­​-‏⁠﻿]/g, '').toLowerCase().trim();
 // Auditoria do login: quem = nome da conta no banco, ou '(inexistente)' (o texto digitado pode ser
@@ -282,6 +285,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
     }
     const sid = await sessoes.criar(user.CODIGO, req.ip);
     await auditarLogin('login_ok', user, req.ip, username);
+    marcarAtrasados(); // sem await: não atrasa nem derruba o login (a função nunca lança)
     res.json({
       success: true,
       token: gerarToken(user, sid),
@@ -1811,6 +1815,7 @@ async function iniciar() {
     const limpar = () => limparPortal(pool).catch(err => console.error('[portal] limpeza falhou:', err.code || 'sem código'));
     await limpar();
     setInterval(limpar, 24 * 60 * 60 * 1000).unref();
+    marcarAtrasados(); // na subida (sem await); o login repete no máximo 1x por hora
   }
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
