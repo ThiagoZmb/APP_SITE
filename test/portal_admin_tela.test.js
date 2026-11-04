@@ -51,12 +51,16 @@ test('portal_admin.js: compila e só usa textContent/value para dados do servido
   assert.ok(contar(codigo, /\.value\s*=/g) >= 1, 'o link vai por value');
 });
 
-test('portal_admin.js: confirm antes de suspender e antes de reiniciar o 2º fator', () => {
+test('portal_admin.js: confirm antes de suspender, reiniciar o 2º fator, desativar e remover usuário', () => {
   const codigo = semComentarios(ler('portal_admin.js'));
   const suspender = codigo.match(/async function suspender[\s\S]*?\n    }\n/);
   const reiniciar = codigo.match(/async function reiniciar2fa[\s\S]*?\n    }\n/);
+  const desativar = codigo.match(/async function desativar[\s\S]*?\n    }\n/);
+  const remover = codigo.match(/async function remover[\s\S]*?\n    }\n/);
   assert.ok(suspender, 'função suspender encontrada');
   assert.ok(reiniciar, 'função reiniciar2fa encontrada');
+  assert.ok(desativar, 'função desativar encontrada');
+  assert.ok(remover, 'função remover encontrada');
   const antesDoPost = (corpo, rota) => {
     const iConfirm = corpo.indexOf('win.confirm(');
     const iChamada = corpo.indexOf(rota);
@@ -65,10 +69,27 @@ test('portal_admin.js: confirm antes de suspender e antes de reiniciar o 2º fat
   };
   antesDoPost(suspender[0], '/suspender');
   antesDoPost(reiniciar[0], '/reiniciar_2fa');
+  antesDoPost(desativar[0], '/desativar');
+  antesDoPost(remover[0], '/remover');
   assert.ok(codigo.includes('Suspender derruba todas as sessões desta empresa. Continuar?'));
   assert.ok(codigo.includes('perderá os códigos de recuperação'));
-  // reativar não pede confirmação, mas suspender e reiniciar sim: exatamente dois confirm
-  assert.equal(contar(codigo, /win\.confirm\(/g), 2);
+  assert.ok(codigo.includes('A pessoa perde o acesso e as sessões abertas caem. Continuar?'));
+  assert.match(codigo, /MSG_REMOVER = '[^']*Continuar\?'/);
+  // reativar não pede confirmação; suspender, reiniciar, desativar e remover sim: exatamente quatro confirm
+  assert.equal(contar(codigo, /win\.confirm\(/g), 4);
+});
+
+test('portal_admin.js: botões Desativar (convidado e ativo, nunca inativo) e Remover (só convidado)', () => {
+  const codigo = semComentarios(ler('portal_admin.js'));
+  const lista = codigo.match(/function desenharUsuarios[\s\S]*?\n    }\n/);
+  assert.ok(lista, 'desenharUsuarios encontrada');
+  assert.match(lista[0], /botao\('Desativar', 'btn-perigo', \(\) => desativar\(u\)\)/);
+  assert.match(lista[0], /botao\('Remover', 'btn-perigo', \(\) => remover\(u\)\)/);
+  // Remover só dentro do bloco do convidado; Desativar só para convidado/ativo (inativo não tem ação)
+  assert.match(lista[0], /if \(u\.situacao === 'convidado'\) \{[\s\S]*?botao\('Remover'[\s\S]*?\}/);
+  assert.match(lista[0], /if \(u\.situacao === 'convidado' \|\| u\.situacao === 'ativo'\) acoes\.appendChild\(botao\('Desativar'/);
+  assert.match(codigo, /inativo: 'Inativo'/);
+  assert.ok(codigo.includes("'/desativar'") && codigo.includes("'/remover'"));
 });
 
 test('portal_admin.js: o link do convite não vai a storage nem a console; busca com encodeURIComponent', () => {

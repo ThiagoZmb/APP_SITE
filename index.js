@@ -21,7 +21,7 @@ const { redeDeValores, semValores, preservarValores, podeVerValores } = require(
 const { filtroEstados } = require('./seguranca/acesso');
 const { acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
-const { lerConfigPortal } = require('./portal/config');
+const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
 const { criarAcessoPortal } = require('./portal/acesso');
 const { cabecalhosPortal } = require('./portal/cabecalhos');
@@ -93,6 +93,7 @@ const pool = mysql.createPool({
 app.use(helmet());
 // Configuração do portal do cliente: lida uma vez; sem ela o portal responde 503 e o resto não muda.
 const configPortal = lerConfigPortal();
+avisarPortalDesativado(configPortal);
 app.use(cors(criarOpcoesCors(configPortal)));
 // Cabeçalhos do portal (páginas e API em /portal): sem cache, sem referrer, CSP estrita (nada de script/estilo inline).
 app.use(cabecalhosPortal);

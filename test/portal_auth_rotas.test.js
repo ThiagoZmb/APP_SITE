@@ -133,6 +133,28 @@ test('convite/iniciar: token inexistente, usado, expirado, lixo, usuário já at
   }
 });
 
+test('convite emitido com a empresa suspensa só funciona depois de reativar (iniciar e concluir dão a 400 uniforme enquanto suspensa)', async t => {
+  const c = await montar(t);
+  const empresa = c.d.empresas.find(e => e.cliente_codigo === 41);
+  assert.equal(empresa.situacao, 'suspensa');
+  const token = c.tokens.empresaSuspensa;
+  const ini = await c.post('/portal/api/convite/iniciar', { token });
+  assert.equal(ini.status, 400);
+  assert.deepEqual(await ini.json(), MSG_CONVITE);
+  const conc = await c.post('/portal/api/convite/concluir', { token, senha: SENHA, codigo: c.codigo(), aceitoTermo: true, termoVersao: 'T1' });
+  assert.equal(conc.status, 400);
+  assert.deepEqual(await conc.json(), MSG_CONVITE);
+  assert.equal(c.d.usuarios.find(x => x.id === 9).situacao, 'convidado');
+  empresa.situacao = 'ativa'; // reativada pela equipe
+  const depois = await c.post('/portal/api/convite/iniciar', { token });
+  assert.equal(depois.status, 200);
+  const dados = await depois.json();
+  assert.equal(dados.email, 'nove@beta.com');
+  const fim = await concluirOk(c, token, dados.segredo);
+  assert.equal(fim.status, 200);
+  assert.equal(c.d.usuarios.find(x => x.id === 9).situacao, 'ativo');
+});
+
 test('convite/iniciar: formato inválido responde 400 sem tocar no banco', async t => {
   const c = await montar(t);
   for (const token of ['lixo', 'a'.repeat(42), 'a'.repeat(44), '+'.repeat(43), 7, null]) {
@@ -231,6 +253,50 @@ test('convite/concluir: token inválido (inexistente, usado, expirado, lixo) dá
     assert.deepEqual(await r.json(), MSG_CONVITE);
   }
   assert.equal(c.d.usuarios.find(x => x.id === 8).totp_ultimo_passo, 0);
+});
+
+// Estes três testes tiram do banco falso a barreira do WHERE (UPDATEs que aceitam tudo): assim cada checagem do código
+// (situação lida, affectedRows da reivindicação e da ativação) precisa se sustentar sozinha.
+const aceitaTudo = (c, re, contador) => c.pool.regras.unshift([re, () => { contador.n++; return { affectedRows: 1 }; }]);
+const RE_ATIVACAO = /^UPDATE web_portal_usuarios SET senha_hash = \?/;
+const RE_REIVINDICA = /^UPDATE web_portal_convites SET usado_em = \? WHERE id = \? AND usado_em IS NULL/;
+
+test('convite/concluir: usuário que NÃO está convidado (a situação lida) é recusado mesmo que o UPDATE de ativação aceitasse tudo', async t => {
+  const c = await montar(t);
+  const ativacoes = { n: 0 };
+  aceitaTudo(c, RE_ATIVACAO, ativacoes);
+  const antes = JSON.stringify(c.d.usuarios.find(x => x.id === 8));
+  const r = await concluirOk(c, c.tokens.usuarioAtivo, c.segredo); // usuário 8: ativo, com segredo e código válidos
+  assert.equal(r.status, 400);
+  assert.deepEqual(await r.json(), MSG_CONVITE);
+  assert.equal(ativacoes.n, 0, 'nem chegou a tentar ativar');
+  assert.equal(JSON.stringify(c.d.usuarios.find(x => x.id === 8)), antes);
+  assert.equal(c.d.recuperacao.filter(x => x.usuario_id === 8).length, 0);
+});
+
+test('convite/concluir: convite reivindicado por outra conclusão (affectedRows 0) é recusado e a conta não é ativada', async t => {
+  const c = await montar(t);
+  const ini = await (await c.post('/portal/api/convite/iniciar', { token: c.tokens.ok })).json();
+  const ativacoes = { n: 0 };
+  aceitaTudo(c, RE_ATIVACAO, ativacoes);
+  c.pool.regras.unshift([RE_REIVINDICA, () => ({ affectedRows: 0 })]); // a outra conclusão já levou o convite
+  const r = await concluirOk(c, c.tokens.ok, ini.segredo);
+  assert.equal(r.status, 400);
+  assert.deepEqual(await r.json(), MSG_CONVITE);
+  assert.equal(ativacoes.n, 0, 'não ativa a conta sem ter reivindicado o convite');
+  assert.equal(c.d.usuarios.find(x => x.id === 2).situacao, 'convidado');
+  assert.ok(c.pool.chamadas.some(x => RE_REIVINDICA.test(x.sql)), 'a reivindicação rodou');
+});
+
+test('convite/concluir: ativação que não afeta 1 linha (affectedRows 0) é recusada e não grava códigos de recuperação', async t => {
+  const c = await montar(t);
+  const ini = await (await c.post('/portal/api/convite/iniciar', { token: c.tokens.ok })).json();
+  c.pool.regras.unshift([RE_ATIVACAO, () => ({ affectedRows: 0 })]);
+  const r = await concluirOk(c, c.tokens.ok, ini.segredo);
+  assert.equal(r.status, 400);
+  assert.deepEqual(await r.json(), MSG_CONVITE);
+  assert.equal(c.d.recuperacao.filter(x => x.usuario_id === 2).length, 0);
+  assert.ok(c.pool.chamadas.some(x => x.sql === 'ROLLBACK'));
 });
 
 test('convite/concluir: sem ter chamado iniciar (sem segredo gravado) recusa e não consome', async t => {
@@ -639,6 +705,33 @@ test('logout: sem X-Portal ou com Origin de outro site dá 403 e a sessão conti
   assert.equal(c.d.sessoes[0].revogada, 1);
 });
 
+test('rotas públicas de dados: Origin de outro site (GitHub Pages, localhost, qualquer um) dá 403 igual, sem tocar no banco; Origin da base e sem Origin passam', async t => {
+  const c = await montar(t);
+  const rotas = ['/portal/api/login', '/portal/api/convite/iniciar', '/portal/api/convite/concluir'];
+  const corpos = {
+    '/portal/api/login': c.corretos(),
+    '/portal/api/convite/iniciar': { token: c.tokens.ok },
+    '/portal/api/convite/concluir': { token: novoTokenOpaco().token, senha: SENHA, codigo: c.codigo(), aceitoTermo: true, termoVersao: 'T1' }
+  };
+  const alheias = ['https://thiagozmb.github.io', 'http://localhost:3000', 'https://malvado.exemplo', 'null', 'https://portal.exemplo.com.malvado.exemplo'];
+  assert.equal(Object.keys(corpos).length, 3);
+  for (const rota of rotas) {
+    const envia = origem => fetch(c.s.url + rota, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Portal': '1', ...(origem ? { Origin: origem } : {}) }, body: JSON.stringify(corpos[rota])
+    });
+    for (const origem of alheias) {
+      const antes = c.pool.chamadas.length;
+      const r = await envia(origem);
+      assert.equal(r.status, 403, `${rota} ${origem}`);
+      assert.deepEqual(await r.json(), { error: 'Requisição recusada.' });
+      assert.equal(c.pool.chamadas.length, antes, `${rota} ${origem}: nada foi ao banco`);
+    }
+    assert.notEqual((await envia(BASE)).status, 403, `${rota} com a Origin da base`);
+    assert.notEqual((await envia(undefined)).status, 403, `${rota} sem Origin`);
+  }
+  assert.equal(c.d.sessoes.length, 1, 'só o login sem recusa (com Origin da base ou sem Origin) abriu sessão: 2 tentativas, a 2ª repete o código e cai no anti-replay');
+});
+
 test('/eu: com sessão devolve o usuário; sem sessão dá 401', async t => {
   const c = await montar(t);
   assert.equal((await c.get('/portal/api/eu')).status, 401);
@@ -701,7 +794,10 @@ test('login: o SQL de busca é uma consulta única com derivado, LEFT JOINs e CO
   const buscas = c.pool.chamadas.filter(x => /^SELECT u\.id, u\.email/.test(x.sql));
   assert.equal(buscas.length, 2);
   const sql = buscas[0].sql.replace(/\s+/g, ' ');
-  assert.match(sql, /FROM \(SELECT \? AS em\) k LEFT JOIN web_portal_usuarios u ON u\.email = k\.em/);
+  // o placeholder é comparado direto com a coluna (utf8mb4_bin), sem passar por tabela derivada (tipagem/collation do derivado)
+  assert.match(sql, /FROM \(SELECT 1 AS um\) k LEFT JOIN web_portal_usuarios u ON u\.email = \?/);
+  assert.ok(!/AS em\b|k\.em/.test(sql), 'sem o derivado com placeholder');
+  assert.equal(sql.split('?').length - 1, 1, 'um único placeholder');
   assert.match(sql, /LEFT JOIN web_portal_empresas e ON e\.cliente_codigo = u\.cliente_codigo/);
   assert.match(sql, /LEFT JOIN cadastro_clientes c ON c\.CODIGO = u\.cliente_codigo/);
   assert.match(sql, /\(SELECT COUNT\(\*\) FROM cadastro_clientes d WHERE d\.RAZAO_SOCIAL = COALESCE\(c\.RAZAO_SOCIAL, '[^']+'\)\) AS qtd_nome/);
@@ -758,6 +854,26 @@ test('login: a SEQUÊNCIA de consultas ao banco é idêntica em todos os caminho
 
 // sequência de SQL de uma tentativa (prefixos normalizados)
 const sequencia = (c, de) => c.pool.chamadas.slice(de).map(x => x.sql.replace(/\s+/g, ' ').slice(0, 55));
+
+test('login: segredo do 2º fator que não decifra (chave trocada) dá a mesma 401 e registra UMA linha fixa, sem dados do usuário', async t => {
+  const c = await montar(t);
+  const linhas = capturarLogs(t);
+  const ok = await c.login(c.corretos());
+  assert.equal(ok.status, 200);
+  assert.equal(linhas.filter(l => /decifrar/.test(l)).length, 0, 'login normal não registra nada disso');
+
+  const outraChave = criarCripto(Buffer.alloc(32, 3).toString('base64'));
+  const cifradoAlheio = outraChave.cifrar(c.segredo);
+  c.d.usuarios.find(x => x.id === 1).totp_segredo_cifrado = cifradoAlheio;
+  const r = await c.login(c.corretos({ codigo: c.codigo(PASSO + 1) }));
+  assert.equal(r.status, 401);
+  assert.deepEqual(await r.json(), MSG_LOGIN);
+  const decifrar = linhas.filter(l => /decifrar o segredo do 2º fator \(chave trocada\?\)/.test(l));
+  assert.equal(decifrar.length, 1);
+  for (const linha of linhas) {
+    for (const proibido of ['ana@acme.com', SENHA, c.segredo, cifradoAlheio, 'acme', 'Não foi possível', 'v1:']) assert.ok(!linha.includes(proibido), `vazou ${proibido}: ${linha}`);
+  }
+});
 
 test('login: o corpo com os DOIS campos roda os DOIS UPDATEs nos MESMOS 8 caminhos de falha (a forma do corpo decide, não a conta)', async t => {
   const c = await montar(t);

@@ -2,7 +2,7 @@ process.env.JWT_SECRET = 'teste';
 process.env.NODE_ENV = 'test';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { lerConfigPortal } = require('../portal/config');
+const { lerConfigPortal, avisarPortalDesativado } = require('../portal/config');
 
 const CHAVE = Buffer.alloc(32, 7).toString('base64');
 const base = (extra = {}) => ({ PORTAL_URL_BASE: 'https://portal.exemplo.com.br', PORTAL_CHAVE_CRIPTO: CHAVE, ...extra });
@@ -71,4 +71,22 @@ test('o motivo nunca contém o valor das variáveis', () => {
     assert.equal(c.ativo, false);
     for (const v of [...valores, CHAVE, 'senha-smtp-x']) assert.ok(!c.motivo.includes(v), v);
   }
+});
+
+test('aviso na subida: portal inativo registra UMA linha com o motivo; ativo e NODE_ENV=test não registram nada', () => {
+  const linhas = [];
+  const aviso = (...a) => linhas.push(a);
+  const inativo = lerConfigPortal({ PORTAL_URL_BASE: 'https://portal.exemplo.com.br' });
+  assert.equal(inativo.ativo, false);
+  assert.equal(avisarPortalDesativado(inativo, { env: { NODE_ENV: 'production' }, aviso }), true);
+  assert.deepEqual(linhas, [['[portal] desativado:', inativo.motivo]]);
+  assert.match(linhas[0][1], /PORTAL_CHAVE_CRIPTO/, 'o dono vê qual variável falta');
+  assert.equal(avisarPortalDesativado(inativo, { env: { NODE_ENV: 'test' }, aviso }), false);
+  assert.equal(avisarPortalDesativado(lerConfigPortal(base()), { env: { NODE_ENV: 'production' }, aviso }), false);
+  assert.equal(linhas.length, 1);
+});
+
+test('o index.js chama o aviso logo depois de ler a configuração do portal', () => {
+  const fonte = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.js'), 'utf8');
+  assert.match(fonte, /const configPortal = lerConfigPortal\(\);\s*avisarPortalDesativado\(configPortal\);/);
 });

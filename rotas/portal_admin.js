@@ -1,6 +1,6 @@
 // ==========================================================================
 // Portal do cliente, lado da equipe: liberar empresas, suspender/reativar, convidar o
-// administrador geral, reenviar convite e reiniciar o 2º fator (exige portal.gerir).
+// administrador geral, reenviar convite, reiniciar o 2º fator, desativar e remover usuário (exige portal.gerir).
 // Só grava em tabelas web_portal_* (e web_auditoria); cadastro_clientes é apenas lido.
 // O token do convite existe só em memória: o banco recebe o hash e o link (com o token no
 // fragmento) só é devolvido à equipe quando o e-mail NÃO foi enviado. Auditoria só com ids.
@@ -18,8 +18,10 @@ const REGEX_EMAIL = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 const MSG_INATIVO = 'Portal não configurado.';
 const MSG_NOME_DUPLICADO = 'Há mais de um cadastro com esta razão social; corrija o cadastro antes de liberar o portal.';
+const MSG_SO_CONVIDADO = 'Só dá para remover quem ainda não aceitou o convite; use Desativar.';
 const MOTIVOS_LIBERAR = {
   nome_duplicado: MSG_NOME_DUPLICADO,
+  sem_nome: 'O cadastro está sem razão social.',
   ja_liberada: 'Esta empresa já foi liberada para o portal.'
 };
 
@@ -74,8 +76,9 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
   rota('get', '/admin/portal/clientes', GERIR, async (req, res) => {
     try {
       const q = String(req.query.q ?? '').trim().slice(0, 100);
-      const filtro = q ? `WHERE c.RAZAO_SOCIAL LIKE ? ESCAPE '\\\\' OR c.CODIGO = ?` : '';
-      const params = q ? [`%${q.replace(/[\\%_]/g, '\\$&')}%`, inteiro(q) ?? 0] : [];
+      // ESCAPE '!' (e não barra invertida): portável, não depende de NO_BACKSLASH_ESCAPES; !, % e _ viram literais
+      const filtro = q ? "WHERE c.RAZAO_SOCIAL LIKE ? ESCAPE '!' OR c.CODIGO = ?" : '';
+      const params = q ? [`%${q.replace(/[!%_]/g, '!$&')}%`, inteiro(q) ?? 0] : [];
       const [rows] = await pool.execute(
         `SELECT c.CODIGO, c.RAZAO_SOCIAL, c.CNPJ_CPF, e.situacao AS situacao_portal,
                 (SELECT COUNT(*) FROM cadastro_clientes d WHERE d.RAZAO_SOCIAL = c.RAZAO_SOCIAL) AS qtd_nome
@@ -86,9 +89,10 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
           const situacaoPortal = r.situacao_portal || 'nao_liberada';
           const item = {
             codigo: r.CODIGO, razaoSocial: r.RAZAO_SOCIAL || '', cnpjCpf: r.CNPJ_CPF || '', situacaoPortal,
-            liberavel: !r.situacao_portal && Number(r.qtd_nome) === 1
+            liberavel: !r.situacao_portal && !!r.RAZAO_SOCIAL && Number(r.qtd_nome) === 1
           };
           if (r.situacao_portal) item.motivo = MOTIVOS_LIBERAR.ja_liberada;
+          else if (!r.RAZAO_SOCIAL) item.motivo = MOTIVOS_LIBERAR.sem_nome;
           else if (Number(r.qtd_nome) !== 1) item.motivo = MSG_NOME_DUPLICADO;
           return item;
         })
@@ -181,7 +185,7 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
     const token = await emTransacao(res, 'POST /admin/portal/convites', async conn => {
       const [emp] = await conn.execute('SELECT situacao FROM web_portal_empresas WHERE cliente_codigo = ? LIMIT 1 FOR UPDATE', [codigo]);
       if (!emp.length) throw new ErroUsuario(400, 'Libere a empresa para o portal antes de convidar.');
-      if (emp[0].situacao !== 'ativa') throw new ErroUsuario(400, 'A empresa está suspensa. Reative-a antes de convidar.');
+      if (emp[0].situacao !== 'ativa') throw new ErroUsuario(409, 'A empresa está suspensa. Reative-a antes de convidar.');
       const [dup] = await conn.execute('SELECT id FROM web_portal_usuarios WHERE email = ? LIMIT 1', [para]);
       if (dup.length) throw new ErroUsuario(409, 'Já existe um usuário do portal com este e-mail.');
       const [cad] = await conn.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [codigo]);
@@ -198,14 +202,22 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
     await responderConvite(res, { token, para, razaoSocial });
   });
 
-  // lê o usuário travado; devolve também a razão social para o texto do e-mail
+  // lê o usuário travado; devolve também a razão social para o texto do e-mail. NÃO exige empresa ativa: no incidente a equipe
+  // suspende a empresa e precisa reiniciar o 2º fator ANTES de reativar (o convite só funciona depois de reativar: iniciar/concluir
+  // conferem a empresa). A empresa tem de existir no portal.
   async function usuarioParaConvite(conn, id) {
+    const usuario = await usuarioTravado(conn, id);
+    const [emp] = await conn.execute('SELECT situacao FROM web_portal_empresas WHERE cliente_codigo = ? LIMIT 1', [usuario.cliente_codigo]);
+    if (!emp.length) throw new ErroUsuario(409, 'A empresa não está liberada no portal.');
+    const [cad] = await conn.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [usuario.cliente_codigo]);
+    return { usuario, razaoSocial: cad.length ? cad[0].RAZAO_SOCIAL : '' };
+  }
+
+  // lê o usuário com trava de linha; 404 se não existe
+  async function usuarioTravado(conn, id) {
     const [us] = await conn.execute('SELECT id, email, cliente_codigo, situacao FROM web_portal_usuarios WHERE id = ? LIMIT 1 FOR UPDATE', [id]);
     if (!us.length) throw new ErroUsuario(404, 'Usuário não encontrado.');
-    const [emp] = await conn.execute('SELECT situacao FROM web_portal_empresas WHERE cliente_codigo = ? LIMIT 1', [us[0].cliente_codigo]);
-    if (!emp.length || emp[0].situacao !== 'ativa') throw new ErroUsuario(409, 'A empresa não está ativa no portal.');
-    const [cad] = await conn.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [us[0].cliente_codigo]);
-    return { usuario: us[0], razaoSocial: cad.length ? cad[0].RAZAO_SOCIAL : '' };
+    return us[0];
   }
 
   // convites antigos do usuário deixam de valer
@@ -250,6 +262,47 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
     });
     if (token === undefined) return;
     await responderConvite(res, { token, para: alvo.usuario.email, razaoSocial: alvo.razaoSocial });
+  });
+
+  // Desativar: a pessoa perde o acesso (qualquer situação, menos já inativo). Não exige empresa ativa (incidente) nem envia e-mail.
+  rota('post', '/admin/portal/usuarios/:id/desativar', GERIR, async (req, res) => {
+    const id = inteiro(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Usuário inválido.' });
+    const ok = await emTransacao(res, 'POST /admin/portal/usuarios/:id/desativar', async conn => {
+      const usuario = await usuarioTravado(conn, id);
+      if (usuario.situacao === 'inativo') throw new ErroUsuario(409, 'O usuário já está desativado.');
+      await conn.execute("UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = ?", [id]);
+      await invalidarConvites(conn, id);
+      await sessoes.revogarUsuario(id); // falha aqui desfaz tudo; o usuário inativo já não autentica de qualquer forma
+      await auditar(conn, { quem: req.user.nome, acao: 'portal_usuario_desativado', alvo: String(id),
+        detalhe: { usuarioId: id, clienteCodigo: usuario.cliente_codigo } });
+      return true;
+    });
+    if (ok) res.json({ ok: true });
+  });
+
+  // Remover: só para quem foi convidado e NUNCA concluiu o convite (e-mail digitado errado): apaga tudo dele e libera o e-mail.
+  // Quem já aceitou algum dia (inclusive o convidado de novo após reiniciar o 2º fator) só se desativa.
+  rota('post', '/admin/portal/usuarios/:id/remover', GERIR, async (req, res) => {
+    const id = inteiro(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Usuário inválido.' });
+    const ok = await emTransacao(res, 'POST /admin/portal/usuarios/:id/remover', async conn => {
+      const [us] = await conn.execute(
+        'SELECT id, cliente_codigo, situacao, termo_aceito_em FROM web_portal_usuarios WHERE id = ? LIMIT 1 FOR UPDATE', [id]);
+      if (!us.length) throw new ErroUsuario(404, 'Usuário não encontrado.');
+      const u = us[0];
+      if (u.situacao !== 'convidado' || u.termo_aceito_em) throw new ErroUsuario(409, MSG_SO_CONVIDADO);
+      await conn.execute('DELETE FROM web_portal_sessoes WHERE usuario_id = ?', [id]);
+      await conn.execute('DELETE FROM web_portal_recuperacao WHERE usuario_id = ?', [id]);
+      await conn.execute('DELETE FROM web_portal_permissoes WHERE usuario_id = ?', [id]);
+      await conn.execute('DELETE FROM web_portal_convites WHERE usuario_id = ?', [id]);
+      const [del] = await conn.execute("DELETE FROM web_portal_usuarios WHERE id = ? AND situacao = 'convidado'", [id]);
+      if (del.affectedRows !== 1) throw new ErroUsuario(409, MSG_SO_CONVIDADO);
+      await auditar(conn, { quem: req.user.nome, acao: 'portal_usuario_removido', alvo: String(id),
+        detalhe: { usuarioId: id, clienteCodigo: u.cliente_codigo } });
+      return true;
+    });
+    if (ok) res.json({ ok: true });
   });
 }
 

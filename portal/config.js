@@ -45,4 +45,12 @@ function lerConfigPortal(env = process.env) {
   return config;
 }
 
-module.exports = { lerConfigPortal };
+// Na subida: com o portal desativado, UMA linha diz o motivo (o texto é fixo e nunca traz valores de variáveis),
+// senão o dono não sabe qual variável está errada. Nunca nos testes. Devolve true se avisou.
+function avisarPortalDesativado(config, { env = process.env, aviso = console.warn } = {}) {
+  if (config.ativo || env.NODE_ENV === 'test') return false;
+  aviso('[portal] desativado:', config.motivo);
+  return true;
+}
+
+module.exports = { lerConfigPortal, avisarPortalDesativado };

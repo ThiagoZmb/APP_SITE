@@ -309,5 +309,33 @@ test('portal inativo desliga a exceção de CORS (mesmo em /portal/)', async t =
   const r = await post(s, '/portal/x', BASE);
   assert.equal(r.status, 500);
   assert.equal(r.headers.get('access-control-allow-origin'), null);
-  assert.equal((await post(s, '/portal/x', 'https://thiagozmb.github.io')).status, 200);
+  // em /portal/ nenhuma origem vale com o portal inativo (a exceção do GitHub Pages também não vale lá)
+  assert.equal((await post(s, '/portal/x', 'https://thiagozmb.github.io')).status, 500);
+  assert.equal((await post(s, '/clientes/x', 'https://thiagozmb.github.io')).status, 200);
+});
+
+test('CORS de /portal/: SÓ a origem do portal vale; GitHub Pages e localhost não (nem no preflight); os outros caminhos não mudam', async t => {
+  const s = await appCors({ ativo: true, baseUrl: BASE });
+  t.after(s.fechar);
+  const alheias = ['https://thiagozmb.github.io', 'http://localhost:3000', 'http://127.0.0.1:8080', 'http://[::1]:5173'];
+  const caminhos = ['/portal/api/login', '/PORTAL/api/login', '/Portal/api/convite/iniciar'];
+  assert.ok(alheias.length > 0 && caminhos.length > 0);
+  for (const caminho of caminhos) {
+    for (const origem of alheias) {
+      const r = await post(s, caminho, origem);
+      assert.equal(r.status, 500, `${caminho} ${origem}`);
+      assert.equal(r.headers.get('access-control-allow-origin'), null, `${caminho} ${origem}`);
+      const pre = await fetch(s.url + caminho, { method: 'OPTIONS', headers: { Origin: origem, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-portal' } });
+      assert.equal(pre.status, 500, `preflight ${caminho} ${origem}`);
+      assert.equal(pre.headers.get('access-control-allow-origin'), null, `preflight ${caminho} ${origem}`);
+    }
+    const pre = await fetch(s.url + caminho, { method: 'OPTIONS', headers: { Origin: BASE, 'Access-Control-Request-Method': 'POST' } });
+    assert.equal(pre.headers.get('access-control-allow-origin'), BASE, `preflight da base ${caminho}`);
+    const sem = await fetch(s.url + caminho, { method: 'POST' });
+    assert.equal(sem.status, 200, `sem Origin ${caminho}`);
+    assert.equal((await post(s, caminho, BASE)).status, 200, `base ${caminho}`);
+  }
+  // fora de /portal/ a regra de sempre continua idêntica
+  for (const origem of alheias) assert.equal((await post(s, '/clientes/salvar', origem)).status, 200, origem);
+  assert.equal((await post(s, '/clientes/salvar', 'https://malvado.com')).status, 500);
 });

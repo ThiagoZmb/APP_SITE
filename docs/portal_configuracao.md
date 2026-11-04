@@ -37,13 +37,13 @@ O e-mail do convite sai da conta `portal@elegancealuminio.com.br`. No painel do 
 | `SMTP_PASS` | senha da conta |
 | `SMTP_FROM` | remetente (opcional; se faltar, usa `SMTP_USER`) |
 
-- **Confirme o servidor e a porta no painel da UOL** (a spec deixa isso em aberto; não chute). A porta 465 usa conexão segura direta; outras portas funcionam, mas o sistema só liga a conexão segura direta na 465.
+- **Confirme o servidor e a porta no painel da UOL** (a spec deixa isso em aberto; não chute). A porta 465 usa conexão segura direta; outras portas funcionam, mas o sistema só liga a conexão segura direta na 465. Se a UOL pedir outra porta, avise o desenvolvedor.
 - O e-mail só é ligado quando `SMTP_HOST`, `SMTP_USER` e `SMTP_PASS` estão preenchidos.
 - Sem SMTP, o portal funciona do mesmo jeito: a tela da equipe mostra o **link do convite** para você copiar e mandar por outro meio.
 
 ## 4. Salvar e reiniciar
 
-No Render, salve as variáveis (`PORTAL_URL_BASE`, `PORTAL_CHAVE_CRIPTO` e as `SMTP_*`) e aguarde o serviço reiniciar. Se faltar ou estiver inválida uma das duas primeiras, o portal continua desligado: a tela da equipe e as páginas do cliente recebem "Portal não configurado." (o servidor não escreve o motivo no log; confira os nomes e os valores das duas variáveis).
+No Render, salve as variáveis (`PORTAL_URL_BASE`, `PORTAL_CHAVE_CRIPTO` e as `SMTP_*`) e aguarde o serviço reiniciar. Se faltar ou estiver inválida uma das duas primeiras, o portal continua desligado: a tela da equipe e as páginas do cliente recebem "Portal não configurado." e o log do Render, na subida, traz uma linha `[portal] desativado:` dizendo qual variável falta ou está inválida (o texto nunca repete o valor). Confira os nomes e os valores das duas variáveis.
 
 ## 5. Testar com um e-mail de teste
 
@@ -58,9 +58,13 @@ Antes de qualquer cliente real:
 ## 6. Liberar a primeira empresa
 
 1. Em **Usuários > Portal do cliente**, busque o cliente pela razão social ou código e clique em **Liberar**.
-2. **Nome duplicado:** a empresa só pode ser liberada se a razão social for **única** no cadastro de clientes (pedidos e financeiro se ligam ao cliente pelo nome) e não estiver vazia. Se o botão não aparecer ou a tela avisar "mais de um cadastro com esta razão social", abra o relatório `/clientes/nomes_duplicados` (no sistema interno, com permissão de editar clientes) para ver os códigos, corrija o cadastro e tente de novo.
+2. **Nome duplicado:** a empresa só pode ser liberada se a razão social for **única** no cadastro de clientes (pedidos e financeiro se ligam ao cliente pelo nome) e não estiver vazia. Se o botão **Liberar** não aparecer, a própria tela **Portal do cliente** mostra o motivo na linha da empresa (por exemplo "mais de um cadastro com esta razão social" ou "O cadastro está sem razão social."). Corrija o cadastro e busque de novo. Para ver a lista completa de nomes repetidos, peça ao desenvolvedor.
 3. Com a empresa liberada, clique em **Abrir**, informe o e-mail do **administrador geral** da empresa e **Enviar convite**. O convite vale **48 horas** e só pode ser usado uma vez. Passou do prazo: use **Reenviar convite**.
 4. **Suspender** derruba na hora todos os acessos da empresa; **Reativar** a libera de novo.
+5. **Remover ou Desativar um usuário** (na lista de usuários da empresa aberta):
+   - **E-mail digitado errado, antes de a pessoa aceitar o convite:** use **Remover**. Apaga o convite e o cadastro dessa pessoa no portal e libera o e-mail; depois é só convidar de novo com o endereço certo. Só funciona para quem ainda não aceitou o convite (a tela pede confirmação).
+   - **Alguém saiu da empresa ou não deve mais entrar:** use **Desativar**. A pessoa perde o acesso na hora, os convites abertos dela deixam de valer e as sessões abertas caem. Vale para quem já aceitou e também para quem ainda está só convidado. Não há botão para reativar: se precisar, peça ao desenvolvedor.
+   - Na dúvida, escolha **Desativar**: ele não apaga nada.
 
 ## 7. O que o cliente faz
 
@@ -75,6 +79,8 @@ Cinco erros seguidos na mesma conta bloqueiam o login por 15 minutos (a tela avi
 ## 8. Quando alguém perde o aparelho (ou os códigos)
 
 Na tela **Portal do cliente**, abra a empresa e clique em **Reiniciar 2º fator** no usuário. Isso apaga o aplicativo cadastrado, os códigos de recuperação **e a senha**, derruba as sessões abertas e gera um **convite novo** (e-mail ou link para copiar). A pessoa refaz senha e aplicativo e recebe códigos novos. Só funciona para usuário já ativo.
+
+**Se a conta de uma empresa foi comprometida:** pode **Suspender** a empresa primeiro e, ainda suspensa, **Reiniciar 2º fator** (e **Reenviar convite**) dos usuários; o convite novo só funciona depois que você **Reativar** a empresa. Assim não há janela em que quem tem a senha antiga consiga entrar.
 
 ## 9. Trocar o texto do termo de uso
 
@@ -99,3 +105,14 @@ Nada disto é feito pelo código; só o dono resolve. Sem isso, qualquer pessoa 
 ## 11. O que ainda não foi testado
 
 Foi testado só com banco, e-mail e navegador simulados. Confira você, na primeira vez: o envio de e-mail pelo SMTP real, as páginas do cliente e a tela da equipe no navegador, o aplicativo autenticador de verdade, e se a pasta de páginas do portal chega ao servidor do Render.
+
+## 12. Conferir no MySQL do HostGator antes do primeiro uso
+
+Nenhum SQL do portal rodou em MySQL real (os testes usam um banco falso, que não simula collation, `FOR UPDATE` nem transação). E a criação das tabelas `web_portal_*` roda **na subida do servidor**: uma falha ali impediria o ERP inteiro de subir. Antes de publicar, peça ao desenvolvedor (ou rode você, num cliente MySQL com o usuário de manutenção) o seguinte:
+
+1. `SELECT @@version, @@sql_mode, @@collation_connection;` — o `sql_mode` **não** pode conter `NO_BACKSLASH_ESCAPES`; anote a versão e a collation.
+2. **Testar a subida do servidor numa cópia do banco** (ou num banco vazio de teste) antes de publicar no Render, e conferir no log que as tabelas foram criadas sem erro.
+3. `SHOW CREATE TABLE` de cada uma das 7 tabelas (`web_portal_empresas`, `web_portal_usuarios`, `web_portal_permissoes`, `web_portal_convites`, `web_portal_recuperacao`, `web_portal_sessoes`, `web_portal_auditoria`): conferir tipos, índices únicos (e-mail em `utf8mb4_bin`) e que não há chave estrangeira.
+4. Rodar a consulta do login (`SQL_LOGIN` em `rotas/portal_auth.js`) com um **e-mail existente** e com um **inexistente**, cada uma precedida de `EXPLAIN`: as duas devem devolver 1 linha e usar o mesmo plano (a contagem de `cadastro_clientes` por razão social roda nos dois casos).
+5. Medir o tempo da busca da tela da equipe (`/admin/portal/clientes?q=a`, que faz `LIKE` e conta nomes iguais em `cadastro_clientes`); se demorar, avise o desenvolvedor.
+6. Depois do primeiro login real, olhar o IP gravado em `web_portal_auditoria`: tem de ser o do cliente e não o do proxy do Render (confere o `trust proxy` de 1 salto).

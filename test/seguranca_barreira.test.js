@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { subir } = require('./apoio/servidor');
 const { criarPoolFalso } = require('./apoio/poolFalso');
-const { app, pool, acesso, sessoes, registro } = require('../index.js');
+const { app, pool, acesso, sessoes, registro, configPortal, sessoesPortal } = require('../index.js');
+const { criarBancoPortal } = require('./apoio/bancoPortal');
 const { SID_TESTE, aceitarSidDeTeste } = require('./apoio/sessaoFalsa');
 aceitarSidDeTeste(sessoes);
 
@@ -93,7 +94,6 @@ test('gerarToken inclui tipo funcionario (token do /login)', async t => {
 });
 
 // ---- Caminho inverso: credenciais do portal não autenticam rotas de funcionário ----
-const crypto = require('node:crypto');
 
 async function varrer(s, headers) {
   const falhas = [];
@@ -105,25 +105,39 @@ async function varrer(s, headers) {
   return falhas;
 }
 
-test('Bearer de 32 hex (formato de sessão do portal) dá 401 em todas as rotas de funcionário', async t => {
-  const s = await subir(app);
-  t.after(s.fechar);
-  acesso.limpar();
-  let chamadas = 0;
-  t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
-  const falhas = await varrer(s, { Authorization: 'Bearer ' + crypto.randomBytes(16).toString('hex') });
-  assert.deepEqual(falhas, []);
-  assert.equal(chamadas, 0);
-});
+// Cria uma sessão VÁLIDA do portal (banco falso do portal no lugar do pool, empresa e usuário ativos) pelo mesmo caminho do login
+// (`sessoesPortal.criar`); o controle positivo prova que o token vale NO PORTAL, então o 401 das rotas de funcionário é da barreira.
+async function sessaoValidaDoPortal(t, s) {
+  const banco = criarBancoPortal({
+    clientes: [{ CODIGO: 40, RAZAO_SOCIAL: 'ACME LTDA' }], empresas: [{ cliente_codigo: 40, situacao: 'ativa' }],
+    usuarios: [{ id: 1, email: 'ana@acme.com', cliente_codigo: 40, papel: 'admin_geral', situacao: 'ativo' }]
+  });
+  pool.execute = banco.pool.execute; pool.getConnection = banco.pool.getConnection;
+  const antes = { ativo: configPortal.ativo, baseUrl: configPortal.baseUrl };
+  configPortal.ativo = true; configPortal.baseUrl = 'https://portal.teste';
+  t.after(() => Object.assign(configPortal, antes));
+  const token = await sessoesPortal.criar(1, '127.0.0.1');
+  assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+  const eu = await fetch(s.url + '/portal/api/eu', { headers: { Cookie: '__Host-portal=' + token } });
+  assert.equal(eu.status, 200, 'controle: a sessão do portal é válida no próprio portal');
+  return token;
+}
 
-test('cookie __Host-portal sozinho não autentica nenhuma rota de funcionário', async t => {
-  const s = await subir(app);
-  t.after(s.fechar);
-  acesso.limpar();
-  let chamadas = 0;
-  t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
-  // Trava a regressão de alguém passar a ler o cookie do portal nas rotas de funcionário.
-  const falhas = await varrer(s, { Authorization: 'Bearer x', Cookie: '__Host-portal=' + crypto.randomBytes(16).toString('hex') });
-  assert.deepEqual(falhas, []);
-  assert.equal(chamadas, 0);
-});
+for (const [rotulo, montarCabecalhos] of [
+  ['como Authorization: Bearer', token => ({ Authorization: 'Bearer ' + token })],
+  ['como cookie __Host-portal (sem Authorization)', token => ({ Cookie: '__Host-portal=' + token })],
+  ['nos dois lugares ao mesmo tempo', token => ({ Authorization: 'Bearer ' + token, Cookie: '__Host-portal=' + token })]
+]) {
+  test(`token de uma sessão VÁLIDA do portal (43 caracteres base64url) enviado ${rotulo} dá 401 em todas as rotas de funcionário`, async t => {
+    const s = await subir(app);
+    t.after(s.fechar);
+    acesso.limpar();
+    let chamadas = 0;
+    t.mock.method(acesso, 'carregar', async () => { chamadas++; return null; });
+    const token = await sessaoValidaDoPortal(t, s);
+    assert.ok(registro.rotasAutenticadas().length > 50);
+    const falhas = await varrer(s, montarCabecalhos(token));
+    assert.deepEqual(falhas, []);
+    assert.equal(chamadas, 0);
+  });
+}

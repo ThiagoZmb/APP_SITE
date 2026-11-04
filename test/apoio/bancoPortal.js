@@ -138,7 +138,7 @@ function criarBancoPortal(inicial = {}) {
     [/^SELECT c\.CODIGO, c\.RAZAO_SOCIAL, c\.CNPJ_CPF/, (sql, params) => {
       let lista = dados.clientes;
       if (params.length) {
-        const termo = params[0].replace(/^%|%$/g, '').replace(/\\([\\%_])/g, '$1').toLowerCase();
+        const termo = params[0].replace(/^%|%$/g, '').replace(/!([!%_])/g, '$1').toLowerCase();
         lista = lista.filter(c => String(c.RAZAO_SOCIAL).toLowerCase().includes(termo) || c.CODIGO === params[1]);
       }
       const m = /LIMIT (\d+)/.exec(sql);
@@ -193,6 +193,34 @@ function criarBancoPortal(inicial = {}) {
     [/^UPDATE web_portal_convites SET usado_em = \? WHERE usuario_id = \? AND usado_em IS NULL/, (sql, [quando, uid]) => {
       dados.convites.filter(c => c.usuario_id === uid && c.usado_em == null).forEach(c => { c.usado_em = quando; });
       return { affectedRows: 1 };
+    }],
+    // ---- revisão final: desativar e remover usuário ----
+    [/^SELECT id, cliente_codigo, situacao, termo_aceito_em FROM web_portal_usuarios WHERE id = \?/, (sql, [id]) =>
+      dados.usuarios.filter(u => u.id === id).map(u => ({
+        id: u.id, cliente_codigo: u.cliente_codigo, situacao: u.situacao, termo_aceito_em: u.termo_aceito_em ?? null
+      }))],
+    [/^UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = \?/, (sql, [id]) => {
+      const u = dados.usuarios.find(x => x.id === id);
+      if (u) u.situacao = 'inativo';
+      return { affectedRows: u ? 1 : 0 };
+    }],
+    [/^DELETE FROM web_portal_convites WHERE usuario_id = \?/, (sql, [id]) => {
+      dados.convites = dados.convites.filter(c => c.usuario_id !== id);
+      return { affectedRows: 1 };
+    }],
+    [/^DELETE FROM web_portal_permissoes WHERE usuario_id = \?/, (sql, [id]) => {
+      dados.permissoes = dados.permissoes.filter(p => p.usuario_id !== id);
+      return { affectedRows: 1 };
+    }],
+    [/^DELETE FROM web_portal_sessoes WHERE usuario_id = \?/, (sql, [id]) => {
+      dados.sessoes = dados.sessoes.filter(s => s.usuario_id !== id);
+      return { affectedRows: 1 };
+    }],
+    // só apaga se ainda estiver convidado (a condição do WHERE é do SQL de produção)
+    [/^DELETE FROM web_portal_usuarios WHERE id = \? AND situacao = 'convidado'/, (sql, [id]) => {
+      const n = dados.usuarios.length;
+      dados.usuarios = dados.usuarios.filter(u => !(u.id === id && u.situacao === 'convidado'));
+      return { affectedRows: n - dados.usuarios.length };
     }],
     [/^INSERT INTO web_auditoria/, (sql, [quem, acao, alvo, detalhe]) => {
       dados.auditoriaEquipe.push({ quem, acao, alvo, detalhe });

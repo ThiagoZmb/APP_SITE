@@ -2,7 +2,7 @@
 // portal_admin.html — tela da EQUIPE do portal do cliente (sistema interno; não é a tela do cliente).
 // Rotas (rotas/portal_admin.js, exigem portal.gerir): GET /admin/portal/clientes?q=, GET /admin/portal/empresas,
 // GET /admin/portal/empresas/:codigo/usuarios, POST /admin/portal/empresas, .../suspender, .../reativar,
-// POST /admin/portal/convites, POST /admin/portal/usuarios/:id/reenviar_convite e .../reiniciar_2fa.
+// POST /admin/portal/convites, POST /admin/portal/usuarios/:id/reenviar_convite, .../reiniciar_2fa, .../desativar e .../remover.
 // Dado vindo da API só entra na tela por textContent/value (a tela é montada com createElement; não há innerHTML).
 // O link do convite existe só em memória e no campo da tela: não vai a localStorage/sessionStorage nem a log,
 // e some ao fechar ou trocar de empresa. A tela no navegador real não tem teste automático.
@@ -14,8 +14,10 @@
   const ROTULO_SITUACAO_PORTAL = { nao_liberada: 'Não liberada', ativa: 'Ativa', suspensa: 'Suspensa' };
   const CLASSE_SITUACAO_PORTAL = { nao_liberada: '', ativa: 'ok', suspensa: 'perigo' };
   const ROTULO_PAPEL = { admin_geral: 'Administrador geral' };
-  const ROTULO_SITUACAO_USUARIO = { convidado: 'Convidado', ativo: 'Ativo' };
-  const CLASSE_SITUACAO_USUARIO = { convidado: 'aviso', ativo: 'ok' };
+  const ROTULO_SITUACAO_USUARIO = { convidado: 'Convidado', ativo: 'Ativo', inativo: 'Inativo' };
+  const CLASSE_SITUACAO_USUARIO = { convidado: 'aviso', ativo: 'ok', inativo: 'perigo' };
+  const MSG_DESATIVAR = 'A pessoa perde o acesso e as sessões abertas caem. Continuar?';
+  const MSG_REMOVER = 'Remover apaga este convite e o cadastro da pessoa no portal; só vale para quem ainda não aceitou o convite (e-mail digitado errado). Continuar?';
   const MSG_SUSPENDER = 'Suspender derruba todas as sessões desta empresa. Continuar?';
   const MSG_REINICIAR = 'Reiniciar o 2º fator: a pessoa terá de configurar o aplicativo de autenticação de novo e perderá os códigos de recuperação atuais. Continuar?';
 
@@ -203,8 +205,12 @@
       if (!estado.usuarios.length) { mostrarVazio(alvo, 'Nenhum usuário convidado ainda.'); return; }
       const linhas = estado.usuarios.map(u => {
         const acoes = el('div', null, 'acoes');
-        if (u.situacao === 'convidado') acoes.appendChild(botao('Reenviar convite', 'btn-secondary', () => reenviar(u)));
+        if (u.situacao === 'convidado') {
+          acoes.appendChild(botao('Reenviar convite', 'btn-secondary', () => reenviar(u)));
+          acoes.appendChild(botao('Remover', 'btn-perigo', () => remover(u)));
+        }
         if (u.situacao === 'ativo') acoes.appendChild(botao('Reiniciar 2º fator', 'btn-perigo', () => reiniciar2fa(u)));
+        if (u.situacao === 'convidado' || u.situacao === 'ativo') acoes.appendChild(botao('Desativar', 'btn-perigo', () => desativar(u)));
         return [
           u.email,
           ROTULO_PAPEL[u.papel] || u.papel,
@@ -284,6 +290,32 @@
         const r = await chamar('/admin/portal/usuarios/' + encodeURIComponent(usuario.id) + '/reiniciar_2fa', { metodo: 'POST' });
         mostrarResultadoConvite(r);
         await carregarUsuarios();
+      } catch (err) { toast(err.message, 'erro'); }
+      finally { estado.ocupado = false; }
+    }
+
+    // Desativar: a pessoa perde o acesso (convites e sessões caem). Remover: só para quem nunca aceitou o convite (e-mail errado).
+    async function desativar(usuario) {
+      if (estado.ocupado) return;
+      if (!win.confirm(MSG_DESATIVAR)) return;
+      limparLink();
+      estado.ocupado = true;
+      try {
+        await chamar('/admin/portal/usuarios/' + encodeURIComponent(usuario.id) + '/desativar', { metodo: 'POST' });
+        toast('Usuário desativado.', 'ok');
+        await Promise.all([carregarUsuarios(), carregarEmpresas()]);
+      } catch (err) { toast(err.message, 'erro'); }
+      finally { estado.ocupado = false; }
+    }
+    async function remover(usuario) {
+      if (estado.ocupado) return;
+      if (!win.confirm(MSG_REMOVER)) return;
+      limparLink();
+      estado.ocupado = true;
+      try {
+        await chamar('/admin/portal/usuarios/' + encodeURIComponent(usuario.id) + '/remover', { metodo: 'POST' });
+        toast('Usuário removido.', 'ok');
+        await Promise.all([carregarUsuarios(), carregarEmpresas()]);
       } catch (err) { toast(err.message, 'erro'); }
       finally { estado.ocupado = false; }
     }

@@ -36,7 +36,8 @@ const SEGREDO_FICTICIO = totp.gerarSegredo();
 const QTD_CODIGOS_RECUPERACAO = 10;
 const LIMITE_IP = { janelaMs: 15 * 60 * 1000, falhas: 10 };
 
-// Consulta única que SEMPRE devolve 1 linha e roda o MESMO plano com ou sem conta: o derivado k fixa a linha, os LEFT JOINs
+// Consulta única que SEMPRE devolve 1 linha e roda o MESMO plano com ou sem conta: o derivado k (constante, sem parâmetro:
+// o e-mail é comparado direto com a coluna utf8mb4_bin, sem collation implícita de tabela derivada) fixa a linha, os LEFT JOINs
 // ficam nulos sem conta e a contagem do nome roda contra um valor sempre presente (COALESCE). Sem isso a conta real custaria
 // uma varredura em cadastro_clientes (tabela do VB, sem índice no nome) e a inexistente não: oráculo de existência por tempo.
 // u.id nulo = sem conta. Nome único: mesma comparação coluna-contra-coluna de empresaLiberavel (portal/acesso.js).
@@ -45,8 +46,8 @@ const SQL_LOGIN =
   `SELECT u.id, u.email, u.cliente_codigo, u.papel, u.situacao, u.senha_hash, u.totp_segredo_cifrado, u.totp_ativo,
           u.totp_ultimo_passo, e.situacao AS empresa_situacao, c.RAZAO_SOCIAL AS razao_social,
           (SELECT COUNT(*) FROM cadastro_clientes d WHERE d.RAZAO_SOCIAL = COALESCE(c.RAZAO_SOCIAL, '${NOME_SEM_CONTA}')) AS qtd_nome
-     FROM (SELECT ? AS em) k
-     LEFT JOIN web_portal_usuarios u ON u.email = k.em
+     FROM (SELECT 1 AS um) k
+     LEFT JOIN web_portal_usuarios u ON u.email = ?
      LEFT JOIN web_portal_empresas e ON e.cliente_codigo = u.cliente_codigo
      LEFT JOIN cadastro_clientes c ON c.CODIGO = u.cliente_codigo
     LIMIT 1`;
@@ -79,14 +80,24 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
     standardHeaders: true, legacyHeaders: false, message: { error: MSG_LIMITE }
   });
 
-  // POST público: X-Portal: 1 + JSON objeto (mais restrito que o guarda de sessão, que também aceita Origin igual ao portal)
-  function exigirJson(req, res, next) {
-    if (req.headers['x-portal'] !== '1') return res.status(403).json({ error: MSG_RECUSADA });
-    const corpo = req.body;
-    if (!req.is('application/json') || corpo === null || typeof corpo !== 'object' || Array.isArray(corpo)) {
-      return res.status(400).json({ error: 'Requisição inválida.' });
+  // CSRF: X-Portal: 1 e, se o navegador mandou Origin, exatamente a origem do portal (GitHub Pages ou localhost não valem)
+  function exigirCsrf(req, res, next) {
+    const origem = req.headers.origin;
+    if (req.headers['x-portal'] !== '1' || (origem !== undefined && origem !== config.baseUrl)) {
+      return res.status(403).json({ error: MSG_RECUSADA });
     }
     next();
+  }
+
+  // POST público de dados: o mesmo CSRF + JSON objeto
+  function exigirJson(req, res, next) {
+    exigirCsrf(req, res, () => {
+      const corpo = req.body;
+      if (!req.is('application/json') || corpo === null || typeof corpo !== 'object' || Array.isArray(corpo)) {
+        return res.status(400).json({ error: 'Requisição inválida.' });
+      }
+      next();
+    });
   }
 
   const conviteInvalido = res => res.status(400).json({ error: MSG_CONVITE });
@@ -204,7 +215,11 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
       let segredo = SEGREDO_FICTICIO;
       let segredoReal = false;
       if (u && Number(u.totp_ativo) === 1 && u.totp_segredo_cifrado) {
-        try { segredo = cripto.decifrar(u.totp_segredo_cifrado); segredoReal = true; } catch { segredo = SEGREDO_FICTICIO; }
+        try { segredo = cripto.decifrar(u.totp_segredo_cifrado); segredoReal = true; } catch (err) {
+          // texto fixo (nada do usuário, do segredo ou da mensagem do erro): depois de trocar a chave todo login falharia em silêncio
+          console.error('[portal] falha ao decifrar o segredo do 2º fator (chave trocada?)', (err && err.code) || 'sem código');
+          segredo = SEGREDO_FICTICIO;
+        }
       }
       const codigoTxt = typeof b.codigo === 'string' ? b.codigo : '';
       const formatoOk = /^\d{6}$/.test(codigoTxt.replace(/\s+/g, ''));
@@ -259,13 +274,6 @@ function registrarPortalAuth({ portal, portalPublica, pool, sessoes, cripto, con
   // Logout só precisa de sessão + CSRF (X-Portal e Origin do portal): não exige usuário/empresa ativos, senão quem teve a
   // empresa suspensa não conseguiria encerrar a própria sessão. Idempotente: sem sessão (ou expirada) também responde 200
   // e limpa o cookie. Por isso nasce por portalPublica (o guarda de sessão completo recusaria essas contas).
-  function exigirCsrf(req, res, next) {
-    const origem = req.headers.origin;
-    if (req.headers['x-portal'] !== '1' || (origem !== undefined && origem !== config.baseUrl)) {
-      return res.status(403).json({ error: MSG_RECUSADA });
-    }
-    next();
-  }
   portalPublica('post', '/portal/api/logout', exigirCsrf, async (req, res) => {
     try {
       const token = lerCookie(req, NOME_COOKIE);
