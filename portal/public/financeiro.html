@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meu financeiro</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main class="larga">
+    <h1>Meu financeiro</h1>
+    <p>A receber: <strong id="resumo-receber">—</strong></p>
+    <p>Em atraso: <strong id="resumo-atraso">—</strong></p>
+    <div class="acoes">
+      <button type="button" id="aba-abertos" class="secundario" aria-pressed="true">Em aberto</button>
+      <button type="button" id="aba-pagos" class="secundario" aria-pressed="false">Pagos</button>
+    </div>
+    <div class="tabela-rolagem">
+      <table class="pedidos">
+        <thead>
+          <tr>
+            <th scope="col">Vencimento</th>
+            <th scope="col">Pedido</th>
+            <th scope="col">Nota fiscal</th>
+            <th scope="col">Valor</th>
+            <th scope="col">Situação</th>
+          </tr>
+        </thead>
+        <tbody id="corpo"></tbody>
+      </table>
+    </div>
+    <div class="acoes">
+      <button type="button" id="anterior" class="secundario" disabled>Anterior</button>
+      <button type="button" id="proxima" class="secundario" disabled>Próxima</button>
+    </div>
+    <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
+    <p><a href="inicio.html">Voltar ao início</a></p>
+  </main>
+  <script src="portal.js"></script>
+  <script src="financeiro.js"></script>
+</body>
+</html>

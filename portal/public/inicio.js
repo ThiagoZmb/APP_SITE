@@ -18,6 +18,10 @@
     const u = r.dados.usuario;
     document.getElementById('usuario-email').textContent = u.email;
     document.getElementById('usuario-empresa').textContent = u.empresa ? u.empresa.razaoSocial : '';
+    // o link só aparece com a permissão; a rota continua exigindo financeiro.ver no servidor
+    if (Array.isArray(u.permissoes) && u.permissoes.includes('financeiro.ver')) {
+      document.getElementById('link-financeiro').hidden = false;
+    }
   }
 
   document.getElementById('sair').addEventListener('click', async () => {
