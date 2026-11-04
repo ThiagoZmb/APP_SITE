@@ -1122,7 +1122,8 @@ const CLASSES_AVULSO = {
   'Puxador': ['Puxador'],
   'Revestimento': ['Revestimento'],
   'Trilhos': ['Trilhos'],
-  'Serviço': ['Serviço', 'Serviços', 'Servico', 'Servicos'],
+  // frmServicos.CarregarListaProdutos: Serviço = CLASSE 'Acessórios' OU 'Sistema de correr' (não existe CLASSE "Serviço" no banco)
+  'Serviço': ['Acessórios', 'Sistema de correr'],
   'Acessório': ['Acessórios', 'Acessório']
 };
 registro.rota('get', '/catalogos_filtro', ['orcamentos.criar'], async (req, res) => {
