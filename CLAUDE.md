@@ -21,6 +21,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Notas fiscais sem itens** (`notas_fiscais.html`, `notas_fiscais.js`, `rotas/notas_fiscais.js`, `calculo/notas_fiscais.js`): registro de notas de entrada (fornecedor) e de saída (cliente) só pelo cabeçalho, em tabela própria `web_notas_fiscais`; não mexe em estoque, caixa nem tabelas do VB. Regras na seção 5, "Notas fiscais".
 - **Central de Gestão, entrega 1** (`gestao.html`, `gestao.js`, `rotas/gestao.js`, `calculo/gestao_caixa.js`): metas de faturamento e despesa por mês, caixa realizado x previsto, orçamento por categoria, comparativos e alertas calculados na hora. Só lê o VB. Regras na seção 5, "Gestão".
 - **Plano de corte de perfis** (`corte.html`, `corte.js`, `rotas/corte.js`, `calculo/corte_*.js`): a partir de um Pedido, distribui as peças de perfil (porta, puxador, divisor) em varas e retalhos minimizando a perda; reserva retalhos, o cortador marca as peças e o estoque de retalhos só muda quando o corte real é conferido e confirmado. Regras na seção 5, "Plano de corte".
+- **Etiquetas de pedido na Zebra** (`etiqueta_zebra.js`, `rotas/etiquetas.js`, `calculo/etiqueta_zpl.js`, `local/zebra.js`): o botão direito do Pedido ("Imprimir etiquetas (Zebra)") monta uma etiqueta ZPL de 100 × 60 mm por item no servidor e o serviço local do PC (porta 3917) a envia RAW à Zebra USB. Regras na seção 5, "Etiquetas na Zebra".
 - **Plano de corte de vidros** (`corte_vidros.html`, `corte_vidros.js`, `rotas/corte_vidros.js`, `calculo/vidro_*.js`): a partir de um Pedido, distribui as peças da tabela `vidros` em chapas do estoque (guilhotina com rotação) e retalhos; o cortador marca as peças e, ao confirmar o corte conferido, as chapas novas baixam do estoque. Regras na seção 5, "Plano de corte de vidros".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Notas de compra pela SEFAZ** (`notas_compra.html`, `notas_compra.js`, `local/sefaz.js`): o serviço local do PC da empresa (o mesmo do salvador de PDF, porta 3917) busca na SEFAZ as NF-e emitidas contra o CNPJ da empresa com o certificado A1, dá a Ciência da operação e guarda os XML; a tela leva o XML para a entrada de estoque existente. O certificado nunca sai do PC. Regras na seção 5, "Notas de compra pela SEFAZ".
@@ -65,7 +66,7 @@ calculo/                 Funções puras (testáveis sem banco)
   vidro_pecas.js / vidro_otimizacao.js / vidro_validacao.js   Plano de corte de vidros: peças (vidros + ped_orc_itens_v4), guilhotina em chapas/retalhos, validação de config/retalho/conferência
   gestao_caixa.js / gestao_validacao.js   Central de Gestão: caixa por mês, variação, meta, progresso/projeção do orçamento, alertas; validação de meta e orçamento (puras)
 pdf/ped_orc.js           PDF do pedido/orçamento (rota /dados_pdf) fiel ao Gerar_PDF_PedOrc do VB; ?producao=1 = Guia de Produção (só Pedido)
-local/                   Serviço do PC da empresa (127.0.0.1:3917): salvador_pdf.js (grava os PDFs nas pastas do VB) e sefaz.js (notas de compra pela SEFAZ). Detalhes e instalação: docs/regras/servico-local.md
+local/                   Serviço do PC da empresa (127.0.0.1:3917): salvador_pdf.js (grava os PDFs nas pastas do VB), sefaz.js (notas de compra pela SEFAZ) e zebra.js (POST /etiqueta: ZPL RAW na Zebra). Detalhes e instalação: docs/regras/servico-local.md
 imagens/logo_elegance.png  Logo do cabeçalho do PDF (convertido do Elegance_Logo.JPEG do VB, que na verdade é BMP)
 leitura/                 Leitura de PDF pela web: rotas.js (rotas /leitura_pdf, tarefas em memória, limites, auditoria), claude.js (pedido à API pelo SDK, erros), pdf.js (assinatura, senha, nº de páginas sem poppler), conferencia.js (dados da janela de conferência)
 .claude/skills/engenharia-projetos-tecnicos/   Skill de leitura de projetos (regras, validação, mapa, confirmação). O servidor IMPORTA scripts/lib/servico.mjs dela: a pasta precisa ir no deploy
@@ -166,6 +167,10 @@ Perfis por Pedido em varas e retalhos; peça sem medida ou sem ligação vira pe
 ### Plano de corte de vidros (chapas por pedido, guilhotina e retalhos)
 Chapas do estoque por Pedido (guilhotina com rotação) e retalhos; quantidades não são comparadas; ao confirmar, as chapas novas baixam do estoque.
 > Regras completas: `docs/regras/corte-vidros.md` (ler antes de mexer neste módulo).
+
+### Etiquetas na Zebra (uma por item do Pedido, ZPL 100 × 60 mm)
+Servidor monta o ZPL (`GET /etiquetas/pedido/:numero`, `pedidos.pdf`); o serviço local envia RAW ao spooler; texto do banco saneado (`^ ~ \`); medida ausente = "—"; sem dinheiro; impressora só do `zebra.config.json` ou detectada, nunca da requisição. **Ainda não testado em Zebra real.**
+> Regras completas: `docs/regras/etiqueta-zebra.md` (ler antes de mexer neste módulo).
 
 ### Peso das portas (etapa 1)
 `web_pesos`; peso sem cadastro nunca vira zero (pendência + parcial); **o peso aparece SÓ em `orcamentos.html`** (regra do dono).
