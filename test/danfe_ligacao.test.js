@@ -50,3 +50,83 @@ test('pedidosDaNota: junta o vínculo manual e o financeiro, sem repetir', async
   assert.equal(empresa, CNPJ);
   assert.deepEqual((await lig.pedidosDaNota(d, empresa)).sort(), [100, 200]);
 });
+
+// ---- caminho do portal: notasDoPedidoCliente(numero, razaoSocial) ----
+const ACME = 'ACME LTDA', BETA = 'BETA LTDA';
+const lanc = (PEDIDO, NOTA_FISCAL, RAZAO_SOCIAL, RAZAO_FABRICANTE = '') => ({ PEDIDO, NOTA_FISCAL, RAZAO_SOCIAL, RAZAO_FABRICANTE });
+const so = notas => notas.map(n => n.chave);
+
+test('notasDoPedidoCliente: manual primeiro, depois financeiro (entrada do próprio cliente), só chave/numeroNf/serie, sem repetir', async () => {
+  const { banco, lig } = montar();
+  const a = banco.semear.danfe({ numero: 11290 });
+  const b = banco.semear.danfe({ numero: 11291, cNF: '00000286' });
+  banco.semear.vinculo(b.chave, 100);
+  banco.semear.fluxo(lanc('100', '11290/11291', ACME));
+  const r = await lig.notasDoPedidoCliente(100, ACME);
+  assert.ok(r.length > 0);
+  assert.deepEqual(so(r), [b.chave, a.chave]);
+  assert.deepEqual(r[0], { chave: b.chave, numeroNf: 11291, serie: 1 });
+  for (const n of r) assert.deepEqual(Object.keys(n).sort(), ['chave', 'numeroNf', 'serie']);
+});
+
+test('notasDoPedidoCliente: lançamento de outra razão social com o mesmo PEDIDO não liga a nota', async () => {
+  const { banco, lig } = montar();
+  const d = banco.semear.danfe({ numero: 33333 });
+  banco.semear.fluxo(lanc('100', '33333', BETA));
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  banco.semear.fluxo(lanc('100', '33333', ACME)); // o do próprio cliente passa, mas a citação de BETA ainda a descarta
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  assert.ok(d.chave);
+});
+
+test('notasDoPedidoCliente: saída (RAZAO_FABRICANTE preenchido) é ignorada; a entrada do cliente liga (controle)', async () => {
+  const { banco, lig } = montar();
+  const d = banco.semear.danfe({ numero: 66666 });
+  banco.semear.fluxo(lanc('100', '66666', ACME, 'Fornecedor X'));
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  banco.semear.fluxo(lanc('100', '66666', ACME));
+  assert.deepEqual(so(await lig.notasDoPedidoCliente(100, ACME)), [d.chave]);
+});
+
+test('notasDoPedidoCliente: mesmo número em duas séries é descartado pelo financeiro, o vínculo manual de uma continua', async () => {
+  const { banco, lig } = montar();
+  const s1 = banco.semear.danfe({ numero: 77777, serie: 1 });
+  const s2 = banco.semear.danfe({ numero: 77777, serie: 2, cNF: '00000286' });
+  banco.semear.fluxo(lanc('100', '77777', ACME));
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  banco.semear.vinculo(s1.chave, 100);
+  assert.deepEqual(so(await lig.notasDoPedidoCliente(100, ACME)), [s1.chave]);
+  assert.ok(s2.chave);
+});
+
+test('notasDoPedidoCliente: número citado por entrada de outra razão social ("88888/1") é descartado; sem a citação, liga', async () => {
+  const { banco, lig } = montar();
+  const d = banco.semear.danfe({ numero: 88888 });
+  banco.semear.fluxo(lanc('100', '88888', ACME));
+  assert.deepEqual(so(await lig.notasDoPedidoCliente(100, ACME)), [d.chave]);
+  banco.semear.fluxo(lanc('200', '88888/1', BETA));
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  // citação de OUTRA SAÍDA não conta (só entradas)
+  const { banco: b2, lig: l2 } = montar();
+  const d2 = b2.semear.danfe({ numero: 88888 });
+  b2.semear.fluxo(lanc('100', '88888', ACME));
+  b2.semear.fluxo(lanc('200', '88888', BETA, 'Fornecedor X'));
+  assert.deepEqual(so(await l2.notasDoPedidoCliente(100, ACME)), [d2.chave]);
+});
+
+test('notasDoPedidoCliente: um número que só aparece como trecho de outro ("188888") não descarta nada', async () => {
+  const { banco, lig } = montar();
+  const d = banco.semear.danfe({ numero: 88888 });
+  banco.semear.fluxo(lanc('100', '88888', ACME));
+  banco.semear.fluxo(lanc('200', '188888', BETA));
+  assert.deepEqual(so(await lig.notasDoPedidoCliente(100, ACME)), [d.chave]);
+});
+
+test('notasDoPedidoCliente: sem razão social ou sem DANFE enviado devolve só o vínculo manual', async () => {
+  const { banco, lig } = montar();
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ACME), []);
+  const d = banco.semear.danfe({ numero: 11290 });
+  banco.semear.fluxo(lanc('100', '11290', ACME));
+  assert.deepEqual(await lig.notasDoPedidoCliente(100, ''), []);
+  assert.deepEqual(so(await lig.notasDoPedidoCliente(100, ACME)), [d.chave]);
+});

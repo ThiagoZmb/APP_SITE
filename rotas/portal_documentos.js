@@ -4,7 +4,7 @@
 // Ordem de cada rota: (1) número do pedido válido, (2) posse do pedido pela empresa da sessão (consulta fixa),
 // (3) só então o resto. Todo insucesso (pedido alheio ou inexistente, orçamento, número ou chave mal formados, chave que
 // não está entre as notas ligadas AQUELE pedido) responde o mesmo 404, com o mesmo corpo e os mesmos cabeçalhos.
-// Nenhum DANFE é buscado só pela chave: a chave só abre se estiver em notasDoPedido(número já validado como da empresa).
+// Nenhum DANFE é buscado só pela chave: a chave só abre se estiver em notasDoPedidoCliente(número já validado como da empresa, razão social da posse).
 const rateLimit = require('express-rate-limit');
 const { numeroValido } = require('../calculo/portal_pedidos');
 const { lerChave } = require('../calculo/danfe');
@@ -78,17 +78,21 @@ function registrarPortalDocumentos({ portal, pool, pdf = require('../pdf/ped_orc
     handler: (req, res) => res.status(429).set('Retry-After', String(Math.ceil(limite.janelaMs / 1000))).json(MSG_LIMITE)
   });
 
+  // o Express atende HEAD pelos handlers de get: sem isto um HEAD geraria o PDF, gastaria o limite e auditaria sem entregar nada
+  const recusarHead = (req, res, next) => (req.method === 'HEAD' ? res.status(405).set('Allow', 'GET').end() : next());
+
   portal('get', '/portal/api/pedidos/:numero/documentos', ['documentos.ver'], async (req, res) => {
     try {
       const numero = numeroValido(req.params.numero);
       if (numero === null) return naoEncontrado(res);
-      if (!await posse(req.portal.empresaCodigo, numero)) return naoEncontrado(res);
-      const { notas } = await ligacao.notasDoPedido(numero);
+      const dono = await posse(req.portal.empresaCodigo, numero);
+      if (!dono) return naoEncontrado(res);
+      const notas = await ligacao.notasDoPedidoCliente(numero, dono.RAZAO_SOCIAL);
       res.json({ pdfPedido: true, notas: notas.map(n => ({ chave: n.chave, numeroNf: n.numeroNf, serie: n.serie })) });
     } catch (err) { falhaInterna(res, 'GET /portal/api/pedidos/:numero/documentos', err); }
   });
 
-  portal('get', '/portal/api/pedidos/:numero/pdf', ['documentos.ver'], limitar, async (req, res) => {
+  portal('get', '/portal/api/pedidos/:numero/pdf', ['documentos.ver'], recusarHead, limitar, async (req, res) => {
     try {
       const numero = numeroValido(req.params.numero);
       if (numero === null) return naoEncontrado(res);
@@ -113,20 +117,21 @@ function registrarPortalDocumentos({ portal, pool, pdf = require('../pdf/ped_orc
     } catch (err) { falhaInterna(res, 'GET /portal/api/pedidos/:numero/pdf', err); }
   });
 
-  portal('get', '/portal/api/pedidos/:numero/danfe/:chave', ['documentos.ver'], limitar, async (req, res) => {
+  portal('get', '/portal/api/pedidos/:numero/danfe/:chave', ['documentos.ver'], recusarHead, limitar, async (req, res) => {
     try {
       const numero = numeroValido(req.params.numero);
       if (numero === null) return naoEncontrado(res);
       const c = lerChave(req.params.chave);
       if (!c.valida) return naoEncontrado(res);
       const empresa = req.portal.empresaCodigo;
-      if (!await posse(empresa, numero)) return naoEncontrado(res);
-      // a chave só abre se estiver entre as notas ligadas a ESTE pedido (que acabou de ser provado como da empresa)
-      const { notas } = await ligacao.notasDoPedido(numero);
+      const dono = await posse(empresa, numero);
+      if (!dono) return naoEncontrado(res);
+      // a chave só abre se estiver entre as notas ligadas a ESTE pedido (provado como da empresa), pela MESMA regra da lista
+      const notas = await ligacao.notasDoPedidoCliente(numero, dono.RAZAO_SOCIAL);
       if (!notas.some(n => n.chave === c.chave)) return naoEncontrado(res);
       const [achadas] = await pool.execute('SELECT numero_nf, pdf FROM web_danfe WHERE chave = ?', [c.chave]);
       if (!achadas.length || !Buffer.isBuffer(achadas[0].pdf)) return naoEncontrado(res);
-      const numeroNf = String(achadas[0].numero_nf).replace(/\D/g, '');
+      const numeroNf = String(achadas[0].numero_nf).replace(/\D/g, '') || 'nota';
       await auditarPortal(pool, {
         evento: 'documento_aberto', usuarioId: req.portal.usuarioId, clienteCodigo: empresa,
         ip: req.ip, detalhe: `tipo=danfe;pedido=${numero};nf=${numeroNf}`

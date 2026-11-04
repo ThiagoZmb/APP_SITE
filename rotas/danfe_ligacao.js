@@ -62,7 +62,43 @@ function criarLigacaoDanfe({ pool }) {
     return { notas, semArquivo: fin.numeros.filter(n => !cobertos.has(n)) };
   }
 
-  return { cnpjEmpresa, notasDoFinanceiro, pedidosDaNota, notasDoPedido };
+  // CAMINHO DO PORTAL (o DANFE tem preços e dados do destinatário, e web_danfe não guarda destinatário): a ligação pelo
+  // financeiro é mais estreita que a do ERP. Só entra o número de NF que (a) consta em lançamento de ENTRADA do próprio cliente,
+  // (b) casa com um único DANFE (séries repetidas = ambíguo, descartado) e (c) não é citado por entrada de OUTRA razão social.
+  // Na dúvida a nota some da lista do cliente; nunca vaza. O vínculo manual (feito pela equipe) é mantido.
+  async function notasDoPedidoCliente(numero, razaoSocial) {
+    const [manuais] = await pool.execute(
+      `SELECT d.chave, d.numero_nf, d.serie, d.enviado_em FROM web_danfe_vinculos v JOIN web_danfe d ON d.chave = v.chave WHERE v.pedido_numero = ? ORDER BY v.id`, [numero]);
+    const saida = [];
+    const juntar = r => { if (!saida.some(n => n.chave === r.chave)) saida.push({ chave: r.chave, numeroNf: Number(r.numero_nf), serie: Number(r.serie) }); };
+    manuais.forEach(juntar);
+
+    const razao = String(razaoSocial ?? '');
+    const empresa = await cnpjEmpresa(pool);
+    if (!razao || !empresa) return saida;
+    const [fluxo] = await pool.execute(
+      "SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE TRIM(PEDIDO) = ? AND RAZAO_SOCIAL = ? AND COALESCE(RAZAO_FABRICANTE, '') = '' AND NOTA_FISCAL IS NOT NULL AND NOTA_FISCAL <> ''",
+      [String(numero), razao]);
+    const numeros = [];
+    for (const f of fluxo) for (const n of numerosDeNotaFiscal(f.NOTA_FISCAL)) if (!numeros.includes(n)) numeros.push(n);
+    if (!numeros.length) return saida;
+    const [achadas] = await pool.execute(
+      `SELECT chave, numero_nf, serie, enviado_em FROM web_danfe WHERE modelo = ? AND cnpj_emitente = ? AND numero_nf IN (${marcas(numeros.length)}) ORDER BY numero_nf, id`,
+      [MODELO_NFE, empresa, ...numeros]);
+    for (const n of numeros) {
+      const doNumero = achadas.filter(a => Number(a.numero_nf) === n);
+      if (doNumero.length !== 1) continue; // sem arquivo ou série repetida (ambíguo)
+      const [alheios] = await pool.execute(
+        "SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE ? AND COALESCE(RAZAO_SOCIAL, '') <> ? AND COALESCE(RAZAO_FABRICANTE, '') = '' LIMIT 500",
+        [like(n), razao]);
+      // 500 linhas = não dá para provar que ninguém mais cita o número: descarta
+      if (alheios.length >= 500 || alheios.some(a => numerosDeNotaFiscal(a.NOTA_FISCAL).includes(n))) continue;
+      juntar(doNumero[0]);
+    }
+    return saida;
+  }
+
+  return { cnpjEmpresa, notasDoFinanceiro, pedidosDaNota, notasDoPedido, notasDoPedidoCliente };
 }
 
 module.exports = { criarLigacaoDanfe, MODELO_NFE };

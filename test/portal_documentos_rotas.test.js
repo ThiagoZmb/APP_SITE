@@ -15,6 +15,8 @@ const { cabecalhosPortal } = require('../portal/cabecalhos');
 const { criarRegistro } = require('../seguranca/rotas');
 const pdfReal = require('../pdf/ped_orc');
 const { registrarPortalDocumentos } = require('../rotas/portal_documentos');
+const { carimboItens } = require('../calculo/leitura_vb');
+const { pngSolido, pngComIdatCorrompido } = require('./apoio/png');
 
 const EMPRESA_CNPJ = '08951388000118';
 const chaveA = chaveCom({ numero: 11290 });   // ligada manualmente ao pedido 12 (ACME)
@@ -32,10 +34,15 @@ const pedido = (NUMERO, TIPO, RAZAO_SOCIAL) => ({
   OBS_GERAL: S.OBS, SUB_TOTAL: S.SUB_TOTAL, TOTAL: S.TOTAL, DESCONTO: S.DESCONTO
 });
 
-function dadosPadrao() {
+function dadosPadrao(desenhoPng = Buffer.from('isto nao e um png')) {
   const base = { NUMERO: 12, TIPO: 'Pedido' };
+  const itens = [{ ...base, ITEM: '1', QTD: 2, TIPO_PRODUTO: 'Porta de giro', DESCRICAO: 'Porta social', OBSERVACAO: '', UNITARIO: S.UNITARIO, TOTAL: S.TOTAL, VALOR_TOTAL: S.VALOR_TOTAL }];
+  const v4 = [{ ...base, ITEM: '1', ITEM_PEDIDO: '1', VALOR_TOTAL: S.VALOR_TOTAL, VALOR: S.VALOR }];
+  const furos = [];
+  // carimbo correto: o desenho só é descartado por validarPng, nunca pelo carimbo
+  const carimbo = carimboItens({ lista: itens, itensV4: v4, furacao: furos });
   return {
-    pedidos: [pedido(12, 'Pedido', 'ACME LTDA'), pedido(13, 'Pedido', 'ACME LTDA'), pedido(99, 'Pedido', 'BETA LTDA'), pedido(15, 'Orçamento', 'ACME LTDA')],
+    pedidos: [pedido(12, 'Pedido', 'ACME LTDA'), pedido(13, 'Pedido', 'ACME LTDA'), pedido(14, 'Pedido', 'ACME LTDA'), pedido(99, 'Pedido', 'BETA LTDA'), pedido(15, 'Orçamento', 'ACME LTDA')],
     danfe: [
       { chave: chaveA, numero_nf: 11290, serie: 1, modelo: '55', cnpj_emitente: EMPRESA_CNPJ, enviado_em: '2026-10-20 10:00:00', pdf: pdfA },
       { chave: chaveF, numero_nf: 22222, serie: 1, modelo: '55', cnpj_emitente: EMPRESA_CNPJ, enviado_em: '2026-10-21 10:00:00', pdf: pdfF },
@@ -43,22 +50,23 @@ function dadosPadrao() {
       { chave: chaveSolta, numero_nf: 44444, serie: 1, modelo: '55', cnpj_emitente: EMPRESA_CNPJ, enviado_em: '2026-10-23 10:00:00', pdf: pdfBytes('SOLTA') }
     ],
     vinculos: [{ id: 1, chave: chaveA, pedido_numero: 12 }, { id: 2, chave: chaveB, pedido_numero: 99 }],
-    fluxo: [{ PEDIDO: '13', NOTA_FISCAL: '22222' }],
+    fluxo: [{ PEDIDO: '13', NOTA_FISCAL: '22222', RAZAO_SOCIAL: 'ACME LTDA', RAZAO_FABRICANTE: '' }],
     corpo: {
-      itens: [{ ...base, ITEM: '1', QTD: 2, TIPO_PRODUTO: 'Porta de giro', DESCRICAO: 'Porta social', OBSERVACAO: '', UNITARIO: S.UNITARIO, TOTAL: S.TOTAL, VALOR_TOTAL: S.VALOR_TOTAL }],
-      v4: [{ ...base, ITEM: '1', ITEM_PEDIDO: '1', VALOR_TOTAL: S.VALOR_TOTAL, VALOR: S.VALOR }],
+      itens, v4,
       serr: [],
       comps: [{ ...base, ITEM_PEDIDO: '1', VALOR: S.VALOR, VALOR_TOTAL: S.VALOR_TOTAL }],
       compSerr: [{ ...base, ITEM_PEDIDO: '1', VALOR: S.VALOR, VALOR_UNITARIO: S.UNITARIO }],
-      furos: [],
-      desenhos: [{ tipo: 'Pedido', numero: 12, item: 1, png: Buffer.from('isto nao e um png'), carimbo: 'qualquer' }]
+      furos,
+      desenhos: [{ tipo: 'Pedido', numero: 12, item: 1, png: desenhoPng, carimbo }]
     }
   };
 }
 
 // Usuários: 1 Ana (admin_geral, ACME), 2 Caio ('usuario' de ACME só com pedidos.ver), 3 Bia (admin_geral, BETA),
 // 4 Dora ('usuario' de ACME com documentos.ver).
-async function montar(t, { mutar = false, quebrarBanco = false, quebrarAuditoria = false, limite, gerador } = {}) {
+// ajustar(dados): acrescenta/ajusta dados antes de montar o pool. mutarFluxo: 'b' tira "RAZAO_SOCIAL = ?" do SQL do financeiro do pedido,
+// 'd' desliga a consulta de entradas de outra razão social, 'ambos' faz as duas coisas.
+async function montar(t, { mutar = false, mutarFluxo = null, quebrarBanco = false, quebrarAuditoria = false, limite, gerador, ajustar, desenhoPng } = {}) {
   const banco = criarBancoPortal();
   const d = banco.dados;
   d.clientes.push({ CODIGO: 40, RAZAO_SOCIAL: 'ACME LTDA' }, { CODIGO: 41, RAZAO_SOCIAL: 'BETA LTDA' });
@@ -68,9 +76,21 @@ async function montar(t, { mutar = false, quebrarBanco = false, quebrarAuditoria
     u(3, 'bia@beta.com', 41, 'admin_geral'), u(4, 'dora@acme.com', 40, 'usuario'));
   d.permissoes.push({ usuario_id: 2, permissao: 'pedidos.ver' }, { usuario_id: 4, permissao: 'documentos.ver' });
 
-  const dados = dadosPadrao();
+  const dados = dadosPadrao(desenhoPng);
+  if (ajustar) ajustar(dados);
   const pool = criarPoolDocumentos({ ...dados, clientes: d.clientes });
   let poolUsado = pool;
+  if (mutarFluxo) {
+    const tiraB = mutarFluxo === 'b' || mutarFluxo === 'ambos';
+    const tiraD = mutarFluxo === 'd' || mutarFluxo === 'ambos';
+    poolUsado = { execute: (sql, params) => {
+      if (tiraB && sql.includes('TRIM(PEDIDO) = ? AND RAZAO_SOCIAL = ?')) {
+        return pool.execute(sql.replace(' AND RAZAO_SOCIAL = ?', ''), [params[0], ...params.slice(2)]);
+      }
+      if (tiraD && sql.includes('FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE ?')) return Promise.resolve([[], []]);
+      return pool.execute(sql, params);
+    } };
+  }
   // mutação fiel: tira a condição de empresa do SQL e o seu parâmetro (o MySQL real recusaria a sobra)
   if (mutar) poolUsado = { execute: (sql, params) => (sql.includes('c.CODIGO = ?')
     ? pool.execute(sql.replace('c.CODIGO = ?', '1 = 1'), params.slice(1)) : pool.execute(sql, params)) };
@@ -86,7 +106,7 @@ async function montar(t, { mutar = false, quebrarBanco = false, quebrarAuditoria
   const pdf = {
     ...pdfReal,
     desenharPedOrc: (doc, dd, op) => {
-      espiadas.push({ dados: JSON.parse(JSON.stringify({ ...dd, desenhos: undefined })), op });
+      espiadas.push({ dados: JSON.parse(JSON.stringify({ ...dd, desenhos: undefined })), op, chavesDesenhos: Object.keys(dd.desenhos || {}) });
       if (gerador) return gerador(doc, dd, op);
       return pdfReal.desenharPedOrc(doc, dd, op);
     }
@@ -104,7 +124,8 @@ async function montar(t, { mutar = false, quebrarBanco = false, quebrarAuditoria
   t.after(s.fechar);
   const cookieDe = async usuarioId => `__Host-portal=${await sessoes.criar(usuarioId, '1.2.3.4')}`;
   const get = (caminho, { cookie, headers = {} } = {}) => fetch(s.url + caminho, { headers: { ...(cookie ? { Cookie: cookie } : {}), ...headers } });
-  return { banco, d, registro, pool, get, cookieDe, espiadas };
+  const head = (caminho, { cookie } = {}) => fetch(s.url + caminho, { method: 'HEAD', headers: cookie ? { Cookie: cookie } : {} });
+  return { banco, d, registro, pool, get, head, cookieDe, espiadas };
 }
 
 const consultaPdfNota = pool => pool.chamadas.filter(c => /^SELECT numero_nf, pdf FROM web_danfe/.test(c.sql));
@@ -346,12 +367,123 @@ test('erros: gerador que lança e banco que lança dão 500 genérico, sem vazar
   assert.ok(!logs.some(l => /SEGREDO|ACME|NOTA INTERNA/.test(l)));
 });
 
-test('desenho corrompido não derruba: o PDF sai sem a imagem', async t => {
-  const c = await montar(t);
+test('desenho corrompido (carimbo correto, IDAT ruim) não derruba: o PDF sai e o gerador não recebe imagem', async t => {
+  const c = await montar(t, { desenhoPng: pngComIdatCorrompido(100, 200, 6) });
   const r = await c.get('/portal/api/pedidos/12/pdf', { cookie: await c.cookieDe(1) });
   assert.equal(r.status, 200);
   assert.equal(Buffer.from(await r.arrayBuffer()).subarray(0, 5).toString('latin1'), '%PDF-');
+  assert.equal(c.espiadas.length, 1);
+  assert.deepEqual(c.espiadas[0].chavesDesenhos, []);
   assert.equal((await c.get('/portal/api/pedidos/12/documentos', { cookie: await c.cookieDe(1) })).status, 200);
+});
+
+test('controle do desenho: com PNG válido e o mesmo carimbo o gerador recebe o item 1 (prova que o carimbo do teste bate)', async t => {
+  const c = await montar(t, { desenhoPng: pngSolido(100, 200, 128, 6) });
+  const r = await c.get('/portal/api/pedidos/12/pdf', { cookie: await c.cookieDe(1) });
+  assert.equal(r.status, 200);
+  assert.deepEqual(c.espiadas[0].chavesDesenhos, ['1']);
+});
+
+test('/documentos: pedido de ACME sem nenhuma nota devolve 200 { pdfPedido: true, notas: [] }', async t => {
+  const c = await montar(t);
+  const r = await c.get('/portal/api/pedidos/14/documentos', { cookie: await c.cookieDe(1) });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { pdfPedido: true, notas: [] });
+});
+
+const chaveC = chaveCom({ numero: 55555 });
+const chaveD = chaveCom({ numero: 66666 });
+const chaveE = chaveCom({ numero: 77777, serie: 1 });
+const chaveE2 = chaveCom({ numero: 77777, serie: 2 });
+const chaveG = chaveCom({ numero: 88888 });
+const nota = (chave, numero_nf, serie = 1) => ({ chave, numero_nf, serie, modelo: '55', cnpj_emitente: EMPRESA_CNPJ, enviado_em: '2026-10-24 10:00:00', pdf: pdfBytes('N' + numero_nf) });
+const lanc = (PEDIDO, NOTA_FISCAL, RAZAO_SOCIAL, RAZAO_FABRICANTE = '') => ({ PEDIDO, NOTA_FISCAL, RAZAO_SOCIAL, RAZAO_FABRICANTE });
+const chavesDe = async (c, cookie, numero = 12) => (await (await c.get(`/portal/api/pedidos/${numero}/documentos`, { cookie })).json()).notas.map(n => n.chave);
+
+// BETA tem lançamento de entrada com PEDIDO '12' (o número do pedido de ACME) citando a nota chaveB; ACME tem o seu próprio (chaveC)
+const vazamento = d => {
+  d.danfe.push(nota(chaveC, 55555));
+  d.fluxo.push(lanc('12', '33333', 'BETA LTDA'), lanc('12', '55555', 'ACME LTDA'));
+};
+
+test('financeiro no portal: lançamento de OUTRA razão social com o mesmo PEDIDO não liga a nota; o de ACME liga (controle)', async t => {
+  const c = await montar(t, { ajustar: vazamento });
+  const cookie = await c.cookieDe(1);
+  const chaves = await chavesDe(c, cookie);
+  assert.ok(chaves.length > 0);
+  assert.deepEqual(chaves.sort(), [chaveA, chaveC].sort());
+  assert.ok(!chaves.includes(chaveB));
+  const rb = await c.get(`/portal/api/pedidos/12/danfe/${chaveB}`, { cookie });
+  assert.equal(rb.status, 404);
+  assert.deepEqual(await rb.json(), { error: 'Documento não encontrado.' });
+  assert.equal(consultaPdfNota(c.pool).length, 0);
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveC}`, { cookie })).status, 200); // controle
+});
+
+test('financeiro no portal: lançamento de saída (RAZAO_FABRICANTE preenchido) é ignorado', async t => {
+  const c = await montar(t, { ajustar: d => { d.danfe.push(nota(chaveD, 66666)); d.fluxo.push(lanc('12', '66666', 'ACME LTDA', 'Fornecedor X')); } });
+  const chaves = await chavesDe(c, await c.cookieDe(1));
+  assert.deepEqual(chaves, [chaveA]);
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveD}`, { cookie: await c.cookieDe(1) })).status, 404);
+});
+
+test('financeiro no portal: duas séries com o mesmo número somem pelo financeiro, mas o vínculo manual de uma continua aparecendo', async t => {
+  const c = await montar(t, { ajustar: d => { d.danfe.push(nota(chaveE, 77777, 1), nota(chaveE2, 77777, 2)); d.fluxo.push(lanc('12', '77777', 'ACME LTDA')); } });
+  const cookie = await c.cookieDe(1);
+  assert.deepEqual(await chavesDe(c, cookie), [chaveA]); // nenhuma das duas séries
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveE}`, { cookie })).status, 404);
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveE2}`, { cookie })).status, 404);
+  const m = await montar(t, { ajustar: d => {
+    d.danfe.push(nota(chaveE, 77777, 1), nota(chaveE2, 77777, 2)); d.fluxo.push(lanc('12', '77777', 'ACME LTDA'));
+    d.vinculos.push({ id: 3, chave: chaveE, pedido_numero: 12 });
+  } });
+  const cookieM = await m.cookieDe(1);
+  assert.deepEqual((await chavesDe(m, cookieM)).sort(), [chaveA, chaveE].sort());
+  assert.equal((await m.get(`/portal/api/pedidos/12/danfe/${chaveE}`, { cookie: cookieM })).status, 200);
+  assert.equal((await m.get(`/portal/api/pedidos/12/danfe/${chaveE2}`, { cookie: cookieM })).status, 404);
+});
+
+test('financeiro no portal: número citado por entrada de OUTRA razão social é descartado, mesmo com o lançamento próprio', async t => {
+  const c = await montar(t, { ajustar: d => { d.danfe.push(nota(chaveG, 88888)); d.fluxo.push(lanc('12', '88888', 'ACME LTDA'), lanc('99', '88888/1', 'BETA LTDA')); } });
+  const cookie = await c.cookieDe(1);
+  assert.deepEqual(await chavesDe(c, cookie), [chaveA]);
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveG}`, { cookie })).status, 404);
+  // sem o lançamento da outra razão social, a mesma nota aparece (controle)
+  const ok = await montar(t, { ajustar: d => { d.danfe.push(nota(chaveG, 88888)); d.fluxo.push(lanc('12', '88888', 'ACME LTDA')); } });
+  assert.deepEqual((await chavesDe(ok, await ok.cookieDe(1))).sort(), [chaveA, chaveG].sort());
+});
+
+test('prova de mutação do financeiro: sem "RAZAO_SOCIAL = ?" e sem a checagem de outra razão social o vazamento APARECE', async t => {
+  const bom = await montar(t, { ajustar: vazamento });
+  assert.ok(!(await chavesDe(bom, await bom.cookieDe(1))).includes(chaveB));
+  const ruim = await montar(t, { ajustar: vazamento, mutarFluxo: 'ambos' });
+  const chaves = await chavesDe(ruim, await ruim.cookieDe(1));
+  assert.ok(chaves.includes(chaveB), 'a mutação deveria deixar a nota de BETA aparecer');
+  assert.equal((await ruim.get(`/portal/api/pedidos/12/danfe/${chaveB}`, { cookie: await ruim.cookieDe(1) })).status, 200);
+  // cada trava sozinha já segura o vazamento (defesa em profundidade)
+  for (const so of ['b', 'd']) {
+    const m = await montar(t, { ajustar: vazamento, mutarFluxo: so });
+    assert.ok(!(await chavesDe(m, await m.cookieDe(1))).includes(chaveB), `trava ${so} sozinha`);
+  }
+});
+
+test('HEAD nas rotas de arquivo: 405 com Allow GET, sem auditoria, sem ler a nota, sem gerar PDF e sem consumir o limite', async t => {
+  const c = await montar(t, { limite: { janelaMs: 60000, max: 2 } });
+  const cookie = await c.cookieDe(1);
+  for (let i = 0; i < 5; i++) {
+    for (const caminho of ['/portal/api/pedidos/12/pdf', `/portal/api/pedidos/12/danfe/${chaveA}`]) {
+      const r = await c.head(caminho, { cookie });
+      assert.equal(r.status, 405, caminho);
+      assert.equal(r.headers.get('allow'), 'GET');
+    }
+  }
+  assert.equal(c.pool.auditoria.length, 0);
+  assert.equal(consultaPdfNota(c.pool).length, 0);
+  assert.equal(c.espiadas.length, 0);
+  // o limite (2) continua inteiro: 2 GET passam e o 3º é barrado
+  assert.equal((await c.get(`/portal/api/pedidos/12/danfe/${chaveA}`, { cookie })).status, 200);
+  assert.equal((await c.get('/portal/api/pedidos/12/pdf', { cookie })).status, 200);
+  assert.equal((await c.get('/portal/api/pedidos/12/pdf', { cookie })).status, 429);
 });
 
 test('registro: as 3 rotas estão em rotasPortal e verificar() não lança', async t => {

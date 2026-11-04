@@ -61,6 +61,12 @@ function bancoDanfe() {
       const nums = params.slice(0, n).map(Number), estados = params.slice(n);
       return pedidos.filter(p => p.TIPO === 'Pedido' && nums.includes(p.NUMERO) && clientes.some(c => c.RAZAO_SOCIAL === p.RAZAO_SOCIAL && estados.includes(c.ESTADO))).map(p => ({ NUMERO: p.NUMERO }));
     }],
+    // caminho do portal (notasDoPedidoCliente): entradas do próprio cliente, e entradas de outra razão social que citam o número;
+    // os filtros só valem se estiverem no TEXTO do SQL
+    [/^SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE TRIM\(PEDIDO\) = \? AND RAZAO_SOCIAL = \?/, (sql, [p, razao]) => fluxo.filter(f => String(f.PEDIDO).trim() === String(p)
+      && f.RAZAO_SOCIAL === razao && !(f.RAZAO_FABRICANTE || '') && f.NOTA_FISCAL).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL }))],
+    [/^SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE \?/, (sql, [l, razao]) => fluxo.filter(f => sqlLike(l, f.NOTA_FISCAL)
+      && (f.RAZAO_SOCIAL || '') !== razao && !(f.RAZAO_FABRICANTE || '')).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL }))],
     [/^SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE TRIM\(PEDIDO\) = \?/, (sql, [p]) => fluxo.filter(f => String(f.PEDIDO).trim() === String(p) && f.NOTA_FISCAL).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL }))],
     [/^SELECT PEDIDO, NOTA_FISCAL FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE \?/, (sql, [l]) => fluxo.filter(f => f.PEDIDO && sqlLike(l, f.NOTA_FISCAL)).map(f => ({ PEDIDO: f.PEDIDO, NOTA_FISCAL: f.NOTA_FISCAL }))],
     [/^SELECT chave, numero_nf, serie, enviado_em FROM web_danfe WHERE modelo = \? AND cnpj_emitente = \?/, (sql, [modelo, cnpj, ...numeros]) =>

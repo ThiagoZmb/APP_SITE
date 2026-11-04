@@ -6,7 +6,7 @@
 // pedidos:  { NUMERO, TIPO, RAZAO_SOCIAL, CLIENTE_FINAL, DATA, DATA_PRONTO, OBS_GERAL, SUB_TOTAL, TOTAL, DESCONTO }
 // clientes: { CODIGO, RAZAO_SOCIAL }
 // danfe:    { chave, numero_nf, serie, modelo, cnpj_emitente, enviado_em, pdf }
-// vinculos: { id, chave, pedido_numero }      fluxo: { PEDIDO, NOTA_FISCAL }
+// vinculos: { id, chave, pedido_numero }      fluxo: { PEDIDO, NOTA_FISCAL, RAZAO_SOCIAL, RAZAO_FABRICANTE } (fabricante preenchido = saída)
 // corpo: { itens, v4, serr, comps, compSerr, furos } = linhas por tabela (todas com NUMERO e TIPO)
 function criarPoolDocumentos({ pedidos = [], clientes = [], danfe = [], vinculos = [], fluxo = [], corpo = {} } = {}) {
   const chamadas = [];
@@ -67,8 +67,24 @@ function criarPoolDocumentos({ pedidos = [], clientes = [], danfe = [], vinculos
       const melhor = Object.entries(cont).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];
       return [melhor ? [{ cnpj_emitente: melhor[0], qtd: melhor[1] }] : [], []];
     }
+    // financeiro do pedido: os filtros de cliente e de entrada só valem se estiverem NO TEXTO do SQL (prova de mutação)
     if (/FROM fluxo_de_caixa WHERE TRIM\(PEDIDO\) = \?/.test(sql)) {
-      return [fluxo.filter(f => String(f.PEDIDO).trim() === params[0] && f.NOTA_FISCAL).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL })), []];
+      let i = 1;
+      const filtraRazao = /RAZAO_SOCIAL = \?/.test(sql);
+      const razao = filtraRazao ? params[i++] : null;
+      const soEntradas = /COALESCE\(RAZAO_FABRICANTE, ''\) = ''/.test(sql);
+      return [fluxo.filter(f => String(f.PEDIDO).trim() === params[0] && f.NOTA_FISCAL
+        && (!filtraRazao || f.RAZAO_SOCIAL === razao)
+        && (!soEntradas || !(f.RAZAO_FABRICANTE || ''))).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL })), []];
+    }
+    // lançamentos de OUTRA razão social que citam o número (LIKE já escapado pelo código)
+    if (/FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE \?/.test(sql)) {
+      const trecho = String(params[0]).replace(/^%|%$/g, '').replace(/\\(.)/g, '$1');
+      const outraRazao = /RAZAO_SOCIAL, ''\) <> \?/.test(sql);
+      const soEntradas = /COALESCE\(RAZAO_FABRICANTE, ''\) = ''/.test(sql);
+      return [fluxo.filter(f => String(f.NOTA_FISCAL || '').includes(trecho)
+        && (!outraRazao || (f.RAZAO_SOCIAL || '') !== params[1])
+        && (!soEntradas || !(f.RAZAO_FABRICANTE || ''))).map(f => ({ NOTA_FISCAL: f.NOTA_FISCAL })), []];
     }
     if (/^SELECT chave, numero_nf, serie, enviado_em FROM web_danfe WHERE modelo = \?/.test(sql)) {
       const [modelo, cnpj, ...numeros] = params;
