@@ -6,6 +6,11 @@
 // Quem muda papel, situação ou remove trava PRIMEIRO todas as linhas de usuário da empresa (sempre na mesma ordem, por id) e só
 // então relê o alvo e as contagens: a trava do último administrador vale sob concorrência. Auditoria só com ids, depois do commit.
 // O link do convite só volta ao chamador quando o e-mail não foi enviado; nunca vai a log nem a auditoria.
+// INVARIANTE: as escritas em tabelas filhas (permissões, convites, sessões, recuperação) só acontecem DEPOIS do SELECT do alvo
+// com cliente_codigo e FOR UPDATE na mesma transação, e cliente_codigo nunca muda; por isso as filhas, que só têm usuario_id,
+// são da empresa da sessão. NÃO troque esse SELECT por JOIN. As escritas em web_portal_usuarios repetem o filtro de empresa e
+// conferem affectedRows (segunda barreira).
+// criado_por (VARCHAR(100)) guarda `portal:<usuarioId>`, nunca o e-mail do administrador (até 190 caracteres).
 const rateLimit = require('express-rate-limit');
 const { PERMISSOES_CONCEDIVEIS } = require('../portal/acesso');
 const { criarConvite, invalidarConvites, responderConviteJson } = require('../portal/convites');
@@ -85,6 +90,10 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
     handler: (req, res) => res.status(429).set('Retry-After', String(Math.ceil(limite.janelaMs / 1000))).json(MSG_LIMITE)
   });
 
+  const criadoPor = req => `portal:${req.portal.usuarioId}`;
+  // as rotas sem dados no corpo também só aceitam objeto JSON (ou corpo ausente = {}); vem antes de qualquer consulta ao id
+  const corpoInvalido = (req, res) => !objeto(req.body) && (res.status(400).json({ error: 'Requisição inválida.' }), true);
+
   portal('get', '/portal/api/usuarios', GERIR, async (req, res) => {
     try {
       const empresa = req.portal.empresaCodigo;
@@ -116,10 +125,10 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
       if (dup.length) throw new ErroUsuario(409, MSG_DUPLICADO);
       const [ins] = await conn.execute(
         "INSERT INTO web_portal_usuarios (email, cliente_codigo, papel, situacao, criado_em, criado_por) VALUES (?, ?, 'usuario', 'convidado', ?, ?)",
-        [para, empresa, new Date(), req.portal.email]);
+        [para, empresa, new Date(), criadoPor(req)]);
       const usuarioId = ins.insertId;
       for (const permissao of v.lista) await conn.execute('INSERT INTO web_portal_permissoes (usuario_id, permissao) VALUES (?, ?)', [usuarioId, permissao]);
-      const token = await criarConvite(conn, usuarioId, req.portal.email);
+      const token = await criarConvite(conn, usuarioId, criadoPor(req));
       return { usuarioId, token };
     });
     if (novo === undefined) return;
@@ -184,6 +193,7 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
   });
 
   portal('post', '/portal/api/usuarios/:id/desativar', GERIR, async (req, res) => {
+    if (corpoInvalido(req, res)) return;
     const id = inteiro(req.params.id);
     if (!id) return naoEncontrado(res);
     const empresa = req.portal.empresaCodigo;
@@ -192,9 +202,12 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
       const alvo = await usuarioDaEmpresa(conn, empresa, id, { travar: true });
       if (alvo.situacao === 'inativo') throw new ErroUsuario(409, 'O usuário já está desativado.');
       if (alvo.papel === 'admin_geral' && alvo.situacao === 'ativo' && await outrosAdministradores(conn, empresa, id) === 0) throw new ErroUsuario(409, MSG_ULTIMO);
-      await conn.execute("UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = ? AND cliente_codigo = ?", [id, empresa]);
+      const [up] = await conn.execute("UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = ? AND cliente_codigo = ?", [id, empresa]);
+      if (up.affectedRows !== 1) throw new ErroUsuario(404, NAO_ENCONTRADO.error); // segunda barreira: antes de tocar convites e sessões
       await invalidarConvites(conn, id);
-      await sessoes.revogarUsuario(id); // falha aqui desfaz tudo; o usuário inativo já não autentica de qualquer forma
+      // revogarUsuario usa o pool (OUTRA conexão): acontece durante a transação, não nela. Se algo falhar depois e houver rollback,
+      // o usuário continua ativo mas sem sessões (precisa entrar de novo): revogar antes do rollback é o lado seguro.
+      await sessoes.revogarUsuario(id);
       return true;
     });
     if (!ok) return;
@@ -203,15 +216,17 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
   });
 
   portal('post', '/portal/api/usuarios/:id/reenviar_convite', GERIR, limitar, async (req, res) => {
+    if (corpoInvalido(req, res)) return;
     const id = inteiro(req.params.id);
     if (!id) return naoEncontrado(res);
     const empresa = req.portal.empresaCodigo;
     let alvo;
     const token = await emTransacao(res, 'POST /portal/api/usuarios/:id/reenviar_convite', async conn => {
+      await travarAdministradores(conn, empresa); // mesma ordem de travas das demais rotas que mudam usuário
       alvo = await usuarioDaEmpresa(conn, empresa, id, { travar: true });
       if (alvo.situacao !== 'convidado') throw new ErroUsuario(409, 'Só é possível reenviar o convite de quem ainda não criou o acesso.');
       await invalidarConvites(conn, id);
-      return criarConvite(conn, id, req.portal.email);
+      return criarConvite(conn, id, criadoPor(req));
     });
     if (token === undefined) return;
     await auditar(req, 'convite_reenviado', `usuario=${id}`);
@@ -221,6 +236,7 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
 
   // Remover: só convidado que NUNCA aceitou o convite (e-mail digitado errado); quem já aceitou algum dia só se desativa.
   portal('post', '/portal/api/usuarios/:id/remover', GERIR, async (req, res) => {
+    if (corpoInvalido(req, res)) return;
     const id = inteiro(req.params.id);
     if (!id) return naoEncontrado(res);
     const empresa = req.portal.empresaCodigo;
@@ -229,12 +245,13 @@ function registrarPortalUsuarios({ portal, pool, sessoes, email, config, limite 
       await travarAdministradores(conn, empresa);
       const alvo = await usuarioDaEmpresa(conn, empresa, id, { travar: true });
       if (alvo.situacao !== 'convidado' || alvo.termo_aceito_em) throw new ErroUsuario(409, MSG_SO_CONVIDADO);
+      // primeiro o usuário (com o filtro de empresa e a conferência de affectedRows); só então as filhas
+      const [del] = await conn.execute("DELETE FROM web_portal_usuarios WHERE id = ? AND situacao = 'convidado' AND cliente_codigo = ?", [id, empresa]);
+      if (del.affectedRows !== 1) throw new ErroUsuario(409, MSG_SO_CONVIDADO);
       await conn.execute('DELETE FROM web_portal_sessoes WHERE usuario_id = ?', [id]);
       await conn.execute('DELETE FROM web_portal_recuperacao WHERE usuario_id = ?', [id]);
       await conn.execute('DELETE FROM web_portal_permissoes WHERE usuario_id = ?', [id]);
       await conn.execute('DELETE FROM web_portal_convites WHERE usuario_id = ?', [id]);
-      const [del] = await conn.execute("DELETE FROM web_portal_usuarios WHERE id = ? AND situacao = 'convidado' AND cliente_codigo = ?", [id, empresa]);
-      if (del.affectedRows !== 1) throw new ErroUsuario(409, MSG_SO_CONVIDADO);
       return true;
     });
     if (!ok) return;

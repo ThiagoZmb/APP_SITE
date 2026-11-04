@@ -92,6 +92,16 @@ test('portal.js: chamar aceita o método (PUT) e mantém POST por padrão e GET 
   assert.equal(pedidos[2].o.headers['X-Portal'], '1');
 });
 
+test('portal.js: só PUT é método alternativo; qualquer outro valor vira POST', async () => {
+  const pedidos = [];
+  const janela = {};
+  const fetchFalso = async (c, o) => { pedidos.push({ c, o }); return { status: 200, json: async () => ({}), headers: { get: () => null } }; };
+  vm.runInNewContext(ler('portal.js'), { window: janela, fetch: fetchFalso });
+  for (const m of ['DELETE', 'PATCH', 'GET', 'put', 'TRACE', '', null, 7, {}]) await janela.PortalApi.chamar('/x', { a: 1 }, m);
+  await janela.PortalApi.chamar('/x', { a: 1 }, 'PUT');
+  assert.deepEqual(pedidos.map(p => p.o.method), ['POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'PUT']);
+});
+
 // ---- DOM falso -------------------------------------------------------------------------------------------------
 function elemento(tag) {
   return {
@@ -334,6 +344,72 @@ test('erro do servidor (409/404) é mostrado e a lista não é recarregada', asy
     assert.equal(r.chamadas.length, antes + 1, 'só a ação, sem recarregar');
     assert.equal(r.botao('desativar', 2).atributos['data-usuario'], '2', 'lista mantida');
   }
+});
+
+test('durante a ação os botões ficam desabilitados (sem clique duplo) e voltam ao fim, com sucesso ou erro', async () => {
+  for (const resposta of [{ status: 200, dados: { ok: true } }, { status: 409, dados: { error: 'Não.' } }]) {
+    let liberar;
+    const r = rodar({ usuarios: [ADMIN, OUTRO_ADMIN, COMUM, CONVIDADO], acao: () => new Promise(res => { liberar = () => res(resposta); }) });
+    await esperar();
+    const botoes = () => todos(r.get('lista')).filter(n => n.atributos['data-acao']);
+    const antigos = botoes();
+    assert.ok(antigos.length > 5 && antigos.every(b => b.disabled === false));
+    const clique = r.botao('desativar', 2).ouvintes.click();
+    await esperar();
+    assert.ok(antigos.every(b => b.disabled === true), 'todos os botões desabilitados durante a chamada');
+    const nAntes = r.chamadas.length;
+    await r.botao('remover', 3).ouvintes.click(); // clique duplo/outro botão durante a chamada: ignorado
+    assert.equal(r.chamadas.length, nAntes, 'nenhuma segunda chamada');
+    assert.equal(r.confirmacoes.length, 1, 'nem o confirm se repete');
+    liberar();
+    await clique;
+    if (resposta.status !== 200) assert.ok(antigos.every(b => b.disabled === false), 'erro: reabilitados');
+    else assert.ok(botoes().every(b => b.disabled === false), 'sucesso: lista nova, botões habilitados');
+  }
+});
+
+test('o botão Convidar também fica desabilitado durante a chamada e volta ao fim', async () => {
+  let liberar;
+  const r = rodar({ acao: () => new Promise(res => { liberar = () => res({ status: 400, dados: { error: 'E-mail inválido.' } }); }) });
+  await esperar();
+  r.get('convite-email').value = 'x@y.com';
+  const clique = r.get('convidar').ouvintes.click();
+  await esperar();
+  assert.equal(r.get('convidar').disabled, true);
+  liberar();
+  await clique;
+  assert.equal(r.get('convidar').disabled, false);
+});
+
+test('se a recarga da lista responder 403 (perdeu a gestão), esconde o painel e mostra o aviso', async () => {
+  let recargas = 0;
+  const el = {};
+  const get = id => (el[id] = el[id] || elemento('#' + id));
+  get('aviso').hidden = true;
+  get('painel').hidden = true;
+  const janela = { location: { replace() {} }, confirm: () => true,
+    PortalApi: { chamar: async (caminho, corpo) => {
+      if (caminho === '/portal/api/eu') return { status: 200, dados: { usuario: { email: 'a@b.c', permissoes: ['usuarios.gerir'] } } };
+      if (caminho === '/portal/api/usuarios' && corpo === undefined) {
+        recargas++;
+        return recargas === 1 ? { status: 200, dados: { usuarios: [ADMIN, OUTRO_ADMIN] } } : { status: 403, dados: { error: 'Sem permissão.' } };
+      }
+      return { status: 200, dados: { ok: true } };
+    } } };
+  vm.runInNewContext(ler('usuarios.js'), { window: janela, document: { getElementById: get, createElement: elemento } });
+  await esperar();
+  assert.equal(get('painel').hidden, false);
+  const b = todos(get('lista')).find(n => n.atributos['data-acao'] === 'rebaixar' && n.atributos['data-usuario'] === '1');
+  await b.ouvintes.click();
+  assert.equal(get('painel').hidden, true);
+  assert.equal(get('aviso').hidden, false);
+  assert.equal(get('aviso').textContent, 'Você não tem mais acesso a esta tela.');
+});
+
+test('o último administrador continua com Desativar e Tornar usuário comum (o servidor é quem recusa)', async () => {
+  const { botao } = rodar({ usuarios: [ADMIN] });
+  await esperar();
+  assert.ok(botao('desativar', 1) && botao('rebaixar', 1));
 });
 
 test('ação com 401 leva ao login', async () => {

@@ -22,6 +22,23 @@
   const SITUACOES = { ativo: 'Ativo', convidado: 'Convite pendente', inativo: 'Desativado' };
   const PAPEIS = { admin_geral: 'Administrador', usuario: 'Usuário' };
   let meuEmail = '';
+  let ocupado = false;     // há uma chamada em andamento: cliques extras são ignorados
+  let botoes = [];         // botões de ação da lista atual (a lista é refeita a cada recarga)
+  const botaoConvidar = document.getElementById('convidar');
+
+  // desabilita/reabilita os botões durante a chamada (evita clique duplo)
+  function definirOcupado(sim) {
+    ocupado = sim;
+    for (const b of botoes) b.disabled = sim;
+    botaoConvidar.disabled = sim;
+  }
+
+  // 403: o administrador perdeu a gestão (ex.: se rebaixou); esconde o painel e avisa
+  function semAcesso() {
+    painel.hidden = true;
+    aviso.textContent = 'Você não tem mais acesso a esta tela.';
+    aviso.hidden = false;
+  }
 
   const mensagemDe = (r, padrao) => (r.dados && typeof r.dados.error === 'string' && r.dados.error) || padrao;
   const idValido = id => /^\d{1,9}$/.test(String(id));
@@ -56,19 +73,25 @@
     if (meuEmail && typeof usuario.email === 'string' && usuario.email.toLowerCase() === meuEmail) {
       pergunta += '\n\nATENÇÃO: este é o seu próprio usuário (você mesmo). A mudança pode tirar o seu acesso de gerenciar.';
     }
+    if (ocupado) return;
     if (!window.confirm(pergunta)) return;
     erro.textContent = '';
-    const r = await chamar(caminho, corpo, metodo);
-    if (r.status === 401) {
-      window.location.replace('/portal/login.html');
-      return;
+    definirOcupado(true);
+    try {
+      const r = await chamar(caminho, corpo, metodo);
+      if (r.status === 401) {
+        window.location.replace('/portal/login.html');
+        return;
+      }
+      if (r.status !== 200) {
+        erro.textContent = mensagemDe(r, 'Não foi possível concluir a ação.');
+        return;
+      }
+      if (aoConcluir) aoConcluir(r.dados); else resultado.textContent = '';
+      await carregarLista();
+    } finally {
+      definirOcupado(false);
     }
-    if (r.status !== 200) {
-      erro.textContent = mensagemDe(r, 'Não foi possível concluir a ação.');
-      return;
-    }
-    if (aoConcluir) aoConcluir(r.dados); else resultado.textContent = '';
-    await carregarLista();
   }
 
   function botao(texto, acao, usuario, aoClicar) {
@@ -78,7 +101,9 @@
     b.textContent = texto;
     b.setAttribute('data-acao', acao);
     b.setAttribute('data-usuario', String(usuario.id));
+    b.disabled = ocupado;
     b.addEventListener('click', aoClicar);
+    botoes.push(b);
     return b;
   }
 
@@ -156,15 +181,21 @@
       window.location.replace('/portal/login.html');
       return;
     }
+    if (r.status === 403) {
+      semAcesso();
+      return;
+    }
     if (r.status !== 200 || !r.dados || !Array.isArray(r.dados.usuarios)) {
       erro.textContent = mensagemDe(r, 'Não foi possível carregar os usuários.');
       return;
     }
     lista.textContent = '';
+    botoes = [];
     for (const u of r.dados.usuarios) lista.appendChild(cartao(u));
   }
 
-  document.getElementById('convidar').addEventListener('click', async () => {
+  botaoConvidar.addEventListener('click', async () => {
+    if (ocupado) return;
     erro.textContent = '';
     const email = String(conviteEmail.value || '').trim();
     if (!email) {
@@ -175,21 +206,26 @@
     if (convitePedidos.checked || conviteDocumentos.checked) permissoes.push('pedidos.ver');
     if (conviteFinanceiro.checked) permissoes.push('financeiro.ver');
     if (conviteDocumentos.checked) permissoes.push('documentos.ver');
-    const r = await chamar('/portal/api/usuarios', { email, permissoes });
-    if (r.status === 401) {
-      window.location.replace('/portal/login.html');
-      return;
+    definirOcupado(true);
+    try {
+      const r = await chamar('/portal/api/usuarios', { email, permissoes });
+      if (r.status === 401) {
+        window.location.replace('/portal/login.html');
+        return;
+      }
+      if (r.status !== 200) {
+        erro.textContent = mensagemDe(r, 'Não foi possível enviar o convite.');
+        return;
+      }
+      mostrarConvite(r.dados, email);
+      conviteEmail.value = '';
+      convitePedidos.checked = false;
+      conviteFinanceiro.checked = false;
+      conviteDocumentos.checked = false;
+      await carregarLista();
+    } finally {
+      definirOcupado(false);
     }
-    if (r.status !== 200) {
-      erro.textContent = mensagemDe(r, 'Não foi possível enviar o convite.');
-      return;
-    }
-    mostrarConvite(r.dados, email);
-    conviteEmail.value = '';
-    convitePedidos.checked = false;
-    conviteFinanceiro.checked = false;
-    conviteDocumentos.checked = false;
-    await carregarLista();
   });
 
   async function iniciar() {

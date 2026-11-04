@@ -81,7 +81,9 @@ async function montar(t, { doisAdmins = false, mutar = false, quebrarBanco = fal
   const enviados = [];
   const email = { enviarConvite: async dd => { enviados.push(dd); return enviar ? enviar(dd) : { enviado: false }; } };
   let poolRotas = banco.pool;
-  if (mutar) poolRotas = envolver(banco.pool, { trocar: SEM_EMPRESA });
+  // mutar === true: tira a condição de empresa de TODO SQL por id; mutar === 'alvo': só a do SELECT do alvo (a 1ª barreira)
+  if (mutar === 'alvo') poolRotas = envolver(banco.pool, { trocar: (sql, params) => (/^\s*SELECT/.test(sql) ? SEM_EMPRESA(sql, params) : [sql, params]) });
+  else if (mutar) poolRotas = envolver(banco.pool, { trocar: SEM_EMPRESA });
   if (quebrarBanco) poolRotas = { execute: async () => { throw { code: 'ER_X', sqlMessage: 'SEGREDO DO BANCO' }; }, getConnection: async () => { throw { code: 'ER_X', sqlMessage: 'SEGREDO DO BANCO' }; } };
   if (quebrarAuditoria) poolRotas = envolver(banco.pool, { antes: sql => { if (/web_portal_auditoria/.test(sql)) throw { code: 'ER_AUD' }; } });
 
@@ -181,6 +183,31 @@ test('rotas por id: usuário de outra empresa, inexistente e id inválido dão o
   assert.equal(c.enviados.length, 0);
 });
 
+test('desativar, reenviar_convite e remover: corpo que não é objeto JSON dá 400 ANTES do 404 do id; POST sem corpo continua válido', async t => {
+  const c = await montar(t);
+  const cookie = await c.cookieDe(1);
+  const antes = estado(c.d);
+  let n = 0;
+  for (const fim of ['desativar', 'reenviar_convite', 'remover']) {
+    for (const id of [4, 999, 6, '12abc']) {
+      for (const raw of ['[]', '[1]', '"texto"', '7', 'null']) {
+        const r = await c.chamar('POST', `/portal/api/usuarios/${id}/${fim}`, undefined, { cookie, raw });
+        assert.equal(r.status, 400, `${fim} ${id} ${raw}`);
+        n++;
+      }
+    }
+  }
+  assert.equal(n, 60);
+  assert.equal(estado(c.d), antes);
+  assert.equal(c.d.auditoria.length, 0);
+  assert.equal(c.enviados.length, 0);
+  // sem corpo nenhum (express.json entrega {}): vale
+  const sem = await c.chamar('POST', '/portal/api/usuarios/4/desativar', undefined, { cookie });
+  assert.equal(sem.status, 200);
+  const sem404 = await c.chamar('POST', '/portal/api/usuarios/999/remover', undefined, { cookie });
+  assert.equal(sem404.status, 404);
+});
+
 // ===================== 3. POST /usuarios =====================
 
 test('POST /usuarios cria usuário comum convidado com as permissões e o convite; o link só vem sem envio', async t => {
@@ -204,6 +231,23 @@ test('POST /usuarios cria usuário comum convidado com as permissões e o convit
   assert.equal(c.enviados.length, 1);
   assert.equal(c.enviados[0].para, 'novo@acme.com');
   assert.equal(c.enviados[0].razaoSocial, 'ACME LTDA');
+  assert.equal(novo.criado_por, 'portal:1', 'criado_por do usuário = portal:<id do administrador>, nunca o e-mail');
+  assert.equal(abertos[0].criado_por, 'portal:1', 'criado_por do convite idem');
+});
+
+test('criado_por (VARCHAR(100)) nunca leva o e-mail: administrador com e-mail de 190 caracteres convida e reenvia sem erro', async t => {
+  const c = await montar(t);
+  const longo = `${'a'.repeat(120)}@${'b'.repeat(60)}.com`; // 120 + 1 + 60 + 4 = 185
+  assert.ok(longo.length > 100 && longo.length <= 190);
+  c.d.usuarios.push({ id: 11, email: longo, cliente_codigo: 40, papel: 'admin_geral', situacao: 'ativo', senha_hash: 'H', totp_segredo_cifrado: 'S', totp_ativo: 1, totp_ultimo_passo: 0, termo_aceito_em: new Date(T0) });
+  const cookie = await c.cookieDe(11);
+  const r = await c.chamar('POST', '/portal/api/usuarios', { email: 'novo@acme.com', permissoes: [] }, { cookie });
+  assert.equal(r.status, 200);
+  const re = await c.chamar('POST', '/portal/api/usuarios/4/reenviar_convite', {}, { cookie });
+  assert.equal(re.status, 200);
+  const gravados = [...c.d.usuarios.map(x => x.criado_por), ...c.d.convites.map(x => x.criado_por)].filter(x => typeof x === 'string' && x !== 'x');
+  assert.equal(gravados.length, 3, 'usuário novo + 2 convites');
+  for (const g of gravados) { assert.equal(g, 'portal:11'); assert.ok(g.length <= 100); }
 });
 
 test('POST /usuarios com o e-mail enviado não devolve o link', async t => {
@@ -414,6 +458,7 @@ test('reenviar_convite: só convidado; os anteriores são invalidados e um novo 
   assert.equal(abertos[0].token_hash, hashToken(corpo.link.split('#')[1]));
   assert.equal(c.enviados.length, 1);
   assert.equal(c.enviados[0].para, 'dora@acme.com');
+  assert.equal(abertos[0].criado_por, 'portal:1');
   const antes = estado(c.d);
   for (const id of [2, 5, 8, 1]) {
     const x = await c.chamar('POST', `/portal/api/usuarios/${id}/reenviar_convite`, {}, { cookie });
@@ -518,6 +563,51 @@ test('prova de mutação: sem o filtro de empresa no SQL por id o isolamento FAL
   assert.notDeepEqual(permsDe(mutado.d, 6), ['pedidos.ver'], 'o usuário da outra empresa foi alterado pela mutação');
 });
 
+// Segunda barreira: mesmo sem o filtro de empresa no SELECT do alvo, o affectedRows do UPDATE/DELETE (que tem o filtro) segura.
+// Usuários da outra empresa (BETA): 6 Fabio (ativo, com sessão) e 7 Gui (convidado, com convite, permissões).
+function marcarOutraEmpresa(d) {
+  d.sessoes.push({ id: 's6', usuario_id: 6, criado_em: new Date(T0), expira_em: new Date(T0 + 3600000), ultimo_uso_em: new Date(T0), ip: '1.1.1.1', revogada: 0 },
+    { id: 's7', usuario_id: 7, criado_em: new Date(T0), expira_em: new Date(T0 + 3600000), ultimo_uso_em: new Date(T0), ip: '1.1.1.1', revogada: 0 });
+  d.recuperacao.push({ usuario_id: 7, codigo_hash: 'r7', usado_em: null });
+}
+const ATAQUES = [['POST', '/portal/api/usuarios/6/desativar', {}], ['POST', '/portal/api/usuarios/7/remover', {}]];
+const foto = d => JSON.stringify({ e: estado(d), a: d.auditoria.length });
+// quantos dados de BETA (6 e 7: usuário, permissões, convites, sessões, recuperação) mudaram frente ao original
+function vazamentos(d, original) {
+  const deBeta = (k, x) => [6, 7].includes(k === 'usuarios' ? x.id : x.usuario_id);
+  return ['usuarios', 'permissoes', 'convites', 'sessoes', 'recuperacao']
+    .filter(k => JSON.stringify(d[k].filter(x => deBeta(k, x))) !== JSON.stringify(original[k].filter(x => deBeta(k, x)))).length;
+}
+
+test('prova de mutação (2ª barreira): sem o filtro só no SELECT do alvo, desativar e remover de outra empresa não alteram NADA', async t => {
+  const c = await montar(t, { mutar: 'alvo' });
+  marcarOutraEmpresa(c.d);
+  const cookie = await c.cookieDe(1);
+  const original = JSON.parse(JSON.stringify(c.d));
+  const antes = foto(c.d);
+  let n = 0;
+  for (const [metodo, caminho, corpo] of ATAQUES) {
+    const r = await c.chamar(metodo, caminho, corpo, { cookie });
+    assert.ok([404, 409].includes(r.status), `${caminho} ${r.status}`);
+    n++;
+  }
+  assert.equal(n, 2);
+  assert.equal(foto(c.d), antes, 'nenhuma linha (usuário, convite, sessão, recuperação, permissão, auditoria) mudou');
+  assert.equal(vazamentos(c.d, original), 0);
+  assert.equal(c.enviados.length, 0);
+});
+
+test('prova de mutação (completa): retirando também a condição do UPDATE/DELETE o vazamento aparece (conta > 0)', async t => {
+  const c = await montar(t, { mutar: true });
+  marcarOutraEmpresa(c.d);
+  const cookie = await c.cookieDe(1);
+  const original = JSON.parse(JSON.stringify(c.d));
+  for (const [metodo, caminho, corpo] of ATAQUES) await c.chamar(metodo, caminho, corpo, { cookie });
+  assert.ok(vazamentos(c.d, original) > 0, 'a mutação completa altera dados da outra empresa');
+  assert.equal(usuario(c.d, 6).situacao, 'inativo');
+  assert.ok(!usuario(c.d, 7));
+});
+
 // ===================== lock em ordem fixa =====================
 
 test('toda rota que muda papel, situação ou remove trava as linhas da empresa ANTES de ler o alvo', async t => {
@@ -527,6 +617,7 @@ test('toda rota que muda papel, situação ou remove trava as linhas da empresa 
     ['PUT', '/portal/api/usuarios/2/permissoes', { permissoes: [] }],
     ['POST', '/portal/api/usuarios/8/papel', { papel: 'admin_geral' }],
     ['POST', '/portal/api/usuarios/2/desativar', {}],
+    ['POST', '/portal/api/usuarios/4/reenviar_convite', {}],
     ['POST', '/portal/api/usuarios/4/remover', {}]
   ];
   for (const [metodo, caminho, corpo] of chamadas) {

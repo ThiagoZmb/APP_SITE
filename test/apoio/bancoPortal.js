@@ -199,8 +199,9 @@ function criarBancoPortal(inicial = {}) {
       dados.usuarios.filter(u => u.id === id).map(u => ({
         id: u.id, cliente_codigo: u.cliente_codigo, situacao: u.situacao, termo_aceito_em: u.termo_aceito_em ?? null
       }))],
-    [/^UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = \?/, (sql, [id]) => {
-      const u = dados.usuarios.find(x => x.id === id);
+    // compartilhada com rotas/portal_admin.js (SQL sem filtro de empresa: params [id]); o filtro vale só quando o TEXTO do SQL o traz: [id, codigo]
+    [/^UPDATE web_portal_usuarios SET situacao = 'inativo' WHERE id = \?/, (sql, [id, codigo]) => {
+      const u = dados.usuarios.find(x => x.id === id && (!sql.includes('cliente_codigo = ?') || x.cliente_codigo === codigo));
       if (u) u.situacao = 'inativo';
       return { affectedRows: u ? 1 : 0 };
     }],
@@ -216,10 +217,11 @@ function criarBancoPortal(inicial = {}) {
       dados.sessoes = dados.sessoes.filter(s => s.usuario_id !== id);
       return { affectedRows: 1 };
     }],
-    // só apaga se ainda estiver convidado (a condição do WHERE é do SQL de produção)
-    [/^DELETE FROM web_portal_usuarios WHERE id = \? AND situacao = 'convidado'/, (sql, [id]) => {
+    // só apaga se ainda estiver convidado; o filtro de empresa vale só quando o TEXTO do SQL o traz: [id, codigo]
+    [/^DELETE FROM web_portal_usuarios WHERE id = \? AND situacao = 'convidado'/, (sql, [id, codigo]) => {
       const n = dados.usuarios.length;
-      dados.usuarios = dados.usuarios.filter(u => !(u.id === id && u.situacao === 'convidado'));
+      const daEmpresa = u => !sql.includes('cliente_codigo = ?') || u.cliente_codigo === codigo;
+      dados.usuarios = dados.usuarios.filter(u => !(u.id === id && u.situacao === 'convidado' && daEmpresa(u)));
       return { affectedRows: n - dados.usuarios.length };
     }],
     [/^INSERT INTO web_auditoria/, (sql, [quem, acao, alvo, detalhe]) => {
