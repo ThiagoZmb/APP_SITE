@@ -9,14 +9,14 @@ const crypto = require('node:crypto');
 const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
 const { ErroUsuario, emTransacao, agoraLocal } = require('./transacao');
-const { MAX_PDF, lerChave, numerosDeNotaFiscal, validarPdf } = require('../calculo/danfe');
+const { MAX_PDF, lerChave, validarPdf } = require('../calculo/danfe');
+const { criarLigacaoDanfe, MODELO_NFE } = require('./danfe_ligacao');
 
 const VER = ['danfe.ver'];
 const ENVIAR = ['danfe.enviar'];
 const VINCULAR = ['danfe.vincular'];
 const MAX_EXISTENTES = 500;
 const LIMITE_LISTA = 200;
-const MODELO_NFE = '55';
 
 // body-parser dentro da rota: estouro de tamanho vira 413 em português (e não a página de erro padrão)
 const rawPdf = express.raw({ type: 'application/pdf', limit: '2mb' });
@@ -30,7 +30,6 @@ const lerPdf = (req, res, next) => rawPdf(req, res, err => {
 const like = s => '%' + String(s).replace(/[\\%_]/g, c => '\\' + c) + '%';
 const marcas = n => Array(n).fill('?').join(', ');
 const dataHora = v => (v ? String(v).replace('T', ' ').slice(0, 19) : '');
-const notaDe = (r, origem) => ({ chave: r.chave, numeroNf: Number(r.numero_nf), serie: Number(r.serie), origem, enviadoEm: dataHora(r.enviado_em) });
 
 function registrarDanfe({ rota, pool, foraDosEstados }) {
   const auditar = (conn, req, acao, alvo, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
@@ -39,42 +38,7 @@ function registrarDanfe({ rota, pool, foraDosEstados }) {
   const restrito = req => (req.acesso?.estados || []).length > 0;
   const pedidoDe = v => { const s = String(v ?? '').trim(); const n = /^\d{1,9}$/.test(s) ? Number(s) : 0; return n > 0 ? n : 0; };
 
-  // CNPJ do emitente = o da empresa: variável EMPRESA_CNPJ (14 dígitos) ou o mais frequente entre os DANFE enviados. '' se não houver nenhum.
-  async function cnpjEmpresa(db) {
-    const env = String(process.env.EMPRESA_CNPJ || '').replace(/\D/g, '');
-    if (env.length === 14) return env;
-    const [[linha]] = await db.execute('SELECT cnpj_emitente, COUNT(*) AS qtd FROM web_danfe GROUP BY cnpj_emitente ORDER BY qtd DESC, cnpj_emitente LIMIT 1');
-    return linha ? String(linha.cnpj_emitente) : '';
-  }
-
-  // notas ligadas pelo financeiro: números de NF dos lançamentos do pedido -> DANFE enviados com esse número
-  async function notasDoFinanceiro(db, pedido, empresa) {
-    const [fluxo] = await db.execute("SELECT NOTA_FISCAL FROM fluxo_de_caixa WHERE TRIM(PEDIDO) = ? AND NOTA_FISCAL IS NOT NULL AND NOTA_FISCAL <> ''", [String(pedido)]);
-    const numeros = [];
-    for (const f of fluxo) for (const n of numerosDeNotaFiscal(f.NOTA_FISCAL)) if (!numeros.includes(n)) numeros.push(n);
-    if (!numeros.length) return { numeros, notas: [] };
-    if (!empresa) return { numeros, notas: [] };
-    const [achadas] = await db.execute(
-      `SELECT chave, numero_nf, serie, enviado_em FROM web_danfe WHERE modelo = ? AND cnpj_emitente = ? AND numero_nf IN (${marcas(numeros.length)}) ORDER BY numero_nf, id`,
-      [MODELO_NFE, empresa, ...numeros]);
-    return { numeros, notas: achadas };
-  }
-
-  // pedidos (números) a que uma nota está ligada: manual + automática (financeiro cita o número da NF e a nota é da empresa)
-  async function pedidosDaNota(d, empresa) {
-    const lista = new Set();
-    const [manual] = await pool.execute('SELECT pedido_numero FROM web_danfe_vinculos WHERE chave = ?', [d.chave]);
-    for (const m of manual) lista.add(Number(m.pedido_numero));
-    if (d.modelo === MODELO_NFE && empresa && d.cnpj_emitente === empresa) {
-      const [fluxo] = await pool.execute(
-        "SELECT PEDIDO, NOTA_FISCAL FROM fluxo_de_caixa WHERE NOTA_FISCAL LIKE ? AND PEDIDO IS NOT NULL AND PEDIDO <> '' LIMIT 500", [like(d.numero_nf)]);
-      for (const f of fluxo) {
-        const p = pedidoDe(f.PEDIDO);
-        if (p && numerosDeNotaFiscal(f.NOTA_FISCAL).includes(Number(d.numero_nf))) lista.add(p);
-      }
-    }
-    return [...lista];
-  }
+  const { cnpjEmpresa, pedidosDaNota, notasDoPedido } = criarLigacaoDanfe({ pool });
 
   // quais das chaves já estão no banco (a tela envia só as novas)
   rota('post', '/danfe/existentes', ENVIAR, async (req, res) => {
@@ -138,14 +102,7 @@ function registrarDanfe({ rota, pool, foraDosEstados }) {
         const [[cli]] = await pool.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [ped.RAZAO_SOCIAL]);
         if (foraDosEstados(req, res, cli?.ESTADO)) return;
       }
-      const [manuais] = await pool.execute(
-        `SELECT d.chave, d.numero_nf, d.serie, d.enviado_em FROM web_danfe_vinculos v JOIN web_danfe d ON d.chave = v.chave WHERE v.pedido_numero = ? ORDER BY v.id`, [numero]);
-      const notas = manuais.map(m => notaDe(m, 'manual'));
-      const empresa = await cnpjEmpresa(pool);
-      const fin = await notasDoFinanceiro(pool, numero, empresa);
-      for (const f of fin.notas) if (!notas.some(n => n.chave === f.chave)) notas.push(notaDe(f, 'financeiro'));
-      const cobertos = new Set(notas.map(n => n.numeroNf));
-      res.json({ notas, semArquivo: fin.numeros.filter(n => !cobertos.has(n)) });
+      res.json(await notasDoPedido(numero));
     } catch (err) { erro500(res, 'GET /danfe/pedido/:numero', err); }
   });
 

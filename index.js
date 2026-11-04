@@ -8,8 +8,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const pdfPedOrc = require('./pdf/ped_orc');
-const { carimboItens } = require('./calculo/leitura_vb');
-const { validarPng } = require('./calculo/png');
+const { carregarCabecalhoPedOrc, carregarCorpoPedOrc } = require('./pdf/carregar_ped_orc');
 const { criarAcesso } = require('./seguranca/acesso');
 const { criarSessoes } = require('./seguranca/sessoes');
 const { opcoesSsl } = require('./seguranca/mysql_ssl');
@@ -854,12 +853,8 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
   if (!numero || !tipo) return res.status(400).json({ error: 'Informe numero e tipo' });
   const producao = tipo === 'Pedido' && /^(1|true|sim)$/i.test(String(req.query.producao || ''));
   try {
-    const [cabs] = await pool.execute(
-      `SELECT RAZAO_SOCIAL, CLIENTE_FINAL, DATA, DATA_PRONTO, OBS_GERAL,
-              SUB_TOTAL, TOTAL, DESCONTO
-       FROM ped_orc WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
-    if (cabs.length === 0) return res.status(404).json({ error: 'Pedido não encontrado' });
-    const cab = cabs[0];
+    const cab = await carregarCabecalhoPedOrc(pool, numero, tipo);
+    if (!cab) return res.status(404).json({ error: 'Pedido não encontrado' });
     // só abre PDF de cliente dentro dos estados do usuário (mesma regra das listas)
     if ((req.acesso.estados || []).length) {
       const [est] = await pool.execute(
@@ -867,23 +862,7 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
       if (foraDosEstados(req, res, est[0]?.ESTADO)) return;
     }
     const verValores = podeVerValores(req);
-    const [itens] = await pool.execute(
-      `SELECT * FROM ped_orc_lista_itens WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
-    const [v4] = await pool.execute(
-      `SELECT * FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = ? ORDER BY CAST(ITEM AS UNSIGNED)`, [numero, tipo]);
-    const [serr] = await pool.execute(
-      `SELECT * FROM ped_orc_serralheria WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
-    const [comps] = await pool.execute(
-      `SELECT * FROM ped_orc_complementos WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
-    const [compSerr] = await pool.execute(
-      `SELECT * FROM ped_orc_serralheria_complementos WHERE NUMERO = ? AND TIPO = ?`, [numero, tipo]);
-    const [furos] = await pool.execute(
-      `SELECT * FROM furacao_pedidos_orcamentos WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo]);
-    let medicao = '';
-    if (producao) {
-      const [med] = await pool.execute('SELECT MEDICAO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [cab.RAZAO_SOCIAL]);
-      medicao = med[0]?.MEDICAO ?? '';
-    }
+    const { itens, v4, serr, comps, compSerr, furos, medicao, desenhos } = await carregarCorpoPedOrc(pool, { numero, tipo, cab, producao });
 
     res.setHeader('Content-Type', 'application/pdf');
     // nome e pasta iguais aos do VB; a tela usa X-Pdf-Pasta/X-Pdf-Nome para gravar em "C:\Programa Elegance\<pasta>\"
@@ -892,15 +871,6 @@ registro.rota('get', '/dados_pdf', ['pedidos.pdf'], async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="${semAcento}"; filename*=UTF-8''${encodeURIComponent(destino.nome)}`);
     res.setHeader('X-Pdf-Nome', encodeURIComponent(destino.nome));
     res.setHeader('X-Pdf-Pasta', encodeURIComponent(destino.pasta));
-    // desenhos das portas guardados na configuração: só valem se o carimbo ainda bate com os itens de agora (o VB pode ter mudado o documento);
-    // qualquer erro ao lê-los deixa a coluna Imagem vazia, nunca derruba o PDF
-    let desenhos = {};
-    try {
-      const [guardados] = await pool.execute('SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = ? AND numero = ?', [tipo, numero]);
-      const carimbo = carimboItens({ lista: itens, itensV4: v4, furacao: furos });
-      // só entra imagem que ainda vale (carimbo) e que decodifica direito: PNG corrompido derrubaria o processo dentro do pdfkit
-      for (const d of guardados) if (d.carimbo === carimbo && validarPng(d.png).ok) desenhos[Number(d.item)] = d.png;
-    } catch { desenhos = {}; }
     const doc = pdfPedOrc.novoDocumento();
     doc.pipe(res);
     // dinheiro só para quem tem valores.ver (o desenho também omite as colunas)
