@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usuários da empresa</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main class="larga">
+    <h1>Usuários da empresa</h1>
+    <p id="aviso" class="erro" hidden>Você não tem permissão para gerenciar os usuários desta empresa.</p>
+    <div id="painel" hidden>
+      <h2>Convidar usuário</h2>
+      <label for="convite-email">E-mail</label>
+      <input type="email" id="convite-email" autocomplete="off">
+      <div class="linha-aceite">
+        <input type="checkbox" id="convite-pedidos">
+        <label for="convite-pedidos">Ver pedidos</label>
+      </div>
+      <div class="linha-aceite">
+        <input type="checkbox" id="convite-financeiro">
+        <label for="convite-financeiro">Ver financeiro</label>
+      </div>
+      <div class="linha-aceite">
+        <input type="checkbox" id="convite-documentos">
+        <label for="convite-documentos">Ver documentos (exige ver pedidos)</label>
+      </div>
+      <div class="acoes">
+        <button type="button" id="convidar">Enviar convite</button>
+      </div>
+      <p id="resultado-convite" role="status" aria-live="polite"></p>
+      <h2>Usuários</h2>
+      <div id="lista"></div>
+    </div>
+    <p id="erro" class="erro" role="alert" aria-live="assertive"></p>
+    <p><a href="inicio.html">Voltar ao início</a></p>
+  </main>
+  <script src="portal.js"></script>
+  <script src="usuarios.js"></script>
+</body>
+</html>

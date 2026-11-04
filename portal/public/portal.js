@@ -3,13 +3,14 @@
 (function () {
   'use strict';
 
-  async function chamar(caminho, corpo) {
+  // `metodo` é opcional e só vale com corpo ('POST' por padrão); sem corpo a chamada é GET
+  async function chamar(caminho, corpo, metodo) {
     const opcoes = {
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Portal': '1' }
     };
     if (corpo !== undefined) {
-      opcoes.method = 'POST';
+      opcoes.method = metodo || 'POST';
       opcoes.body = JSON.stringify(corpo);
     }
     let resposta;

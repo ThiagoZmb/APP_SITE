@@ -106,6 +106,10 @@ table.pedidos { width: 100%; border-collapse: collapse; }
 table.pedidos th, table.pedidos td { padding: 8px; border-bottom: 1px solid var(--borda); text-align: left; }
 table.pedidos th { color: var(--suave); font-size: 0.9rem; }
 
+.usuario { padding: 12px 0; border-bottom: 1px solid var(--borda); }
+.usuario p { margin: 4px 0; }
+label.permissao { display: block; margin: 4px 0; font-weight: 400; }
+
 ul.codigos { padding: 0; list-style: none; columns: 2; }
 ul.codigos li {
   margin: 4px 0;

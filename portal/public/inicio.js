@@ -22,6 +22,10 @@
     if (Array.isArray(u.permissoes) && u.permissoes.includes('financeiro.ver')) {
       document.getElementById('link-financeiro').hidden = false;
     }
+    // idem: a gestão de usuários continua exigindo usuarios.gerir no servidor
+    if (Array.isArray(u.permissoes) && u.permissoes.includes('usuarios.gerir')) {
+      document.getElementById('link-usuarios').hidden = false;
+    }
   }
 
   document.getElementById('sair').addEventListener('click', async () => {
