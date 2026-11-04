@@ -175,11 +175,13 @@ test('convite.html: link do termo seguro', () => {
 test('HTTP: páginas, cabeçalhos, tipos e caminhos proibidos', async t => {
   const s = await subir(app);
   t.after(s.fechar);
-  const r = await fetch(s.url + '/portal/login.html');
-  assert.equal(r.status, 200);
-  assert.equal(r.headers.get('content-security-policy'), CSP_PORTAL);
-  assert.equal(r.headers.get('cache-control'), 'no-store');
-  assert.match(r.headers.get('content-type'), /^text\/html/);
+  for (const pagina of ['/portal/login.html', '/portal/pedidos.html']) {
+    const r = await fetch(s.url + pagina);
+    assert.equal(r.status, 200, pagina);
+    assert.equal(r.headers.get('content-security-policy'), CSP_PORTAL, pagina);
+    assert.equal(r.headers.get('cache-control'), 'no-store', pagina);
+    assert.match(r.headers.get('content-type'), /^text\/html/, pagina);
+  }
   for (const [p, tipo] of [['/portal/login.js', /javascript/], ['/portal/portal.css', /^text\/css/]]) {
     const x = await fetch(s.url + p);
     assert.equal(x.status, 200, p);

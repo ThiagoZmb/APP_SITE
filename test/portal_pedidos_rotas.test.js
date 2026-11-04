@@ -156,10 +156,14 @@ test('SQL fixo e empresa só da sessão: texto sem colunas sensíveis, 1º parâ
     assert.match(q.sql, /c\.CODIGO = \?/);
     assert.match(q.sql, /p\.TIPO = 'Pedido'/);
     assert.doesNotMatch(q.sql, /TOTAL|OBS_GERAL|CLIENTE_FINAL|FINANCEIRO|MOTIVO/i);
+    assert.doesNotMatch(q.sql, /\bOR\b/i);
     assert.equal(q.params[0], 40);
   }
   const lista = await (await c.get('/portal/api/pedidos?empresa=41', { cookie, headers: { 'X-Empresa': '41' } })).json();
   assert.deepEqual(lista.pedidos.map(p => p.numero), [120, 14, 13, 12]);
+  const semEntrega = lista.pedidos.find(p => p.numero === 13);
+  assert.strictEqual(semEntrega.entrega, null);
+  assert.strictEqual(semEntrega.dataAgendada, null);
 });
 
 test('prova de mutação: sem "c.CODIGO = ?" (trocado por "1 = 1") o teste de isolamento FALHA, logo o pool falso aplica o filtro de verdade', async t => {

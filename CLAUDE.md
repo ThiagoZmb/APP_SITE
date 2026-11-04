@@ -65,6 +65,7 @@ calculo/                 Funções puras (testáveis sem banco)
   corte_pecas.js / corte_otimizacao.js / corte_validacao.js   Plano de corte: peças do pedido (perfis + ped_orc_itens_v4), otimização em varas/retalhos, validação de config/retalho/conferência
   vidro_pecas.js / vidro_otimizacao.js / vidro_validacao.js   Plano de corte de vidros: peças (vidros + ped_orc_itens_v4), guilhotina em chapas/retalhos, validação de config/retalho/conferência
   gestao_caixa.js / gestao_validacao.js   Central de Gestão: caixa por mês, variação, meta, progresso/projeção do orçamento, alertas; validação de meta e orçamento (puras)
+  portal_pedidos.js      Portal do cliente, etapa 3a: projeção (o que o cliente pode ver de um pedido) e validação dos parâmetros de lista/detalhe (puras)
 pdf/ped_orc.js           PDF do pedido/orçamento (rota /dados_pdf) fiel ao Gerar_PDF_PedOrc do VB; ?producao=1 = Guia de Produção (só Pedido)
 local/                   Serviço do PC da empresa (127.0.0.1:3917): salvador_pdf.js (grava os PDFs nas pastas do VB), sefaz.js (notas de compra pela SEFAZ) e zebra.js (POST /etiqueta: ZPL RAW na Zebra). Detalhes e instalação: docs/regras/servico-local.md
 imagens/logo_elegance.png  Logo do cabeçalho do PDF (convertido do Elegance_Logo.JPEG do VB, que na verdade é BMP)
@@ -72,8 +73,9 @@ leitura/                 Leitura de PDF pela web: rotas.js (rotas /leitura_pdf, 
 .claude/skills/engenharia-projetos-tecnicos/   Skill de leitura de projetos (regras, validação, mapa, confirmação). O servidor IMPORTA scripts/lib/servico.mjs dela: a pasta precisa ir no deploy
 seguranca/               acesso.js (perfil+permissões por requisição, cache 60 s), permissoes.js (catálogo único de permissões), rotas.js (registro obrigatório de rotas), valores.js (esconde dinheiro de quem não tem `valores.ver`), instalacao.js (cria tabelas web_*, migrações)
 portal/                  Portal do cliente (identidade externa), sem JWT e sem reaproveitar as sessões de funcionário: config.js (lê as variáveis PORTAL_* e SMTP_*), cookie.js (`__Host-portal`), tokens.js (token opaco, hash SHA-256, códigos de recuperação com HMAC), sessoes.js (tabela `web_portal_sessoes`), acesso.js (guardas `portalAtivo`/`portalAutenticar`, `empresaLiberavel`), totp.js (RFC 6238), cripto.js (AES-256-GCM do segredo TOTP), senha.js (regras da senha), email.js (convite por SMTP), auditoria.js (`web_portal_auditoria`), cabecalhos.js (CSP e no-store em `/portal`), cors.js (origem do portal só em `/portal/...`), transacao.js, limpeza.js (retenção)
-portal/public/          Páginas do cliente servidas pelo servidor da API em `/portal/*` (mesma origem): login, convite, termo (RASCUNHO), início; `portal.js` (chamadas com `X-Portal: 1`), `portal.css`; sem script nem estilo inline
+portal/public/          Páginas do cliente servidas pelo servidor da API em `/portal/*` (mesma origem): login, convite, termo (RASCUNHO), início, Meus pedidos (`pedidos.html/.js`); `portal.js` (chamadas com `X-Portal: 1`), `portal.css`; sem script nem estilo inline
 rotas/portal_auth.js    Rotas do cliente: `POST /portal/api/convite/iniciar`, `/convite/concluir`, `/login`, `/logout` (públicas) e `GET /portal/api/eu` (autenticada)
+rotas/portal_pedidos.js Rotas do cliente (etapa 3a, exigem `pedidos.ver`): `GET /portal/api/pedidos` (lista paginada) e `GET /portal/api/pedidos/:numero` (detalhe e status)
 rotas/portal_admin.js   Rotas da equipe (`portal.gerir`): `/admin/portal/clientes`, `/empresas` (liberar, suspender, reativar), `/convites`, reenviar convite, reiniciar 2º fator
 portal_admin.html/.js   Tela da equipe "Portal do cliente" (subitem de Usuários no menu)
 corte.html/.js           Tela do plano de corte (varas desenhadas em escala em CSS), retalhos e parâmetros

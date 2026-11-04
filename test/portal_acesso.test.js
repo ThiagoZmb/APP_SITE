@@ -134,6 +134,18 @@ test('empresa sem registro em web_portal_empresas e nome que deixou de ser únic
   assert.equal((await fetch(s.url + '/portal/teste', { headers: cookie(token) })).status, 401);
 });
 
+test('razão social só com espaços dá 401 uniforme e empresaLiberavel responde sem_nome', async t => {
+  const c = cenario();
+  const s = await subirApp(c);
+  t.after(s.fechar);
+  const token = await c.sessoes.criar(2, null);
+  c.banco.dados.clientes.find(x => x.CODIGO === 40).RAZAO_SOCIAL = '   ';
+  const r = await fetch(s.url + '/portal/teste', { headers: cookie(token) });
+  assert.equal(r.status, 401);
+  assert.deepEqual(await r.json(), MSG401);
+  assert.deepEqual(await empresaLiberavel(c.banco.pool, 40), { ok: false, motivo: 'sem_nome' });
+});
+
 test('sessão revogada depois de aceita deixa de valer', async t => {
   const c = cenario();
   const s = await subirApp(c);

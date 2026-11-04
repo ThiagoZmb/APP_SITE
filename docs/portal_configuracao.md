@@ -1,6 +1,6 @@
 # Portal do cliente: configuração (passo a passo do dono)
 
-Este guia liga o portal do cliente (etapa 2: só a **identidade**, ou seja, convite, senha, 2º fator e login). Depois de entrar, o cliente ainda não vê pedidos, notas nem financeiro: isso vem nas etapas seguintes.
+Este guia liga o portal do cliente (etapa 2: a **identidade**, ou seja, convite, senha, 2º fator e login; etapa 3a: a tela **Meus pedidos**). Depois de entrar, o cliente vê a lista dos pedidos da empresa e o status de cada um, mas ainda não vê PDF, notas (DANFE) nem financeiro: isso vem nas etapas seguintes.
 
 Enquanto as variáveis abaixo não estiverem no Render, o portal fica desligado (responde "Portal não configurado.") e o resto do sistema funciona normalmente.
 
@@ -104,7 +104,7 @@ Nada disto é feito pelo código; só o dono resolve. Sem isso, qualquer pessoa 
 
 ## 11. O que ainda não foi testado
 
-Foi testado só com banco, e-mail e navegador simulados. Confira você, na primeira vez: o envio de e-mail pelo SMTP real, as páginas do cliente e a tela da equipe no navegador, o aplicativo autenticador de verdade, e se a pasta de páginas do portal chega ao servidor do Render.
+Foi testado só com banco, e-mail e navegador simulados. Confira você, na primeira vez: o envio de e-mail pelo SMTP real, as páginas do cliente (login, início e **Meus pedidos**, com a paginação e o detalhe de um pedido) e a tela da equipe no navegador, o aplicativo autenticador de verdade, e se a pasta de páginas do portal chega ao servidor do Render.
 
 ## 12. Conferir no MySQL do HostGator antes do primeiro uso
 
@@ -115,4 +115,5 @@ Nenhum SQL do portal rodou em MySQL real (os testes usam um banco falso, que nã
 3. `SHOW CREATE TABLE` de cada uma das 7 tabelas (`web_portal_empresas`, `web_portal_usuarios`, `web_portal_permissoes`, `web_portal_convites`, `web_portal_recuperacao`, `web_portal_sessoes`, `web_portal_auditoria`): conferir tipos, índices únicos (e-mail em `utf8mb4_bin`) e que não há chave estrangeira.
 4. Rodar a consulta do login (`SQL_LOGIN` em `rotas/portal_auth.js`) com um **e-mail existente** e com um **inexistente**, cada uma precedida de `EXPLAIN`: as duas devem devolver 1 linha e usar o mesmo plano (a contagem de `cadastro_clientes` por razão social roda nos dois casos).
 5. Medir o tempo da busca da tela da equipe (`/admin/portal/clientes?q=a`, que faz `LIKE` e conta nomes iguais em `cadastro_clientes`); se demorar, avise o desenvolvedor.
-6. Depois do primeiro login real, olhar o IP gravado em `web_portal_auditoria`: tem de ser o do cliente e não o do proxy do Render (confere o `trust proxy` de 1 salto).
+6. **Pedidos do cliente (etapa 3a):** rode a consulta da constante `SELECIONAR` de `rotas/portal_pedidos.js` (com o filtro da empresa, `ORDER BY p.NUMERO DESC` e `LIMIT`/`OFFSET` como no código) usando o `CODIGO` de uma empresa real, e confira: (a) que não dá "Illegal mix of collations" entre `cadastro_clientes.RAZAO_SOCIAL` e `ped_orc.RAZAO_SOCIAL` no JOIN; (b) que `DATE_FORMAT(p.DATA_ENTREGA, ...)` funciona com o tipo real da coluna (o resto do `index.js` usa `CAST(p.DATA_ENTREGA AS CHAR)`; se a coluna for texto, o `DATE_FORMAT` devolve vazio ou nulo e precisa ser trocado no código: avise o desenvolvedor); (c) que o `LIMIT` e o `OFFSET` escritos direto na consulta funcionam; (d) o tempo do JOIN por razão social numa empresa com muitos pedidos (se passar de alguns segundos, avise o desenvolvedor). Depois abra **Meus pedidos** no portal com essa empresa e compare a lista com a tela de Pedidos do sistema.
+7. Depois do primeiro login real, olhar o IP gravado em `web_portal_auditoria`: tem de ser o do cliente e não o do proxy do Render (confere o `trust proxy` de 1 salto).

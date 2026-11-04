@@ -87,12 +87,13 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
       res.json({
         clientes: rows.map(r => {
           const situacaoPortal = r.situacao_portal || 'nao_liberada';
+          const semNome = !r.RAZAO_SOCIAL || !String(r.RAZAO_SOCIAL).trim();
           const item = {
             codigo: r.CODIGO, razaoSocial: r.RAZAO_SOCIAL || '', cnpjCpf: r.CNPJ_CPF || '', situacaoPortal,
-            liberavel: !r.situacao_portal && !!r.RAZAO_SOCIAL && Number(r.qtd_nome) === 1
+            liberavel: !r.situacao_portal && !semNome && Number(r.qtd_nome) === 1
           };
           if (r.situacao_portal) item.motivo = MOTIVOS_LIBERAR.ja_liberada;
-          else if (!r.RAZAO_SOCIAL) item.motivo = MOTIVOS_LIBERAR.sem_nome;
+          else if (semNome) item.motivo = MOTIVOS_LIBERAR.sem_nome;
           else if (Number(r.qtd_nome) !== 1) item.motivo = MSG_NOME_DUPLICADO;
           return item;
         })

@@ -19,7 +19,7 @@ async function empresaLiberavel(pool, clienteCodigo, { aoLiberar = false } = {})
   const [cad] = await pool.execute('SELECT RAZAO_SOCIAL FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [clienteCodigo]);
   if (!cad.length) return { ok: false, motivo: 'inexistente' };
   const razaoSocial = cad[0].RAZAO_SOCIAL;
-  if (!razaoSocial) return { ok: false, motivo: 'sem_nome' }; // razão social vazia não identifica a empresa nos pedidos
+  if (!razaoSocial || !String(razaoSocial).trim()) return { ok: false, motivo: 'sem_nome' }; // razão social vazia não identifica a empresa nos pedidos
   const [cont] = await pool.execute('SELECT COUNT(*) AS n FROM cadastro_clientes WHERE RAZAO_SOCIAL = ?', [razaoSocial]);
   if (Number(cont[0].n) !== 1) return { ok: false, motivo: 'nome_duplicado' };
   if (aoLiberar) {

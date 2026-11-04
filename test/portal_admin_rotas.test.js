@@ -533,6 +533,20 @@ test('razão social vazia: a lista marca como não liberável com motivo e liber
   assert.equal(dados.empresas.length, 0);
 });
 
+test('razão social só com espaços: não liberável e liberar responde 409 com a mesma mensagem', async t => {
+  const { chamar, dados } = await preparar(t, { inicial: {
+    clientes: [{ CODIGO: 22, RAZAO_SOCIAL: '   ', CNPJ_CPF: '' }]
+  } });
+  const lista = await (await chamar(1, '/admin/portal/clientes')).json();
+  const item = lista.clientes.find(c => c.codigo === 22);
+  assert.equal(item.liberavel, false);
+  assert.equal(item.motivo, 'O cadastro está sem razão social.');
+  const r = await chamar(1, '/admin/portal/empresas', 'POST', { clienteCodigo: 22 });
+  assert.equal(r.status, 409);
+  assert.equal((await r.json()).error, 'O cadastro está sem razão social.');
+  assert.equal(dados.empresas.length, 0);
+});
+
 // ---- M2: o link do convite, o token e o e-mail do convidado nunca vão a log ----
 test('convite, reenvio e reinício (com e sem e-mail enviado): nenhum console.log/error/warn leva o token, o link nem o e-mail do convidado', async t => {
   for (const enviar of [undefined, async () => ok, async () => { throw new Error('SMTP caiu para seguro@alfa.com'); }]) {

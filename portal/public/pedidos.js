@@ -29,6 +29,8 @@
 
   async function carregar(pagina) {
     erro.textContent = '';
+    const anteriorAntes = anterior.disabled;
+    const proximaAntes = proxima.disabled;
     anterior.disabled = true;
     proxima.disabled = true;
     const r = await chamar('/portal/api/pedidos?pagina=' + pagina);
@@ -37,6 +39,9 @@
       return;
     }
     if (r.status !== 200 || !r.dados || !Array.isArray(r.dados.pedidos)) {
+      // falhou: a tabela e a página atual ficam como estavam e os botões voltam, para tentar de novo sem recarregar
+      anterior.disabled = anteriorAntes;
+      proxima.disabled = proximaAntes;
       erro.textContent = (r.dados && typeof r.dados.error === 'string' && r.dados.error) || 'Não foi possível carregar seus pedidos.';
       return;
     }

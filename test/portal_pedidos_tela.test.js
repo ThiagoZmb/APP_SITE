@@ -86,6 +86,28 @@ test('pedidos.js (vm): Próxima carrega a página 2 e a última desabilita Próx
   assert.deepEqual(celulas(get('corpo').children[0]), ['1', '02/01/2026', 'Pronto', 'Entrega agendada', '10/01/2026']);
 });
 
+test('pedidos.js (vm): falha ao avançar mantém a tabela antiga, a página atual e Próxima habilitada para tentar de novo', async () => {
+  let falhar = true;
+  const { get, chamadas } = rodar(c => {
+    if (c.endsWith('pagina=2') && falhar) return { status: 500, dados: { error: 'Erro de servidor' } };
+    return { status: 200, dados: { pagina: Number(c.split('=')[1]), temMais: c.endsWith('pagina=1'), pedidos: [
+      { numero: Number(c.split('=')[1]), data: '2026-01-02', situacao: 'Pronto', dataEntrega: null, entrega: null, dataAgendada: null }] } };
+  });
+  await esperar();
+  await get('proxima').ouvintes.click();
+  assert.equal(get('erro').textContent, 'Erro de servidor');
+  assert.equal(get('proxima').disabled, false, 'Próxima continua habilitada');
+  assert.equal(get('anterior').disabled, true, 'continua na página 1');
+  assert.equal(get('corpo').children.length, 1);
+  assert.equal(celulas(get('corpo').children[0])[0], '1', 'tabela antiga mantida');
+  falhar = false;
+  await get('proxima').ouvintes.click();
+  assert.equal(chamadas[chamadas.length - 1], '/portal/api/pedidos?pagina=2');
+  assert.equal(celulas(get('corpo').children[0])[0], '2');
+  assert.equal(get('anterior').disabled, false);
+  assert.equal(get('proxima').disabled, true);
+});
+
 test('pedidos.js (vm): lista vazia, 401 e erro', async () => {
   let r = rodar({ status: 200, dados: { pagina: 1, temMais: false, pedidos: [] } });
   await esperar();
