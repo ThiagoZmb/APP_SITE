@@ -5,13 +5,12 @@
 // O token do convite existe só em memória: o banco recebe o hash e o link (com o token no
 // fragmento) só é devolvido à equipe quando o e-mail NÃO foi enviado. Auditoria só com ids.
 // ==========================================================================
-const { novoTokenOpaco } = require('../portal/tokens');
+const { criarConvite, invalidarConvites, responderConviteJson } = require('../portal/convites');
 const { empresaLiberavel } = require('../portal/acesso');
 const { ErroUsuario } = require('./transacao');
 const { emTransacaoPortal } = require('../portal/transacao');
 
 const GERIR = ['portal.gerir'];
-const VALIDADE_CONVITE_MS = 48 * 60 * 60 * 1000;
 const LIMITE_EMAIL = 190;
 const LIMITE_LISTA = 50;
 const REGEX_EMAIL = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
@@ -49,22 +48,10 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
   };
 
-  // convite novo de 48 h; o hash vai ao banco e o token em claro volta só para montar o link
-  async function criarConvite(conn, usuarioId, quem) {
-    const { token, hash } = novoTokenOpaco();
-    const agora = new Date();
-    await conn.execute(
-      'INSERT INTO web_portal_convites (token_hash, usuario_id, expira_em, criado_por, criado_em) VALUES (?, ?, ?, ?, ?)',
-      [hash, usuarioId, new Date(agora.getTime() + VALIDADE_CONVITE_MS), quem, agora]);
-    return token;
-  }
-
   // depois do commit: tenta o e-mail; sem envio devolve o link para a equipe repassar à mão
-  async function responderConvite(res, { token, para, razaoSocial }) {
-    const link = `${config.baseUrl}/portal/convite.html#${token}`;
-    let enviado = false;
-    try { enviado = !!(await email.enviarConvite({ para, link, razaoSocial })).enviado; } catch { enviado = false; }
-    res.json(enviado ? { emailEnviado: true } : { emailEnviado: false, link });
+  async function responderConvite(res, dados) {
+    const r = await responderConviteJson({ config, email }, dados);
+    res.json(r.enviado ? { emailEnviado: true } : { emailEnviado: false, link: r.link });
   }
 
   const portalInativo = (req, res) => {
@@ -220,10 +207,6 @@ function registrarPortalAdmin({ rota, pool, sessoes, email, config }) {
     if (!us.length) throw new ErroUsuario(404, 'Usuário não encontrado.');
     return us[0];
   }
-
-  // convites antigos do usuário deixam de valer
-  const invalidarConvites = (conn, usuarioId) =>
-    conn.execute('UPDATE web_portal_convites SET usado_em = ? WHERE usuario_id = ? AND usado_em IS NULL', [new Date(), usuarioId]);
 
   rota('post', '/admin/portal/usuarios/:id/reenviar_convite', GERIR, async (req, res) => {
     if (portalInativo(req, res)) return;

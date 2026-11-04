@@ -27,7 +27,7 @@ const MSG_CONVITE = { error: 'Convite inválido ou expirado.' };
 const MSG_LOGIN = { error: 'E-mail, senha ou código inválidos.' };
 const MSG_LIMITE = { error: 'Muitas tentativas. Aguarde alguns minutos.' };
 const COOKIE_RE = /^__Host-portal=[A-Za-z0-9_-]{43}; Max-Age=28800; HttpOnly; Secure; SameSite=Strict; Path=\/$/;
-const TRES = ['documentos.ver', 'financeiro.ver', 'pedidos.ver'];
+const TRES = ['documentos.ver', 'financeiro.ver', 'pedidos.ver', 'usuarios.gerir']; // administrador geral: as 4 (usuarios.gerir é só dele)
 
 // Monta um app de teste com o registro REAL e as rotas de portal/auth, sobre o banco falso.
 // Usuários: 1 Ana (ativa, admin_geral, empresa 40), 3 Bia (ativa, empresa 41 suspensa), 4 Ivo (inativo),

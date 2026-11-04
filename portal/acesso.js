@@ -7,7 +7,10 @@
 const { NOME_COOKIE, lerCookie } = require('./cookie');
 
 // As permissões do portal (a permissão de funcionário nunca vale aqui)
-const PERMISSOES_PORTAL = ['pedidos.ver', 'documentos.ver', 'financeiro.ver'];
+// PERMISSOES_CONCEDIVEIS podem ser gravadas em web_portal_permissoes; `usuarios.gerir` é só do
+// administrador geral (pelo papel) e NUNCA vale por linha gravada.
+const PERMISSOES_CONCEDIVEIS = ['pedidos.ver', 'documentos.ver', 'financeiro.ver'];
+const PERMISSOES_PORTAL = [...PERMISSOES_CONCEDIVEIS, 'usuarios.gerir'];
 
 const NAO_AUTENTICADO = { error: 'Sessão expirada. Entre novamente.' };
 const METODOS_SEGUROS = new Set(['GET', 'HEAD']);
@@ -29,11 +32,11 @@ async function empresaLiberavel(pool, clienteCodigo, { aoLiberar = false } = {})
   return { ok: true, razaoSocial };
 }
 
-// Permissões do usuário do portal: o administrador geral tem as três; os demais, as gravadas (só as conhecidas).
+// Permissões do usuário do portal: o administrador geral tem as quatro; os demais, as gravadas concedíveis.
 async function carregarPermissoesPortal(pool, usuarioId, papel) {
   if (papel === 'admin_geral') return new Set(PERMISSOES_PORTAL);
   const [ps] = await pool.execute('SELECT permissao FROM web_portal_permissoes WHERE usuario_id = ?', [usuarioId]);
-  return new Set(ps.map(p => p.permissao).filter(p => PERMISSOES_PORTAL.includes(p)));
+  return new Set(ps.map(p => p.permissao).filter(p => PERMISSOES_CONCEDIVEIS.includes(p)));
 }
 
 function criarAcessoPortal({ pool, sessoes, config }) {
@@ -86,4 +89,4 @@ function criarAcessoPortal({ pool, sessoes, config }) {
   return { portalAtivo, portalAutenticar };
 }
 
-module.exports = { criarAcessoPortal, empresaLiberavel, carregarPermissoesPortal, PERMISSOES_PORTAL };
+module.exports = { criarAcessoPortal, empresaLiberavel, carregarPermissoesPortal, PERMISSOES_PORTAL, PERMISSOES_CONCEDIVEIS };

@@ -17,7 +17,7 @@ const { criarOpcoesCors } = require('../portal/cors');
 const { criarRegistro } = require('../seguranca/rotas');
 
 const BASE = 'https://portal.exemplo.com';
-const TRES = ['pedidos.ver', 'documentos.ver', 'financeiro.ver'];
+const TRES = ['pedidos.ver', 'documentos.ver', 'financeiro.ver', 'usuarios.gerir']; // as do administrador geral (a 4ª nunca é concedível)
 
 function cenario({ ativo = true } = {}) {
   const banco = criarBancoPortal();
@@ -86,7 +86,7 @@ test('200 com sessão válida e req.portal completo', async t => {
   });
 });
 
-test('administrador geral recebe as três permissões do portal', async t => {
+test('administrador geral recebe as quatro permissões do portal', async t => {
   const c = cenario();
   const s = await subirApp(c);
   t.after(s.fechar);
@@ -94,6 +94,16 @@ test('administrador geral recebe as três permissões do portal', async t => {
   const j = await (await fetch(s.url + '/portal/teste', { headers: cookie(token) })).json();
   assert.deepEqual(j.permissoes, [...TRES].sort());
   assert.equal(j.papel, 'admin_geral');
+});
+
+test('usuário comum com usuarios.gerir gravada recebe só as concedíveis', async t => {
+  const c = cenario();
+  c.banco.dados.permissoes.push({ usuario_id: 2, permissao: 'usuarios.gerir' });
+  const s = await subirApp(c);
+  t.after(s.fechar);
+  const token = await c.sessoes.criar(2, null);
+  const j = await (await fetch(s.url + '/portal/teste', { headers: cookie(token) })).json();
+  assert.deepEqual(j.permissoes, ['pedidos.ver']);
 });
 
 for (const situacao of ['convidado', 'inativo']) {
