@@ -46,6 +46,19 @@ function divergenciaIdaVolta(grupos, cfgs, seqs) {
   return null;
 }
 
+// Junta linhas de folha idênticas (mesmas colunas de IDA_VOLTA exceto QTD e mesma sequência/lado de furos), na ordem da primeira aparição, como agruparFolhas
+function colapsarLinhasIguais(cfgs, seqs) {
+  const mapa = new Map();
+  cfgs.forEach((c, k) => {
+    const chave = Object.keys(IDA_VOLTA).filter(col => col !== 'QTD').map(col => (typeof c[col] === 'number' ? String(num(c[col])) : txt(c[col]))).join('|')
+      + '#' + (seqs.length ? `${seqs[k].lado}|${seqs[k].medidas.join()}` : '');
+    if (mapa.has(chave)) mapa.get(chave).cfg.QTD = num(mapa.get(chave).cfg.QTD) + num(c.QTD);
+    else mapa.set(chave, { cfg: { ...c }, seq: seqs[k] });
+  });
+  const itens = [...mapa.values()];
+  return { cfgs: itens.map(i => i.cfg), seqs: seqs.length ? itens.map(i => i.seq) : [] };
+}
+
 function cabecalhoDe(c) {
   return {
     tipo: c.TIPO, numero: Number(c.NUMERO), razaoSocial: c.RAZAO_SOCIAL, clienteFinal: txt(c.CLIENTE_FINAL), obsGeral: txt(c.OBS_GERAL),
@@ -130,7 +143,13 @@ function traduzirPorta(l, linhas, sistemas) {
 
   // ida e volta: o que a gravação geraria a partir da tradução precisa ser o que está no banco
   const grupos = agruparFolhas(folhasDoItem(item, { descontoAlturaSistema: sistema?.descontoAltura || 0 }));
-  const divergencia = divergenciaIdaVolta(grupos, cfgs, seqs);
+  let divergencia = divergenciaIdaVolta(grupos, cfgs, seqs);
+  // gravação antiga da web: uma linha por folha (QTD 1) ou linhas iguais separadas; hoje as folhas iguais ficam numa linha só.
+  // Linhas idênticas em tudo (colunas + furos + lado) são o mesmo grupo: junta (soma QTD) e confere de novo. Ao salvar, vai no formato atual.
+  if (divergencia && cfgs.length > 1) {
+    const c = colapsarLinhasIguais(cfgs, seqs);
+    if (c.cfgs.length < cfgs.length) divergencia = divergenciaIdaVolta(grupos, c.cfgs, c.seqs);
+  }
   if (divergencia) throw new Trava('a tradução não reproduz o que está gravado', divergencia);
   return item;
 }

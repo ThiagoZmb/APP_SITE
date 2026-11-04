@@ -225,3 +225,44 @@ test('detalheTecnico: nome de campo não casa com REGEX_VALOR (a rota não apaga
   const { REGEX_VALOR } = require('../seguranca/valores');
   assert.equal(REGEX_VALOR.test('detalheTecnico'), false);
 });
+
+// Gravação antiga da web: uma linha por folha (QTD 1, "Folha 1/2/3") com furos por folha. Hoje as folhas iguais ficam numa linha só.
+// Linhas idênticas viram o mesmo grupo na leitura (gravado=3, regenerado=2 antes da correção); ao salvar de novo vai no formato atual.
+for (const [nome, lados, esperadoLinhas] of [
+  ['lados D,D,E (adjacentes iguais)', ['Direito', 'Direito', 'Esquerdo'], 2],
+  ['lados D,E,D (iguais separadas)', ['Direito', 'Esquerdo', 'Direito'], 2],
+  ['lados D,D,D', ['Direito', 'Direito', 'Direito'], 1]
+]) {
+  test(`gravação antiga, uma linha por folha: ${nome} reabre editável e converte em Pedido`, async t => {
+    const { banco, chamar, abrir } = await preparar(t);
+    const r = await chamar('/ped_orc/salvar', 'POST', corpo('Orçamento', [itemDoDono()]));
+    const { numero } = await r.json();
+    const base = { ...banco.itensV4[0] };
+    banco.itensV4.length = 0;
+    lados.forEach((_, k) => banco.itensV4.push({ ...base, ITEM: k + 1, PORTA: `Folha ${k + 1}`, QTD: 1, TOTAL: base.UNITARIO }));
+    banco.furacao.length = 0;
+    lados.forEach((lado, k) => [100, 700, 1300, 1900].forEach((tam, i) => banco.furacao.push({ NUMERO: numero, TIPO: 'Orçamento', ITEM: 1, FURO: i + 1, LADO: lado, TAMANHO: tam })));
+    const j = await abrir('Orçamento', numero);
+    assert.equal(j.itens[0].travado, undefined, `${j.itens[0].motivo} -> ${j.itens[0].detalheTecnico}`);
+    assert.equal(j.itens[0].qtd, 3);
+    assert.deepEqual(j.itens[0].furos.lados, lados);
+    // editar e regravar: sai no formato atual (folhas iguais agrupadas) e continua legível
+    const itens = comoTelaDe(j).map(it => ({ ...it, origem: { ...it.origem, estado: 'editado' } }));
+    const s = await chamar('/ped_orc/salvar', 'POST', sobre(j, { itens }));
+    assert.equal(s.status, 200, JSON.stringify(await s.clone().json()));
+    const j2 = await abrir('Orçamento', numero);
+    assert.equal(j2.itens[0].travado, undefined, `${j2.itens[0].motivo} -> ${j2.itens[0].detalheTecnico}`);
+    assert.equal(banco.itensV4.filter(x => Number(x.ITEM_PEDIDO) === 1).length, esperadoLinhas);
+    const p = await chamar('/ped_orc/salvar', 'POST', { ...corpo('Pedido', comoTelaDe(j2).map(({ origem, ...i }) => i)), modo: 'novo' });
+    assert.equal(p.status, 200, JSON.stringify(await p.clone().json()));
+  });
+}
+
+test('linhas de folha realmente diferentes continuam travando (não afrouxa a proteção)', async t => {
+  const { banco, traduzir } = await gravadoDoDono(t);
+  const base = { ...banco.itensV4[0] };
+  banco.itensV4.length = 0;
+  [1, 2].forEach(k => banco.itensV4.push({ ...base, ITEM: k, QTD: k === 1 ? 2 : 1, ALTURA: k === 1 ? 2234 : 2000 }));
+  const it = traduzir();
+  assert.equal(it.travado, true);
+});
