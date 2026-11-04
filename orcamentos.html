@@ -2782,6 +2782,14 @@
             const quantidades = pecasSerr.map(p => Math.max(1, parseInt(p.qtd) || 1));
             return quantidades.every(q => q === quantidades[0]) ? quantidades[0] : 1;
         }
+        // Valor UNITÁRIO do item de serralheria = total do item ÷ quantidade do item (a mesma conta de precoSerralheria no servidor):
+        // total = Σ (valor de 1 peça × quantidade da peça) + Σ complementos; o unitário divide tudo pela quantidade do item,
+        // senão com 3 conjuntos o total seria multiplicado duas vezes (peça ×3 e depois item ×3).
+        function valorUnitarioSerralheria(pecas, complementos, qtdItem) {
+            const totalPecas = pecas.reduce((soma, p) => soma + p.valor * (p.qtd || 1), 0);
+            const totalComplementos = complementos.reduce((soma, c) => soma + c.valorTotal, 0);
+            return (totalPecas + totalComplementos) / Math.max(1, qtdItem);
+        }
         function atualizarValorSerralheria() {
             const qtd = qtdSerralheriaItem();
             const pecasPrecificadas = pecasSerr.every(p => Number.isFinite(p.valor));
@@ -2790,9 +2798,7 @@
             if (!pecasPrecificadas || !complementosPrecificados) {
                 valor.value = '';
             } else {
-                const totalPecas = pecasSerr.reduce((soma, p) => soma + p.valor * (p.qtd || 1), 0);
-                const totalComplementos = complementosSerr.reduce((soma, c) => soma + c.valorTotal, 0);
-                valor.value = ((totalPecas + totalComplementos / qtd) || 0).toFixed(2);
+                valor.value = (valorUnitarioSerralheria(pecasSerr, complementosSerr, qtd) || 0).toFixed(2);
             }
             const total = (parseFloat(valor.value.replace(',', '.')) || 0) * qtd;
             document.getElementById('f-total-item').value = total.toFixed(2).replace('.', ',');

@@ -38,3 +38,24 @@ test('a tela mostra e soma quantidade e valor de cada peça separadamente', () =
   assert.match(html, /s \+ \(p\.valor \|\| 0\) \* \(p\.qtd \|\| 1\)/);
   assert.match(html, /quantidades\.every\(q => q === quantidades\[0\]\) \? quantidades\[0\] : 1/);
 });
+
+test('serralheria na tela: valor unitário = total do item ÷ quantidade (mesma conta do servidor); 3 conjuntos não multiplica duas vezes', () => {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+  const h = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
+  const ini = h.indexOf('function valorUnitarioSerralheria(pecas, complementos, qtdItem) {');
+  assert.ok(ini > 0, 'função presente');
+  const corpo = /^function valorUnitarioSerralheria\(pecas, complementos, qtdItem\) \{[\s\S]*?\r?\n        \}/.exec(h.slice(ini))[0];
+  const { valorUnitarioSerralheria: f } = vm.runInNewContext(corpo + '\n({ valorUnitarioSerralheria })');
+  const peca = (valor, qtd) => ({ valor, qtd });
+  // o caso real do pedido: 1 peça de R$ 857,31, quantidade 3 na peça e 3 no item => unitário 857,31 e total 2.571,93 (o PDF está certo)
+  const unit3 = f([peca(857.31, 3)], [], 3);
+  assert.equal(Math.round(unit3 * 100) / 100, 857.31);
+  assert.equal(Math.round(unit3 * 3 * 100) / 100, 2571.93);
+  // quantidade 1: igual ao valor da peça
+  assert.equal(Math.round(f([peca(857.31, 1)], [], 1) * 100) / 100, 857.31);
+  // quantidades diferentes entre as peças: o item vale 1 e o unitário é a soma de valor × quantidade
+  assert.equal(Math.round(f([peca(100, 2), peca(50, 4)], [], 1) * 100) / 100, 400);
+  // complementos entram no total do item e também são divididos pela quantidade do item
+  assert.equal(Math.round(f([peca(100, 3)], [{ valorTotal: 30 }], 3) * 100) / 100, 110);
+  assert.equal(Math.round(f([peca(18, 18)], [], 18) * 100) / 100, 18);
+});
