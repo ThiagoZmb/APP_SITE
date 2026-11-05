@@ -58,6 +58,14 @@ const CATALOGO = [
   { codigo: 'corte.ver', nome: 'Ver o plano de corte dos pedidos e os retalhos', area: 'Plano de corte' },
   { codigo: 'corte.planejar', nome: 'Gerar, salvar, conferir e confirmar o plano de corte', area: 'Plano de corte' },
   { codigo: 'corte.parametros', nome: 'Editar vara, serra e sobra mínima e cadastrar retalhos à mão', area: 'Plano de corte' },
+  { codigo: 'etapas.ver', nome: 'Ver a tela de etapas de produção dos pedidos', area: 'Etapas de produção' },
+  { codigo: 'etapas.corte_perfil', nome: 'Dar OK na etapa Perfil cortado', area: 'Etapas de produção' },
+  { codigo: 'etapas.corte_vidro', nome: 'Dar OK na etapa Vidro cortado', area: 'Etapas de produção' },
+  { codigo: 'etapas.pintura_perfil', nome: 'Dar OK na etapa Perfil pintado', area: 'Etapas de produção' },
+  { codigo: 'etapas.pintura_vidro', nome: 'Dar OK na etapa Vidro pintado', area: 'Etapas de produção' },
+  { codigo: 'etapas.montagem', nome: 'Dar OK na etapa Portas montadas', area: 'Etapas de produção' },
+  { codigo: 'etapas.finalizar', nome: 'Dar OK em Pedido finalizado (marca o pedido como Pronto)', area: 'Etapas de produção' },
+  { codigo: 'etapas.gerir', nome: 'Gerir todas as etapas de produção: qualquer etapa, N/A, desfazer e forçar o finalizado', area: 'Etapas de produção' },
   { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos e Gestão; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' },
@@ -68,7 +76,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS.filter(c => c !== 'atendimento.modo') },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

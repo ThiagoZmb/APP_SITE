@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Etapas de produção</title>
+    <link rel="stylesheet" href="etapas_producao.css?v=202611061400">
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611061400" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="etapas_producao.js?v=202611061400" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Etapas de produção</h1>
+            <p class="welcome-subtitle">Cada setor dá OK na sua parte. "Pedido finalizado" marca o pedido como Pronto. O corte confirmado marca o corte sozinho.</p>
+
+            <section class="painel" id="etp-corpo-painel" aria-label="Pedidos em produção e suas etapas">
+                <div class="etp-topo">
+                    <div class="etp-campo">
+                        <label for="etp-busca">Buscar</label>
+                        <input type="search" id="etp-busca" placeholder="Nº do pedido ou cliente" autocomplete="off" data-foco-busca>
+                    </div>
+                    <div class="etp-campo">
+                        <label for="etp-falta">O que falta</label>
+                        <select id="etp-falta"></select>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="etp-minha" aria-pressed="false" title="Mostra só os pedidos com etapa pendente que você pode marcar e destaca essas colunas">Minha etapa</button>
+                    <label class="etp-check"><input type="checkbox" id="etp-abertos"> Mostrar todos em aberto</label>
+                    <div class="etp-estado">
+                        <span class="cinza" id="etp-resumo"></span>
+                        <span class="cinza" id="etp-atualizado">carregando…</span>
+                        <button type="button" class="btn btn-mini" id="etp-recarregar" aria-label="Atualizar agora">↻ Atualizar</button>
+                    </div>
+                </div>
+                <div class="etp-legenda" id="etp-legenda" hidden>
+                    <span><span class="selo ok">✓ OK</span> feito</span>
+                    <span><span class="selo">○ Pendente</span> falta fazer</span>
+                    <span><span class="selo">N/A</span> não se aplica</span>
+                    <span>"pelo corte" = marcado sozinho ao confirmar o corte</span>
+                    <span>apagado = só leitura (sem permissão)</span>
+                </div>
+                <p class="cinza etp-ajuda" id="etp-erro" role="alert" hidden></p>
+                <div class="etp-rolagem">
+                    <table class="etp-tabela" id="etp-tabela">
+                        <thead id="etp-thead"></thead>
+                        <tbody id="etp-corpo"></tbody>
+                    </table>
+                </div>
+                <p class="cinza etp-ajuda">Toque na etapa para marcar OK (tocar de novo pergunta se quer desfazer). Botão direito, tecla de menu ou Shift+F10 na etapa (no celular, o botão ⋯) abrem: marcar OK, desfazer, N/A e histórico.</p>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

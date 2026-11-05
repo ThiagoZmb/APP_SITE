@@ -7,6 +7,8 @@ const { PADRAO, otimizarVidros } = require('../calculo/vidro_otimizacao');
 const { montarPecasVidro, chaveGrupoVidro, impressaoPecasVidro, normalizar } = require('../calculo/vidro_pecas');
 const { validarConfigVidros, validarRetalhoVidro, validarConferenciaVidros } = require('../calculo/vidro_validacao');
 const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');
+const { reavaliarEtapaCorte } = require('./etapas_banco');   // etapas de produção: "Vidro cortado" automático
+const { contarPecasPlano, contarCortadas } = require('../calculo/etapas_producao');
 
 const VER = ['corte.ver'];
 const PARAMETROS = ['corte.ver', 'corte.parametros'];
@@ -70,6 +72,25 @@ async function lerPecasVidroDoPedido(db, numero) {
   const [itens] = await db.execute("SELECT ITEM_PEDIDO, REVESTIMENTO, COR_REVESTIMENTO FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = 'Pedido'", [numero]);
   return { ...montarPecasVidro({ vidros, itens }), vazio: vidros.length === 0 };
 }
+
+// Estado do corte de vidros do pedido para a etapa "Vidro cortado" (rotas/etapas_banco.js): peças e pendências de agora e o plano ativo
+// (o último não cancelado nem excluído), com a impressão conferida contra o pedido de agora e as peças marcadas como cortadas.
+async function estadoCorteVidroParaEtapa(db, numero) {
+  const base = await lerPecasVidroDoPedido(db, numero);
+  const ativo = await planoAtivo(db, numero);
+  let plano = null;
+  if (ativo) {
+    const [[p] = []] = await db.execute('SELECT id, pedido, situacao, impressao_pecas, parametros, resultado, progresso, criado_por, criado_em, conferido_por, conferido_em FROM web_vidro_planos WHERE id = ?', [ativo.id]);
+    if (p) {
+      const salvo = lerJson(p.resultado, {}).plano || { grupos: [] };
+      plano = { id: Number(p.id), situacao: p.situacao, impressaoConfere: p.impressao_pecas === impressaoPecasVidro(base.pecas),
+        qtdPecasPlano: contarPecasPlano(salvo, 'chapas'), qtdCortadas: contarCortadas(salvo, 'chapas', lerJson(p.progresso, [])) };
+    }
+  }
+  return { qtdPecas: base.pecas.length, qtdPendencias: base.pendencias.length, plano };
+}
+// depois do commit: reavalia "Vidro cortado" (nunca lança; falha só vai para o log)
+const etapaAposCorte = (pool, numero, quem, motivo) => reavaliarEtapaCorte(pool, { numero, grupo: 'vidro', quem, estadoCorte: estadoCorteVidroParaEtapa, motivo });
 
 // escolhas: { chave: produtoCodigo }. planoId: reservas desse plano contam como disponíveis (é o plano que será substituído).
 // Produto escolhido que não é candidato (inativo, fora da classe, inexistente) vira erro explicado do grupo.
@@ -420,9 +441,11 @@ function registrarCorteVidros({ rota, pool }) {
     // retalhos não usados: ausente = nenhum; presente e fora do formato = 400 antes de qualquer escrita
     if (corpo.retalhosNaoUsados !== undefined && !(Array.isArray(corpo.retalhosNaoUsados) && corpo.retalhosNaoUsados.every(x => Number.isInteger(x) && x > 0)))
       return res.status(400).json({ error: 'Lista de retalhos não usados inválida.' });
+    let pedido = null;
     const r = await emTransacao(pool, res, 'POST /corte_vidros/plano/:id/confirmar', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
+      pedido = Number(p.pedido);
       const plano = lerJson(p.resultado, {}).plano || { grupos: [] };
       const conf = validarConferenciaVidros(corpo, plano);
       if (!conf.ok) throw new ErroUsuario(400, conf.erro);
@@ -462,6 +485,7 @@ function registrarCorteVidros({ rota, pool }) {
       if (baixadas.length) await auditarConn(conn, quem, 'corte_vidros_baixa_estoque', id, { campos: ['estoque'], pedido: Number(p.pedido), itens: baixadas });
       return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, baixas: baixadas };
     });
+    if (r) await etapaAposCorte(pool, pedido, req.acesso?.nome || '', 'corte conferido');   // transação própria, depois do commit do corte
     if (r) res.json(r);
   });
 
@@ -492,22 +516,26 @@ function registrarCorteVidros({ rota, pool }) {
         { campos: ['planos', 'retalhos'], pedido: numero, planos: planos.map(p => Number(p.id)), qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados });
       return { ok: true, pedido: numero, qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados };
     });
+    if (r) await etapaAposCorte(pool, numero, req.acesso?.nome || '', 'dados do corte excluídos');   // sem plano conferido: o OK automático volta a pendente
     if (r) res.json(r);
   });
 
   rota('post', '/corte_vidros/plano/:id/cancelar', PLANEJAR, async (req, res) => {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
+    let pedido = null;
     const r = await emTransacao(pool, res, 'POST /corte_vidros/plano/:id/cancelar', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
+      pedido = Number(p.pedido);
       await liberarReservas(conn, id);
       await cancelarPlano(conn, id);
       await auditarConn(conn, req.acesso?.nome, 'corte_vidros_plano_cancelado', id, { campos: ['situacao'], pedido: Number(p.pedido) });
       return { ok: true, id, situacao: 'cancelado' };
     });
+    if (r) await etapaAposCorte(pool, pedido, req.acesso?.nome || '', 'plano cancelado');
     if (r) res.json(r);
   });
 }
 
-module.exports = { registrarCorteVidros, liberarPlanosVidroDoPedido };
+module.exports = { registrarCorteVidros, liberarPlanosVidroDoPedido, estadoCorteVidroParaEtapa, lerPecasVidroDoPedido };

@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 58 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 58);
-  assert.equal(CODIGOS.size, 58);
+test('catálogo tem 66 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 66);
+  assert.equal(CODIGOS.size, 66);
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
@@ -15,11 +15,11 @@ test('catálogo tem 58 permissões e códigos únicos', () => {
 
 test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e excluir', () => {
   const p = perfil('Interno completo');
-  assert.equal(p.permissoes.length, 42); // + perfis.desenho, + danfe.ver, orcamentos.situacao, pesos.*, notas.*, atendimento.modo, + fornecedores.*, tintas.*, corte.ver/planejar, compras_nfe.* e pedidos.checklist/checklist.enviar
+  assert.equal(p.permissoes.length, 48); // + etapas.ver e as 5 etapas de produção (não finalizar nem gerir), + perfis.desenho, + danfe.ver, orcamentos.situacao, pesos.*, notas.*, atendimento.modo, + fornecedores.*, tintas.*, corte.ver/planejar, compras_nfe.* e pedidos.checklist/checklist.enviar
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil("Administrador").permissoes.length, 57);
+  assert.equal(perfil("Administrador").permissoes.length, 65);
   assert.ok(p.permissoes.includes('corte.ver') && p.permissoes.includes('corte.planejar')); // plano de corte: Interno completo planeja
   assert.ok(!p.permissoes.includes('corte.parametros')); // parâmetros e retalhos manuais: só o Administrador
   assert.ok(!p.permissoes.includes('gestao.ver') && !p.permissoes.includes('gestao.editar')); // Central de Gestão: só o Administrador na migração
@@ -102,4 +102,14 @@ test('tintas: Administrador e Interno completo recebem tintas.ver e tintas.edita
     assert.ok(perfil('Interno completo').permissoes.includes(c), c);
   }
   for (const n of ['Vendedor', 'Estoquista', 'Representante']) assert.ok(!perfil(n).permissoes.some(c => c.startsWith('tintas.')), n);
+});
+
+test('etapas de produção: no catálogo (área Etapas de produção); Interno completo ganha ver e as 5 etapas, não finalizar nem gerir; Administrador tem tudo', () => {
+  const etapas = ['etapas.ver', 'etapas.corte_perfil', 'etapas.corte_vidro', 'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'etapas.gerir'];
+  for (const c of etapas) { assert.ok(CODIGOS.has(c), c); assert.equal(CATALOGO.find(p => p.codigo === c).area, 'Etapas de produção'); }
+  const ic = perfil('Interno completo').permissoes;
+  for (const c of etapas.slice(0, 6)) assert.ok(ic.includes(c), c);
+  assert.ok(!ic.includes('etapas.finalizar') && !ic.includes('etapas.gerir'));
+  for (const c of etapas) assert.ok(perfil('Administrador').permissoes.includes(c), c);
+  for (const n of ['Vendedor', 'Estoquista', 'Representante']) assert.ok(!perfil(n).permissoes.some(c => c.startsWith('etapas.')), n);
 });

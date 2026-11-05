@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
@@ -41,6 +41,7 @@ const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precific
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
 const { registrarCalendario } = require('./rotas/calendario');
+const { registrarEtapasProducao } = require('./rotas/etapas_producao');
 const { registrarFornecedores } = require('./rotas/fornecedores');
 const { registrarTintas } = require('./rotas/tintas');
 const { registrarPesos } = require('./rotas/pesos');
@@ -1755,6 +1756,7 @@ registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
 registrarCalendario({ rota: registro.rota, pool });
+registrarEtapasProducao({ rota: registro.rota, pool });
 registrarFornecedores({ rota: registro.rota, pool });
 registrarFuncionarios({ rota: registro.rota, pool });
 registrarTintas({ rota: registro.rota, pool });
@@ -1807,6 +1809,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesOrcSituacao(pool)).feito) console.log('[permissões] orcamentos.situacao acrescentada ao Administrador, Interno completo e Representante');
   if ((await acrescentarPermissoesChecklist(pool)).feito) console.log('[permissões] pedidos.checklist acrescentada ao Administrador, Interno completo e auxiliares; checklist.enviar ao Administrador e Interno completo');
   if ((await acrescentarPermissoesPerfisDesenho(pool)).feito) console.log('[permissões] perfis.desenho acrescentada ao Administrador e Interno completo');
+  if ((await acrescentarPermissoesEtapas(pool)).feito) console.log('[permissões] etapas.* acrescentadas ao Administrador; etapas.ver e as 5 etapas de produção ao Interno completo');
   try {
     const sem = await semearPerfilSecoes(pool);
     if (sem.feito) console.log(`[banco] biblioteca de seções de perfil: inseridas ${sem.inseridas.join(',') || '-'}; atualizadas ${sem.atualizadas.join(',') || '-'}`);

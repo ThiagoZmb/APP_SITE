@@ -485,6 +485,33 @@ const TABELAS = [
      detalhe TEXT NULL,
      KEY idx_portal_audit_evento (evento),
      KEY idx_portal_audit_quando (quando)
+   ) ${OPCOES}`,
+  // etapas de produção por pedido (sub-situação): uma linha por pedido e etapa; ausente = pendente ou N/A automático (calculo/etapas_producao.js).
+  // numero = ped_orc.NUMERO (TIPO Pedido) só por referência lógica, sem FK; origem corte = marcada pela confirmação do corte real.
+  `CREATE TABLE IF NOT EXISTS \`web_producao_etapas\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     numero INT NOT NULL,
+     etapa VARCHAR(30) NOT NULL,
+     estado ENUM('pendente','ok','na') NOT NULL DEFAULT 'pendente',
+     origem ENUM('manual','corte') NOT NULL DEFAULT 'manual',
+     usuario VARCHAR(190) NOT NULL DEFAULT '',
+     quando DATETIME NOT NULL,
+     observacao VARCHAR(500) NULL,
+     UNIQUE KEY uq_producao_etapa (numero, etapa)
+   ) ${OPCOES}`,
+  // histórico de cada mudança de etapa (manual, pelo corte ou pelo sistema ao cancelar o pedido)
+  `CREATE TABLE IF NOT EXISTS \`web_producao_etapas_eventos\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     numero INT NOT NULL,
+     etapa VARCHAR(30) NOT NULL,
+     estado_antes VARCHAR(10) NULL,
+     estado_depois VARCHAR(10) NOT NULL,
+     origem ENUM('manual','corte','sistema') NOT NULL,
+     usuario VARCHAR(190) NOT NULL,
+     quando DATETIME NOT NULL,
+     observacao VARCHAR(500) NULL,
+     detalhe TEXT NULL,
+     KEY idx_producao_evento (numero, etapa)
    ) ${OPCOES}`
 ];
 
@@ -1038,4 +1065,32 @@ async function acrescentarPermissoesOrcSituacao(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Etapas de produção: Administrador recebe todas; Interno completo recebe ver e as 5 etapas de chão de fábrica (não finalizar nem gerir:
+// finalizar grava SITUACAO = Pronto, como pedidos.situacao, que na migração é só do Administrador). Uma vez só (auditoria permissoes_etapas).
+const PERMISSOES_ETAPAS = { 'Administrador': ['etapas.ver', 'etapas.corte_perfil', 'etapas.corte_vidro', 'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'etapas.gerir'],
+  'Interno completo': ['etapas.ver', 'etapas.corte_perfil', 'etapas.corte_vidro', 'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem'] };
+async function acrescentarPermissoesEtapas(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_etapas' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) {
+      for (const permissao of PERMISSOES_ETAPAS[p.nome] || []) {
+        await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, permissao]);
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_etapas', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

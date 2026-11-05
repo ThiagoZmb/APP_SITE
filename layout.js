@@ -14,6 +14,7 @@
         clientes: ic('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5"/>'),
         entregas: ic('<path d="M2 6a1 1 0 0 1 1-1h11v11H2z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/>'),
         calendario: ic('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+        etapas: ic('<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11"/><circle cx="5" cy="18" r="1.5"/>'),
         graficos: ic('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
         estoque: ic('<path d="m21 8-9-5-9 5 9 5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'),
         produtos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
@@ -35,10 +36,11 @@
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
         { href: 'corte.html', texto: 'Corte de perfil', icone: 'corte', sub: true },   // subitem de Pedidos (corte de perfis por pedido e retalhos)
         { href: 'corte_vidros.html', texto: 'Corte de vidros', icone: 'corte', sub: true },   // subitem de Pedidos (corte de vidros por pedido, chapas e retalhos)
+        { href: 'calendario.html', texto: 'Calendário de pedidos', icone: 'calendario' },   // previsão de finalização (DATA_PRONTO) em mês; fica logo abaixo de Corte de vidros
+        { href: 'etapas_producao.html', texto: 'Etapas de produção', icone: 'etapas' },   // OK de cada setor por pedido (corte, pintura, montagem, finalizado); logo depois do Calendário
         { href: 'clientes.html', texto: 'Clientes', icone: 'clientes' },
         { href: 'entregas.html', texto: 'Entregas', icone: 'entregas' },
         { href: 'minhas_entregas.html', texto: 'Minhas entregas', icone: 'entregas', sub: true },   // subitem de Entregas (tela do motorista)
-        { href: 'calendario.html', texto: 'Calendário de pedidos', icone: 'calendario' },   // previsão de finalização (DATA_PRONTO) em mês; fica ao lado de Entregas
         { secao: 'Gestão' },
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
@@ -102,6 +104,7 @@
         'corte_vidros.html': ['corte.ver'],
         'usuarios.html': ['admin.usuarios'],
         'portal_admin.html': ['portal.gerir'],
+        'etapas_producao.html': ['etapas.ver'],   // antes de minhas_entregas: quem só tem as etapas (chão de fábrica) cai aqui depois do login
         'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
     };
     window.ACESSO_PAGINAS = PAGINAS;

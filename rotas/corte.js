@@ -6,6 +6,8 @@ const { PADRAO, resolverParametros, otimizar } = require('../calculo/corte_otimi
 const { montarPecas, impressaoPecas } = require('../calculo/corte_pecas');
 const { validarConfig, validarRetalho, validarConferencia } = require('../calculo/corte_validacao');
 const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');   // mesma saída de estoque de POST /estoque/saida
+const { reavaliarEtapaCorte } = require('./etapas_banco');   // etapas de produção: "Perfil cortado" automático
+const { contarPecasPlano, contarCortadas } = require('../calculo/etapas_producao');
 
 const VER = ['corte.ver'];
 const PARAMETROS = ['corte.ver', 'corte.parametros'];
@@ -53,6 +55,25 @@ async function lerPecasDoPedido(db, numero) {
   const [itens] = await db.execute("SELECT ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR, QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL, ALTURA, LARGURA FROM ped_orc_itens_v4 WHERE NUMERO = ? AND TIPO = 'Pedido' ORDER BY ITEM_PEDIDO, ITEM", [numero]);
   return { ...montarPecas({ perfis, itens }), vazio: perfis.length === 0 };
 }
+
+// Estado do corte de perfis do pedido para a etapa "Perfil cortado" (rotas/etapas_banco.js): peças e pendências de agora e o plano ativo
+// (o último não cancelado nem excluído), com a impressão conferida contra o pedido de agora e as peças marcadas como cortadas.
+async function estadoCorteParaEtapa(db, numero) {
+  const base = await lerPecasDoPedido(db, numero);
+  const ativo = await planoAtivo(db, numero);
+  let plano = null;
+  if (ativo) {
+    const [[p] = []] = await db.execute('SELECT id, pedido, situacao, impressao_pecas, parametros, resultado, progresso, criado_por, criado_em, conferido_por, conferido_em FROM web_corte_planos WHERE id = ?', [ativo.id]);
+    if (p) {
+      const salvo = lerJson(p.resultado, {}).plano || { grupos: [] };
+      plano = { id: Number(p.id), situacao: p.situacao, impressaoConfere: p.impressao_pecas === impressaoPecas(base.pecas),
+        qtdPecasPlano: contarPecasPlano(salvo, 'barras'), qtdCortadas: contarCortadas(salvo, 'barras', lerJson(p.progresso, [])) };
+    }
+  }
+  return { qtdPecas: base.pecas.length, qtdPendencias: base.pendencias.length, plano };
+}
+// depois do commit: reavalia "Perfil cortado" (nunca lança; falha só vai para o log)
+const etapaAposCorte = (pool, numero, quem, motivo) => reavaliarEtapaCorte(pool, { numero, grupo: 'perfil', quem, estadoCorte: estadoCorteParaEtapa, motivo });
 
 // planoId: reservas desse plano contam como disponíveis (é o plano que será substituído)
 async function calcularPlano(db, numero, planoId, travar = false) {
@@ -333,9 +354,11 @@ function registrarCorte({ rota, pool }) {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
     const corpo = req.body || {};
+    let pedido = null;
     const r = await emTransacao(pool, res, 'POST /corte/plano/:id/confirmar', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
+      pedido = Number(p.pedido);
       const plano = lerJson(p.resultado, {}).plano || { grupos: [] };
       const conf = validarConferencia(corpo, plano);
       if (!conf.ok) throw new ErroUsuario(400, conf.erro);
@@ -377,6 +400,7 @@ function registrarCorte({ rota, pool }) {
       if (baixadas.length) await auditarConn(conn, quem, 'corte_baixa_estoque', id, { campos: ['estoque'], pedido: Number(p.pedido), itens: baixadas });
       return { ok: true, id, situacao: 'conferido', qtdRetalhosUsados: usados, qtdRetalhosNovos: novos, baixas: baixadas };
     });
+    if (r) await etapaAposCorte(pool, pedido, req.acesso?.nome || '', 'corte conferido');   // transação própria, depois do commit do corte
     if (r) res.json(r);
   });
 
@@ -408,22 +432,26 @@ function registrarCorte({ rota, pool }) {
         { campos: ['planos', 'retalhos'], pedido: numero, planos: planos.map(p => Number(p.id)), qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados });
       return { ok: true, pedido: numero, qtdPlanos: planos.length, qtdConferidos: conferidos, qtdRetalhosLiberados: liberados };
     });
+    if (r) await etapaAposCorte(pool, numero, req.acesso?.nome || '', 'dados do corte excluídos');   // sem plano conferido: o OK automático volta a pendente
     if (r) res.json(r);
   });
 
   rota('post', '/corte/plano/:id/cancelar', PLANEJAR, async (req, res) => {
     const id = inteiroPositivo(req.params.id);
     if (!id) return res.status(404).json({ error: 'Plano não encontrado.' });
+    let pedido = null;
     const r = await emTransacao(pool, res, 'POST /corte/plano/:id/cancelar', async conn => {
       const p = await travarPlano(conn, id);
       exigirGerado(p);
+      pedido = Number(p.pedido);
       await liberarReservas(conn, id);
       await cancelarPlano(conn, id);
       await auditarConn(conn, req.acesso?.nome, 'corte_plano_cancelado', id, { campos: ['situacao'], pedido: Number(p.pedido) });
       return { ok: true, id, situacao: 'cancelado' };
     });
+    if (r) await etapaAposCorte(pool, pedido, req.acesso?.nome || '', 'plano cancelado');
     if (r) res.json(r);
   });
 }
 
-module.exports = { registrarCorte, liberarPlanosDoPedido };
+module.exports = { registrarCorte, liberarPlanosDoPedido, estadoCorteParaEtapa, lerPecasDoPedido };

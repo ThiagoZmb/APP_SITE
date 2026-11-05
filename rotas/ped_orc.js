@@ -12,6 +12,7 @@ const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calcul
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 const { liberarPlanosDoPedido } = require('./corte');
 const { liberarPlanosVidroDoPedido } = require('./corte_vidros');
+const { desmarcarEtapasDoCorte, apagarEtapasDoPedido } = require('./etapas_banco');   // etapas de produção: cancelar desmarca o automático do corte; excluir apaga (número reaproveitado)
 
 const TIPOS = ['Orçamento', 'Pedido'];
 const SITUACOES_PEDIDO = ['Em Produção', 'Entregue', 'Cancelado', 'Retirado'];
@@ -54,6 +55,64 @@ async function lerDocumento(db, tipo, numero, { travar = false } = {}) {
   // vidros/perfis não têm TIPO: só pertencem ao pedido (spec da parte 1, §5.5)
   if (tipo === 'Pedido') for (const t of ['vidros', 'perfis']) [linhas[t]] = await db.execute(`SELECT * FROM ${t} WHERE NUMERO = ? ORDER BY id`, [numero]);
   return linhas;
+}
+
+// ---- ações sobre um documento já gravado (cancelar, situação, data de pronto, excluir) ----
+// Compartilhadas com a etapa "Pedido finalizado" (rotas/etapas_producao.js): a mesma regra, a mesma auditoria, dentro da transação de quem chama.
+const auditarDoc = (conn, req, acao, tipo, numero, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
+  [agoraLocal(), req.acesso?.nome || req.usuario?.nome || '', acao, `${tipo} ${numero}`, JSON.stringify(detalhe)]);
+// usuário com estados restritos: o cliente do documento precisa ser de um desses estados (senão 403)
+async function conferirEstadosDoCliente(conn, req, razaoSocial) {
+  if (!(req.acesso?.estados || []).length) return;
+  const [cli] = await conn.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [razaoSocial]);
+  if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
+}
+// documento travado + conferência de estado do cliente; devolve as linhas ou lança ErroUsuario
+async function docParaAcao(conn, req, tipo, numero) {
+  const linhas = await lerDocumento(conn, tipo, numero, { travar: true });
+  if (!linhas) throw new ErroUsuario(404, `${tipo} nº ${numero} não encontrado.`);
+  await conferirEstadosDoCliente(conn, req, linhas.cab.RAZAO_SOCIAL);
+  return linhas;
+}
+
+// Muda a situação de um PEDIDO cujo cabeçalho (cab) já está travado (FOR UPDATE) e conferido (estados) pela transação de quem chama.
+// Regra do menu do botão direito (POST /ped_orc/:tipo/:numero/situacao): Cancelado não muda; mesma situação = 409; Entregue/Retirado gravam
+// DATA_ENTREGA (hoje, a escolhida ou a de pronto); manterData não toca na data gravada; as demais limpam DATA_ENTREGA. Audita pedido_situacao.
+// `origem` (opcional) entra na auditoria (ex.: 'etapas_producao'). Devolve { antes, dataEntrega }.
+async function aplicarSituacaoPedido(conn, req, alvo, cab, { nova, manterData = false, usarDataPronto = false, escolhida = null, origem = null }) {
+  const antes = String(cab.SITUACAO || '');
+  if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de situação.`);
+  if (antes === nova) throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está "${nova}".`);
+  let dataEntrega = nova === 'Entregue' || nova === 'Retirado' ? hojeLocal() : null;
+  if (escolhida) {
+    dataEntrega = escolhida;
+    await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
+  } else if (usarDataPronto) {
+    const pronto = String(cab.DATA_PRONTO ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pronto)) throw new ErroUsuario(400, `O pedido nº ${alvo.numero} não tem data de pronto.`);
+    dataEntrega = pronto;
+    await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
+  } else if (manterData) {
+    await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
+    dataEntrega = cab.DATA_ENTREGA ?? null;
+  } else {
+    await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
+  }
+  await auditarDoc(conn, req, 'pedido_situacao', alvo.tipo, alvo.numero, { cliente: cab.RAZAO_SOCIAL, de: antes, para: nova,
+    ...(escolhida ? { dataEscolhida: true } : usarDataPronto ? { usarDataPronto: true } : manterData ? { manterData: true } : {}), ...(origem ? { origem } : {}) });
+  cab.SITUACAO = nova;
+  return { antes, dataEntrega };
+}
+
+// Grava SÓ ped_orc.DATA_PRONTO de um documento já travado (regra de POST /ped_orc/:tipo/:numero/data_pronto): cancelado não muda; mesma data = 409.
+// Audita data_pronto_alterada. `origem` (opcional) entra na auditoria.
+async function aplicarDataPronto(conn, req, alvo, cab, nova, { origem = null } = {}) {
+  if (String(cab.SITUACAO || '') === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de data.`);
+  const antes = String(cab.DATA_PRONTO ?? '').slice(0, 10);
+  if (antes === nova) throw new ErroUsuario(409, `A data de pronto do ${alvo.tipo === 'Pedido' ? 'pedido' : 'orçamento'} nº ${alvo.numero} já é ${nova.split('-').reverse().join('/')}.`);
+  await conn.execute('UPDATE ped_orc SET DATA_PRONTO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
+  await auditarDoc(conn, req, 'data_pronto_alterada', alvo.tipo, alvo.numero, { cliente: cab.RAZAO_SOCIAL, de: antes || null, para: nova, ...(origem ? { origem } : {}) });
+  cab.DATA_PRONTO = nova;
 }
 
 // sistemas de correr citados nas descrições ("Sist: X") — a tradução precisa do desconto e dos itens de cada um
@@ -584,18 +643,7 @@ function registrarPedOrc({ rota, pool }) {
   });
 
   // ---- cancelar / excluir (a tela sempre pergunta antes; aqui só o servidor decide e registra) ----
-  const auditarDoc = (conn, req, acao, tipo, numero, detalhe) => conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
-    [agoraLocal(), req.acesso?.nome || req.usuario?.nome || '', acao, `${tipo} ${numero}`, JSON.stringify(detalhe)]);
-  // documento travado + conferência de estado do cliente; devolve as linhas ou lança ErroUsuario
-  async function docParaAcao(conn, req, tipo, numero) {
-    const linhas = await lerDocumento(conn, tipo, numero, { travar: true });
-    if (!linhas) throw new ErroUsuario(404, `${tipo} nº ${numero} não encontrado.`);
-    if ((req.acesso?.estados || []).length) {
-      const [cli] = await conn.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
-      if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
-    }
-    return linhas;
-  }
+  // auditarDoc, docParaAcao, aplicarSituacaoPedido e aplicarDataPronto ficam no nível do módulo (compartilhados com as etapas de produção)
   const validarAlvo = (req, res) => {
     const tipo = req.params.tipo, numero = Number(req.params.numero);
     if (!TIPOS.includes(tipo) || !(Number.isInteger(numero) && numero > 0)) { res.status(400).json({ error: 'Documento inválido.' }); return null; }
@@ -613,6 +661,7 @@ function registrarPedOrc({ rota, pool }) {
       await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', ['Cancelado', alvo.numero, alvo.tipo]);
       await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '');   // plano de corte: cancela o plano gerado e solta os retalhos reservados
       await liberarPlanosVidroDoPedido(conn, alvo.numero, req.acesso?.nome || '');   // plano de corte de vidros: idem
+      await desmarcarEtapasDoCorte(conn, alvo.numero, req.acesso?.nome || '', 'Pedido cancelado');   // etapas de produção: o OK automático do corte volta a pendente (OK manual fica)
       await auditarDoc(conn, req, 'pedido_cancelado', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, situacaoAnterior: antes });
       return { ok: true };
     });
@@ -657,27 +706,10 @@ function registrarPedOrc({ rota, pool }) {
     const escolhida = (nova === 'Entregue' || nova === 'Retirado') && (req.body || {}).dataEntrega !== undefined ? validarData((req.body || {}).dataEntrega) : null;
     if ((nova === 'Entregue' || nova === 'Retirado') && (req.body || {}).dataEntrega !== undefined && !escolhida) return res.status(400).json({ error: 'Data de entrega inválida.' });
     if (escolhida && escolhida > hojeLocal()) return res.status(400).json({ error: 'A data de entrega não pode ser futura.' });
-    let dataEntrega = nova === 'Entregue' || nova === 'Retirado' ? hojeLocal() : null;
+    let dataEntrega = null;
     const r = await emTransacao(pool, res, 'POST /ped_orc/situacao', async conn => {
       const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
-      const antes = String(linhas.cab.SITUACAO || '');
-      if (antes === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de situação.`);
-      if (antes === nova) throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está "${nova}".`);
-      if (escolhida) {
-        dataEntrega = escolhida;
-        await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
-      } else if (usarDataPronto) {
-        const pronto = String(linhas.cab.DATA_PRONTO ?? '').slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(pronto)) throw new ErroUsuario(400, `O pedido nº ${alvo.numero} não tem data de pronto.`);
-        dataEntrega = pronto;
-        await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
-      } else if (manterData) {
-        await conn.execute('UPDATE ped_orc SET SITUACAO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
-        dataEntrega = linhas.cab.DATA_ENTREGA ?? null;
-      } else {
-        await conn.execute('UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = ?', [nova, dataEntrega, alvo.numero, alvo.tipo]);
-      }
-      await auditarDoc(conn, req, 'pedido_situacao', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes, para: nova, ...(escolhida ? { dataEscolhida: true } : usarDataPronto ? { usarDataPronto: true } : manterData ? { manterData: true } : {}) });
+      ({ dataEntrega } = await aplicarSituacaoPedido(conn, req, alvo, linhas.cab, { nova, manterData, usarDataPronto, escolhida }));
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
@@ -693,11 +725,7 @@ function registrarPedOrc({ rota, pool }) {
     if (!nova) return res.status(400).json({ error: 'Data de pronto inválida. Use o formato AAAA-MM-DD.' });
     const r = await emTransacao(pool, res, 'POST /ped_orc/data_pronto', async conn => {
       const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
-      if (String(linhas.cab.SITUACAO || '') === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de data.`);
-      const antes = String(linhas.cab.DATA_PRONTO ?? '').slice(0, 10);
-      if (antes === nova) throw new ErroUsuario(409, `A data de pronto do ${alvo.tipo === 'Pedido' ? 'pedido' : 'orçamento'} nº ${alvo.numero} já é ${nova.split('-').reverse().join('/')}.`);
-      await conn.execute('UPDATE ped_orc SET DATA_PRONTO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
-      await auditarDoc(conn, req, 'data_pronto_alterada', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes || null, para: nova });
+      await aplicarDataPronto(conn, req, alvo, linhas.cab, nova);
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, dataPronto: nova });
@@ -718,6 +746,7 @@ function registrarPedOrc({ rota, pool }) {
       if (alvo.tipo === 'Pedido') {
         await liberarPlanosDoPedido(conn, alvo.numero, req.acesso?.nome || '', { excluindo: true });   // plano de corte: idem; o conferido fica de histórico, mas solto do número (reaproveitado)
         await liberarPlanosVidroDoPedido(conn, alvo.numero, req.acesso?.nome || '', { excluindo: true });   // plano de corte de vidros: idem
+        await apagarEtapasDoPedido(conn, alvo.numero, req.acesso?.nome || req.usuario?.nome || '');   // etapas de produção: o número é reaproveitado, as etapas e o histórico saem juntos
         const [entregas] = await conn.execute('SELECT id FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
         for (const { id } of entregas) {
           await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
@@ -737,4 +766,4 @@ function registrarPedOrc({ rota, pool }) {
   });
 }
 
-module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento, gruposDoItem, ErroItem, FRENTES_PORTA, MAX_QTD_ITEM };
+module.exports = { registrarPedOrc, lerSistemaCorrer, lerDocumento, gruposDoItem, ErroItem, FRENTES_PORTA, MAX_QTD_ITEM, auditarDoc, conferirEstadosDoCliente, docParaAcao, aplicarSituacaoPedido, aplicarDataPronto };

@@ -1,0 +1,69 @@
+# Etapas de produção por pedido ("sub-situação")
+
+Tela: `etapas_producao.html` / `etapas_producao.js` / `etapas_producao.css` (menu Comercial, logo depois do Calendário; `layout.js` `PAGINAS` exige `etapas.ver`).
+Servidor: `rotas/etapas_producao.js` (rotas), `rotas/etapas_banco.js` (leitura/gravação das tabelas e gatilhos; sem dependência de outras rotas), `calculo/etapas_producao.js` (regras puras).
+Testes: `test/etapas_calculo.test.js`, `test/etapas_rotas.test.js`, `test/etapas_corte.test.js`, `test/etapas_ligacoes.test.js`, `test/etapas_tela.test.js` (banco falso `test/apoio/bancoEtapas.js`).
+
+## Etapas (fixas, nesta ordem)
+| # | código | nome | permissão | grupo |
+|---|---|---|---|---|
+| 1 | `perfil_cortado` | Perfil cortado | `etapas.corte_perfil` | perfil |
+| 2 | `vidro_cortado` | Vidro cortado | `etapas.corte_vidro` | vidro |
+| 3 | `perfil_pintado` | Perfil pintado | `etapas.pintura_perfil` | perfil |
+| 4 | `vidro_pintado` | Vidro pintado | `etapas.pintura_vidro` | vidro |
+| 5 | `portas_montadas` | Portas montadas | `etapas.montagem` | — |
+| 6 | `finalizado` | Pedido finalizado | `etapas.finalizar` | — |
+
+Estado de cada etapa: `pendente` | `ok` | `na`. Origem: `manual` (alguém clicou) ou `corte` (marcada pela confirmação do corte real).
+Progresso = etapas OK ou N/A sobre 6 (N/A conta como concluída).
+
+## Tabelas (só da web, criadas em `seguranca/instalacao.js`)
+- `web_producao_etapas`: `numero` (ped_orc.NUMERO, TIPO Pedido, só referência lógica, sem FK), `etapa`, `estado`, `origem`, `usuario`, `quando`, `observacao` (até 500); `UNIQUE (numero, etapa)`.
+- `web_producao_etapas_eventos`: histórico de cada mudança (`estado_antes`, `estado_depois`, `origem` manual|corte|sistema, `usuario`, `quando`, `observacao`, `detalhe` JSON: `forcado`/`pendentes`, `situacao`, `dataPronto`, `motivo`, `planoId`).
+- **Sem linha gravada** a etapa é calculada na leitura: `pendente` se o grupo se aplica; **N/A automático** se o pedido não tem peças **nem pendências** do grupo (perfil = `calculo/corte_pecas.js`; vidro = `calculo/vidro_pecas.js`, as mesmas regras do plano de corte). Nada é gravado só para "nascer N/A": se o pedido for editado e ganhar vidro, a etapa passa sozinha a pendente. N/A marcado à mão é gravado e vale sempre.
+- Atenção: `perfis` não tem TIPO (o VB grava também para orçamento de mesmo número); linhas que não se ligam ao item viram **pendência**, então a etapa de perfil fica aplicável (pendente) e não N/A. Quem tiver a permissão marca N/A à mão.
+
+## Rotas (todas por `registro.rota`, exigem `etapas.ver`; nenhuma pública; nada é dinheiro)
+- `GET /etapas/fila?situacao=producao|abertos&versao=X`: pedidos (`TIPO='Pedido'`) com as 6 etapas, `qtdConcluidas`/`qtdEtapas`, `atrasado`, `prontoEm`. `producao` (padrão) = situação classificada como em produção (`classificarSituacao` de `calculo/calendario.js`, a mesma do painel); `abertos` = em produção, pronto e situação desconhecida ("Mostrar todos em aberto"). Pronto (no padrão), Entregue, Retirado e Cancelado saem da fila. Ordem: data de pronto mais antiga primeiro (atrasados no topo), sem data por último. Estados restritos do usuário filtram pelo cliente (`filtroEstados`, INNER JOIN só com restrição). Sem N+1: 1 consulta em `ped_orc`, 1 em `web_producao_etapas`, 1 em `perfis`, 1 em `ped_orc_itens_v4`, 1 em `vidros`. Até 400 pedidos (`limitado: true` se passar). `versao` = hash da resposta: o polling manda a última e recebe `{ inalterado: true, versao }` se nada mudou. Nunca devolve TOTAL nem campo com nome de dinheiro (testado contra `REGEX_VALOR`).
+- `PUT /etapas/pedido/:numero/:etapa` corpo `{ estado: 'ok'|'pendente'|'na', observacao?, forcar?, dataPronto?: 'manter'|'hoje', voltarParaProducao? }`. Transação (`emTransacao`, nova tentativa em deadlock): trava `ped_orc` (`SELECT * ... FOR UPDATE`) **antes** das linhas de `web_producao_etapas` (mesma ordem do gatilho do corte e do cancelar pedido). Respostas: 400 (pedido/etapa/estado/corpo inválidos, N/A no finalizado), 403 (sem permissão da etapa, cliente fora dos estados, forçar sem `etapas.gerir`, voltar situação sem `pedidos.situacao`), 404 (pedido inexistente), 409 (pedido Cancelado, Entregue ou Retirado; finalizar com etapas pendentes — corpo traz `pendentes`; voltar etapa anterior com o finalizado OK; voltar para Em Produção com entrega ativa). **Idempotente**: mesmo estado = 200 `mudou: false`, nada gravado.
+- `GET /etapas/pedido/:numero/historico?etapa=codigo`: eventos (mais novo primeiro, até 200); respeita os estados do usuário; pedido inexistente 404.
+
+## Permissões (`seguranca/permissoes.js`, área "Etapas de produção")
+- `etapas.ver` (tela e rotas), uma por etapa (`etapas.corte_perfil`, `etapas.corte_vidro`, `etapas.pintura_perfil`, `etapas.pintura_vidro`, `etapas.montagem`, `etapas.finalizar`) e `etapas.gerir` (qualquer etapa, N/A, desfazer e **forçar** o finalizado).
+- A permissão da etapa permite marcar OK, desfazer e N/A **daquela etapa**. Na tela, a célula sem permissão fica "só leitura" (o servidor recusa com 403 de qualquer jeito).
+- **Finalizar**: basta `etapas.finalizar` (ou `etapas.gerir`); não exige `pedidos.situacao`. Decisão de segurança: a etapa só faz UMA transição estreita (situação em produção/desconhecida → `Pronto`) com as mesmas garantias da rota de situação (trava, estados do usuário, cancelado não muda, auditoria `pedido_situacao` com `origem: 'etapas_producao'`), e **por padrão `etapas.finalizar` e `etapas.gerir` só vão para quem já tinha `pedidos.situacao` (o Administrador)**: ninguém ganha um poder que não tinha. Dar `etapas.finalizar` a um encarregado de produção é decisão consciente na tela de usuários. Voltar a situação para Em Produção (desfazer) exige `pedidos.situacao`.
+- **Padrão por perfil** (migração `acrescentarPermissoesEtapas`, auditoria `permissoes_etapas`, roda uma vez; também em `PERFIS_INICIAIS`): Administrador = todas as 8; Interno completo = `etapas.ver` + as 5 etapas de chão de fábrica (sem `finalizar` nem `gerir`); Vendedor, Estoquista e Representante = nenhuma. Para um funcionário só da fábrica: criar um perfil com `etapas.ver` + a etapa do setor; a primeira página dele depois do login vira `etapas_producao.html` (em `PAGINAS` antes de `minhas_entregas.html`, que segue por último).
+
+## "Pedido finalizado" marca o pedido como Pronto (exceção à antiga regra "a web nunca marca Pronto")
+- Decisão do dono: OK em "Pedido finalizado" grava `ped_orc.SITUACAO = 'Pronto'` (escrita em tabela do VB). A gravação usa **exatamente** a função do menu de situação (`aplicarSituacaoPedido` em `rotas/ped_orc.js`, a mesma que `POST /ped_orc/Pedido/:numero/situacao` usa) dentro da transação da etapa: Cancelado não muda (409), mesma situação = 409, auditoria `pedido_situacao`. Como no menu (que manda Pronto sem `manterData`), **`DATA_ENTREGA` fica nula** (o pedido ainda não foi entregue).
+- **Exige as etapas anteriores OK ou N/A** (N/A automático ou manual não trava). Com pendências: 409 com a lista; `forcar: true` só com `etapas.gerir` (fica no evento: `forcado` + `pendentes`).
+- **DATA_PRONTO**: a janela da tela pergunta, como o diálogo de data do menu: "Manter a data de pronto (dd/mm/aaaa)" (padrão, nada muda) ou "Atualizar a data de pronto para hoje". `dataPronto: 'hoje'` grava `DATA_PRONTO = hoje` (Brasília) pela função de "Alterar data de pronto" (`aplicarDataPronto`, auditoria `data_pronto_alterada` com `origem`), na mesma transação, só quando a situação muda e a data é diferente de hoje.
+- Pedido que **já está Pronto**: o OK só marca a etapa (situação e datas não mudam). Se a etapa já está OK mas o pedido voltou para produção (alguém mudou pelo menu ou o VB regravou), dar OK de novo marca o pedido como Pronto outra vez.
+- **Entregas**: depois do commit a rota roda `sincronizarFila` (a mesma varredura de `GET /entregas`); o pedido entra em "A programar". Falha da varredura não desfaz a etapa (vai para o log; a próxima abertura de Entregas acerta).
+- **Desfazer o finalizado** (OK → pendente): por padrão **a situação continua Pronto** (só a etapa volta). Na janela, quem tem `pedidos.situacao` pode marcar "Voltar também a situação para Em Produção" (`voltarParaProducao: true`): exige o pedido Pronto e **nenhuma entrega `agendada`, `em_rota` ou `ocorrencia`** (409; resolva a entrega antes), e usa a mesma `aplicarSituacaoPedido` (Em Produção limpa `DATA_ENTREGA`, como o menu). A varredura então cancela a entrega "A programar" ("Pedido saiu de Pronto").
+- Com o finalizado OK, as etapas anteriores não voltam a pendente (409 "Desfaça primeiro..."); N/A continua permitido.
+- **Corrida com a baixa do motorista**: o finalizado só grava a situação quando o pedido, lido com `FOR UPDATE`, não é Pronto/Entregue/Retirado/Cancelado; a baixa só existe para pedido que já entrou na fila (Pronto). Pedido Entregue/Retirado recusa qualquer mudança de etapa (409). Voltar para Em Produção trava as entregas ativas do pedido e recusa se houver alguma; a ordem de trava é sempre ped_orc → web_entregas/etapas, e deadlock refaz a transação.
+
+## Gatilho do corte (marcação automática)
+- Onde: `rotas/corte.js` e `rotas/corte_vidros.js`, **depois do commit** de `POST .../plano/:id/confirmar`, `POST .../plano/:id/cancelar` e `DELETE .../pedido/:numero` (excluir dados), chamando `reavaliarEtapaCorte` (`rotas/etapas_banco.js`) numa **transação própria**. Decisão: assim uma falha na etapa nunca desfaz o corte (o corte é o fato físico; a etapa é derivada) e um corte que falhou nunca marca a etapa. A função nunca lança: erro vai para o log e a etapa fica como estava (o setor marca à mão). A resposta do corte não muda.
+- **Corte completo** (`corteCompleto`): existe plano ativo (o último não cancelado nem excluído) **conferido**, cuja impressão das peças é a do pedido de agora (pedido não mudou depois do plano), o pedido tem peças e **nenhuma pendência** de medida/ligação (regra do plano de corte: nunca estimar) e **todas as peças do plano estão marcadas como cortadas** (`progresso`). Como o corte só aceita um plano conferido por pedido, "todos os planos confirmados" = esse plano.
+- Decisão (`decidirAutomatico`): completo + etapa ausente ou pendente → `ok` origem `corte` (usuário = quem confirmou; evento com `planoId`). Não completo + etapa `ok` de origem `corte` → volta a `pendente`. **OK manual e N/A nunca mudam pelo gatilho.** Pedido Cancelado/Entregue/Retirado: o gatilho não faz nada.
+- O automático não exige permissão de etapa (quem confirmou já tinha `corte.planejar`); fica registrado quem causou.
+- **Pedido cancelado** (`POST /ped_orc/Pedido/:n/cancelar`): na mesma transação, `desmarcarEtapasDoCorte` volta a pendente as etapas OK de origem corte (evento origem `sistema`, motivo "Pedido cancelado"); OK manual fica. O pedido sai da fila (Cancelado).
+- **Pedido excluído** (`DELETE /ped_orc/Pedido/:n`): na mesma transação, `apagarEtapasDoPedido` apaga as etapas e o histórico do número (o NUMERO é reaproveitado, MAX+1) e audita `etapas_removidas_com_pedido`. Exclusão feita direto pelo VB não passa por aqui: as etapas do número ficam órfãs e reaparecem se o número for reaproveitado (mesma limitação das entregas).
+
+## Tela
+- Tabela com uma linha por pedido: Nº (abre a guia de produção em PDF com `pedidos.pdf`; ou "Abrir para editar" com `orcamentos.criar` + `valores.ver`), Cliente, Cliente final, Pronto em (selo "Atrasado"), uma coluna por etapa e Progresso (`3/6` + barra fina por classe, sem estilo inline).
+- Cada célula é um botão-estado grande (≥ 48 px): Pendente, ✓ OK (quem e quando no título), ✓ OK "pelo corte" (automático, azul), N/A ("não se aplica" quando automático), apagado = só leitura (sem permissão). Estado sempre por texto, não só por cor.
+- Clique: pendente → OK; N/A → OK (pergunta); OK → desfazer (pergunta). "Pedido finalizado" abre a janela da data de pronto (e "Forçar" para quem tem `etapas.gerir` com etapas pendentes). Botão direito, tecla de menu ou Shift+F10 na célula abrem o menu (marcar OK, desfazer, N/A, histórico da etapa); no celular, o botão "⋯" de cada pedido abre o menu das etapas que o usuário pode marcar e o histórico do pedido.
+- Filtros: busca por número/cliente/cliente final (`data-foco-busca`), "O que falta" (etapa pendente), "Minha etapa" (só pedidos com etapa pendente que o usuário pode marcar, com as colunas destacadas) e "Mostrar todos em aberto". Os três últimos ficam no `localStorage` (try/catch; só conveniência).
+- Atualização: polling a cada 15 s **só com a aba visível** e sem janela/menu/gravação em andamento, com `?versao=` (sem resposta nova, nada é redesenhado); ao voltar para a aba, atualiza se passou o intervalo. "atualizado há X s" no topo. Redesenho por linha (só a linha cujo HTML mudou é trocada; o foco volta ao mesmo botão) e atualização otimista ao clicar (desfeita se o servidor recusar). Pedido que vira Pronto sai da lista (no filtro padrão).
+- Celular (≤ 760 px): cada pedido vira um cartão com os 6 botões grandes em 2 colunas, com o nome da etapa no botão.
+- CSP igual à das páginas vizinhas; sem script/estilo inline no HTML; cores só por variáveis do tema; `tema.css` por último.
+
+## Limitações conhecidas
+- Etapas são por pedido inteiro, não por item/porta.
+- Editar o pedido depois do corte automático não desmarca a etapa sozinho (a reavaliação só roda nos eventos do corte); o setor desfaz à mão se precisar.
+- Re-salvar o pedido pela tela de orçamentos (ou o VB) pode voltar a situação para Em Produção com o finalizado OK; dar OK de novo marca Pronto.
+- O VB não conhece as etapas (só vê a situação Pronto quando o finalizado é marcado).
+- Não testado em navegador real, em MySQL real nem em celular/tablet real; o banco foi simulado (`test/apoio/bancoEtapas.js`, `bancoCorte.js`, `bancoVidros.js`, `bancoPedOrc.js`).
