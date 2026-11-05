@@ -27,7 +27,7 @@
   const TRILHO_MM = 60, FOLGA_MM = 45; // trilho e folga do correr com sistema (2D)
   const PUX_TAM_PADRAO_MM = 120; // 2D: tamanho do puxador quando o campo está vazio
   const ESP_PORTA_MM = 40;       // ESPESSURA da porta: o 2D não tem profundidade; valor só visual do 3D
-  const ESP_VIDRO_MM = 8;        // idem
+  const ESP_VIDRO_MM = 4;        // regra do dono: vidro SEMPRE com 4 mm
   const SALIENCIA_PUX_MM = 18;   // quanto o puxador sobreposto/total sai de cada face (só visual)
   const AFASTO_CORRER_MM = 22;   // folhas de correr em trilhos diferentes: afastamento em z (só visual)
 
@@ -178,7 +178,7 @@
         peca('base', gw, [x0 + L - P, 0, zIni], [0, 1, 0], [-1, 0, 0]);
         // vidro no canal: espessura = largura do canal; começa a y0 da borda externa em cada lado
         const cv = sec.canalVidro;
-        add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zIni + (cv.x0 + cv.x1) / 2, w: Math.max(0, L - 2 * cv.y0), h: Math.max(0, H - 2 * cv.y0), d: cv.x1 - cv.x0, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
+        add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zIni + (cv.x0 + cv.x1) / 2, w: Math.max(0, L - 2 * cv.y0), h: Math.max(0, H - 2 * cv.y0), d: ESP_VIDRO_MM, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
       } else {
         add({ id: `${idf}-perfil-esq`, tipo: 'perfil', folha: i, x: x0 + P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });
         add({ id: `${idf}-perfil-dir`, tipo: 'perfil', folha: i, x: x0 + L - P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });

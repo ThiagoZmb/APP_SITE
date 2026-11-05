@@ -58,7 +58,7 @@ test('porta de giro com 1036: espessura 18,9, perfis em seção, vidro no canal'
   perto(r.limites.min.z, -9.45); assert.equal(r.limites.min.y, 0);
   // vidro: 4,5 mm no canal (x 1,5..6 -> z centro = -9,45 + 3,75), y a partir de 1,5 mm da borda
   const v = por(r, 'vidro')[0];
-  perto(v.d, 4.5); perto(v.z, -9.45 + 3.75); perto(v.w, 800 - 3); perto(v.h, 2100 - 3);
+  perto(v.d, 4); perto(v.z, -9.45 + 3.75); perto(v.w, 800 - 3); perto(v.h, 2100 - 3);
   // eixos formam rotação própria (determinante +1) e o pé (x=0) fica no lado -z nos quatro lados
   perfis.forEach(p => {
     const { sx, sy, sz } = p.eixos;
@@ -79,7 +79,7 @@ test('perfil sem seção cadastrada: comportamento antigo (blocos de 45 x 40, vi
   assert.deepEqual(outro.caixas, sem.caixas);
   assert.equal(sem.secao, null);
   por(sem, 'perfil').forEach(p => { assert.equal(p.d, 40); assert.ok(!p.secao); });
-  assert.equal(por(sem, 'vidro')[0].d, 8);
+  assert.equal(por(sem, 'vidro')[0].d, 4);
 });
 
 test('orcamentos.html liga o perfil à seção e carrega o módulo antes do 3D', () => {
