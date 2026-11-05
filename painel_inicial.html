@@ -270,7 +270,8 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
-    <script src="ranking.js?v=202611051300" defer></script>
+    <script src="comparativo_ranking.js?v=202611051800" defer></script>
+    <script src="ranking.js?v=202611051800" defer></script>
 </head>
 <body>
     <div class="container">
@@ -650,6 +651,7 @@
                 subtitulo: (t, m) => (cliente ? 'Pedidos deste cliente · ' : 'Itens de pedidos · ') + (m.id === 'valor' ? `Total vendido: <b>${moeda(t)}</b>` : `Total: <b>${num(Math.round(t))} un.</b>`),
                 metricas: [{ id: 'valor', rotulo: 'Por valor', valor: it => it.valor, formatar: moeda, dinheiro: true }, { id: 'qtd', rotulo: 'Por quantidade', valor: it => it.qtd, formatar: n => `${num(Math.round(n))} un.` }],
                 info: (it, m, p) => `${p} · ${m.id === 'valor' ? num(Math.round(it.qtd)) + ' un. · ' : Acesso.pode('valores.ver') ? moeda(it.valor) + ' · ' : ''}${it.pedidos} pedido(s)`,
+                comparar: { nome: 'Metalons' },
                 carregar: () => api('/ranking_produtos' + (cliente ? '?cliente=' + encodeURIComponent(cliente) : ''))
             });
             const el = $('ranking-clientes');

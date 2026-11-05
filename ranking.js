@@ -9,6 +9,7 @@
 //   info: (item, metrica, pct) => texto da linha de baixo,
 //   carregar: async () => [{ nome, ... }],
 //   aoClicar: item => {}            (opcional)
+//   comparar: { nome }              (opcional) barra 100% "nome x demais" com todos os itens (comparativo_ranking.js)
 // })
 // ==========================================================================
 (function () {
@@ -52,10 +53,31 @@
             <div class="rk-corpo">
                 <ul class="rk-lista"><li class="rk-vazio">Carregando...</li></ul>
                 <div class="rk-rosca"><canvas></canvas><div class="rk-centro"><small>Top ${TOP_ROSCA}</small><b>—</b></div></div>
-            </div>`;
+            </div>
+            ${cfg.comparar && window.Comparativo ? '<div class="rk-comp"></div>' : ''}`;
         const lista = alvo.querySelector('.rk-lista');
         const sub = alvo.querySelector('.rk-sub');
         const centro = alvo.querySelector('.rk-centro b');
+        const comp = alvo.querySelector('.rk-comp');
+
+        // barra empilhada 100%: item em destaque (mesma cor da lista) x todo o restante (inclui itens fora do top)
+        function desenharComparativo(ordenados) {
+            if (!comp) return;
+            const nome = cfg.comparar.nome;
+            const c = Comparativo.calcular(ordenados.map(x => ({ nome: x.it.nome, v: x.v })), nome);
+            if (c.vazio) { comp.innerHTML = ''; return; }
+            const pos = Comparativo.posicao(ordenados, nome);
+            const cor = CORES[Math.min(pos < 0 ? 0 : pos, CORES.length - 1)];
+            const seg = (cls, largura, estilo) => largura > 0 ? `<span class="${cls}" style="${estilo}width:${largura}%"></span>` : '';
+            comp.innerHTML = `
+                <div class="rk-comp-rotulos">
+                    <span><i style="background:${cor}"></i><b>${esc(nome)}</b> ${esc(metrica.formatar(c.alvo))} · ${pctBR(c.pctAlvo)}</span>
+                    <span><i class="rk-comp-neutro"></i><b>Demais produtos</b> ${esc(metrica.formatar(c.demais))} · ${pctBR(c.pctDemais)}</span>
+                </div>
+                <div class="rk-comp-barra" role="img" aria-label="${esc(nome)} ${pctBR(c.pctAlvo)} contra demais produtos ${pctBR(c.pctDemais)}">
+                    ${seg('rk-comp-alvo', c.pctAlvo, 'background:' + cor + ';')}${seg('rk-comp-demais', c.pctDemais, '')}
+                </div>`;
+        }
 
         async function desenhar() {
             const ordenados = [...dados].map(it => ({ it, v: metrica.valor(it) || 0 })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
@@ -76,6 +98,7 @@
                 </li>`;
             }).join('') : '<li class="rk-vazio">Nenhum dado nos últimos 12 meses</li>';
             lista._top = top.map(x => x.it);
+            desenharComparativo(ordenados);
 
             const fatias = ordenados.slice(0, TOP_ROSCA);
             const outros = ordenados.slice(TOP_ROSCA).reduce((s, x) => s + x.v, 0);

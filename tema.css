@@ -757,3 +757,13 @@ body .card-sub, body .card-change { margin-top: 3px !important; }
 select option, select optgroup { background-color: #1b1e24; color: #e8eaee; }
 select option:checked { background-color: #3a404b; color: #fff; }
 select option:disabled { color: #6b7280; }
+
+/* ===== Comparativo "item x demais" do painel de ranking (ranking.js + comparativo_ranking.js) ===== */
+.rk-comp { padding: 4px 24px 14px; }
+.rk-comp-rotulos { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-mid); margin-bottom: 6px; }
+.rk-comp-rotulos b { color: var(--text-dark); font-weight: 700; margin-right: 4px; }
+.rk-comp-rotulos i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+.rk-comp-rotulos .rk-comp-neutro { background: var(--border-strong); }
+.rk-comp-barra { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--border-color); }
+.rk-comp-barra span { display: block; height: 100%; }
+.rk-comp-barra .rk-comp-demais { background: var(--border-strong); }
