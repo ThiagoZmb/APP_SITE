@@ -59,6 +59,7 @@ const { registrarCustos } = require('./rotas/custos');
 const { registrarPrecosFormacao } = require('./rotas/precos_formacao');
 const { registrarEtiquetas } = require('./rotas/etiquetas');
 const { registrarLeituraPdf } = require('./leitura/rotas');
+const { registrarLeituraImagemPerfil } = require('./leitura/perfil_imagem');
 
 const app = express();
 // Render fica atrás de proxy: sem isto, req.ip seria o IP do proxy e o limite de login
@@ -1772,6 +1773,8 @@ registrarPrecosFormacao({ rota: registro.rota, pool });
 registrarEstoqueAnalises({ rota: registro.rota, pool });
 // leitura de projeto técnico em PDF pela API do Claude (ANTHROPIC_API_KEY; sem chave a rota responde 503 com mensagem clara)
 const leituraPdf = registrarLeituraPdf({ rota: registro.rota, pool });
+// desenho automático da seção do perfil a partir da imagem (mesma chave da API; só propõe, quem grava é o PUT /perfil_secoes/:codigo)
+registrarLeituraImagemPerfil({ rota: registro.rota, pool });
 
 // tratador global: depois de todas as rotas (erro sem detalhe interno na resposta)
 app.use(tratadorDeErros);

@@ -339,6 +339,57 @@
         .pe-rodape { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
         .pe-sujo { font-size: 12px; color: var(--warning-color); font-weight: 700; margin-left: auto; }
         .pe-sujo[hidden] { display: none; }
+
+        /* --- desenho automático a partir da imagem (perfil_auto.js): 3 passos; painéis com fundo sólido, só variáveis do tema --- */
+        .pa-fluxo { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+        .pa-titulo { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; }
+        .pa-aviso { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13.5px; background: var(--bg); border: 1px solid var(--warning-color); color: var(--text-dark); margin-bottom: 12px; }
+        .pa-aviso[hidden], .pa-passo[hidden], .pa-progresso[hidden], .pa-erro[hidden], .pa-bloco[hidden], .pa-miniatura img[hidden] { display: none; }
+        .pa-passo { padding: 12px 0; border-top: 1px solid var(--border-color); }
+        .pa-aviso + .pa-passo, .pa-titulo + .pa-passo { border-top: none; padding-top: 0; }
+        .pa-passo-cab { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
+        .pa-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: var(--primary-color); color: var(--on-primary); font-size: 13px; font-weight: 700; }
+        .pa-imagem { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
+        @media (max-width: 700px) { .pa-imagem { grid-template-columns: 1fr; } }
+        .pa-miniatura { display: flex; align-items: center; justify-content: center; min-height: 120px; max-height: 200px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; font-size: 12.5px; color: var(--text-light); text-align: center; padding: 6px; }
+        .pa-miniatura img { max-width: 100%; max-height: 188px; display: block; }
+        .pa-grupo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .pa-solta { padding: 14px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-mid); font-size: 13px; text-align: center; cursor: pointer; }
+        .pa-solta:hover, .pa-solta:focus-visible, .pa-solta.sobre { border-color: var(--primary-color); color: var(--primary-color); outline: none; }
+        .pa-grande { width: 100%; max-width: 420px; padding: 14px 20px; font-size: 15px; }
+        .pa-progresso { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--text-mid); max-width: 420px; }
+        .pa-barra-prog { height: 6px; border-radius: 999px; background: var(--border-color); overflow: hidden; position: relative; }
+        .pa-barra-prog span { position: absolute; top: 0; bottom: 0; width: 35%; border-radius: 999px; background: var(--primary-color); animation: pa-corre 1.3s ease-in-out infinite alternate; }
+        @keyframes pa-corre { from { left: 0; } to { left: 65%; } }
+        @media (prefers-reduced-motion: reduce) { .pa-barra-prog span { animation: none; width: 100%; } }
+        .pa-erro { margin-top: 10px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--danger-color); font-size: 13.5px; color: var(--selo-perigo-fg); }
+        .pa-erro ul { margin: 6px 0 0 18px; color: var(--text-dark); }
+        .pa-conferir { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+        @media (max-width: 1100px) { .pa-conferir { grid-template-columns: 1fr; } }
+        .pa-palco { background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; }
+        .pa-palco canvas { display: block; width: 100%; height: auto; }
+        .pa-lado { display: flex; flex-direction: column; gap: 12px; }
+        .pa-selo { align-self: flex-start; font-size: 12.5px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .pa-selo.alta { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+        .pa-selo.media { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .pa-selo.baixa { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+        .pa-bloco { background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; }
+        .pa-bloco h5 { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); margin-bottom: 8px; }
+        .pa-cotas { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .pa-cotas th { text-align: left; padding: 4px 6px; font-size: 11px; }
+        .pa-cotas td { padding: 4px 6px; border-bottom: 1px solid var(--linha-tabela); }
+        .pa-cotas td.num, .pa-cotas th.num { text-align: right; font-family: var(--font-mono); }
+        .pa-cotas .bate td:last-child { color: var(--selo-ok-fg); font-weight: 600; }
+        .pa-cotas .difere td:last-child { color: var(--selo-aviso-fg); font-weight: 600; }
+        .pa-avisos { margin: 0 0 0 18px; font-size: 13px; color: var(--text-mid); }
+        .pa-avisos li { margin-bottom: 4px; }
+        .pa-junta { background: var(--bg); border: 1px solid var(--warning-color); border-radius: var(--radius-sm); padding: 10px 12px; }
+        .pa-junta.definida { border-color: var(--border-color); }
+        .pa-junta-pergunta { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+        .pa-acoes { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        details.pe-manual { background: var(--surface-2); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 16px; }
+        details.pe-manual > summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--text-mid); padding: 4px 0; }
+        details.pe-manual[open] > summary { margin-bottom: 10px; color: var(--text-dark); }
         .btn.btn-perigo { color: var(--danger-color); border-color: var(--danger-color); }
         .pe-raiz-btn:disabled, #pe-raiz .btn:disabled { opacity: .5; cursor: not-allowed; }
         @media (prefers-reduced-motion: reduce) { .pe-palco canvas { transition: none; } }
@@ -475,6 +526,76 @@
                         <div class="pe-aviso" id="pe-aviso" role="status" hidden></div>
                         <div id="pe-corpo" hidden>
                             <p class="dica" id="pe-info"></p>
+                            <!-- ===== DESENHO AUTOMÁTICO (perfil_auto.js): 3 passos. Caminho principal; o traçador manual fica recolhido abaixo ===== -->
+                            <section class="pa-fluxo" id="pa-raiz" data-pe-edita aria-label="Desenho automático do perfil a partir de uma imagem">
+                                <h4 class="pa-titulo">Desenho automático a partir da imagem</h4>
+                                <div class="pa-aviso" id="pa-indisponivel" role="status" hidden></div>
+                                <div class="pa-passo">
+                                    <div class="pa-passo-cab"><span class="pa-num">1</span> Imagem do perfil</div>
+                                    <div class="pa-imagem">
+                                        <div class="pa-miniatura" id="pa-miniatura">
+                                            <img id="pa-mini" alt="Imagem do perfil escolhida" hidden>
+                                            <span id="pa-mini-vazio">Nenhuma imagem escolhida</span>
+                                        </div>
+                                        <div class="pa-escolha">
+                                            <div class="pa-grupo">
+                                                <button type="button" class="btn btn-mini" id="pa-usar-produto">Usar a imagem do produto</button>
+                                                <button type="button" class="btn btn-mini" id="pa-enviar">Enviar imagem…</button>
+                                                <input type="file" id="pa-arq" accept="image/png,image/jpeg" hidden>
+                                            </div>
+                                            <div class="pa-solta" id="pa-solta" tabindex="0" role="button" aria-label="Arraste uma imagem PNG ou JPEG até aqui, ou clique para escolher o arquivo">Arraste a imagem aqui (PNG ou JPEG, até 3 MB) ou clique para escolher</div>
+                                            <p class="dica" id="pa-img-info">Quanto mais limpa a seção (só o corte, com as cotas legíveis) e maior a resolução, melhor a leitura. A imagem enviada é lida e descartada: não fica guardada.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="pa-passo">
+                                    <div class="pa-passo-cab"><span class="pa-num">2</span> Gerar o desenho</div>
+                                    <button type="button" class="btn btn-primary pa-grande" id="pa-gerar" disabled>✨ Gerar desenho automaticamente</button>
+                                    <div class="pa-progresso" id="pa-progresso" role="status" aria-live="polite" hidden>
+                                        <div class="pa-barra-prog" aria-hidden="true"><span></span></div>
+                                        <span id="pa-prog-txt"></span>
+                                    </div>
+                                    <div class="pa-erro" id="pa-erro" role="alert" hidden></div>
+                                </div>
+                                <div class="pa-passo" id="pa-passo3" hidden>
+                                    <div class="pa-passo-cab"><span class="pa-num">3</span> Conferir</div>
+                                    <p class="dica">O contorno (azul), os vazados e o canal do vidro (verde) estão desenhados por cima da imagem. A prévia 3D e as configurações (parede, cores) estão logo abaixo. Nada foi salvo ainda.</p>
+                                    <div class="pa-conferir">
+                                        <div class="pa-palco" id="pa-palco"><canvas id="pa-canvas" aria-label="Imagem do perfil com o desenho gerado por cima"></canvas></div>
+                                        <div class="pa-lado">
+                                            <div class="pa-selo" id="pa-selo" role="status"></div>
+                                            <div class="pa-bloco">
+                                                <h5>Cotas lidas × desenho gerado</h5>
+                                                <table class="pa-cotas" id="pa-cotas">
+                                                    <thead><tr><th>Cota lida</th><th class="num">Desenho</th><th>Resultado</th></tr></thead>
+                                                    <tbody></tbody>
+                                                </table>
+                                            </div>
+                                            <div class="pa-bloco" id="pa-avisos-box" hidden>
+                                                <h5>Avisos</h5>
+                                                <ul class="pa-avisos" id="pa-avisos"></ul>
+                                            </div>
+                                            <div class="pa-junta" id="pa-junta-box" role="group" aria-labelledby="pa-junta-pergunta">
+                                                <div class="pa-junta-pergunta" id="pa-junta-pergunta">Corte a 45° ou reto?</div>
+                                                <p class="dica" id="pa-junta-dica">A imagem raramente mostra como as peças se encontram nos cantos: confirme.</p>
+                                                <div class="pa-grupo">
+                                                    <button type="button" class="btn btn-mini" id="pa-junta-45" data-junta="meia_esquadria">Corte a 45° (meia-esquadria)</button>
+                                                    <button type="button" class="btn btn-mini" id="pa-junta-reta" data-junta="reta">Corte reto (esquadro)</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="pa-acoes">
+                                        <button type="button" class="btn btn-primary" id="pa-aceitar">✔ Aceitar e salvar</button>
+                                        <button type="button" class="btn btn-secondary" id="pa-tentar">Tentar de novo</button>
+                                        <button type="button" class="btn btn-secondary" id="pa-ajustar">Ajustar manualmente</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <details class="pe-manual" id="pe-manual">
+                                <summary>Ajustar manualmente (traçador sobre a imagem e tabela de pontos)</summary>
+                                <p class="dica">Use só se o desenho automático ficou ligeiramente errado: o desenho gerado já vem carregado aqui para você corrigir os pontos.</p>
                             <div class="pe-barra">
                                 <div class="pe-grupo" data-pe-edita>
                                     <span class="pe-rotulo">Imagem</span>
@@ -519,6 +640,11 @@
                             <div class="pe-palco" id="pe-palco"><canvas id="pe-canvas" tabindex="0" aria-label="Área de traçado da seção do perfil"></canvas></div>
                             <div class="pe-linha-info"><span id="pe-dica"></span><span class="pe-coord" id="pe-coord"></span></div>
                             <div class="pe-msg" id="pe-msg" role="status"></div>
+                                <div class="pe-secao">
+                                    <h4>Pontos (mm, y para cima)</h4>
+                                    <div id="pe-tabelas"></div>
+                                </div>
+                            </details>
 
                             <div class="pe-grade">
                                 <div>
@@ -556,10 +682,6 @@
                                             <button type="button" class="btn btn-mini" id="pe-add-cor">＋ Acabamento</button>
                                             <button type="button" class="btn btn-mini" id="pe-add-todas" title="Acrescenta os acabamentos permitidos para este perfil">Todos os acabamentos do perfil</button>
                                         </div>
-                                    </div>
-                                    <div class="pe-secao">
-                                        <h4>Pontos (mm, y para cima)</h4>
-                                        <div id="pe-tabelas"></div>
                                     </div>
                                 </div>
                                 <div>
@@ -608,7 +730,8 @@
     <script src="calculo/perfil_secoes.js?v=202611051800"></script>
     <script src="desenho3d.js?v=202611051800"></script>
     <script src="calculo/perfil_traco.js?v=202611060100"></script>
-    <script src="perfil_editor.js?v=202611060100"></script>
+    <script src="perfil_editor.js?v=202611060200"></script>
+    <script src="perfil_auto.js?v=202611060200"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -636,7 +759,7 @@
             if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             if (comoBlob && res.ok) return res.blob();
             const dados = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error((dados.error || `Erro HTTP: ${res.status}`));
+            if (!res.ok) { const err = new Error(dados.error || `Erro HTTP: ${res.status}`); err.status = res.status; err.dados = dados; throw err; }
             return dados;
         }
 
@@ -816,10 +939,12 @@
         $('f-classe').addEventListener('change', () => { aplicarRegrasClasse(true); avisarEditorPerfil(false); });
         // Aba "Desenho 3D" (perfil_editor.js): avisa o editor de qual produto está na ficha
         function avisarEditorPerfil(recarregar) {
-            if (window.PerfilEditor) PerfilEditor.produtoMudou({
+            const info = {
                 codigo: selecionado, modelo: $('f-modelo').value.trim(), classe: $('f-classe').value, classeSalva,
                 salvo: selecionado !== null && selecionado !== undefined, temImagem: temImagemSalva, acabamentos: acabamentosDoProduto, recarregar: !!recarregar
-            });
+            };
+            if (window.PerfilEditor) PerfilEditor.produtoMudou(info);
+            if (window.PerfilAuto) PerfilAuto.produtoMudou(info);
         }
         const desenhoPerfilSujo = () => !!(window.PerfilEditor && PerfilEditor.temAlteracao());
 
@@ -1041,6 +1166,7 @@
                 $('foto').title = '';
             }
             if (window.PerfilEditor) PerfilEditor.iniciar({ api, toast, confirmar, pode: c => Acesso.pode(c) });
+            if (window.PerfilAuto && window.PerfilEditor) PerfilAuto.iniciar({ api, toast, confirmar, pode: c => Acesso.pode(c), editor: PerfilEditor });
             await Promise.all([carregarOpcoes(), carregarProdutos()]);
             limparFicha();
             $('f-modelo').focus();

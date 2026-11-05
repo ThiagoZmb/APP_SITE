@@ -590,15 +590,18 @@
   // salvar / remover
   // ----------------------------------------------------------------------------------------------------------------
   async function salvar() {
-    if (somenteLeitura || !produto) return;
+    if (somenteLeitura || !produto) return false;
     renderErros();
-    if (ultimaValidacao.erros.length) { ctx.toast('Há problemas no desenho. Veja a lista abaixo.', 'erro'); return; }
+    if (ultimaValidacao.erros.length) { ctx.toast('Há problemas no desenho. Veja a lista abaixo.', 'erro'); return false; }
+    let gravou = false;
     el.salvar.disabled = true; const txt = el.salvar.textContent; el.salvar.textContent = 'Salvando...';
     try {
       const r = await ctx.api('/perfil_secoes/' + encodeURIComponent(produto.codigo), { method: 'PUT', body: JSON.stringify(ultimaValidacao.secao) });
       existe = true; sujo = false;
       if (r && r.secao) config = T.configDaSecao(r.secao);
       produto.__atualizado = r && r.atualizadoEm ? `${r.atualizadoEm}${r.atualizadoPor ? ' por ' + r.atualizadoPor : ''}` : '';
+      gravou = true;
+      el.erroApi.hidden = true;
       ctx.toast('Desenho do perfil salvo. O 3D dos orçamentos já usa esta seção.', 'ok');
     } catch (e) {
       ctx.toast(e.message || 'Não foi possível salvar o desenho.', 'erro');
@@ -608,6 +611,7 @@
       el.salvar.textContent = txt;
       renderTudo();
     }
+    return gravou;
   }
   async function remover() {
     if (somenteLeitura || !existe) return;
@@ -748,7 +752,7 @@
       if (!(v > 0)) { msg('Parede: informe um valor em mm maior que zero.'); el.parede.value = T.formatarMm(config.parede); return; }
       config.parede = v; config.estimada = config.estimada.filter(t => t !== 'parede'); marcar();
     });
-    el.junta.addEventListener('change', () => { config.junta = el.junta.value === 'meia_esquadria' ? 'meia_esquadria' : 'reta'; marcar(); });
+    el.junta.addEventListener('change', () => { config.junta = el.junta.value === 'meia_esquadria' ? 'meia_esquadria' : 'reta'; config.estimada = config.estimada.filter(t => t !== 'junta'); marcar(); });
     el.usarCor.addEventListener('change', () => { config.corPadrao = el.usarCor.checked ? el.corPadrao.value : ''; marcar(); });
     el.corPadrao.addEventListener('input', () => { if (el.usarCor.checked) { config.corPadrao = el.corPadrao.value; sujo = true; renderTudo({ semCores: true }); } });
     [['x0', el.canalX0], ['x1', el.canalX1], ['y0', el.canalY0]].forEach(([k, inp]) => inp.addEventListener('change', () => {
@@ -775,6 +779,8 @@
     });
     el.estimada.addEventListener('click', e => { const bt = e.target.closest('[data-acao="conferido"]'); if (!bt) return; config.estimada.splice(Number(bt.dataset.i), 1); marcar(); });
     el.prevAcab.addEventListener('change', agendarPrevia);
+    // o traçador manual fica recolhido (desenho automático é o caminho principal); ao abrir, ajusta o canvas ao tamanho real
+    el.manual.addEventListener('toggle', () => { if (el.manual.open) setTimeout(() => { ajustarVista(); renderTudo(); }, 0); });
 
     // troca de aba da ficha
     document.querySelectorAll('.aba').forEach(a => a.addEventListener('click', () => { if (a.dataset.aba === 'desenho3d') aoAtivarAba(); else aoSairAba(); }));
@@ -791,7 +797,7 @@
     tabelas: 'pe-tabelas', largura: 'pe-largura', altura: 'pe-altura', parede: 'pe-parede', paredeErro: 'pe-parede-erro', junta: 'pe-junta',
     usarCor: 'pe-usar-cor', corPadrao: 'pe-cor-padrao', canalX0: 'pe-canal-x0', canalX1: 'pe-canal-x1', canalY0: 'pe-canal-y0', limparCanalBtn: 'pe-canal-limpar', canalErro: 'pe-canal-erro',
     cores: 'pe-cores', addCor: 'pe-add-cor', addTodas: 'pe-add-todas', listaAcab: 'pe-lista-acab', estimada: 'pe-estimada', estimadaBox: 'pe-estimada-box',
-    cena: 'pe-cena', prevAcab: 'pe-prev-acab', prevStatus: 'pe-prev-status', erros: 'pe-erros', erroApi: 'pe-erro-api', salvar: 'pe-salvar', remover: 'pe-remover'
+    manual: 'pe-manual', cena: 'pe-cena', prevAcab: 'pe-prev-acab', prevStatus: 'pe-prev-status', erros: 'pe-erros', erroApi: 'pe-erro-api', salvar: 'pe-salvar', remover: 'pe-remover'
   };
 
   function iniciar(contexto) {
@@ -809,5 +815,36 @@
     aviso('Abra um produto da classe Perfil para cadastrar o desenho.');
   }
 
-  return { iniciar, produtoMudou, temAlteracao };
+  // ----------------------------------------------------------------------------------------------------------------
+  // desenho automático (perfil_auto.js): carrega a PROPOSTA no editor (ainda não salva) e deixa salvar / ajustar à mão
+  // ----------------------------------------------------------------------------------------------------------------
+  // secao: seção v2 em mm. opcoes: { blob (a imagem lida), calibracao: { mmPorPx, origem:{px,py} } (para o traçador manual aparecer sobre a imagem) }
+  async function carregarProposta(secao, opcoes) {
+    if (!ctx || somenteLeitura || !produto || !carregado || !secao) return false;
+    estado = T.estadoDaSecao(secao);
+    config = T.configDaSecao(secao);
+    hist = T.criarHistorico(estado);
+    sujo = true; sel = null; modo = 'contorno'; calEtapa = null; calP1 = calP2 = null;
+    el.erroApi.hidden = true;
+    const o = opcoes || {};
+    if (o.blob) await usarImagem(URL.createObjectURL(o.blob));
+    if (img && o.calibracao && T.calibracaoCompleta(o.calibracao)) { cal = { mmPorPx: o.calibracao.mmPorPx, origem: { px: o.calibracao.origem.px, py: o.calibracao.origem.py } }; }
+    imagemTentada = true;
+    ajustarVista();
+    renderTudo();
+    return true;
+  }
+  // a pergunta "corte a 45° ou reto?" da conferência; escolher tira a marca de estimado da junta
+  function definirJunta(junta) {
+    if (somenteLeitura || !estado || (junta !== 'reta' && junta !== 'meia_esquadria')) return false;
+    config.junta = junta;
+    config.estimada = config.estimada.filter(t => t !== 'junta');
+    sujo = true;
+    renderTudo();
+    return true;
+  }
+  const juntaAtual = () => (config ? config.junta : 'reta');
+  const abrirManual = () => { if (el.manual) { el.manual.open = true; el.manual.scrollIntoView?.({ block: 'start' }); } };
+
+  return { iniciar, produtoMudou, temAlteracao, carregarProposta, definirJunta, juntaAtual, salvar, abrirManual };
 });
