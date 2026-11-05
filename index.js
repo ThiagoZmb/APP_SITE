@@ -1799,6 +1799,10 @@ async function iniciar() {
   if ((await acrescentarPermissoesEntregas(pool)).feito) console.log('[permissões] entregas.ver e entregas.programar acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesOrcSituacao(pool)).feito) console.log('[permissões] orcamentos.situacao acrescentada ao Administrador, Interno completo e Representante');
   if ((await acrescentarPermissoesChecklist(pool)).feito) console.log('[permissões] pedidos.checklist acrescentada ao Administrador, Interno completo e auxiliares; checklist.enviar ao Administrador e Interno completo');
+  // coluna IMAGEM (foto do produto): falha não derruba o servidor; só o envio da foto continua recusado
+  try {
+    if ((await require('./seguranca/coluna_imagem').garantirColunaImagemProduto(pool)).feito) console.log('[banco] coluna cadastro_de_produtos.IMAGEM criada');
+  } catch (err) { console.error('[banco] não foi possível criar a coluna IMAGEM:', err.code || 'sem código'); }
   if ((await acrescentarPermissoesPortal(pool)).feito) console.log('[permissões] portal.gerir acrescentada ao Administrador');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
