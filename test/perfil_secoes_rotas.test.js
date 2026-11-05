@@ -138,7 +138,10 @@ test('DELETE /perfil_secoes/:codigo: remove, audita; 404 se não existe', async 
   const r = await del('/perfil_secoes/13');
   assert.equal(r.status, 200); assert.equal((await r.json()).ok, true);
   assert.equal(estado.linhas.size, 0);
-  assert.deepEqual(estado.auditoria, [{ quem: 'Caio', acao: 'perfil_secao_removida', alvo: '13', detalhe: { codigo: 13, versao: 2 } }]);
+  assert.deepEqual(estado.auditoria, [
+    { quem: 'Caio', acao: 'perfil_secao_removida', alvo: '13', detalhe: { codigo: 13, versao: 2 } },
+    { quem: 'Caio', acao: 'semente_perfil_secoes_removida', alvo: '13', detalhe: { codigo: 13 } }   // a semeadura não traz de volta
+  ]);
   assert.deepEqual((await (await get('/perfil_secoes')).json()).secoes, []);
 });
 
@@ -179,35 +182,66 @@ test('instalarTabelas cria web_perfil_secoes com codigo como chave primária', a
   for (const col of ['modelo', 'secao', 'versao_esquema', 'atualizado_em', 'atualizado_por']) assert.match(sql, new RegExp(col));
 });
 
-function poolSemente({ marcador = false, linha = false } = {}) {
-  const estado = { insercoes: [], auditoria: [] };
+// Banco falso da semeadura: `linhas` = [[codigo, { atualizado_por, semente_rev }]]; `auditoria` = [{ acao, alvo }] já existentes
+function poolSemente({ linhas = [], auditoria = [] } = {}) {
+  const estado = { linhas: new Map(linhas), auditoria: [...auditoria], inseridas: [], atualizacoes: [] };
   const f = criarPoolFalso([
-    [/FROM web_auditoria WHERE acao = 'semente_perfil_secoes'/, () => (marcador ? [{ id: 1 }] : [])],
-    [/^SELECT codigo FROM web_perfil_secoes WHERE codigo = \? FOR UPDATE/, () => (linha ? [{ codigo: 13 }] : [])],
-    [/^INSERT INTO web_perfil_secoes/, (sql, p) => { estado.insercoes.push(p); return { affectedRows: 1 }; }],
-    [/INSERT INTO web_auditoria/, (sql, p) => { estado.auditoria.push(p); return { affectedRows: 1 }; }]
+    [/^SELECT codigo, atualizado_por, semente_rev FROM web_perfil_secoes WHERE codigo = \? FOR UPDATE/, (sql, [c]) => (estado.linhas.has(c) ? [{ codigo: c, ...estado.linhas.get(c) }] : [])],
+    [/^SELECT id FROM web_auditoria WHERE alvo = \?/, (sql, [alvo]) => (estado.auditoria.some(a => a.alvo === alvo && ['semente_perfil_secoes_removida', 'semente_perfil_secoes'].includes(a.acao)) ? [{ id: 1 }] : [])],
+    [/^INSERT INTO web_perfil_secoes/, (sql, p) => { estado.inseridas.push(p); estado.linhas.set(p[0], { atualizado_por: p[4], semente_rev: p[5] }); return { affectedRows: 1 }; }],
+    [/^UPDATE web_perfil_secoes/, (sql, p) => { estado.atualizacoes.push(p); estado.linhas.set(p[5], { atualizado_por: p[3], semente_rev: p[4] }); return { affectedRows: 1 }; }],
+    [/INSERT INTO web_auditoria/, (sql, [quem, acao, alvo]) => { estado.auditoria.push({ acao, alvo }); return { affectedRows: 1 }; }]
   ]);
   return { f, estado };
 }
+const BIB = require('../calculo/perfil_secoes_biblioteca');
 
-test('semente do 1036: grava o código 13 uma vez; nunca sobrescreve o que o dono editou nem ressuscita o apagado', async () => {
-  // 1) tabela vazia, sem marcador: semeia
-  let { f, estado } = poolSemente();
-  assert.deepEqual(await semearPerfilSecoes(f), { feito: true });
-  assert.equal(estado.insercoes.length, 1);
-  const [codigo, modelo, secao, versao, quem] = estado.insercoes[0];
-  assert.deepEqual([codigo, modelo, versao, quem.slice ? quem : ''], [13, '1036', 2, 'sistema']);
-  assert.deepEqual(PS.validar(JSON.parse(secao)), []);
-  assert.equal(JSON.parse(secao).cores.padrao, '#c3c8cd');
-  assert.ok(estado.auditoria[0].includes('semente_perfil_secoes'));
-  // 2) já existe linha (editada pelo dono): não insere, só marca
-  ({ f, estado } = poolSemente({ linha: true }));
-  assert.deepEqual(await semearPerfilSecoes(f), { feito: false });
-  assert.equal(estado.insercoes.length, 0); assert.equal(estado.auditoria.length, 1);
+test('semeadura: tabela vazia insere toda a biblioteca como semente com a rev; segunda subida não faz nada', async () => {
+  const { f, estado } = poolSemente();
+  assert.deepEqual(await semearPerfilSecoes(f), { feito: true, inseridas: [13, 92], atualizadas: [] });
+  assert.deepEqual(estado.inseridas.map(p => [p[0], p[1], p[3], p[4], p[5]]), [[13, '1036', 2, 'semente', 1], [92, '3345', 2, 'semente', 1]]);
+  for (const p of estado.inseridas) assert.deepEqual(PS.validar(JSON.parse(p[2])), []);
+  assert.deepEqual(await semearPerfilSecoes(f), { feito: false, inseridas: [], atualizadas: [] });   // idempotente
+  assert.equal(estado.inseridas.length, 2); assert.equal(estado.atualizacoes.length, 0);
+});
+
+test('semeadura: só um código novo falta -> insere só ele; semente com rev menor é atualizada', async () => {
+  const { f, estado } = poolSemente({ linhas: [[13, { atualizado_por: 'semente', semente_rev: 1 }]] });
+  assert.deepEqual(await semearPerfilSecoes(f), { feito: true, inseridas: [92], atualizadas: [] });
+  const antes = BIB.SECOES[1].rev;
+  BIB.SECOES[1].rev = antes + 1;   // correção de semente: sobe a rev
+  try {
+    assert.deepEqual(await semearPerfilSecoes(f), { feito: true, inseridas: [], atualizadas: [92] });
+    assert.deepEqual([estado.atualizacoes[0][3], estado.atualizacoes[0][4], estado.atualizacoes[0][5]], ['semente', antes + 1, 92]);
+    assert.deepEqual(await semearPerfilSecoes(f), { feito: false, inseridas: [], atualizadas: [] });
+  } finally { BIB.SECOES[1].rev = antes; }
+});
+
+test('semeadura: 1036 antigo (atualizado_por sistema, sem rev) vira semente de rev 1', async () => {
+  const { f, estado } = poolSemente({ linhas: [[13, { atualizado_por: 'sistema', semente_rev: null }], [92, { atualizado_por: 'semente', semente_rev: 1 }]] });
+  assert.deepEqual(await semearPerfilSecoes(f), { feito: true, inseridas: [], atualizadas: [13] });
+  assert.equal(estado.atualizacoes[0][3], 'semente');
+});
+
+test('semeadura: linha editada por pessoa nunca é sobrescrita, mesmo com rev maior', async () => {
+  const { f, estado } = poolSemente({ linhas: [[13, { atualizado_por: 'Caio', semente_rev: 0 }], [92, { atualizado_por: 'Ana', semente_rev: null }]] });
+  const rev = BIB.SECOES.map(s => s.rev);
+  BIB.SECOES.forEach(s => { s.rev += 5; });
+  try {
+    assert.deepEqual(await semearPerfilSecoes(f), { feito: false, inseridas: [], atualizadas: [] });
+  } finally { BIB.SECOES.forEach((s, i) => { s.rev = rev[i]; }); }
+  assert.equal(estado.inseridas.length + estado.atualizacoes.length, 0);
   assert.ok(!f.chamadas.some(c => /UPDATE web_perfil_secoes|ON DUPLICATE/.test(c.sql)));
-  // 3) já semeada antes (o dono pode ter apagado): não faz nada
-  ({ f, estado } = poolSemente({ marcador: true }));
-  assert.deepEqual(await semearPerfilSecoes(f), { feito: false });
-  assert.equal(estado.insercoes.length, 0); assert.equal(estado.auditoria.length, 0);
-  assert.equal(f.chamadas.filter(c => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(c.sql)).length, 0);
+});
+
+test('semeadura: não ressuscita o removido (auditoria nova, ou a antiga semente_perfil_secoes do 1036)', async () => {
+  const { f, estado } = poolSemente({ auditoria: [{ acao: 'semente_perfil_secoes_removida', alvo: '92' }, { acao: 'semente_perfil_secoes', alvo: '13' }] });
+  assert.deepEqual(await semearPerfilSecoes(f), { feito: false, inseridas: [], atualizadas: [] });
+  assert.equal(estado.inseridas.length, 0);
+});
+
+test('instalarTabelas acrescenta semente_rev em web_perfil_secoes quando falta', async () => {
+  const f = criarPoolFalso([]);
+  await instalarTabelas(f);
+  assert.ok(f.chamadas.some(c => /ALTER TABLE web_perfil_secoes ADD COLUMN semente_rev INT NULL/.test(c.sql)));
 });

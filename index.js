@@ -1806,7 +1806,8 @@ async function iniciar() {
   if ((await acrescentarPermissoesChecklist(pool)).feito) console.log('[permissões] pedidos.checklist acrescentada ao Administrador, Interno completo e auxiliares; checklist.enviar ao Administrador e Interno completo');
   if ((await acrescentarPermissoesPerfisDesenho(pool)).feito) console.log('[permissões] perfis.desenho acrescentada ao Administrador e Interno completo');
   try {
-    if ((await semearPerfilSecoes(pool)).feito) console.log('[banco] seção do perfil 1036 semeada em web_perfil_secoes');
+    const sem = await semearPerfilSecoes(pool);
+    if (sem.feito) console.log(`[banco] biblioteca de seções de perfil: inseridas ${sem.inseridas.join(',') || '-'}; atualizadas ${sem.atualizadas.join(',') || '-'}`);
   } catch (err) { console.error('[banco] não foi possível semear web_perfil_secoes:', err.code || 'sem código'); }
   // coluna IMAGEM (foto do produto): falha não derruba o servidor; só o envio da foto continua recusado
   try {

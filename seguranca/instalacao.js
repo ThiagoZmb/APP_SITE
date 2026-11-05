@@ -524,6 +524,10 @@ async function instalarTabelas(pool) {
     await pool.execute('UPDATE web_custo_ligacoes l JOIN web_custo_componentes c ON c.id = l.componente_id SET l.quantidade = c.quantidade WHERE c.quantidade IS NOT NULL AND c.quantidade <> 1');
     await pool.execute('UPDATE web_custo_componentes SET quantidade = 1 WHERE quantidade IS NOT NULL AND quantidade <> 1');
   }
+  // revisão da semente que gerou a linha (biblioteca de seções de perfis): NULL = linha não veio de semente ou veio antes da coluna
+  const [[sr] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_perfil_secoes' AND COLUMN_NAME = 'semente_rev'");
+  if (!Number(sr?.n)) await pool.execute('ALTER TABLE web_perfil_secoes ADD COLUMN semente_rev INT NULL');
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo
@@ -918,30 +922,53 @@ async function acrescentarPermissoesPerfisDesenho(pool) {
   }
 }
 
-// Semente da biblioteca de seções: grava o perfil 1036 (código 13) UMA vez só. Nunca sobrescreve o que o dono editou: se já existe linha
-// do código 13, ou se a semente já foi aplicada antes (auditoria semente_perfil_secoes; o dono pode ter apagado de propósito), não faz nada.
+// Semeadura da biblioteca de seções (calculo/perfil_secoes_biblioteca.js), a CADA subida, uma transação por seção:
+//  (a) sem linha do código: insere (atualizado_por = 'semente', semente_rev = rev) -- EXCETO se o dono apagou pela tela
+//      (auditoria semente_perfil_secoes_removida, ou, para o 1036 semeado na versão antiga, a auditoria legada semente_perfil_secoes com alvo = código);
+//  (b) linha de semente (atualizado_por = 'semente') com semente_rev < rev da biblioteca (NULL = 0): atualiza (assim uma semente errada se corrige subindo a rev);
+//  (c) linha editada por pessoa (atualizado_por diferente de 'semente'): NUNCA sobrescreve.
+// Migração do 1036 antigo: a versão anterior gravava atualizado_por = 'sistema' e nenhuma rev. 'sistema' só existe nessa linha de semente (a tela grava o nome
+// da pessoa), então 'sistema' sem rev conta como semente de rev 0 e é regravada (mesmo conteúdo) já como 'semente'. Se uma pessoa tivesse editado, a linha teria o nome dela.
+// Devolve { feito, inseridas[], atualizadas[] } (feito = mexeu em alguma linha).
 async function semearPerfilSecoes(pool) {
-  const semente = require('../calculo/perfil_secoes').semente1036();
-  const [jaSemeada] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'semente_perfil_secoes' LIMIT 1");
-  if (jaSemeada.length) return { feito: false };
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [existe] = await conn.execute('SELECT codigo FROM web_perfil_secoes WHERE codigo = ? FOR UPDATE', [semente.codigo]);
-    if (!existe.length) {
-      await conn.execute('INSERT INTO web_perfil_secoes (codigo, modelo, secao, versao_esquema, atualizado_em, atualizado_por) VALUES (?, ?, ?, ?, NOW(), ?)',
-        [semente.codigo, semente.modelo, JSON.stringify(semente), semente.versao, 'sistema']);
+  const { SECOES } = require('../calculo/perfil_secoes_biblioteca');
+  const inseridas = [], atualizadas = [];
+  const SQL_INS = 'INSERT INTO web_perfil_secoes (codigo, modelo, secao, versao_esquema, atualizado_em, atualizado_por, semente_rev) VALUES (?, ?, ?, ?, NOW(), ?, ?)';
+  const SQL_AUD = 'INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)';
+  for (const item of SECOES) {
+    const secao = { ...item.secao, codigo: item.codigo, modelo: item.modelo };
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [existe] = await conn.execute('SELECT codigo, atualizado_por, semente_rev FROM web_perfil_secoes WHERE codigo = ? FOR UPDATE', [item.codigo]);
+      if (!existe.length) {
+        const [apagada] = await conn.execute(
+          "SELECT id FROM web_auditoria WHERE alvo = ? AND acao IN ('semente_perfil_secoes_removida', 'semente_perfil_secoes') LIMIT 1", [String(item.codigo)]);
+        if (!apagada.length) {
+          await conn.execute(SQL_INS, [item.codigo, item.modelo, JSON.stringify(secao), secao.versao, 'semente', item.rev]);
+          await conn.execute(SQL_AUD, ['sistema', 'semente_perfil_secoes_inserida', String(item.codigo), JSON.stringify({ codigo: item.codigo, rev: item.rev })]);
+          inseridas.push(item.codigo);
+        }
+      } else {
+        const l = existe[0];
+        const porSemente = l.atualizado_por === 'semente' || l.atualizado_por === 'sistema';
+        const revAtual = l.semente_rev == null ? 0 : Number(l.semente_rev);
+        if (porSemente && revAtual < item.rev) {
+          await conn.execute('UPDATE web_perfil_secoes SET modelo = ?, secao = ?, versao_esquema = ?, atualizado_em = NOW(), atualizado_por = ?, semente_rev = ? WHERE codigo = ?',
+            [item.modelo, JSON.stringify(secao), secao.versao, 'semente', item.rev, item.codigo]);
+          await conn.execute(SQL_AUD, ['sistema', 'semente_perfil_secoes_atualizada', String(item.codigo), JSON.stringify({ codigo: item.codigo, de: revAtual, para: item.rev })]);
+          atualizadas.push(item.codigo);
+        }
+      }
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
-    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
-      ['sistema', 'semente_perfil_secoes', String(semente.codigo), JSON.stringify({ codigo: semente.codigo, criada: !existe.length })]);
-    await conn.commit();
-    return { feito: !existe.length };
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
   }
+  return { feito: inseridas.length + atualizadas.length > 0, inseridas, atualizadas };
 }
 
 // Checklist de produção: pedidos.checklist para Administrador, Interno completo e, como no VB, Auxiliar de escritório e Auxiliar financeiro (se existirem como perfil);

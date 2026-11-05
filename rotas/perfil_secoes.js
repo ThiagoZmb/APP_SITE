@@ -77,6 +77,8 @@ function registrarPerfilSecoes({ rota, pool }) {
       if (!atual) throw new ErroUsuario(404, 'Este perfil não tem desenho cadastrado.');
       await conn.execute('DELETE FROM web_perfil_secoes WHERE codigo = ?', [codigo]);
       await auditar(conn, req, 'perfil_secao_removida', codigo, { codigo, versao: Number(atual.versao_esquema) });
+      // marca que o dono apagou de propósito: a semeadura da biblioteca (semearPerfilSecoes) não traz de volta este código
+      await auditar(conn, req, 'semente_perfil_secoes_removida', codigo, { codigo });
       return { ok: true };
     });
     if (r) res.json(r);
