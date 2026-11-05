@@ -35,6 +35,8 @@ function divergenciaIdaVolta(grupos, cfgs, seqs) {
   for (let k = 0; k < grupos.length; k++) {
     const f = { ...grupos[k].folha, qtd: grupos[k].qtd };
     for (const [col, campo] of Object.entries(IDA_VOLTA)) {
+      // o VB grava QTD_PUXADOR=1 mesmo sem puxador (orçamento 21345); sem puxador nomeado a quantidade não tem significado
+      if (col === 'QTD_PUXADOR' && !txt(cfgs[k].PUXADOR)) continue;
       if (!igual(f[campo], cfgs[k][col])) return `linha ${k + 1} (ITEM ${cfgs[k].ITEM}), ${col}: gravado=${mostra(cfgs[k][col])} regenerado=${mostra(f[campo])}`;
     }
     if (seqs.length) {

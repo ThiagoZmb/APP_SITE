@@ -136,6 +136,22 @@ test('ida e volta: quantidade de puxador gravada diferente das posições trava'
   assert.match(motivo(l), /não reproduz/);
 });
 
+test('ida e volta: sem puxador, o VB grava QTD_PUXADOR=1 e isso não trava (orçamento 21345)', () => {
+  const l = vazio();
+  l.lista.push(linha(1, { QTD: 1 }));
+  l.itensV4.push(cfg(1, 1, { QTD: 1, PUXADOR: '', ACABAMENTO_PUXADOR: '', COR_PUXADOR: '', TAM_PUXADOR: 0, TIPO_PUXADOR: '', QTD_PUXADOR: 1, POSICAO_PUXADOR: '' }));
+  const [it] = traduzirDocumento(l, { sistemas: {} }).itens;
+  assert.equal(it.travado, undefined);
+  assert.equal(it.detalhes.puxador, '');
+});
+
+test('ida e volta: com puxador nomeado, QTD_PUXADOR=1 sem posição continua travando', () => {
+  const l = vazio();
+  l.lista.push(linha(1, { QTD: 1 }));
+  l.itensV4.push(cfg(1, 1, { QTD: 1, QTD_PUXADOR: 1, POSICAO_PUXADOR: '' }));
+  assert.match(motivo(l), /não reproduz/);
+});
+
 test('impressão digital', () => {
   const a = giro4(), b = giro4();
   assert.match(impressaoDigital(a, 'Pedido'), /^[0-9a-f]{64}$/);
