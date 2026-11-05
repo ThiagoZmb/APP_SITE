@@ -16,6 +16,10 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
 
+  // seções transversais dos perfis (calculo/perfil_secoes.js): require no Node, global PerfilSecoes no navegador
+  let SECOES = raiz.PerfilSecoes || null;
+  if (!SECOES && typeof require === 'function') { try { SECOES = require('./calculo/perfil_secoes.js'); } catch (_) { SECOES = null; } }
+
   // ----- constantes (as mesmas do 2D quando existem lá) -----
   const PERFIL_MM = 45;          // largura do perfil (fixa no 2D)
   const DIVISOR_MM = 15;         // espessura do divisor (2D)
@@ -101,6 +105,8 @@
     return {
       ok: true,
       geo: {
+        perfil: String(geo.perfil || ''),
+        secao: geo.secao && typeof geo.secao === 'object' ? geo.secao : null, // injeção direta (teste/futuro traçador); senão busca pelo perfil
         correr: !!geo.correr,
         altura, largura,
         folhas,
@@ -130,7 +136,9 @@
     if (!nrm.ok) return { ok: false, motivo: nrm.motivo, caixas: [], limites: null };
     const g = nrm.geo;
     const n = g.folhas.length;
-    const H = g.altura, P = PERFIL_MM, T = ESP_PORTA_MM;
+    // seção transversal real do perfil escolhido (se cadastrada); sem ela, o bloco liso de antes
+    const sec = g.secao || (SECOES && g.perfil ? SECOES.porModelo(g.perfil) : null);
+    const H = g.altura, P = sec ? sec.altura : PERFIL_MM, T = sec ? sec.largura : ESP_PORTA_MM;
     const caixas = [];
     const add = c => { caixas.push(c); return c; };
 
@@ -145,14 +153,40 @@
       xCursor += L + g.gap;
       const zc = g.correr && n > 1 ? (i % 2 === 0 ? -AFASTO_CORRER_MM : AFASTO_CORRER_MM) : 0;
       const idf = `f${i + 1}`;
-      // perfis: 2 montantes inteiros + travessas entre eles
-      add({ id: `${idf}-perfil-esq`, tipo: 'perfil', folha: i, x: x0 + P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });
-      add({ id: `${idf}-perfil-dir`, tipo: 'perfil', folha: i, x: x0 + L - P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });
+      // perfis: 2 montantes inteiros + travessas entre eles (esquadro simples)
       const gw = Math.max(0, L - 2 * P), gh = Math.max(0, H - 2 * P);
-      add({ id: `${idf}-perfil-topo`, tipo: 'perfil', folha: i, x: x0 + L / 2, y: H - P / 2, z: zc, w: gw, h: P, d: T, cor: CORES.perfil });
-      add({ id: `${idf}-perfil-base`, tipo: 'perfil', folha: i, x: x0 + L / 2, y: P / 2, z: zc, w: gw, h: P, d: T, cor: CORES.perfil });
-      // vidro (translúcido)
-      add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zc, w: gw, h: gh, d: ESP_VIDRO_MM, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
+      if (sec) {
+        // extrusão da seção: sx = espessura -> z da cena (y=0 da seção na borda externa), sy = para dentro da folha, sz = ao longo do comprimento.
+        // Os três eixos formam rotação própria (sem espelhamento); o pé (x = 0) fica sempre do lado -z, nos quatro lados.
+        const zIni = zc - T / 2, ez = [0, 0, 1];
+        const peca = (sufixo, comp, origem, sy, sz) => {
+          const c = {
+            id: `${idf}-perfil-${sufixo}`, tipo: 'perfil', folha: i, cor: CORES.perfil,
+            secao: sec, comprimento: comp, origem, eixos: { sx: ez, sy, sz }
+          };
+          c.x = origem[0] + sy[0] * P / 2 + sz[0] * comp / 2;
+          c.y = origem[1] + sy[1] * P / 2 + sz[1] * comp / 2;
+          c.z = zIni + T / 2;
+          c.w = Math.abs(sy[0]) * P + Math.abs(sz[0]) * comp;
+          c.h = Math.abs(sy[1]) * P + Math.abs(sz[1]) * comp;
+          c.d = T;
+          return add(c);
+        };
+        peca('esq', H, [x0, 0, zIni], [1, 0, 0], [0, 1, 0]);
+        peca('dir', H, [x0 + L, H, zIni], [-1, 0, 0], [0, -1, 0]);
+        peca('topo', gw, [x0 + P, H, zIni], [0, -1, 0], [1, 0, 0]);
+        peca('base', gw, [x0 + L - P, 0, zIni], [0, 1, 0], [-1, 0, 0]);
+        // vidro no canal: espessura = largura do canal; começa a y0 da borda externa em cada lado
+        const cv = sec.canalVidro;
+        add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zIni + (cv.x0 + cv.x1) / 2, w: Math.max(0, L - 2 * cv.y0), h: Math.max(0, H - 2 * cv.y0), d: cv.x1 - cv.x0, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
+      } else {
+        add({ id: `${idf}-perfil-esq`, tipo: 'perfil', folha: i, x: x0 + P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });
+        add({ id: `${idf}-perfil-dir`, tipo: 'perfil', folha: i, x: x0 + L - P / 2, y: H / 2, z: zc, w: P, h: H, d: T, cor: CORES.perfil });
+        add({ id: `${idf}-perfil-topo`, tipo: 'perfil', folha: i, x: x0 + L / 2, y: H - P / 2, z: zc, w: gw, h: P, d: T, cor: CORES.perfil });
+        add({ id: `${idf}-perfil-base`, tipo: 'perfil', folha: i, x: x0 + L / 2, y: P / 2, z: zc, w: gw, h: P, d: T, cor: CORES.perfil });
+        // vidro (translúcido)
+        add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zc, w: gw, h: gh, d: ESP_VIDRO_MM, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
+      }
       // divisores (15 mm), igualmente espaçados na área do vidro
       for (let d = 1; d <= g.divH; d++) {
         const yDown = P + gh / (g.divH + 1) * d;
@@ -198,7 +232,7 @@
     if (g.trilhoSup) add({ id: 'trilho-sup', tipo: 'trilho', nome: g.trilhoSup.nome, x: xIni + totalW / 2, y: H + FOLGA_MM + TRILHO_MM / 2, z: 0, w: totalW, h: TRILHO_MM, d: profTrilho, cor: CORES.trilho });
     if (g.trilhoInf) add({ id: 'trilho-inf', tipo: 'trilho', nome: g.trilhoInf.nome, x: xIni + totalW / 2, y: -(FOLGA_MM + TRILHO_MM / 2), z: 0, w: totalW, h: TRILHO_MM, d: profTrilho, cor: CORES.trilho });
 
-    return { ok: true, caixas, limites: calcularLimites(caixas), folhas: n };
+    return { ok: true, caixas, limites: calcularLimites(caixas), folhas: n, secao: sec ? sec.modelo : null, espessuraPorta: T };
   }
 
   function calcularLimites(caixas) {
@@ -307,7 +341,18 @@
       res.caixas.forEach(cx => {
         let geom, mat;
         const cor = new T.Color(cx.cor);
-        if (cx.tipo === 'furo') {
+        if (cx.secao) {
+          // extrusão da seção real ao longo do comprimento, depois orientada pelos eixos calculados em montarCaixas
+          const pt = q => new T.Vector2(q[0], q[1]);
+          const forma = new T.Shape(cx.secao.contorno.map(pt));
+          (cx.secao.vazados || []).forEach(v => forma.holes.push(new T.Path(v.map(pt))));
+          geom = new T.ExtrudeGeometry(forma, { depth: cx.comprimento, bevelEnabled: false, steps: 1 });
+          const e = cx.eixos;
+          const m = new T.Matrix4().makeBasis(new T.Vector3(...e.sx), new T.Vector3(...e.sy), new T.Vector3(...e.sz));
+          m.setPosition(cx.origem[0], cx.origem[1], cx.origem[2]);
+          geom.applyMatrix4(m);
+          mat = new T.MeshStandardMaterial({ color: cor, roughness: 0.55, metalness: 0.45 });
+        } else if (cx.tipo === 'furo') {
           geom = new T.CylinderGeometry(cx.raio, cx.raio, cx.d, 20);
           geom.rotateX(Math.PI / 2); // eixo do furo ao longo de z
           mat = new T.MeshStandardMaterial({ color: cor, roughness: 0.9, metalness: 0 });
@@ -318,7 +363,8 @@
             : new T.MeshStandardMaterial({ color: cor, roughness: cx.tipo === 'puxador' ? 0.5 : 0.55, metalness: cx.tipo === 'puxador' ? 0.3 : 0.45 });
         }
         const malha = new T.Mesh(geom, mat);
-        malha.position.set(cx.x, cx.y, cx.z);
+        if (cx.secao) malha.position.set(0, 0, 0); // a geometria já está na posição final
+        else malha.position.set(cx.x, cx.y, cx.z);
         if (cx.tipo === 'vidro') malha.renderOrder = 2;
         grupo.add(malha);
         if (cx.tipo === 'perfil' || cx.tipo === 'divisor' || cx.tipo === 'trilho' || cx.tipo === 'puxador') {

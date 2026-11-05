@@ -982,7 +982,8 @@
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
     <script src="desenhos.js?v=202610272200"></script>
-    <script src="desenho3d.js?v=202611051400"></script>
+    <script src="calculo/perfil_secoes.js?v=202611051500"></script>
+    <script src="desenho3d.js?v=202611051500"></script>
     <script src="alteracao_valor.js?v=202611041200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
@@ -2235,6 +2236,7 @@
             const { trilhoSup, trilhoInf } = trilhosCorrer(correrSis);
             const nomeTrilho = (a, padrao) => a ? `${a.qtd} ${a.nome}` : padrao;
             return {
+                perfil: val('f-perfil'), // MODELO do perfil: o 3D usa a seção real se houver cadastrada (calculo/perfil_secoes.js)
                 correr: ehCorrer(),
                 altura, largura,
                 folhas: lfs.map((l, i) => ({
