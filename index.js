@@ -558,13 +558,20 @@ registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados
     // Razão Social identifica o cliente nos pedidos e no fluxo de caixa: não pode repetir
     const [dup] = await pool.execute('SELECT CODIGO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? AND CODIGO <> ? LIMIT 1', [d.razao, codigo]);
     if (dup.length) return erro('Já existe outro cliente com esta Razão Social!');
+    // REPRESENTANTE tem chave estrangeira para `representantes`: "sem representante" (tela manda vazio) não pode ir como texto vazio.
+    // Grava "Nenhum" (como o VB) se existir no cadastro de representantes; senão NULL.
+    let representante = txtEstq(b.representante, 120);
+    if (!representante) {
+      const [nenhum] = await pool.execute('SELECT 1 AS x FROM representantes WHERE REPRESENTANTE = ? LIMIT 1', ['Nenhum']);
+      representante = nenhum.length ? 'Nenhum' : null;
+    }
     const campos = {
       TIPO: txtEstq(b.tipo, 30), RAZAO_SOCIAL: d.razao, FANTASIA: txtEstq(b.fantasia), CNPJ_CPF: txtEstq(b.cnpjCpf, 30), IE_RG: txtEstq(b.ieRg, 30),
       ENDERECO: txtEstq(b.endereco), NUMERO: txtEstq(b.numero, 20), CEP: txtEstq(b.cep, 12), BAIRRO: txtEstq(b.bairro, 120),
       CIDADE: txtEstq(b.cidade, 120), ESTADO: txtEstq(b.estado, 4), COMPLEMENTO: txtEstq(b.complemento, 500), TELEFONE: d.telefone,
       CONTATO: txtEstq(b.contato, 120), EMAIL: txtEstq(b.email, 160), CLASSE: d.classe, DESCONTO: numEstq(b.desconto),
       DESCONTO_ADICIONAL: numEstq(b.descontoAdicional), CONDICAO: txtEstq(b.condicao, 120), MEDICAO: d.medicao,
-      OBSERVACAO: txtEstq(b.observacao, 2000), COMISSAO: numEstq(b.comissao), REPRESENTANTE: txtEstq(b.representante, 120),
+      OBSERVACAO: txtEstq(b.observacao, 2000), COMISSAO: numEstq(b.comissao), REPRESENTANTE: representante,
       FRETE_PORTAS: numEstq(b.fretePortas), FRETE_METALON: numEstq(b.freteMetalon),
       TIPO_DESCONTO: ['Desconto progressivo', 'Desconto fixo'].includes(b.tipoDesconto) ? b.tipoDesconto : '',
       SITUACAO: b.situacao === 'Inativo' ? 'Inativo' : 'Ativo'
