@@ -172,7 +172,7 @@
             @media (max-width: 768px) { .btn-atendimento span { display: none; } .btn-atendimento { margin-right: 8px; } }
             #sem-acesso-pagina { text-align: center; padding: 80px 20px; color: var(--text-light, #666); }
             #sem-acesso-pagina h2 { color: var(--text-dark, #222); margin-bottom: 8px; }
-            #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #8B0000); font-weight: 700; }`;
+            #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #f2a33a); font-weight: 700; }`;
         document.head.appendChild(css);
         aplicar();
         new MutationObserver(lista => {
@@ -479,19 +479,19 @@
             /* uma PORTA DE CORRER em miniatura (a cara da fábrica): duas folhas de vidro deslizam no trilho, um brilho passa pelo vidro,
                a sombra no chão acompanha e o "Carregando" ganha pontinhos. Cartão no centro da tela, sem bloquear cliques. */
             #carregando-global .cg-porta { position: absolute; top: 50%; left: 50%; width: 84px; height: 62px; margin: -46px 0 0 -42px; }
-            #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #7a828c, #4d545c); }
-            #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #b9bfc6; border-radius: 3px;
-                background: linear-gradient(115deg, rgba(255,255,255,0) 38%, rgba(255,255,255,.85) 50%, rgba(255,255,255,0) 62%) 130% 0 / 260% 100% no-repeat, linear-gradient(180deg, #eaf4fb, #d2e7f6);
-                box-shadow: 0 2px 6px rgba(0,0,0,.16); }
-            #carregando-global .cg-folha::after { content: ''; position: absolute; top: 12px; width: 3px; height: 20px; border-radius: 2px; background: var(--primary-color, #8B0000); }
+            #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #4a515e, #3a404b); }
+            #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #6b7280; border-radius: 3px;
+                background: linear-gradient(115deg, rgba(255,255,255,0) 38%, rgba(255,255,255,.28) 50%, rgba(255,255,255,0) 62%) 130% 0 / 260% 100% no-repeat, linear-gradient(180deg, #2c3a48, #212c37);
+                box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+            #carregando-global .cg-folha::after { content: ''; position: absolute; top: 12px; width: 3px; height: 20px; border-radius: 2px; background: var(--primary-color, #f2a33a); }
             #carregando-global .cg-f1 { left: 0; z-index: 1; animation: cg-brilho 2.6s ease-in-out infinite; }
             #carregando-global .cg-f1::after { right: 2px; }
             #carregando-global .cg-f2 { left: 42px; z-index: 2; animation: cg-desliza 2.6s ease-in-out infinite, cg-brilho 2.6s ease-in-out .18s infinite; }
             #carregando-global .cg-f2::after { left: 2px; }
-            #carregando-global .cg-sombra { position: absolute; left: 50%; bottom: -8px; width: 72px; height: 7px; margin-left: -36px; border-radius: 50%; background: rgba(0,0,0,.13); animation: cg-sombra 2.6s ease-in-out infinite; }
+            #carregando-global .cg-sombra { position: absolute; left: 50%; bottom: -8px; width: 72px; height: 7px; margin-left: -36px; border-radius: 50%; background: rgba(0,0,0,.35); animation: cg-sombra 2.6s ease-in-out infinite; }
             #carregando-global .cg-texto { position: absolute; top: 50%; left: 50%; width: 148px; margin: 33px 0 0 -74px; text-align: center; font: 700 10.5px/1 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
-                letter-spacing: .14em; text-transform: uppercase; color: #8a7d82; }
-            #carregando-global .cg-texto b { display: inline-block; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--primary-color, #8B0000); opacity: .25; animation: cg-ponto 1.2s ease-in-out infinite; }
+                letter-spacing: .14em; text-transform: uppercase; color: #8b93a1; }
+            #carregando-global .cg-texto b { display: inline-block; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--primary-color, #f2a33a); opacity: .25; animation: cg-ponto 1.2s ease-in-out infinite; }
             #carregando-global .cg-texto b:nth-child(2) { animation-delay: .2s; }
             #carregando-global .cg-texto b:nth-child(3) { animation-delay: .4s; }
             @keyframes carregando-entrada { from { opacity: 0; } to { opacity: 1; } }

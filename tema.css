@@ -752,3 +752,8 @@ body .card-sub, body .card-change { margin-top: 3px !important; }
 .cf-topo .cf-aba { color: var(--text-light) !important; }
 .cf-topo .cf-aba:hover { color: var(--text-dark) !important; background: rgba(255, 255, 255, .06) !important; }
 .cf-topo .cf-aba.ativa { color: var(--primary-color) !important; background: var(--primary-light) !important; }
+
+/* ===== LISTAS ABERTAS (select): fundo sólido, senão herdam o fundo translúcido do campo e o texto some ===== */
+select option, select optgroup { background-color: #1b1e24; color: #e8eaee; }
+select option:checked { background-color: #3a404b; color: #fff; }
+select option:disabled { color: #6b7280; }
