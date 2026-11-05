@@ -503,7 +503,8 @@ body .totais .valor { color: var(--primary-color) !important; font-weight: 600 !
 body #cv-visualizacao { border-radius: 8px !important; border-color: var(--border-color) !important; background: #fbfbfd !important; color: #4b5563 !important; }
 
 /* ===== GAVETA, MODAL, TOAST ===== */
-body .gaveta { border-radius: 12px 0 0 12px; border-left: 1px solid var(--border-color); }
+body .gaveta, body .cf { border-radius: 12px 0 0 12px; border-left: 1px solid var(--border-color); }
+body .cf { background: var(--bg); }
 body .gaveta-topo { background: var(--surface-2) !important; color: var(--text-dark) !important; border-bottom: 1px solid var(--border-color); }
 body .gaveta-fundo, body .modal-fundo { background: rgba(21, 17, 26, .45) !important; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 body .modal { border-radius: 10px !important; box-shadow: var(--shadow-heavy) !important; border: 1px solid var(--border-color); }

@@ -61,7 +61,7 @@
         /* ===== ficha lateral (padrão da ficha de clientes) ===== */
         .fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
         .fundo.aberta { opacity: 1; pointer-events: auto; }
-        .gaveta { position: fixed; top: 0; right: 0; bottom: 0; width: min(920px, 100vw); background: hsla(240, 60%, 55%, .14); z-index: 41;
+        .gaveta { position: fixed; top: 0; right: 0; bottom: 0; width: min(920px, 100vw); background: var(--bg); z-index: 41;
             transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
             box-shadow: -20px 0 50px -20px rgba(20,16,28,.35); border-radius: 20px 0 0 20px; overflow: hidden; }
         .gaveta.aberta { transform: none; }

@@ -183,6 +183,8 @@ Responsivo: abaixo de 960px a sidebar vira gaveta com fundo escurecido; há ajus
 
 Plano por padrão: superfícies com filete de 1px. A hierarquia vem de um degrau de tom (`#14161a` → `#1b1e24` → `#20242b`), não de sombra. Sombras só em camadas flutuantes (modal, toast, gaveta): `0 24px 48px -12px rgba(0,0,0,.7)`. O foco usa anel âmbar de 3px.
 
+Camadas sobrepostas (gaveta, ficha lateral, modal, menu de contexto, popover, sugestões): fundo sempre sólido do tema (`var(--bg)` na gaveta/ficha lateral, `var(--surface-2)` ou `var(--white)` em menus e cartões), nunca `rgba`/`hsla` com alfa menor que 1 nem `transparent`. Só o fundo de escurecimento (`*-fundo`, backdrop) é translúcido.
+
 ### Named Rules
 **The Hairline Rule.** Separação é filete de 1px. Cartão não sobe, brilha nem projeta sombra ao passar o ponteiro; só a borda se firma.
 
