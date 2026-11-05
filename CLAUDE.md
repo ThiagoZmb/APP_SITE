@@ -26,6 +26,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Etiquetas de pedido na Zebra** (`etiqueta_zebra.js`, `rotas/etiquetas.js`, `calculo/etiqueta_zpl.js`, `local/zebra.js`): o botão direito do Pedido ("Imprimir etiquetas (Zebra)") monta uma etiqueta ZPL de 100 × 60 mm por item no servidor e o serviço local do PC (porta 3917) a envia RAW à Zebra USB. Regras na seção 5, "Etiquetas na Zebra".
 - **Checklist de produção** (`checklist_pedido.js`, `rotas/checklist.js`, `calculo/checklist.js`): o botão direito do Pedido (`pedidos.checklist`) abre o PDF único do checklist guardado no banco (`web_checklist`); quem tem `checklist.enviar` o envia/troca na aba "Checklist de produção" de `danfe_envio.html`. Funciona de qualquer lugar, sem serviço local. Regras na seção 5, "Checklist de produção".
 - **Plano de corte de vidros** (`corte_vidros.html`, `corte_vidros.js`, `rotas/corte_vidros.js`, `calculo/vidro_*.js`): a partir de um Pedido, distribui as peças da tabela `vidros` em chapas do estoque (guilhotina com rotação) e retalhos; o cortador marca as peças e, ao confirmar o corte conferido, as chapas novas baixam do estoque. Regras na seção 5, "Plano de corte de vidros".
+- **Calendário de pedidos** (`calendario.html`, `calendario_dia.html`, `calendario.js`, `calendario_dia.js`, `calendario_comum.js`, `rotas/calendario.js`, `calculo/calendario.js`): mês inteiro e página de cada dia com a previsão de finalização (`ped_orc.DATA_PRONTO`) dos Pedidos, filtro "Em aberto" x "Todos", selo de atraso e o mesmo menu do botão direito do Início (alterar data de pronto, mudar situação, PDFs, Zebra, cortes, checklist, DANFE). Só lê; permissão `pedidos.ver`. Regras na seção 5, "Calendário de pedidos".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Notas de compra pela SEFAZ** (`notas_compra.html`, `notas_compra.js`, `local/sefaz.js`): o serviço local do PC da empresa (o mesmo do salvador de PDF, porta 3917) busca na SEFAZ as NF-e emitidas contra o CNPJ da empresa com o certificado A1, dá a Ciência da operação e guarda os XML; a tela leva o XML para a entrada de estoque existente. O certificado nunca sai do PC. Regras na seção 5, "Notas de compra pela SEFAZ".
 - **Nota fiscal em PDF (DANFE) pelo pedido** (`danfe_envio.html`, `danfe_envio.js`, `danfe_pedido.js`, `rotas/danfe.js`, `calculo/danfe.js`): os PDFs das notas (nome = chave de acesso de 44 dígitos) são enviados pela tela para o banco da web e abrem pelo botão direito do Pedido, de qualquer lugar. Regras na seção 5, "Nota fiscal em PDF (DANFE)".
@@ -57,11 +58,13 @@ rotas/                   Módulos de rotas registrados pelo index.js
   corte_vidros.js        Plano de corte de vidros: /corte_vidros/* (prévia, salvar, plano, peças, confirmar com baixa de chapas, cancelar, excluir, config, retalhos, estoque/produtos); exporta liberarPlanosVidroDoPedido (usada ao cancelar/excluir pedido em ped_orc.js)
   gestao.js              Central de Gestão: /gestao/painel, /gestao/orcamento, /gestao/metas_vb (leitura) e PUT /gestao/meta e /gestao/orcamento (gravam só em web_gestao_*)
   desenhos.js            Tela de orçamentos: funções puras da captura/envio do desenho da porta (caixa, redução do PNG, PUT por item)
+  calendario.js          Calendário de pedidos: GET /calendario/pedidos (mês, agrupado por dia) e GET /calendario/dia (somente leitura; estados do usuário; valor só com valores.ver)
   entregas.js            Entregas: varredura da fila (`sincronizarFila`), agenda, anexos, rotas da equipe (`/entregas*`) e do motorista (`/minhas_entregas*`)
   transacao.js           Transação com nova tentativa em deadlock, `ErroUsuario`, hora local (compartilhado pelas rotas)
 calculo/                 Funções puras (testáveis sem banco)
   precos.js              Motor de preço: portas, serralheria, avulso, acessórios; leitor do cadastro
   precos_formacao.js / precos_referencias.js / custos.js / custos_sugestao.js   Formação de preço e custos
+  calendario.js          Calendário de pedidos: validação de mês/data/situação, "em aberto", atraso, agrupamento por dia (puras)
   entregas.js            Máquina de status das entregas (`proximo`, `pedidoPara`) e validação de anexo
   engenharia.js          Regras de engenharia das portas
   leitura_vb.js / linhas_vb.js   Conversão banco<->tela no formato do VB
@@ -93,6 +96,7 @@ portal_admin.html/.js   Tela da equipe "Portal do cliente" (subitem de Usuários
 corte.html/.js           Tela do plano de corte (varas desenhadas em escala em CSS), retalhos e parâmetros
 corte_vidros.html/.js   Tela do plano de corte de vidros (chapas desenhadas em escala em CSS), retalhos e parâmetros
 gestao.html/.js          Tela da Central de Gestão (barras em CSS, sem biblioteca de gráficos)
+calendario.html/.js, calendario_dia.html/.js, calendario_comum.js, calendario.css   Telas do calendário de pedidos (mês e dia); o menu do botão direito é o `inicio_menu.js`
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
 DESIGN.md                Regras da identidade visual (cores, fonte, componentes, do's and don'ts); espelha o tema.css
 *.html, layout.js, login.js, ranking.js, custos_precos.js, importar_itens.js, leitura_pdf.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
@@ -158,6 +162,10 @@ O servidor lê o PDF de projeto pela API do Claude e a skill valida; nada entra 
 ### Entregas (módulo web, tabelas `web_entregas`, `web_entrega_eventos`, `web_entrega_anexos`)
 Fila de pedidos Pronto, agenda e baixa pelo motorista (`web_entregas*`); a web nunca marca Pronto; a baixa grava `ped_orc.SITUACAO` e `DATA_ENTREGA` na mesma transação.
 > Regras completas: `docs/regras/entregas.md` (ler antes de mexer neste módulo).
+
+### Calendário de pedidos (previsão de finalização por dia)
+Data = `ped_orc.DATA_PRONTO` (só Pedido); "em aberto" = tudo menos Entregue/Retirado/Cancelado; atrasado = data anterior a hoje e ainda em produção/situação desconhecida (Pronto não atrasa); `pedidos.ver`, estados e `valores.ver` como `/dados_lista`; o menu do botão direito é o `inicio_menu.js` do Início (opção `voltar`).
+> Regras completas: `docs/regras/calendario-pedidos.md` (ler antes de mexer neste módulo).
 
 ### Cadastros (fornecedores e funcionários)
 Fornecedores (a razão social não muda depois de criada) e funcionários (SENHA e NIVEL do VB nunca saem; salário só com `valores.ver`).

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Calendário de pedidos</title>
+    <link rel="stylesheet" href="calendario.css?v=202611061200">
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="calendario_comum.js?v=202611061200" defer></script>
+    <script src="inicio_menu.js?v=202611061200" defer></script>
+    <script src="escolha_data_entrega.js?v=202610301300" defer></script>
+    <script src="alterar_data_pronto.js?v=202611051200" defer></script>
+    <script src="danfe_pedido.js?v=202611051300" defer></script>
+    <script src="etiqueta_zebra.js?v=202611041200" defer></script>
+    <script src="checklist_pedido.js?v=202611051700" defer></script>
+    <script src="calendario.js?v=202611061200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Calendário de pedidos</h1>
+            <p class="welcome-subtitle">Previsão de finalização dos pedidos (data de pronto). Clique em um dia para ver a lista completa.</p>
+
+            <section class="painel" id="cal-corpo">
+                <div class="cal-topo">
+                    <button type="button" class="btn btn-mini btn-secondary" data-mes="-1" aria-label="Mês anterior">‹</button>
+                    <button type="button" class="btn btn-mini btn-secondary" data-mes="0">Hoje</button>
+                    <button type="button" class="btn btn-mini btn-secondary" data-mes="1" aria-label="Próximo mês">›</button>
+                    <h2 id="cal-titulo" aria-live="polite"></h2>
+                    <span class="cinza" id="cal-resumo"></span>
+                    <div id="cal-situacao"></div>
+                </div>
+                <div id="cal-grade"></div>
+                <div id="cal-lista" class="cal-lista"></div>
+                <p class="cinza cal-ajuda">Clique com o botão direito em um pedido (ou use a tecla de menu / Shift+F10) para alterar a data de pronto, mudar a situação e abrir PDFs.</p>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

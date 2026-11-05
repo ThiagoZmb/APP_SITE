@@ -40,6 +40,7 @@ const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
+const { registrarCalendario } = require('./rotas/calendario');
 const { registrarFornecedores } = require('./rotas/fornecedores');
 const { registrarTintas } = require('./rotas/tintas');
 const { registrarPesos } = require('./rotas/pesos');
@@ -1753,6 +1754,7 @@ registrarPortalUsuarios({ portal: registro.portal, pool, sessoes: sessoesPortal,
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
+registrarCalendario({ rota: registro.rota, pool });
 registrarFornecedores({ rota: registro.rota, pool });
 registrarFuncionarios({ rota: registro.rota, pool });
 registrarTintas({ rota: registro.rota, pool });

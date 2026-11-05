@@ -1,7 +1,7 @@
 // Menu do botão direito nos pedidos das listas da página Início ("Entregas da semana" e "Últimos pedidos"):
 // PDFs, imprimir, abrir para editar, cortes, mudar situação e ver entrega. Mesmas ações e permissões do menu da lista de
 // Pedidos e Orçamentos (painel_inicial.html), sem as destrutivas (cancelar/excluir ficam só lá).
-// iniciar({ apiBase, loginUrl, token, pode, docDe, recarregar, esc })
+// iniciar({ apiBase, loginUrl, token, pode, docDe, recarregar, esc, voltar? })  (voltar = página para onde "Abrir para editar" volta; padrão inicio.html)
 (function () {
   'use strict';
   const SITUACOES = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
@@ -87,7 +87,7 @@
       add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
       add('pedidos.checklist', '✅', 'Imprimir checklist', () => window.ChecklistPedido.abrir({ apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
       sep();
-      add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=inicio.html`; });
+      add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
       if (!cancelado) {
         add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${enc(n)}`; });
         add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${enc(n)}`; });

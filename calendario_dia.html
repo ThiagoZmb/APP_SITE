@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Pedidos do dia</title>
+    <link rel="stylesheet" href="calendario.css?v=202611061200">
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="calendario_comum.js?v=202611061200" defer></script>
+    <script src="inicio_menu.js?v=202611061200" defer></script>
+    <script src="escolha_data_entrega.js?v=202610301300" defer></script>
+    <script src="alterar_data_pronto.js?v=202611051200" defer></script>
+    <script src="danfe_pedido.js?v=202611051300" defer></script>
+    <script src="etiqueta_zebra.js?v=202611041200" defer></script>
+    <script src="checklist_pedido.js?v=202611051700" defer></script>
+    <script src="calendario_dia.js?v=202611061200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Pedidos do dia</h1>
+            <p class="welcome-subtitle">Pedidos com previsão de finalização neste dia.</p>
+            <a class="voltar-cal" id="dia-voltar" href="calendario.html">← Voltar ao calendário</a>
+
+            <section class="painel">
+                <div class="dia-topo">
+                    <a class="btn btn-mini btn-secondary btn-link" id="dia-anterior" href="#" aria-label="Dia anterior">‹</a>
+                    <a class="btn btn-mini btn-secondary btn-link" id="dia-hoje" href="#">Hoje</a>
+                    <a class="btn btn-mini btn-secondary btn-link" id="dia-proximo" href="#" aria-label="Próximo dia">›</a>
+                    <h2 id="dia-titulo" aria-live="polite"></h2>
+                </div>
+                <div class="dia-sub">
+                    <span class="cinza" id="dia-resumo"></span>
+                    <div id="dia-situacao"></div>
+                </div>
+                <ul class="lista-dia" id="dia-lista"><li class="vazio">Carregando...</li></ul>
+            </section>
+            <p class="cinza cal-ajuda">Clique com o botão direito em um pedido (ou use o botão Ações) para alterar a data de pronto, mudar a situação e abrir PDFs.</p>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
