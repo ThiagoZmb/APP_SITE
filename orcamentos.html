@@ -133,6 +133,11 @@
             border-radius: 12px; display: block; margin: 0 auto; cursor: crosshair;
         }
         #cv-visualizacao.modo-pux { cursor: pointer; border-color: var(--primary-color); border-width: 2px; }
+        /* ===== VISUALIZADOR 3D (somente leitura, desenho3d.js): abas 2D/3D ao lado do desenho ===== */
+        .viz-abas { display: flex; gap: 6px; margin-bottom: 10px; }
+        .viz3d-cena { position: relative; width: 100%; height: 480px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border-color); border-radius: 12px; cursor: grab; touch-action: none; }
+        .viz3d-cena:active { cursor: grabbing; }
+        .viz3d-cena canvas { display: block; }
         .viz-linha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
         .viz-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-light); }
         .viz-status { font-size: 13px; color: var(--primary-color); font-weight: 600; min-height: 18px; margin-top: 6px; }
@@ -786,7 +791,21 @@
                     <!-- 🖥️ VISUALIZAÇÃO EM TEMPO REAL (motor fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🖥️ Visualização em tempo real<span id="peso-visualizacao" class="peso-visualizacao" hidden></span></h4>
+                        <div class="viz-abas" id="viz-abas" role="tablist" aria-label="Tipo de visualização">
+                            <button type="button" class="btn-mini ativo" id="aba-2d" role="tab" aria-selected="true">2D</button>
+                            <button type="button" class="btn-mini" id="aba-3d" role="tab" aria-selected="false" style="display:none" title="Visualização 3D (somente leitura)">3D</button>
+                        </div>
                         <canvas id="cv-visualizacao"></canvas>
+                        <div id="viz3d" style="display:none">
+                            <div id="viz3d-cena" class="viz3d-cena" aria-label="Visualização 3D da porta (somente leitura)"></div>
+                            <div class="viz-linha">
+                                <button type="button" class="btn-mini" id="btn-3d-frontal">Frontal</button>
+                                <button type="button" class="btn-mini" id="btn-3d-persp">Perspectiva</button>
+                                <button type="button" class="btn-mini" id="btn-3d-auto" aria-pressed="false">Girar automático</button>
+                                <button type="button" class="btn-mini" id="btn-3d-reset">Resetar vista</button>
+                            </div>
+                            <div class="viz-status" id="viz3d-aviso" aria-live="polite"></div>
+                        </div>
                         <div class="viz-linha">
                             <button class="btn-mini" id="btn-modo-pux" title="A posição do puxador é definida aqui, folha por folha: clique no botão e depois nas posições em laranja de cada folha no desenho">🎯 Posicionar puxador (clique no desenho)</button>
                         </div>
@@ -963,6 +982,7 @@
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
     <script src="desenhos.js?v=202610272200"></script>
+    <script src="desenho3d.js?v=202611051400"></script>
     <script src="alteracao_valor.js?v=202611041200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
@@ -1981,9 +2001,17 @@
             }
             el.textContent = 'Puxador — ' + lista.map((p, i) => `F${i + 1}: ${p || (ehCorrer() ? 'sem puxador' : 'falta posicionar')}`).join(' · ');
         }
+        // trilhos do sistema de correr (usado pelo 2D e pelo 3D): "sup"/"inf" na classe ou no nome (regra do VB)
+        function trilhosCorrer(correrSis) {
+            const trilhos = correrSis ? acessoriosItem.filter(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`)) : [];
+            const lado = (a, re) => re.test(`${a.classe || ''} ${a.nome}`);
+            const trilhoSup = trilhos.find(a => lado(a, /SUP/i)) || trilhos.find(a => !lado(a, /INF/i)) || null;
+            const trilhoInf = trilhos.find(a => lado(a, /INF/i)) || trilhos.find(a => a !== trilhoSup && !lado(a, /SUP/i)) || null;
+            return { trilhoSup, trilhoInf };
+        }
         function desenharVisualizacao(opcoes = {}) {
             const limpo = !!(opcoes && opcoes.limpo === true && opcoes.alvo);
-            if (!limpo) atualizarResumoPuxador();
+            if (!limpo) { atualizarResumoPuxador(); agendar3D(); } // o 3D só segue o 2D (nunca é lido pela captura do PDF)
             const cv = limpo ? opcoes.alvo : document.getElementById('cv-visualizacao');
             if (!cv) return;
             // porta de correr com sistema: a medida digitada é o VÃO; as folhas são desenhadas com a medida da PORTA (frmPortasCorrer)
@@ -1994,10 +2022,7 @@
             const largura = mp ? mp.largura : vaoL;
             // correr com sistema: folhas desenhadas afastadas (só visual), trilho superior com folga e, se houver, trilho inferior
             // trilhos do sistema: "sup"/"inf" na classe ou no nome (regra do VB); sem indicação, o 1º vai em cima e o 2º embaixo
-            const trilhos = correrSis ? acessoriosItem.filter(a => a.origem === ORIGEM_SIS && /TRILHO/i.test(`${a.classe || ''} ${a.nome}`)) : [];
-            const lado = (a, re) => re.test(`${a.classe || ''} ${a.nome}`);
-            const trilhoSup = trilhos.find(a => lado(a, /SUP/i)) || trilhos.find(a => !lado(a, /INF/i)) || null;
-            const trilhoInf = trilhos.find(a => lado(a, /INF/i)) || trilhos.find(a => a !== trilhoSup && !lado(a, /SUP/i)) || null;
+            const { trilhoSup, trilhoInf } = trilhosCorrer(correrSis);
             const TRILHO_MM = 60, FOLGA_MM = 45;
             const extraTopoMm = correrSis ? TRILHO_MM + FOLGA_MM : 0, extraBaseMm = trilhoInf ? TRILHO_MM + FOLGA_MM : 0;
             const qtdDivH = parseInt(val('f-div-h')) || 0;
@@ -2190,6 +2215,103 @@
                 }
             }
         }
+        // ============ VISUALIZADOR 3D (somente leitura; desenho3d.js) ============
+        // Só reflete o estado do formulário: lê o mesmo estado do 2D, não grava nada e não participa da captura do PDF.
+        var viz3d = { ctl: null, aba: '2d', agendado: 0 };
+        // objeto de geometria (mm) que o desenho3d.js transforma em cena; mesmas regras de leitura do 2D
+        function geometria3D() {
+            if (!Desenhos.FRENTES_COM_DESENHO.includes(frenteAtual)) return null;
+            const vaoA = parseFloat(val('f-altura')) || 0, vaoL = parseFloat(val('f-largura')) || 0;
+            const correrSis = ehCorrer() && temSistemaCorrer() && !!sistemaCorrer;
+            const mp = correrSis ? medidasPortasCorrer() : null;
+            const altura = mp ? mp.altura : vaoA, largura = mp ? mp.largura : vaoL;
+            if (!(altura > 0 && largura > 0)) return null;
+            garantirFolhas();
+            const n = posicoesFolhas.length;
+            const lfs = Array.from({ length: n }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || largura);
+            const comFuros = ehPortaComFuros() && furosLista.length > 0;
+            const tem = temPuxador();
+            const emb = nativoEmbutido(), sob = nativoSobreposto() || !tipoNativo();
+            const { trilhoSup, trilhoInf } = trilhosCorrer(correrSis);
+            const nomeTrilho = (a, padrao) => a ? `${a.qtd} ${a.nome}` : padrao;
+            return {
+                correr: ehCorrer(),
+                altura, largura,
+                folhas: lfs.map((l, i) => ({
+                    largura: l,
+                    posicoes: tem ? listaPos(posicoesFolhas[i]).map(p => normalizarPosicao(p, false)) : [],
+                    puxadorTotal: tem ? puxadorTotalNaFolha(i) : false,
+                    ladoFuro: comFuros ? ladoFuroDaFolha(i) : ''
+                })),
+                gap: n > 1 ? Math.max(150, largura * 0.08) : 0,
+                sobraVao: correrSis && n === 1 ? Math.max(0, vaoL - lfs[0]) : 0,
+                divH: parseInt(val('f-div-h')) || 0,
+                divV: parseInt(val('f-div-v')) || 0,
+                puxador: { tem, tipo: emb ? 'embutido' : sob ? 'sobreposto' : 'outro', tamanho: parseFloat(val('f-tamanho-pux')) || 0 },
+                furos: { lista: comFuros ? furosLista.slice() : [], referenciaInvertida: isReferenciaInvertida },
+                trilhoSup: correrSis ? { nome: nomeTrilho(trilhoSup, 'Trilho superior') } : null,
+                trilhoInf: correrSis && trilhoInf ? { nome: nomeTrilho(trilhoInf, 'Trilho inferior') } : null
+            };
+        }
+        function agendar3D() {
+            if (!viz3d || viz3d.agendado || typeof Desenho3D === 'undefined') return; // viz3d ainda não existe nas primeiras chamadas do 2D
+            viz3d.agendado = requestAnimationFrame(() => { viz3d.agendado = 0; atualizar3D(); });
+        }
+        function atualizar3D() {
+            const aba3 = document.getElementById('aba-3d');
+            if (!aba3 || typeof Desenho3D === 'undefined') return;
+            const suportado = Desenhos.FRENTES_COM_DESENHO.includes(frenteAtual);
+            if (!aba3.disabled) aba3.style.display = suportado ? '' : 'none';
+            if (!suportado) { if (viz3d.aba === '3d') mostrarAbaViz('2d'); return; }
+            if (viz3d.aba !== '3d' || !viz3d.ctl) return;
+            const geo = geometria3D();
+            viz3d.ctl.atualizar(geo);
+            document.getElementById('viz3d-aviso').textContent = geo ? '' : 'Informe altura e largura para ver o 3D.';
+        }
+        async function mostrarAbaViz(qual) {
+            const cv = document.getElementById('cv-visualizacao'), painel = document.getElementById('viz3d');
+            const marcar = a => ['2d', '3d'].forEach(k => {
+                const b = document.getElementById('aba-' + k);
+                b.classList.toggle('ativo', k === a); b.setAttribute('aria-selected', String(k === a));
+            });
+            if (qual === '3d') {
+                const aviso = document.getElementById('viz3d-aviso'), cena = document.getElementById('viz3d-cena');
+                if (!viz3d.ctl) viz3d.ctl = Desenho3D.criar(cena, { aoErro: msg => { aviso.textContent = msg; } });
+                const h = cv.getBoundingClientRect().height;
+                cena.style.height = (h > 200 ? Math.round(h) : 480) + 'px';
+                cv.style.display = 'none'; painel.style.display = ''; viz3d.aba = '3d'; marcar('3d');
+                const ok = await viz3d.ctl.mostrar();
+                if (!ok) { // sem WebGL ou biblioteca indisponível: volta para o 2D, que segue normal
+                    const msg = aviso.textContent || 'O 3D não está disponível neste navegador.';
+                    const aba3 = document.getElementById('aba-3d');
+                    aba3.disabled = true; aba3.title = msg;
+                    await mostrarAbaViz('2d');
+                    document.getElementById('viz-status').textContent = msg;
+                    return;
+                }
+                if (viz3d.aba !== '3d') { viz3d.ctl.esconder(); return; } // o usuário voltou ao 2D enquanto a biblioteca carregava
+                atualizar3D();
+            } else {
+                if (viz3d.ctl) viz3d.ctl.esconder(); // libera o WebGL ao esconder
+                painel.style.display = 'none'; cv.style.display = ''; viz3d.aba = '2d'; marcar('2d');
+                desenharVisualizacao();
+            }
+        }
+        document.getElementById('aba-2d')?.addEventListener('click', () => mostrarAbaViz('2d'));
+        document.getElementById('aba-3d')?.addEventListener('click', () => mostrarAbaViz('3d'));
+        document.getElementById('btn-3d-frontal')?.addEventListener('click', () => viz3d.ctl?.vista('frontal'));
+        document.getElementById('btn-3d-persp')?.addEventListener('click', () => viz3d.ctl?.vista('perspectiva'));
+        document.getElementById('btn-3d-reset')?.addEventListener('click', () => {
+            viz3d.ctl?.resetar();
+            const b = document.getElementById('btn-3d-auto'); b.classList.remove('ativo'); b.setAttribute('aria-pressed', 'false');
+        });
+        document.getElementById('btn-3d-auto')?.addEventListener('click', e => {
+            const lig = !e.currentTarget.classList.contains('ativo');
+            e.currentTarget.classList.toggle('ativo', lig); e.currentTarget.setAttribute('aria-pressed', String(lig));
+            viz3d.ctl?.girarAuto(lig);
+        });
+        // posicionar o puxador só funciona clicando no 2D: se o 3D estiver aberto, volta para o 2D antes
+        document.getElementById('btn-modo-pux')?.addEventListener('click', () => { if (viz3d.aba === '3d') mostrarAbaViz('2d'); }, true);
         // picDesenho_MouseClick: escolha da posição clicando num fantasma
         document.getElementById('cv-visualizacao')?.addEventListener('click', e => {
             if (!modoPuxador || !temPuxador()) return;
