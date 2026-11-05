@@ -10,9 +10,9 @@
         /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
         [hidden] { display: none !important; }
         /* mobile primeiro: sem moldura, uma coluna */
-        body { background: #f5f7fa; color: var(--text-dark); min-height: 100vh; }
+        body { background: hsla(216, 60%, 55%, .14); color: var(--text-dark); min-height: 100vh; }
         .container { display: grid; grid-template-columns: 1fr; grid-template-areas: "header" "main"; min-height: 100vh; background: var(--white); }
-        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
         .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
         .logo::before { content: "◆"; font-size: 18px; opacity: 0.8; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 50px; background: rgba(255,255,255,0.1); }
@@ -36,10 +36,10 @@
         .cartao p { font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
         .endereco { font-size: 16px; }
         .endereco.sem { color: var(--danger-color); font-weight: 600; }
-        .aviso { background: #fff3cd; color: #7a5d00; border-radius: 10px; padding: 8px 10px; font-size: 13px !important; }
+        .aviso { background: hsla(46, 100%, 55%, .14); color: hsl(46, 78%, 72%); border-radius: 10px; padding: 8px 10px; font-size: 13px !important; }
         .itens { list-style: none; font-size: 15px; }
         .itens li { padding: 6px 0; border-bottom: 1px dashed var(--border-color); overflow-wrap: anywhere; }
-        .ocorrencia { background: #f8d7da; color: #7a1a24; border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+        .ocorrencia { background: hsla(355, 70%, 55%, .14); color: hsl(354, 78%, 72%); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
         .cinza { color: var(--text-light); font-size: 13px; }
         .vazio { text-align: center; padding: 40px 10px; color: var(--text-light); }
         .selo { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); white-space: nowrap; }
@@ -50,7 +50,7 @@
         .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
         .acoes > :only-child { grid-column: 1 / -1; }
         .btn { padding: 14px 16px; border: none; border-radius: 14px; font-weight: 700; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; min-height: 52px; width: 100%; }
-        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-ok { background: var(--success-color); color: white; }
         .btn-perigo { background: var(--white); color: var(--danger-color); border: 2px solid var(--danger-color); }
@@ -92,8 +92,8 @@
             #toasts { left: auto; right: 24px; max-width: 380px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611050830">
-    <script src="layout.js?v=202610282000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611051300">
+    <script src="layout.js?v=202611051300" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="minhas_entregas.js?v=202610261500" defer></script>
 </head>

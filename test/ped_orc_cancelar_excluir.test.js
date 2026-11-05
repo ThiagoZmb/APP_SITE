@@ -201,10 +201,10 @@ test('orçamento: Fechado / Aguardando resposta pela rota própria, auditado; ou
   assert.equal((await chamar('/ped_orc/orcamentos/abc/situacao', 'POST', { situacao: 'Fechado' })).status, 400);
 });
 
-test('lista: orçamento Fechado ganha a linha azul clara e o menu tem Fechado / Aguardando resposta', () => {
+test('lista: orçamento Fechado ganha a linha azulada e o menu tem Fechado / Aguardando resposta', () => {
   const h = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'painel_inicial.html'), 'utf8');
   assert.match(h, /n === 'fechado' \? 'fechado' : n === 'baixado' \? 'baixado' : 'outro'/);
-  assert.match(h, /#orders-tbody tr\.linha-fechada \{ background: #eaf3ff; \}/);
+  assert.match(h, /#orders-tbody tr\.linha-fechada \{ background: hsla\(214, 100%, 55%, \.14\); \}/);
   assert.match(h, /tipoLista === 'Orçamento' && x\.s === 'fechado' \? ' class="linha-fechada"'/);
   assert.ok(h.indexOf('tr.linha-fechada {') < h.indexOf('#orders-tbody tr.ctx'), 'a regra do clique direito vence a da linha fechada');
   assert.match(h, /mudarSituacaoOrcamento\(numero, 'Fechado'\)/);

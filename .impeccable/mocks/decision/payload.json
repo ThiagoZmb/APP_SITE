@@ -1,0 +1,84 @@
+{
+  "title": "Escolha a nova cara do ELEGANCE",
+  "question": "O sorteio atribuiu 'Talão de Pedidos'. Fique com ele, escolha outro ou sorteie de novo. Todas mantêm a logo e o layout de Orçamentos e Financeiro.",
+  "options": [
+    {
+      "id": "assigned", "kind": "assigned", "label": "Talão de Pedidos", "kicker": "THE ROLL",
+      "lineage": "talão de pedidos e notas em papel carbonado, numeração tipográfica em vermelho",
+      "thesis": "Cada documento é identificado pelo seu número em vermelho, como no talão que a empresa conhece desde sempre.",
+      "palette": ["#1f3a93", "#c8102e", "#121826", "#eef1f6"],
+      "materials": ["azul de carbono", "numeração vermelha", "papel branco frio"],
+      "viewport": "Menu lateral azul-tinta; título da tela com o número do documento em vermelho tabular; indicadores e tabela limpos em painéis brancos.",
+      "risk": "Se o vermelho aparecer além do número e dos alertas, a tela vira festa de cores.",
+      "raised": [
+        {"from": "aww2-zoo-gardens-guide-map", "raise": "Status vivo viaja: a pílula de situação cruza da borda direita para a esquerda quando o documento está ativo."},
+        {"from": "rw-centre-rail-reference-setting", "raise": "Estados são marcas impressas: foco é um colchete ao redor do campo; cancelado é risco fino sobre o texto."}
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html"
+    },
+    {
+      "id": "model-pick", "kind": "pick", "label": "Prancha Técnica", "kicker": "IMPECCABLE’S PICK",
+      "lineage": "prancha de projeto em desenho técnico (ABNT), com carimbo e linhas de cota",
+      "thesis": "O sistema vira uma prancha bem desenhada: carimbo de identificação no topo e linhas de cota separando as áreas.",
+      "palette": ["#0b1f33", "#0a6cbd", "#d62828", "#f1f3f5"],
+      "materials": ["linha fina azul de cota", "carimbo da prancha", "papel branco"],
+      "viewport": "Carimbo no topo com nº, cliente, data e revisão; menu lateral escuro azul-marinho; painéis separados por filetes com marcas de cota.",
+      "risk": "Familiar para quem é da área técnica, mas pode soar frio para quem só vende.",
+      "html": ".impeccable/mocks/decision/model-pick.html"
+    },
+    {
+      "id": "challenger-console", "kind": "challenger", "catalogId": "digital-design-canon-dark-first-developer-console",
+      "label": "Console Grafite", "verdict": "competitive",
+      "lineage": "painéis escuros de ferramenta de trabalho",
+      "thesis": "Fundo grafite com painéis divididos por filetes e ações destrutivas sempre isoladas.",
+      "palette": ["#14161a", "#1b1e24", "#f2a33a", "#3ddc97"],
+      "materials": ["grafite", "filetes de 1px", "números tabulares"],
+      "viewport": "Menu e painéis em grafite, acento âmbar só para a ação principal, verde e vermelho só para estado.",
+      "case": "Segura a clareza de produto de trabalho, mas perde na identificação: escritório e vendas usam o dia todo em tela clara.",
+      "risk": "Tela escura o dia inteiro cansa em escritório bem iluminado e destoa do portal do cliente.",
+      "html": ".impeccable/mocks/decision/challenger-console.html"
+    },
+    {
+      "id": "challenger-zoo", "kind": "challenger", "catalogId": "aww2-zoo-gardens-guide-map",
+      "label": "Mapa do Zoológico", "verdict": "declined", "lineage": "mapa de guia de jardim zoológico",
+      "palette": ["#8ED462", "#F5F1E4", "#FF705D", "#2C2E2A"], "materials": ["cor chapada", "cápsulas"],
+      "case": "Perde nos dois eixos: lúdico demais para um sistema de gestão.", "kept": "A pílula de status que muda de lado quando está ativa."
+    },
+    {
+      "id": "challenger-streaming", "kind": "challenger", "catalogId": "pop-culture-shelf-streaming-title-card-wall",
+      "label": "Parede de Streaming", "verdict": "declined", "lineage": "catálogo de streaming em prateleiras",
+      "palette": ["#0b0b0f", "#e50914"], "materials": ["pôsteres", "fileiras"],
+      "case": "Depende de imagens; o sistema é de tabelas e números.", "kept": "Escurecer o resto quando um item está em foco."
+    },
+    {
+      "id": "challenger-rail", "kind": "challenger", "catalogId": "rw-centre-rail-reference-setting",
+      "label": "Página de Referência", "verdict": "declined", "lineage": "edição com margem larga e trilho central",
+      "palette": ["#1a1816", "#b4361f", "#efe9dc"], "materials": ["papel", "filetes"],
+      "case": "Soa editorial; tabela de trabalho vira texto de livro.", "kept": "Estados como marcas impressas: foco em colchete, cancelado riscado."
+    },
+    {
+      "id": "challenger-sleeve", "kind": "challenger", "catalogId": "brand-identity-canon-saville-catalog-sleeve",
+      "label": "Capa de Catálogo", "verdict": "declined", "lineage": "capas de gravadora com código de cores",
+      "palette": ["#0a0a0a", "#ffffff"], "materials": ["preto fosco", "linhas brancas"],
+      "case": "Esconde nomes atrás de código; o sistema precisa de leitura direta.", "kept": "Cor codificada que mostra a palavra ao passar o mouse."
+    },
+    {
+      "id": "challenger-font", "kind": "challenger", "catalogId": "variable-font-specimen",
+      "label": "Amostra de Fonte", "verdict": "declined", "lineage": "especimens de fonte variável",
+      "palette": ["#fafafa", "#111111"], "materials": ["papel", "tipo grande"],
+      "case": "Tipografia vira protagonista; o protagonista aqui é o dado.", "kept": "Leitura numérica em monoespaçada com valores tabulares."
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code"},
+  "canon": true,
+  "canonCard": {
+    "kind": "canon", "label": "Padrão de mercado",
+    "thesis": "Painel de gestão claro e limpo, como os melhores sistemas de gestão fazem hoje.",
+    "palette": ["#ffffff", "#111827", "#2563eb", "#f3f4f6"], "materials": ["cartões brancos", "azul de ação", "sombras suaves"],
+    "viewport": "Menu lateral claro, cabeçalho enxuto, indicadores e tabela em cartões.",
+    "risk": "Limpo e profissional, mas indistinguível da concorrência por definição.",
+    "html": ".impeccable/mocks/decision/canon.html"
+  },
+  "steer": true
+}

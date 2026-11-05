@@ -18,7 +18,7 @@
             grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px);
             background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
         }
-        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; }
         .logo { font-size: 28px; font-weight: 700; }
         main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
         .welcome-title { font-size: 30px; margin-bottom: 6px; color: var(--text-dark); }
@@ -29,13 +29,13 @@
         .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow-light); }
         .linha-campos { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
         .campo { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--text-light); }
-        .campo input, .campo select, .campo textarea { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; color: var(--text-dark); background: #fff; font-weight: 400; }
+        .campo input, .campo select, .campo textarea { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; color: var(--text-dark); background: var(--white); font-weight: 400; }
         .campo textarea { min-height: 64px; resize: vertical; }
         .campo.largo { flex: 1 1 260px; }
         .btn { border: none; border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
         .btn:disabled { opacity: .5; cursor: not-allowed; }
-        .btn-primario { background: var(--gradient-primary); color: #fff; }
-        .btn-secundario { background: #fff; color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-primario { background: var(--gradient-primary); color: var(--on-primary); }
+        .btn-secundario { background: var(--white); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-mini { padding: 5px 10px; font-size: 12.5px; }
         .rolagem { overflow-x: auto; }
         .tabela { width: 100%; border-collapse: collapse; }
@@ -64,13 +64,13 @@
         .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
         /* listas longas (estoque grande) rolam dentro do bloco; o cabeçalho da tabela fica fixo */
         #an-previsao .rolagem { max-height: 480px; overflow: auto; }
-        #an-previsao thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+        #an-previsao thead th { position: sticky; top: 0; background: var(--white); z-index: 1; }
         #an-parados .an-conteudo { max-height: 360px; overflow-y: auto; }
         .an-rank-linha { display: grid; grid-template-columns: 26px 1fr auto; gap: 4px 10px; align-items: center; padding: 6px 0; }
         .an-rank-pos { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-light); color: var(--primary-color); font-size: 12px; font-weight: 800; display: grid; place-items: center; }
         .an-rank-nome { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .an-rank-val { font-size: 13px; color: var(--text-light); white-space: nowrap; }
-        .an-rank-barra { grid-column: 2 / -1; height: 6px; background: #ececf2; border-radius: 4px; overflow: hidden; }
+        .an-rank-barra { grid-column: 2 / -1; height: 6px; background: hsla(240, 60%, 55%, .14); border-radius: 4px; overflow: hidden; }
         .an-rank-barra span { display: block; height: 100%; background: var(--primary-color); border-radius: 4px; }
         .an-alternar { display: flex; gap: 6px; margin-bottom: 8px; }
         .an-lista { list-style: none; }
@@ -81,11 +81,11 @@
         .bloco-erro { color: var(--erro); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
         .bloco-hist { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-color); }
         .bloco-hist .rolagem { max-height: 420px; overflow: auto; }
-        .bloco-hist thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+        .bloco-hist thead th { position: sticky; top: 0; background: var(--white); z-index: 1; }
         .bloco-hist h3 { font-size: 16px; margin-bottom: 10px; color: var(--text-dark); }
         .rodape-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
         .aviso { padding: 10px 14px; border-radius: 12px; background: rgba(178,106,0,.1); color: var(--aviso); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
-        .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: #ececf2; color: var(--text-light); }
+        .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: hsla(240, 60%, 55%, .14); color: var(--text-light); }
         .selo[title] { cursor: help; } /* selo com explicação ao passar o mouse */
         .selo.ok { background: rgba(31,157,85,.12); color: var(--ok); }
         .selo.aviso { background: rgba(178,106,0,.12); color: var(--aviso); }
@@ -112,8 +112,8 @@
 
         /* ===== busca de produto ===== */
         .busca { position: relative; }
-        .sugestoes { position: fixed; z-index: 60; background: #fff; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); max-height: 280px; overflow-y: auto; }
-        .sugestoes button { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: none; background: #fff; padding: 9px 12px; text-align: left; font-size: 14px; cursor: pointer; }
+        .sugestoes { position: fixed; z-index: 60; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); max-height: 280px; overflow-y: auto; }
+        .sugestoes button { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: none; background: var(--white); padding: 9px 12px; text-align: left; font-size: 14px; cursor: pointer; }
         .sugestoes button:hover, .sugestoes button.foco { background: var(--primary-light); }
         .sugestoes small { color: var(--text-light); white-space: nowrap; }
 
@@ -128,7 +128,7 @@
         /* ===== modal ===== */
         .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: rgba(21,17,26,.45); }
         .modal-fundo.aberto { display: flex; }
-        .modal { background: #fff; border-radius: 18px; padding: 20px 22px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .modal { background: var(--white); border-radius: 18px; padding: 20px 22px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .modal h3 { font-size: 18px; }
         .modal .acoes { display: flex; gap: 8px; justify-content: flex-end; }
 
@@ -139,8 +139,8 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="tema.css?v=202611050830">
-    <script src="layout.js?v=202610291200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611051300">
+    <script src="layout.js?v=202611051300" defer></script>
     <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
     <script src="notas_compra.js?v=202610301200" defer></script>
 </head>

@@ -1,0 +1,85 @@
+{
+  "title": "Nova mão: escolha a cara do ELEGANCE",
+  "question": "Segunda mão, com números menores (valores em 17px, sem números gigantes). O sorteio atribuiu 'Vidro Verde-Água'. Todas mantêm a logo e o layout de Orçamentos e Financeiro.",
+  "followup": true,
+  "options": [
+    {
+      "id": "r2-assigned", "kind": "assigned", "label": "Vidro Verde-Água", "kicker": "THE ROLL",
+      "lineage": "borda de chapa de vidro vista de lado, verde-água, e a paleta de vidros do ofício",
+      "thesis": "Painéis com a borda verde do vidro: calmos, claros e reconhecíveis por quem trabalha com vidro e esquadria.",
+      "palette": ["#0f766e", "#7cc7bf", "#0d2b2a", "#eaf2f1"],
+      "materials": ["borda verde de vidro", "verde-azulado profundo", "fundo gelo"],
+      "viewport": "Menu lateral verde-escuro com marca em degradê de vidro; cartões e painel com filete verde-água na borda; valores pequenos e monoespaçados.",
+      "risk": "O verde-azulado e o vermelho da logo precisam conviver; se o vermelho aparecer demais, desarmoniza.",
+      "raised": [
+        {"from": "vernacular-ephemera-jet-age-ticket-wallet", "raise": "Documento cancelado ganha carimbo oblíquo CANCELADO em vez de sumir: nada desaparece, cancela."},
+        {"from": "ikeda-datamatics", "raise": "Todo número em monoespaçada tabular, num único tamanho discreto, alinhado em coluna."}
+      ],
+      "html": ".impeccable/mocks/decision/r2-assigned.html"
+    },
+    {
+      "id": "r2-pick", "kind": "pick", "label": "Catálogo de Acabamentos", "kicker": "IMPECCABLE’S PICK",
+      "lineage": "cartela de acabamentos do alumínio anodizado: bronze, champagne, preto fosco, natural",
+      "thesis": "As cores vêm da cartela de acabamentos do próprio produto, e cada pastilha vira marcador de categoria e status.",
+      "palette": ["#8a5a2b", "#d9c7a3", "#2b2d31", "#f3f1ee"],
+      "materials": ["pastilhas de acabamento", "grafite", "greige quente"],
+      "viewport": "Menu grafite; cartões com pastilha redonda de acabamento ao lado do rótulo; status com ponto colorido em vez de pílula.",
+      "risk": "Bronze e greige podem soar antigos se a tipografia não for bem firme.",
+      "html": ".impeccable/mocks/decision/r2-pick.html"
+    },
+    {
+      "id": "r2-console", "kind": "challenger", "catalogId": "digital-design-canon-monochrome-product-marketing",
+      "label": "Escala de Cinza", "verdict": "competitive",
+      "lineage": "produto de software em escala neutra com um único acento",
+      "thesis": "Quase só preto e branco, com o vinho da marca usado em poucos pontos: botão principal e alertas.",
+      "palette": ["#0a0a0a", "#ffffff", "#e5e5e5", "#9b1b30"],
+      "materials": ["escala neutra", "filetes de 1px", "um acento"],
+      "viewport": "Menu claro com filete, cartões brancos de borda fina, botão principal em vinho e o resto em cinza.",
+      "case": "Segura a clareza e o profissionalismo; perde um pouco na identificação com vidro e esquadria.",
+      "risk": "Pode ficar sem personalidade se o acento não for bem dosado.",
+      "html": ".impeccable/mocks/decision/r2-console.html"
+    },
+    {
+      "id": "c-ticket", "kind": "challenger", "catalogId": "vernacular-ephemera-jet-age-ticket-wallet",
+      "label": "Carteira de Passagem", "verdict": "declined", "lineage": "cupons carbonados de passagem aérea",
+      "palette": ["#12285c", "#c8102e", "#ffffff"], "materials": ["cupom", "carbono"],
+      "case": "Repete o talão já descartado e perde clareza.", "kept": "Estado cancelado carimbado, nunca apagado."
+    },
+    {
+      "id": "c-ikeda", "kind": "challenger", "catalogId": "ikeda-datamatics",
+      "label": "Dados em Código de Barras", "verdict": "declined", "lineage": "instalações de dados em preto e branco",
+      "palette": ["#000000", "#ffffff"], "materials": ["barras", "monoespaçada"],
+      "case": "Estroboscópico e sem cor de estado; cansa no uso diário.", "kept": "Números monoespaçados tabulares em tamanho único."
+    },
+    {
+      "id": "c-lab", "kind": "challenger", "catalogId": "notation-diagram-systems-labanotation",
+      "label": "Partitura de Dança", "verdict": "declined", "lineage": "notação de dança Laban",
+      "palette": ["#ffffff", "#000000"], "materials": ["pauta central"],
+      "case": "Simetria rígida não serve a tabelas largas.", "kept": "Duração como comprimento: barra proporcional ao prazo."
+    },
+    {
+      "id": "c-char", "kind": "challenger", "catalogId": "pop-culture-shelf-character-goods-catalog",
+      "label": "Catálogo de Mascotes", "verdict": "declined", "lineage": "catálogo de personagens fofos",
+      "palette": ["#ffd1dc", "#ffffff"], "materials": ["pastel"],
+      "case": "Infantil demais para a empresa.", "kept": "Item inativo impresso em tons de cinza."
+    },
+    {
+      "id": "c-botanic", "kind": "challenger", "catalogId": "editorial-sequence-montage-botanical-folio-season",
+      "label": "Fólio Botânico", "verdict": "declined", "lineage": "pranchas botânicas",
+      "palette": ["#f1ead8", "#2f5d3a"], "materials": ["papel", "gravura"],
+      "case": "Depende de ilustração e soa editorial.", "kept": "Mesma escala e mesma base em todas as telas."
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code"},
+  "canon": true,
+  "canonCard": {
+    "kind": "canon", "label": "Padrão de mercado",
+    "thesis": "Painel de gestão claro e limpo, como os melhores sistemas de gestão fazem hoje.",
+    "palette": ["#ffffff", "#111827", "#2563eb", "#f3f4f6"], "materials": ["cartões brancos", "azul de ação", "sombras suaves"],
+    "viewport": "Menu lateral claro, cabeçalho enxuto, indicadores e tabela em cartões.",
+    "risk": "Limpo e profissional, mas indistinguível da concorrência por definição.",
+    "html": ".impeccable/mocks/decision/r2-canon.html"
+  },
+  "steer": true
+}

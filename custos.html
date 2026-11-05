@@ -17,7 +17,7 @@
         .welcome-subtitle { color: var(--text-light); font-size: 13px; margin-bottom: 12px; }
         .abas { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
         .abas button { border: 1px solid var(--border-color); background: var(--white); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
-        .abas button.on { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .abas button.on { background: var(--primary-color); color: var(--on-primary); border-color: var(--primary-color); }
         .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
         #cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
         #cartoes button { text-align: left; border: 1px solid var(--border-color); background: var(--white); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
@@ -33,12 +33,12 @@
         td { padding: 6px 8px; border-top: 1px solid var(--border-color); vertical-align: top; }
         td.num, th.num { text-align: right; white-space: nowrap; }
         #tab-materiais tbody tr { cursor: pointer; }
-        #tab-materiais tbody tr:hover td { background: #fafbfc; }
+        #tab-materiais tbody tr:hover td { background: hsla(210, 60%, 55%, .14); }
         .sit { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-        .sit.confiavel { background: #e6f4ea; color: var(--ok); }
-        .sit.desatualizado { background: #fff4e0; color: var(--atencao); }
-        .sit.faltando { background: #fdecea; color: var(--falta); }
-        .sit.sem_compra { background: #eef0f2; color: var(--neutro); }
+        .sit.confiavel { background: hsla(137, 60%, 55%, .14); color: var(--ok); }
+        .sit.desatualizado { background: hsla(39, 100%, 55%, .14); color: var(--atencao); }
+        .sit.faltando { background: hsla(6, 83%, 55%, .14); color: var(--falta); }
+        .sit.sem_compra { background: var(--surface-2); color: var(--neutro); }
         .motivo { display: block; font-size: 11.5px; color: var(--falta); }
         .diverge { color: var(--atencao); font-size: 11.5px; display: block; }
         .det-fundo { position: fixed; inset: 0; background: rgba(15, 23, 42, .35); display: none; z-index: 50; }
@@ -54,15 +54,15 @@
         tr.ignorada td { color: var(--text-light); text-decoration: line-through; }
         tr.ignorada td:last-child { text-decoration: none; }
         .forca-forte, .forca-parecida { display: block; width: fit-content; max-width: none !important; overflow: visible !important; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; margin: 3px 0 2px; }
-        html body #tab-ligacoes .lig-confirmar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
+        html body #tab-ligacoes .lig-confirmar { background: var(--primary-color) !important; color: var(--on-primary) !important; border-color: var(--primary-color) !important; }
         html body .sit { white-space: normal; }
-        .forca-forte { background: #e6f4ea; color: var(--ok); }
-        .forca-parecida { background: #fff4e0; color: var(--atencao); }
+        .forca-forte { background: hsla(137, 60%, 55%, .14); color: var(--ok); }
+        .forca-parecida { background: hsla(39, 100%, 55%, .14); color: var(--atencao); }
         .lig-fator { width: 90px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .lig-frase { display: block; font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .lig-alternativa { max-width: 100%; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .btn-mini { border: 1px solid var(--border-color); background: var(--white); border-radius: 6px; padding: 3px 9px; font-size: 12.5px; cursor: pointer; margin: 2px 2px 2px 0; }
-        .btn-mini.prim { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .btn-mini.prim { background: var(--primary-color); color: var(--on-primary); border-color: var(--primary-color); }
         dialog { border: none; border-radius: 12px; padding: 16px; margin: auto; width: min(480px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
         dialog::backdrop { background: rgba(15, 23, 42, .45); }
         /* respiro nos diálogos: título, explicação, rótulo em cima do campo, botões separados (nada encostado) */
@@ -90,7 +90,7 @@
         #prc-parametros .prc-valor.indef { font-size: 14px; color: var(--falta); }
         #prc-parametros .prc-ref { display: block; font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
         .prc-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        #prc-selo { background: #fff4e0; color: var(--atencao); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+        #prc-selo { background: hsla(39, 100%, 55%, .14); color: var(--atencao); font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
         #prc-soma { font-size: 13px; }
         #prc-soma.alerta { color: var(--falta); font-weight: 800; }
         /* barra de filtros da formação de preço: busca compacta, tudo na mesma altura, gravação à direita */
@@ -106,8 +106,8 @@
         #prc-fora-filtro:empty { display: none; }
         #prc-recarregar { height: 34px; }
         #tab-precos tbody tr { cursor: pointer; }
-        #tab-precos tbody tr:hover td { background: #fafbfc; }
-        #tab-precos tr.conflito td { background: #fdecea; }
+        #tab-precos tbody tr:hover td { background: hsla(210, 60%, 55%, .14); }
+        #tab-precos tr.conflito td { background: hsla(6, 83%, 55%, .14); }
         /* balão de explicação das colunas da formação de preço */
         #tab-precos [data-balao] { cursor: help; }
         #tab-precos thead th[data-balao] { text-decoration: underline dotted; text-underline-offset: 3px; }
@@ -120,13 +120,13 @@
         .seta { color: var(--text-light); margin: 0 3px; }
         .novo { font-weight: 800; }
         .var-sobe, .var-desce { color: var(--text-dark); font-weight: 700; }
-        html body #prc-gravar:not(:disabled), html body #dlg-gravar-confirmar, html body #pp-salvar, html body #cf-usar { background: var(--primary-color) !important; color: #fff !important; border-color: var(--primary-color) !important; }
+        html body #prc-gravar:not(:disabled), html body #dlg-gravar-confirmar, html body #pp-salvar, html body #cf-usar { background: var(--primary-color) !important; color: var(--on-primary) !important; border-color: var(--primary-color) !important; }
         html body #prc-gravar:disabled { opacity: .5; cursor: default; }
         .prc-ref-contas { color: var(--primary-color); font-weight: 700; }
         #prc-calcular-cf { margin-top: 6px; }
         .cf-conta { font-size: 14px; margin: 6px 0 10px; } .cf-conta b { font-size: 18px; }
         .origem-material, .origem-classe, .origem-padrao { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
-        .origem-material { background: #e8eefc; color: #2b4c9a; } .origem-classe { background: #f1e8fc; color: #6b2b9a; } .origem-padrao { background: #eef0f2; color: var(--neutro); }
+        .origem-material { background: hsla(222, 77%, 55%, .14); color: hsl(222, 78%, 72%); } .origem-classe { background: hsla(267, 77%, 55%, .14); color: hsl(275, 78%, 72%); } .origem-padrao { background: var(--surface-2); color: var(--neutro); }
         .prc-motivo { color: var(--falta); font-size: 12px; }
         .prc-aviso { display: block; font-size: 11.5px; color: var(--atencao); }
         .neg { color: var(--falta); font-weight: 700; }
@@ -180,15 +180,15 @@
         .comp-informado-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0; }
         .comp-informado { width: 100px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
         .comp-informado-quando { color: var(--text-light); font-size: 12px; }
-        .sit.informado { background: #f1e8fc; color: #6b2b9a; }
+        .sit.informado { background: hsla(267, 77%, 55%, .14); color: hsl(275, 78%, 72%); }
         #det-explica-composicao { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-light); }
         .componente .comp-item + div, .componente .comp-motivo + div { margin-top: 6px; }
         .lig-componente { margin-top: 6px; color: var(--primary-color); font-size: 12.5px; }
         .campo-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611050830">
-    <script src="layout.js?v=202610282000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611051300">
+    <script src="layout.js?v=202611051300" defer></script>
 </head>
 <body>
     <div class="container">

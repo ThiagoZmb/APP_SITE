@@ -1,0 +1,31 @@
+{
+  "title": "Console escuro: qual acento?",
+  "question": "Direção fixada por você: sempre escuro, como o Console Grafite, com números pequenos. Falta só escolher a cor de acento. A logo é vinho.",
+  "followup": true,
+  "options": [
+    {
+      "id": "r3-vinho", "kind": "grounded", "label": "Grafite com acento vinho",
+      "lineage": "painéis escuros de ferramenta de trabalho, com a cor da marca como acento",
+      "thesis": "O vinho da logo vira o único acento sobre o grafite: botão principal, item ativo e marcas.",
+      "palette": ["#14161a", "#1b1e24", "#c2354f", "#3ddc97"],
+      "materials": ["grafite", "filetes de 1px", "números monoespaçados pequenos"],
+      "viewport": "Menu e painéis grafite; botão principal e item ativo em vinho claro; verde, azul, âmbar e vermelho só para estado.",
+      "risk": "Vinho e vermelho de alerta ficam próximos; o vermelho de atraso precisa ser mais vivo para não confundir.",
+      "html": ".impeccable/mocks/decision/r3-vinho.html"
+    },
+    {
+      "id": "r3-ambar", "kind": "grounded", "label": "Grafite com acento âmbar",
+      "lineage": "painéis escuros de ferramenta de trabalho",
+      "thesis": "Acento âmbar separado da marca: a logo vinho se destaca sozinha no topo.",
+      "palette": ["#14161a", "#1b1e24", "#f2a33a", "#3ddc97"],
+      "materials": ["grafite", "filetes de 1px", "números monoespaçados pequenos"],
+      "viewport": "Menu e painéis grafite; botão principal e item ativo em âmbar; verde, azul e vermelho só para estado.",
+      "risk": "Âmbar é também a cor de aviso; ação principal e atenção se misturam.",
+      "html": ".impeccable/mocks/decision/r3-ambar.html"
+    }
+  ],
+  "reroll": false,
+  "buildPath": {"value": "code"},
+  "canon": false,
+  "steer": false
+}

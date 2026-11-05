@@ -15,7 +15,7 @@
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
             min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
         }
-        header { grid-area: header; background: var(--gradient-primary); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
         .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
         .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
@@ -60,7 +60,7 @@
         .dica { font-size: 13px; color: var(--text-light); margin: 0 22px 14px; }
 
         .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
-        .btn-primary { background: var(--gradient-primary); color: white; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; margin: 2px 0; }
@@ -84,8 +84,8 @@
             td.acoes-linha { white-space: normal; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611050830">
-    <script src="layout.js?v=202610291200" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611051300">
+    <script src="layout.js?v=202611051300" defer></script>
     <script src="notas_compra.js?v=202610301200" defer></script>
 </head>
 <body>

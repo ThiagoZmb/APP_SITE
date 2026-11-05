@@ -113,7 +113,7 @@ test('funcionários (tela): custo total mensal espelha o servidor, formata em R$
 
 test('funcionários (tela): CSS dos desabilitados vence a regra dos campos (especificidade) e layout Cidade/Bairro/UF', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'tema.css'), 'utf8');
-  assert.match(css, /body \.form-group input:not\(\[type=checkbox\]\):not\(\[type=radio\]\):disabled[\s\S]*?background-color: #f4f4f6 !important/);
+  assert.match(css, /body \.form-group input:not\(\[type=checkbox\]\):not\(\[type=radio\]\):disabled[\s\S]*?background-color: #181a1f !important/);
   assert.ok(css.indexOf(':not([type=radio]):disabled') > css.indexOf('body .form-group input:not([type=checkbox]):not([type=radio]),'), 'vem depois da regra geral');
   const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
   assert.match(f, /\.linha3b \{[^}]*minmax\(0, 1\.3fr\) minmax\(0, 1\.7fr\) 84px/);
