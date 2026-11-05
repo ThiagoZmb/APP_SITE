@@ -222,8 +222,8 @@
         @media (prefers-reduced-motion: reduce) { .peca-v { transition: none; } }
     </style>
 
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="corte_vidros.js?v=202610281600" defer></script>
 </head>
@@ -255,7 +255,7 @@
             <div id="painel-plano">
                 <section class="painel">
                     <form id="form-pedido" class="busca-pedido" novalidate>
-                        <div class="form-group"><label for="numero">Número do pedido</label><input id="numero" inputmode="numeric" autocomplete="off" placeholder="ex.: 1234"></div>
+                        <div class="form-group"><label for="numero">Número do pedido</label><input data-foco-busca data-foco-busca id="numero" inputmode="numeric" autocomplete="off" placeholder="ex.: 1234"></div>
                         <button type="button" class="btn btn-primary" id="btn-abrir" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Abrir</span></button>
                     </form>
                     <div id="lista-pedidos" class="lista-pedidos" role="dialog" aria-label="Escolher pedido" hidden>

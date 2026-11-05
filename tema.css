@@ -768,3 +768,16 @@ select option:disabled { color: #6b7280; }
 .rk-comp-barra { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--border-color); }
 .rk-comp-barra span { display: block; height: 100%; }
 .rk-comp-barra .rk-comp-demais { background: var(--border-strong); }
+
+/* janela "Alterar data de pronto" (alterar_data_pronto.js): modal 10px, fundo sólido do tema, só o escurecimento é translúcido */
+.dp-fundo { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 9, 11, .62); }
+.dp-caixa { width: 100%; max-width: 380px; box-sizing: border-box; padding: 22px; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: var(--shadow-heavy); font: 14px/1.5 var(--font); }
+.dp-titulo { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+.dp-sub { color: var(--text-mid); margin-bottom: 14px; }
+.dp-rotulo { display: block; font-weight: 700; margin-bottom: 6px; }
+.dp-data { width: 100%; box-sizing: border-box; padding: 9px 11px; background: var(--bg); color: var(--text-dark); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font: inherit; color-scheme: dark; }
+.dp-data:focus-visible, .dp-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+.dp-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.dp-btn { padding: 10px 16px; border-radius: var(--radius-sm); font: inherit; font-weight: 700; cursor: pointer; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-strong); }
+.dp-btn-ok { background: var(--primary-color); color: var(--on-primary); border-color: var(--primary-color); }
+.dp-btn:disabled { opacity: .5; cursor: not-allowed; }

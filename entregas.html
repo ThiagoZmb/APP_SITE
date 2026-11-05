@@ -125,8 +125,8 @@
         .etiqueta:hover, .etiqueta:focus-visible { filter: brightness(1.15); outline: 2px solid var(--primary-color); outline-offset: 1px; }
         .mais { border: none; background: none; color: var(--primary-color); font-size: 11.5px; font-weight: 600; text-align: left; cursor: pointer; padding: 1px 4px; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="entregas.js?v=202610261500" defer></script>
 </head>
@@ -159,7 +159,7 @@
                             <button type="button" class="aba" role="tab" data-aba="concluidas">Concluídas</button>
                             <button type="button" class="aba" role="tab" data-aba="ocorrencias">Ocorrências<span class="contagem" hidden></span></button>
                         </div>
-                        <div class="busca"><input type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
+                        <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
                     </div>
                     <div class="lista-wrap" id="lista"><p class="vazio">Carregando…</p></div>
                 </section>

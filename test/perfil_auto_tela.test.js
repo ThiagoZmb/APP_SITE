@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const M = require('../calculo/perfil_imagem');
 const { png, leituraPixels1036 } = require('./apoio/imagemPerfil');
 
-const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');   // checkout com CRLF (autocrlf) nao quebra os trechos com \n
 const html = ler('produtos.html');
 const auto = ler('perfil_auto.js');
 const editor = ler('perfil_editor.js');

@@ -187,8 +187,8 @@
         .campo-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text-light); }
         @media (max-width: 700px) { .col-opc { display: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
 </head>
 <body>
     <div class="container">
@@ -226,7 +226,7 @@
                 </div>
                 <div class="painel">
                     <div class="filtros">
-                        <input type="search" id="busca" placeholder="Buscar material…" aria-label="Buscar material">
+                        <input data-foco-busca type="search" id="busca" placeholder="Buscar material…" aria-label="Buscar material">
                         <select id="f-classe" aria-label="Classe"><option value="">Todas as classes</option></select>
                         <select id="f-situacao" aria-label="Situação">
                             <option value="todos">Todas as situações</option><option value="confiavel">Confiáveis</option><option value="desatualizado">Desatualizados</option>

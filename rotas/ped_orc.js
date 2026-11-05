@@ -683,6 +683,26 @@ function registrarPedOrc({ rota, pool }) {
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
   });
 
+  // alterar a DATA DE PRONTO (ped_orc.DATA_PRONTO = "Pronto em" do PDF / data prometida; é o campo "data de entrega" da tela de orçamentos) pelo menu do botão direito.
+  // Grava SÓ essa coluna: não muda situação, DATA_ENTREGA nem itens/valores, e não toca em web_entregas (a fila de Entregas só LÊ a data prometida).
+  // Pedido exige pedidos.situacao; Orçamento exige orcamentos.salvar (quem só tem orcamentos.situacao, ex.: Representante, não edita). Pedido cancelado não muda.
+  rota('post', '/ped_orc/:tipo/:numero/data_pronto', [{ algum: ['pedidos.situacao', 'orcamentos.salvar'] }], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    if (!req.acesso.permissoes.has(alvo.tipo === 'Pedido' ? 'pedidos.situacao' : 'orcamentos.salvar')) return res.status(403).json({ error: MSG_SEM_ACESSO });
+    const nova = validarData((req.body || {}).dataPronto);
+    if (!nova) return res.status(400).json({ error: 'Data de pronto inválida. Use o formato AAAA-MM-DD.' });
+    const r = await emTransacao(pool, res, 'POST /ped_orc/data_pronto', async conn => {
+      const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      if (String(linhas.cab.SITUACAO || '') === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de data.`);
+      const antes = String(linhas.cab.DATA_PRONTO ?? '').slice(0, 10);
+      if (antes === nova) throw new ErroUsuario(409, `A data de pronto do ${alvo.tipo === 'Pedido' ? 'pedido' : 'orçamento'} nº ${alvo.numero} já é ${nova.split('-').reverse().join('/')}.`);
+      await conn.execute('UPDATE ped_orc SET DATA_PRONTO = ? WHERE NUMERO = ? AND TIPO = ?', [nova, alvo.numero, alvo.tipo]);
+      await auditarDoc(conn, req, 'data_pronto_alterada', alvo.tipo, alvo.numero, { cliente: linhas.cab.RAZAO_SOCIAL, de: antes || null, para: nova });
+      return { ok: true };
+    });
+    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, dataPronto: nova });
+  });
+
   // excluir: apaga o cabeçalho e todas as linhas do documento (mesmas tabelas que o salvar regrava); sem desfazer
   rota('delete', '/ped_orc/:tipo/:numero', ['pedidos.excluir'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;

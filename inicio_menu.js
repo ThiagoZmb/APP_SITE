@@ -58,6 +58,19 @@
       } catch (err) { alert(err.message); }
     }
 
+    async function alterarDataPronto(x) {
+      const nova = await window.AlterarDataPronto.perguntar({ tipo: 'Pedido', numero: x.numero, cliente: x.cliente, dataAtual: x.prontoEm });
+      if (!nova) return;
+      try {
+        const r = await fetch(`${cfg.apiBase}/ped_orc/Pedido/${enc(x.numero)}/data_pronto`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token() }, body: JSON.stringify({ dataPronto: nova }) });
+        if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || `Erro HTTP: ${r.status}`);
+        cfg.recarregar();
+      } catch (err) { alert(err.message); }
+    }
+
     function itensDoMenu(x) {
       const n = x.numero, L = [], cancelado = norm(x.situacao).includes('cancel');
       const add = (perm, icone, rotulo, fn, extra = {}) => { if (!perm || cfg.pode(perm)) L.push({ icone, rotulo, fn, ...extra }); };
@@ -80,6 +93,7 @@
         add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${enc(n)}`; });
       }
       if (!cancelado && cfg.pode('pedidos.situacao')) {
+        sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(x));
         sep(); L.push({ titulo: 'Mudar situação para' });
         for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual }); }
       }

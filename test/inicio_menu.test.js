@@ -20,7 +20,7 @@ test('menu do botão direito do início: administrador vê PDFs, imprimir, edita
   const m = carregarMenu(new Set(['pedidos.pdf', 'orcamentos.criar', 'valores.ver', 'corte.ver', 'pedidos.situacao', 'entregas.ver']));
   const it = m.itensDoMenu({ numero: 7, cliente: 'X', situacao: 'Em Produção', entregaStatus: 'agendada' });
   assert.deepEqual(rotulos(it), ['Abrir PDF', 'Guia de produção (PDF sem valores)', 'Vidros (PDF)', 'Imprimir PDF', 'Imprimir guia de produção', 'Imprimir vidros', 'Imprimir etiquetas (Zebra)',
-    'Abrir para editar', 'Corte de perfil', 'Corte de vidros', 'Em Produção', 'Pronto', 'Entregue', 'Retirado', 'Ver entrega (Agendada)']);
+    'Abrir para editar', 'Corte de perfil', 'Corte de vidros', 'Alterar data de pronto', 'Em Produção', 'Pronto', 'Entregue', 'Retirado', 'Ver entrega (Agendada)']);
   assert.ok(it.find(x => x.rotulo === 'Em Produção').desativado, 'a situação atual fica marcada e desativada');
   assert.ok(!rotulos(it).some(r => /cancelar|excluir/i.test(r)), 'nada destrutivo neste menu');
   assert.ok(it[it.length - 1].rotulo && !it[it.length - 1].sep, 'não termina em separador');

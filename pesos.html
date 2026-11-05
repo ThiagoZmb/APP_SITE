@@ -128,8 +128,8 @@
         .selo.estimado { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
         .num { text-align: right; white-space: nowrap; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="pesos.js?v=202610291200" defer></script>
 </head>
@@ -156,7 +156,7 @@
                 <section class="painel">
                     <div class="painel-head">
                         <div class="barra">
-                            <div class="busca"><input type="search" id="busca" placeholder="Buscar pelo nome do produto" aria-label="Buscar pelo nome do produto"></div>
+                            <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar pelo nome do produto" aria-label="Buscar pelo nome do produto"></div>
                             <select id="filtro-tipo" aria-label="Tipo"><option value="">Todos os tipos</option></select>
                             <button type="button" class="btn btn-primary" id="btn-novo" data-perm="pesos.editar">+ Novo peso</button>
                         </div>

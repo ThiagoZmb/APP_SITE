@@ -111,12 +111,12 @@
         .totais .rotulo { font-size: 13px; color: var(--text-light); font-weight: 600; text-transform: uppercase; }
         .totais .valor { font-size: 24px; font-weight: 700; color: var(--primary-color); }
         .badge-frente { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
-        .bf-correr { background: rgba(40,167,69,.12); color: var(--success-color); }
-        .bf-serralheria { background: rgba(255,165,0,.18); color: hsl(32, 78%, 72%); }
-        .bf-basculante { background: rgba(111,66,193,.12); color: hsl(261, 78%, 72%); }
-        .bf-gaveta { background: rgba(224,82,126,.12); color: hsl(341, 78%, 72%); }
-        .bf-avulso { background: rgba(47,111,219,.12); color: hsl(218, 78%, 72%); }
+        .bf-abrir { background: var(--selo-info-bg); color: var(--selo-info-fg); }
+        .bf-correr { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+        .bf-serralheria { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .bf-basculante { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
+        .bf-gaveta { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+        .bf-avulso { background: var(--selo-info-bg); color: var(--selo-info-fg); }
         /* ===== FURAÇÕES (pnlFuracoes do VB) ===== */
         #pnl-furacoes { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 6px; }
         .linha-furo { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -281,16 +281,9 @@
         #ped-numero { width: 110px; flex: none; font-weight: 700; text-align: center; }
         .faixa-leitura { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: hsla(48, 96%, 55%, .14); color: hsl(23, 78%, 72%); font-size: 14px; }
         body.so-leitura #btn-salvar, body.so-leitura #btn-salvar-topo,body.so-leitura #btn-adicionar, body.so-leitura #btn-vazio, body.so-leitura #itens-tbody .col-acoes button { display: none !important; }
-        /* etapa 3: cartão inteiro no estilo da caixa de Observação (fundo tingido, borda e faixa lateral), em vermelho claro; tema.css usa !important */
-        html body section.card.card-itens { background: hsla(0, 83%, 55%, .14) !important; border: 1px solid #f0a8a8 !important; border-left: 1px solid #e05555 !important;
-            box-shadow: 0 8px 22px -10px rgba(224, 85, 85, .45) !important; }
-        html body section.card.card-itens > .card-title { color: hsl(0, 78%, 72%) !important; font-size: 18px !important; padding-bottom: 10px; border-bottom: 1px solid #f0c4c4; }
-        html body .card-itens thead th { background: var(--primary-color) !important; color: var(--on-primary) !important; border-bottom: none !important; }
-        html body .card-itens thead th:first-child { border-top-left-radius: 8px; }
-        html body .card-itens thead th:last-child { border-top-right-radius: 8px; }
-        html body .card-itens #itens-tbody tr:nth-child(even):not(.preco-mudou):not(.travado) td { background: hsla(0, 76%, 55%, .14) !important; }
-        html body .card-itens #itens-tbody tr:hover:not(.preco-mudou):not(.travado) td { background: #f6c6c6 !important; }
-        html body .card-itens #itens-tbody td { border-bottom: 1px solid #f0c4c4 !important; }
+        /* etapa 3: cartão e tabela de itens no padrão do tema (painel, cabeçalho em Painel Elevado, linhas sóbrias); estados por tom (travado, preço mudou, com %) */
+        html body .card-itens #itens-tbody tr:nth-child(even):not(.preco-mudou):not(.travado):not(.com-pct) td { background: rgba(255, 255, 255, .02) !important; }
+        html body .card-itens #itens-tbody tr:hover:not(.preco-mudou):not(.travado):not(.com-pct) td { background: var(--hover-linha) !important; }
         html body .card-itens .totais { padding: 6px 18px; border-radius: 10px; background: var(--white); border: 2px solid var(--primary-ring); }
         html body .card-itens .totais .grupo:last-child .valor { font-size: 24px; }
         #wrap-pares.inativo { opacity: .5; }
@@ -337,7 +330,7 @@
         html body #btn-adicionar:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
         #tab-itens.ocultar-pct .col-pct { display: none; }
         #tab-itens .col-pct { white-space: nowrap; }
-        #itens-tbody tr.travado td { background: hsla(210, 60%, 55%, .14); }
+        #itens-tbody tr.travado td { background: rgba(108, 182, 255, .10); }
         .cadeado { cursor: help; margin-right: 4px; }
         .detalhe-tecnico { font-size: 11px; color: var(--text-mid); font-weight: normal; margin-top: 2px; word-break: break-word; }
         .abrir-filtros { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -357,8 +350,8 @@
         .msg-salvar { margin-top: 10px; font-size: 14px; }
         .msg-salvar.erro { color: hsl(0, 78%, 72%); }
         .msg-salvar.ok { color: hsl(142, 78%, 72%); font-weight: 600; }
-        #itens-tbody tr.preco-mudou td { background: hsla(0, 86%, 55%, .14); }
-        #itens-tbody tr.preco-mudou td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
+        #itens-tbody tr.preco-mudou td { background: rgba(255, 107, 122, .10); }
+        #itens-tbody tr.preco-mudou td:first-child { box-shadow: inset 1px 0 0 var(--danger-color); }
         .dlg-salvar { margin: auto; border: none; border-radius: 12px; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
         .dlg-salvar .abrir-lista { margin: 0; padding: 4px; max-height: 50vh; overflow: auto; }
         .dlg-salvar .abrir-lista:empty { display: none; }
@@ -425,7 +418,7 @@
         .lp-item-acoes { padding: 6px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-wrap: wrap; }
         @media (max-width: 640px) { .lp-linha { grid-template-columns: 1fr; } .lp-linha .lp-acoes { justify-content: flex-start; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
+    <link rel="stylesheet" href="tema.css?v=202611061000">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -483,9 +476,9 @@
         @media (max-width: 700px) { html body .obs-item { grid-column: 1 / -1; } }
         .nota-pct { font-size: 12px; font-weight: 600; color: hsl(36, 78%, 72%); margin-top: 6px; }
         .nota-pct:empty { display: none; }
-        /* linhas com porcentagem (ColorirLinhasComPorcentagem: laranja claro) */
-        html body tbody tr.com-pct td { background: rgba(255, 200, 124, .38); }
-        html body tbody tr.com-pct:hover td { background: rgba(255, 200, 124, .55); }
+        /* linhas com porcentagem (ColorirLinhasComPorcentagem: âmbar do tema, tom translúcido) */
+        html body tbody tr.com-pct td { background: rgba(242, 163, 58, .12); }
+        html body tbody tr.com-pct:hover td { background: rgba(242, 163, 58, .2); }
         .col-pct { white-space: nowrap; font-weight: 700; color: hsl(36, 78%, 72%); }
         .col-acoes { white-space: nowrap; }
         /* ===== FICHA "ALTERAÇÃO DE VALORES" (mesmo padrão da ficha de clientes) ===== */
@@ -535,7 +528,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: var(--white); border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202611051700" defer></script>
+    <script src="layout.js?v=202611051800" defer></script>
 </head>
 <body>
     <div class="container">
@@ -3494,6 +3487,7 @@
             $s('abrir-tipo').value = tipoAtual() || 'Orçamento';
             $s('abrir-busca').value = '';
             $s('dlg-abrir').showModal();
+            $s('abrir-busca').focus();
             buscarParaAbrir();
         }
         function escolherParaAbrir(e) {

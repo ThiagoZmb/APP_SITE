@@ -86,8 +86,8 @@
             .welcome-title { font-size: 26px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="portal_admin.js?v=202611031200" defer></script>
 </head>
@@ -115,7 +115,7 @@
                     <section class="painel">
                         <h2>Liberar uma empresa</h2>
                         <p class="dica">Busque o cliente pela razão social ou pelo código. A empresa só pode ser liberada se o nome for único no cadastro.</p>
-                        <div class="busca"><input type="search" id="busca" placeholder="Razão social ou código" aria-label="Buscar cliente por razão social ou código" autocomplete="off"></div>
+                        <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Razão social ou código" aria-label="Buscar cliente por razão social ou código" autocomplete="off"></div>
                         <p class="dica" id="dica-duplicados" hidden>Para achar os cadastros com o mesmo nome, use a lista de nomes duplicados do sistema (GET /clientes/nomes_duplicados) e corrija o cadastro antes de liberar.</p>
                         <div class="lista-wrap" id="lista-clientes"><p class="vazio">Digite para buscar um cliente.</p></div>
                     </section>

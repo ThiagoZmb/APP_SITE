@@ -139,8 +139,8 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
     <script src="notas_compra.js?v=202610301200" defer></script>
 </head>
@@ -476,6 +476,7 @@
             ORDEM_ABAS.forEach(a => { $('painel-' + a).hidden = a !== nome; });
             if (!iniciadas.has(nome) && iniciadores[nome]) { iniciadas.add(nome); iniciadores[nome](); }
             else if (nome === 'analises' && analisesDesatualizadas) carregarAnalises();
+            if (window.focarBusca && (nome === 'saida' || nome === 'ajuste')) window.focarBusca($(nome === 'saida' ? 's-busca' : 'a-busca'));
         }
         // a barra é a mesma do cadastro (links); aqui dentro ela só troca de aba
         document.querySelectorAll('.aba-est[data-aba]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); abrirAba(b.dataset.aba); }));

@@ -587,3 +587,24 @@
     document.addEventListener('focusin', abrirLista);
     document.addEventListener('click', abrirLista);
 })();
+
+// Foco inicial na pesquisa: o campo marcado com data-foco-busca recebe o foco ao abrir a página (computador, com mouse),
+// se estiver visível e nenhum diálogo estiver aberto. No celular o teclado não abre sozinho. window.focarBusca(el) vale
+// para campos que aparecem depois (aba, painel) com a mesma regra.
+(function () {
+    function focarBusca(el) {
+        try {
+            if (!el || el.disabled || el.readOnly || el.offsetParent === null) return;
+            if (window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+            if (document.querySelector('dialog[open]')) return;
+            if (document.activeElement && document.activeElement !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+            el.focus();
+        } catch { /* sem foco automático: a página segue normal */ }
+    }
+    window.focarBusca = focarBusca;
+    function inicial() { focarBusca(document.querySelector('[data-foco-busca]')); }
+    // depois da carga inicial da página (o layout e os scripts da tela já montaram o que precisavam)
+    if (typeof window.addEventListener !== 'function') return;
+    if (document.readyState === 'complete') setTimeout(inicial, 0);
+    else window.addEventListener('load', () => setTimeout(inicial, 0));
+})();

@@ -117,7 +117,7 @@ test('menu: Representante vê PDF, Imprimir e "Marcar como Baixado", nada mais',
 
 test('menu: quem tem orcamentos.salvar vê Fechado, Aguardando e Baixado; sem nenhuma das duas, nada de situação', () => {
   const r = menu(new Set(['pedidos.pdf', 'orcamentos.salvar']), { numero: 2, s: 'outro', situacao: '' }).map(i => i.rotulo);
-  assert.deepEqual(r.slice(2), ['Fechado', 'Aguardando resposta', 'Marcar como Baixado']);
+  assert.deepEqual(r.slice(2), ['Alterar data de pronto', 'Fechado', 'Aguardando resposta', 'Marcar como Baixado']);
   assert.ok(!menu(new Set(['pedidos.pdf']), { numero: 2, s: 'outro' }).some(i => /Baixado|Fechado/.test(i.rotulo)));
 });
 

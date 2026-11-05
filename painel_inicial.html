@@ -264,9 +264,10 @@
         #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
+    <script src="alterar_data_pronto.js?v=202611051200" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
@@ -792,6 +793,16 @@
                 setTimeout(limpar, 5 * 60 * 1000);
             } catch (err) { limpar(); alert('Não foi possível imprimir: ' + err.message); }
         }
+        // alterar a data de pronto (só ela: não muda situação nem data de entrega); vale para Pedido e Orçamento
+        async function alterarDataPronto(numero) {
+            const x = docDe(numero);
+            const nova = await window.AlterarDataPronto.perguntar({ tipo: tipoLista, numero, cliente: x && x.cliente, dataAtual: x && x.prontoEm });
+            if (!nova) return;
+            try {
+                await api(`/ped_orc/${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}/data_pronto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataPronto: nova }) });
+                await carregar();
+            } catch (err) { alert(err.message); }
+        }
         // orçamento: Fechado / Aguardando resposta (como "Alterar situação para..." do VB)
         async function mudarSituacaoOrcamento(numero, nome) {
             const x = docDe(numero);
@@ -823,6 +834,9 @@
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });
+            if (!cancelado && Acesso.pode(ehPedido ? 'pedidos.situacao' : 'orcamentos.salvar')) {
+                sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(numero));
+            }
             if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {
                 sep(); L.push({ titulo: 'Mudar situação para' });
                 for (const [chave, nome] of Object.entries(SITUACAO_NOME)) {
@@ -942,7 +956,7 @@
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             cliente = new URLSearchParams(location.search).get('cliente') || '';
             $('f-cliente').value = cliente;
-            carregar();
+            carregar().then(() => { if (!document.querySelector('dialog[open]')) $('search-input').focus(); });
         });
     </script>
 </body>

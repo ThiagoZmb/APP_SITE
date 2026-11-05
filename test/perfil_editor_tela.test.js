@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');   // checkout com CRLF (autocrlf) nao quebra os trechos com \n
 const html = ler('produtos.html');
 const editor = ler('perfil_editor.js');
 

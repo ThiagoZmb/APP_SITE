@@ -422,8 +422,8 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051700" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+    <script src="layout.js?v=202611051800" defer></script>
 </head>
 <body>
     <div class="container">
@@ -516,7 +516,7 @@
                         <option value="a_pagar">Visualizar todos (a pagar)</option>
                     </select>
                     <select class="ferr-select" id="filtro-situacao" aria-label="Situação no mês"><option value="">Todas as situações</option></select>
-                    <div class="busca"><input type="search" id="pesquisa" placeholder="Pedido, NF, cliente, fornecedor, valor... (Enter)" autocomplete="off"></div>
+                    <div class="busca"><input data-foco-busca type="search" id="pesquisa" placeholder="Pedido, NF, cliente, fornecedor, valor... (Enter)" autocomplete="off"></div>
                     <button class="btn btn-secondary btn-mini" id="btn-relatorio" title="Exporta o mês exibido (sem Caixa Econômica Federal e XP)">📊 Relatório do mês</button>
                     <button class="btn btn-primary" id="btn-novo" data-perm="financeiro.lancar">＋ Novo movimento</button>
                 </div>
