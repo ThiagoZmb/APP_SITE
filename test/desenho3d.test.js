@@ -27,7 +27,7 @@ test('porta de giro 1 folha: 4 perfis de 45 mm, vidro translúcido e limites = t
   const [esq] = por(r, 'perfil');
   assert.equal(esq.w, 45); assert.equal(esq.h, 2100); assert.equal(esq.cor, '#c3c8cd');
   const v = por(r, 'vidro')[0];
-  assert.equal(v.cor, '#eaf4fb'); assert.ok(v.opacidade < 1);
+  assert.equal(v.cor, '#5fc9e8'); assert.ok(v.opacidade < 1);
   perto(v.w, 800 - 90); perto(v.h, 2100 - 90);
   perto(r.limites.tamanho.x, 800); perto(r.limites.tamanho.y, 2100);
   perto(r.limites.centro.x, 0); // centralizada

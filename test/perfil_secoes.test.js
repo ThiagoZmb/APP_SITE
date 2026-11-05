@@ -52,7 +52,7 @@ test('porta de giro com 1036: espessura 18,9, perfis em seção, vidro no canal'
   assert.equal(perfis.length, 4);
   perfis.forEach(p => { assert.ok(p.secao); perto(p.d, 18.9); });
   const [esq, dir, topo, base] = perfis;
-  perto(esq.comprimento, 2100); perto(topo.comprimento, 800 - 90);
+  perto(esq.comprimento, 2100); perto(topo.comprimento, 800); // 1036 = meia-esquadria: comprimento externo
   // limites: porta 800 x 2100 x 18,9, centrada em z
   perto(r.limites.tamanho.x, 800); perto(r.limites.tamanho.y, 2100); perto(r.limites.tamanho.z, 18.9);
   perto(r.limites.min.z, -9.45); assert.equal(r.limites.min.y, 0);
@@ -69,8 +69,8 @@ test('porta de giro com 1036: espessura 18,9, perfis em seção, vidro no canal'
   // y=0 na borda externa: início de cada peça fica na borda da folha
   assert.deepEqual(esq.origem.slice(0, 2), [-400, 0]);
   assert.deepEqual(dir.origem.slice(0, 2), [400, 2100]);
-  assert.deepEqual(topo.origem.slice(0, 2), [-355, 2100]);
-  assert.deepEqual(base.origem.slice(0, 2), [355, 0]);
+  assert.deepEqual(topo.origem.slice(0, 2), [-400, 2100]);
+  assert.deepEqual(base.origem.slice(0, 2), [400, 0]);
 });
 
 test('perfil sem seção cadastrada: comportamento antigo (blocos de 45 x 40, vidro de 8)', () => {
@@ -86,4 +86,81 @@ test('orcamentos.html liga o perfil à seção e carrega o módulo antes do 3D',
   const h = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
   assert.ok(h.indexOf('calculo/perfil_secoes.js') > 0 && h.indexOf('calculo/perfil_secoes.js') < h.indexOf('<script src="desenho3d.js'));
   assert.ok(h.includes("perfil: val('f-perfil')"));
+});
+
+// ----- junta: meia-esquadria (45°) x reta -----
+const pontosDaSecao = s => s.contorno.concat(...s.vazados);
+
+test('junta: 1036 = meia_esquadria; padrão = reta; valor inválido é recusado', () => {
+  assert.equal(PS.porModelo('1036').junta, 'meia_esquadria');
+  const base = { codigo: 99, modelo: 'TESTE-JUNTA', largura: 10, altura: 20, parede: 1, contorno: [[0, 0], [10, 0], [10, 20], [0, 20]], vazados: [], canalVidro: { x0: 1, x1: 5, y0: 1 } };
+  assert.deepEqual(PS.validar(base), []);
+  assert.equal(PS.registrar(base).junta, 'reta');
+  assert.deepEqual(PS.validar({ ...base, junta: 'reta' }), []);
+  assert.deepEqual(PS.validar({ ...base, junta: 'meia_esquadria' }), []);
+  assert.ok(PS.validar({ ...base, junta: 'curva' }).some(e => e.includes('junta')));
+  assert.ok(PS.validar({ ...base, junta: null }).some(e => e.includes('junta')));
+});
+
+test('pontasPeca: 45° desloca cada ponto pelo próprio y; reta não desloca', () => {
+  const s = PS.porModelo('1036');
+  const [a0, a1] = PS.pontasPeca(s, 0, 800), [b0, b1] = PS.pontasPeca(s, 45, 800);
+  perto(a0, 0); perto(a1, 800);               // y = 0: comprimento externo inteiro
+  perto(b0, 45); perto(b1, 755);              // y = 45: recua 45 mm em cada ponta
+  perto(b0 - a0, 45); perto(a1 - b1, 45);     // 45 mm entre os dois pontos ao longo do eixo
+  assert.deepEqual(PS.pontasPeca({ junta: 'reta' }, 30, 800), [0, 800]);
+  assert.deepEqual(PS.pontasPeca({}, 30, 800), [0, 800]);
+  // nenhum ponto da seção passa do comprimento externo nem inverte a peça
+  pontosDaSecao(s).forEach(([, y]) => { const [i, f] = PS.pontasPeca(s, y, 800); assert.ok(i >= 0 && f <= 800 && f > i); });
+});
+
+test('1036 em 3D: 4 peças com comprimento externo e pontas vizinhas coincidindo nos 4 cantos', () => {
+  const r = D3.montarCaixas(giro1({ perfil: '1036' }));
+  const s = r.caixas.find(c => c.secao).secao;
+  const [esq, dir, topo, base] = por(r, 'perfil');
+  [esq, dir].forEach(p => { perto(p.comprimento, 2100); assert.equal(p.junta, 'meia_esquadria'); });
+  [topo, base].forEach(p => { perto(p.comprimento, 800); assert.equal(p.junta, 'meia_esquadria'); });
+  // posição no mundo de um ponto (y da seção; sx=0 basta) numa das pontas: 0 = início, 1 = fim
+  const mundo = (p, y, ponta) => {
+    const s2 = PS.pontasPeca(p.secao, y, p.comprimento)[ponta], e = p.eixos;
+    return [0, 1].map(k => p.origem[k] + e.sy[k] * y + e.sz[k] * s2);
+  };
+  const igual = (a, b) => { perto(a[0], b[0]); perto(a[1], b[1]); };
+  for (const [, y] of pontosDaSecao(s)) {
+    igual(mundo(esq, y, 0), mundo(base, y, 1));   // canto inferior esquerdo
+    igual(mundo(esq, y, 1), mundo(topo, y, 0));   // canto superior esquerdo
+    igual(mundo(dir, y, 0), mundo(topo, y, 1));   // canto superior direito
+    igual(mundo(dir, y, 1), mundo(base, y, 0));   // canto inferior direito
+  }
+  // contorno externo (y = 0) fecha exatamente nos cantos da folha
+  igual(mundo(esq, 0, 0), [-400, 0]); igual(mundo(topo, 0, 0), [-400, 2100]);
+  igual(mundo(dir, 0, 0), [400, 2100]); igual(mundo(base, 0, 0), [400, 0]);
+  // limites externos = tamanho da porta; área livre do vidro e divisores não mudam
+  perto(r.limites.tamanho.x, 800); perto(r.limites.tamanho.y, 2100);
+  const v = por(r, 'vidro')[0]; perto(v.w, 797); perto(v.h, 2097);
+  const rd = D3.montarCaixas(giro1({ perfil: '1036', divH: 1, divV: 1 }));
+  perto(por(rd, 'divisor').find(d => d.id.includes('divh')).w, 710);
+  perto(por(rd, 'divisor').find(d => d.id.includes('divv')).h, 2010);
+});
+
+test('junta reta (seção injetada): idêntico ao esquadro simples de antes', () => {
+  const s = { ...PS.porModelo('1036'), junta: 'reta' };
+  const r = D3.montarCaixas(giro1({ secao: s }));
+  const [, , topo, base] = por(r, 'perfil');
+  perto(topo.comprimento, 710); perto(base.comprimento, 710);
+  assert.deepEqual(topo.origem.slice(0, 2), [-355, 2100]);
+  assert.deepEqual(base.origem.slice(0, 2), [355, 0]);
+  const semJunta = { ...s }; delete semJunta.junta;
+  assert.deepEqual(D3.montarCaixas(giro1({ secao: semJunta })).caixas.map(c => ({ ...c, junta: undefined, secao: undefined })), r.caixas.map(c => ({ ...c, junta: undefined, secao: undefined })));
+});
+
+test('montarMalhaPeca: malha fechada (volume bate com a área x comprimento médio) em reta e em 45°', () => {
+  // seção retangular 10 x 20 (y = 0 externo), triangulação em leque (convexa)
+  const sec = j => ({ junta: j, contorno: [[0, 0], [10, 0], [10, 20], [0, 20]], vazados: [] });
+  const leque = c => c.slice(2).map((_, i) => [0, i + 1, i + 2]);
+  const volume = pos => { let v = 0; for (let i = 0; i < pos.length; i += 9) { const a = pos.slice(i, i + 3), b = pos.slice(i + 3, i + 6), c = pos.slice(i + 6, i + 9);
+    v += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6; } return v; };
+  perto(volume(D3.montarMalhaPeca(sec('reta'), 100, leque).posicoes), 10 * 20 * 100, 1e-6);
+  // 45°: comprimento médio = 100 - 2 * (y médio = 10) = 80
+  perto(volume(D3.montarMalhaPeca(sec('meia_esquadria'), 100, leque).posicoes), 10 * 20 * 80, 1e-6);
 });

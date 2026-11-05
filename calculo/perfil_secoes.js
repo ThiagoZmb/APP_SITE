@@ -19,6 +19,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // junta: como as peças da moldura se encontram nos cantos ('reta' = esquadro simples, padrão; 'meia_esquadria' = corte de 45°)
+  const JUNTAS = ['reta', 'meia_esquadria'];
+
   const norm = s => String(s == null ? '' : s).trim().toUpperCase();
 
   // Área de um polígono (positiva, fórmula do laço)
@@ -62,13 +65,24 @@
     const c = s.canalVidro;
     if (!c || !(c.x1 > c.x0) || c.x0 < 0 || c.x1 > s.largura || !(c.y0 >= 0) || c.y0 > s.altura) erros.push('canal do vidro inválido');
     if (!(s.parede > 0)) erros.push('parede inválida');
+    if (s.junta !== undefined && !JUNTAS.includes(s.junta)) erros.push(`junta inválida (use ${JUNTAS.join(' ou ')})`);
     if (areaSolida(s) <= 0) erros.push('área sólida não positiva');
     return erros;
   }
 
+  // Pontas de uma peça da moldura. `comprimento` = comprimento EXTERNO (medido na borda externa, y = 0 da seção).
+  // Devolve [inicio, fim]: posição, ao longo do eixo da peça (0 .. comprimento), do ponto da seção a y mm da borda externa.
+  //   'reta': [0, comprimento] para todo y (esquadro simples).
+  //   'meia_esquadria': corte de 45°: o ponto a y mm da borda externa recua y mm em cada ponta -> [y, comprimento - y].
+  // Peças vizinhas (mesmo y) fecham no mesmo ponto do canto: a linha de corte é a diagonal do canto.
+  function pontasPeca(secao, y, comprimento) {
+    if (secao && secao.junta === 'meia_esquadria') return [y, comprimento - y];
+    return [0, comprimento];
+  }
+
   const secoes = new Map();   // chave = modelo normalizado
   function registrar(s) {
-    const normal = { ...s, vazados: s.vazados || [] };
+    const normal = { ...s, vazados: s.vazados || [], junta: s.junta === undefined ? 'reta' : s.junta };
     const erros = validar(normal);
     if (erros.length) throw new Error(`Seção do perfil ${s && s.modelo} inválida: ${erros.join('; ')}`);
     secoes.set(norm(normal.modelo), normal);
@@ -91,6 +105,7 @@
   registrar({
     codigo: 13, modelo: '1036',
     largura: 18.9, altura: 45, parede: p,
+    junta: 'meia_esquadria',   // o 1036 é montado em corte de 45°
     estimada: ['parede', 'espessura da aba e da base do pé'],
     // caixa x 6,0..18,9 / y 0..45 + pé em U (base x 0..6 y 0..1,5; aba x 0..1,5 até y 7,8). Sentido anti-horário.
     contorno: [[0, 0], [18.9, 0], [18.9, 45], [x0Caixa, 45], [x0Caixa, p], [p, p], [p, 7.8], [0, 7.8]],
@@ -100,5 +115,5 @@
     canalVidro: { x0: p, x1: x0Caixa, y0: p }
   });
 
-  return { areaPoligono, areaSolida, validar, registrar, porModelo, porCodigo };
+  return { JUNTAS, areaPoligono, areaSolida, validar, registrar, porModelo, porCodigo, pontasPeca };
 });

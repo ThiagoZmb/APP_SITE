@@ -31,8 +31,9 @@
   const SALIENCIA_PUX_MM = 18;   // quanto o puxador sobreposto/total sai de cada face (só visual)
   const AFASTO_CORRER_MM = 22;   // folhas de correr em trilhos diferentes: afastamento em z (só visual)
 
-  const CORES = { perfil: '#c3c8cd', puxador: '#2b2f33', vidro: '#eaf4fb', furo: '#1f2d2d', trilho: '#5f6670', contorno: '#6b7178' };
-  const OPACIDADE_VIDRO = 0.45;
+  // vidro: azul-esverdeado saturado, bem distinto do perfil (#c3c8cd, cinza claro) e do fundo escuro; borda mais escura do mesmo tom
+  const CORES = { perfil: '#c3c8cd', puxador: '#2b2f33', vidro: '#5fc9e8', vidroBorda: '#1f7f9c', furo: '#1f2d2d', trilho: '#5f6670', contorno: '#6b7178' };
+  const OPACIDADE_VIDRO = 0.5;
 
   const VISTAS = {
     frontal: { az: 0, el: 0 },
@@ -139,6 +140,7 @@
     // seção transversal real do perfil escolhido (se cadastrada); sem ela, o bloco liso de antes
     const sec = g.secao || (SECOES && g.perfil ? SECOES.porModelo(g.perfil) : null);
     const H = g.altura, P = sec ? sec.altura : PERFIL_MM, T = sec ? sec.largura : ESP_PORTA_MM;
+    const miter = !!(sec && sec.junta === 'meia_esquadria');
     const caixas = [];
     const add = c => { caixas.push(c); return c; };
 
@@ -162,7 +164,7 @@
         const peca = (sufixo, comp, origem, sy, sz) => {
           const c = {
             id: `${idf}-perfil-${sufixo}`, tipo: 'perfil', folha: i, cor: CORES.perfil,
-            secao: sec, comprimento: comp, origem, eixos: { sx: ez, sy, sz }
+            secao: sec, comprimento: comp, origem, eixos: { sx: ez, sy, sz }, junta: miter ? 'meia_esquadria' : 'reta'
           };
           c.x = origem[0] + sy[0] * P / 2 + sz[0] * comp / 2;
           c.y = origem[1] + sy[1] * P / 2 + sz[1] * comp / 2;
@@ -174,8 +176,15 @@
         };
         peca('esq', H, [x0, 0, zIni], [1, 0, 0], [0, 1, 0]);
         peca('dir', H, [x0 + L, H, zIni], [-1, 0, 0], [0, -1, 0]);
-        peca('topo', gw, [x0 + P, H, zIni], [0, -1, 0], [1, 0, 0]);
-        peca('base', gw, [x0 + L - P, 0, zIni], [0, 1, 0], [-1, 0, 0]);
+        if (miter) {
+          // meia-esquadria: as 4 peças têm o comprimento EXTERNO (L nas travessas) e as pontas cortadas a 45°
+          // (ver PerfilSecoes.pontasPeca); o contorno externo da moldura fecha limpo nos cantos
+          peca('topo', L, [x0, H, zIni], [0, -1, 0], [1, 0, 0]);
+          peca('base', L, [x0 + L, 0, zIni], [0, 1, 0], [-1, 0, 0]);
+        } else {
+          peca('topo', gw, [x0 + P, H, zIni], [0, -1, 0], [1, 0, 0]);
+          peca('base', gw, [x0 + L - P, 0, zIni], [0, 1, 0], [-1, 0, 0]);
+        }
         // vidro no canal: espessura = largura do canal; começa a y0 da borda externa em cada lado
         const cv = sec.canalVidro;
         add({ id: `${idf}-vidro`, tipo: 'vidro', folha: i, x: x0 + L / 2, y: H / 2, z: zIni + (cv.x0 + cv.x1) / 2, w: Math.max(0, L - 2 * cv.y0), h: Math.max(0, H - 2 * cv.y0), d: ESP_VIDRO_MM, cor: CORES.vidro, opacidade: OPACIDADE_VIDRO });
@@ -233,6 +242,39 @@
     if (g.trilhoInf) add({ id: 'trilho-inf', tipo: 'trilho', nome: g.trilhoInf.nome, x: xIni + totalW / 2, y: -(FOLGA_MM + TRILHO_MM / 2), z: 0, w: totalW, h: TRILHO_MM, d: profTrilho, cor: CORES.trilho });
 
     return { ok: true, caixas, limites: calcularLimites(caixas), folhas: n, secao: sec ? sec.modelo : null, espessuraPorta: T };
+  }
+
+  // Malha de uma peça de perfil em coordenadas LOCAIS (x,y = seção; z = ao longo da peça, 0..comprimento), com as pontas
+  // conforme a junta da seção (PerfilSecoes.pontasPeca): reta = tampas planas; meia_esquadria = tampas no plano de 45°.
+  // `triangular(contorno, buracos)` devolve triângulos [i,j,k] sobre contorno+buracos concatenados (no navegador:
+  // THREE.ShapeUtils.triangulateShape). Devolve { posicoes:[x,y,z,...] } com 3 vértices por triângulo (sombreamento chapado),
+  // com enrolamento voltado para fora (contorno anti-horário, buracos horários).
+  function montarMalhaPeca(secao, comprimento, triangular) {
+    const area2 = r => r.reduce((a, q, i) => { const w = r[(i + 1) % r.length]; return a + q[0] * w[1] - w[0] * q[1]; }, 0);
+    const horario = r => area2(r) < 0 ? r : r.slice().reverse();
+    const anti = r => area2(r) > 0 ? r : r.slice().reverse();
+    const contorno = anti(secao.contorno);
+    const buracos = (secao.vazados || []).map(horario);
+    const pontas = q => (SECOES ? SECOES.pontasPeca(secao, q[1], comprimento) : [0, comprimento]);
+    const pos = [];
+    const tri = (a, b, c) => { pos.push(...a, ...b, ...c); };
+    const v0 = q => [q[0], q[1], pontas(q)[0]], v1 = q => [q[0], q[1], pontas(q)[1]];
+    // laterais: um quad por aresta de cada anel
+    [contorno, ...buracos].forEach(anel => {
+      for (let i = 0; i < anel.length; i++) {
+        const a = anel[i], b = anel[(i + 1) % anel.length];
+        tri(v0(a), v0(b), v1(b)); tri(v0(a), v1(b), v1(a));
+      }
+    });
+    // tampas: a de z crescente (fim) sai com enrolamento anti-horário em xy; a do início, invertida
+    const todos = contorno.concat(...buracos);
+    triangular(contorno, buracos).forEach(([i, j, k]) => {
+      let A = todos[i], B = todos[j], C = todos[k];
+      if ((B[0] - A[0]) * (C[1] - A[1]) - (C[0] - A[0]) * (B[1] - A[1]) < 0) { const t = B; B = C; C = t; } // força anti-horário
+      tri(v1(A), v1(B), v1(C));
+      tri(v0(A), v0(C), v0(B));
+    });
+    return { posicoes: pos };
   }
 
   function calcularLimites(caixas) {
@@ -343,10 +385,13 @@
         const cor = new T.Color(cx.cor);
         if (cx.secao) {
           // extrusão da seção real ao longo do comprimento, depois orientada pelos eixos calculados em montarCaixas
+          // malha própria (pontas em 45° quando a junta é meia_esquadria; tampas trianguladas, nada de oco aberto)
           const pt = q => new T.Vector2(q[0], q[1]);
-          const forma = new T.Shape(cx.secao.contorno.map(pt));
-          (cx.secao.vazados || []).forEach(v => forma.holes.push(new T.Path(v.map(pt))));
-          geom = new T.ExtrudeGeometry(forma, { depth: cx.comprimento, bevelEnabled: false, steps: 1 });
+          const triangular = (cont, bur) => T.ShapeUtils.triangulateShape(cont.map(pt), bur.map(b => b.map(pt)));
+          const malhaPeca = montarMalhaPeca(cx.secao, cx.comprimento, triangular);
+          geom = new T.BufferGeometry();
+          geom.setAttribute('position', new T.Float32BufferAttribute(malhaPeca.posicoes, 3));
+          geom.computeVertexNormals();
           const e = cx.eixos;
           const m = new T.Matrix4().makeBasis(new T.Vector3(...e.sx), new T.Vector3(...e.sy), new T.Vector3(...e.sz));
           m.setPosition(cx.origem[0], cx.origem[1], cx.origem[2]);
@@ -367,6 +412,13 @@
         else malha.position.set(cx.x, cx.y, cx.z);
         if (cx.tipo === 'vidro') malha.renderOrder = 2;
         grupo.add(malha);
+        if (cx.tipo === 'vidro') {
+          // borda realçada do vidro: linhas mais escuras, desenhadas depois (renderOrder 3), sem escrever profundidade
+          const borda = new T.LineSegments(new T.EdgesGeometry(geom), new T.LineBasicMaterial({ color: new T.Color(CORES.vidroBorda), transparent: true, opacity: 0.9, depthWrite: false }));
+          borda.position.copy(malha.position);
+          borda.renderOrder = 3;
+          grupo.add(borda);
+        }
         if (cx.tipo === 'perfil' || cx.tipo === 'divisor' || cx.tipo === 'trilho' || cx.tipo === 'puxador') {
           const linhas = new T.LineSegments(new T.EdgesGeometry(geom), new T.LineBasicMaterial({ color: new T.Color(CORES.contorno) }));
           linhas.position.copy(malha.position);
@@ -530,7 +582,7 @@
 
   return {
     CORES, VISTAS, BIBLIOTECAS, PERFIL_MM, DIVISOR_MM, FURO_DIAM_MM, TRILHO_MM, FOLGA_MM, ESP_PORTA_MM,
-    comprimentoPuxador, espessuraPuxador, retanguloPuxador, normalizarGeometria, montarCaixas, calcularLimites,
+    comprimentoPuxador, espessuraPuxador, retanguloPuxador, normalizarGeometria, montarCaixas, montarMalhaPeca, calcularLimites,
     distanciaEnquadrar, posicaoCamera, criar, webglDisponivel
   };
 });
