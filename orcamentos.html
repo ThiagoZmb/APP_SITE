@@ -982,8 +982,8 @@
     </aside>
     <script src="importar_itens.js?v=202610261800"></script>
     <script src="desenhos.js?v=202610272200"></script>
-    <script src="calculo/perfil_secoes.js?v=202611051500"></script>
-    <script src="desenho3d.js?v=202611051500"></script>
+    <script src="calculo/perfil_secoes.js?v=202611051800"></script>
+    <script src="desenho3d.js?v=202611051800"></script>
     <script src="alteracao_valor.js?v=202611041200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
@@ -1357,6 +1357,7 @@
         // ============ HANDLERS DOS COMBOS (região 4 do VB) ============
         function aoMudarAcabPerfil() {
             filtrarCores('f-cor', val('f-acab'));
+            agendar3D(); // a cor do perfil no 3D depende do acabamento
             // puxador selecionado herda o acabamento do perfil
             if (val('f-puxador') && selecionarSeExistir('f-acab-pux', val('f-acab'))) aoMudarAcabPuxador();
             calcularPrecoAutomatico();
@@ -2219,6 +2220,21 @@
         // ============ VISUALIZADOR 3D (somente leitura; desenho3d.js) ============
         // Só reflete o estado do formulário: lê o mesmo estado do 2D, não grava nada e não participa da captura do PDF.
         var viz3d = { ctl: null, aba: '2d', agendado: 0 };
+        // Biblioteca de seções dos perfis (GET /perfil_secoes): carregada uma vez e mantida em memória (PerfilSecoes). Se a chamada falhar,
+        // fica o 1036 embutido como reserva e o 3D dos perfis sem seção segue como antes; a próxima abertura da aba 3D tenta de novo.
+        var secoesPerfisPromessa = null;
+        function carregarSecoesPerfis() {
+            if (secoesPerfisPromessa) return secoesPerfisPromessa;
+            secoesPerfisPromessa = Promise.resolve().then(async () => {
+                if (typeof PerfilSecoes === 'undefined') return false;
+                const d = await fetchAutenticado(`${API_BASE}/perfil_secoes`);
+                if (!d || !Array.isArray(d.secoes)) throw new Error('resposta inesperada');
+                const r = PerfilSecoes.substituirTodas(d.secoes);
+                if (r.ignoradas.length) console.warn('Seções de perfil ignoradas (inválidas):', r.ignoradas.map(i => i.modelo).join(', '));
+                return true;
+            }).catch(err => { console.warn('Seções dos perfis indisponíveis; usando a reserva embutida:', err.message); secoesPerfisPromessa = null; return false; });
+            return secoesPerfisPromessa;
+        }
         // objeto de geometria (mm) que o desenho3d.js transforma em cena; mesmas regras de leitura do 2D
         function geometria3D() {
             if (!Desenhos.FRENTES_COM_DESENHO.includes(frenteAtual)) return null;
@@ -2236,6 +2252,7 @@
             const { trilhoSup, trilhoInf } = trilhosCorrer(correrSis);
             const nomeTrilho = (a, padrao) => a ? `${a.qtd} ${a.nome}` : padrao;
             return {
+                acabamento: val('f-acab'), // nome do acabamento do perfil: define a cor do 3D (cores.porAcabamento da seção)
                 perfil: val('f-perfil'), // MODELO do perfil: o 3D usa a seção real se houver cadastrada (calculo/perfil_secoes.js)
                 correr: ehCorrer(),
                 altura, largura,
@@ -2282,6 +2299,7 @@
                 const h = cv.getBoundingClientRect().height;
                 cena.style.height = (h > 200 ? Math.round(h) : 480) + 'px';
                 cv.style.display = 'none'; painel.style.display = ''; viz3d.aba = '3d'; marcar('3d');
+                await carregarSecoesPerfis(); // antes de montar o 3D: cada perfil usa a seção cadastrada
                 const ok = await viz3d.ctl.mostrar();
                 if (!ok) { // sem WebGL ou biblioteca indisponível: volta para o 2D, que segue normal
                     const msg = aviso.textContent || 'O 3D não está disponível neste navegador.';

@@ -164,3 +164,119 @@ test('montarMalhaPeca: malha fechada (volume bate com a área x comprimento méd
   // 45°: comprimento médio = 100 - 2 * (y médio = 10) = 80
   perto(volume(D3.montarMalhaPeca(sec('meia_esquadria'), 100, leque).posicoes), 10 * 20 * 80, 1e-6);
 });
+
+
+// ----- esquema versão 2: validação, cores, nervuras, biblioteca -----
+const base2 = (extra = {}) => ({
+  versao: 2, codigo: 501, modelo: 'V2-TESTE', largura: 20, altura: 40, parede: 1.5,
+  contorno: [[0, 0], [20, 0], [20, 40], [0, 40]],
+  vazados: [[[2, 2], [18, 2], [18, 38], [2, 38]]],
+  canalVidro: { x0: 1, x1: 5, y0: 1 }, junta: 'reta',
+  cores: { padrao: '#aabbcc', porAcabamento: { 'Anodizado Fosco': '#112233' } }, estimada: [], ...extra
+});
+const clone = o => JSON.parse(JSON.stringify(o));
+
+test('esquema 2: seção boa passa; o 1036 ganhou versao 2 e cores.padrao #c3c8cd', () => {
+  assert.deepEqual(PS.validar(base2()), []);
+  const s = PS.porModelo('1036');
+  assert.equal(s.versao, 2); assert.equal(s.cores.padrao, '#c3c8cd'); assert.deepEqual(s.cores.porAcabamento, {});
+  assert.deepEqual(PS.validar(PS.semente1036()), []);
+  // seção sem versao/cores (esquema 1) segue valendo e vira versão 2
+  const v1 = clone(base2()); delete v1.versao; delete v1.cores;
+  assert.deepEqual(PS.validar(v1), []);
+  const n = PS.normalizar(v1); assert.equal(n.versao, 2); assert.equal(n.junta, 'reta');
+});
+
+test('esquema 2: validar recusa seção quebrada (cada defeito com mensagem própria)', () => {
+  const erra = (mut, trecho) => {
+    const s = clone(base2()); mut(s);
+    const e = PS.validar(s);
+    assert.ok(e.some(m => m.includes(trecho)), `${trecho} em ${JSON.stringify(e)}`);
+  };
+  erra(s => { s.contorno = [[0, 0], [20, 10], [20, 0], [0, 40]]; }, 'contorno cruza');
+  erra(s => { s.contorno = [[0, 0], [20, 0], [20, 0], [20, 40], [0, 40]]; }, 'repetidos');
+  erra(s => { s.vazados = [[[2, 2], [30, 2], [30, 38], [2, 38]]]; }, 'vazado 0 fora do contorno');
+  erra(s => { s.vazados = [[[-1, 2], [10, 2], [10, 38]]]; }, 'vazado 0 fora do contorno');
+  erra(s => { s.vazados = [[[2, 2], [12, 10], [12, 2], [2, 30]]]; }, 'vazado 0 cruza');
+  erra(s => { s.vazados.push([[10, 10], [14, 10], [14, 14], [10, 14]]); }, 'se cruzam ou se sobrepõem');
+  erra(s => { s.vazados = [[[2, 2], [12, 2], [12, 20], [2, 20]], [[8, 10], [18, 10], [18, 30], [8, 30]]]; }, 'se cruzam');
+  erra(s => { s.canalVidro = { x0: 5, x1: 25, y0: 1 }; }, 'canal do vidro');
+  erra(s => { s.canalVidro = { x0: 5, x1: 3, y0: 1 }; }, 'canal do vidro');
+  erra(s => { s.junta = 'curva'; }, 'junta');
+  erra(s => { s.cores.padrao = 'azul'; }, 'cor padrão');
+  erra(s => { s.cores.padrao = '#abc'; }, 'cor padrão');
+  erra(s => { s.cores.porAcabamento.Preto = 'preto'; }, 'cor inválida');
+  erra(s => { s.cores.porAcabamento.PRETO = '#000000'; s.cores.porAcabamento.preto = '#111111'; }, 'repetido');
+  erra(s => { s.largura = 0; }, 'largura');
+  erra(s => { s.largura = 301; }, 'largura');
+  erra(s => { s.altura = 0.5; }, 'altura');
+  erra(s => { s.parede = 0; }, 'parede');
+  erra(s => { s.codigo = -3; }, 'código');
+  erra(s => { s.versao = 3; }, 'versão');
+  erra(s => { s.contorno = Array.from({ length: 201 }, (_, i) => [i % 2 ? 20 : 0, i * 0.19]); }, 'pontos demais');
+  assert.ok(PS.validar(null).length && PS.validar([]).length);
+});
+
+test('esquema 2: nervuras (vários vazados disjuntos) são aceitas, inclusive encostadas no contorno', () => {
+  const s = base2({ vazados: [[[2, 2], [9, 2], [9, 38], [2, 38]], [[11, 2], [18, 2], [18, 20], [11, 20]]] });
+  assert.deepEqual(PS.validar(s), []);
+  assert.deepEqual(PS.validar(base2({ vazados: [[[0, 0], [10, 0], [10, 10], [0, 10]]] })), []);
+});
+
+test('cor por acabamento: acabamento -> padrão da seção -> cinza de sempre (sem seção)', () => {
+  PS.registrar(base2());
+  const s = PS.porModelo('V2-TESTE');
+  assert.equal(PS.corDoPerfil(s, 'Anodizado Fosco'), '#112233');
+  assert.equal(PS.corDoPerfil(s, 'ANODIZADO  fosco'), '#112233');
+  assert.equal(PS.corDoPerfil(s, 'Pintura'), '#aabbcc');
+  assert.equal(PS.corDoPerfil(s, ''), '#aabbcc');
+  assert.equal(PS.corDoPerfil({ largura: 1 }, 'x'), null);
+  const com = D3.montarCaixas(giro1({ perfil: 'V2-TESTE', acabamento: 'anodizado fosco' }));
+  assert.ok(por(com, 'perfil').length === 4 && por(com, 'perfil').every(p => p.cor === '#112233'));
+  assert.ok(por(D3.montarCaixas(giro1({ perfil: 'V2-TESTE', acabamento: 'Outro' })), 'perfil').every(p => p.cor === '#aabbcc'));
+  assert.ok(por(D3.montarCaixas(giro1({ perfil: 'V2-TESTE' })), 'perfil').every(p => p.cor === '#aabbcc'));
+  PS.registrar(base2({ modelo: 'V2-SEM-COR', codigo: 502, cores: undefined }));
+  assert.ok(por(D3.montarCaixas(giro1({ perfil: 'V2-SEM-COR', acabamento: 'x' })), 'perfil').every(p => p.cor === D3.CORES.perfil));
+  assert.ok(por(D3.montarCaixas(giro1({ perfil: '1099', acabamento: 'x' })), 'perfil').every(p => p.cor === D3.CORES.perfil));
+  // o vidro continua com 4 mm e a própria cor
+  assert.equal(por(com, 'vidro')[0].d, 4); assert.equal(por(com, 'vidro')[0].cor, D3.CORES.vidro);
+});
+
+test('substituirTodas: a biblioteca do servidor vira a verdade; inválidas são ignoradas', () => {
+  const guardadas = PS.lista().map(clone);
+  try {
+    const r = PS.substituirTodas([base2({ modelo: 'LIB-A', codigo: 601 }), { modelo: 'RUIM', contorno: [] }, base2({ modelo: 'LIB-B', codigo: 602 })]);
+    assert.equal(r.registradas, 2); assert.equal(r.ignoradas.length, 1); assert.equal(r.ignoradas[0].modelo, 'RUIM');
+    assert.ok(PS.porModelo('LIB-A') && PS.porModelo('lib-b') && PS.porCodigo(602));
+    assert.equal(PS.porModelo('1036'), null);
+    assert.equal(PS.substituirTodas([]).registradas, 0);
+    assert.equal(PS.lista().length, 0);
+  } finally { PS.substituirTodas(guardadas); }
+  assert.ok(PS.porModelo('1036'));
+});
+
+test('nervuras entram na extrusão e na meia-esquadria (malha da peça)', () => {
+  const sem = { junta: 'meia_esquadria', contorno: [[0, 0], [20, 0], [20, 40], [0, 40]], vazados: [[[2, 2], [18, 2], [18, 38], [2, 38]]] };
+  const nerv = { ...sem, vazados: [[[2, 2], [9, 2], [9, 38], [2, 38]], [[11, 2], [18, 2], [18, 20], [11, 20]]] };
+  const nada = () => [];   // só as laterais (2 triângulos por aresta de cada anel)
+  const A = D3.montarMalhaPeca(sem, 500, nada).posicoes, B = D3.montarMalhaPeca(nerv, 500, nada).posicoes;
+  assert.equal(A.length, 2 * (4 + 4) * 9);
+  assert.equal(B.length, 2 * (4 + 4 + 4) * 9);
+  // vértice (11, 20) da nervura: recua 20 mm em cada ponta (corte de 45°) -> z em 20 e 480
+  const zs = []; for (let i = 0; i < B.length; i += 3) if (B[i + 1] === 20 && B[i] === 11) zs.push(B[i + 2]);
+  assert.ok(zs.includes(20) && zs.includes(480), JSON.stringify(zs));
+  // junta reta: pontas só em 0 e no comprimento
+  const C = D3.montarMalhaPeca({ ...nerv, junta: 'reta' }, 500, nada).posicoes;
+  const zr = new Set(); for (let i = 2; i < C.length; i += 3) zr.add(C[i]);
+  assert.deepEqual([...zr].sort((a, b) => a - b), [0, 500]);
+});
+
+test('orcamentos.html: carrega GET /perfil_secoes uma vez, antes do 3D, com reserva embutida e acabamento no 3D', () => {
+  const h = fs.readFileSync(path.join(__dirname, '..', 'orcamentos.html'), 'utf8');
+  assert.ok(h.includes('/perfil_secoes'));
+  assert.ok(h.includes('function carregarSecoesPerfis'));
+  assert.ok(h.indexOf('await carregarSecoesPerfis()') > 0 && h.indexOf('await carregarSecoesPerfis()') < h.indexOf('await viz3d.ctl.mostrar()'));
+  assert.ok(h.includes('PerfilSecoes.substituirTodas'));
+  assert.ok(h.includes("acabamento: val('f-acab')"));
+  assert.ok(/function aoMudarAcabPerfil\(\) \{[^}]*agendar3D\(\)/.test(h));
+});

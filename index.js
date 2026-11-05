@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
@@ -45,6 +45,7 @@ const { registrarTintas } = require('./rotas/tintas');
 const { registrarPesos } = require('./rotas/pesos');
 const { registrarDanfe } = require('./rotas/danfe');
 const { registrarChecklist } = require('./rotas/checklist');
+const { registrarPerfilSecoes } = require('./rotas/perfil_secoes');
 const { registrarPesoItens } = require('./rotas/peso_itens');
 const { registrarNotas } = require('./rotas/notas_fiscais');
 const { registrarImportacaoNotas } = require('./rotas/notas_importacao');
@@ -1757,6 +1758,7 @@ registrarTintas({ rota: registro.rota, pool });
 registrarPesos({ rota: registro.rota, pool });
 registrarDanfe({ rota: registro.rota, pool, foraDosEstados });
 registrarChecklist({ rota: registro.rota, pool });
+registrarPerfilSecoes({ rota: registro.rota, pool });
 registrarPesoItens({ rota: registro.rota, pool });
 registrarNotas({ rota: registro.rota, pool, foraDosEstados });
 registrarImportacaoNotas({ publica: registro.publica, pool });
@@ -1799,6 +1801,10 @@ async function iniciar() {
   if ((await acrescentarPermissoesEntregas(pool)).feito) console.log('[permissões] entregas.ver e entregas.programar acrescentadas ao Administrador e Interno completo');
   if ((await acrescentarPermissoesOrcSituacao(pool)).feito) console.log('[permissões] orcamentos.situacao acrescentada ao Administrador, Interno completo e Representante');
   if ((await acrescentarPermissoesChecklist(pool)).feito) console.log('[permissões] pedidos.checklist acrescentada ao Administrador, Interno completo e auxiliares; checklist.enviar ao Administrador e Interno completo');
+  if ((await acrescentarPermissoesPerfisDesenho(pool)).feito) console.log('[permissões] perfis.desenho acrescentada ao Administrador e Interno completo');
+  try {
+    if ((await semearPerfilSecoes(pool)).feito) console.log('[banco] seção do perfil 1036 semeada em web_perfil_secoes');
+  } catch (err) { console.error('[banco] não foi possível semear web_perfil_secoes:', err.code || 'sem código'); }
   // coluna IMAGEM (foto do produto): falha não derruba o servidor; só o envio da foto continua recusado
   try {
     if ((await require('./seguranca/coluna_imagem').garantirColunaImagemProduto(pool)).feito) console.log('[banco] coluna cadastro_de_produtos.IMAGEM criada');

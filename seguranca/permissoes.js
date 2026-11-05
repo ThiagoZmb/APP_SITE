@@ -30,6 +30,7 @@ const CATALOGO = [
   { codigo: 'compras_nfe.importar', nome: 'Dar ciência da operação, baixar o XML e importar a nota de compra na entrada (também exige Dar entrada e saída)', area: 'Estoque' },
   { codigo: 'produtos.ver', nome: 'Ver cadastro de produtos', area: 'Produtos' },
   { codigo: 'produtos.editar', nome: 'Editar produto e imagem', area: 'Produtos' },
+  { codigo: 'perfis.desenho', nome: 'Editar o desenho (seção) dos perfis usado no 3D do orçamento', area: 'Produtos' },
   { codigo: 'financeiro.ver', nome: 'Ver fluxo de caixa (também exige Valores financeiros)', area: 'Financeiro' },
   { codigo: 'financeiro.lancar', nome: 'Lançar, editar e mudar situação (também exige Valores financeiros)', area: 'Financeiro' },
   { codigo: 'financeiro.excluir', nome: 'Excluir lançamento (também exige Valores financeiros)', area: 'Financeiro' },

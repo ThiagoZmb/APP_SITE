@@ -273,6 +273,75 @@
         .perm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
         .perm-chips span { font-size: 13px; padding: 5px 10px; border-radius: 8px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .perm-vazio { font-size: 13px; color: #adb5bd; }
+
+        /* ===== ABA DESENHO 3D (perfil_editor.js): traçador, tabelas de pontos, prévia 3D. Só variáveis do tema; fundos sólidos. ===== */
+        .aba.pe-oculta { display: none !important; }
+        .workspace.modo-desenho { grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
+        .ficha.modo-desenho .acoes { display: none; }
+        @media (max-width: 1200px) { .workspace.modo-desenho { grid-template-columns: 1fr; } }
+        .pe-aviso { padding: 12px 14px; border-radius: var(--radius); font-size: 13.5px; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text-mid); }
+        .pe-aviso[hidden], #pe-corpo[hidden] { display: none; }
+        .pe-barra { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-bottom: 10px; }
+        .pe-grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .pe-rotulo { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); margin-right: 2px; }
+        .pe-leitura [data-pe-edita] { display: none !important; }
+        .pe-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-mid); cursor: pointer; }
+        .pe-cal-caixa { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 13px; color: var(--text-mid); }
+        .pe-cal-caixa[hidden] { display: none; }
+        .pe-cal-caixa input { width: 80px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-dark); font-family: var(--font-mono); text-align: right; }
+        .pe-palco { position: relative; width: 100%; height: 440px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; }
+        .pe-palco canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; outline: none; }
+        .pe-palco canvas:focus-visible { box-shadow: inset 0 0 0 3px var(--primary-ring); }
+        .pe-palco.pe-sem-escala canvas { cursor: not-allowed; }
+        .pe-linha-info { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--text-mid); min-height: 20px; }
+        .pe-coord { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-light); font-size: 12.5px; }
+        .pe-msg { color: var(--primary-color); font-weight: 600; font-size: 13px; min-height: 18px; margin-top: 4px; }
+        .pe-grade { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; margin-top: 16px; align-items: start; }
+        @media (max-width: 1100px) { .pe-grade { grid-template-columns: 1fr; } }
+        .pe-secao { background: var(--surface-2); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; }
+        .pe-secao h4 { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); margin-bottom: 10px; }
+        .pe-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .pe-campos .form-group label { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--text-mid); }
+        .pe-campos .form-group.dobro { grid-column: span 2; }
+        .pe-campos input.ruim, .pe-tabela input.ruim { border-color: var(--danger-color); }
+        .pe-erro-linha { font-size: 12.5px; color: var(--selo-perigo-fg); margin: 4px 0; }
+        .pe-poli { margin-bottom: 14px; }
+        .pe-poli-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+        .pe-poli-qtd { font-size: 12px; color: var(--text-light); }
+        .pe-poli-acoes { margin-left: auto; display: inline-flex; gap: 6px; }
+        .pe-selo { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+        .pe-selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+        .pe-selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .pe-tabela { width: 100%; border-collapse: collapse; }
+        .pe-tabela th { text-align: left; padding: 6px 8px; font-size: 11px; }
+        .pe-tabela td { padding: 3px 6px; border-bottom: 1px solid var(--linha-tabela); }
+        .pe-tabela td.num, .pe-tabela th.num { text-align: right; width: 34px; color: var(--text-light); font-family: var(--font-mono); }
+        .pe-tabela tbody tr { cursor: default; }
+        .pe-tabela tbody tr.selecionado { background: var(--primary-light); }
+        .pe-tabela input { width: 100%; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-dark); font-family: var(--font-mono); text-align: right; min-height: 0; }
+        .pe-tabela input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-ring); }
+        .pe-linha-acoes { white-space: nowrap; text-align: right; }
+        .pe-cor-linha { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .pe-cor-nome { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-dark); }
+        .pe-cor-valor, #pe-cor-padrao { width: 44px; height: 34px; padding: 2px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; }
+        .pe-cor-valor:disabled, #pe-cor-padrao:disabled { cursor: not-allowed; }
+        .pe-chips-est { display: flex; flex-wrap: wrap; gap: 6px; }
+        .pe-chip-est { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .pe-chip-est button { border: none; background: var(--surface-2); color: var(--text-mid); border-radius: 999px; width: 22px; height: 22px; cursor: pointer; font-weight: 700; }
+        .pe-chip-est button:hover { color: var(--primary-color); }
+        .pe-cena { position: relative; width: 100%; height: 360px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border-color); border-radius: var(--radius); cursor: grab; touch-action: none; }
+        .pe-cena canvas { display: block; }
+        .pe-prev-status { font-size: 12.5px; color: var(--text-light); margin-top: 6px; min-height: 18px; }
+        .pe-erros { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--danger-color); font-size: 13.5px; color: var(--text-dark); }
+        .pe-erros[hidden], .pe-erro-api[hidden] { display: none; }
+        .pe-erros ul { margin: 6px 0 0 18px; }
+        .pe-erro-api { margin-top: 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--danger-color); font-size: 13.5px; color: var(--selo-perigo-fg); }
+        .pe-rodape { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+        .pe-sujo { font-size: 12px; color: var(--warning-color); font-weight: 700; margin-left: auto; }
+        .pe-sujo[hidden] { display: none; }
+        .btn.btn-perigo { color: var(--danger-color); border-color: var(--danger-color); }
+        .pe-raiz-btn:disabled, #pe-raiz .btn:disabled { opacity: .5; cursor: not-allowed; }
+        @media (prefers-reduced-motion: reduce) { .pe-palco canvas { transition: none; } }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611051600">
     <script src="layout.js?v=202611051700" defer></script>
@@ -369,6 +438,7 @@
                         <button class="aba ativa" data-aba="dados">Dados</button>
                         <button class="aba" data-aba="precos">Preços e descontos</button>
                         <button class="aba" data-aba="permissoes">Permissões</button>
+                        <button class="aba pe-oculta" data-aba="desenho3d" type="button">Desenho 3D</button>
                     </div>
 
                     <form id="form" autocomplete="off" onsubmit="return false">
@@ -400,6 +470,118 @@
                         </div>
                     </form>
 
+                    <!-- ===== ABA DESENHO 3D (perfil_editor.js): fora do <form> de propósito ===== -->
+                    <div class="aba-conteudo" data-aba="desenho3d" id="pe-raiz">
+                        <div class="pe-aviso" id="pe-aviso" role="status" hidden></div>
+                        <div id="pe-corpo" hidden>
+                            <p class="dica" id="pe-info"></p>
+                            <div class="pe-barra">
+                                <div class="pe-grupo" data-pe-edita>
+                                    <span class="pe-rotulo">Imagem</span>
+                                    <button type="button" class="btn btn-mini" id="pe-img-produto">Imagem do produto</button>
+                                    <button type="button" class="btn btn-mini" id="pe-img-arquivo" title="Só para traçar: o arquivo fica no seu navegador e não é enviado ao servidor">Escolher arquivo…</button>
+                                    <button type="button" class="btn btn-mini" id="pe-img-nenhuma">Sem imagem</button>
+                                    <input type="file" id="pe-arq" accept="image/png,image/jpeg" hidden>
+                                </div>
+                                <div class="pe-grupo" data-pe-edita>
+                                    <span class="pe-rotulo">Escala</span>
+                                    <button type="button" class="btn btn-mini" id="pe-calibrar" title="Clique em duas pontas de uma cota e informe a distância real">1. Calibrar</button>
+                                    <button type="button" class="btn btn-mini" id="pe-origem" title="Canto inferior esquerdo externo da seção = 0,0">2. Origem</button>
+                                    <span class="pe-cal-caixa" id="pe-cal-box" hidden>
+                                        <label for="pe-cal-mm">Distância real entre A e B</label>
+                                        <input type="text" id="pe-cal-mm" inputmode="decimal" autocomplete="off" placeholder="45">
+                                        <span>mm</span>
+                                        <button type="button" class="btn btn-mini" id="pe-cal-ok">Aplicar</button>
+                                    </span>
+                                </div>
+                                <div class="pe-grupo" data-pe-edita role="group" aria-label="O que traçar">
+                                    <span class="pe-rotulo">Traçar</span>
+                                    <button type="button" class="btn btn-mini ativo" data-modo="contorno">Contorno externo</button>
+                                    <button type="button" class="btn btn-mini" data-modo="vazado">Vazado</button>
+                                    <button type="button" class="btn btn-mini" data-modo="canal">Canal do vidro</button>
+                                </div>
+                                <div class="pe-grupo" data-pe-edita>
+                                    <label class="pe-check"><input type="checkbox" id="pe-ima" checked> Ímã</label>
+                                    <button type="button" class="btn btn-mini" id="pe-desfazer" title="Ctrl+Z">Desfazer</button>
+                                    <button type="button" class="btn btn-mini" id="pe-refazer" title="Ctrl+Y">Refazer</button>
+                                    <button type="button" class="btn btn-mini" id="pe-fechar">Fechar contorno</button>
+                                    <button type="button" class="btn btn-mini" id="pe-novo-vazado">Novo vazado</button>
+                                    <button type="button" class="btn btn-mini" id="pe-apagar" title="Delete, ou botão direito sobre o ponto">Apagar ponto</button>
+                                    <button type="button" class="btn btn-mini" id="pe-encostar" title="Desloca o desenho para o menor x e y ficarem em 0">Encostar na origem</button>
+                                </div>
+                                <div class="pe-grupo">
+                                    <span class="pe-rotulo">Zoom</span>
+                                    <button type="button" class="btn btn-mini" id="pe-zoom-menos" aria-label="Diminuir zoom">−</button>
+                                    <button type="button" class="btn btn-mini" id="pe-zoom-mais" aria-label="Aumentar zoom">+</button>
+                                    <button type="button" class="btn btn-mini" id="pe-ajustar">Ajustar</button>
+                                </div>
+                            </div>
+                            <div class="pe-palco" id="pe-palco"><canvas id="pe-canvas" tabindex="0" aria-label="Área de traçado da seção do perfil"></canvas></div>
+                            <div class="pe-linha-info"><span id="pe-dica"></span><span class="pe-coord" id="pe-coord"></span></div>
+                            <div class="pe-msg" id="pe-msg" role="status"></div>
+
+                            <div class="pe-grade">
+                                <div>
+                                    <div class="pe-secao" id="pe-config">
+                                        <h4>Configurações do perfil</h4>
+                                        <div class="pe-campos">
+                                            <div class="form-group"><label for="pe-largura">Largura (mm)</label><input id="pe-largura" class="num" readonly></div>
+                                            <div class="form-group"><label for="pe-altura">Altura (mm)</label><input id="pe-altura" class="num" readonly></div>
+                                            <div class="form-group"><label for="pe-parede">Parede (mm)</label><input id="pe-parede" class="num" inputmode="decimal"></div>
+                                            <div class="form-group dobro"><label for="pe-junta">Junta nos cantos</label><select id="pe-junta"></select></div>
+                                            <div class="form-group"><label for="pe-vidro">Vidro</label><input id="pe-vidro" class="num" value="4 mm (fixo)" readonly></div>
+                                        </div>
+                                        <div class="pe-erro-linha" id="pe-parede-erro"></div>
+                                        <h4 style="margin-top:14px">Canal do vidro (mm)</h4>
+                                        <div class="pe-campos">
+                                            <div class="form-group"><label for="pe-canal-x0">x0 (esquerda)</label><input id="pe-canal-x0" class="num" inputmode="decimal"></div>
+                                            <div class="form-group"><label for="pe-canal-x1">x1 (direita)</label><input id="pe-canal-x1" class="num" inputmode="decimal"></div>
+                                            <div class="form-group"><label for="pe-canal-y0">y0 (onde começa)</label><input id="pe-canal-y0" class="num" inputmode="decimal"></div>
+                                        </div>
+                                        <div class="pe-erro-linha" id="pe-canal-erro"></div>
+                                        <button type="button" class="btn btn-mini" id="pe-canal-limpar" data-pe-edita>Limpar canal</button>
+                                        <div id="pe-estimada-box" hidden>
+                                            <h4 style="margin-top:14px">Valores estimados (confira e marque)</h4>
+                                            <div class="pe-chips-est" id="pe-estimada"></div>
+                                        </div>
+                                    </div>
+                                    <div class="pe-secao">
+                                        <h4>Cores</h4>
+                                        <label class="pe-check"><input type="checkbox" id="pe-usar-cor"> Definir cor padrão</label>
+                                        <input type="color" id="pe-cor-padrao" value="#c3c8cd" aria-label="Cor padrão do perfil">
+                                        <h4 style="margin-top:14px">Cor por acabamento</h4>
+                                        <div id="pe-cores"></div>
+                                        <datalist id="pe-lista-acab"></datalist>
+                                        <div class="pe-grupo" data-pe-edita style="margin-top:8px">
+                                            <button type="button" class="btn btn-mini" id="pe-add-cor">＋ Acabamento</button>
+                                            <button type="button" class="btn btn-mini" id="pe-add-todas" title="Acrescenta os acabamentos permitidos para este perfil">Todos os acabamentos do perfil</button>
+                                        </div>
+                                    </div>
+                                    <div class="pe-secao">
+                                        <h4>Pontos (mm, y para cima)</h4>
+                                        <div id="pe-tabelas"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="pe-secao">
+                                        <h4>Prévia 3D</h4>
+                                        <div class="form-group" style="margin-bottom:10px"><label for="pe-prev-acab">Acabamento da prévia</label><select id="pe-prev-acab"></select></div>
+                                        <div class="pe-cena" id="pe-cena"></div>
+                                        <div class="pe-prev-status" id="pe-prev-status" role="status"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pe-erros" id="pe-erros" role="alert" hidden></div>
+                            <div class="pe-erro-api" id="pe-erro-api" role="alert" hidden></div>
+                            <div class="pe-rodape">
+                                <button type="button" class="btn btn-primary" id="pe-salvar">💾 Salvar desenho</button>
+                                <button type="button" class="btn btn-secondary btn-perigo" id="pe-remover" hidden>Remover desenho</button>
+                                <span class="pe-sujo" id="pe-sujo" hidden>● desenho não salvo</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="acoes">
                         <button class="btn btn-primary" id="btn-salvar" data-perm="produtos.editar">💾 Salvar</button>
                         <!-- produto novo exige valores: o backend recusa cadastrar sem preço -->
@@ -423,6 +605,10 @@
         </div>
     </div>
 
+    <script src="calculo/perfil_secoes.js?v=202611051800"></script>
+    <script src="desenho3d.js?v=202611051800"></script>
+    <script src="calculo/perfil_traco.js?v=202611060100"></script>
+    <script src="perfil_editor.js?v=202611060100"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -493,6 +679,9 @@
         let situacao = 'Ativo';
         let filtroSituacao = '';
         let alterado = false;
+        let classeSalva = '';      // classe GRAVADA do produto aberto (o select pode estar adiante); o desenho do perfil só vale para Perfil gravado
+        let temImagemSalva = false;
+        let acabamentosDoProduto = [];
         let fotoPendente = null;   // Blob comprimido aguardando o Salvar
         let fotoUrl = null;
         const gruposAbertos = new Set();
@@ -624,7 +813,15 @@
             $('regra-classe').textContent = regra;
             $('regra-classe').classList.toggle('visivel', !!regra);
         }
-        $('f-classe').addEventListener('change', () => aplicarRegrasClasse(true));
+        $('f-classe').addEventListener('change', () => { aplicarRegrasClasse(true); avisarEditorPerfil(false); });
+        // Aba "Desenho 3D" (perfil_editor.js): avisa o editor de qual produto está na ficha
+        function avisarEditorPerfil(recarregar) {
+            if (window.PerfilEditor) PerfilEditor.produtoMudou({
+                codigo: selecionado, modelo: $('f-modelo').value.trim(), classe: $('f-classe').value, classeSalva,
+                salvo: selecionado !== null && selecionado !== undefined, temImagem: temImagemSalva, acabamentos: acabamentosDoProduto, recarregar: !!recarregar
+            });
+        }
+        const desenhoPerfilSujo = () => !!(window.PerfilEditor && PerfilEditor.temAlteracao());
 
         function atualizarResumo() {
             $('r-fixo').textContent = moeda(lerNumero($('f-fixo').value));
@@ -738,9 +935,11 @@
             aplicarRegrasClasse(false);
             atualizarResumo();
             marcarAlterado(false);
+            classeSalva = ''; temImagemSalva = false; acabamentosDoProduto = [];
+            avisarEditorPerfil(true);
         }
         async function abrirProduto(codigo) {
-            if (alterado && !(await confirmar('Descartar alterações?', 'Há alterações não salvas neste produto. Deseja descartá-las?'))) return;
+            if ((alterado || desenhoPerfilSujo()) && !(await confirmar('Descartar alterações?', 'Há alterações não salvas neste produto' + (desenhoPerfilSujo() ? ' (inclusive no desenho 3D)' : '') + '. Deseja descartá-las?'))) return;
             try {
                 const p = await api('/produtos/item/' + encodeURIComponent(codigo));
                 $('f-codigo').value = p.codigo;
@@ -763,6 +962,8 @@
                 document.querySelectorAll('.prod-linha').forEach(l => l.classList.toggle('selecionado', l.dataset.codigo === String(p.codigo)));
                 renderPermissoes(p.permitidos);
                 marcarAlterado(false);
+                classeSalva = p.classe || ''; temImagemSalva = !!p.temImagem; acabamentosDoProduto = (p.permitidos && p.permitidos.acabamentos) || [];
+                avisarEditorPerfil(true);
                 if (p.temImagem) carregarFoto(p.codigo); else mostrarFoto(null);
             } catch (e) {
                 toast('Ocorreu um erro ao tentar carregar registro: ' + e.message, 'erro');
@@ -813,7 +1014,7 @@
         }
         $('btn-salvar').addEventListener('click', salvarRegistro);
         $('btn-novo').addEventListener('click', async () => {
-            if (alterado && !(await confirmar('Descartar alterações?', 'Há alterações não salvas. Deseja começar um novo produto mesmo assim?'))) return;
+            if ((alterado || desenhoPerfilSujo()) && !(await confirmar('Descartar alterações?', 'Há alterações não salvas. Deseja começar um novo produto mesmo assim?'))) return;
             await carregarProdutos();   // Contar_Registros + Carrega_Treenodes
             limparFicha();
             irParaAba('dados');
@@ -823,7 +1024,7 @@
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); salvarRegistro(); }
             if (e.key === 'Escape') $('modal').classList.remove('aberto');
         });
-        window.addEventListener('beforeunload', e => { if (alterado) { e.preventDefault(); e.returnValue = ''; } });
+        window.addEventListener('beforeunload', e => { if (alterado || desenhoPerfilSujo()) { e.preventDefault(); e.returnValue = ''; } });
 
         // ============ INIT ============
         document.addEventListener('DOMContentLoaded', async () => {
@@ -839,6 +1040,7 @@
                 document.querySelectorAll('#form input, #form select, #form textarea, .switch-situacao button').forEach(el => el.disabled = true);
                 $('foto').title = '';
             }
+            if (window.PerfilEditor) PerfilEditor.iniciar({ api, toast, confirmar, pode: c => Acesso.pode(c) });
             await Promise.all([carregarOpcoes(), carregarProdutos()]);
             limparFicha();
             $('f-modelo').focus();

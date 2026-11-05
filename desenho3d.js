@@ -107,6 +107,7 @@
       ok: true,
       geo: {
         perfil: String(geo.perfil || ''),
+        acabamento: String(geo.acabamento || ''), // acabamento do perfil: define a cor (cores.porAcabamento da seção)
         secao: geo.secao && typeof geo.secao === 'object' ? geo.secao : null, // injeção direta (teste/futuro traçador); senão busca pelo perfil
         correr: !!geo.correr,
         altura, largura,
@@ -141,6 +142,8 @@
     const sec = g.secao || (SECOES && g.perfil ? SECOES.porModelo(g.perfil) : null);
     const H = g.altura, P = sec ? sec.altura : PERFIL_MM, T = sec ? sec.largura : ESP_PORTA_MM;
     const miter = !!(sec && sec.junta === 'meia_esquadria');
+    // cor do perfil: cores.porAcabamento[acabamento] -> cores.padrao -> cinza de sempre
+    const corPerfil = (sec && SECOES && SECOES.corDoPerfil && SECOES.corDoPerfil(sec, g.acabamento)) || CORES.perfil;
     const caixas = [];
     const add = c => { caixas.push(c); return c; };
 
@@ -163,7 +166,7 @@
         const zIni = zc - T / 2, ez = [0, 0, 1];
         const peca = (sufixo, comp, origem, sy, sz) => {
           const c = {
-            id: `${idf}-perfil-${sufixo}`, tipo: 'perfil', folha: i, cor: CORES.perfil,
+            id: `${idf}-perfil-${sufixo}`, tipo: 'perfil', folha: i, cor: corPerfil,
             secao: sec, comprimento: comp, origem, eixos: { sx: ez, sy, sz }, junta: miter ? 'meia_esquadria' : 'reta'
           };
           c.x = origem[0] + sy[0] * P / 2 + sz[0] * comp / 2;

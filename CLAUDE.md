@@ -191,6 +191,10 @@ Servidor monta o ZPL (`GET /etiquetas/pedido/:numero`, `pedidos.pdf`); o serviç
 `web_checklist` guarda um único PDF vigente (id 1); `GET /checklist/pdf` (`pedidos.checklist`), `PUT /checklist` e `GET /checklist/info` (`checklist.enviar`); PDF validado pelos bytes, até 5 MB.
 > Regras completas: `docs/regras/checklist.md` (ler antes de mexer neste módulo).
 
+### Biblioteca de seções de perfis (desenho do perfil no 3D)
+`web_perfil_secoes` (esquema versão 2 em `calculo/perfil_secoes.js`: contorno, vazados/nervuras, canal do vidro, junta, cores por acabamento; vidro sempre 4 mm); `GET/PUT/DELETE /perfil_secoes`, edição com `perfis.desenho`; o 3D de `orcamentos.html` carrega a biblioteca e usa o 1036 embutido como reserva. Editor visual = Parte 2 (não feito).
+> Regras completas: `docs/regras/perfil-secoes.md` (ler antes de mexer neste módulo).
+
 ### Peso das portas (etapa 1)
 `web_pesos`; peso sem cadastro nunca vira zero (pendência + parcial); **o peso aparece SÓ em `orcamentos.html`** (regra do dono).
 > Regras completas: `docs/regras/peso.md` (ler antes de mexer neste módulo).

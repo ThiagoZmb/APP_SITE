@@ -247,6 +247,16 @@ const TABELAS = [
      enviado_por VARCHAR(100) NULL,
      enviado_em DATETIME NULL
    ) ${OPCOES}`,
+  // Biblioteca de seções de perfis para o 3D do orçamento: uma linha por perfil (codigo = cadastro_de_produtos.CODIGO). `secao` = JSON do esquema versão 2 (calculo/perfil_secoes.js)
+  `CREATE TABLE IF NOT EXISTS \`web_perfil_secoes\` (
+     codigo INT NOT NULL PRIMARY KEY,
+     modelo VARCHAR(100) NOT NULL,
+     secao LONGTEXT NOT NULL,
+     versao_esquema INT NOT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(100) NULL,
+     KEY ix_perfil_secoes_modelo (modelo)
+   ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_danfe_vinculos\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
      chave CHAR(44) NOT NULL,
@@ -887,6 +897,53 @@ async function acrescentarPermissoesCorte(pool) {
   }
 }
 
+// Desenho dos perfis (3D): perfis.desenho (editar a seção) para Administrador e Interno completo; uma vez só (auditoria permissoes_perfis_desenho)
+async function acrescentarPermissoesPerfisDesenho(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_perfis_desenho' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo') ORDER BY id");
+    for (const p of perfis) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, 'perfis.desenho']);
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_perfis_desenho', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Semente da biblioteca de seções: grava o perfil 1036 (código 13) UMA vez só. Nunca sobrescreve o que o dono editou: se já existe linha
+// do código 13, ou se a semente já foi aplicada antes (auditoria semente_perfil_secoes; o dono pode ter apagado de propósito), não faz nada.
+async function semearPerfilSecoes(pool) {
+  const semente = require('../calculo/perfil_secoes').semente1036();
+  const [jaSemeada] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'semente_perfil_secoes' LIMIT 1");
+  if (jaSemeada.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [existe] = await conn.execute('SELECT codigo FROM web_perfil_secoes WHERE codigo = ? FOR UPDATE', [semente.codigo]);
+    if (!existe.length) {
+      await conn.execute('INSERT INTO web_perfil_secoes (codigo, modelo, secao, versao_esquema, atualizado_em, atualizado_por) VALUES (?, ?, ?, ?, NOW(), ?)',
+        [semente.codigo, semente.modelo, JSON.stringify(semente), semente.versao, 'sistema']);
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'semente_perfil_secoes', String(semente.codigo), JSON.stringify({ codigo: semente.codigo, criada: !existe.length })]);
+    await conn.commit();
+    return { feito: !existe.length };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Checklist de produção: pedidos.checklist para Administrador, Interno completo e, como no VB, Auxiliar de escritório e Auxiliar financeiro (se existirem como perfil);
 // checklist.enviar (trocar o PDF) só para Administrador e Interno completo
 async function acrescentarPermissoesChecklist(pool) {
@@ -954,4 +1011,4 @@ async function acrescentarPermissoesOrcSituacao(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
