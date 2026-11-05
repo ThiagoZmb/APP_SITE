@@ -23,6 +23,15 @@ const PERFIS = {
   'Sem etapas': ['etapas.corte_perfil', 'pedidos.ver']
 };
 
+// tipo dos itens do pedido (lista comercial e serralheria), sobre `estado.lista` / `estado.serralheria`
+function regrasItens(estado) {
+  const de = (linhas, ns) => linhas.filter(l => ns.map(Number).includes(l.NUMERO) && l.TIPO === 'Pedido');
+  return [
+    [/^SELECT NUMERO, ITEM, TIPO_PRODUTO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, ns) => de(estado.lista, ns).map(l => ({ NUMERO: l.NUMERO, ITEM: l.ITEM, TIPO_PRODUTO: l.TIPO_PRODUTO }))],
+    [/^SELECT NUMERO, ITEM_PEDIDO FROM ped_orc_serralheria WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, ns) => de(estado.serralheria, ns).map(s => ({ NUMERO: s.NUMERO, ITEM_PEDIDO: s.ITEM_PEDIDO }))]
+  ];
+}
+
 // regras de web_producao_etapas e eventos sobre `estado.etapas` / `estado.eventos`
 function regrasEtapas(estado) {
   let proxEtapa = 1, proxEvento = 1;
@@ -56,8 +65,8 @@ function regrasEtapas(estado) {
 }
 
 function bancoEtapas() {
-  const estado = { pedidos: [], clientes: [], perfis: [], itens: [], vidros: [], etapas: [], eventos: [], auditoria: [], entregas: [], entregaEventos: [] };
-  const { pedidos, clientes, perfis, itens, vidros, auditoria, entregas } = estado;
+  const estado = { pedidos: [], clientes: [], perfis: [], itens: [], vidros: [], lista: [], serralheria: [], etapas: [], eventos: [], auditoria: [], entregas: [], entregaEventos: [] };
+  const { pedidos, clientes, perfis, itens, vidros, lista, serralheria, auditoria, entregas } = estado;
   let proxPerfil = 1, proxVidro = 1, proxEntrega = 1;
   const doNumero = (linhas, ns) => linhas.filter(l => ns.map(Number).includes(l.NUMERO));
   const regras = [
@@ -83,6 +92,7 @@ function bancoEtapas() {
     [/^SELECT NUMERO, id, ITEM, QTD_PORTAS, PERFIL/, (sql, ns) => doNumero(perfis, ns)],
     [/^SELECT NUMERO, ITEM_PEDIDO, ITEM, QTD, PERFIL/, (sql, ns) => doNumero(itens, ns).filter(i => i.TIPO === 'Pedido')],
     [/^SELECT NUMERO, id, MEDICAO, ITEM, QTD, MODELO/, (sql, ns) => doNumero(vidros, ns)],
+    ...regrasItens(estado),
     // ---- entregas (trava ao voltar para produção; varredura depois do finalizado) ----
     [/^SELECT id, status FROM web_entregas WHERE numero = \? AND status IN/, (sql, [n]) => entregas.filter(e => e.numero === Number(n) && ['agendada', 'em_rota', 'ocorrencia'].includes(e.status)).map(e => ({ id: e.id, status: e.status }))],
     [/^\s*INSERT IGNORE INTO web_entregas/, () => {
@@ -114,6 +124,11 @@ function bancoEtapas() {
     vidro: (x = {}) => { const r = { id: proxVidro++, NUMERO: 100, MEDICAO: 'Porta', ITEM: 1, QTD: 2, MODELO: 'Incolor', COR_REVESTIMENTO: 'Incolor', TAMANHO: '2000 x 800', ...x }; vidros.push(r); return r; },
     // pedido completo: perfil + vidro
     completo: (x = {}) => { const p = semear.pedido(x); semear.perfil({ NUMERO: p.NUMERO }); semear.item({ NUMERO: p.NUMERO }); semear.vidro({ NUMERO: p.NUMERO }); return p; },
+    // linha da lista comercial (ped_orc_lista_itens) e peça de serralheria (ped_orc_serralheria)
+    listaItem: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', ITEM: 1, TIPO_PRODUTO: 'Porta de giro', ...x }; lista.push(r); return r; },
+    serralheria: (x = {}) => { const r = { NUMERO: 100, TIPO: 'Pedido', ITEM_PEDIDO: 1, ITEM: 1, PRODUTO: 'Portão', ...x }; serralheria.push(r); return r; },
+    // pedido só de serralheria como o VB/web gravam: lista 'Metalons' + ped_orc_serralheria; nada em perfis/itens_v4/vidros
+    soSerralheria: (x = {}) => { const p = semear.pedido(x); semear.listaItem({ NUMERO: p.NUMERO, TIPO_PRODUTO: 'Metalons' }); semear.serralheria({ NUMERO: p.NUMERO }); return p; },
     etapa: (x = {}) => { const r = { id: 1000 + estado.etapas.length, numero: 100, etapa: 'perfil_cortado', estado: 'ok', origem: 'manual', usuario: 'Ana', quando: '2026-11-01 08:00:00', observacao: null, ...x }; estado.etapas.push(r); return r; }
   };
   return { f, regras, estado, ...estado, semear };
@@ -135,4 +150,4 @@ async function prepararEtapas(t, { perfil = 'Administrador', permissoes = null, 
   return { banco, chamar };
 }
 
-module.exports = { bancoEtapas, prepararEtapas, regrasEtapas, PERFIS, TODAS_ETAPAS };
+module.exports = { bancoEtapas, prepararEtapas, regrasEtapas, regrasItens, PERFIS, TODAS_ETAPAS };

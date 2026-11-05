@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { bancoCorte, prepararCorte, corpoConfirmacao } = require('./apoio/bancoCorte');
 const V = require('./apoio/bancoVidros');
 const { prepararPedOrc, bancoPedOrc } = require('./apoio/bancoPedOrc');
-const { regrasEtapas } = require('./apoio/bancoEtapas');
+const { regrasEtapas, regrasItens } = require('./apoio/bancoEtapas');
 const etapasBanco = require('../rotas/etapas_banco');
 const { criarPoolFalso } = require('./apoio/poolFalso');
 
@@ -91,6 +91,23 @@ test('falha ao gravar a etapa não desfaz o corte confirmado (transação própr
   const r = await confirmarPerfil(chamar, id);
   assert.equal(r.status, 200);
   assert.equal(b.estado.planos.find(p => p.id === id).situacao, 'conferido');
+});
+
+test('pedido misto (porta + serralheria): corte de perfil completo NÃO marca "Perfil cortado" (o plano não calcula serralheria; só manual)', async t => {
+  const b = bancoCorte(); b.semear.pedido(); b.semear.perfil(); b.semear.item();
+  const est = comEtapas(b);
+  const tipos = { lista: [{ NUMERO: 100, TIPO: 'Pedido', ITEM: 1, TIPO_PRODUTO: 'Porta de giro' }, { NUMERO: 100, TIPO: 'Pedido', ITEM: 2, TIPO_PRODUTO: 'Metalons' }],
+    serralheria: [{ NUMERO: 100, TIPO: 'Pedido', ITEM_PEDIDO: 2 }] };
+  b.regras.unshift(...regrasItens(tipos));
+  const { chamar } = await prepararCorte(t, { banco: b });
+  const { id, marcas } = await planoPerfil(chamar);
+  await marcar(chamar, id, marcas);
+  assert.equal((await confirmarPerfil(chamar, id)).status, 200);
+  assert.equal(etapa(est, 'perfil_cortado'), undefined);
+  // e um OK que o próprio corte tivesse marcado antes volta a pendente na próxima reavaliação (excluir dados)
+  est.etapas.push({ id: 50, numero: 100, etapa: 'perfil_cortado', estado: 'ok', origem: 'corte', usuario: 'Caio', quando: '2026-11-01 08:00:00', observacao: null });
+  await chamar('/corte/pedido/100', 'DELETE', { incluirConferidos: true });
+  assert.equal(etapa(est, 'perfil_cortado').estado, 'pendente');
 });
 
 test('pedido cancelado ou entregue: o corte conferido não marca etapa', async t => {

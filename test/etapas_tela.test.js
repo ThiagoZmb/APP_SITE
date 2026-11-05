@@ -48,11 +48,11 @@ test('filtrar: busca por número/cliente/cliente final (sem acento), "o que falt
 
 test('textoAtualizado e pendentesAntes', () => {
   assert.equal(T.textoAtualizado(null), 'carregando…');
-  assert.equal(T.textoAtualizado(2), 'atualizado agora');
-  assert.equal(T.textoAtualizado(12.7), 'atualizado há 12 s');
-  assert.equal(T.textoAtualizado(130), 'atualizado há 2 min');
+  assert.equal(T.textoAtualizado(new Date(2026, 10, 5, 9, 7).getTime()), 'Atualizado às 09:07');
+  assert.equal(T.textoAtualizado(new Date(2026, 10, 5, 14, 30).getTime()), 'Atualizado às 14:30');
+  assert.equal(T.textoAtualizado('lixo'), 'carregando…');
   assert.deepEqual(T.pendentesAntes(pedido()), ['perfil_pintado', 'portas_montadas']);
-  assert.equal(T.INTERVALO, 15000);
+  assert.equal(T.INTERVALO, undefined, 'sem intervalo de atualização automática');
 });
 
 test('menus: célula com permissão (OK, desfazer, N/A, histórico; finalizado sem N/A) e sem permissão (só histórico); linha só com as etapas permitidas', () => {
@@ -118,10 +118,11 @@ test('etapas_producao.html: CSP igual à das páginas vizinhas, tema.css por úl
   assert.match(h, /aria-pressed="false"/);
 });
 
-test('etapas_producao.js: polling só com a aba visível, sem janela/menu aberto; menu por botão direito/Shift+F10 e "⋯"; finalizar pergunta a data de pronto', () => {
+test('etapas_producao.js: SEM atualização automática (só ao abrir e no botão Atualizar); menu por botão direito/Shift+F10 e "⋯"; finalizar pergunta a data de pronto', () => {
   const js = ler('etapas_producao.js');
-  assert.match(js, /doc\.visibilityState !== 'visible' \|\| estado\.salvando\.size \|\| estado\.janela \|\| estado\.menuAberto \|\| estado\.carregando\) return;/);
-  assert.match(js, /Date\.now\(\) - estado\.tentativaEm < INTERVALO/, 'depois de uma falha também espera o intervalo');
+  assert.doesNotMatch(js, /setInterval|setTimeout|visibilitychange|requestAnimationFrame/, 'a página não se recarrega sozinha');
+  assert.match(js, /\$\('etp-recarregar'\)\.addEventListener\('click', \(\) => \{ if \(!estado\.carregando && !estado\.salvando\.size\) carregar\(\); \}\);/);
+  assert.match(js, /aplicarOtimista\(antes, etapa, corpo\.estado/, 'clique continua otimista');
   assert.match(js, /\+\+estado\.consulta; estado\.carregando = false;/, 'gravar descarta a consulta da fila que estava a caminho');
   assert.match(js, /versao=/);
   assert.match(js, /addEventListener\('contextmenu'/);

@@ -27,6 +27,20 @@ async function lerLinhasDe(db, numeros) {
   return mapa;
 }
 
+// Tipo dos itens de vários pedidos (porta / serralheria / avulso / desconhecido), com 2 consultas no total: Map numero -> classificarItens(...)
+// Serralheria = TIPO_PRODUTO 'Metalons' na lista OU item com linha em ped_orc_serralheria (os dois do VB e do salvar da web).
+async function itensDosPedidos(db, numeros) {
+  const mapa = new Map();
+  if (!numeros.length) return mapa;
+  const ph = numeros.map(() => '?').join(',');
+  const [lista] = await db.execute(`SELECT NUMERO, ITEM, TIPO_PRODUTO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${ph})`, numeros);
+  const [serr] = await db.execute(`SELECT NUMERO, ITEM_PEDIDO FROM ped_orc_serralheria WHERE TIPO = 'Pedido' AND NUMERO IN (${ph})`, numeros);
+  for (const n of numeros) {
+    mapa.set(n, E.classificarItens((lista || []).filter(l => Number(l.NUMERO) === n), (serr || []).filter(s => Number(s.NUMERO) === n).map(s => s.ITEM_PEDIDO)));
+  }
+  return mapa;
+}
+
 // Grava a etapa (atualiza a linha existente ou insere) e o evento do histórico, na conexão (transação) de quem chama.
 // origemEvento: 'manual' | 'corte' | 'sistema' (padrão = origem). Devolve a linha nova (como viria do banco).
 async function gravarEtapa(conn, { numero, etapa, estado, origem, usuario = '', observacao = null, linha = null, antes = null, origemEvento = null, detalhe = null }) {
@@ -81,7 +95,9 @@ async function reavaliarEtapaCorte(pool, { numero, grupo, quem = '', estadoCorte
       const [linhas] = await conn.execute(`SELECT ${COLUNAS} FROM web_producao_etapas WHERE numero = ? AND etapa = ? FOR UPDATE`, [numero, etapa]);
       const linha = (linhas || [])[0];
       const est = await estadoCorte(conn, numero);
-      const completo = E.corteCompleto(est);
+      // pedido com serralheria: o plano de corte de perfis não calcula essas peças, então "Perfil cortado" é só manual (o gatilho só desmarca o que ele mesmo marcou)
+      const itens = grupo === 'perfil' ? (await itensDosPedidos(conn, [numero])).get(numero) : null;
+      const completo = E.corteAutomaticoAplica(grupo, itens) && E.corteCompleto(est);
       const novo = E.decidirAutomatico(linha, completo);
       if (novo) {
         await gravarEtapa(conn, { numero, etapa, estado: novo, origem: 'corte', usuario: quem, linha, antes: linha ? linha.estado : null,
@@ -100,4 +116,4 @@ async function reavaliarEtapaCorte(pool, { numero, grupo, quem = '', estadoCorte
   }
 }
 
-module.exports = { lerLinhas, lerLinhasDe, gravarEtapa, desmarcarEtapasDoCorte, apagarEtapasDoPedido, reavaliarEtapaCorte };
+module.exports = { itensDosPedidos, lerLinhas, lerLinhasDe, gravarEtapa, desmarcarEtapasDoCorte, apagarEtapasDoPedido, reavaliarEtapaCorte };

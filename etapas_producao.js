@@ -1,6 +1,6 @@
 // ==========================================================================
 // etapas_producao.html — etapas de produção por pedido (Perfil cortado, Vidro cortado, Perfil pintado, Vidro pintado, Portas montadas, Pedido finalizado).
-// Rotas: GET /etapas/fila (polling leve a cada 15 s com ?versao=), PUT /etapas/pedido/:n/:etapa, GET /etapas/pedido/:n/historico.
+// Rotas: GET /etapas/fila (ao abrir a página e no botão "Atualizar"; a página NÃO se recarrega sozinha), PUT /etapas/pedido/:n/:etapa, GET /etapas/pedido/:n/historico.
 // Cada célula é um botão-estado: clicar alterna pendente <-> OK (desfazer pede confirmação); botão direito / Shift+F10 / "⋯" abrem o menu.
 // "Pedido finalizado" marca o pedido como Pronto (o servidor usa a mesma regra do menu de situação). Funções puras exportadas para os testes.
 // Regras: docs/regras/etapas-producao.md
@@ -14,7 +14,6 @@
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const esc = C.esc;
-  const INTERVALO = 15000;          // polling da fila
   const CHAVE_FILTROS = 'etapas_producao_filtros';
   const FINAL = 'finalizado';
   const ETAPAS_PADRAO = [
@@ -66,11 +65,12 @@
     });
   }
 
-  function textoAtualizado(segundos) {
-    if (segundos === null || segundos === undefined) return 'carregando…';
-    if (segundos < 5) return 'atualizado agora';
-    if (segundos < 60) return `atualizado há ${Math.floor(segundos)} s`;
-    return `atualizado há ${Math.floor(segundos / 60)} min`;
+  // "Atualizado às HH:MM" (hora do navegador da última leitura da fila); sem leitura ainda = "carregando…"
+  function textoAtualizado(quando) {
+    if (!quando) return 'carregando…';
+    const d = new Date(quando);
+    if (Number.isNaN(d.getTime())) return 'carregando…';
+    return `Atualizado às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
   // itens do menu de uma célula (etapa): marcar OK, desfazer, N/A, histórico
@@ -222,15 +222,12 @@
       $('etp-legenda').hidden = false;
     }
 
-    function tique() {
-      const s = estado.atualizadoEm ? (Date.now() - estado.atualizadoEm) / 1000 : null;
-      $('etp-atualizado').textContent = textoAtualizado(s);
-    }
+    function tique() { $('etp-atualizado').textContent = textoAtualizado(estado.atualizadoEm); }
 
     async function carregar({ forcar = false } = {}) {
       const minha = ++estado.consulta;
       const situacao = estado.filtros.abertos ? 'abertos' : 'producao';
-      estado.tentativaEm = Date.now(); estado.carregando = true;
+      estado.carregando = true;
       try {
         const versao = forcar ? '' : estado.versao;
         const d = await chamar(`/etapas/fila?situacao=${situacao}${versao ? '&versao=' + encodeURIComponent(versao) : ''}`);
@@ -287,7 +284,7 @@
     async function gravar(p, etapa, corpo, { otimista = true } = {}) {
       const chave = `${p.numero}|${etapa}`;
       if (estado.salvando.has(chave)) return;
-      ++estado.consulta; estado.carregando = false;   // uma consulta da fila que já estava a caminho traria o estado de antes do clique: é descartada
+      ++estado.consulta; estado.carregando = false;   // uma consulta da fila que já estava a caminho (botão Atualizar) traria o estado de antes do clique: é descartada
       const antes = doNumero(p.numero);
       if (otimista && antes && corpo.estado) {
         const i = estado.pedidos.indexOf(antes);
@@ -456,19 +453,12 @@
     $('etp-falta').addEventListener('change', e => { estado.filtros.falta = e.target.value; salvarFiltros(); desenhar(); });
     $('etp-minha').addEventListener('click', () => { estado.filtros.minha = !estado.filtros.minha; marcarMinha(); salvarFiltros(); desenhar(); });
     $('etp-abertos').addEventListener('change', e => { estado.filtros.abertos = e.target.checked; salvarFiltros(); estado.versao = ''; carregar({ forcar: true }); });
-    $('etp-recarregar').addEventListener('click', () => carregar({ forcar: true }));
-
-    // polling leve: só com a aba visível, sem janela/menu aberto e sem gravação em andamento
-    win.setInterval(() => {
-      tique();
-      if (doc.visibilityState !== 'visible' || estado.salvando.size || estado.janela || estado.menuAberto || estado.carregando) return;
-      if (estado.tentativaEm && Date.now() - estado.tentativaEm < INTERVALO) return;   // também espera o intervalo depois de uma falha
-      carregar();
-    }, 1000);
-    doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'visible' && !estado.carregando && (!estado.tentativaEm || Date.now() - estado.tentativaEm >= INTERVALO)) carregar(); });
+    // sem atualização automática (decisão do dono): a fila só é lida ao abrir a página, ao trocar "Mostrar todos em aberto" e no botão "Atualizar";
+    // cada clique numa etapa já mostra a mudança na hora (otimista) e fica com a resposta do servidor
+    $('etp-recarregar').addEventListener('click', () => { if (!estado.carregando && !estado.salvando.size) carregar(); });
     $('etp-corpo-painel').setAttribute('aria-busy', 'true');
     carregar({ forcar: true });
   }
 
-  return { ETAPAS_PADRAO, INTERVALO, celula, acaoDoClique, pendentesAntes, filtrar, textoAtualizado, itensMenuCelula, itensMenuLinha, htmlLinha, htmlCabecalho, aplicarOtimista, iniciar };
+  return { ETAPAS_PADRAO, celula, acaoDoClique, pendentesAntes, filtrar, textoAtualizado, itensMenuCelula, itensMenuLinha, htmlLinha, htmlCabecalho, aplicarOtimista, iniciar };
 });

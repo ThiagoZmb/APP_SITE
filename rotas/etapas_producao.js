@@ -27,8 +27,8 @@ const txt = v => String(v ?? '').trim();
 const inteiroPositivo = v => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null; };
 const lista = numeros => numeros.map(() => '?').join(',');
 
-// Aplicabilidade dos grupos (perfil/vidro) de vários pedidos com 3 consultas no total (mesmas regras de peça/pendência do plano de corte).
-// Map numero -> { perfil: bool, vidro: bool }
+// Aplicabilidade dos grupos (perfil/vidro/montagem) de vários pedidos com 5 consultas no total: peças/pendências do plano de corte
+// (perfis, ped_orc_itens_v4, vidros) + tipo dos itens (ped_orc_lista_itens, ped_orc_serralheria). Map numero -> { perfil, vidro, montagem }
 async function aplicabilidadeDos(db, numeros) {
   const mapa = new Map();
   if (!numeros.length) return mapa;
@@ -36,12 +36,13 @@ async function aplicabilidadeDos(db, numeros) {
   const [itens] = await db.execute(`SELECT NUMERO, ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR,
     QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL, ALTURA, LARGURA, REVESTIMENTO, COR_REVESTIMENTO FROM ped_orc_itens_v4 WHERE TIPO = 'Pedido' AND NUMERO IN (${lista(numeros)})`, numeros);
   const [vidros] = await db.execute(`SELECT NUMERO, id, MEDICAO, ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO FROM vidros WHERE NUMERO IN (${lista(numeros)})`, numeros);
+  const tipos = await banco.itensDosPedidos(db, numeros);
   const de = (linhas, n) => (linhas || []).filter(l => Number(l.NUMERO) === n);
   for (const n of numeros) {
     const itensDoPedido = de(itens, n);
     const p = montarPecas({ perfis: de(perfis, n), itens: itensDoPedido });
     const v = montarPecasVidro({ vidros: de(vidros, n), itens: itensDoPedido });
-    mapa.set(n, E.aplicabilidade({ perfil: { qtdPecas: p.pecas.length, qtdPendencias: p.pendencias.length }, vidro: { qtdPecas: v.pecas.length, qtdPendencias: v.pendencias.length } }));
+    mapa.set(n, E.aplicabilidade({ perfil: { qtdPecas: p.pecas.length, qtdPendencias: p.pendencias.length }, vidro: { qtdPecas: v.pecas.length, qtdPendencias: v.pendencias.length }, itens: tipos.get(n) }));
   }
   return mapa;
 }
@@ -76,7 +77,7 @@ function registrarEtapasProducao({ rota, pool }) {
       const linhasPor = await banco.lerLinhasDe(pool, numeros);
       const aplic = await aplicabilidadeDos(pool, numeros);
       const saida = pedidos.map(p => {
-        const etapas = E.montarEtapas(linhasPor.get(p.numero) || [], aplic.get(p.numero) || { perfil: true, vidro: true });
+        const etapas = E.montarEtapas(linhasPor.get(p.numero) || [], aplic.get(p.numero) || { perfil: true, vidro: true, montagem: true });
         return { ...p, classe: classificarSituacao(p.situacao), atrasado: atrasado(p.situacao, p.prontoEm, hoje), ...E.progresso(etapas), etapas };
       });
       const corpo = { filtro, hoje, limitado: filtrados.length > LIMITE_FILA, qtdPedidos: saida.length, etapas: resumoEtapas(),

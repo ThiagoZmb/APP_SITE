@@ -1,7 +1,8 @@
 // ==========================================================================
 // Etapas de produção por pedido ("sub-situação"): funções puras, testáveis sem banco.
 // Seis etapas fixas, nesta ordem. Estado por etapa: pendente | ok | na. Origem: manual | corte (marcada pela confirmação do corte real).
-// Etapa sem linha gravada: pendente se o grupo (perfil/vidro) se aplica ao pedido; N/A automático se o pedido não tem peças nem pendências do grupo.
+// Etapa sem linha gravada: pendente se o grupo (perfil/vidro/montagem) se aplica ao pedido; senão N/A automático (ver aplicabilidade: peças do
+// plano de corte + tipo dos itens; serralheria tem perfil, mas não vidro nem portas).
 // Regras completas: docs/regras/etapas-producao.md
 // ==========================================================================
 const { classificarSituacao, emAberto } = require('./calendario');
@@ -11,7 +12,7 @@ const ETAPAS = [
   { codigo: 'vidro_cortado', nome: 'Vidro cortado', permissao: 'etapas.corte_vidro', grupo: 'vidro', curto: 'Vidro cort.' },
   { codigo: 'perfil_pintado', nome: 'Perfil pintado', permissao: 'etapas.pintura_perfil', grupo: 'perfil', curto: 'Perfil pint.' },
   { codigo: 'vidro_pintado', nome: 'Vidro pintado', permissao: 'etapas.pintura_vidro', grupo: 'vidro', curto: 'Vidro pint.' },
-  { codigo: 'portas_montadas', nome: 'Portas montadas', permissao: 'etapas.montagem', grupo: null, curto: 'Montadas' },
+  { codigo: 'portas_montadas', nome: 'Portas montadas', permissao: 'etapas.montagem', grupo: 'montagem', curto: 'Montadas' },
   { codigo: 'finalizado', nome: 'Pedido finalizado', permissao: 'etapas.finalizar', grupo: null, curto: 'Finalizado' }
 ];
 const ESTADOS = ['pendente', 'ok', 'na'];
@@ -26,12 +27,46 @@ const etapaPorCodigo = c => ETAPAS.find(e => e.codigo === c) || null;
 const nomeDa = c => (etapaPorCodigo(c) || {}).nome || c;
 const concluida = estado => estado === 'ok' || estado === 'na';
 
-// { perfil: { qtdPecas, qtdPendencias }, vidro: {...} } -> { perfil: bool, vidro: bool }
-// Aplicável = o pedido tem peças OU pendências do grupo (pendência de medida/ligação é trabalho que existe e não foi resolvido).
+// Tipo de cada item do pedido (ped_orc_lista_itens.TIPO_PRODUTO, como o VB e calculo/leitura_vb.js leem):
+//   porta = 'Porta de giro' | 'Porta basculante' | 'Frente de gaveta' | 'Porta de correr';
+//   serralheria = 'Metalons' (ModPedOrc encaminha para ProcessarSerralheriaNoBanco) OU item com linha em ped_orc_serralheria (os dois sinais valem);
+//   avulso = 'Serviço' | 'Perfil' | 'Puxador' | 'Revestimento' | 'Trilhos' | 'Acessório'; qualquer outro texto = desconhecido (tratado como porta possível).
+const TIPOS_PORTA = ['porta de giro', 'porta basculante', 'frente de gaveta', 'porta de correr'];
+const TIPOS_AVULSO = ['servico', 'perfil', 'puxador', 'revestimento', 'trilhos', 'acessorio'];
+const normTipo = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+// lista: [{ ITEM, TIPO_PRODUTO }]; itensSerralheria: números de item (ITEM_PEDIDO) com linha em ped_orc_serralheria
+function classificarItens(lista = [], itensSerralheria = []) {
+  const serr = new Set((itensSerralheria || []).map(Number));
+  const r = { qtdItens: 0, qtdPortas: 0, qtdSerralheria: 0, qtdAvulsos: 0, qtdDesconhecidos: 0 };
+  for (const l of lista || []) {
+    const t = normTipo(l.TIPO_PRODUTO);
+    r.qtdItens++;
+    if (t === 'metalons' || serr.has(Number(l.ITEM))) r.qtdSerralheria++;
+    else if (TIPOS_PORTA.includes(t)) r.qtdPortas++;
+    else if (TIPOS_AVULSO.includes(t)) r.qtdAvulsos++;
+    else r.qtdDesconhecidos++;
+  }
+  return r;
+}
+// "serralheria sem portas": tem item de serralheria e nenhum item de porta nem de tipo desconhecido (avulsos podem existir)
+const serralheriaSemPortas = it => !!it && it.qtdSerralheria > 0 && it.qtdPortas === 0 && it.qtdDesconhecidos === 0;
+
+// { perfil: { qtdPecas, qtdPendencias }, vidro: {...}, itens: classificarItens(...) } -> { perfil, vidro, montagem }
+// - perfil: peças OU pendências do plano de corte de perfis (pendência é trabalho que existe e não foi resolvido) OU algum item de serralheria
+//   (o plano de corte não calcula serralheria, então "sem peças" não quer dizer "sem perfil");
+// - vidro: peças OU pendências do plano de corte de vidros; N/A em pedido de serralheria sem portas (linha solta de `vidros`, que não tem TIPO,
+//   seria de outro documento);
+// - montagem (Portas montadas): N/A só em pedido de serralheria sem portas; pedido sem itens, com porta ou com item desconhecido = aplicável.
+// Pedido misto (portas + serralheria): cada etapa se aplica se QUALQUER item a exigir.
 function aplicabilidade(grupos = {}) {
   const tem = g => !!g && (Number(g.qtdPecas) || 0) + (Number(g.qtdPendencias) || 0) > 0;
-  return { perfil: tem(grupos.perfil), vidro: tem(grupos.vidro) };
+  const it = grupos.itens || null;
+  const soSerr = serralheriaSemPortas(it);
+  return { perfil: tem(grupos.perfil) || !!(it && it.qtdSerralheria > 0), vidro: !soSerr && tem(grupos.vidro), montagem: !soSerr };
 }
+// o gatilho automático do corte vale para a etapa? Vidro: sempre. Perfil: só sem serralheria (o plano de corte de perfis não calcula
+// serralheria, então num pedido com serralheria "todas as peças cortadas" não cobre o pedido inteiro: Perfil cortado é só manual).
+const corteAutomaticoAplica = (grupo, itens) => grupo === 'vidro' || !(itens && itens.qtdSerralheria > 0);
 
 // linha gravada (web_producao_etapas) ou undefined -> estado efetivo mostrado na tela
 function estadoEfetivo(linha, aplicavel) {
@@ -44,9 +79,11 @@ function estadoEfetivo(linha, aplicavel) {
 }
 
 // linhas do pedido + aplicabilidade -> as 6 etapas na ordem fixa
-function montarEtapas(linhas = [], aplic = { perfil: true, vidro: true }) {
+function montarEtapas(linhas = [], aplic = { perfil: true, vidro: true, montagem: true }) {
   const por = new Map((linhas || []).map(l => [l.etapa, l]));
-  return ETAPAS.map(e => ({ codigo: e.codigo, ...estadoEfetivo(por.get(e.codigo), e.grupo ? !!aplic[e.grupo] : true) }));
+  // perfil/vidro ausentes = não aplicável (como antes); montagem ausente = aplicável (só vira N/A quando aplicabilidade diz que não)
+  const aplica = g => (!g ? true : g === 'montagem' ? aplic.montagem !== false : !!aplic[g]);
+  return ETAPAS.map(e => ({ codigo: e.codigo, ...estadoEfetivo(por.get(e.codigo), aplica(e.grupo)) }));
 }
 
 const progresso = etapas => ({ qtdConcluidas: etapas.filter(e => concluida(e.estado)).length, qtdEtapas: ETAPAS.length });
@@ -146,5 +183,5 @@ function ordenarFila(pedidos) {
   });
 }
 
-module.exports = { ETAPAS, ESTADOS, FINAL, GERIR, FILTROS, MAX_OBSERVACAO, ETAPA_DO_CORTE, etapaPorCodigo, nomeDa, concluida, aplicabilidade, estadoEfetivo, montarEtapas, progresso,
+module.exports = { ETAPAS, ESTADOS, FINAL, GERIR, FILTROS, MAX_OBSERVACAO, ETAPA_DO_CORTE, etapaPorCodigo, nomeDa, concluida, classificarItens, serralheriaSemPortas, corteAutomaticoAplica, aplicabilidade, estadoEfetivo, montarEtapas, progresso,
   pendentesAntesDeFinalizar, podeAlterar, etapasQuePode, validarMudanca, validarCorpo, corteCompleto, decidirAutomatico, contarPecasPlano, contarCortadas, validarFiltro, filtrarFila, ordenarFila };

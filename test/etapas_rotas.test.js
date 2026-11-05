@@ -74,9 +74,50 @@ test('fila: sem N+1 (uma consulta por tabela, qualquer que seja o número de ped
   const antes = banco.f.chamadas.length;
   assert.equal((await (await chamar('/etapas/fila')).json()).pedidos.length, 30);
   const feitas = banco.f.chamadas.slice(antes).map(c => c.sql);
-  for (const re of [/FROM ped_orc p/, /FROM web_producao_etapas WHERE numero IN/, /FROM perfis WHERE NUMERO IN/, /FROM ped_orc_itens_v4 WHERE/, /FROM vidros WHERE NUMERO IN/]) {
+  for (const re of [/FROM ped_orc p/, /FROM web_producao_etapas WHERE numero IN/, /FROM perfis WHERE NUMERO IN/, /FROM ped_orc_itens_v4 WHERE/, /FROM vidros WHERE NUMERO IN/,
+    /FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, /FROM ped_orc_serralheria WHERE TIPO = 'Pedido' AND NUMERO IN/]) {
     assert.equal(feitas.filter(s => re.test(s)).length, 1, String(re));
   }
+});
+
+// ---------- serralheria ----------
+test('fila: pedido só de serralheria = Perfil cortado, Perfil pintado e Finalizado pendentes; Vidro cortado/pintado e Portas montadas N/A (1/6 → 3/6)', async t => {
+  const banco = bancoEtapas();
+  banco.semear.soSerralheria({ NUMERO: 23378 });
+  banco.semear.pedido({ NUMERO: 300 }); banco.semear.listaItem({ NUMERO: 300, ITEM: 1, TIPO_PRODUTO: 'Metalons' });   // só o sinal da lista (sem ped_orc_serralheria)
+  banco.semear.pedido({ NUMERO: 301 }); banco.semear.listaItem({ NUMERO: 301, ITEM: 2, TIPO_PRODUTO: 'Estrutura' }); banco.semear.serralheria({ NUMERO: 301, ITEM_PEDIDO: 2 });   // só o sinal da tabela
+  const { chamar } = await prepararEtapas(t, { banco });
+  const d = await (await chamar('/etapas/fila')).json();
+  for (const p of d.pedidos) {
+    assert.deepEqual(p.etapas.map(e => e.estado), ['pendente', 'na', 'pendente', 'na', 'na', 'pendente'], String(p.numero));
+    assert.equal(p.qtdConcluidas, 3);
+  }
+  assert.equal(d.pedidos.length, 3);
+});
+
+test('fila: pedido misto (porta com vidro + serralheria) = todas as etapas aplicáveis; só porta = como antes; sem itens = Portas montadas pendente', async t => {
+  const banco = bancoEtapas();
+  banco.semear.completo({ NUMERO: 100 }); banco.semear.listaItem({ NUMERO: 100, ITEM: 1 }); banco.semear.listaItem({ NUMERO: 100, ITEM: 2, TIPO_PRODUTO: 'Metalons' }); banco.semear.serralheria({ NUMERO: 100, ITEM_PEDIDO: 2 });
+  banco.semear.pedido({ NUMERO: 101 }); banco.semear.perfil({ NUMERO: 101 }); banco.semear.item({ NUMERO: 101 }); banco.semear.listaItem({ NUMERO: 101 });   // porta sem vidro
+  banco.semear.pedido({ NUMERO: 102 });   // sem itens
+  const { chamar } = await prepararEtapas(t, { banco });
+  const d = await (await chamar('/etapas/fila')).json();
+  const de = n => d.pedidos.find(p => p.numero === n).etapas.map(e => e.estado);
+  assert.deepEqual(de(100), ['pendente', 'pendente', 'pendente', 'pendente', 'pendente', 'pendente']);
+  assert.deepEqual(de(101), ['pendente', 'na', 'pendente', 'na', 'pendente', 'pendente']);
+  assert.deepEqual(de(102), ['na', 'na', 'na', 'na', 'pendente', 'pendente']);
+});
+
+test('serralheria: finalizar exige só Perfil cortado e Perfil pintado (o resto é N/A) e marca Pronto', async t => {
+  const banco = bancoEtapas(); banco.semear.soSerralheria();
+  okEm(banco, ['perfil_cortado']);
+  const { chamar } = await prepararEtapas(t, { banco, perfil: 'Finalizador' });
+  const r = await chamar(PUT(100, 'finalizado'), 'PUT', { estado: 'ok' });
+  assert.equal(r.status, 409);
+  assert.deepEqual((await r.json()).pendentes, ['perfil_pintado']);
+  okEm(banco, ['perfil_pintado']);
+  assert.equal((await chamar(PUT(100, 'finalizado'), 'PUT', { estado: 'ok' })).status, 200);
+  assert.equal(banco.estado.pedidos[0].SITUACAO, 'Pronto');
 });
 
 // ---------- marcar / permissões ----------

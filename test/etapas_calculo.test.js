@@ -11,16 +11,53 @@ test('ETAPAS: seis etapas fixas, na ordem do dono, cada uma com a sua permissão
   assert.deepEqual(E.ETAPAS.map(e => e.codigo), ['perfil_cortado', 'vidro_cortado', 'perfil_pintado', 'vidro_pintado', 'portas_montadas', 'finalizado']);
   assert.deepEqual(E.ETAPAS.map(e => e.nome), ['Perfil cortado', 'Vidro cortado', 'Perfil pintado', 'Vidro pintado', 'Portas montadas', 'Pedido finalizado']);
   assert.deepEqual(E.ETAPAS.map(e => e.permissao), ['etapas.corte_perfil', 'etapas.corte_vidro', 'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar']);
-  assert.deepEqual(E.ETAPAS.map(e => e.grupo), ['perfil', 'vidro', 'perfil', 'vidro', null, null]);
+  assert.deepEqual(E.ETAPAS.map(e => e.grupo), ['perfil', 'vidro', 'perfil', 'vidro', 'montagem', null]);
   assert.deepEqual(E.ESTADOS, ['pendente', 'ok', 'na']);
   assert.equal(E.etapaPorCodigo('xx'), null);
   assert.equal(E.etapaPorCodigo('vidro_pintado').nome, 'Vidro pintado');
 });
 
 test('aplicabilidade: grupo sem peças NEM pendências nasce N/A; pendência de medida mantém a etapa aplicável', () => {
-  assert.deepEqual(E.aplicabilidade({ perfil: { qtdPecas: 0, qtdPendencias: 0 }, vidro: { qtdPecas: 3, qtdPendencias: 0 } }), { perfil: false, vidro: true });
-  assert.deepEqual(E.aplicabilidade({ perfil: { qtdPecas: 0, qtdPendencias: 2 }, vidro: { qtdPecas: 0, qtdPendencias: 0 } }), { perfil: true, vidro: false });
-  assert.deepEqual(E.aplicabilidade({}), { perfil: false, vidro: false });
+  assert.deepEqual(E.aplicabilidade({ perfil: { qtdPecas: 0, qtdPendencias: 0 }, vidro: { qtdPecas: 3, qtdPendencias: 0 } }), { perfil: false, vidro: true, montagem: true });
+  assert.deepEqual(E.aplicabilidade({ perfil: { qtdPecas: 0, qtdPendencias: 2 }, vidro: { qtdPecas: 0, qtdPendencias: 0 } }), { perfil: true, vidro: false, montagem: true });
+  assert.deepEqual(E.aplicabilidade({}), { perfil: false, vidro: false, montagem: true });
+});
+
+test('classificarItens: porta, serralheria (Metalons OU linha em ped_orc_serralheria), avulso e desconhecido, sem diferenciar caixa/acento', () => {
+  const lista = [{ ITEM: 1, TIPO_PRODUTO: 'Porta de giro' }, { ITEM: 2, TIPO_PRODUTO: 'Metalons' }, { ITEM: 3, TIPO_PRODUTO: 'Estrutura' }, { ITEM: 4, TIPO_PRODUTO: 'Serviço' },
+    { ITEM: 5, TIPO_PRODUTO: 'PORTA DE CORRER' }, { ITEM: 6, TIPO_PRODUTO: 'Algo do VB' }, { ITEM: 7, TIPO_PRODUTO: 'Acessorio' }];
+  assert.deepEqual(E.classificarItens(lista, [3]), { qtdItens: 7, qtdPortas: 2, qtdSerralheria: 2, qtdAvulsos: 2, qtdDesconhecidos: 1 });
+  assert.deepEqual(E.classificarItens([], []), { qtdItens: 0, qtdPortas: 0, qtdSerralheria: 0, qtdAvulsos: 0, qtdDesconhecidos: 0 });
+});
+
+test('aplicabilidade por tipo de pedido: só serralheria, só porta, misto e sem itens', () => {
+  const sem = { qtdPecas: 0, qtdPendencias: 0 }, com = { qtdPecas: 4, qtdPendencias: 0 };
+  const itens = lista => E.classificarItens(lista.map((t, i) => ({ ITEM: i + 1, TIPO_PRODUTO: t })), []);
+  const etapas = a => E.montarEtapas([], a).map(e => e.estado);
+  // só serralheria (o plano de corte não gera peça): perfil cortado/pintado e finalizado pendentes; vidro e portas montadas N/A
+  const serr = E.aplicabilidade({ perfil: sem, vidro: sem, itens: itens(['Metalons', 'Metalons']) });
+  assert.deepEqual(serr, { perfil: true, vidro: false, montagem: false });
+  assert.deepEqual(etapas(serr), ['pendente', 'na', 'pendente', 'na', 'na', 'pendente']);
+  // serralheria + avulso: igual (avulso não é porta)
+  assert.deepEqual(E.aplicabilidade({ perfil: sem, vidro: sem, itens: itens(['Metalons', 'Serviço']) }), { perfil: true, vidro: false, montagem: false });
+  // serralheria com linha solta em vidros (de outro documento): vidro continua N/A
+  assert.equal(E.aplicabilidade({ perfil: sem, vidro: { qtdPecas: 0, qtdPendencias: 1 }, itens: itens(['Metalons']) }).vidro, false);
+  // só porta: como antes (pelas peças), portas montadas aplicável
+  assert.deepEqual(E.aplicabilidade({ perfil: com, vidro: com, itens: itens(['Porta de giro']) }), { perfil: true, vidro: true, montagem: true });
+  assert.deepEqual(E.aplicabilidade({ perfil: com, vidro: sem, itens: itens(['Porta de giro']) }), { perfil: true, vidro: false, montagem: true });
+  // misto: tudo o que QUALQUER item exige
+  assert.deepEqual(E.aplicabilidade({ perfil: sem, vidro: com, itens: itens(['Porta de giro', 'Metalons']) }), { perfil: true, vidro: true, montagem: true });
+  // item de tipo desconhecido junto da serralheria: tratado como porta possível (montagem e vidro pelas peças)
+  assert.deepEqual(E.aplicabilidade({ perfil: sem, vidro: com, itens: itens(['Metalons', 'Algo do VB']) }), { perfil: true, vidro: true, montagem: true });
+  // sem itens: como antes (perfil e vidro pelas peças) e portas montadas pendente
+  assert.deepEqual(E.aplicabilidade({ perfil: sem, vidro: sem, itens: itens([]) }), { perfil: false, vidro: false, montagem: true });
+});
+
+test('corteAutomaticoAplica: vidro sempre; perfil só em pedido sem serralheria (o plano de corte não calcula serralheria)', () => {
+  assert.equal(E.corteAutomaticoAplica('vidro', { qtdSerralheria: 3 }), true);
+  assert.equal(E.corteAutomaticoAplica('perfil', { qtdSerralheria: 0 }), true);
+  assert.equal(E.corteAutomaticoAplica('perfil', { qtdSerralheria: 1 }), false);
+  assert.equal(E.corteAutomaticoAplica('perfil', null), true);
 });
 
 test('estadoEfetivo: linha gravada vale sempre; sem linha = pendente se aplicável, N/A automático se não', () => {
