@@ -118,6 +118,11 @@ test('etapas_producao.html: CSP igual à das páginas vizinhas, tema.css por úl
   assert.match(h, /aria-pressed="false"/);
 });
 
+test('etapas_producao.html: o ?v= do etapas_producao.js mudou junto com a remoção da atualização automática (senão o navegador roda o JS antigo com polling em cache)', () => {
+  const h = ler('etapas_producao.html');
+  assert.match(h, /etapas_producao\.js\?v=202611061500/);
+});
+
 test('etapas_producao.js: SEM atualização automática (só ao abrir e no botão Atualizar); menu por botão direito/Shift+F10 e "⋯"; finalizar pergunta a data de pronto', () => {
   const js = ler('etapas_producao.js');
   assert.doesNotMatch(js, /setInterval|setTimeout|visibilitychange|requestAnimationFrame/, 'a página não se recarrega sozinha');
