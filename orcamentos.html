@@ -110,6 +110,8 @@
         .totais .grupo { text-align: right; }
         .totais .rotulo { font-size: 13px; color: var(--text-light); font-weight: 600; text-transform: uppercase; }
         .totais .valor { font-size: 24px; font-weight: 700; color: var(--primary-color); }
+        /* peso no extremo esquerdo da barra (o HTML continua com o peso por último: order só muda a posição visual) */
+        .totais #grupo-peso-doc { order: -1; margin-right: auto; text-align: left; }
         .badge-frente { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .bf-abrir { background: var(--selo-info-bg); color: var(--selo-info-fg); }
         .bf-correr { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
