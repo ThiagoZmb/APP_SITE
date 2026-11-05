@@ -5,15 +5,16 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login Elegance</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --vinho: #9b1b30; --vinho-esc: #6e0f20; --ring: rgba(242, 163, 58, .16);
-      --texto: #18151d; --texto-2: #77707f; --borda: #d9d9e3; --fundo: #f4f4f7;
+      color-scheme: dark;
+      --acento: #f2a33a; --on-acento: #14161a; --ring: rgba(242, 163, 58, .28);
+      --texto: #e8eaee; --texto-2: #8b93a1; --borda: #3a404b; --fundo: #14161a; --painel: #101215; --filete: #2c313a;
     }
     body {
-      font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Public Sans', 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh; background: var(--fundo); color: var(--texto);
       -webkit-font-smoothing: antialiased;
     }
@@ -21,106 +22,88 @@
 
     /* ===== lado da marca ===== */
     .brand-side {
-      position: relative; overflow: hidden; color: #fff; padding: 48px 56px;
+      position: relative; overflow: hidden; color: var(--texto); padding: 48px 56px;
       display: flex; flex-direction: column; justify-content: space-between;
-      background:
-        radial-gradient(700px 420px at 20% 15%, rgba(255, 255, 255, .10), transparent 60%),
-        radial-gradient(600px 500px at 90% 100%, rgba(255, 120, 140, .18), transparent 60%),
-        linear-gradient(150deg, #b02a3f 0%, #7c1123 55%, #3d0712 100%);
+      background: var(--painel); border-right: 1px solid var(--filete);
     }
-    .brand-side::before {
-      content: ""; position: absolute; inset: 0; opacity: .12; pointer-events: none;
-      background-image: linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
-      background-size: 44px 44px;
-      -webkit-mask-image: radial-gradient(ellipse at 30% 40%, #000 0%, transparent 70%);
-      mask-image: radial-gradient(ellipse at 30% 40%, #000 0%, transparent 70%);
-    }
-    .brand-side::after {
-      content: ""; position: absolute; width: 520px; height: 520px; right: -160px; top: 18%;
-      border-radius: 50%; border: 1px solid rgba(255, 255, 255, .14);
-      box-shadow: 0 0 0 60px rgba(255,255,255,.03), 0 0 0 130px rgba(255,255,255,.025);
-      animation: girar 40s linear infinite;
-    }
-    @keyframes girar { to { transform: rotate(360deg); } }
     .marca { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
     .marca-logo {
-      width: 44px; height: 44px; border-radius: 14px; background: rgba(255,255,255,.16);
-      border: 1px solid rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center;
-      object-fit: cover; font-weight: 800; font-size: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+      width: 44px; height: 44px; border-radius: 8px; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      object-fit: cover; font-weight: 800; font-size: 20px;
     }
-    .marca b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; display: block; }
-    .marca small { font-size: 12px; opacity: .75; font-weight: 600; }
+    .marca b { font-size: 20px; font-weight: 700; letter-spacing: -.01em; display: block; }
+    .marca small { font-size: 12px; color: var(--texto-2); font-weight: 600; }
     .brand-texto { position: relative; z-index: 1; max-width: 480px; }
-    .brand-texto h1 { font-size: 40px; line-height: 1.12; font-weight: 800; letter-spacing: -.035em; margin-bottom: 16px; }
-    .brand-texto p { font-size: 16px; line-height: 1.6; opacity: .82; margin-bottom: 28px; }
+    .brand-texto h1 { font-size: 32px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; margin-bottom: 16px; }
+    .brand-texto p { font-size: 15px; line-height: 1.6; color: var(--texto-2); margin-bottom: 28px; }
     .recursos { list-style: none; display: grid; gap: 12px; }
-    .recursos li { display: flex; align-items: center; gap: 12px; font-size: 14.5px; font-weight: 600; }
+    .recursos li { display: flex; align-items: center; gap: 12px; font-size: 14.5px; font-weight: 600; color: #b4bac4; }
     .recursos li span {
-      width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2);
+      width: 32px; height: 32px; border-radius: 6px; background: rgba(242, 163, 58, .12); border: 1px solid rgba(242, 163, 58, .22); color: var(--acento);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     .recursos svg { width: 16px; height: 16px; }
-    .brand-rodape { position: relative; z-index: 1; font-size: 12.5px; opacity: .6; }
+    .brand-rodape { position: relative; z-index: 1; font-size: 12.5px; color: #6b7280; }
 
     /* ===== lado do formulário ===== */
     .form-side { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
     .login-container { width: 100%; max-width: 400px; animation: subir .5s cubic-bezier(.2,.7,.2,1) both; }
     @keyframes subir { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
     .login-header { margin-bottom: 32px; }
-    .login-header h2 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+    .login-header h2 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 8px; }
     .login-header p { color: var(--texto-2); font-size: 15px; }
     .form-group { margin-bottom: 18px; }
-    .form-group label { display: block; font-size: 13px; font-weight: 700; color: #4a4553; margin-bottom: 8px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 700; color: #b4bac4; margin-bottom: 8px; }
     .input-wrapper { position: relative; }
     .form-group input {
       width: 100%; height: 48px; padding: 0 16px 0 46px; font: inherit; font-size: 15px; color: var(--texto);
-      background: #fff; border: 1px solid var(--borda); border-radius: 12px;
-      box-shadow: 0 1px 2px rgba(20, 16, 28, .04); transition: border-color .15s ease, box-shadow .15s ease;
+      background: var(--fundo); border: 1px solid var(--borda); border-radius: 6px;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
-    .form-group input:hover { border-color: #c6c4d0; }
-    .form-group input:focus { outline: none; border-color: var(--vinho); box-shadow: 0 0 0 4px var(--ring); }
-    .form-group input::placeholder { color: #a5a0ad; }
+    .form-group input:hover { border-color: #4a515e; }
+    .form-group input:focus { outline: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--ring); }
+    .form-group input::placeholder { color: #5f6673; }
     .input-icon {
       position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 15px;
       filter: grayscale(1); opacity: .55; pointer-events: none; transition: opacity .15s ease, filter .15s ease;
     }
     .form-group input:focus + .input-icon { opacity: 1; filter: none; }
     .login-btn {
-      width: 100%; height: 50px; margin-top: 8px; border: 1px solid #7c1123; border-radius: 12px; cursor: pointer;
-      font: inherit; font-size: 15.5px; font-weight: 700; color: #fff;
-      background: linear-gradient(135deg, #b02a3f 0%, #7c1123 100%);
-      box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 12px 24px -10px rgba(242, 163, 58, .7);
+      width: 100%; height: 50px; margin-top: 8px; border: 1px solid var(--acento); border-radius: 6px; cursor: pointer;
+      font: inherit; font-size: 15.5px; font-weight: 700; color: var(--on-acento);
+      background: var(--acento);
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      transition: transform .15s ease, box-shadow .2s ease;
+      transition: filter .15s ease;
     }
-    .login-btn:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 16px 28px -10px rgba(242, 163, 58, .8); }
-    .login-btn:active { transform: none; }
+    .login-btn:hover { filter: brightness(1.1); }
+    .login-btn:active { filter: brightness(.95); }
     .login-btn:disabled { cursor: wait; }
     .loading {
       display: none; width: 18px; height: 18px; border-radius: 50%;
-      border: 2.5px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .8s linear infinite;
+      border: 2.5px solid rgba(20,22,26,.3); border-top-color: var(--on-acento); animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .forgot-password { text-align: center; margin-top: 20px; }
-    .forgot-password a { color: var(--vinho); font-size: 14px; font-weight: 700; text-decoration: none; }
+    .forgot-password a { color: var(--acento); font-size: 14px; font-weight: 700; text-decoration: none; }
     .forgot-password a:hover { text-decoration: underline; }
     .social-login { display: none; }
     .result {
-      margin-top: 20px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 600; text-align: center;
+      margin-top: 20px; padding: 0 16px; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center;
       max-height: 0; opacity: 0; overflow: hidden; transition: all .25s ease;
     }
     .result.show { max-height: 120px; opacity: 1; padding: 13px 16px; }
-    .result.success { background: rgba(18, 161, 80, .1); color: #0c7a3c; border: 1px solid rgba(18, 161, 80, .25); }
-    .result.error { background: rgba(224, 56, 75, .08); color: #b8283a; border: 1px solid rgba(224, 56, 75, .25); }
+    .result.success { background: rgba(61, 220, 151, .12); color: #3ddc97; border: 1px solid rgba(61, 220, 151, .3); }
+    .result.error { background: rgba(255, 107, 122, .12); color: #ff8d99; border: 1px solid rgba(255, 107, 122, .3); }
     .seguro { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 28px; font-size: 12.5px; color: var(--texto-2); }
     .seguro svg { width: 14px; height: 14px; }
+    @media (prefers-reduced-motion: reduce) { .login-container, .loading { animation-duration: .01ms; } }
 
     @media (max-width: 900px) {
       .login-shell { grid-template-columns: 1fr; }
-      .brand-side { padding: 28px 24px; min-height: auto; }
-      .brand-texto h1 { font-size: 26px; margin-bottom: 8px; }
+      .brand-side { padding: 28px 24px; min-height: auto; border-right: 0; border-bottom: 1px solid var(--filete); }
+      .brand-texto h1 { font-size: 24px; margin-bottom: 8px; }
       .brand-texto p, .recursos, .brand-rodape { display: none; }
-      .brand-side::after { display: none; }
       .brand-texto { margin-top: 24px; }
     }
   </style>
@@ -275,6 +258,6 @@
     document.head.appendChild(style);
   </script>
   <script src="layout.js?v=202611051300" defer></script>
-  <script src="login.js?v=202610281700" defer></script>
+  <script src="login.js?v=202611051500" defer></script>
 </body>
 </html>

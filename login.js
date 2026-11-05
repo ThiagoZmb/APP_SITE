@@ -90,15 +90,15 @@ function mostrarBoasVindas(userName) {
   welcomeDiv.id = 'welcome-message';
   welcomeDiv.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(10px);';
   const box = document.createElement('div');
-  box.style.cssText = 'background:white;padding:40px;border-radius:20px;text-align:center;max-width:500px;box-shadow:0 10px 50px rgba(0,0,0,.5);';
+  box.style.cssText = 'background:#1b1e24;border:1px solid #2c313a;padding:40px;border-radius:10px;text-align:center;max-width:500px;box-shadow:0 24px 48px rgba(0,0,0,.6);';
   const h2 = document.createElement('h2');
   h2.textContent = `Bem-vindo, ${userName}!`; // textContent = seguro contra XSS
-  h2.style.cssText = 'color:#8B0000;margin-bottom:20px;font-size:32px;';
+  h2.style.cssText = 'color:#f2a33a;margin-bottom:20px;font-size:28px;';
   const p = document.createElement('p');
   p.textContent = 'Redirecionando para o painel principal...';
-  p.style.cssText = 'font-size:18px;color:#333;margin-bottom:30px;';
+  p.style.cssText = 'font-size:18px;color:#b4bac4;margin-bottom:30px;';
   const spinner = document.createElement('div');
-  spinner.style.cssText = 'width:50px;height:50px;border:5px solid rgba(139,0,0,.2);border-top:5px solid #8B0000;border-radius:50%;margin:0 auto;animation:spin 1s linear infinite;';
+  spinner.style.cssText = 'width:50px;height:50px;border:5px solid rgba(242,163,58,.2);border-top:5px solid #f2a33a;border-radius:50%;margin:0 auto;animation:spin 1s linear infinite;';
   box.appendChild(h2); box.appendChild(p); box.appendChild(spinner);
   welcomeDiv.appendChild(box);
   document.body.appendChild(welcomeDiv);
