@@ -7,19 +7,8 @@
     <title>Elegance Dashboard - Orçamento</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        :root {
-            --primary-color: #8B0000;
-            --primary-light: rgba(139, 0, 0, 0.1);
-            --text-dark: #2c3e50;
-            --text-light: #6c757d;
-            --white: #ffffff;
-            --border-color: #e9ecef;
-            --secondary-color: #f8f9fa;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
-            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-        }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
+        body { min-height: 100vh; padding: 20px; }
         .container {
             display: grid;
             grid-template-columns: 280px 1fr;
@@ -90,7 +79,7 @@
         #bloqueio-msg {
             display: none; align-items: center; gap: 10px; margin-bottom: 18px;
             padding: 14px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
-            background: rgba(139,0,0,.08); border: 1px dashed rgba(139,0,0,.35); color: var(--primary-color);
+            background: rgba(155, 27, 48,.08); border: 1px dashed rgba(155, 27, 48,.35); color: var(--primary-color);
         }
         #bloqueio-msg.visivel { display: flex; }
         #form-item.bloqueado { opacity: .5; pointer-events: none; filter: grayscale(.4); }
@@ -99,7 +88,7 @@
             cursor: pointer; font-family: inherit; transition: all .2s ease;
         }
         .btn-primary { background: var(--gradient-primary); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(155, 27, 48,.3); }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .acoes-linha { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
@@ -115,7 +104,7 @@
             background: white; cursor: pointer; font-size: 13px; font-family: inherit;
         }
         .btn-mini:hover { background: var(--primary-light); color: var(--primary-color); }
-        .btn-mini.excluir:hover { background: rgba(220,53,69,.1); color: #dc3545; }
+        .btn-mini.excluir:hover { background: rgba(220,53,69,.1); color: var(--danger-color); }
         .btn-mini.ativo { background: var(--primary-light); color: var(--primary-color); border-color: var(--primary-color); }
         .totais { display: flex; justify-content: flex-end; gap: 40px; margin-top: 20px; flex-wrap: wrap; align-items: flex-end; }
         .totais .grupo { text-align: right; }
@@ -123,7 +112,7 @@
         .totais .valor { font-size: 24px; font-weight: 700; color: var(--primary-color); }
         .badge-frente { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .bf-abrir { background: rgba(23,162,184,.12); color: #17a2b8; }
-        .bf-correr { background: rgba(40,167,69,.12); color: #28a745; }
+        .bf-correr { background: rgba(40,167,69,.12); color: var(--success-color); }
         .bf-serralheria { background: rgba(255,165,0,.18); color: #c96a00; }
         .bf-basculante { background: rgba(111,66,193,.12); color: #6f42c1; }
         .bf-gaveta { background: rgba(224,82,126,.12); color: #c23b66; }
@@ -134,7 +123,7 @@
         .linha-furo label { width: 64px; text-align: right; font-weight: 600; color: var(--text-light); }
         .linha-furo input { width: 100px; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit; }
         .linha-furo input[readonly] { background: #f5f5f5; }
-        .linha-furo .rem { width: 30px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; color: #dc3545; font-weight: 700; cursor: pointer; }
+        .linha-furo .rem { width: 30px; height: 28px; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; color: var(--danger-color); font-weight: 700; cursor: pointer; }
         .btn-mini.auto-on { background: #90ee90; border-color: #5cb85c; }
         .btn-mini.ref-on { background: #87cefa; border-color: #3a9ad9; }
         /* ===== VISUALIZAÇÃO (motor fiel ao frmPortasAbrir.vb) ===== */
@@ -431,7 +420,7 @@
         .lp-item-acoes { padding: 6px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-wrap: wrap; }
         @media (max-width: 640px) { .lp-linha { grid-template-columns: 1fr; } .lp-linha .lp-acoes { justify-content: flex-start; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -468,7 +457,7 @@
         html body .btn { padding: 8px 18px !important; font-size: 14px !important; }
         html body #btn-peca-inserir { background: #2563eb !important; color: #fff !important; border-color: #1d4ed8 !important; }
         html body #btn-peca-inserir:hover { background: #1d4ed8 !important; border-color: #1e40af !important; }
-        html body #btn-add-complemento { background: #f1f3f5 !important; color: #495057 !important; border-color: #d6d9dc !important; }
+        html body #btn-add-complemento { background: #f1f3f5 !important; color: var(--text-mid) !important; border-color: #d6d9dc !important; }
         html body #btn-add-complemento:hover { background: #e2e6ea !important; border-color: #c6cbd0 !important; color: #343a40 !important; }
         html body .btn-mini { padding: 4px 10px !important; font-size: 12.5px !important; }
         html body #bloqueio-msg { padding: 8px 12px; margin-bottom: 10px; }

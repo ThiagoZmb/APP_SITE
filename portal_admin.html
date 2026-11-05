@@ -7,15 +7,9 @@
     <title>Elegance Dashboard - Portal do cliente</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        :root {
-            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
-            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
-        }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
         [hidden] { display: none !important; }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
         .container {
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
             min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
@@ -24,7 +18,7 @@
         .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
         .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
-        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
         .user-info { display: flex; flex-direction: column; line-height: 1.2; }
         .user-cargo { font-size: 11px; opacity: 0.8; }
         .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
@@ -45,15 +39,15 @@
         table { width: 100%; border-collapse: collapse; }
         thead th { position: sticky; top: 0; background: var(--secondary-color); padding: 10px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; border-bottom: 2px solid var(--border-color); white-space: nowrap; }
         tbody td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: top; }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.08); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(155, 27, 48,.08); }
         .vazio { text-align: center; padding: 30px; color: var(--text-light); }
         .cinza { color: var(--text-light); font-size: 13px; }
         .dica { font-size: 12px; color: var(--text-light); margin: 6px 0 10px; }
-        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #e9ecef; color: #495057; }
-        .selo.aviso { background: #fff3cd; color: #8a6d00; }
-        .selo.info { background: #dbeafe; color: #1e40af; }
-        .selo.ok { background: #d4edda; color: #1b6b30; }
-        .selo.perigo { background: #f8d7da; color: #a12330; }
+        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
+        .selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
+        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
         .busca input, .form-group input { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; background: var(--secondary-color); }
         .busca input:focus, .form-group input:focus { outline: none; border-color: var(--primary-color); }
         .form-group { margin-bottom: 12px; }
@@ -92,7 +86,7 @@
             .welcome-title { font-size: 26px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="portal_admin.js?v=202611031200" defer></script>

@@ -58,7 +58,7 @@
         .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
         .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
         .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
-        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .tag.inativo { background: #fff; color: var(--text-light); border: 1px solid #ced4da; }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
         .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
@@ -76,14 +76,14 @@
             border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
         }
         .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
-        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+        .switch-situacao button.on-inativo { background: var(--text-light); color: white; }
 
         .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
         .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
         .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
         .estoque-status { font-size: 13px; font-weight: 700; }
-        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra { height: 10px; border-radius: 6px; background: var(--border-color); position: relative; overflow: visible; }
         .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
         .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
         .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
@@ -264,7 +264,7 @@
         #menu-ctx button.mc-perigo { color: #b42318; }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="danfe_pedido.js?v=202610301500" defer></script>

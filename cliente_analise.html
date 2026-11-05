@@ -9,28 +9,12 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
-            --primary-color: #8B0000;
-            --primary-light: rgba(139, 0, 0, 0.1);
-            --primary-dark: #600000;
-            --secondary-color: #f8f9fa;
-            --text-dark: #2c3e50;
-            --text-light: #6c757d;
-            --white: #ffffff;
-            --border-color: #e9ecef;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
-            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
-            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-            --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            --success-color: #28a745;
-            --warning-color: #e0a800;
-            --danger-color: #dc3545;
             /* cores do Grifar_Estoque do VB */
             --row-inativo: #e2e3e5;
             --row-minimo: #ffe4c4;
             --row-falta: #ffb59a;
         }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
         .container {
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
             grid-template-areas: "header header" "sidebar main";
@@ -45,8 +29,7 @@
         .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
         .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500);
-            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
+            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;
         }
         .user-info { display: flex; flex-direction: column; line-height: 1.2; }
         .user-cargo { font-size: 11px; opacity: 0.8; }
@@ -119,17 +102,17 @@
         tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         tbody tr { cursor: pointer; transition: background .15s ease; }
         tbody tr:hover { background: var(--primary-light); }
-        tbody tr.inativo { background: var(--row-inativo); color: #6c757d; }
+        tbody tr.inativo { background: var(--row-inativo); color: var(--text-light); }
         tbody tr.minimo { background: var(--row-minimo); }
         tbody tr.falta { background: var(--row-falta); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(139,0,0,.14); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(155, 27, 48,.14); }
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
         .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
         .tag.minimo { background: #fff; color: #b8620b; border: 1px solid #f0c08a; }
         .tag.falta { background: #fff; color: #c0392b; border: 1px solid #f5a08a; }
-        .tag.inativo { background: #fff; color: #6c757d; border: 1px solid #ced4da; }
+        .tag.inativo { background: #fff; color: var(--text-light); border: 1px solid #ced4da; }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
         .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
@@ -147,14 +130,14 @@
             border: none; background: var(--white); padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--text-light); cursor: pointer;
         }
         .switch-situacao button.on-ativo { background: var(--success-color); color: white; }
-        .switch-situacao button.on-inativo { background: #6c757d; color: white; }
+        .switch-situacao button.on-inativo { background: var(--text-light); color: white; }
 
         .estoque-visual { margin: 0 24px 6px; padding: 16px 18px; border-radius: 14px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .estoque-numeros { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
         .estoque-atual { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
         .estoque-atual small { font-size: 14px; color: var(--text-light); font-weight: 600; }
         .estoque-status { font-size: 13px; font-weight: 700; }
-        .barra { height: 10px; border-radius: 6px; background: #e9ecef; position: relative; overflow: visible; }
+        .barra { height: 10px; border-radius: 6px; background: var(--border-color); position: relative; overflow: visible; }
         .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
         .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
         .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
@@ -195,7 +178,7 @@
             display: inline-flex; align-items: center; gap: 8px;
         }
         .btn-primary { background: var(--gradient-primary); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,0,0,.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(155, 27, 48,.3); }
         .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
@@ -307,7 +290,7 @@
             .hero-meta { grid-template-columns: 1fr 1fr; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="ranking.js?v=202610251200" defer></script>
 </head>

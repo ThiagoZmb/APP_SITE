@@ -8,19 +8,11 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         :root {
-            --primary-color: #8B0000;
-            --primary-light: rgba(139, 0, 0, 0.1);
-            --text-dark: #2c3e50;
-            --text-light: #6c757d;
-            --white: #ffffff;
-            --border-color: #e9ecef;
-            --secondary-color: #f8f9fa;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06);
-            --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-            --ok: #1f9d55; --erro: #d22f42; --aviso: #b26a00;
+            --ok: #1f9d55;
+            --erro: #d22f42;
+            --aviso: #b26a00;
         }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; padding: 20px; }
+        body { min-height: 100vh; padding: 20px; }
         .container {
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
             grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px);
@@ -113,7 +105,7 @@
         /* ===== perfis ===== */
         #lista-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
         .cartao { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; cursor: pointer; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
-        .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(139,0,0,.45); }
+        .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(155, 27, 48,.45); }
         .cartao.desativado { opacity: .65; }
         .cartao b { font-size: 15px; display: block; }
         .cartao p { font-size: 13px; color: var(--text-light); margin: 4px 0 10px; min-height: 18px; }
@@ -145,7 +137,7 @@
             .tabela { min-width: 640px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <script src="layout.js?v=202610282000" defer></script>
 </head>
 <body>

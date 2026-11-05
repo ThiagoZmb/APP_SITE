@@ -7,13 +7,7 @@
     <title>Elegance Dashboard - Minhas entregas</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        :root {
-            --primary-color: #8B0000; --primary-light: rgba(139, 0, 0, 0.1); --primary-dark: #600000;
-            --secondary-color: #f8f9fa; --text-dark: #2c3e50; --text-light: #6c757d; --white: #ffffff; --border-color: #e9ecef;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.06); --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1); --shadow-heavy: 0 10px 40px rgba(0, 0, 0, 0.15);
-            --gradient-primary: linear-gradient(135deg, #8B0000 0%, #600000 100%);
-            --success-color: #28a745; --warning-color: #e0a800; --danger-color: #dc3545;
-        }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
         [hidden] { display: none !important; }
         /* mobile primeiro: sem moldura, uma coluna */
         body { background: #f5f7fa; color: var(--text-dark); min-height: 100vh; }
@@ -22,7 +16,7 @@
         .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
         .logo::before { content: "◆"; font-size: 18px; opacity: 0.8; }
         .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 50px; background: rgba(255,255,255,0.1); }
-        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #ff6b6b, #ffa500); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
         .user-info { display: none; }
         .sidebar { grid-area: sidebar; }
         main { grid-area: main; padding: 16px 14px 40px; min-width: 0; }
@@ -48,10 +42,10 @@
         .ocorrencia { background: #f8d7da; color: #7a1a24; border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
         .cinza { color: var(--text-light); font-size: 13px; }
         .vazio { text-align: center; padding: 40px 10px; color: var(--text-light); }
-        .selo { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #e9ecef; color: #495057; white-space: nowrap; }
-        .selo.info { background: #dbeafe; color: #1e40af; }
-        .selo.ok { background: #d4edda; color: #1b6b30; }
-        .selo.perigo { background: #f8d7da; color: #a12330; }
+        .selo { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); white-space: nowrap; }
+        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
+        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
 
         .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
         .acoes > :only-child { grid-column: 1 / -1; }
@@ -87,7 +81,7 @@
         .toast.info { background: var(--text-dark); }
 
         @media (min-width: 769px) {
-            body { padding: 20px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+            body { padding: 20px; }
             .container { grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden; }
             header { padding: 0 40px; }
             .logo { font-size: 28px; }
@@ -98,7 +92,7 @@
             #toasts { left: auto; right: 24px; max-width: 380px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611041500">
+    <link rel="stylesheet" href="tema.css?v=202611050830">
     <script src="layout.js?v=202610282000" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="minhas_entregas.js?v=202610261500" defer></script>

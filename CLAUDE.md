@@ -4,6 +4,8 @@ Não havia README nem CLAUDE.md anterior; este arquivo foi gerado a partir da le
 
 > **Trabalho em andamento (branch `feat/skill-engenharia-projetos`):** antes de mexer na skill `.claude/skills/engenharia-projetos-tecnicos/`, leia `CONTEXTO_SKILL_ENGENHARIA.md` (raiz), que tem decisões, estado atual e próximos passos.
 
+> **Visual (qualquer tela, botão, tabela, modal ou cor):** antes de criar ou mexer em interface, leia `DESIGN.md` (raiz). Ele é a fonte única das regras visuais; a implementação está em `tema.css`, que toda página interna carrega por último. Use as variáveis do tema, não cores soltas, e mantenha `DESIGN.md` e `tema.css` em sincronia ao mudar o padrão.
+
 ## 1. O que o sistema faz
 
 Versão web (front-end + API) de um sistema de gestão que já existe em **VB (Visual Basic)** para uma empresa de esquadrias/portas/serralheria ("ELEGANCE"). A web lê e grava **as mesmas tabelas do banco do VB**; muitos comentários dizem "fiel ao VB" e citam formulários/módulos do VB (ex.: `frm_Pedido2`, `ModPedOrc`, `MotorFinanceiro`).
@@ -90,6 +92,7 @@ corte.html/.js           Tela do plano de corte (varas desenhadas em escala em C
 corte_vidros.html/.js   Tela do plano de corte de vidros (chapas desenhadas em escala em CSS), retalhos e parâmetros
 gestao.html/.js          Tela da Central de Gestão (barras em CSS, sem biblioteca de gráficos)
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
+DESIGN.md                Regras da identidade visual (cores, fonte, componentes, do's and don'ts); espelha o tema.css
 *.html, layout.js, login.js, ranking.js, custos_precos.js, importar_itens.js, leitura_pdf.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
 test/                    Testes (node:test); test/apoio/ = banco/pool falsos, servidor de teste, XMLs de NF-e
 .gitignore               node_modules/, .env, *.log
