@@ -7,6 +7,8 @@ const CATALOGO = [
   { codigo: 'paineis.ver', nome: 'Ver início e painéis', area: 'Painéis' },
   { codigo: 'pedidos.ver', nome: 'Ver pedidos e orçamentos', area: 'Pedidos' },
   { codigo: 'pedidos.pdf', nome: 'Abrir PDF de pedido/orçamento', area: 'Pedidos' },
+  { codigo: 'pedidos.checklist', nome: 'Imprimir o checklist de produção (PDF enviado ao sistema)', area: 'Pedidos' },
+  { codigo: 'checklist.enviar', nome: 'Enviar (trocar) o PDF do checklist de produção', area: 'Pedidos' },
   { codigo: 'orcamentos.criar', nome: 'Montar orçamento (também exige Valores financeiros)', area: 'Pedidos' },
   { codigo: 'orcamentos.salvar', nome: 'Salvar orçamento', area: 'Pedidos' },
   { codigo: 'orcamentos.situacao', nome: 'Marcar orçamento como Baixado (sem editar nem cancelar)', area: 'Pedidos' },

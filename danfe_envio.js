@@ -20,6 +20,7 @@
   const TENTATIVAS = 3;
   const ENVIOS_SIMULTANEOS = 6; // moderado: o servidor tem 10 conexões de banco e outras telas também usam
   const MODELO_NFE = '55';
+  const MAX_CHECKLIST = 5 * 1024 * 1024; // igual a calculo/checklist.js
 
   // DV da chave de acesso: módulo 11, pesos 2..9 da direita para a esquerda nos 43 primeiros dígitos
   function chaveValida(chave) {
@@ -35,6 +36,13 @@
     const base = String(nome ?? '').split(/[\\/]/).pop().trim();
     const m = /^(\d{44})\.pdf$/i.exec(base);
     return m && chaveValida(m[1]) ? m[1] : '';
+  }
+  // confere o arquivo escolhido para o checklist (o servidor confere de novo pelos bytes)
+  function validarChecklist(f) {
+    if (!f || !/\.pdf$/i.test(String(f.name || ''))) return { ok: false, motivo: 'Escolha um arquivo PDF.' };
+    if (!(f.size > 0)) return { ok: false, motivo: 'O arquivo está vazio.' };
+    if (f.size > MAX_CHECKLIST) return { ok: false, motivo: 'PDF muito grande (máximo 5 MB).' };
+    return { ok: true };
   }
   const numeroDaChave = chave => Number(String(chave).slice(25, 34));
 
@@ -79,11 +87,12 @@
 
     // ---------- abas ----------
     function mostrarAba(nome) {
-      for (const a of ['enviar', 'vincular']) {
+      for (const a of ['enviar', 'vincular', 'checklist']) {
         $('aba-' + a).classList.toggle('ativo', a === nome);
         $('sec-' + a).hidden = a !== nome;
       }
       if (nome === 'vincular' && !estado.lista.length) buscar();
+      if (nome === 'checklist') carregarChecklist();
     }
     for (const a of doc.querySelectorAll('.aba')) a.addEventListener('click', () => mostrarAba(a.dataset.aba));
 
@@ -247,6 +256,31 @@
       } catch (err) { toast(err.message, 'erro'); } finally { b.disabled = false; }
     }
 
+    // ---------- checklist de produção (PDF único no banco: GET /checklist/info, PUT /checklist?nome=) ----------
+    function mostrarChecklist(d) {
+      const tem = d && d.existe !== false && d.nome;
+      $('checklist-nome').textContent = tem ? d.nome : 'Nenhum arquivo enviado ainda.';
+      $('checklist-quando').textContent = tem && d.enviadoEm ? dataHoraBR(d.enviadoEm) + (d.enviadoPor ? ' por ' + d.enviadoPor : '') : '—';
+    }
+    async function carregarChecklist() {
+      try { mostrarChecklist(await chamar('/checklist/info')); }
+      catch (err) { $('checklist-nome').textContent = 'Não foi possível consultar.'; toast(err.message, 'erro'); }
+    }
+    async function aoEscolherChecklist(ev) {
+      const arq = ev.target.files && ev.target.files[0];
+      ev.target.value = '';
+      if (!arq) return;
+      const v = validarChecklist(arq);
+      if (!v.ok) { toast(v.motivo, 'erro'); return; }
+      try {
+        const bytes = new Uint8Array(await arq.arrayBuffer());
+        const d = await chamar('/checklist?nome=' + encodeURIComponent(arq.name), { metodo: 'PUT', binario: bytes, mime: 'application/pdf' });
+        mostrarChecklist({ existe: true, ...d });
+        toast(d.substituido ? 'Checklist substituído.' : 'Checklist enviado.', 'ok');
+      } catch (err) { toast(err.message, 'erro'); }
+    }
+    $('entrada-checklist').addEventListener('change', aoEscolherChecklist);
+
     // ---------- ligações ----------
     $('entrada-pasta').addEventListener('change', aoEscolher);
     $('entrada-arquivos').addEventListener('change', aoEscolher);
@@ -258,9 +292,10 @@
     // não deixa fechar a página no meio do envio sem avisar
     win.addEventListener('beforeunload', e => { if (estado.ocupado) { e.preventDefault(); e.returnValue = ''; } });
 
-    const inicial = params.get('aba') === 'vincular' && pode('danfe.vincular') ? 'vincular' : pode('danfe.enviar') ? 'enviar' : 'vincular';
+    const inicial = params.get('aba') === 'checklist' && pode('checklist.enviar') ? 'checklist' : params.get('aba') === 'vincular' && pode('danfe.vincular') ? 'vincular'
+      : pode('danfe.enviar') ? 'enviar' : pode('danfe.vincular') ? 'vincular' : 'checklist';
     mostrarAba(inicial);
   }
 
-  return { MAX_PDF, chaveValida, chaveDoNome, numeroDaChave, classificarArquivos, lotes, resumir, iniciar };
+  return { MAX_PDF, MAX_CHECKLIST, validarChecklist, chaveValida, chaveDoNome, numeroDaChave, classificarArquivos, lotes, resumir, iniciar };
 });

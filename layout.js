@@ -85,7 +85,7 @@
         'produtos.html': ['produtos.ver'],
         'fornecedores.html': ['fornecedores.ver'],
         'notas_fiscais.html': ['notas.ver'],
-        'danfe_envio.html': [{ algum: ['danfe.enviar', 'danfe.vincular'] }],
+        'danfe_envio.html': [{ algum: ['danfe.enviar', 'danfe.vincular', 'checklist.enviar'] }],
         'tintas.html': ['tintas.ver'],
         'notas_compra.html': ['compras_nfe.ver'],
         'pesos.html': ['pesos.ver'],

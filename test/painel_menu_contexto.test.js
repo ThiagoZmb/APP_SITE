@@ -71,3 +71,10 @@ test('perfil Representante inicial: só listar, abrir PDF, clientes e valores (n
   for (const c of ['pedidos.ver', 'pedidos.pdf']) assert.ok(rep.permissoes.includes(c), c);
   for (const c of ['orcamentos.criar', 'orcamentos.salvar', 'pedidos.situacao', 'pedidos.cancelar', 'pedidos.excluir', 'corte.ver', 'entregas.ver']) assert.ok(!rep.permissoes.includes(c), c);
 });
+
+test('menu do botão direito: "Imprimir checklist" só em Pedido e só com pedidos.checklist', () => {
+  const x = { numero: 1, s: 'pronto' };
+  assert.ok(menuDoPainel(new Set(['pedidos.checklist']), 'Pedido', x).includes('Imprimir checklist'));
+  assert.ok(!menuDoPainel(new Set(['pedidos.pdf']), 'Pedido', x).includes('Imprimir checklist'));
+  assert.ok(!menuDoPainel(new Set(['pedidos.checklist']), 'Orçamento', { numero: 2, s: 'aberto' }).includes('Imprimir checklist'));
+});

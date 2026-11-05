@@ -486,7 +486,7 @@
         /* ===== FICHA "ALTERAÇÃO DE VALORES" (mesmo padrão da ficha de clientes) ===== */
         .avl-fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
         .avl-fundo.aberta { opacity: 1; pointer-events: auto; }
-        .avl { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); background: hsla(240, 60%, 55%, .14); z-index: 41;
+        .avl { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); background: var(--bg); z-index: 41;
                transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
                box-shadow: -20px 0 50px -20px rgba(20,16,28,.35); border-radius: 20px 0 0 20px; overflow: hidden; }
         .avl.aberta { transform: none; }
@@ -530,7 +530,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: var(--white); border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
-    <script src="layout.js?v=202611051530" defer></script>
+    <script src="layout.js?v=202611051700" defer></script>
 </head>
 <body>
     <div class="container">

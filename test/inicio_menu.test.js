@@ -68,3 +68,13 @@ test('"Entregas da semana" carrega todos os pedidos (sem o corte de 8) e rola de
   assert.ok(trecho.includes('.sort((a, b) => a.quando - b.quando)') && !/\.slice\(/.test(trecho), 'sem slice: todos os pedidos');
   assert.ok(h.includes('#entregas { max-height: 540px; overflow-y: auto;'));
 });
+
+test('"Imprimir checklist" aparece no menu do início só com pedidos.checklist, ao lado das impressões', () => {
+  const com = rotulos(carregarMenu(new Set(['pedidos.pdf', 'pedidos.checklist'])).itensDoMenu({ numero: 1, situacao: 'Pronto' }));
+  assert.equal(com[com.indexOf('Imprimir etiquetas (Zebra)') + 1], 'Imprimir checklist');
+  assert.ok(!rotulos(carregarMenu(new Set(['pedidos.pdf'])).itensDoMenu({ numero: 1, situacao: 'Pronto' })).includes('Imprimir checklist'));
+  assert.deepEqual(rotulos(carregarMenu(new Set(['pedidos.checklist'])).itensDoMenu({ numero: 1, situacao: 'Pronto' })), ['Imprimir checklist']);
+  const h = ler('inicio.html');
+  assert.ok(h.includes('<script src="checklist_pedido.js'));
+  assert.ok(ler('painel_inicial.html').includes('<script src="checklist_pedido.js'));
+});

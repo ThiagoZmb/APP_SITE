@@ -144,9 +144,9 @@
         .origem-selecao strong { font-weight: 700; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051530" defer></script>
+    <script src="layout.js?v=202611051700" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="danfe_envio.js?v=202610301500" defer></script>
+    <script src="danfe_envio.js?v=202611051700" defer></script>
 </head>
 <body>
     <div class="container">
@@ -165,13 +165,14 @@
         </nav>
         <main>
             <h1 class="welcome-title">Enviar DANFEs</h1>
-            <p class="welcome-subtitle">Envie os PDFs das notas fiscais (nome do arquivo = chave de acesso de 44 dígitos) para abri-los pelo pedido, de qualquer lugar.</p>
+            <p class="welcome-subtitle">Envie os PDFs das notas fiscais (nome do arquivo = chave de acesso de 44 dígitos) para abri-los pelo pedido, de qualquer lugar. A aba Checklist troca o PDF do checklist de produção.</p>
 
             <section class="painel">
                 <div class="painel-head">
                     <div class="abas" role="tablist">
                         <button type="button" class="aba ativo" id="aba-enviar" role="tab" data-aba="enviar" data-perm="danfe.enviar">Enviar</button>
                         <button type="button" class="aba" id="aba-vincular" role="tab" data-aba="vincular" data-perm="danfe.vincular">Vincular a um pedido</button>
+                        <button type="button" class="aba" id="aba-checklist" role="tab" data-aba="checklist" data-perm="checklist.enviar">Checklist de produção</button>
                     </div>
                 </div>
 
@@ -194,6 +195,15 @@
                     <div class="progresso" id="barra" hidden><div id="barra-interna"></div></div>
                     <p class="cinza" id="texto-progresso" aria-live="polite"></p>
                     <div class="relatorio" id="relatorio" hidden></div>
+                </div>
+
+                <div id="sec-checklist" style="padding:0 22px 22px" hidden>
+                    <p class="dica" style="margin:0 0 10px">PDF único do checklist de produção, aberto pelo botão direito do Pedido ("Imprimir checklist"), de qualquer lugar. Enviar de novo substitui o anterior (PDF de até 5 MB).</p>
+                    <dl class="info" id="checklist-vigente"><dt>Arquivo vigente</dt><dd id="checklist-nome">Carregando…</dd><dt>Enviado em</dt><dd id="checklist-quando">—</dd></dl>
+                    <div class="acoes">
+                        <label class="btn btn-primary" for="entrada-checklist">Enviar checklist (PDF)…</label>
+                        <input type="file" id="entrada-checklist" accept=".pdf,application/pdf" hidden>
+                    </div>
                 </div>
 
                 <div id="sec-vincular" style="padding:0 22px 22px" hidden>

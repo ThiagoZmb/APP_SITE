@@ -24,6 +24,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Central de Gestão, entrega 1** (`gestao.html`, `gestao.js`, `rotas/gestao.js`, `calculo/gestao_caixa.js`): metas de faturamento e despesa por mês, caixa realizado x previsto, orçamento por categoria, comparativos e alertas calculados na hora. Só lê o VB. Regras na seção 5, "Gestão".
 - **Plano de corte de perfis** (`corte.html`, `corte.js`, `rotas/corte.js`, `calculo/corte_*.js`): a partir de um Pedido, distribui as peças de perfil (porta, puxador, divisor) em varas e retalhos minimizando a perda; reserva retalhos, o cortador marca as peças e o estoque de retalhos só muda quando o corte real é conferido e confirmado. Regras na seção 5, "Plano de corte".
 - **Etiquetas de pedido na Zebra** (`etiqueta_zebra.js`, `rotas/etiquetas.js`, `calculo/etiqueta_zpl.js`, `local/zebra.js`): o botão direito do Pedido ("Imprimir etiquetas (Zebra)") monta uma etiqueta ZPL de 100 × 60 mm por item no servidor e o serviço local do PC (porta 3917) a envia RAW à Zebra USB. Regras na seção 5, "Etiquetas na Zebra".
+- **Checklist de produção** (`checklist_pedido.js`, `rotas/checklist.js`, `calculo/checklist.js`): o botão direito do Pedido (`pedidos.checklist`) abre o PDF único do checklist guardado no banco (`web_checklist`); quem tem `checklist.enviar` o envia/troca na aba "Checklist de produção" de `danfe_envio.html`. Funciona de qualquer lugar, sem serviço local. Regras na seção 5, "Checklist de produção".
 - **Plano de corte de vidros** (`corte_vidros.html`, `corte_vidros.js`, `rotas/corte_vidros.js`, `calculo/vidro_*.js`): a partir de um Pedido, distribui as peças da tabela `vidros` em chapas do estoque (guilhotina com rotação) e retalhos; o cortador marca as peças e, ao confirmar o corte conferido, as chapas novas baixam do estoque. Regras na seção 5, "Plano de corte de vidros".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Notas de compra pela SEFAZ** (`notas_compra.html`, `notas_compra.js`, `local/sefaz.js`): o serviço local do PC da empresa (o mesmo do salvador de PDF, porta 3917) busca na SEFAZ as NF-e emitidas contra o CNPJ da empresa com o certificado A1, dá a Ciência da operação e guarda os XML; a tela leva o XML para a entrada de estoque existente. O certificado nunca sai do PC. Regras na seção 5, "Notas de compra pela SEFAZ".
@@ -47,6 +48,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
   fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
+  checklist.js           Checklist de produção em PDF no banco (web_checklist): GET /checklist/pdf, GET /checklist/info, PUT /checklist (validação em calculo/checklist.js)
   danfe.js               DANFE (nota fiscal em PDF) pelo pedido: /danfe/existentes, PUT /danfe/:chave, /danfe/pedido/:n, /danfe/:chave/pdf, /danfe/lista, /danfe/vinculo (validação em calculo/danfe.js)
   pesos.js               Peso por produto (web_pesos): /pesos, /pesos/produtos (validação e cálculo em calculo/peso.js)
   tintas.js              Cadastro de tintas (rotas; validação e listas fixas em calculo/tintas.js)
@@ -184,6 +186,10 @@ Chapas do estoque por Pedido (guilhotina com rotação) e retalhos; quantidades 
 ### Etiquetas na Zebra (uma por item do Pedido, ZPL 100 × 60 mm)
 Servidor monta o ZPL (`GET /etiquetas/pedido/:numero`, `pedidos.pdf`); o serviço local envia RAW ao spooler; texto do banco saneado (`^ ~ \`); medida ausente = "—"; sem dinheiro; impressora só do `zebra.config.json` ou detectada, nunca da requisição. **Ainda não testado em Zebra real.**
 > Regras completas: `docs/regras/etiqueta-zebra.md` (ler antes de mexer neste módulo).
+
+### Checklist de produção (PDF no banco)
+`web_checklist` guarda um único PDF vigente (id 1); `GET /checklist/pdf` (`pedidos.checklist`), `PUT /checklist` e `GET /checklist/info` (`checklist.enviar`); PDF validado pelos bytes, até 5 MB.
+> Regras completas: `docs/regras/checklist.md` (ler antes de mexer neste módulo).
 
 ### Peso das portas (etapa 1)
 `web_pesos`; peso sem cadastro nunca vira zero (pendência + parcial); **o peso aparece SÓ em `orcamentos.html`** (regra do dono).

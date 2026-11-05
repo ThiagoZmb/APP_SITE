@@ -265,10 +265,11 @@
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611051600">
-    <script src="layout.js?v=202611051530" defer></script>
+    <script src="layout.js?v=202611051700" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
+    <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
 </head>
 <body>
@@ -814,6 +815,7 @@
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
             if (ehPedido) add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }));
+            if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => window.ChecklistPedido.abrir({ apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }));
             sep();
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });

@@ -70,7 +70,8 @@ test('página danfe_envio.html: CSP igual à das outras, scripts, abas com permi
   for (const s of ['layout.js', 'entregas_comum.js', 'danfe_envio.js']) assert.ok(h.includes(`<script src="${s}`), s);
   assert.ok(!/<script(?![^>]*\ssrc=)/.test(h), 'sem script inline');
   assert.doesNotMatch(h, /\son(click|change|submit|error|load)=/);
-  assert.ok(h.includes('data-perm="danfe.enviar"') && h.includes('data-perm="danfe.vincular"'));
+  assert.ok(h.includes('data-perm="danfe.enviar"') && h.includes('data-perm="danfe.vincular"') && h.includes('data-perm="checklist.enviar"'));
+  for (const id of ['aba-checklist', 'sec-checklist', 'entrada-checklist', 'checklist-nome', 'checklist-quando']) assert.ok(h.includes(`id="${id}"`), id);
   assert.match(h, /webkitdirectory/);
   for (const id of ['entrada-pasta', 'entrada-arquivos', 'btn-enviar', 'btn-parar', 'barra', 'relatorio', 'busca', 'lista', 'sec-enviar', 'sec-vincular']) assert.ok(h.includes(`id="${id}"`), id);
   assert.ok(!h.includes('data-valor'), 'DANFE não é dinheiro');
@@ -84,7 +85,7 @@ test('layout.js: Enviar DANFEs no menu (subitem do Financeiro) e em PAGINAS com 
   const l = ler('layout.js');
   assert.match(l, /href: 'danfe_envio\.html', texto: 'Enviar DANFEs'.*sub: true/);
   assert.ok(l.indexOf("href: 'danfe_envio.html'") > l.indexOf("href: 'notas_fiscais.html'") && l.indexOf("href: 'danfe_envio.html'") < l.indexOf("href: 'usuarios.html'"));
-  assert.match(l, /'danfe_envio\.html': \[\{ algum: \['danfe\.enviar', 'danfe\.vincular'\] \}\]/);
+  assert.match(l, /'danfe_envio\.html': \[\{ algum: \['danfe\.enviar', 'danfe\.vincular', 'checklist\.enviar'\] \}\]/);
 });
 
 test('menu do botão direito: "Abrir nota fiscal (DANFE)" só para Pedido, com danfe.ver, nos dois menus', () => {

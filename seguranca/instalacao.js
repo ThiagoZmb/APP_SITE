@@ -238,6 +238,15 @@ const TABELAS = [
      UNIQUE KEY ux_danfe_chave (chave),
      KEY ix_danfe_numero (numero_nf)
    ) ${OPCOES}`,
+  // Checklist de produção em PDF: um único documento vigente (id fixo 1), enviado pela tela e aberto de qualquer lugar pelo Pedido.
+  `CREATE TABLE IF NOT EXISTS \`web_checklist\` (
+     id INT NOT NULL PRIMARY KEY,
+     nome_arquivo VARCHAR(150) NOT NULL,
+     conteudo LONGBLOB NOT NULL,
+     tamanho INT NOT NULL,
+     enviado_por VARCHAR(100) NULL,
+     enviado_em DATETIME NULL
+   ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_danfe_vinculos\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
      chave CHAR(44) NOT NULL,
@@ -878,6 +887,31 @@ async function acrescentarPermissoesCorte(pool) {
   }
 }
 
+// Checklist de produção: pedidos.checklist para Administrador, Interno completo e, como no VB, Auxiliar de escritório e Auxiliar financeiro (se existirem como perfil);
+// checklist.enviar (trocar o PDF) só para Administrador e Interno completo
+async function acrescentarPermissoesChecklist(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_checklist' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT id, nome FROM web_perfis WHERE nome IN ('Administrador', 'Interno completo', 'Auxiliar de escritório', 'Auxiliar financeiro') ORDER BY id");
+    for (const p of perfis) {
+      await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, 'pedidos.checklist']);
+      if (p.nome === 'Administrador' || p.nome === 'Interno completo') await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [p.id, 'checklist.enviar']);
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_checklist', '', JSON.stringify({ perfis: perfis.map(p => p.id) })]);
+    await conn.commit();
+    return { feito: true };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Modo atendimento: Interno completo e Vendedor passam a iniciar nele (o usuário desliga na tela); o Administrador não
 async function acrescentarPermissoesAtendimento(pool) {
   const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_atendimento' LIMIT 1");
@@ -920,4 +954,4 @@ async function acrescentarPermissoesOrcSituacao(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
