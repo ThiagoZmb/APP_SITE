@@ -600,7 +600,7 @@ registro.rota('post', '/clientes/salvar', ['clientes.editar'], clienteNosEstados
     res.json({ ok: true, codigo, mensagem: 'Cliente cadastrado com sucesso!' });
   } catch (err) {
     console.error('Erro /clientes/salvar:', err.code, err.message);
-    res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.' });
+    res.status(500).json({ error: err.code === 'ER_DUP_ENTRY' ? 'Este código já existe!' : 'Erro ao salvar o cliente.' + (/^ER_[A-Z_]+$/.test(err.code || '') ? ' (' + err.code + ')' : '') });
   }
 });
 
