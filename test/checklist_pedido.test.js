@@ -40,6 +40,7 @@ function carregar() {
   global.window = { open: (u) => { st.abertas.push(u); return st.aba; }, location: {} };
   global.localStorage = { removeItem: () => { st.removeu = true; } };
   global.alert = m => avisos.push(m);
+  global.setTimeout = () => 0; // o aviso de 5 min para liberar o blob não pode manter o processo de teste vivo
   global.URL = Object.assign(Object.create(URL), { createObjectURL: () => 'blob:x', revokeObjectURL() {} });
   delete require.cache[require.resolve('../checklist_pedido.js')];
   require('../checklist_pedido.js');
