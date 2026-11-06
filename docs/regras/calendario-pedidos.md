@@ -27,7 +27,7 @@ Classificação da situação (`classificarSituacao`, os mesmos grupos de `paine
 - **Dinheiro**: `valor` só com `valores.ver` (`semValores`); sem a permissão o campo nem existe. Contagens usam `qtd*`.
 
 ## Telas
-- Mês: grade domingo a sábado, setas de mês, "Hoje", alternador "Em aberto | Todos" (botões com `aria-pressed`). Cada dia mostra até 3 etiquetas (`#número`, cliente abreviado, selo "Atrasado") e "+N mais"; dia atual destacado. Clique no dia (número, célula, etiqueta ou "+N mais") abre `calendario_dia.html?data=...&situacao=...`. Até 900 px de largura a grade vira uma lista só dos dias com pedido.
+- Mês: grade domingo a sábado, setas de mês, "Hoje", alternador "Em aberto | Todos" (botões com `aria-pressed`). Cada dia mostra até 8 etiquetas (`MAX_ETIQUETAS`; a célula cresce na vertical, mínimo 150 px) (`#número`, cliente abreviado, selo "Atrasado") e "+N mais"; dia atual destacado. Clique no dia (número, célula, etiqueta ou "+N mais") abre `calendario_dia.html?data=...&situacao=...`. Até 900 px de largura a grade vira uma lista só dos dias com pedido.
 - Dia: lista completa (número, cliente, cliente final, situação, selo de atraso, valor só se a API mandou), dia anterior/próximo/hoje, "Voltar ao calendário" (volta para o mês e filtro do dia). Botão "Ações" em cada linha abre o mesmo menu (celular/teclado).
 - Mês e filtro ficam na URL (`?mes=`, `?data=`, `?situacao=`), mantidos por `history.replaceState`.
 - Menu lateral: "Calendário de pedidos" logo depois de "Minhas entregas" (seção Comercial); `calendario.html` e `calendario_dia.html` exigem `pedidos.ver` em `layout.js` (`PAGINAS`); o dia acende o item do calendário (`PAGINA_PAI`). `minhas_entregas.html` continua por último em `PAGINAS`.

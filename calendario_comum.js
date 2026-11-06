@@ -21,11 +21,13 @@
   // classe do pedido (calculo/calendario.js) -> cor do selo (selo-*-bg/fg do tema.css) e texto curto
   const COR_CLASSE = { producao: 'info', pronto: 'ok', entregue: 'ok', retirado: 'ok', cancelado: 'neutro', outro: 'aviso' };
   const SIGLA_CLASSE = { producao: 'Produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado', cancelado: 'Cancelado', outro: '' };
-  const MAX_ETIQUETAS = 3;
+  const MAX_ETIQUETAS = 8;   // etiquetas por dia na grade; o resto vira "+N mais" (a célula cresce na vertical)
+  const VISOES = [{ id: 'grade', rotulo: 'Calendário' }, { id: 'lista', rotulo: 'Lista' }];
 
   const dois = n => String(n).padStart(2, '0');
   const isoUTC = d => `${d.getUTCFullYear()}-${dois(d.getUTCMonth() + 1)}-${dois(d.getUTCDate())}`;
   const situacaoValida = v => (SITUACOES.some(s => s.id === v) ? v : 'abertos');
+  const visaoValida = v => (VISOES.some(s => s.id === v) ? v : 'grade');
 
   // ---------- datas ----------
   const mesValido = v => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(v ?? ''));
@@ -74,7 +76,7 @@
   }
   const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
-  const urlMes = (mes, situacao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}`;
+  const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'lista' ? '&visao=lista' : ''}`;
   const rotuloPedido = p => `Pedido ${p.numero}, ${p.cliente || 'sem cliente'}, ${p.situacao || 'sem situação'}${p.atrasado ? ', atrasado' : ''}`;
 
   // Etiqueta do pedido no calendário (classe etq: "chip" já é do tema.css). É um <li data-numero> focável: o InicioMenu abre o menu pelo botão direito, pela tecla de menu e por Shift+F10.
@@ -103,6 +105,25 @@
     return dias.map(c => `<section class="dia-lista${c.hoje ? ' hoje' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(DIAS_SEMANA[new Date(c.dia + 'T00:00:00Z').getUTCDay()])}, ${esc(dataBR(c.dia).slice(0, 5))}</a>` +
       `<span class="cinza">${c.qtdPedidos} pedido(s)${c.qtdAtrasados ? ` · ${c.qtdAtrasados} atrasado(s)` : ''}</span></h3>` +
       `<ul class="etqs">${c.pedidos.map(p => htmlEtiqueta(p, situacao)).join('')}</ul></section>`).join('');
+  }
+  // Visão em lista, como a folha de papel da produção: cada dia com pedido vira um bloco (data e dia da semana) e uma linha por pedido
+  // "P 23392 - Cliente | Cliente final". A linha é <li data-numero>: o menu do botão direito funciona como no calendário.
+  function htmlLinhaFolha(p, situacao) {
+    const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
+    return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
+      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit}` +
+      (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
+  }
+  function htmlFolha(semanas, situacao) {
+    const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
+    if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
+    return dias.map(c => `<section class="folha-dia${c.hoje ? ' hoje' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
+      `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao)).join('')}</ul></section>`).join('');
+  }
+  // alternador "Calendário | Lista" (botões com aria-pressed)
+  function htmlVisao(visao) {
+    return `<div class="grupo-sit" role="group" aria-label="Como mostrar os pedidos">${VISOES.map(s =>
+      `<button type="button" class="btn btn-mini ${s.id === visao ? 'btn-primary' : 'btn-secondary'}" data-visao="${s.id}" aria-pressed="${s.id === visao}">${s.rotulo}</button>`).join('')}</div>`;
   }
   const seloSituacao = p => `<span class="selo ${COR_CLASSE[p.classe] || 'aviso'}">${esc(p.situacao || '—')}</span>`;
   const seloAtraso = p => (p.atrasado ? '<span class="selo perigo">Atrasado</span>' : '');
@@ -152,6 +173,6 @@
       `<button type="button" class="btn btn-mini ${s.id === situacao ? 'btn-primary' : 'btn-secondary'}" data-sit="${s.id}" aria-pressed="${s.id === situacao}">${s.rotulo}</button>`).join('')}</div>`;
   }
 
-  return { MESES, DIAS_SEMANA, SITUACOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
+  return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
     montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

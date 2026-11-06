@@ -59,9 +59,11 @@ test('somarMeses, somarDias, mesDe, nomeMes, dataExtenso e validadores', () => {
 });
 
 test('lerConsulta: mês e data da URL, inválidos caem no padrão', () => {
-  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&situacao=todos', '2026-11-05'), { mes: '2026-03', situacao: 'todos' });
-  assert.deepEqual(Mes.lerConsulta('?mes=2026-99&situacao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos' });
-  assert.deepEqual(Mes.lerConsulta('', '2026-11-05'), { mes: '2026-11', situacao: 'abertos' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&situacao=todos', '2026-11-05'), { mes: '2026-03', situacao: 'todos', visao: 'grade' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&visao=lista', '2026-11-05'), { mes: '2026-03', situacao: 'abertos', visao: 'lista' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-99&situacao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
+  assert.deepEqual(Mes.lerConsulta('?visao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
+  assert.deepEqual(Mes.lerConsulta('', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
   assert.deepEqual(Dia.lerConsulta('?data=2028-02-29&situacao=todos'), { data: '2028-02-29', situacao: 'todos' });
   assert.deepEqual(Dia.lerConsulta('?data=2027-02-29'), { data: null, situacao: 'abertos' });
   assert.deepEqual(Dia.lerConsulta(''), { data: null, situacao: 'abertos' });
@@ -80,12 +82,13 @@ test('etiqueta: número, cliente abreviado, selo de atraso e escape de HTML; sit
   assert.doesNotMatch(K.htmlEtiqueta(ped(9), 'abertos'), /Atrasado/);
 });
 
-test('célula: no máximo 3 etiquetas e "+N mais" que leva ao dia; número do dia é link; dia de fora sem link', () => {
-  const pedidos = [1, 2, 3, 4, 5].map(n => ped(n));
+test('célula: no máximo MAX_ETIQUETAS etiquetas e "+N mais" que leva ao dia; número do dia é link; dia de fora sem link', () => {
+  assert.equal(K.MAX_ETIQUETAS, 8);
+  const pedidos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ped(n));
   const sem = K.montarGrade([dia('2026-11-05', pedidos)], '2026-11', '2026-11-05');
   const h = K.htmlCelula(sem.flat().find(c => c.dia === '2026-11-05'), 'todos');
-  assert.equal((h.match(/<li class="etq/g) || []).length, 3);
-  assert.match(h, /<a class="mais" href="calendario_dia\.html\?data=2026-11-05&amp;situacao=todos">\+2 mais<\/a>/);
+  assert.equal((h.match(/<li class="etq/g) || []).length, 8);
+  assert.match(h, /<a class="mais" href="calendario_dia\.html\?data=2026-11-05&amp;situacao=todos">\+2 mais<\/a>/);   // 10 pedidos: 8 etiquetas + "+2 mais"
   assert.match(h, /<a class="num" href="calendario_dia\.html\?data=2026-11-05&amp;situacao=todos"[^>]*aria-current="date"/);
   assert.match(h, /class="cel hoje"/);
   const fora = K.montarGrade([], '2026-12', '').flat().find(c => !c.doMes);
@@ -244,4 +247,27 @@ test('layout.js: item no menu logo depois de Minhas entregas, em PAGINAS com ped
 test('index.js registra o módulo do calendário e inicio_menu.js aceita "voltar"', () => {
   assert.match(ler('index.js'), /registrarCalendario\(\{ rota: registro\.rota, pool \}\)/);
   assert.match(ler('inicio_menu.js'), /voltar=\$\{enc\(cfg\.voltar \|\| 'inicio\.html'\)\}/);
+});
+
+test('visão em lista: um bloco por dia com pedido (data e dia da semana), uma linha "P número - cliente | cliente final"', () => {
+  const p1 = { ...ped(23392), cliente: 'P & G Comércio', clienteFinal: 'Gilma Goulart' }, p2 = { ...ped(23405), cliente: 'Oceanstop', clienteFinal: '' };
+  const sem = K.montarGrade([dia('2026-11-09', [p1, p2]), dia('2026-11-11', [ped(7)])], '2026-11', '2026-11-05');
+  const h = K.htmlFolha(sem, 'abertos');
+  assert.equal((h.match(/<section class="folha-dia/g) || []).length, 2);          // só os dias com pedido
+  assert.match(h, /09\/11\/2026 \(segunda-feira\)/);
+  assert.match(h, /11\/11\/2026 \(quarta-feira\)/);
+  assert.match(h, /P 23392<\/span> - <span class="folha-cli">P &amp; G Comércio<\/span> \| <span class="folha-final">Gilma Goulart<\/span>/);   // escapa HTML
+  assert.match(h, /data-numero="23405"/);                                          // o menu do botão direito acha a linha
+  assert.ok(!/23405<\/span> - <span class="folha-cli">Oceanstop<\/span> \|/.test(h), 'sem cliente final não põe a barra');
+  assert.match(K.htmlFolha(K.montarGrade([], '2026-11', ''), 'abertos'), /Nenhum pedido previsto/);
+  assert.match(K.htmlFolha(sem, 'todos'), /folha-sit/);                            // situação visível só em "todos"
+});
+
+test('alternador Calendário | Lista e endereço da visão', () => {
+  assert.equal(K.visaoValida('lista'), 'lista');
+  assert.equal(K.visaoValida('x'), 'grade');
+  assert.match(K.htmlVisao('lista'), /data-visao="lista"[^>]*aria-pressed="true"/);
+  assert.match(K.htmlVisao('lista'), /data-visao="grade"[^>]*aria-pressed="false"/);
+  assert.equal(K.urlMes('2026-11', 'abertos', 'lista'), 'calendario.html?mes=2026-11&situacao=abertos&visao=lista');
+  assert.equal(K.urlMes('2026-11', 'abertos'), 'calendario.html?mes=2026-11&situacao=abertos');
 });

@@ -16,7 +16,7 @@
   function lerConsulta(search, hoje) {
     const q = new URLSearchParams(search || '');
     const mes = q.get('mes');
-    return { mes: K.mesValido(mes) ? mes : K.mesDe(hoje), situacao: K.situacaoValida(q.get('situacao')) };
+    return { mes: K.mesValido(mes) ? mes : K.mesDe(hoje), situacao: K.situacaoValida(q.get('situacao')), visao: K.visaoValida(q.get('visao')) };
   }
 
   function iniciar(win) {
@@ -30,14 +30,17 @@
       const semanas = K.montarGrade(d.dias, estado.mes, d.hoje || hoje);
       $('cal-titulo').textContent = K.nomeMes(estado.mes);
       $('cal-resumo').textContent = `${d.qtdPedidos} pedido(s) no mês${d.qtdAtrasados ? ` · ${d.qtdAtrasados} atrasado(s)` : ''}`;
+      $('cal-visao').innerHTML = K.htmlVisao(estado.visao);
       $('cal-situacao').innerHTML = K.htmlSituacao(estado.situacao);
+      $('cal-corpo').dataset.visao = estado.visao;
+      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao);
       $('cal-grade').innerHTML = K.htmlGrade(semanas, estado.situacao);
       $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao);
     }
 
     async function carregar() {
       const minha = ++estado.consulta;
-      try { win.history.replaceState(null, '', K.urlMes(estado.mes, estado.situacao)); } catch { /* sem history: a tela segue */ }
+      try { win.history.replaceState(null, '', K.urlMes(estado.mes, estado.situacao, estado.visao)); } catch { /* sem history: a tela segue */ }
       $('cal-corpo').setAttribute('aria-busy', 'true');
       try {
         const d = await chamar(`/calendario/pedidos?mes=${encodeURIComponent(estado.mes)}&situacao=${encodeURIComponent(estado.situacao)}`);
@@ -57,6 +60,9 @@
     doc.addEventListener('click', ev => {
       const mes = ev.target.closest('[data-mes]');
       if (mes) { estado.mes = mes.dataset.mes === '0' ? K.mesDe(hoje) : K.somarMeses(estado.mes, Number(mes.dataset.mes)); carregar(); return; }
+      const vis = ev.target.closest('[data-visao]');
+      if (vis) { estado.visao = K.visaoValida(vis.dataset.visao); carregar(); return; }
+      if (ev.target.closest('[data-imprimir]')) { win.print(); return; }
       const sit = ev.target.closest('[data-sit]');
       if (sit) { estado.situacao = K.situacaoValida(sit.dataset.sit); carregar(); return; }
       if (ev.target.closest('a')) return; // número do dia e "+N mais" são links

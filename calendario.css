@@ -44,7 +44,7 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .cal { padding: 0 8px 14px; }
 .cal-sem, .cal-linha { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .cal-sem span { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-light); padding: 6px 0; }
-.cel { min-height: 112px; border: 1px solid var(--border-color); margin: -1px 0 0 -1px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; cursor: pointer; }
+.cel { min-height: 150px; border: 1px solid var(--border-color); margin: -1px 0 0 -1px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; cursor: pointer; }
 .cel.fora { opacity: .4; cursor: default; }
 .cel:hover:not(.fora) { background: var(--hover-linha); }
 .cel .num { font-size: 12px; font-weight: 600; align-self: center; min-width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; color: var(--text-dark); text-decoration: none; }
@@ -64,6 +64,30 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .mais { color: var(--primary-color); font-size: 11.5px; font-weight: 600; padding: 1px 4px; text-decoration: none; }
 .mais:hover { text-decoration: underline; }
 .cal-ajuda { padding: 0 16px 16px; }
+
+/* visão em lista (folha): um bloco por dia com pedido, uma linha por pedido; a grade e a lista do celular saem do caminho */
+.cal-topo .grupo-visao { margin-left: auto; }
+.cal-topo .grupo-visao + #cal-situacao .grupo-sit { margin-left: 0; }
+.btn-imprimir { display: none; }
+.cal-folha { display: none; padding: 0 16px 16px; }
+#cal-corpo[data-visao="lista"] #cal-grade, #cal-corpo[data-visao="lista"] #cal-lista { display: none; }
+#cal-corpo[data-visao="lista"] .cal-folha { display: block; }
+#cal-corpo[data-visao="lista"] .btn-imprimir { display: inline-flex; }
+.folha-dia { padding: 14px 0 10px; border-top: 1px solid var(--border-color); }
+.folha-dia h3 { font-size: 15px; margin-bottom: 6px; }
+.folha-dia h3 a { color: var(--text-dark); text-decoration: none; }
+.folha-dia h3 a:hover { text-decoration: underline; }
+.folha-dia.hoje h3 a { color: var(--primary-color); }
+.folha-dia ul { list-style: none; }
+.folha-linha { padding: 3px 6px; border-radius: 4px; font-size: 14px; line-height: 1.5; cursor: context-menu; }
+.folha-linha:hover { background: var(--hover-linha); }
+.folha-linha:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+.folha-linha.ctx { background: var(--primary-light); }
+.folha-p { font-family: var(--font-mono); font-weight: 700; }
+.folha-cli { font-weight: 600; }
+.folha-final, .folha-sit { color: var(--text-light); }
+.folha-atraso { font-weight: 700; color: var(--selo-perigo-fg); font-size: 12px; }
+.folha-linha.atraso { box-shadow: inset 3px 0 0 var(--danger-color); }
 
 /* celular: lista dos dias com pedido em vez da grade */
 .cal-lista { display: none; padding: 0 16px 16px; }
@@ -119,5 +143,15 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
     .ld-sit { grid-column: 2; justify-content: flex-end; }
     .ld-valor { grid-column: 1; text-align: left; }
     .ld-acoes { grid-column: 2; }
+}
+@media print {
+    body { padding: 0; background: white; color: black; }
+    .container { display: block; box-shadow: none; border-radius: 0; background: white; }
+    header, .sidebar, .cal-topo button, .cal-topo .grupo-visao, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
+    main { padding: 0; overflow: visible; }
+    .welcome-subtitle { display: none; }
+    .painel { border: none; box-shadow: none; }
+    #cal-corpo[data-visao="lista"] .folha-dia { break-inside: avoid; border-top-color: black; }
+    #cal-corpo[data-visao="lista"] .folha-dia h3 a, #cal-corpo[data-visao="lista"] .folha-linha, .folha-final, .folha-sit { color: black; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
