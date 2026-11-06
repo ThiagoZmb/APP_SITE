@@ -78,12 +78,17 @@
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
   const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'lista' ? '&visao=lista' : ''}`;
   const rotuloPedido = p => `Pedido ${p.numero}, ${p.cliente || 'sem cliente'}, ${p.situacao || 'sem situação'}${p.atrasado ? ', atrasado' : ''}`;
+  const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
+  const iconesItens = p => {
+    const tem = ITENS_DOC.filter(([chave]) => p[chave]);
+    return tem.length ? ` <span class="itens-doc" role="img" aria-label="Contém: ${tem.map(t => t[2]).join(', ')}">${tem.map(([, icone, nome]) => `<span class="item-doc" title="${nome}">${icone}</span>`).join('')}</span>` : '';
+  };
 
   // Etiqueta do pedido no calendário (classe etq: "chip" já é do tema.css). É um <li data-numero> focável: o InicioMenu abre o menu pelo botão direito, pela tecla de menu e por Shift+F10.
   function htmlEtiqueta(p, situacao) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="etq-sit">${esc(SIGLA_CLASSE[p.classe])}</span>` : '';
     return `<li class="etq ${COR_CLASSE[p.classe] || 'aviso'}${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
-      `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${sit}` +
+      `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${iconesItens(p)}${sit}` +
       (p.atrasado ? ' <span class="etq-atraso">Atrasado</span>' : '') + '</li>';
   }
   function htmlCelula(c, situacao) {
@@ -111,7 +116,7 @@
   function htmlLinhaFolha(p, situacao) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
     return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
-      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit}` +
+      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${iconesItens(p)}${sit}` +
       (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
   }
   function htmlFolha(semanas, situacao) {
@@ -131,7 +136,7 @@
     const temValor = Object.prototype.hasOwnProperty.call(p, 'valor');
     return `<li class="linha-dia${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" aria-label="${esc(rotuloPedido(p))}">` +
       `<span class="ld-num">#${esc(p.numero)}</span>` +
-      `<div class="ld-meio"><b>${esc(p.cliente || '—')}</b>${p.clienteFinal ? `<small>${esc(p.clienteFinal)}</small>` : ''}</div>` +
+      `<div class="ld-meio"><b>${esc(p.cliente || '—')}</b>${p.clienteFinal ? `<small>${esc(p.clienteFinal)}</small>` : ''}${iconesItens(p)}</div>` +
       `<div class="ld-sit">${seloSituacao(p)} ${seloAtraso(p)}</div>` +
       (temValor ? `<span class="ld-valor" data-valor>${esc(moeda(p.valor))}</span>` : '') +
       `<button type="button" class="btn btn-mini btn-secondary ld-acoes" aria-haspopup="menu" aria-label="Ações do pedido ${esc(p.numero)}">Ações</button></li>`;

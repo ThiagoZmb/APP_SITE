@@ -89,6 +89,10 @@ function montarPedido(r, hoje) {
     atrasado: atrasado(situacao, prontoEm, hoje),
     prontoEm,
     dataEntrega: dataISO(r.data_entrega),
+    comPerfil: !!r.comPerfil,
+    comVidro: !!r.comVidro,
+    comSerralheria: !!r.comSerralheria,
+    comPintura: !!r.comPintura,
     valor: Number(r.valor) || 0
   };
 }

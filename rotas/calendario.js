@@ -10,6 +10,8 @@ const { filtroEstados } = require('../seguranca/acesso');
 const { semValores } = require('../seguranca/valores');
 const { hojeLocal } = require('./transacao');
 const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia } = require('../calculo/calendario');
+const { carregarComposicao } = require('../calculo/composicao_documentos');
+const { SEM_COMPOSICAO } = require('../calculo/composicao_pedido');
 
 const VER = ['pedidos.ver'];
 
@@ -35,7 +37,11 @@ function registrarCalendario({ rota, pool }) {
     if (!situacao) return res.status(400).json({ error: 'Situação inválida. Use abertos ou todos.' });
     try {
       const hoje = hojeLocal();
-      const dias = agruparPorDia((await buscar(req, mes.inicio, mes.fim)).map(r => montarPedido(r, hoje)), situacao);
+      const linhas = await buscar(req, mes.inicio, mes.fim);
+      let composicao = new Map();
+      try { composicao = await carregarComposicao(pool, 'Pedido', linhas.map(r => r.numero)); }
+      catch (err) { console.error('Erro composição do calendário:', err.message); }
+      const dias = agruparPorDia(linhas.map(r => montarPedido({ ...r, ...(composicao.get(Number(r.numero)) || SEM_COMPOSICAO) }, hoje)), situacao);
       res.json(semValores(req, { mes: mes.chave, situacao, hoje, ...resumo(dias), dias }, ['valor']));
     } catch (err) {
       console.error('Erro GET /calendario/pedidos:', err.message);
@@ -50,7 +56,11 @@ function registrarCalendario({ rota, pool }) {
     if (!situacao) return res.status(400).json({ error: 'Situação inválida. Use abertos ou todos.' });
     try {
       const hoje = hojeLocal();
-      const dias = agruparPorDia((await buscar(req, data, somarDias(data, 1))).map(r => montarPedido(r, hoje)), situacao);
+      const linhas = await buscar(req, data, somarDias(data, 1));
+      let composicao = new Map();
+      try { composicao = await carregarComposicao(pool, 'Pedido', linhas.map(r => r.numero)); }
+      catch (err) { console.error('Erro composição do calendário:', err.message); }
+      const dias = agruparPorDia(linhas.map(r => montarPedido({ ...r, ...(composicao.get(Number(r.numero)) || SEM_COMPOSICAO) }, hoje)), situacao);
       const pedidos = dias.length ? dias[0].pedidos : [];
       res.json(semValores(req, { data, situacao, hoje, ...resumo(dias), pedidos }, ['valor']));
     } catch (err) {

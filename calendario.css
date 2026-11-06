@@ -86,6 +86,8 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .folha-linha.ctx { background: var(--primary-light); }
 .folha-p { font-family: var(--font-mono); font-weight: 700; }
 .folha-cli { font-weight: 600; }
+.itens-doc { display: inline-flex; gap: 3px; margin-left: 7px; vertical-align: middle; }
+.item-doc { font-size: 13px; line-height: 1; cursor: help; }
 .folha-final, .folha-sit { color: var(--text-light); }
 .folha-atraso { font-weight: 700; color: var(--selo-perigo-fg); font-size: 12px; }
 .folha-linha.atraso { box-shadow: inset 3px 0 0 var(--danger-color); }

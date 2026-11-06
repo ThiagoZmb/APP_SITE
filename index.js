@@ -38,6 +38,7 @@ const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const composicaoPedido = require('./calculo/composicao_pedido');
+const { carregarComposicao } = require('./calculo/composicao_documentos');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
@@ -342,11 +343,7 @@ const comDatasSeguras = rows => rows.map(r => ({ ...r, prontoEm: dataBRSegura(r.
 // Ícones da lista do Início (Perfil, Vidro, Serralheria, Pintura): 4 leituras por tipo de documento; se falharem, a lista sai sem ícones (nunca derruba a lista)
 async function composicaoDosDocumentos(tipo) {
   try {
-    const [itens] = await pool.execute('SELECT NUMERO, ITEM, ITEM_PEDIDO, PERFIL, ACABAMENTO_PERFIL, REVESTIMENTO FROM ped_orc_itens_v4 WHERE TIPO = ?', [tipo]);
-    const [vidros] = await pool.execute('SELECT DISTINCT NUMERO, ITEM FROM vidros');
-    const [serr] = await pool.execute('SELECT DISTINCT NUMERO FROM ped_orc_serralheria WHERE TIPO = ?', [tipo]);
-    const [tipos] = await pool.execute('SELECT DISTINCT NUMERO, TIPO_PRODUTO FROM ped_orc_lista_itens WHERE TIPO = ?', [tipo]);
-    return composicaoPedido.compor({ itens, vidros, serralheria: (serr || []).map(r => r.NUMERO), tipos });
+    return await carregarComposicao(pool, tipo);
   } catch (err) {
     console.error('Erro composição da lista:', err.message);
     return new Map();
