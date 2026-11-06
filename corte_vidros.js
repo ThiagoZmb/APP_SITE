@@ -42,7 +42,7 @@
   const semCor = v => txt(v) || '(sem cor)';
   const rotuloGrupo = g => txt(g.modelo) + (txt(g.cor) ? ' / ' + txt(g.cor) : '');
   const MATIZES = [212, 275, 24, 336, 190, 252, 8, 300];
-  const estiloGrupo = i => { const h = MATIZES[((i % MATIZES.length) + MATIZES.length) % MATIZES.length]; return `--g-solido:hsl(${h} 55% 30%);--g-fundo:hsl(${h} 60% 95%);--g-peca:hsl(${h} 70% 83%);--g-borda:hsl(${h} 50% 42%)`; };
+  const estiloGrupo = i => { const h = MATIZES[((i % MATIZES.length) + MATIZES.length) % MATIZES.length]; return `--g-solido:hsl(${h} 75% 74%);--g-fundo:hsl(${h} 30% 13%);--g-peca:hsl(${h} 45% 25%);--g-borda:hsl(${h} 40% 34%)`; };
   const contarPecas = plano => ((plano && plano.grupos) || []).reduce((s, g) => s + g.chapas.reduce((t, c) => t + c.pecas.length, 0), 0);
   const chaveCortada = (grupo, chapa, peca) => `${grupo}\u0001${chapa}\u0001${peca}`;
   // aproveitamento geral = área das peças / área das chapas (e retalhos) usadas

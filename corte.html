@@ -161,7 +161,7 @@
         /* perfil: cabeçalho em uma linha (nome, chips, andamento) e barras alinhadas */
         main .grupo { margin-bottom: 22px; padding: 16px 18px 8px; border-radius: 14px; background: var(--g-fundo, hsla(216, 60%, 55%, .14)); border: 1px solid var(--g-borda, var(--border-color)); border-left: 1px solid var(--g-solido, #444); }
         main .grupo h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; text-transform: none; letter-spacing: 0; }
-        .nome-perfil { background: var(--g-solido, #444); color: #fff; font-size: 20px; font-weight: 800; letter-spacing: .3px; padding: 4px 14px; border-radius: 10px; line-height: 1.3; }
+        .nome-perfil { background: var(--g-solido, #444); color: var(--on-primary); font-size: 20px; font-weight: 800; letter-spacing: .3px; padding: 4px 14px; border-radius: 10px; line-height: 1.3; }
         .chip { background: var(--white); color: var(--g-solido, var(--text-mid)); border: 1px solid var(--g-borda, #999); font-size: 12.5px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
         .progresso-grupo { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--g-solido, var(--text-mid)); }
         .selo-completa { display: inline-flex; align-items: center; background: #2e7d32; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
@@ -174,9 +174,12 @@
         .peca small { font-weight: 500; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .peca[disabled] { cursor: default; }
         .peca:not([disabled]):hover { filter: brightness(.93); outline: 2px solid var(--g-solido, #444); outline-offset: -2px; }
-        .peca.cortada { background: #a5d6a7; color: hsl(124, 78%, 72%); text-decoration: line-through; }
-        .sobra { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; background: repeating-linear-gradient(45deg, hsla(46, 100%, 55%, .14), hsla(46, 100%, 55%, .14) 6px, hsla(45, 100%, 55%, .14) 6px, hsla(45, 100%, 55%, .14) 12px); }
-        .sobra.descartar { background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 6px, var(--bg) 6px, var(--bg) 12px); color: var(--text-light); }
+        .peca.cortada { background: hsl(140, 50%, 24%); color: hsl(140, 70%, 88%); text-decoration: line-through; }
+        .sobra { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; overflow: hidden; color: var(--text-dark); background: repeating-linear-gradient(45deg, hsla(46, 100%, 55%, .14), hsla(46, 100%, 55%, .14) 6px, hsla(45, 100%, 55%, .14) 6px, hsla(45, 100%, 55%, .14) 12px); }
+        .sobra.descartar { background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 6px, var(--bg) 6px, var(--bg) 12px); color: var(--text-mid); }
+        main .grupo .cinza { color: var(--text-mid); }
+        .barra-titulo b { color: var(--text-dark); }
+        .peca small { opacity: 1; }
         .conf-linha { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 14px; }
         .conf-linha label { display: inline-flex; align-items: center; gap: 8px; }
         .conf-linha .conf-medida { width: 110px; }
@@ -211,7 +214,7 @@
     <link rel="stylesheet" href="tema.css?v=202611061000">
     <script src="layout.js?v=202611061400" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="corte.js?v=202610281500" defer></script>
+    <script src="corte.js?v=202611061600" defer></script>
 </head>
 <body>
     <div class="container">
