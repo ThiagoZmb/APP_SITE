@@ -246,12 +246,8 @@
         @media (max-width: 900px) { .duas, .larga { grid-template-columns: 1fr; } .filtros input { min-width: 0; flex: 1; } }
         .ico { width: 15px; height: 15px; flex: none; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         #orders-tbody tr[data-numero]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
-        .order-number .acao-menu { opacity: 1; font-weight: 800; color: var(--text-mid); border-radius: 6px; padding: 0 6px; min-width: 24px; }
-        .order-number .acao-menu:hover, .order-number .acao-menu[aria-expanded="true"] { background: var(--primary-light); color: var(--primary-color); transform: none; }
-        .order-number a.editar { margin-left: 6px; text-decoration: none; opacity: .7; }
-        .order-number a.editar:hover, .order-number a.editar:focus { opacity: 1; }
-        .order-number .acao-doc { margin-left: 4px; padding: 0 2px; border: none; background: none; cursor: pointer; font-size: inherit; opacity: .7; }
-        .order-number .acao-doc:hover, .order-number .acao-doc:focus-visible { opacity: 1; transform: scale(1.15); }
+        .itens-doc { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+        .item-doc { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--white); font-size: 12px; line-height: 1; cursor: default; }
         /* menu do botão direito nas linhas de pedidos/orçamentos */
         #orders-tbody tr.ctx { background: var(--primary-light); }
         #menu-ctx { position: fixed; z-index: 1000; min-width: 240px; max-width: 320px; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); font-size: 13.5px; animation: entra .12s ease-out; }
@@ -685,6 +681,12 @@
             }
             return t;
         }
+        // ícones do que o documento TEM (vêm de /dados_lista); só os presentes aparecem, cada um com texto alternativo
+        const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
+        const iconesItens = x => {
+            const tem = ITENS_DOC.filter(([k]) => x[k]);
+            return tem.length ? ` <span class="itens-doc" role="img" aria-label="Contém: ${tem.map(t => t[2]).join(', ')}">${tem.map(([, e, nome]) => `<span class="item-doc" title="${nome}">${e}</span>`).join('')}</span>` : '';
+        };
         function renderLista() {
             const j = janela();
             const base = entre(doCliente(tipoLista === 'Pedido' ? pedidos : orcamentos), j.ini, j.fim);
@@ -702,11 +704,7 @@
             const MAX = 500;
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
                 <tr data-numero="${esc(x.numero)}" tabindex="0"${tipoLista === 'Orçamento' && x.s === 'fechado' ? ' class="linha-fechada"' : ''}>
-                    <td class="order-number">${esc(x.numero)} <a class="editar" data-perm="orcamentos.criar valores.ver" title="Abrir para editar"
-                        href="orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(x.numero)}&voltar=${voltarParaEstaPagina()}">✏️</a>
-                        ${tipoLista === 'Pedido' && x.s !== 'cancelado' ? '<button type="button" class="acao-doc" data-acao="cancelar" data-perm="pedidos.cancelar" title="Cancelar este pedido">🚫</button>' : ''}
-                        <button type="button" class="acao-doc" data-acao="excluir" data-perm="pedidos.excluir" title="Excluir este documento">🗑️</button>
-                        <button type="button" class="acao-doc acao-menu" data-acao="menu" aria-label="Ações d${tipoLista === 'Pedido' ? 'o pedido' : 'o orçamento'} ${esc(x.numero)}" aria-haspopup="menu" aria-expanded="false" title="Mais ações">⋯</button></td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
+                    <td class="order-number">${esc(x.numero)}${iconesItens(x)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
                     <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}</td>
@@ -731,17 +729,10 @@
             } catch (err) { alert(err.message); }
         }
         $('orders-tbody').addEventListener('click', e => {
-            if (e.target.closest('a.editar')) return; // ✏️ abre a tela de orçamento, não o PDF
-            const botao = e.target.closest('button.acao-doc');
-            if (botao) {
-                const linha = botao.closest('tr[data-numero]');
-                if (botao.dataset.acao === 'menu') { if (menuCtx && origemMenu === botao) fecharMenu(true); else abrirMenu(e, linha, botao); return; }
-                acaoNoDocumento(botao.dataset.acao, linha.dataset.numero); return;
-            }
             const tr = e.target.closest('tr[data-numero]');
             if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
-        // teclado: Enter ou Espaço na linha fazem o mesmo que o clique (PDF, se houver permissão); os botões da linha usam o próprio teclado
+        // teclado: Enter ou Espaço na linha fazem o mesmo que o clique (PDF, se houver permissão); a tecla de menu / Shift+F10 abrem o menu (evento contextmenu)
         $('orders-tbody').addEventListener('keydown', e => {
             if (e.target.tagName !== 'TR' || (e.key !== 'Enter' && e.key !== ' ')) return;
             e.preventDefault();
@@ -915,7 +906,7 @@
             if (primeiro) primeiro.focus({ preventScroll: true });
         }
         $('orders-tbody').addEventListener('contextmenu', e => { const tr = e.target.closest('tr[data-numero]'); if (tr) abrirMenu(e, tr); });
-        document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target) && !e.target.closest('.acao-menu')) fecharMenu(); });
+        document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target)) fecharMenu(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuCtx) fecharMenu(true); });
         document.addEventListener('scroll', fecharMenu, true);
         window.addEventListener('resize', fecharMenu);

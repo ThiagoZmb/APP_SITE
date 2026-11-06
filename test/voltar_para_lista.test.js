@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
-test('lista de pedidos/orçamentos: os dois caminhos de "Abrir para editar" levam o endereço de volta', () => {
+test('lista de pedidos/orçamentos: o caminho de "Abrir para editar" (menu do botão direito) leva o endereço de volta', () => {
   const h = ler('painel_inicial.html');
   assert.match(h, /const voltarParaEstaPagina = \(\) => encodeURIComponent\(location\.pathname\.split\('\/'\)\.pop\(\) \+ location\.search\);/);
-  assert.equal((h.match(/&voltar=\$\{voltarParaEstaPagina\(\)\}/g) || []).length, 2);
+  assert.equal((h.match(/&voltar=\$\{voltarParaEstaPagina\(\)\}/g) || []).length, 1);
   assert.ok(h.indexOf('const voltarParaEstaPagina') < h.indexOf('&voltar='), 'declarada antes de ser usada');
 });
 
