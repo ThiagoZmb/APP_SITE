@@ -243,3 +243,23 @@ test('PDF de porta de correr gravada pelo VB com QTD inflada: uma folha por linh
   const web = textos(descricaoItem('Porta de correr', { v4 })).filter(t => t.startsWith('Folha'));
   assert.equal(web.length, 9, 'sem o marcador (pedido da web) cada QTD continua valendo');
 });
+
+test('PDF de porta de correr: mostra Qtd = nº de folhas e unitário = total ÷ folhas, igual à tela (qtd 2, 6.468,83, total 12.937,66)', () => {
+  const it = { ITEM: 1, QTD: 1, TIPO_PRODUTO: 'Porta de correr', DESCRICAO: 'Portas: 2', UNITARIO: '12937.66', TOTAL: '12937.66' };
+  const v4 = [{ PORTA: 'Folha 1', QTD: 1 }, { PORTA: 'Folha 2', QTD: 1 }];
+  const r = pdf.qtdUnitarioPdf(it, v4);
+  assert.equal(r.qtd, 2);
+  assert.equal(moedaBR(r.unitario), 'R$ 6.468,83');
+  assert.equal(moedaBR(it.TOTAL), 'R$ 12.937,66');
+  // grupo de folhas iguais (uma linha com QTD 2) dá o mesmo resultado
+  assert.equal(pdf.qtdUnitarioPdf(it, [{ PORTA: 'Folha 1', QTD: 2 }]).qtd, 2);
+  // VB com QTD inflada (2 linhas, QTD 2 cada): 2 folhas, não 4
+  assert.equal(pdf.qtdUnitarioPdf(it, [{ QTD: 2 }, { QTD: 2 }]).qtd, 2);
+  // uma folha só, ou outro tipo de produto: nada muda
+  assert.deepEqual(pdf.qtdUnitarioPdf(it, [{ QTD: 1 }]), { qtd: 1, unitario: '12937.66' });
+  assert.deepEqual(pdf.qtdUnitarioPdf({ ...it, TIPO_PRODUTO: 'Metalons' }, v4), { qtd: 1, unitario: '12937.66' });
+  // desenha sem erro
+  const dados = dadosExemplo();
+  dados.itens = [it]; dados.v4 = v4.map(v => ({ ...v, ITEM_PEDIDO: 1 }));
+  desenhar(dados, { comPrecos: true });
+});

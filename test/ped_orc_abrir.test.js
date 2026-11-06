@@ -134,14 +134,14 @@ test('só %: nova porcentagem sobre o valor original salvo, sem conferir o cadas
   assert.equal(f.pedOrc[0].TOTAL, 1551.18);
 });
 
-test('editado é recalculado com o cadastro de hoje', async t => {
+test('editado mantém o valor da tela (não recalcula com o cadastro de hoje)', async t => {
   const { banco, chamar, aberto } = await salvoEAberto(t, { itens: [giro()] });
   banco.produtos.find(p => p.MODELO === 'Perfil P').VALOR_FIXO = 200;
   const itens = comoTela(aberto);
   itens[0] = { ...itens[0], origem: { ...itens[0].origem, estado: 'editado' } };
   const r = await salvar(chamar, atualizar(aberto, { itens }));
-  assert.equal(r.status, 200); // a tela ainda mostra o preço antigo: salva com o de hoje e só avisa
-  assert.deepEqual((await r.json()).avisos, { precoMudou: [1] });
+  assert.equal(r.status, 200); // a tela mostra o preço antigo: é ele que fica gravado, sem aviso
+  assert.equal((await r.json()).avisos, undefined);
 });
 
 test('salvar com novo número a partir de um aberto: cópia nova, original intacto', async t => {

@@ -702,7 +702,7 @@
                         <h4>🟧 Puxador</h4>
                         <div class="grid-form">
                             <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o puxador —</option></select></div>
-                            <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select></div>
+                            <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select><small id="aviso-acab-pux" style="display:none;color:var(--warning-color)"></small></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Cor do puxador</label><select id="f-cor-pux" disabled><option value="">— escolha o acabamento —</option></select></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
                             <div class="form-group f-pux-extra" style="display:none">
@@ -1275,10 +1275,12 @@
             filtrarCores('f-cor-revest', '');
             tipoPuxadorAtual = '';
             alternarCamposPuxador('');
+            sincronizarAcabPuxador();
         }
         async function carregarDependentesPuxador(puxador) {
             if (!puxador) {
                 popularLista('f-acab-pux', [], '— escolha o puxador —');
+                sincronizarAcabPuxador();
                 filtrarCores('f-cor-pux', '');
                 tipoPuxadorAtual = '';
                 alternarCamposPuxador('');
@@ -1354,8 +1356,28 @@
             filtrarCores('f-cor', val('f-acab'));
             agendar3D(); // a cor do perfil no 3D depende do acabamento
             // puxador selecionado herda o acabamento do perfil
-            if (val('f-puxador') && selecionarSeExistir('f-acab-pux', val('f-acab'))) aoMudarAcabPuxador();
+            if (val('f-puxador')) { sincronizarAcabPuxador(); aoMudarAcabPuxador(); }
             calcularPrecoAutomatico();
+        }
+        // Regra do dono: o acabamento do puxador é SEMPRE o do perfil (o campo fica travado). Se o cadastro do
+        // puxador não lista esse acabamento, avisa e mantém o do perfil (nunca troca por outro em silêncio);
+        // o servidor aplica a mesma regra no preço e na gravação (calculo/precos.js: acabamentoDoPuxador).
+        function sincronizarAcabPuxador() {
+            const sel = document.getElementById('f-acab-pux'), aviso = document.getElementById('aviso-acab-pux');
+            if (!sel) return;
+            const alvo = val('f-acab'), pux = val('f-puxador');
+            let msg = '';
+            if (!pux) { sel.disabled = false; }
+            else if (!alvo) { sel.value = ''; sel.disabled = false; msg = 'Escolha o acabamento do perfil: o puxador sempre usa o mesmo acabamento.'; }
+            else {
+                if (![...sel.options].some(o => o.value === alvo)) {
+                    msg = `⚠️ O puxador "${pux}" não tem o acabamento "${alvo}" no cadastro. Ele segue o acabamento do perfil; confira se existe essa variante.`;
+                }
+                selecionarComboPorTexto('f-acab-pux', alvo);
+                sel.disabled = true;
+                sel.title = 'Sempre igual ao acabamento do perfil';
+            }
+            if (aviso) { aviso.textContent = msg; aviso.style.display = msg ? '' : 'none'; }
         }
         function aoMudarAcabPuxador() {
             const temCor = filtrarCores('f-cor-pux', val('f-acab-pux'));
@@ -1386,7 +1408,7 @@
             document.getElementById('chk-toda-ext').checked = false;
             document.getElementById('f-tamanho-pux').value = 0;
             if (pux) {
-                selecionarSeExistir('f-acab-pux', val('f-acab'));
+                sincronizarAcabPuxador();
                 if (filtrarCores('f-cor-pux', val('f-acab-pux'))) selecionarSeExistir('f-cor-pux', val('f-cor'));
                 garantirFolhas();
                 aplicarRegrasPuxador();          // total de fábrica marca "toda extensão"; tamanho vai para o padrão
@@ -2462,7 +2484,8 @@
                     if (d.puxador) await carregarDependentesPuxador(d.puxador);
                     if (!tipoPuxadorAtual) tipoPuxadorAtual = d.tipoPuxadorNativo || String(d.tipoPuxador || '').replace(/\s*total$/i, '');
                     selecionarComboPorTexto('f-acab-pux', d.acabPux);
-                    filtrarCores('f-cor-pux', d.acabPux);
+                    sincronizarAcabPuxador();      // regra: acabamento do puxador = o do perfil
+                    filtrarCores('f-cor-pux', val('f-acab-pux') || d.acabPux);
                     selecionarComboPorTexto('f-cor-pux', d.corPux);
                     // CADEIA 3: REVESTIMENTO → cor
                     selecionarComboPorTexto('f-revest', d.revestimento);
@@ -2566,6 +2589,7 @@
             document.getElementById('f-tamanho-pux').readOnly = false;
             filtrarCores('f-cor', ''); filtrarCores('f-cor-pux', ''); filtrarCores('f-cor-revest', '');
             tipoPuxadorAtual = '';
+            { const sp = document.getElementById('f-acab-pux'), av = document.getElementById('aviso-acab-pux'); if (sp) sp.disabled = false; if (av) av.style.display = 'none'; }
             posicoesFolhas = [''];
             ladosFuros = ['Esquerdo'];
             furosLista = [];

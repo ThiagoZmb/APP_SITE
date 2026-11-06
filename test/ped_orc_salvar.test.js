@@ -85,13 +85,14 @@ test('validações com as mensagens do VB', async t => {
   assert.equal(banco.pedOrc.length, 0);
 });
 
-test('preço diferente do mostrado na tela: salva com o preço do servidor e devolve só um aviso', async t => {
+test('preço diferente do que o servidor calcularia: grava o da tela, sem aviso', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const r = await salvar(chamar, corpo({ itens: [giro(), giro({ valorTela: 705.10 })] }));
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.equal(j.ok, true);
-  assert.deepEqual(j.avisos, { precoMudou: [2] });
+  assert.equal(j.avisos, undefined);
+  assert.equal(banco.listaItens[1].UNITARIO, 705.10);
   assert.equal(banco.pedOrc.length, 1);
 });
 
@@ -184,11 +185,20 @@ test('porta de correr sem sistema: só portas, vão em branco', async t => {
   assert.equal(banco.complementos.length, 0);
 });
 
-test('acessório manual fora dos permitidos: 422', async t => {
+test('acessório manual fora da lista de permitidos não trava mais o salvamento', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const r = await salvar(chamar, corpo({ itens: [giro({ acessorios: [{ nome: 'Roldana', qtd: 1, origem: 'MANUAL' }] })] }));
-  assert.equal(r.status, 422);
-  assert.equal(banco.pedOrc.length, 0);
+  assert.equal(r.status, 200);
+  assert.equal(banco.pedOrc.length, 1);
+});
+
+test('o valor da tela é gravado como está, sem recalcular nem aviso', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const r = await salvar(chamar, corpo({ itens: [giro({ valorTela: 12345.67 })] }));
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.avisos, undefined);
+  assert.equal(banco.listaItens[0].UNITARIO, 12345.67);
 });
 
 test('serralheria e avulso', async t => {

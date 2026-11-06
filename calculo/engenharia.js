@@ -41,7 +41,9 @@ function larguraRealDoVao(item, folhas) {
 }
 
 // Item da tela → uma Folha por porta (item.qtd folhas)
-function folhasDoItem(item, { descontoAlturaSistema = 0 } = {}) {
+// acabPuxadorDoPerfil (só na gravação): o acabamento do puxador vira o do perfil; a leitura de pedido do VB não usa,
+// para o item antigo reabrir como foi gravado (senão a impressão digital o travaria).
+function folhasDoItem(item, { descontoAlturaSistema = 0, acabPuxadorDoPerfil = false } = {}) {
   const d = item.detalhes || {};
   const n = Math.max(1, parseInt(item.qtd) || 1);
   let altura = num(item.altura), larguraPadrao = num(item.largura), alturaVao = null, larguraVao = null;
@@ -68,7 +70,8 @@ function folhasDoItem(item, { descontoAlturaSistema = 0 } = {}) {
       altura, largura, alturaVao, larguraVao,
       perfil: txt(d.perfil), acabPerfil: txt(d.acabamento), corPerfil: txt(d.cor), usinagemPerfil: '',
       revestimento: txt(d.revestimento), corRevestimento: txt(d.corRevest),
-      puxador, acabPuxador: txt(d.acabPux), corPuxador: txt(d.corPux), tamanhoPuxador: num(d.tamanhoPux),
+      // regra do dono: acabamento do puxador = o do perfil (mesma regra de acabamentoDoPuxador em precos.js)
+      puxador, acabPuxador: acabPuxadorDoPerfil && puxador ? (txt(d.acabamento) || txt(d.acabPux)) : txt(d.acabPux), corPuxador: txt(d.corPux), tamanhoPuxador: num(d.tamanhoPux),
       usinagemPuxador: '', tipoPuxador: puxador ? txt(d.tipoPuxador) : '',
       qtdPuxador: puxador && pos ? pos.split(',').filter(p => p.trim()).length : 0,
       posicaoPuxador: puxador ? pos : '',

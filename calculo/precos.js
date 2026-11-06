@@ -129,6 +129,13 @@ function chavePosicaoPreco(pos) {
   return `${u.includes('TOPO') || u.includes('BASE') ? 'TB' : 'L'}|${u.split(',').filter(p => p.trim()).length}|${u.includes('TOTAL') ? 'T' : ''}`;
 }
 
+// Regra do dono: o acabamento do puxador é SEMPRE o do perfil (a tela já trava o campo; aqui vale para
+// qualquer cliente da API). Sem acabamento no perfil, mantém o que veio. Não recusa nem bloqueia.
+function acabamentoDoPuxador(acabPerfil, acabPuxador) {
+  const perfil = String(acabPerfil ?? '').trim();
+  return perfil || String(acabPuxador ?? '').trim();
+}
+
 async function calcularPrecoItem(b, cliente, leitor) {
   const isFixo = !!cliente?.isFixo;
   const descontoCliente = cliente ? (cliente.desconto || 0) : 0;
@@ -221,7 +228,7 @@ async function calcularPrecoItem(b, cliente, leitor) {
   const dadosDiv = b.divisor ? await leitor.produto(b.divisor) : null;
 
   const taxaPerfil = await leitor.taxaAcabamento(b.acabPerfil);
-  const taxaPux = dadosPux ? await leitor.taxaAcabamento(b.acabPuxador) : 0;
+  const taxaPux = dadosPux ? await leitor.taxaAcabamento(acabamentoDoPuxador(b.acabPerfil, b.acabPuxador)) : 0;
   const taxaRev = dadosRev ? await leitor.taxaAcabamento(b.acabRevest) : 0;
 
   const temPux = !!dadosPux;
@@ -349,4 +356,4 @@ async function precoSerralheria(entrada, cliente, leitor, complementos = []) {
   return { unitario: Math.round(total / qtdItem * 100) / 100, total, pecas: r.total, pecasDetalhe: r.detalhe, complementos: precificados, diag: r.diag };
 }
 
-module.exports = { precoSerralheria, valoresAcessorio, precoComAcessorios, precificarAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais, chavePosicaoPreco };
+module.exports = { acabamentoDoPuxador, precoSerralheria, valoresAcessorio, precoComAcessorios, precificarAcessorios, ErroPreco, criarLeitor, lerCliente, calcularPrecoItem, precoAcessorio, fatorHistorico, aplicarPercentuais, chavePosicaoPreco };

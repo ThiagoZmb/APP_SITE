@@ -449,14 +449,15 @@ function desenharPedOrc(doc, dados, { verValores = false, producao = false, logo
   };
   const linhas = (dados.itens || []).map(it => {
     const id = String(it.ITEM ?? '').trim();
+    const { qtd: qtdLinha, unitario: unitLinha } = qtdUnitarioPdf(it, g.v4[id]);
     const desc = descricaoItem(textoVB(it.TIPO_PRODUTO), {
       v4: g.v4[id], complementos: g.complementos[id], serralheria: g.serralheria[id],
       compSerralheria: g.compSerralheria[id], furos: g.furos[id],
       qtdInflada: textoVB(it.TIPO_PRODUTO) === 'Porta de correr' && qtdInfladaVB(g.v4[id], it.DESCRICAO)
     });
-    const linha = [cel7(textoVB(it.ITEM)), cel7(textoVB(it.QTD)), imagemDoItem(doc, dados.desenhos?.[Number(id)]),
+    const linha = [cel7(textoVB(it.ITEM)), cel7(textoVB(qtdLinha)), imagemDoItem(doc, dados.desenhos?.[Number(id)]),
       { paragrafos: desc.map(l => ({ ...l, tamanho: 7 })) }, cel7(textoVB(it.OBSERVACAO))];
-    if (comPrecos) linha.push(cel7(moedaBR(it.UNITARIO)), cel7(moedaBR(it.TOTAL)));
+    if (comPrecos) linha.push(cel7(moedaBR(unitLinha)), cel7(moedaBR(it.TOTAL)));
     return linha;
   });
   tabela(ctx, cols.map(c => c.w), linhas, { espacoAntes: 15, cabecalho });
@@ -504,7 +505,19 @@ function destinoPdf({ tipo, numero, razaoSocial, producao = false, vidros = fals
   return { pasta: tipo === 'Pedido' ? 'Pedidos(PDF)' : 'Orçamentos(PDF)', nome: `${base}.PDF` };
 }
 
+// Porta de correr: a lista guarda o conjunto (QTD 1, UNITARIO = TOTAL). A tela mostra por folha (QTD = nº de folhas, unitário = total ÷ folhas);
+// o PDF mostra o mesmo que a tela. Nº de folhas = soma das QTD das linhas de folha (ped_orc_itens_v4), ou o nº de linhas se o VB inflou a QTD.
+// Sem folhas conhecidas, ou com QTD já > 1 na lista, mantém o que está gravado.
+function qtdUnitarioPdf(it, v4Item) {
+  const igual = { qtd: it.QTD, unitario: it.UNITARIO };
+  if (textoVB(it.TIPO_PRODUTO) !== 'Porta de correr' || lerDecimal(it.QTD) !== 1) return igual;
+  const ls = Array.isArray(v4Item) ? v4Item : [];
+  const folhas = qtdInfladaVB(ls, it.DESCRICAO) ? ls.length : ls.reduce((a, r) => a + (parseInt(r.QTD, 10) || 1), 0);
+  if (!(folhas > 1)) return igual;
+  return { qtd: folhas, unitario: Math.round(lerDecimal(it.UNITARIO) / folhas * 100) / 100 };
+}
+
 module.exports = {
-  desenharPedOrc, desenharVidros, ajustarImagem, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
+  qtdUnitarioPdf, desenharPedOrc, desenharVidros, ajustarImagem, novoDocumento, destinoPdf, nomeSeguroWindows, descricaoItem, blocosDeFuros, colunasPdf,
   textoVB, lerDecimal, moedaBR, numeroBR, formatarQuantidade, dataVB, dataHoraVB, quebrar, LOGO_PADRAO
 };

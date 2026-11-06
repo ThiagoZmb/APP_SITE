@@ -230,11 +230,9 @@ async function prepararItem(db, leitor, cliente, item, n) {
   if (ehPorta) {
     const manuais = (Array.isArray(item.acessorios) ? item.acessorios : []).filter(a => a && a.origem !== 'SISTEMA DE CORRER');
     if (manuais.length) {
-      const [perm] = await db.execute('SELECT MODELO FROM acessorios_permitidos WHERE TIPO_PRODUTO = ? ORDER BY MODELO ASC', [item.frente]);
-      const permitidos = new Set(perm.map(p => p.MODELO));
+      // sem trava de compatibilidade acessório x tipo de porta (decisão do dono): a lista da tela é só sugestão
       for (const a of manuais) {
         const qtd = parseInt(a.qtd);
-        if (!permitidos.has(a.nome)) throw new ErroItem(422, `Item ${n}: o acessório '${a.nome}' não é permitido para ${item.frente}.`, { item: n });
         if (!(qtd >= 1 && qtd <= 9999)) throw new ErroItem(400, `Item ${n}: quantidade inválida do acessório '${a.nome}'.`);
         acessorios.push({ nome: a.nome, qtd, tamanho: parseInt(a.tamanho) || 0, origem: 'MANUAL' });
       }
@@ -259,7 +257,7 @@ async function prepararItem(db, leitor, cliente, item, n) {
         return { nome: a.nome, qtd, tamanho: a.tamanho, origem: 'SISTEMA DE CORRER' };
       }), ...acessorios];
     }
-    folhas = folhasDoItem(item, { descontoAlturaSistema });
+    folhas = folhasDoItem(item, { descontoAlturaSistema, acabPuxadorDoPerfil: true });
   }
   let preco;
   const complementosSerr = item.frente === 'Serralheria' ? (Array.isArray(item.complementos) ? item.complementos : []).slice(0, 100)
@@ -271,7 +269,11 @@ async function prepararItem(db, leitor, cliente, item, n) {
   }
   catch (err) { if (err instanceof ErroPreco) throw new ErroItem(422, `Item ${n}: ${err.message}`, { item: n }); throw err; }
   const historico = corta(item.historico, 500);
-  const valor = arred2(preco.unitario * fatorHistorico(historico));
+  // O valor mostrado na tela (orçamento aberto ou item conferido) é o que vale: nada de recalcular ao salvar/converter em pedido.
+  // Só sem valor de tela válido (item novo vindo de fora, importação) o servidor usa o preço calculado.
+  const valorTela = Number(item.valorTela);
+  const temValorTela = item.valorTela !== null && item.valorTela !== '' && Number.isFinite(valorTela) && valorTela > 0 && valorTela < 1e9;
+  const valor = temValorTela ? arred2(valorTela) : arred2(preco.unitario * fatorHistorico(historico));
   const qtdTela = Math.max(1, parseInt(item.qtd) || 1);
   const r = { item, n, historico, valor, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios || [], folhas, grupos: [],
     fator: fatorHistorico(historico), pecasSerr: preco.pecas, pecasDetalhe: preco.pecasDetalhe || [], complementosSerr: preco.complementos || [] };
@@ -556,8 +558,8 @@ function registrarPedOrc({ rota, pool }) {
       console.error('Erro POST /ped_orc/salvar (preparo):', err.message);
       return res.status(500).json({ error: 'Erro de servidor' });
     }
-    // preço da tela diferente do que o servidor calcula agora: NÃO impede o salvamento (grava o do servidor) e volta só como aviso
-    const mudaram = preparados.filter(p => !p.copia && Math.abs(p.valor - (parseFloat(p.item.valorTela) || 0)) > 0.01).map(p => p.n);
+    // o valor da tela é gravado como está (prepararItem), então não há mais aviso de preço recalculado
+    const mudaram = [];
 
     // cliente com desconto fixo já tem o desconto no preço (a tela trava o desconto geral)
     // desconto adicional (txt_Desconto_Adicional do VB): sempre editável, por cima do desconto do cliente que já está nos itens
