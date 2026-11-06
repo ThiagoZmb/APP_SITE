@@ -214,6 +214,19 @@
         html body label[for="sel-cliente"] { font-size: 14px !important; font-weight: 700 !important; color: var(--text-dark) !important; }
         /* datas: só a largura de "dd/mm/aaaa" + ícone do calendário */
         .ped-pedido-grid.ped-datas { grid-template-columns: repeat(2, 160px); gap: 12px 16px; }
+        /* Cabeçalho do documento: tipo junto ao título e número/datas no canto superior direito. */
+        html body .card-title.card-title-cliente { display:flex; align-items:center; gap:12px; position:relative; padding-right:240px; min-height:38px; }
+        .tipo-toggle { display:inline-flex; padding:3px; gap:2px; border:1px solid var(--border-color); border-radius:999px; background:var(--white); }
+        .tipo-toggle button { border:0; border-radius:999px; background:transparent; color:var(--text-mid); padding:5px 12px; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+        .tipo-toggle button[aria-pressed="true"] { background:var(--gradient-primary); color:var(--on-primary); }
+        .numero-datas { position:absolute; top:0; right:0; display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+        #ped-numero { width:220px; height:56px; box-sizing:border-box; font-size:200%; font-weight:800; text-align:center; }
+        .numero-datas .ped-datas { display:grid; grid-template-columns:repeat(2,160px); gap:8px; }
+        .numero-datas .ped-datas label { font-size:13px; }
+        .numero-datas .ped-datas input { font-size:14px; }
+        .cab-esq .form-group.full.datas-antigas { display:none; }
+        html body .cab-meio .obs-geral #ped-obs { min-height:54px; height:54px; }
+        @media(max-width:700px) { html body .card-title.card-title-cliente { padding-right:0; flex-wrap:wrap; } .numero-datas { position:static; align-items:stretch; } .numero-datas .ped-datas { grid-template-columns:repeat(2,minmax(120px,1fr)); } #ped-numero { width:100%; } }
         .correr-larguras { margin: 6px 0 10px; padding: 8px 12px; border: 1px dashed var(--border-strong, #d9d9e3); border-radius: 8px; }
         .correr-larguras > small { display: block; margin-bottom: 6px; color: var(--text-light); font-weight: 600; }
         .correr-larguras .cl-linha { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -554,7 +567,12 @@
             <p class="welcome-subtitle">1. Selecione o cliente &nbsp;→&nbsp; 2. Escolha a frente &nbsp;→&nbsp; 3. Monte os itens — preços calculados pelo motor financeiro</p>
             <!-- ═══════════ ETAPA 1: CLIENTE ═══════════ -->
             <section class="card">
-                <div class="card-title"><span class="etapa">1</span> Cliente</div>
+                <div class="card-title card-title-cliente"><span class="etapa">1</span> Cliente
+                    <span class="tipo-toggle" role="group" aria-label="Tipo do documento"><button type="button" data-tipo="Pedido" aria-pressed="false">Pedido</button><button type="button" data-tipo="Orçamento" aria-pressed="true">Orçamento</button></span>
+                    <div class="numero-datas"><input type="text" id="ped-numero" readonly placeholder="novo" aria-label="Número" title="Número do orçamento/pedido (definido ao salvar)">
+                        <div class="ped-datas"><div><label for="ped-data">Data</label><input type="date" id="ped-data" readonly title="Data do documento (gravada ao salvar)"></div><div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div></div>
+                    </div>
+                </div>
                 <div id="faixa-leitura" class="faixa-leitura" style="display:none">🔒 Somente leitura — você pode ver este pedido, mas não alterar.</div>
                 <!-- atalhos: repetem Novo / Abrir / Salvar do rodapé (cada um aciona o botão original) -->
                 <div class="acoes-linha acoes-topo" role="toolbar" aria-label="Ações do documento">
@@ -577,10 +595,8 @@
                     <div class="form-group full cab-meio">
                     <div class="cab-esq">
                     <div class="form-group dupla">
-                        <label for="ped-tipo">Tipo e número</label>
                         <div class="tipo-numero">
-                            <select id="ped-tipo"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
-                            <input type="text" id="ped-numero" readonly placeholder="novo" aria-label="Número" title="Número do orçamento/pedido (definido ao salvar)">
+                            <select id="ped-tipo" aria-label="Tipo do documento" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
                         </div>
                     </div>
                     <div class="form-group dupla">
@@ -588,10 +604,7 @@
                         <input type="text" id="ped-cliente-final" maxlength="190">
                     </div>
                     <div class="form-group full">
-                        <div class="ped-pedido-grid ped-datas">
-                            <div><label for="ped-data">Data</label><input type="date" id="ped-data" readonly title="Data do documento (gravada ao salvar)"></div>
-                            <div><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
-                        </div>
+                        <div class="ped-pedido-grid ped-datas datas-antigas"></div>
                     </div>
                     </div>
                     <div class="form-group full obs-geral">
@@ -3939,6 +3952,22 @@
         document.getElementById('abrir-lista').addEventListener('click', escolherParaAbrir);
         document.getElementById('abrir-lista').addEventListener('keydown', e => { if (e.key === 'Enter') escolherParaAbrir(e); });
         document.getElementById('ped-tipo').addEventListener('change', atualizarCamposPedido);
+        document.querySelectorAll('.tipo-toggle [data-tipo]').forEach(btn => btn.addEventListener('click', () => {
+            const tipo = document.getElementById('ped-tipo');
+            if (btn.disabled || tipo.disabled || ![...tipo.options].some(o => o.value === btn.dataset.tipo)) return;
+            tipo.value = btn.dataset.tipo;
+            tipo.dispatchEvent(new Event('change', { bubbles: true }));
+            sincronizarTipoToggle();
+        }));
+        function sincronizarTipoToggle() {
+            const tipo = document.getElementById('ped-tipo');
+            document.querySelectorAll('.tipo-toggle [data-tipo]').forEach(btn => {
+                btn.setAttribute('aria-pressed', String(btn.dataset.tipo === tipo.value));
+                btn.disabled = tipo.disabled || ![...tipo.options].some(o => o.value === btn.dataset.tipo);
+            });
+        }
+        sincronizarTipoToggle();
+        document.getElementById('ped-tipo').addEventListener('change', sincronizarTipoToggle);
         document.addEventListener('DOMContentLoaded', () => { if (!$s('ped-data').value) $s('ped-data').value = hojeISO(); }); // documento novo nasce com a data de hoje
         document.addEventListener('DOMContentLoaded', configurarTipo); // layout.js (defer) já definiu o Acesso
         document.getElementById('desconto').addEventListener('input', atualizarTotais);
