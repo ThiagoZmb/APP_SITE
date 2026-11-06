@@ -32,7 +32,7 @@
       $('cal-resumo').textContent = `${d.qtdPedidos} pedido(s) no mês${d.qtdAtrasados ? ` · ${d.qtdAtrasados} atrasado(s)` : ''}`;
       $('cal-visao').innerHTML = K.htmlVisao(estado.visao);
       $('cal-situacao').innerHTML = K.htmlSituacao(estado.situacao);
-      $('cal-corpo').dataset.visao = estado.visao;
+      $('cal-corpo').dataset.modo = estado.visao;   // não pode ser data-visao: é o atributo dos botões e o closest() pegaria o contêiner
       $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao);
       $('cal-grade').innerHTML = K.htmlGrade(semanas, estado.situacao);
       $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao);

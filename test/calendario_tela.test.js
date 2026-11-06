@@ -268,6 +268,21 @@ test('alternador Calendário | Lista e endereço da visão', () => {
   assert.equal(K.visaoValida('x'), 'grade');
   assert.match(K.htmlVisao('lista'), /data-visao="lista"[^>]*aria-pressed="true"/);
   assert.match(K.htmlVisao('lista'), /data-visao="grade"[^>]*aria-pressed="false"/);
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calendario.html'), 'utf8');   // o alternador fica ao lado do título e não na barra do mês
+  assert.match(html, /<h1 class="welcome-title">Calendário de pedidos<\/h1>\s*<div id="cal-visao" class="tipo-toggle"/);
+  assert.doesNotMatch(html.slice(html.indexOf('class="cal-topo"')), /id="cal-visao"/);
   assert.equal(K.urlMes('2026-11', 'abertos', 'lista'), 'calendario.html?mes=2026-11&situacao=abertos&visao=lista');
   assert.equal(K.urlMes('2026-11', 'abertos'), 'calendario.html?mes=2026-11&situacao=abertos');
+});
+
+test('alternadores: a opção escolhida tem a classe "ativo" e o contêiner não usa data-visao nem data-sit (o closest() engolia o clique de Em aberto/Todos)', () => {
+  assert.match(K.htmlVisao('lista'), /class="toggle-btn active" data-visao="lista"/);
+  assert.match(K.htmlVisao('lista'), /class="toggle-btn" data-visao="grade"/);
+  assert.match(K.htmlSituacao('todos'), /class="btn btn-mini btn-primary ativo" data-sit="todos"/);
+  const js = fs.readFileSync(path.join(__dirname, '..', 'calendario.js'), 'utf8');
+  assert.match(js, /\$\('cal-corpo'\)\.dataset\.modo = /);
+  assert.doesNotMatch(js, /cal-corpo'\)\.dataset\.(visao|sit)\b/);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'calendario.css'), 'utf8');
+  assert.doesNotMatch(css, /data-visao="lista"\]/);
+  assert.match(css, /#cal-corpo:not\(\[data-modo="lista"\]\) \.btn-imprimir \{ display: none; \}/);
 });

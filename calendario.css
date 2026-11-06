@@ -66,13 +66,14 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .cal-ajuda { padding: 0 16px 16px; }
 
 /* visão em lista (folha): um bloco por dia com pedido, uma linha por pedido; a grade e a lista do celular saem do caminho */
-.cal-topo .grupo-visao { margin-left: auto; }
-.cal-topo .grupo-visao + #cal-situacao .grupo-sit { margin-left: 0; }
-.btn-imprimir { display: none; }
+.titulo-linha { display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; margin-bottom: 8px; }
+.titulo-linha .welcome-title { margin-bottom: 0; }
+.titulo-linha .tipo-toggle { margin-top: 4px; }
+body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .cal-folha { display: none; padding: 0 16px 16px; }
-#cal-corpo[data-visao="lista"] #cal-grade, #cal-corpo[data-visao="lista"] #cal-lista { display: none; }
-#cal-corpo[data-visao="lista"] .cal-folha { display: block; }
-#cal-corpo[data-visao="lista"] .btn-imprimir { display: inline-flex; }
+#cal-corpo[data-modo="lista"] #cal-grade, #cal-corpo[data-modo="lista"] #cal-lista { display: none; }
+#cal-corpo[data-modo="lista"] .cal-folha { display: block; }
+#cal-corpo[data-modo="lista"] .btn-imprimir { display: inline-flex; }
 .folha-dia { padding: 14px 0 10px; border-top: 1px solid var(--border-color); }
 .folha-dia h3 { font-size: 15px; margin-bottom: 6px; }
 .folha-dia h3 a { color: var(--text-dark); text-decoration: none; }
@@ -147,11 +148,11 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 @media print {
     body { padding: 0; background: white; color: black; }
     .container { display: block; box-shadow: none; border-radius: 0; background: white; }
-    header, .sidebar, .cal-topo button, .cal-topo .grupo-visao, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
+    header, .sidebar, .cal-topo button, .titulo-linha .tipo-toggle, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
     main { padding: 0; overflow: visible; }
     .welcome-subtitle { display: none; }
     .painel { border: none; box-shadow: none; }
-    #cal-corpo[data-visao="lista"] .folha-dia { break-inside: avoid; border-top-color: black; }
-    #cal-corpo[data-visao="lista"] .folha-dia h3 a, #cal-corpo[data-visao="lista"] .folha-linha, .folha-final, .folha-sit { color: black; }
+    #cal-corpo[data-modo="lista"] .folha-dia { break-inside: avoid; border-top-color: black; }
+    #cal-corpo[data-modo="lista"] .folha-dia h3 a, #cal-corpo[data-modo="lista"] .folha-linha, .folha-final, .folha-sit { color: black; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

@@ -120,10 +120,9 @@
     return dias.map(c => `<section class="folha-dia${c.hoje ? ' hoje' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
       `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao)).join('')}</ul></section>`).join('');
   }
-  // alternador "Calendário | Lista" (botões com aria-pressed)
+  // alternador "Calendário | Lista" ao lado do título: só os botões (o contêiner #cal-visao é o .tipo-toggle do tema.css, o mesmo de Pedidos | Orçamentos no Início)
   function htmlVisao(visao) {
-    return `<div class="grupo-sit" role="group" aria-label="Como mostrar os pedidos">${VISOES.map(s =>
-      `<button type="button" class="btn btn-mini ${s.id === visao ? 'btn-primary' : 'btn-secondary'}" data-visao="${s.id}" aria-pressed="${s.id === visao}">${s.rotulo}</button>`).join('')}</div>`;
+    return VISOES.map(s => `<button type="button" class="toggle-btn${s.id === visao ? ' active' : ''}" data-visao="${s.id}" aria-pressed="${s.id === visao}">${s.rotulo}</button>`).join('');
   }
   const seloSituacao = p => `<span class="selo ${COR_CLASSE[p.classe] || 'aviso'}">${esc(p.situacao || '—')}</span>`;
   const seloAtraso = p => (p.atrasado ? '<span class="selo perigo">Atrasado</span>' : '');
@@ -170,7 +169,7 @@
   // alternador "Em aberto | Todos" (botões com aria-pressed); `aoTrocar(id)` roda ao escolher
   function htmlSituacao(situacao) {
     return `<div class="grupo-sit" role="group" aria-label="Quais pedidos mostrar">${SITUACOES.map(s =>
-      `<button type="button" class="btn btn-mini ${s.id === situacao ? 'btn-primary' : 'btn-secondary'}" data-sit="${s.id}" aria-pressed="${s.id === situacao}">${s.rotulo}</button>`).join('')}</div>`;
+      `<button type="button" class="btn btn-mini ${s.id === situacao ? 'btn-primary ativo' : 'btn-secondary'}" data-sit="${s.id}" aria-pressed="${s.id === situacao}">${s.rotulo}</button>`).join('')}</div>`;
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
