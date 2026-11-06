@@ -194,7 +194,7 @@
 
     const casa = e => {
       const b = estado.busca.toLowerCase();
-      return !b || String(e.numero).includes(b) || String(e.cliente || '').toLowerCase().includes(b);
+      return !b || String(e.numero).includes(b) || String(e.cliente || '').toLowerCase().includes(b) || String(e.clienteFinal || '').toLowerCase().includes(b);
     };
     const local = e => [e.cidade, e.uf].filter(Boolean).join('/');
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
@@ -212,7 +212,7 @@
     }
 
     function linha(e, aba) {
-      const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(local(e))}</td>`;
+      const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
       if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td>${botaoAcao('reagendar', 'Reagendar')}</td>`;
@@ -221,10 +221,10 @@
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {
-      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cidade/UF', 'Prometido', 'Status', ''],
-      ocorrencias: ['Pedido', 'Cliente', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
-      outras: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
-      em_rota: ['Pedido', 'Cliente', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
+      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', ''],
+      ocorrencias: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
+      outras: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
+      em_rota: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
     };
 
     // Agenda em calendário mensal: cada entrega é uma etiqueta colorida pelo status; clicar abre o detalhe

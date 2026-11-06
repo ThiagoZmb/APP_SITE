@@ -249,12 +249,12 @@ function registrarEntregas({ rota, pool }) {
     try {
       const where = ["p.TIPO = 'Pedido'"], params = [];
       if (status) { where.push('e.status = ?'); params.push(status); }
-      if (busca) { where.push('(CAST(e.numero AS CHAR) LIKE ? OR p.RAZAO_SOCIAL LIKE ?)'); params.push(`%${busca}%`, `%${busca}%`); }
+      if (busca) { where.push('(CAST(e.numero AS CHAR) LIKE ? OR p.RAZAO_SOCIAL LIKE ? OR p.CLIENTE_FINAL LIKE ?)'); params.push(`%${busca}%`, `%${busca}%`, `%${busca}%`); }
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) { where.push(est.sql); params.push(...est.params); }
       const [linhas] = await pool.execute(
         `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
-                p.RAZAO_SOCIAL AS cliente, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
+                p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
                 u.NOME AS motorista,
                 (SELECT COUNT(*) FROM web_entrega_eventos v WHERE v.entrega_id = e.id
                    AND v.tipo IN (${OCORRENCIAS.map(o => `'${o}'`).join(', ')})) AS qtd_ocorrencias
@@ -265,7 +265,7 @@ function registrarEntregas({ rota, pool }) {
          WHERE ${where.join(' AND ')}
          ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero`, params);
       res.json({ entregas: linhas.map(l => ({
-        id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null, cliente: l.cliente || '', cidade: l.cidade || '', uf: l.uf || '',
+        id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null, cliente: l.cliente || '', clienteFinal: l.cliente_final || '', cidade: l.cidade || '', uf: l.uf || '',
         dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,

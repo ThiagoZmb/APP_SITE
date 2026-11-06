@@ -85,7 +85,7 @@ test('dataPrometida vem de DATA_PRONTO, dataPedido de DATA e dataAgendada é tex
   banco.semear.evento({ entrega_id: 1, tipo: 'ausente' });
   banco.semear.evento({ entrega_id: 1, tipo: 'agendada' });
   const [e] = (await (await chamar('/entregas')).json()).entregas;
-  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'dataAgendada', 'dataPedido', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'status', 'tipo', 'uf'].sort());
+  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'clienteFinal', 'dataAgendada', 'dataPedido', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'status', 'tipo', 'uf'].sort());
   assert.equal(e.dataPrometida, '2026-11-10');
   assert.equal(e.dataPedido, '2026-10-20');
   assert.equal(e.dataAgendada, '2026-11-03');
@@ -119,4 +119,16 @@ test('usuário com estados restritos não vê cliente de outro estado', async t 
   banco.semear.pedido({ NUMERO: 501 }); banco.semear.pedido({ NUMERO: 502, RAZAO_SOCIAL: 'PAULISTA LTDA' });
   const { entregas } = await (await chamar('/entregas')).json();
   assert.deepEqual(entregas.map(e => e.numero), [501]);
+});
+
+test('Cliente final (ped_orc.CLIENTE_FINAL): vem na lista, entra na busca e é coluna de todas as abas da tela', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const rota = fs.readFileSync(path.join(__dirname, '..', 'rotas', 'entregas.js'), 'utf8');
+  assert.match(rota, /p\.CLIENTE_FINAL AS cliente_final/);
+  assert.match(rota, /clienteFinal: l\.cliente_final \|\| ''/);
+  assert.match(rota, /OR p\.CLIENTE_FINAL LIKE \?/);
+  const tela = fs.readFileSync(path.join(__dirname, '..', 'entregas.js'), 'utf8');
+  assert.equal((tela.match(/'Cliente', 'Cliente final', 'Cidade\/UF'/g) || []).length, 4);   // fila (depois da data), ocorrências, outras, em rota
+  assert.match(tela, /<td>\$\{esc\(e\.clienteFinal \|\| '-'\)\}<\/td>/);
+  assert.match(tela, /e\.clienteFinal \|\| ''\)\.toLowerCase\(\)\.includes\(b\)/);
 });
