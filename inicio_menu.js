@@ -76,7 +76,7 @@
       const add = (perm, icone, rotulo, fn, extra = {}) => { if (!perm || cfg.pode(perm)) L.push({ icone, rotulo, fn, ...extra }); };
       const sep = () => { if (L.length && !L[L.length - 1].sep) L.push({ sep: true }); };
       add('pedidos.pdf', '📄', 'Abrir PDF', () => window.abrirPdfAutenticado(urlPdf(n, false)));
-      add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => window.abrirPdfAutenticado(urlPdf(n, true)));
+      add('pedidos.pdf', '🏭', 'Guia de produção', () => window.abrirPdfAutenticado(urlPdf(n, true)));
       add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => window.abrirPdfAutenticado(urlVidros(n)));
       // nota fiscal (DANFE) do pedido; o servidor confere a permissão e os estados do usuário
       add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, pode: cfg.pode }));

@@ -135,7 +135,7 @@ const TODAS = ['pedidos.ver', 'pedidos.pdf', 'pedidos.checklist', 'pedidos.situa
 
 test('menu do calendário: tem todos os itens pedidos para quem tem todas as permissões', () => {
   const r = rotulos(carregarMenu(new Set(TODAS)).itensDoMenu(ped(7)));
-  for (const esperado of ['Alterar data de pronto', 'Entregue', 'Pronto', 'Retirado', 'Em Produção', 'Abrir para editar', 'Abrir PDF', 'Guia de produção (PDF sem valores)',
+  for (const esperado of ['Alterar data de pronto', 'Entregue', 'Pronto', 'Retirado', 'Em Produção', 'Abrir para editar', 'Abrir PDF', 'Guia de produção',
     'Imprimir etiquetas (Zebra)', 'Corte de perfil', 'Corte de vidros', 'Imprimir checklist', 'Abrir nota fiscal (DANFE)']) assert.ok(r.includes(esperado), esperado);
 });
 
@@ -148,7 +148,7 @@ test('menu do calendário: cada item some sem a permissão correspondente', () =
   sem('pedidos.situacao', 'Alterar data de pronto');
   sem('pedidos.situacao', 'Entregue');
   sem('pedidos.pdf', 'Abrir PDF');
-  sem('pedidos.pdf', 'Guia de produção (PDF sem valores)');
+  sem('pedidos.pdf', 'Guia de produção');
   sem('pedidos.pdf', 'Imprimir etiquetas (Zebra)');
   sem('pedidos.checklist', 'Imprimir checklist');
   sem('danfe.ver', 'Abrir nota fiscal (DANFE)');

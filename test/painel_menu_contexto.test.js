@@ -45,7 +45,7 @@ function menuDoPainel(permissoes, tipoLista, x) {
 test('menu do botão direito: quem só tem pedidos.pdf (perfil Representante) vê somente as opções de PDF', () => {
   const rep = new Set(['pedidos.pdf']);
   const ped = menuDoPainel(rep, 'Pedido', { numero: 1, s: 'pronto', entregaStatus: 'agendada' });
-  assert.deepEqual(ped, ['Abrir PDF', 'Guia de produção (PDF sem valores)', 'Vidros (PDF)', 'Imprimir PDF', 'Imprimir guia de produção', 'Imprimir vidros', 'Imprimir etiquetas (Zebra)']);
+  assert.deepEqual(ped, ['Abrir PDF', 'Guia de produção', 'Vidros (PDF)', 'Imprimir PDF', 'Imprimir guia de produção', 'Imprimir vidros', 'Imprimir etiquetas (Zebra)']);
   const orc = menuDoPainel(rep, 'Orçamento', { numero: 2, s: 'aberto', situacao: '' });
   assert.deepEqual(orc, ['Abrir PDF', 'Imprimir orçamento']);
   // sem pedidos.pdf, nada de PDF

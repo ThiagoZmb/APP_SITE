@@ -818,7 +818,7 @@
             const add = (perm, icone, rotulo, fn, extra = {}) => { if (!perm || Acesso.pode(perm)) L.push({ icone, rotulo, fn, ...extra }); };
             const sep = () => { if (L.length && !L[L.length - 1].sep) L.push({ sep: true }); };
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
-            if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção (PDF sem valores)', () => abrirPdfAutenticado(urlPdf(numero, true)));
+            if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção', () => abrirPdfAutenticado(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
             // nota fiscal (DANFE) do pedido: só Pedido (orçamento não tem nota); o servidor confere a permissão e os estados do usuário
             if (ehPedido) add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) }));
