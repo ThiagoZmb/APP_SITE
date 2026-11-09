@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; media-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Etiquetas de QR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
+        [hidden] { display: none !important; }
+        body { background: var(--bg); color: var(--text-dark); min-height: 100vh; }
+        .container { display: grid; grid-template-columns: 1fr; grid-template-areas: "header" "main"; min-height: 100vh; background: var(--white); }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 18px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 50px; background: var(--primary-light); }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: none; }
+        .sidebar { grid-area: sidebar; }
+        main { grid-area: main; padding: 16px 14px 40px; min-width: 0; }
+        .welcome-title { font-size: 24px; margin-bottom: 4px; font-weight: 700; }
+        .welcome-subtitle { font-size: 14px; color: var(--text-light); margin-bottom: 14px; }
+        .aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
+        .erro-form { color: var(--danger-color); font-size: 14px; min-height: 20px; margin-bottom: 8px; font-weight: 600; }
+        .cinza { color: var(--text-light); font-size: 14px; }
+
+        .barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+        .barra input[type="search"] { flex: 1 1 220px; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 16px; background: var(--white); color: var(--text-dark); }
+        .barra input[type="search"]:focus { outline: none; border-color: var(--primary-color); }
+        .btn { padding: 12px 18px; border: none; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .todos { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
+
+        .lista { border: 1px solid var(--border-color); border-radius: 12px; max-height: 320px; overflow: auto; margin-bottom: 16px; }
+        .linha-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--linha-tabela); font-size: 15px; cursor: pointer; }
+        .linha-item:last-child { border-bottom: none; }
+        .linha-item:hover { background: var(--hover-linha); }
+        .linha-item .nome { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+        .linha-item .cod { font-family: var(--font-mono); font-size: 13px; color: var(--text-light); }
+
+        /* folha de etiquetas: sempre tinta preta sobre papel branco (o QR precisa de contraste total, mesmo no tema escuro) */
+        .folhas { display: grid; gap: 16px; }
+        .folha { --papel: #fff; --tinta: #000; background: var(--papel); color: var(--tinta); border: 1px solid var(--border-color); padding: 10mm; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; break-after: page; }
+        .etiqueta { border: 1px dashed var(--tinta); padding: 3mm; display: flex; flex-direction: column; align-items: center; text-align: center; break-inside: avoid; }
+        .qr { width: 32mm; height: 32mm; display: block; }
+        .qr-fundo { fill: var(--papel); }
+        .qr-modulo { fill: var(--tinta); }
+        .et-nome { font-size: 11px; font-weight: 700; margin-top: 2mm; overflow-wrap: anywhere; }
+        .et-cod { font-family: var(--font-mono); font-size: 10px; }
+
+        @media (min-width: 769px) {
+            body { padding: 20px; }
+            .container { grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden; }
+            header { padding: 0 40px; }
+            .logo { font-size: 28px; }
+            .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+            .user-cargo { font-size: 11px; opacity: 0.8; }
+            main { padding: 40px; }
+        }
+
+        /* impressão: só a folha de etiquetas */
+        @media print {
+            body, .container { background: #fff !important; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; display: block !important; min-height: 0 !important; }
+            header, .sidebar, .no-print, .menu-title { display: none !important; }
+            main { padding: 0 !important; }
+            .folhas { display: block; }
+            .folha { border: none; padding: 8mm; }
+            .folha:last-child { break-after: auto; }
+        }
+    </style>
+    <script src="layout.js?v=202611061400" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="vendor/qrcode.js?v=1.4.4" defer></script>
+    <script src="etiquetas_qr.js?v=202611091100" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <div class="no-print">
+                <h1 class="welcome-title">Etiquetas de QR</h1>
+                <p class="welcome-subtitle">Marque os itens, confira a prévia e imprima. O QR de cada etiqueta é o código de barras do item.</p>
+                <p class="aviso" id="aviso-sem-codigo" hidden></p>
+                <p class="erro-form" id="msg" role="alert"></p>
+                <div class="barra">
+                    <input type="search" id="busca" placeholder="Buscar por nome ou código" autocomplete="off" aria-label="Buscar por nome ou código">
+                    <button type="button" class="btn btn-primary" id="btn-imprimir" disabled>Imprimir</button>
+                </div>
+                <label class="todos"><input type="checkbox" id="marcar-todos"> Marcar todos</label>
+                <div class="lista" id="lista"></div>
+                <p class="cinza" id="vazio" hidden>Nenhum item encontrado.</p>
+                <p class="cinza" id="contagem">0 etiqueta(s) selecionada(s)</p>
+            </div>
+            <div class="folhas" id="folhas"></div>
+        </main>
+    </div>
+</body>
+</html>

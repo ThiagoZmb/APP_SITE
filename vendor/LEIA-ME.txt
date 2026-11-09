@@ -7,3 +7,11 @@ jsQR.js
   Origem:   pacote npm "jsqr@1.4.0" (package/dist/jsQR.js), https://github.com/cozmo/jsQR
   Uso:      baixa_qr.html (leitura do QR da etiqueta pela câmera do celular)
   Obs.:     conteúdo original; só foi acrescentada a primeira linha de comentário com a licença.
+
+qrcode.js
+  Nome:     qrcode-generator (gerador de QR Code em JavaScript puro)
+  Versão:   1.4.4
+  Licença:  MIT
+  Origem:   pacote npm "qrcode-generator@1.4.4" (package/qrcode.js), https://github.com/kazuhikoarase/qrcode-generator
+  Uso:      etiquetas_qr.html (desenho do QR das etiquetas de estoque, para impressão)
+  Obs.:     conteúdo original, sem alterações (cabeçalho de licença mantido).
