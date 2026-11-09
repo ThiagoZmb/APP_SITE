@@ -85,6 +85,19 @@ test('secure só na porta 465', () => {
   assert.equal(b.estado.criados[0].port, 587);
 });
 
+test('fora da 465 o STARTTLS é obrigatório (sem downgrade) e o TLS mínimo é 1.2', () => {
+  const a = falso();
+  criarEmail({ smtp: smtp({ port: 465 }), criarTransporte: a.criarTransporte });
+  assert.equal(a.estado.criados[0].requireTLS, false);
+  for (const port of [587, 25, 2525]) {
+    const b = falso();
+    criarEmail({ smtp: smtp({ port }), criarTransporte: b.criarTransporte });
+    assert.equal(b.estado.criados[0].requireTLS, true, String(port));
+    assert.equal(b.estado.criados[0].tls.minVersion, 'TLSv1.2');
+    assert.equal(b.estado.criados[0].tls.rejectUnauthorized, true);
+  }
+});
+
 test('erro do transporte: não lança, devolve enviado false e o log só tem o código', async () => {
   const f = falso({ falhar: { code: 'ECONNREFUSED' } });
   const email = criarEmail({ smtp: smtp(), criarTransporte: f.criarTransporte });

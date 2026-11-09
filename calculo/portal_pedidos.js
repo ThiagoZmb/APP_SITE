@@ -4,7 +4,8 @@
 const TAMANHO_PAGINA = 50;
 
 // Teto de página: com 50 por página já passa de 5 milhões de pedidos e mantém o OFFSET longe de perder precisão.
-const PAGINA_MAXIMA = 100000;
+// Teto realista: OFFSET alto com JOIN por nome varre a tabela do VB inteira (DoS autenticado); 2000 páginas já passam de qualquer cliente.
+const PAGINA_MAXIMA = 2000;
 
 const ROTULO_SITUACAO = Object.freeze({
   'Em Produção': 'Em produção',

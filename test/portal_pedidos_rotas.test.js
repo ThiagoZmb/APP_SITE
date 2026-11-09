@@ -35,7 +35,7 @@ const CHAVES = ['numero', 'data', 'situacao', 'dataEntrega', 'entrega', 'dataAge
 // Usuários do portal: 1 Ana (admin_geral, ACME), 2 Caio (papel 'usuario' de ACME, SEM permissões),
 // 3 Dora (papel 'usuario' de ACME com pedidos.ver), 4 Bia (admin_geral, BETA).
 // `mutar` troca "c.CODIGO = ?" por "1 = 1" no SQL antes de chegar ao pool falso (prova de mutação, teste 5).
-async function montar(t, { pedidos = PEDIDOS, mutar = false } = {}) {
+async function montar(t, { pedidos = PEDIDOS, mutar = false, limite } = {}) {
   const banco = criarBancoPortal();
   const d = banco.dados;
   d.clientes.push({ CODIGO: 40, RAZAO_SOCIAL: 'ACME LTDA' }, { CODIGO: 41, RAZAO_SOCIAL: 'BETA LTDA' });
@@ -56,7 +56,7 @@ async function montar(t, { pedidos = PEDIDOS, mutar = false } = {}) {
   const sessoes = criarSessoesPortal({ pool: banco.pool });
   const { portalAtivo, portalAutenticar } = criarAcessoPortal({ pool: banco.pool, sessoes, config });
   const registro = criarRegistro(app, { autenticado: [], portalPublico: [portalAtivo], portalAutenticado: [portalAtivo, portalAutenticar] });
-  registrarPortalPedidos({ portal: registro.portal, pool: poolUsado });
+  registrarPortalPedidos({ portal: registro.portal, pool: poolUsado, ...(limite ? { limite } : {}) });
   registro.verificar();
   const s = await subir(app);
   t.after(s.fechar);
@@ -91,6 +91,21 @@ test('lista de ACME: só os 4 pedidos de ACME, sem orçamento nem BETA, 6 chaves
   assert.equal(p14.situacao, 'Pronto');
   assert.equal(p14.entrega, 'Entrega agendada');
   assert.equal(p14.dataAgendada, '2026-11-10');
+});
+
+test('limite de uso por usuário: passou do teto vira 429 só para ele, sem tocar o banco do VB; outro usuário segue normal', async t => {
+  const c = await montar(t, { limite: { janelaMs: 60000, max: 3 } });
+  const ana = await c.cookieDe(1), dora = await c.cookieDe(3);
+  for (let i = 0; i < 3; i++) assert.equal((await c.get('/portal/api/pedidos', { cookie: ana })).status, 200, `ana ${i}`);
+  const antes = consultasPedidos(c.pool).length;
+  const r = await c.get('/portal/api/pedidos', { cookie: ana });
+  assert.equal(r.status, 429);
+  assert.equal(r.headers.get('retry-after'), '60');
+  assert.equal(consultasPedidos(c.pool).length, antes, 'o 429 não pode consultar o banco');
+  assert.equal((await c.get('/portal/api/pedidos/12', { cookie: ana })).status, 429, 'o teto vale para a lista e o detalhe juntos');
+  assert.equal((await c.get('/portal/api/pedidos', { cookie: dora })).status, 200);
+  // sem sessão continua o 401 de sempre: o limite vem depois da autenticação e não revela contagem
+  assert.equal((await c.get('/portal/api/pedidos')).status, 401);
 });
 
 test('detalhe: 12 devolve só o 12; pedido de BETA, inexistente e 12abc dão 404 idêntico', async t => {

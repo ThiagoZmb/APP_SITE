@@ -80,5 +80,5 @@ test('projetarTitulo: chaves fechadas', () => {
 });
 
 test('PAGINA_MAXIMA exportado', () => {
-  assert.strictEqual(pedidos.PAGINA_MAXIMA, 100000);
+  assert.strictEqual(pedidos.PAGINA_MAXIMA, 2000);
 });

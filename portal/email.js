@@ -46,11 +46,14 @@ function criarEmail({ smtp, criarTransporte = nodemailer.createTransport } = {})
     host: smtp.host,
     port: smtp.port,
     secure: Number(smtp.port) === 465,
+    // fora da 465 (TLS direto) o STARTTLS é OBRIGATÓRIO: sem isto quem estiver na rede remove o anúncio do STARTTLS e
+    // o link do convite e a senha do SMTP seguiriam em texto claro (downgrade).
+    requireTLS: Number(smtp.port) !== 465,
     auth: { user: smtp.user, pass: smtp.pass },
     connectionTimeout: TIMEOUT_MS,
     greetingTimeout: TIMEOUT_MS,
     socketTimeout: TIMEOUT_MS,
-    tls: { rejectUnauthorized: true },
+    tls: { rejectUnauthorized: true, minVersion: 'TLSv1.2' },
   });
 
   async function enviarConvite({ para, link, razaoSocial } = {}) {

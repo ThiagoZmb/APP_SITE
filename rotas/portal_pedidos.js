@@ -3,6 +3,7 @@
 // A empresa vem SEMPRE da sessão (req.portal.empresaCodigo); nenhum parâmetro, cabeçalho ou corpo escolhe a empresa.
 // A consulta é fixa e seleciona só as 6 colunas da lista fechada (nunca valores, observações nem cliente final).
 const { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA, PAGINA_MAXIMA } = require('../calculo/portal_pedidos');
+const { criarLimiteLeitura } = require('../portal/limite_leitura');
 
 const SELECIONAR = `SELECT p.NUMERO AS NUMERO, DATE_FORMAT(p.DATA, '%Y-%m-%d') AS DATA, p.SITUACAO AS SITUACAO,
        DATE_FORMAT(p.DATA_ENTREGA, '%Y-%m-%d') AS DATA_ENTREGA, en.status AS ENTREGA_STATUS,
@@ -15,13 +16,14 @@ const SELECIONAR = `SELECT p.NUMERO AS NUMERO, DATE_FORMAT(p.DATA, '%Y-%m-%d') A
 const NAO_ENCONTRADO = { error: 'Pedido não encontrado.' };
 const PAGINA_INVALIDA = { error: 'Página inválida.' };
 
-function registrarPortalPedidos({ portal, pool }) {
+function registrarPortalPedidos({ portal, pool, limite }) {
+  const limitar = criarLimiteLeitura(limite);
   const falhaInterna = (res, nome, err) => {
     console.error(`Erro ${nome}:`, (err && err.code) || 'sem código');
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
   };
 
-  portal('get', '/portal/api/pedidos', ['pedidos.ver'], async (req, res) => {
+  portal('get', '/portal/api/pedidos', ['pedidos.ver'], limitar, async (req, res) => {
     try {
       const pagina = paginaValida(req.query.pagina);
       if (pagina === null || pagina > PAGINA_MAXIMA) return res.status(400).json(PAGINA_INVALIDA);
@@ -35,7 +37,7 @@ function registrarPortalPedidos({ portal, pool }) {
     } catch (err) { falhaInterna(res, 'GET /portal/api/pedidos', err); }
   });
 
-  portal('get', '/portal/api/pedidos/:numero', ['pedidos.ver'], async (req, res) => {
+  portal('get', '/portal/api/pedidos/:numero', ['pedidos.ver'], limitar, async (req, res) => {
     try {
       const numero = numeroValido(req.params.numero);
       if (numero === null) return res.status(404).json(NAO_ENCONTRADO);

@@ -287,7 +287,7 @@ test('paginação: 51 em aberto = 50 + 1; pagina e visao inválidas dão 400 sem
 
   const antes = c.pool.chamadas.length;
   assert.ok(antes >= 4);
-  const ruins = ['pagina=0', 'pagina=-1', 'pagina=1.5', 'pagina=abc', 'pagina=100001', 'pagina=1&pagina=2',
+  const ruins = ['pagina=0', 'pagina=-1', 'pagina=1.5', 'pagina=abc', 'pagina=2001', 'pagina=1&pagina=2',
     'visao=todos', 'visao=abertos&visao=pagos', 'visao='];
   for (const q of ruins) {
     const r = await c.get('/portal/api/financeiro?' + q, { cookie });

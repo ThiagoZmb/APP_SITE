@@ -8,6 +8,7 @@ const {
 } = require('../calculo/portal_financeiro');
 const { hojeLocal } = require('./transacao');
 const { auditarPortal } = require('../portal/auditoria');
+const { criarLimiteLeitura } = require('../portal/limite_leitura');
 
 const LISTA_ABERTOS = `(${EM_ABERTO.map(s => `'${s}'`).join(',')})`;
 
@@ -39,13 +40,14 @@ const SQL_RESUMO = `SELECT COALESCE(SUM(f.VALOR),0) AS A_RECEBER,
 const VISAO_INVALIDA = { error: 'Visão inválida.' };
 const PAGINA_INVALIDA = { error: 'Página inválida.' };
 
-function registrarPortalFinanceiro({ portal, pool, hoje = hojeLocal }) {
+function registrarPortalFinanceiro({ portal, pool, hoje = hojeLocal, limite }) {
+  const limitar = criarLimiteLeitura(limite);
   const falhaInterna = (res, nome, err) => {
     console.error(`Erro ${nome}:`, (err && err.code) || 'sem código');
     if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
   };
 
-  portal('get', '/portal/api/financeiro', ['financeiro.ver'], async (req, res) => {
+  portal('get', '/portal/api/financeiro', ['financeiro.ver'], limitar, async (req, res) => {
     try {
       const visao = visaoValida(req.query.visao);
       if (visao === null) return res.status(400).json(VISAO_INVALIDA);
