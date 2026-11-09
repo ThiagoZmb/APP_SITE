@@ -277,6 +277,7 @@
         .status { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; background: var(--secondary-color); border: 1px solid var(--border-color); color: var(--text-light); }
         .status.producao { color: hsl(188, 78%, 72%); border-color: #9fd4dc; background: hsla(190, 67%, 55%, .14); }
         .status.pronto { color: hsl(134, 78%, 72%); border-color: #a3d9b1; background: hsla(133, 60%, 55%, .14); }
+        .status.programar { color: hsl(38, 92%, 74%); border-color: hsl(38, 80%, 62%); background: hsla(38, 92%, 55%, .16); }
         .status.atraso { color: hsl(6, 78%, 72%); border-color: #f5a08a; background: hsla(10, 100%, 55%, .14); }
 
         .fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px 24px; }
@@ -532,7 +533,7 @@
                 const quando = atrasado ? `atrasado ${-dias} dia${dias === -1 ? '' : 's'}` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
                 return `<li data-numero="${escapeHtml(p.numero)}">
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
-                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${p.rotulo} ${escapeHtml(p.dataTxt)}${p.entregaStatus && !(p.entregaStatus === 'agendada' && p.rotulo === 'Agendada') ? ' · <span class="status">' + escapeHtml(ROT_ENTREGA[p.entregaStatus] || p.entregaStatus) + '</span>' : ''}</small></div>
+                    <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${p.rotulo} ${escapeHtml(p.dataTxt)}${p.entregaStatus && !(p.entregaStatus === 'agendada' && p.rotulo === 'Agendada') ? ' · <span class="status' + (p.entregaStatus === 'a_programar' ? ' programar' : '') + '">' + escapeHtml(ROT_ENTREGA[p.entregaStatus] || p.entregaStatus) + '</span>' : ''}</small></div>
                     <div class="dir"><span class="status ${atrasado ? 'atraso' : classeStatus(p.situacao)}">${quando}</span><small>${escapeHtml(p.situacao || '')}</small></div>
                 </li>`;
             }).join('') || '<li class="vazio">Nenhuma entrega prevista para os próximos 7 dias 🎉</li>';
