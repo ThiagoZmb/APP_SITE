@@ -227,10 +227,10 @@
     function linha(e, aba) {
       const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
-      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
-      else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td>${botaoAcao('reagendar', 'Reagendar')}</td>`;
+      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')}</td>`;
+      else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
       else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.statusExibicao || e.status)}</td>` +
-        (aba === 'em_rota' ? `<td>${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
+        (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {

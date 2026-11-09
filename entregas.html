@@ -89,6 +89,9 @@
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
         .btn-perigo { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
         .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; }
+        /* protege as células de ação para não comprimir os botões */
+        td.acao { width: 1%; white-space: nowrap; padding: 8px 4px; }
+        td.acao button.btn-mini { white-space: nowrap; min-width: 70px; display: inline-block; overflow: visible; }
         tbody td button.btn-mini { white-space: nowrap; min-width: 80px; display: inline-block; overflow: visible; }
         .btn:disabled { opacity: .6; cursor: wait; }
 
