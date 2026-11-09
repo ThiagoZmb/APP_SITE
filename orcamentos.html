@@ -3140,12 +3140,10 @@
             const m = medidasPortasCorrer();
             return Array.from({ length: m.n }, (_, i) => (ehCorrer() && larguraEditadaDe(i)) || m.largura);
         }
-        // com larguras editadas os trilhos cobrem a soma das folhas − transpasse × (n − 1); senão, o vão digitado
+        // trilhos e bandeira de acabamento têm SEMPRE o tamanho do vão digitado, mesmo com larguras de porta editadas
+        // (decisão do dono, 2026-11-09; o VB rebaixava para a soma das folhas − transpasse × (n − 1)). Igual a larguraRealDoVao do servidor.
         function vaoRealCorrer() {
-            const l = parseFloat(val('f-largura')) || 0;
-            if (!temLarguraEditada() || !temSistemaCorrer() || qtdEfetiva() === 1) return l; // 1 porta: o trilho cobre o vão digitado, a porta pode ser menor
-            const n = qtdEfetiva(), t = parseFloat(val('f-transpasse')) || 0, auto = Math.round((l + t * (n - 1)) / n);
-            return Array.from({ length: n }, (_, i) => larguraEditadaDe(i) || auto).reduce((x, w) => x + w, 0) - t * (n - 1);
+            return parseFloat(val('f-largura')) || 0;
         }
         function zerarLargurasFolhas() { largurasFolhas = []; }
         // uma caixa por folha; vazia = automática (mostrada como placeholder)

@@ -31,13 +31,11 @@ function larguraEditadas(lista, n) {
   return Array.from({ length: n }, (_, i) => { const v = Math.round(num(l[i])); return v > 0 ? v : 0; });
 }
 
-// Vão que os trilhos cobrem quando há largura editada (frmPortasCorrer.EditarTamanho: soma das folhas − transpasse × (n − 1));
-// sem edição vale o vão digitado
-function larguraRealDoVao(item, folhas) {
-  const d = item.detalhes || {};
-  // uma porta só: os trilhos cobrem o vão digitado, mesmo com a porta menor (largura própria)
-  if (folhas.length === 1 || !larguraEditadas(d.largurasFolhas, folhas.length).some(v => v > 0)) return num(item.largura);
-  return folhas.reduce((t, f) => t + f.largura, 0) - num(d.transpasse) * Math.max(folhas.length - 1, 0);
+// Vão que os trilhos e a bandeira de acabamento cobrem: SEMPRE o vão digitado, mesmo com largura de porta editada.
+// Decisão do dono (2026-11-09). Diferente do VB, que em frmPortasCorrer.EditarTamanho rebaixava trilho e bandeira para a
+// soma das folhas − transpasse × (n − 1); a web não faz isso. O 2º parâmetro (folhas) ficou só para não mudar os chamadores.
+function larguraRealDoVao(item, folhas) { // eslint-disable-line no-unused-vars
+  return num(item.largura);
 }
 
 // Item da tela → uma Folha por porta (item.qtd folhas)

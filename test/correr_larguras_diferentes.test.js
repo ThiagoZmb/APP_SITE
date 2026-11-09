@@ -23,11 +23,31 @@ test('sem larguras editadas nada muda', () => {
   assert.equal(agruparFolhas(fl).length, 1);
 });
 
-test('vão real dos trilhos = soma das folhas − transpasse × (n − 1), só quando há edição', () => {
+// Decisão do dono (2026-11-09): trilho e bandeira de acabamento têm SEMPRE o tamanho do vão digitado, mesmo com larguras de
+// porta editadas. (O VB rebaixava para a soma das folhas − transpasse × (n − 1) em frmPortasCorrer.EditarTamanho; a web não.)
+test('vão dos trilhos e da bandeira = o vão digitado, com ou sem largura editada', () => {
   const comEdicao = base({ largurasFolhas: [0, 900, 0] });
-  assert.equal(larguraRealDoVao(comEdicao, folhasDoItem(comEdicao, { descontoAlturaSistema: 40 })), 833 + 900 + 833 - 100);
+  assert.equal(larguraRealDoVao(comEdicao, folhasDoItem(comEdicao, { descontoAlturaSistema: 40 })), 2400);
+  const todasEditadas = { ...base({ largurasFolhas: [500, 500, 500] }), qtd: 3 };
+  assert.equal(larguraRealDoVao(todasEditadas, folhasDoItem(todasEditadas, { descontoAlturaSistema: 40 })), 2400);
   const sem = base();
   assert.equal(larguraRealDoVao(sem, folhasDoItem(sem, { descontoAlturaSistema: 40 })), 2400);
+});
+
+test('acessórios do sistema: trilho superior, inferior e bandeira levam o vão digitado, não a soma das folhas', () => {
+  const { acessoriosDoSistema } = require('../calculo/engenharia');
+  const item = { frente: 'Porta de Correr', qtd: 2, altura: 2250, largura: 2000, detalhes: { sistema: 'S1', transpasse: '0', largurasFolhas: [500, 500] } };
+  const larguraVao = require('../calculo/engenharia').larguraRealDoVao(item, folhasDoItem(item, { descontoAlturaSistema: 62 }));
+  const itens = [
+    { classe: 'Trilho Superior', modelo: 'Trilho Superior 3086', qtd: 1 },
+    { classe: 'Trilho Inferior', modelo: 'Trilho Inferior 3087', qtd: 1 },
+    { classe: 'Bandeira', modelo: 'Bandeira de acabamento AL86', qtd: 1 }
+  ];
+  const r = acessoriosDoSistema(itens, {}, { larguraVao, folhas: 2, incluirDesempenador: false });
+  const tamanhos = Object.fromEntries(r.map(a => [a.nome, a.tamanho]));
+  assert.equal(tamanhos['Trilho Superior 3086'], 2000);
+  assert.equal(tamanhos['Trilho Inferior 3087'], 2000);
+  assert.equal(tamanhos['Bandeira de acabamento AL86'], 2000);
 });
 
 test('divisor acompanha a largura da própria folha', () => {
