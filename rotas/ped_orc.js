@@ -439,13 +439,18 @@ function registrarPedOrc({ rota, pool }) {
   rota('get', '/ped_orc/sistema_correr', ['orcamentos.criar'], async (req, res) => {
     try {
       const folhas = Math.max(1, parseInt(req.query.folhas) || 2);
-      const sis = await lerSistemaCorrer(pool, String(req.query.nome || ''), folhas);
+      // o sistema e o cliente são independentes; depois, o cadastro de cada acessório também: tudo que pode sair junto sai junto
+      // (cada ida ao banco custa ~190 ms no Render; os acessórios eram lidos um por um)
+      const [sis, clienteLido] = await Promise.all([
+        lerSistemaCorrer(pool, String(req.query.nome || ''), folhas),
+        lerCliente(pool, { clienteCodigo: req.query.clienteCodigo })
+      ]);
       if (!sis) return res.status(404).json({ error: 'Sistema de correr não encontrado.' });
-      const cliente = (await lerCliente(pool, { clienteCodigo: req.query.clienteCodigo })) || SEM_CLIENTE;
+      const cliente = clienteLido || SEM_CLIENTE;
       const lista = acessoriosDoSistema(sis.itens, sis.config, {
         larguraVao: parseFloat(req.query.larguraVao) || 0, folhas, incluirDesempenador: req.query.desempenador === '1' });
-      const acessorios = [];
-      for (const a of lista) acessorios.push({ ...a, ...valoresAcessorio(await leitor.produto(a.nome), cliente, a) });
+      const produtos = await Promise.all(lista.map(a => leitor.produto(a.nome)));
+      const acessorios = lista.map((a, i) => ({ ...a, ...valoresAcessorio(produtos[i], cliente, a) }));
       res.json(semValores(req, {
         descontoAltura: sis.descontoAltura,
         temDesempenador: sis.itens.some(i => i.classe === 'Desempenador'),

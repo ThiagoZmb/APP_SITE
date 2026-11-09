@@ -1250,20 +1250,24 @@ registro.rota('get', '/estoque', ['estoque.ver'], async (req, res) => {
 // Combos (classes/unidades/fornecedores já usados) + Contar_Valor_Estoque + contadores
 registro.rota('get', '/estoque/resumo', ['estoque.ver'], async (req, res) => {
   try {
-    const [[tot]] = await pool.execute(
-      `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
-              SUM(SITUACAO = 'Ativo') AS ativos,
-              SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE <= 0) AS falta,
-              SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE > 0 AND MIN_ESTOQUE > 0 AND QTD_ESTOQUE <= MIN_ESTOQUE) AS minimo
-       FROM estoque`);
     const distintos = async col => {
       const [r] = await pool.execute(`SELECT DISTINCT ${col} AS v FROM estoque WHERE ${col} IS NOT NULL AND ${col} <> '' ORDER BY ${col}`);
       return r.map(x => x.v);
     };
+    // as 4 leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render; eram 4 em série)
+    const [[[tot]], classes, unidades, fornecedores] = await Promise.all([
+      pool.execute(
+        `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
+                SUM(SITUACAO = 'Ativo') AS ativos,
+                SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE <= 0) AS falta,
+                SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE > 0 AND MIN_ESTOQUE > 0 AND QTD_ESTOQUE <= MIN_ESTOQUE) AS minimo
+         FROM estoque`),
+      distintos('CLASSE'), distintos('UNIDADE'), distintos('FORNECEDOR')
+    ]);
     res.json(semValores(req, {
       valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0,
       falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0,
-      classes: await distintos('CLASSE'), unidades: await distintos('UNIDADE'), fornecedores: await distintos('FORNECEDOR')
+      classes, unidades, fornecedores
     }, ['valorTotal']));
   } catch (err) {
     console.error('Erro /estoque/resumo:', err.message);
@@ -1625,16 +1629,17 @@ registro.rota('get', '/fluxo/resumo', ['financeiro.ver', 'valores.ver'], async (
 // Combos: situações existentes, formas de pagamento, bancos, clientes, fornecedores e próximo ID
 registro.rota('get', '/fluxo/opcoes', ['financeiro.ver', 'valores.ver'], async (req, res) => {
   const lista = async sql => { try { const [r] = await pool.execute(sql); return r.map(x => x.v).filter(Boolean); } catch { return []; } };
-  const [[mx]] = await pool.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa').catch(() => [[{ m: 0 }]]);
-  res.json({
-    proximoId: (parseInt(mx.m, 10) || 0) + 1,
-    situacoes: await lista('SELECT DISTINCT SITUACAO AS v FROM fluxo_de_caixa ORDER BY SITUACAO ASC'),
-    formas: await lista("SELECT DISTINCT FORMA_PGTO AS v FROM fluxo_de_caixa WHERE FORMA_PGTO <> '' ORDER BY FORMA_PGTO"),
-    bancos: await lista("SELECT DISTINCT BANCO AS v FROM fluxo_de_caixa WHERE BANCO <> '' ORDER BY BANCO"),
-    clientes: await lista('SELECT RAZAO_SOCIAL AS v FROM cadastro_clientes ORDER BY RAZAO_SOCIAL'),
-    fornecedores: await lista(`SELECT RAZAO_FABRICANTE AS v FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE <> ''
-                               UNION SELECT DISTINCT RAZAO_FABRICANTE FROM fluxo_de_caixa WHERE RAZAO_FABRICANTE <> '' ORDER BY v`)
-  });
+  // as 6 leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render; eram 6 em série)
+  const [[[mx]], situacoes, formas, bancos, clientes, fornecedores] = await Promise.all([
+    pool.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa').catch(() => [[{ m: 0 }]]),
+    lista('SELECT DISTINCT SITUACAO AS v FROM fluxo_de_caixa ORDER BY SITUACAO ASC'),
+    lista("SELECT DISTINCT FORMA_PGTO AS v FROM fluxo_de_caixa WHERE FORMA_PGTO <> '' ORDER BY FORMA_PGTO"),
+    lista("SELECT DISTINCT BANCO AS v FROM fluxo_de_caixa WHERE BANCO <> '' ORDER BY BANCO"),
+    lista('SELECT RAZAO_SOCIAL AS v FROM cadastro_clientes ORDER BY RAZAO_SOCIAL'),
+    lista(`SELECT RAZAO_FABRICANTE AS v FROM cadastro_fornecedores WHERE RAZAO_FABRICANTE <> ''
+           UNION SELECT DISTINCT RAZAO_FABRICANTE FROM fluxo_de_caixa WHERE RAZAO_FABRICANTE <> '' ORDER BY v`)
+  ]);
+  res.json({ proximoId: (parseInt(mx.m, 10) || 0) + 1, situacoes, formas, bancos, clientes, fornecedores });
 });
 
 // Árvore de categorias (fluxo_de_caixa_classificacao: TIPO > CLASSE1 > CLASSE2 > CLASSE3)

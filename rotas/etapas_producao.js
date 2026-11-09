@@ -32,11 +32,15 @@ const lista = numeros => numeros.map(() => '?').join(',');
 async function aplicabilidadeDos(db, numeros) {
   const mapa = new Map();
   if (!numeros.length) return mapa;
-  const [perfis] = await db.execute(`SELECT NUMERO, id, ITEM, QTD_PORTAS, PERFIL, QTD_ALTURA, TAM_ALTURA, QTD_LARGURA, TAM_LARGURA, PUXADOR, QTD_PUXADOR, TAM_PUXADOR FROM perfis WHERE NUMERO IN (${lista(numeros)})`, numeros);
-  const [itens] = await db.execute(`SELECT NUMERO, ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR,
-    QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL, ALTURA, LARGURA, REVESTIMENTO, COR_REVESTIMENTO FROM ped_orc_itens_v4 WHERE TIPO = 'Pedido' AND NUMERO IN (${lista(numeros)})`, numeros);
-  const [vidros] = await db.execute(`SELECT NUMERO, id, MEDICAO, ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO FROM vidros WHERE NUMERO IN (${lista(numeros)})`, numeros);
-  const tipos = await banco.itensDosPedidos(db, numeros);
+  // as leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render). Numa transação (`db` = uma conexão) o mysql2
+  // as enfileira na mesma conexão, então nada muda ali.
+  const [[perfis], [itens], [vidros], tipos] = await Promise.all([
+    db.execute(`SELECT NUMERO, id, ITEM, QTD_PORTAS, PERFIL, QTD_ALTURA, TAM_ALTURA, QTD_LARGURA, TAM_LARGURA, PUXADOR, QTD_PUXADOR, TAM_PUXADOR FROM perfis WHERE NUMERO IN (${lista(numeros)})`, numeros),
+    db.execute(`SELECT NUMERO, ITEM_PEDIDO, ITEM, QTD, PERFIL, ACABAMENTO_PERFIL, COR_PERFIL, PUXADOR, ACABAMENTO_PUXADOR, COR_PUXADOR, DIVISOR, ACABAMENTO_DIVISOR, COR_DIVISOR,
+      QTD_HORIZONTAL, QTD_VERTICAL, TAM_DIV_HORIZONTAL, TAM_DIV_VERTICAL, ALTURA, LARGURA, REVESTIMENTO, COR_REVESTIMENTO FROM ped_orc_itens_v4 WHERE TIPO = 'Pedido' AND NUMERO IN (${lista(numeros)})`, numeros),
+    db.execute(`SELECT NUMERO, id, MEDICAO, ITEM, QTD, MODELO, COR_REVESTIMENTO, TAMANHO FROM vidros WHERE NUMERO IN (${lista(numeros)})`, numeros),
+    banco.itensDosPedidos(db, numeros)
+  ]);
   const de = (linhas, n) => (linhas || []).filter(l => Number(l.NUMERO) === n);
   for (const n of numeros) {
     const itensDoPedido = de(itens, n);
@@ -74,8 +78,8 @@ function registrarEtapasProducao({ rota, pool }) {
       const filtrados = E.ordenarFila(E.filtrarFila(base, filtro));
       const pedidos = filtrados.slice(0, LIMITE_FILA);
       const numeros = pedidos.map(p => p.numero);
-      const linhasPor = await banco.lerLinhasDe(pool, numeros);
-      const aplic = await aplicabilidadeDos(pool, numeros);
+      // as etapas gravadas e a aplicabilidade não dependem uma da outra: saem juntas
+      const [linhasPor, aplic] = await Promise.all([banco.lerLinhasDe(pool, numeros), aplicabilidadeDos(pool, numeros)]);
       const saida = pedidos.map(p => {
         const etapas = E.montarEtapas(linhasPor.get(p.numero) || [], aplic.get(p.numero) || { perfil: true, vidro: true, montagem: true });
         return { ...p, classe: classificarSituacao(p.situacao), atrasado: atrasado(p.situacao, p.prontoEm, hoje), ...E.progresso(etapas), etapas };
