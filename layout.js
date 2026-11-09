@@ -4,6 +4,8 @@
 // Quem decide de verdade é o backend; aqui a tela só deixa de mostrar o que não vale.
 // ==========================================================================
 (function () {
+    // Atalho no celular (PWA): pwa.js põe as tags do manifesto, se faltarem, e registra o sw.js (que não guarda dados).
+    try { const s = document.createElement("script"); s.src = new URL("pwa.js", (document.currentScript && document.currentScript.src) || location.href).href; document.head.appendChild(s); } catch (e) { /* sem o atalho o sistema funciona igual */ }
     const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
     const API = 'https://elegance-backend-hrho.onrender.com';
     const ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
