@@ -5,7 +5,7 @@
 // ==========================================================================
 const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
-const { STATUS, TIPOS, proximo, pedidoPara, validarAnexo } = require('../calculo/entregas');
+const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
@@ -255,7 +255,8 @@ function registrarEntregas({ rota, pool }) {
       const [linhas] = await pool.execute(
         `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
                 p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
-                u.NOME AS motorista,
+                u.NOME AS motorista, p.SITUACAO AS situacao_pedido,
+                (SELECT v.usuario FROM web_entrega_eventos v WHERE v.entrega_id = e.id AND v.tipo = 'cancelada' ORDER BY v.id DESC LIMIT 1) AS cancelada_por,
                 (SELECT COUNT(*) FROM web_entrega_eventos v WHERE v.entrega_id = e.id
                    AND v.tipo IN (${OCORRENCIAS.map(o => `'${o}'`).join(', ')})) AS qtd_ocorrencias
          FROM web_entregas e
@@ -265,7 +266,8 @@ function registrarEntregas({ rota, pool }) {
          WHERE ${where.join(' AND ')}
          ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero`, params);
       res.json({ entregas: linhas.map(l => ({
-        id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null, cliente: l.cliente || '', clienteFinal: l.cliente_final || '', cidade: l.cidade || '', uf: l.uf || '',
+        id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null,
+        statusExibicao: statusExibicao({ status: l.status, situacaoPedido: l.situacao_pedido, canceladaPor: l.cancelada_por }), cliente: l.cliente || '', clienteFinal: l.cliente_final || '', cidade: l.cidade || '', uf: l.uf || '',
         dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
@@ -297,7 +299,7 @@ function registrarEntregas({ rota, pool }) {
     try {
       const est = filtroEstados(req, 'c.ESTADO');
       const [[r]] = await pool.execute(
-        `SELECT e.*, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
+        `SELECT e.*, p.SITUACAO AS situacao_pedido, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
                 c.ENDERECO AS cli_endereco, c.NUMERO AS cli_numero, c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade,
                 c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone
          FROM web_entregas e
@@ -311,7 +313,8 @@ function registrarEntregas({ rota, pool }) {
       const [anexos] = await pool.execute(
         'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND evento_id IS NOT NULL ORDER BY id', [id]);
       res.json({
-        entrega: { ...paraEntrega(r), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
+        entrega: { ...paraEntrega(r), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
+          canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
         itens,

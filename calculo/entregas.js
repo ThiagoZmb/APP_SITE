@@ -39,6 +39,20 @@ function pedidoPara(status) {
   return null;
 }
 
+// Rótulo mostrado para entrega com status 'cancelada' (o valor gravado não muda). Só "Cancelada" quando houve cancelamento de verdade:
+//  - cancelada  = o pedido está Cancelado, ou a equipe cancelou a entrega à mão (canceladaPor <> 'sistema');
+//  - encerrada  = o pedido foi para Entregue/Retirado fora do sistema (a varredura só viu que saiu de Pronto);
+//  - suspensa   = o pedido saiu de Pronto para outra situação (a varredura reabre se ele voltar a Pronto).
+// Sem situação conhecida do pedido (excluído) mantém "cancelada". Qualquer outro status volta como veio.
+function statusExibicao({ status, situacaoPedido, canceladaPor } = {}) {
+  if (status !== 'cancelada') return status;
+  if (canceladaPor && canceladaPor !== 'sistema') return 'cancelada';
+  const s = String(situacaoPedido ?? '').trim().toLowerCase();
+  if (!s || s === 'cancelado') return 'cancelada';
+  if (s === 'entregue' || s === 'retirado') return 'encerrada';
+  return 'suspensa';
+}
+
 const LIMITE_ANEXO = 1048576; // 1 MiB
 
 // confere tamanho, assinatura (JPEG/PNG) e se o mime declarado bate com ela
@@ -53,4 +67,4 @@ function validarAnexo(buffer, mime) {
   return { ok: true, tipo };
 }
 
-module.exports = { STATUS, TIPOS, proximo, pedidoPara, validarAnexo };
+module.exports = { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo };

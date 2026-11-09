@@ -18,8 +18,8 @@
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
-    retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
-  const COR_STATUS = { a_programar: 'aviso', agendada: 'info', em_rota: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok', enviada: 'info', cancelada: 'neutro' };
+    retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada', encerrada: 'Encerrada', suspensa: 'Suspensa' };
+  const COR_STATUS = { a_programar: 'aviso', agendada: 'info', em_rota: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok', enviada: 'info', cancelada: 'neutro', encerrada: 'neutro', suspensa: 'aviso' };
   const ROTULO_TIPO = { motorista: 'Entrega', retirada: 'Retirado pelo cliente', outro_estado: 'Entrega em outro estado' };
   const ROTULO_EVENTO = { criada: 'Entrou na fila', agendada: 'Agendada', reagendada: 'Reagendada', saiu: 'Saiu para a entrega', entregue: 'Entregue',
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
@@ -214,9 +214,9 @@
     function linha(e, aba) {
       const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
-      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
+      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}</td><td>${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td>${botaoAcao('reagendar', 'Reagendar')}</td>`;
-      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.status)}</td>` +
+      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.statusExibicao || e.status)}</td>` +
         (aba === 'em_rota' ? `<td>${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
@@ -302,7 +302,7 @@
       const { entrega: e, eventos, itens, anexos } = estado.det;
       mostrar('vista-detalhe');
       $('d-titulo').textContent = `Pedido ${e.numero}`;
-      $('d-status').innerHTML = selo(e.status);
+      $('d-status').innerHTML = selo(e.statusExibicao || e.status);
       $('d-info').innerHTML = linhaInfo('Cliente', e.cliente) + linhaInfo('Tipo', e.tipo ? rotuloTipo(e.tipo) : '') +
         linhaInfo('Data do pedido', dataBR(e.dataPedido)) + linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
         linhaInfo('Motorista', (estado.motoristas || []).find(m => m.codigo === e.motoristaCodigo)?.nome || (e.motoristaCodigo ? '#' + e.motoristaCodigo : '')) +

@@ -84,3 +84,16 @@ test('validarAnexo', () => {
   assert.equal(r.ok, false);
   assert.match(r.motivo, /1 MB|grande/i);
 });
+
+test('statusExibicao: Cancelada só com cancelamento real; Entregue/Retirado fora do sistema = Encerrada; outra situação = Suspensa', () => {
+  const { statusExibicao } = require('../calculo/entregas');
+  const base = { status: 'cancelada' };
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Cancelado', canceladaPor: 'sistema' }), 'cancelada');
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Pronto', canceladaPor: '7' }), 'cancelada'); // equipe cancelou à mão
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Entregue', canceladaPor: 'sistema' }), 'encerrada');
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Retirado', canceladaPor: 'sistema' }), 'encerrada');
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Em Produção', canceladaPor: 'sistema' }), 'suspensa');
+  assert.equal(statusExibicao({ ...base, situacaoPedido: null, canceladaPor: 'sistema' }), 'cancelada'); // pedido sem situação conhecida
+  assert.equal(statusExibicao({ ...base, situacaoPedido: 'Entregue', canceladaPor: '7' }), 'cancelada'); // decisão humana prevalece
+  assert.equal(statusExibicao({ status: 'agendada', situacaoPedido: 'Entregue' }), 'agendada'); // só mexe em cancelada
+});
