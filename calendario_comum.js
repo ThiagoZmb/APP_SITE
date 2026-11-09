@@ -27,7 +27,7 @@
   const dois = n => String(n).padStart(2, '0');
   const isoUTC = d => `${d.getUTCFullYear()}-${dois(d.getUTCMonth() + 1)}-${dois(d.getUTCDate())}`;
   const situacaoValida = v => (SITUACOES.some(s => s.id === v) ? v : 'abertos');
-  const visaoValida = v => (VISOES.some(s => s.id === v) ? v : 'grade');
+  const visaoValida = v => (VISOES.some(s => s.id === v) ? v : 'lista');
 
   // ---------- datas ----------
   const mesValido = v => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(v ?? ''));
@@ -76,7 +76,7 @@
   }
   const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
-  const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'lista' ? '&visao=lista' : ''}`;
+  const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'grade' ? '&visao=grade' : ''}`;
   const rotuloPedido = p => `Pedido ${p.numero}, ${p.cliente || 'sem cliente'}, ${p.situacao || 'sem situação'}${p.atrasado ? ', atrasado' : ''}`;
   const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
   const iconesItens = p => {
