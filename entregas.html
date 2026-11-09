@@ -29,7 +29,7 @@
         .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
         .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
 
-        .workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .workspace { display: grid; grid-template-columns: minmax(auto, 2.4fr) minmax(auto, 1fr); gap: 24px; align-items: start; }
         .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
         .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
         .painel-head { padding: 22px 22px 0; }
@@ -90,9 +90,9 @@
         .btn-perigo { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
         .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; }
         /* protege as células de ação para não comprimir os botões */
-        td.acao { width: 1%; white-space: nowrap; padding: 8px 4px; }
-        td.acao button.btn-mini { white-space: nowrap; min-width: 70px; display: inline-block; overflow: visible; }
-        tbody td button.btn-mini { white-space: nowrap; min-width: 80px; display: inline-block; overflow: visible; }
+        td.acao { width: 1% !important; white-space: nowrap !important; padding: 8px 6px !important; }
+        td.acao button.btn-mini { white-space: nowrap !important; min-width: 85px !important; display: inline-block !important; overflow: visible !important; }
+        tbody td button.btn-mini { white-space: nowrap !important; min-width: 85px !important; display: inline-block !important; overflow: visible !important; }
         .btn:disabled { opacity: .6; cursor: wait; }
 
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
