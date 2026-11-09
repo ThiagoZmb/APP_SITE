@@ -111,8 +111,31 @@
     return { estado, lerCodigo, mudarQtd, confirmar, cancelar };
   }
 
+  // Gestor do stream da câmera: uma trava impede duas chamadas de getUserMedia ao mesmo tempo
+  // (a segunda substituía a primeira e a luz da câmera ficava ligada sem dono).
+  // abrir() -> Promise<stream>; podeUsar() diz se a página ainda quer a câmera quando o stream chega.
+  // ligar() -> { estado: 'ok' | 'ocupado' | 'falha' | 'descartado' }
+  function criarGestorStream(abrir, podeUsar) {
+    let stream = null, ligando = false;
+    const pararFaixas = s => { try { s.getTracks().forEach(t => t.stop()); } catch { /* já parado */ } };
+    return {
+      get stream() { return stream; },
+      async ligar() {
+        if (stream || ligando) return { estado: 'ocupado' };
+        ligando = true;
+        let s;
+        try { s = await abrir(); } catch { return { estado: 'falha' }; } finally { ligando = false; }
+        if (stream || !podeUsar()) { pararFaixas(s); return { estado: 'descartado' }; }
+        stream = s;
+        return { estado: 'ok', stream: s };
+      },
+      parar() { if (stream) { pararFaixas(stream); stream = null; } }
+    };
+  }
+
   // ============ NAVEGADOR ============
   function iniciar(win) {
+    if (win.Acesso && !win.Acesso.paginaLiberada()) return;   // sem permissão: o layout.js já mostrou "Sem acesso"; não pede a câmera
     const doc = win.document;
     const $ = id => doc.getElementById(id);
     const { chamar } = C.criarApi(win);
@@ -162,8 +185,12 @@
     // ---------- câmera (jsQR) ----------
     const camera = (function () {
       const video = $('video'), quadro = $('quadro');
-      let stream = null, varrendo = false, quer = false;
+      let varrendo = false, quer = false;
       const nav = win.navigator || {};
+      const gestor = criarGestorStream(
+        () => nav.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }),
+        () => quer && doc.visibilityState !== 'hidden'
+      );
       const possivel = !!(nav.mediaDevices && nav.mediaDevices.getUserMedia && win.isSecureContext !== false && typeof win.jsQR === 'function');
 
       function semCamera(motivo) {
@@ -174,11 +201,11 @@
       }
       function parar() {
         varrendo = false;
-        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        gestor.parar();
         if (video) video.srcObject = null;
       }
       function laco() {
-        if (!varrendo || !stream) return;
+        if (!varrendo || !gestor.stream) return;
         if (video.readyState >= 2 && video.videoWidth) {
           const esc = Math.min(1, 640 / video.videoWidth);
           quadro.width = Math.round(video.videoWidth * esc);
@@ -196,18 +223,15 @@
       }
       async function ligar() {
         if (!possivel) { semCamera(win.isSecureContext === false ? 'A câmera só funciona em conexão segura (HTTPS).' : 'Câmera indisponível neste aparelho.'); return; }
-        if (stream) return;
-        try {
-          stream = await nav.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        } catch { semCamera('Não foi possível usar a câmera (sem permissão ou sem câmera).'); return; }
-        if (!quer || doc.visibilityState === 'hidden') { parar(); return; }
-        video.srcObject = stream;
+        const r = await gestor.ligar();
+        if (r.estado === 'falha') { semCamera('Não foi possível usar a câmera (sem permissão ou sem câmera).'); return; }
+        if (r.estado !== 'ok') return;   // ocupado: a chamada em andamento cuida; descartado: o stream novo já foi parado
+        video.srcObject = r.stream;
         try { await video.play(); } catch { /* o laço espera o vídeo ficar pronto */ }
-        varrendo = true;
-        win.requestAnimationFrame(laco);
+        if (e.fase === 'lendo' && quer && gestor.stream) { varrendo = true; win.requestAnimationFrame(laco); }   // só varre se ainda estiver na fase de leitura
       }
       return {
-        retomar() { quer = true; if (!possivel) { ligar(); return; } if (stream && !varrendo) { varrendo = true; win.requestAnimationFrame(laco); } else if (!stream) ligar(); },
+        retomar() { quer = true; if (!possivel) { ligar(); return; } if (gestor.stream && !varrendo) { varrendo = true; win.requestAnimationFrame(laco); } else if (!gestor.stream) ligar(); },
         pausar() { varrendo = false; },
         desligar() { quer = false; parar(); },
         religar() { quer = true; if (e.fase === 'lendo') ligar(); }
@@ -251,5 +275,5 @@
     desenhar();
   }
 
-  return { ajustarQtd, novaChave, dataLocal, corpoDaBaixa, mensagemDeErro, criarFluxo, lerQr, iniciar };
+  return { ajustarQtd, novaChave, dataLocal, corpoDaBaixa, mensagemDeErro, criarFluxo, criarGestorStream, lerQr, iniciar };
 });

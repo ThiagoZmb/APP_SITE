@@ -49,3 +49,84 @@ test('HTML: CSP, biblioteca antes do script, tema por último, @media print, sem
 test('estoque.html tem o link para etiquetas_qr.html com data-perm estoque.editar', () => {
   assert.match(ler('estoque.html'), /<a[^>]*data-perm="estoque\.editar"[^>]*href="etiquetas_qr\.html"[^>]*>|<a[^>]*href="etiquetas_qr\.html"[^>]*data-perm="estoque\.editar"[^>]*>/);
 });
+
+// ---- desenho do QR (vendor/qrcode.js real e geradores falsos) ----
+function noFalso(tag) {
+  const n = {
+    tag, attrs: {}, children: [], textContent: '', className: '',
+    setAttribute(k, v) { n.attrs[k] = String(v); },
+    appendChild(c) { n.children.push(c); return c; },
+    cloneNode() {
+      const c = noFalso(tag);
+      c.attrs = { ...n.attrs }; c.textContent = n.textContent; c.className = n.className;
+      c.children = n.children.map(x => x.cloneNode(true));
+      return c;
+    }
+  };
+  return n;
+}
+const docFalso = () => ({ createElementNS: (ns, tag) => noFalso(tag), createElement: tag => noFalso(tag) });
+const contar = (no, tag) => (no.tag === tag ? 1 : 0) + no.children.reduce((a, c) => a + contar(c, tag), 0);
+
+test('desenharQr com a biblioteca real: ABC123, EAN-13 e texto acentuado, em UTF-8 e com UM <path>', () => {
+  const qrcode = require('../vendor/qrcode.js');
+  for (const t of ['ABC123', '7891234567895', 'AÇÃO-é']) {
+    const svg = E.desenharQr(docFalso(), qrcode, t);
+    assert.equal(svg.tag, 'svg');
+    assert.equal(contar(svg, 'path'), 1, 'um único path para todos os módulos');
+    assert.ok(contar(svg, 'rect') <= 1, 'só o fundo pode ser rect');
+  }
+  // a codificação passou a ser UTF-8: 'é' = 2 bytes (com c & 0xff seria 1)
+  assert.equal(qrcode.stringToBytes('é').length, 2);
+  assert.equal(qrcode.stringToBytes('AÇÃO-é').length, 9);
+});
+
+function geradorFalso(falharEm) {
+  const g = () => {
+    g.chamadas++;
+    return {
+      addData(t) { if (t === falharEm) throw new Error('estourou'); },
+      make() {}, getModuleCount: () => 3, isDark: (r, c) => (r + c) % 2 === 0
+    };
+  };
+  g.chamadas = 0;
+  g.stringToBytesFuncs = { 'UTF-8': s => Array.from(Buffer.from(s, 'utf8')) };
+  return g;
+}
+
+test('criarFabricaQr: cache por código (o gerador roda uma vez) e cada etiqueta recebe um clone', () => {
+  const g = geradorFalso();
+  const fab = E.criarFabricaQr(docFalso(), g);
+  const a = fab('ABC123'), b = fab('ABC123'), c = fab('XYZ999');
+  assert.equal(g.chamadas, 2);
+  assert.notEqual(a, b, 'clones distintos para poder entrar em etiquetas diferentes');
+  assert.equal(contar(a, 'path'), 1);
+  assert.equal(contar(b, 'path'), 1);
+  assert.equal(c.tag, 'svg');
+});
+
+test('criarFabricaQr: um item cujo gerador lança vira "QR indisponível" e os outros seguem desenhados', () => {
+  const g = geradorFalso('RUIM');
+  const fab = E.criarFabricaQr(docFalso(), g);
+  const ruim = fab('RUIM'), bom = fab('BOM');
+  assert.equal(ruim.textContent, 'QR indisponível');
+  assert.equal(bom.tag, 'svg');
+});
+
+test('iniciar: página não liberada não chama a API nem mexe na tela', () => {
+  let chamadas = 0;
+  const win = {
+    Acesso: { paginaLiberada: () => false },
+    document: { getElementById() { throw new Error('não deveria mexer na tela'); } },
+    fetch() { chamadas++; return Promise.resolve({}); }
+  };
+  E.iniciar(win);
+  assert.equal(chamadas, 0);
+});
+
+test('a busca redesenha só a lista: desenharLista não chama desenharFolhas', () => {
+  const src = ler('etiquetas_qr.js');
+  const corpo = src.slice(src.indexOf("$('vazio').hidden"), src.indexOf('function desenharFolhas'));   // fim de desenharLista (o clique na caixa chama desenharFolhas de propósito)
+  assert.ok(corpo.length > 50);
+  assert.doesNotMatch(corpo, /desenharFolhas\(/);
+});

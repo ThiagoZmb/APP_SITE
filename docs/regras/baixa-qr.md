@@ -42,11 +42,13 @@ Páginas (`PAGINAS` do `layout.js`): `baixa_qr.html` = `estoque.ver` + `estoque.
 ### Testes
 `test/estoque_qr_calculo.test.js`, `test/estoque_qr_rotas.test.js`, `test/baixa_qr_login.test.js`, `test/baixa_qr_tela.test.js`, `test/etiquetas_qr_tela.test.js`. Câmera, jsQR e QR gerado reais não são automatizáveis.
 
-### Pendências conhecidas (menores)
-1. `baixa_qr.js`: o stream da câmera continua ligado nas fases cartão/erro/feito; só o laço de leitura pausa (`pausar()`), as faixas só são paradas em `desligar()` (pagehide, aba oculta, sair).
-2. `baixa_qr.js`: `ligar()` não tem trava contra um segundo `getUserMedia` concorrente (duas chamadas seguidas antes de a primeira resolver).
-3. `vendor/qrcode.js` usa por padrão `c & 0xff` para converter texto em bytes: código de barras com acento ou caractere acima de 255 gera QR diferente do texto. EAN-13 é ASCII e não é afetado. Correção prevista: `qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8']`, confirmando antes que o jsQR devolve UTF-8.
-4. `etiquetas_qr.js`: `desenharQr` não tem try/catch por item (um código que estoure o QR derruba a folha inteira) e não tem teste.
+### Decisão intencional: a câmera fica ligada nas fases cartão, erro e feito
+`baixa_qr.js`: o stream da câmera continua ligado enquanto o cartão está aberto (só o laço de leitura pausa em `pausar()`). Isso evita a demora de reabrir a câmera a cada item e, no iPhone, um possível novo pedido de permissão a cada item. Custo: luz da câmera e bateria enquanto o cartão está aberto. As faixas são paradas em `desligar()`: `pagehide`, aba oculta e "Sair". Não é pendência.
+
+### Câmera e etiquetas: como funciona
+- `criarGestorStream` (em `baixa_qr.js`) tem uma trava: um segundo `ligar()` durante o pedido de permissão não chama `getUserMedia` de novo; se a página deixou de querer a câmera quando o stream chega, as faixas do stream novo são paradas. O laço só começa se a fase for "lendo".
+- `iniciar` das duas páginas (`baixa_qr.js`, `etiquetas_qr.js`) sai logo se `Acesso.paginaLiberada()` for falso (não pede a câmera numa página oculta).
+- `etiquetas_qr.js` troca a codificação da biblioteca para UTF-8 (`qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8']`, sem editar `vendor/`), porque o jsQR decodifica UTF-8; cada QR é um único `<path>`, o desenho é guardado por código (cache) e clonado, a busca só redesenha a lista (não as folhas) e um item cujo QR falhe mostra "QR indisponível" sem derrubar a folha.
 
 ### Roteiro manual no celular (resultado a registrar; nada foi executado ainda)
 - [ ] pendente: imprimir 3 etiquetas (folha de `etiquetas_qr.html`) e conferir tamanho/legibilidade do QR no papel
@@ -58,5 +60,8 @@ Páginas (`PAGINAS` do `layout.js`): `baixa_qr.html` = `estoque.ver` + `estoque.
 - [ ] pendente: tocar duas vezes em "Dar baixa" (só uma baixa gravada)
 - [ ] pendente: ler o QR de um item inativo ("Item não encontrado.", nada gravado)
 - [ ] pendente: câmera negada / sem HTTPS cai no campo de digitar o código
+- [ ] pendente: confirmar no iPhone que a câmera não pede permissão de novo a cada item e que a luz/bateria é aceitável
+- [ ] pendente: ler uma etiqueta de código com acento (ex.: 'AÇÃO-1') e confirmar a leitura
+- [ ] pendente: marcar todos os itens na página de etiquetas e confirmar que a página não trava ao digitar na busca
 - [ ] pendente: entrar com um Estoquista (`estoque.ver` + `estoque.movimentar`): cai na leitura
 - [ ] pendente: entrar com um Administrador: cai no sistema normal e abre a leitura pelo menu Estoque

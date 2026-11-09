@@ -120,13 +120,40 @@ test('fluxo: erro de saldo mantém o cartão, a quantidade e a MESMA chave na no
   assert.equal(f.estado.fase, 'feito');
 });
 
-test('fluxo: 409 vira "já registrada"; queda de rede mantém o cartão para repetir com a mesma chave', async () => {
+test('fluxo: 409 vira "já registrada" e mantém o cartão', async () => {
   const api = apiFalsa(ok(ITEM), falha(409, 'Este lançamento já foi gravado.'));
   const f = fluxo(api);
   await f.lerCodigo('ABC');
   await f.confirmar();
   assert.equal(f.estado.mensagem, 'Esta baixa já foi registrada. Confira no histórico antes de repetir.');
   assert.equal(f.estado.fase, 'cartao');
+});
+
+test('fluxo: queda de rede (api lança ou status 0) mantém o cartão; nova tentativa usa a MESMA chave e o 409 vira "já registrada"', async () => {
+  const lanca = () => { throw new Error('rede'); };
+  for (const queda of [lanca, { ok: false, status: 0, corpo: { error: 'Sem conexão. Tente de novo.' } }]) {
+    const api = apiFalsa(ok(ITEM), queda, falha(409, 'Este lançamento já foi gravado.'));
+    const f = fluxo(api);
+    await f.lerCodigo('ABC');
+    await f.confirmar();
+    assert.equal(f.estado.fase, 'cartao');
+    assert.equal(f.estado.mensagem, 'Sem conexão. Tente de novo.');
+    await f.confirmar();
+    assert.equal(f.estado.fase, 'cartao');
+    assert.equal(f.estado.mensagem, 'Esta baixa já foi registrada. Confira no histórico antes de repetir.');
+    const posts = api.chamadas.filter(c => c.opcoes && c.opcoes.metodo === 'POST');
+    assert.equal(posts.length, 2);
+    assert.equal(posts[0].opcoes.corpo.chave, posts[1].opcoes.corpo.chave);
+  }
+});
+
+test('fluxo: lerCodigo com api que lança vira erro "Sem conexão" e nunca faz POST', async () => {
+  const api = apiFalsa(() => { throw new Error('rede'); });
+  const f = fluxo(api);
+  await f.lerCodigo('ABC');
+  assert.equal(f.estado.fase, 'erro');
+  assert.equal(f.estado.mensagem, 'Sem conexão. Tente de novo.');
+  assert.ok(api.chamadas.every(c => !c.opcoes || c.opcoes.metodo !== 'POST'));
 });
 
 test('fluxo: sucesso mostra o saldo novo e a leitura seguinte usa chave diferente; cancelar volta a lendo', async () => {
@@ -161,4 +188,72 @@ test('HTML: CSP, ordem dos scripts, tema por último, campo de código, sem oncl
 test('vendor/jsQR.js existe, não está vazio e tem LEIA-ME', () => {
   assert.ok(ler('vendor/jsQR.js').length > 100000);
   assert.match(ler('vendor/LEIA-ME.txt'), /1\.4\.0/);
+});
+
+// ---- câmera: gestor do stream (sem trava, duas chamadas de getUserMedia vazavam a câmera) ----
+function streamFalso() {
+  const s = { paradas: 0 };
+  s.getTracks = () => [{ stop() { s.paradas++; } }, { stop() { s.paradas++; } }];
+  return s;
+}
+function abrirControlavel() {
+  const pend = [];
+  const abrir = () => new Promise((res, rej) => { pend.push({ res, rej }); });
+  abrir.pend = pend;
+  return abrir;
+}
+
+test('câmera: duas chamadas de ligar() seguidas abrem UM stream só', async () => {
+  const abrir = abrirControlavel();
+  const g = B.criarGestorStream(abrir, () => true);
+  const p1 = g.ligar();
+  const p2 = g.ligar();
+  assert.equal(abrir.pend.length, 1, 'getUserMedia chamado uma vez');
+  assert.equal((await p2).estado, 'ocupado');
+  const s1 = streamFalso();
+  abrir.pend[0].res(s1);
+  assert.equal((await p1).estado, 'ok');
+  assert.equal(g.stream, s1);
+  assert.equal(s1.paradas, 0);
+  assert.equal((await g.ligar()).estado, 'ocupado');
+  g.parar();
+  assert.equal(s1.paradas, 2);
+  assert.equal(g.stream, null);
+});
+
+test('câmera: se a página deixou de querer a câmera durante o prompt, as faixas do stream novo são paradas', async () => {
+  const abrir = abrirControlavel();
+  let quer = true;
+  const g = B.criarGestorStream(abrir, () => quer);
+  const p = g.ligar();
+  quer = false;
+  const s = streamFalso();
+  abrir.pend[0].res(s);
+  assert.equal((await p).estado, 'descartado');
+  assert.equal(s.paradas, 2);
+  assert.equal(g.stream, null);
+});
+
+test('câmera: falha do getUserMedia devolve "falha" e libera a trava para nova tentativa', async () => {
+  const abrir = abrirControlavel();
+  const g = B.criarGestorStream(abrir, () => true);
+  const p = g.ligar();
+  abrir.pend[0].rej(new Error('negado'));
+  assert.equal((await p).estado, 'falha');
+  const p2 = g.ligar();
+  assert.equal(abrir.pend.length, 2);
+  abrir.pend[1].res(streamFalso());
+  assert.equal((await p2).estado, 'ok');
+});
+
+test('iniciar: página não liberada para o usuário não toca na câmera nem na API', () => {
+  let chamadas = 0;
+  const win = {
+    Acesso: { paginaLiberada: () => false },
+    document: { getElementById() { throw new Error('não deveria mexer na tela'); } },
+    navigator: { mediaDevices: { getUserMedia() { chamadas++; return Promise.resolve(streamFalso()); } } },
+    fetch() { chamadas++; return Promise.resolve({}); }
+  };
+  B.iniciar(win);
+  assert.equal(chamadas, 0);
 });
