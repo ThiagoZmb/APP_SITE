@@ -177,7 +177,7 @@ Pares `-bg` (tom translúcido) e `-fg` (texto claro da mesma cor) em `tema.css`:
 
 A casca é uma grade de duas colunas: sidebar fixa de 264px e conteúdo ocupando o resto, com uma faixa fina de 24px no topo (empresa e usuário). Cartões de indicador entram em grade automática (financeiro: 3 × 2); painéis e gráficos têm 18–22px de respiro; tabelas são compactas (8px × 10px por célula, uma linha por registro).
 
-Responsivo: abaixo de 960px a sidebar vira gaveta com fundo escurecido; há ajustes em 1200, 1000, 700, 600 e 520px. O motorista usa `minhas_entregas.html` no celular, então toque e leitura em tela pequena contam.
+Responsivo: abaixo de 960px a sidebar vira gaveta com fundo escurecido; há ajustes em 1200, 1000, 700, 600 e 520px. O motorista usa `minhas_entregas.html` no celular, então toque e leitura em tela pequena contam. O botão do menu móvel (`.btn-menu-mobile`, três barras no topo) tem área de toque de 44x44 px e ícone de 24 px na cor do texto da barra (`--side-text`), sem caixa visível; a barra do topo continua com 24 px de altura (margem negativa no botão).
 
 ## Elevation & Depth
 

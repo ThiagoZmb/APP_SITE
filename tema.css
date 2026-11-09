@@ -129,11 +129,13 @@ body .user-avatar {
 body .user-info { line-height: 1; display: flex !important; flex-direction: column; }
 body .user-info span:first-child, body #user-name { font-weight: 700; font-size: 9px; }
 body .user-cargo { font-size: 8px !important; color: var(--text-light); opacity: 1 !important; font-weight: 500; }
+/* botão do menu móvel: área de toque 44x44; a margem negativa mantém a barra de 24px e o espaço até o logo como antes */
 .btn-menu-mobile {
-    display: none; width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--border-color);
-    background: var(--white); color: var(--text-dark); cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;
+    display: none; width: 44px; height: 44px; margin: -10px -14px -10px -10px; padding: 0; border-radius: 10px; border: none;
+    background: transparent; color: var(--side-text); cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.btn-menu-mobile svg { width: 12px; height: 12px; }
+.btn-menu-mobile svg { width: 24px; height: 24px; }
+.btn-menu-mobile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -8px; }
 
 /* sidebar */
 body .container > .sidebar, body .container > nav {
