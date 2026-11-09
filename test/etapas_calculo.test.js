@@ -69,10 +69,15 @@ test('estadoEfetivo: linha gravada vale sempre; sem linha = pendente se aplicáv
   assert.equal(E.estadoEfetivo(linha('vidro_cortado', 'na'), true).estado, 'na');
 });
 
-test('montarEtapas + progresso: N/A conta como concluída; ordem fixa', () => {
+test('montarEtapas + progresso: N/A fica fora do progresso (1/4, não 3/6) mas libera o finalizado; ordem fixa', () => {
   const et = E.montarEtapas([linha('perfil_cortado', 'ok'), linha('portas_montadas', 'pendente')], aplic(true, false));
   assert.deepEqual(et.map(e => [e.codigo, e.estado]), [['perfil_cortado', 'ok'], ['vidro_cortado', 'na'], ['perfil_pintado', 'pendente'], ['vidro_pintado', 'na'], ['portas_montadas', 'pendente'], ['finalizado', 'pendente']]);
-  assert.deepEqual(E.progresso(et), { qtdConcluidas: 3, qtdEtapas: 6 });
+  assert.deepEqual(E.progresso(et), { qtdConcluidas: 1, qtdEtapas: 4 });
+  // o caso do dono: 4 etapas N/A (perfil e vidro não se aplicam) + Portas montadas e Finalizado pendentes = 0 de 2, não 4/6
+  const soDuas = E.montarEtapas([], { perfil: false, vidro: false, montagem: true });
+  assert.deepEqual(soDuas.map(e => e.estado), ['na', 'na', 'na', 'na', 'pendente', 'pendente']);
+  assert.deepEqual(E.progresso(soDuas), { qtdConcluidas: 0, qtdEtapas: 2 });
+  assert.deepEqual(E.pendentesAntesDeFinalizar(soDuas), ['portas_montadas']);   // N/A continua valendo como cumprido para finalizar
   assert.deepEqual(E.pendentesAntesDeFinalizar(et), ['perfil_pintado', 'portas_montadas']);
 });
 

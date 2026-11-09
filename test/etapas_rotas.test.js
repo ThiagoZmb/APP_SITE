@@ -81,7 +81,7 @@ test('fila: sem N+1 (uma consulta por tabela, qualquer que seja o número de ped
 });
 
 // ---------- serralheria ----------
-test('fila: pedido só de serralheria = Perfil cortado, Perfil pintado e Finalizado pendentes; Vidro cortado/pintado e Portas montadas N/A (1/6 → 3/6)', async t => {
+test('fila: pedido só de serralheria = Perfil cortado, Perfil pintado e Finalizado pendentes; Vidro cortado/pintado e Portas montadas N/A (progresso 0/3: as N/A ficam fora)', async t => {
   const banco = bancoEtapas();
   banco.semear.soSerralheria({ NUMERO: 23378 });
   banco.semear.pedido({ NUMERO: 300 }); banco.semear.listaItem({ NUMERO: 300, ITEM: 1, TIPO_PRODUTO: 'Metalons' });   // só o sinal da lista (sem ped_orc_serralheria)
@@ -90,7 +90,7 @@ test('fila: pedido só de serralheria = Perfil cortado, Perfil pintado e Finaliz
   const d = await (await chamar('/etapas/fila')).json();
   for (const p of d.pedidos) {
     assert.deepEqual(p.etapas.map(e => e.estado), ['pendente', 'na', 'pendente', 'na', 'na', 'pendente'], String(p.numero));
-    assert.equal(p.qtdConcluidas, 3);
+    assert.deepEqual([p.qtdConcluidas, p.qtdEtapas], [0, 3], String(p.numero));
   }
   assert.equal(d.pedidos.length, 3);
 });

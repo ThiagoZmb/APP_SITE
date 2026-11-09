@@ -86,7 +86,9 @@ function montarEtapas(linhas = [], aplic = { perfil: true, vidro: true, montagem
   return ETAPAS.map(e => ({ codigo: e.codigo, ...estadoEfetivo(por.get(e.codigo), aplica(e.grupo)) }));
 }
 
-const progresso = etapas => ({ qtdConcluidas: etapas.filter(e => concluida(e.estado)).length, qtdEtapas: ETAPAS.length });
+// Progresso = etapas OK sobre as que SE APLICAM ao pedido: as N/A saem da conta (decisão do dono, 2026-11-09; 4 N/A + 2 pendentes = 0/2, não 4/6).
+// Para liberar o "Pedido finalizado" o N/A continua valendo como cumprido (`concluida`, `pendentesAntesDeFinalizar`): só o progresso muda.
+const progresso = etapas => ({ qtdConcluidas: etapas.filter(e => e.estado === 'ok').length, qtdEtapas: etapas.filter(e => e.estado !== 'na').length });
 const pendentesAntesDeFinalizar = etapas => etapas.filter(e => e.codigo !== FINAL && !concluida(e.estado)).map(e => e.codigo);
 
 const podeAlterar = (permissoes, codigo) => {

@@ -15,7 +15,7 @@ Testes: `test/etapas_calculo.test.js`, `test/etapas_rotas.test.js`, `test/etapas
 | 6 | `finalizado` | Pedido finalizado | `etapas.finalizar` | — |
 
 Estado de cada etapa: `pendente` | `ok` | `na`. Origem: `manual` (alguém clicou) ou `corte` (marcada pela confirmação do corte real).
-Progresso = etapas OK ou N/A sobre 6 (N/A conta como concluída).
+Progresso = etapas **OK sobre as que se aplicam** (as N/A saem da conta; decisão do dono, 2026-11-09: 4 N/A + 2 pendentes = `0/2`, não `4/6`). Só o progresso muda: para liberar o "Pedido finalizado" a N/A continua valendo como cumprida.
 
 ## Tabelas (só da web, criadas em `seguranca/instalacao.js`)
 - `web_producao_etapas`: `numero` (ped_orc.NUMERO, TIPO Pedido, só referência lógica, sem FK), `etapa`, `estado`, `origem`, `usuario`, `quando`, `observacao` (até 500); `UNIQUE (numero, etapa)`.
@@ -30,7 +30,7 @@ Progresso = etapas OK ou N/A sobre 6 (N/A conta como concluída).
   - **Portas montadas**: N/A só em pedido de serralheria sem portas (serralheria + no máximo avulsos, nenhum item de porta nem desconhecido); em qualquer outro caso (porta, desconhecido, só avulso, **pedido sem itens**) é aplicável.
   - **Pedido finalizado**: sempre aplicável.
   - **Pedido misto** (portas + serralheria): cada etapa se aplica se QUALQUER item a exigir (perfil sempre; vidro pelas peças das portas; Portas montadas aplicável).
-  - Exemplos: só serralheria = Perfil cortado, Perfil pintado e Finalizado pendentes; Vidro cortado, Vidro pintado e Portas montadas N/A (começa em 3/6). Só porta = como o plano de corte diz (porta sem vidro: vidro N/A). Sem itens na lista = perfil e vidro pelas peças (normalmente N/A) e Portas montadas pendente.
+  - Exemplos: só serralheria = Perfil cortado, Perfil pintado e Finalizado pendentes; Vidro cortado, Vidro pintado e Portas montadas N/A (começa em 0/3). Só porta = como o plano de corte diz (porta sem vidro: vidro N/A). Sem itens na lista = perfil e vidro pelas peças (normalmente N/A) e Portas montadas pendente.
 - Atenção: `perfis` não tem TIPO (o VB grava também para orçamento de mesmo número); linhas que não se ligam ao item viram **pendência**, então a etapa de perfil fica aplicável (pendente) e não N/A. Quem tiver a permissão marca N/A à mão.
 
 ## Rotas (todas por `registro.rota`, exigem `etapas.ver`; nenhuma pública; nada é dinheiro)
@@ -64,7 +64,7 @@ Progresso = etapas OK ou N/A sobre 6 (N/A conta como concluída).
 - **Pedido excluído** (`DELETE /ped_orc/Pedido/:n`): na mesma transação, `apagarEtapasDoPedido` apaga as etapas e o histórico do número (o NUMERO é reaproveitado, MAX+1) e audita `etapas_removidas_com_pedido`. Exclusão feita direto pelo VB não passa por aqui: as etapas do número ficam órfãs e reaparecem se o número for reaproveitado (mesma limitação das entregas).
 
 ## Tela
-- Tabela com uma linha por pedido: Nº (abre a guia de produção em PDF com `pedidos.pdf`; ou "Abrir para editar" com `orcamentos.criar` + `valores.ver`), Cliente, Cliente final, Pronto em (selo "Atrasado"), uma coluna por etapa e Progresso (`3/6` + barra fina por classe, sem estilo inline).
+- Tabela com uma linha por pedido: Nº (abre a guia de produção em PDF com `pedidos.pdf`; ou "Abrir para editar" com `orcamentos.criar` + `valores.ver`), Cliente, Cliente final, Pronto em (selo "Atrasado"), uma coluna por etapa e Progresso (`1/4` = OK sobre as etapas que se aplicam, + barra fina por classes `etp-t{total}` e `etp-f{feitas}`, sem estilo inline).
 - Cada célula é um botão-estado grande (≥ 48 px): Pendente, ✓ OK (quem e quando no título), ✓ OK "pelo corte" (automático, azul), N/A ("não se aplica" quando automático), apagado = só leitura (sem permissão). Estado sempre por texto, não só por cor.
 - Clique: pendente → OK; N/A → OK (pergunta); OK → desfazer (pergunta). "Pedido finalizado" abre a janela da data de pronto (e "Forçar" para quem tem `etapas.gerir` com etapas pendentes). Botão direito, tecla de menu ou Shift+F10 na célula abrem o menu (marcar OK, desfazer, N/A, histórico da etapa); no celular, o botão "⋯" de cada pedido abre o menu das etapas que o usuário pode marcar e o histórico do pedido.
 - Filtros: busca por número/cliente/cliente final (`data-foco-busca`), "O que falta" (etapa pendente), "Minha etapa" (só pedidos com etapa pendente que o usuário pode marcar, com as colunas destacadas) e "Mostrar todos em aberto". Os três últimos ficam no `localStorage` (try/catch; só conveniência).

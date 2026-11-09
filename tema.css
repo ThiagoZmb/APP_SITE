@@ -458,6 +458,11 @@ body tbody tr:last-child td { border-bottom: none !important; }
 body .order-number, body .client-code, body .num-ped { color: var(--primary-color) !important; font-weight: 700 !important; }
 body .price-value { font-weight: 700 !important; font-variant-numeric: tabular-nums; }
 body .tabela-wrap { border-top: 1px solid var(--border-color) !important; }
+/* LISTAS: o cabeçalho das colunas fica SEMPRE visível ao rolar os itens (regra do dono, 2026-11-09; DESIGN.md).
+   O th só gruda se a lista rolar dentro de um quadro com altura limitada; por isso o quadro das listas ganha, quando a página
+   não definiu o seu, uma altura máxima que cabe na janela. :where() zera a especificidade: o que a página definir vence. */
+:where(.tabela-wrap, .lista-wrap, .rolagem, .etp-rolagem) { overflow: auto; max-height: max(320px, calc(100vh - 220px)); }
+body :where(.tabela-wrap, .lista-wrap, .rolagem, .etp-rolagem) thead th { position: sticky; top: 0; z-index: 3; }
 /* cores de linha herdadas do VB, em tons suaves com marcador lateral */
 body tbody tr.entrada { background: rgba(61, 220, 151, .05) !important; }
 body tbody tr.saida { background: rgba(255, 107, 122, .045) !important; }

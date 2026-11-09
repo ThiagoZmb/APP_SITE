@@ -40,7 +40,9 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .etp-legenda span { display: inline-flex; align-items: center; gap: 6px; }
 
 /* tabela: uma linha por pedido */
-.etp-rolagem { overflow-x: auto; }
+/* a lista rola DENTRO do próprio quadro (altura = o que sobra na janela depois do título e dos filtros), para o cabeçalho
+   das colunas (th sticky abaixo) ficar sempre visível; só com overflow-x o th nunca grudava, porque o quadro não rolava na vertical */
+.etp-rolagem { overflow: auto; max-height: calc(100vh - 300px); min-height: 260px; }
 .etp-tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .etp-tabela th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); color: var(--text-light); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
 .etp-tabela th.etp-col-etapa { text-align: center; }
@@ -57,8 +59,10 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .etp-pronto .selo { margin-left: 6px; font-family: var(--font); }
 .etp-prog { white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 72px; }
 .etp-barra { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
-.etp-barra i { display: block; height: 100%; background: var(--success-color); }
-.etp-p0 { width: 0; } .etp-p1 { width: 16.67%; } .etp-p2 { width: 33.33%; } .etp-p3 { width: 50%; } .etp-p4 { width: 66.67%; } .etp-p5 { width: 83.33%; } .etp-p6 { width: 100%; }
+.etp-barra i { display: block; height: 100%; background: var(--success-color); width: calc(var(--f, 0) / var(--t, 1) * 100%); }
+/* o total de etapas que se aplicam (N/A fora) e quantas estão OK entram por classe, sem estilo inline */
+.etp-t1 { --t: 1; } .etp-t2 { --t: 2; } .etp-t3 { --t: 3; } .etp-t4 { --t: 4; } .etp-t5 { --t: 5; } .etp-t6 { --t: 6; }
+.etp-f0 { --f: 0; } .etp-f1 { --f: 1; } .etp-f2 { --f: 2; } .etp-f3 { --f: 3; } .etp-f4 { --f: 4; } .etp-f5 { --f: 5; } .etp-f6 { --f: 6; }
 .etp-vazio { text-align: center; padding: 40px 16px; color: var(--text-light); }
 
 /* botão-estado de cada etapa (grande: dedo de quem está na fábrica) */

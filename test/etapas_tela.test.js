@@ -9,7 +9,7 @@ const T = require('../etapas_producao.js');
 const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 const csp = h => (h.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1];
 const ef = (estado, extra = {}) => ({ estado, origem: 'manual', usuario: 'Bia Souza', quando: '2026-11-05 14:30:00', observacao: null, ...extra });
-const pedido = (extra = {}) => ({ numero: 321, cliente: 'Cliente <X>', clienteFinal: 'Obra Y', situacao: 'Em Produção', prontoEm: '2026-11-01', atrasado: true, qtdConcluidas: 2, qtdEtapas: 6,
+const pedido = (extra = {}) => ({ numero: 321, cliente: 'Cliente <X>', clienteFinal: 'Obra Y', situacao: 'Em Produção', prontoEm: '2026-11-01', atrasado: true, qtdConcluidas: 1, qtdEtapas: 4,
   etapas: [ef('ok', { origem: 'corte', codigo: 'perfil_cortado' }), { codigo: 'vidro_cortado', ...ef('na', { origem: 'auto', usuario: '' }) }, { codigo: 'perfil_pintado', ...ef('pendente', { usuario: '' }) },
     { codigo: 'vidro_pintado', ...ef('na', { origem: 'auto', usuario: '' }) }, { codigo: 'portas_montadas', ...ef('pendente', { usuario: '' }) }, { codigo: 'finalizado', ...ef('pendente', { usuario: '' }) }].map((e, i) => ({ ...e, codigo: T.ETAPAS_PADRAO[i].codigo })),
   ...extra });
@@ -77,8 +77,11 @@ test('htmlLinha: escapa texto do banco, 6 botões com data-etapa, bloqueio por p
   assert.equal((h.match(/aria-disabled="true"/g) || []).length, 5, 'só a etapa permitida fica clicável');
   assert.equal((h.match(/etp-minha/g) || []).length, 1);
   assert.match(h, /<span class="selo perigo">Atrasado<\/span>/);
-  assert.match(h, /class="etp-p2"/);
-  assert.match(h, /2\/6/);
+  assert.match(h, /class="etp-t4 etp-f1"/);   // 1 OK de 4 etapas que se aplicam (as 2 N/A ficam fora)
+  assert.match(h, /1\/4/);
+  assert.match(h, /1 de 4 etapas concluídas/);
+  // sem etapa nenhuma que se aplique/total inválido não quebra a barra
+  assert.match(T.htmlLinha(pedido({ qtdConcluidas: 9, qtdEtapas: 0 }), { etapas: T.ETAPAS_PADRAO, podeEtapa: () => false, link: null }), /class="etp-t1 etp-f1"/);
   assert.match(h, /data-guia="321"/);
   assert.match(h, /salvando" data-numero="321" data-etapa="portas_montadas"[^>]*aria-busy="true"/);
   assert.doesNotMatch(h, /style=/);
@@ -92,7 +95,8 @@ test('aplicarOtimista: muda só a célula e recalcula o progresso', () => {
   const p = pedido();
   const n = T.aplicarOtimista(p, 'perfil_pintado', 'ok', 'Bia');
   assert.equal(n.etapas.find(e => e.codigo === 'perfil_pintado').estado, 'ok');
-  assert.equal(n.qtdConcluidas, 4);
+  assert.equal(n.qtdConcluidas, 2);   // perfil_cortado + perfil_pintado; as N/A não entram na conta
+  assert.equal(n.qtdEtapas, 4);
   assert.equal(p.etapas.find(e => e.codigo === 'perfil_pintado').estado, 'pendente', 'não muda o original (para desfazer se falhar)');
 });
 
@@ -177,4 +181,16 @@ test('todas as páginas usam a mesma versão do layout.js (o menu novo chega a t
   const versoes = fs.readdirSync(dir).filter(n => n.endsWith('.html')).map(n => /layout\.js\?v=(\d+)/.exec(fs.readFileSync(path.join(dir, n), 'utf8'))).filter(Boolean).map(m => m[1]);
   assert.ok(versoes.length > 20);
   assert.equal(new Set(versoes).size, 1);
+});
+
+// ---------- cabeçalho de lista sempre visível (regra do dono, 2026-11-09; DESIGN.md) ----------
+test('listas: o quadro rola na vertical e o cabeçalho (th) gruda; tema.css dá o padrão a todas as listas', () => {
+  const css = ler('etapas_producao.css'), tema = ler('tema.css');
+  // etapas: quadro com altura máxima + overflow auto (só overflow-x não deixava o th grudar) e th sticky no topo do quadro
+  assert.match(css, /\.etp-rolagem \{[^}]*overflow: auto;[^}]*max-height: calc\(100vh - 300px\)/);
+  assert.match(css, /\.etp-tabela th \{[^}]*position: sticky; top: 0/);
+  // tema.css: padrão para todas as listas (quadros conhecidos), com especificidade zero para a página poder definir a sua
+  assert.match(tema, /:where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) \{ overflow: auto; max-height: max\(320px, calc\(100vh - 220px\)\); \}/);
+  assert.match(tema, /body :where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) thead th \{ position: sticky; top: 0; z-index: 3; \}/);
+  assert.match(ler('DESIGN.md'), /Toda lista com rolagem mantém o cabeçalho das colunas sempre visível/);
 });

@@ -121,6 +121,9 @@
     }).join('');
     const atraso = p.atrasado ? '<span class="selo perigo">Atrasado</span>' : '';
     const prog = `${p.qtdConcluidas}/${p.qtdEtapas}`;
+    // barra por classes (sem estilo inline): etp-t{1..6} = quantas etapas se aplicam, etp-f{0..t} = quantas estão OK
+    const total = Math.max(1, Math.min(6, Number(p.qtdEtapas) || 1));
+    const feitas = Math.max(0, Math.min(total, Number(p.qtdConcluidas) || 0));
     return `<tr data-numero="${esc(p.numero)}">`
       + `<td class="etp-num">${htmlNumero(p, ctx.link)}</td>`
       + `<td class="etp-acoes"><button type="button" class="etp-mais" data-mais="${esc(p.numero)}" aria-label="Ações do pedido ${esc(p.numero)}" aria-haspopup="menu">⋯</button></td>`
@@ -128,7 +131,7 @@
       + `<td class="etp-final" title="${esc(p.clienteFinal)}">${esc(p.clienteFinal)}</td>`
       + `<td class="etp-pronto">${p.prontoEm ? esc(dataBR(p.prontoEm)) : '—'}${atraso}</td>`
       + celulas
-      + `<td class="etp-prog" aria-label="${esc(`${p.qtdConcluidas} de ${p.qtdEtapas} etapas concluídas`)}">${esc(prog)}<span class="etp-barra" aria-hidden="true"><i class="etp-p${Math.max(0, Math.min(6, Number(p.qtdConcluidas) || 0))}"></i></span></td>`
+      + `<td class="etp-prog" aria-label="${esc(`${p.qtdConcluidas} de ${p.qtdEtapas} etapas concluídas`)}">${esc(prog)}<span class="etp-barra" aria-hidden="true"><i class="etp-t${total} etp-f${feitas}"></i></span></td>`
       + '</tr>';
   }
 
@@ -141,8 +144,10 @@
   // estado otimista de uma célula enquanto o servidor responde
   function aplicarOtimista(p, etapa, estado, usuario) {
     const etapas = (p.etapas || []).map(e => (e.codigo === etapa ? { ...e, estado, origem: 'manual', usuario: usuario || e.usuario, quando: null, automatico: false } : e));
-    const qtdConcluidas = etapas.filter(e => e.estado === 'ok' || e.estado === 'na').length;
-    return { ...p, etapas, qtdConcluidas };
+    // mesma conta do servidor (calculo/etapas_producao.js progresso): OK sobre as etapas que se aplicam (N/A fora)
+    const qtdConcluidas = etapas.filter(e => e.estado === 'ok').length;
+    const qtdEtapas = etapas.filter(e => e.estado !== 'na').length;
+    return { ...p, etapas, qtdConcluidas, qtdEtapas };
   }
 
   const lerFiltros = win => { try { return JSON.parse(win.localStorage.getItem(CHAVE_FILTROS) || '{}') || {}; } catch { return {}; } };
