@@ -9,7 +9,7 @@ O funcionário que só retira material do estoque entra pelo celular, a câmera 
 Sucesso = baixa rápida, sem digitar código nem procurar o item em lista, com baixa errada ou duplicada difícil de acontecer.
 
 ### Decisões do dono (conversa de 2026-11-09)
-- O **sistema gera** o QR de cada item (etiqueta impressa); o QR carrega o **código de barras EAN-13 que o produto já tem** (`cadastro_de_produtos.CODIGO_BARRA`, único, gerado por `POST /estoque/codigo_barras`). Nenhum identificador novo.
+- O **sistema gera** o QR de cada item (etiqueta impressa); o QR carrega o **código de barras que o item do estoque já tem** (`estoque.CODIGO_BARRA`, até 20 caracteres; o cadastro web o gera como EAN-13 por `POST /estoque/codigo_barras`, mas itens vindos do VB podem ter outro formato). Nenhum identificador novo. O banco **não** impõe unicidade desse código.
 - Depois de ler: cartão com nome, unidade e saldo, **quantidade em 1 com + e −** e botão grande **"Dar baixa"**.
 - Cai direto na leitura **só quem tem apenas a permissão de baixa** (ex.: perfil Estoquista). Quem tem outros acessos entra normal e abre a leitura por atalho no menu.
 
@@ -25,10 +25,10 @@ Descartadas: `BarcodeDetector` nativo (não existe no Safari do iPhone) e QR com
 
 ## 3. Telas
 
-### 3.1 Etiquetas de QR (em `estoque.html`, permissão `estoque.editar`)
+### 3.1 Etiquetas de QR (página `etiquetas_qr.html`, permissão `estoque.editar`, botão de acesso em `estoque.html`)
 - O usuário escolhe os itens e gera uma folha para imprimir (QR + nome + código por item).
-- Item sem código de barras: usa o botão já existente que gera o EAN-13 antes de entrar na folha.
-- O QR é desenhado no navegador (biblioteca de geração de QR, também copiada para o projeto). Sem rota nova de servidor para isso.
+- Item sem código de barras não entra na folha: a página avisa quantos são e manda cadastrar o código em `estoque.html` (o cadastro já exige código de barras ao salvar).
+- O QR é desenhado no navegador (biblioteca de geração de QR, também copiada para o projeto). A lista de itens vem de uma rota de leitura nova (seção 4).
 
 ### 3.2 Leitura e baixa (`baixa_qr.html`, `baixa_qr.js`, permissão `estoque.movimentar`)
 1. A câmera abre sozinha.
@@ -41,9 +41,10 @@ Descartadas: `BarcodeDetector` nativo (não existe no Safari do iPhone) e QR com
 
 ## 4. Backend
 
-- **Nova rota:** `GET /estoque/por_codigo/:codigo`, permissão `estoque.movimentar`, criada por `registro.rota(...)`. Devolve só `{ codigo, nome, unidade, saldo }` (**sem preço, custo nem fornecedor**; contagem com nome `saldo`, não de dinheiro). Código validado (só dígitos, até 20), SQL parametrizado, 404 uniforme se não existir ou estiver inativo.
-- **Baixa:** `POST /estoque/saida` existente, sem alteração (`chave` única por confirmação, `itens: [{ produtoCodigo, qtd }]`).
-- Arquivo novo para a rota de consulta (ex.: `rotas/estoque_qr.js`), com a validação do código em função pura em `calculo/` para testar sem banco.
+- **Rota nova de leitura 1:** `GET /estoque/por_codigo/:codigo`, permissões `estoque.ver` + `estoque.movimentar` (as mesmas de `POST /estoque/saida`), criada por `registro.rota(...)`. Devolve só `{ codigo, nome, unidade, qtd }` (**sem preço, custo nem fornecedor**). O campo se chama `qtd` e **não** `saldo`: `saldo` casa com `REGEX_VALOR` de `seguranca/valores.js` e seria apagado da resposta de quem não tem `valores.ver` (o Estoquista). Código validado (texto de 1 a 20 caracteres, o mesmo limite do cadastro), SQL parametrizado. 404 uniforme se não existir ou se `SITUACAO` for `Inativo`; **409** ("Código de barras repetido no estoque: avise o administrador") se mais de um item tiver o mesmo código, para nunca baixar o item errado.
+- **Rota nova de leitura 2:** `GET /estoque/etiquetas`, permissão `estoque.editar`, devolve `[{ codigo, produto, unidade, codBarras }]` dos itens ativos com código de barras preenchido, mais `semCodigo` (quantidade de itens ativos sem código).
+- **Baixa:** `POST /estoque/saida` existente, sem alteração (`chave` única por confirmação, `data` `AAAA-MM-DD` do dia, `itens: [{ produtoCodigo, qtd }]`).
+- Arquivos novos: `rotas/estoque_qr.js` (as duas rotas) e `calculo/estoque_qr.js` (validação do código e projeção das linhas, funções puras testáveis sem banco).
 
 ## 5. Segurança e erros
 
@@ -60,7 +61,8 @@ Descartadas: `BarcodeDetector` nativo (não existe no Safari do iPhone) e QR com
 
 ## 6. Testes (node:test, sem MySQL)
 
-- Rota `por_codigo`: só os 4 campos permitidos; recusa código inválido (400); 404 para inexistente; 403 sem `estoque.movimentar`; nenhum campo de dinheiro (`redeDeValores`).
+- Rota `por_codigo`: só os 4 campos permitidos; recusa código inválido (400); 404 para inexistente e para `Inativo`; 409 para código repetido; 403 sem `estoque.movimentar`; nenhum campo de dinheiro (`redeDeValores`).
+- Rota `etiquetas`: só itens ativos com código; `semCodigo` correto; 403 sem `estoque.editar`.
 - Regra do login: só `estoque.ver` + `estoque.movimentar` → `baixa_qr.html`; Administrador, Estoquista com qualquer permissão extra e outros perfis → destino de hoje.
 - Tela: confirmação com `chave` única por tentativa; botão bloqueado durante a gravação; erro de saldo mantém o cartão e a quantidade; falha da câmera mostra o campo de digitar.
 - **Não automatizável:** biblioteca de QR e câmera reais. Precisa de teste num celular Android e num iPhone; registrar como "NÃO testado em aparelho real" no CLAUDE.md/docs até acontecer (mesmo tratamento da Zebra).
