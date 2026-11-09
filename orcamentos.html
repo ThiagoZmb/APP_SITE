@@ -239,6 +239,8 @@
         .correr-larguras label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-weight: 700; color: var(--text-light); }
         .correr-larguras input { width: 84px; padding: 5px 6px; font-size: 13px; min-height: 32px; }
         .correr-larguras input.editada { border-color: #e8590c; background: hsla(26, 100%, 55%, .14); }
+        .medidas-item { display: block; margin-top: 2px; font-size: 13px; color: var(--text-light); }
+        .medidas-item b { color: inherit; font-weight: 700; }
         .peso-item { display: block; margin-top: 2px; font-size: 12px; color: var(--text-light); }
         .peso-item.parcial { color: hsl(35, 78%, 72%); cursor: help; }
         .chip-sistema { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: hsla(211, 100%, 55%, .14); color: hsl(212, 78%, 72%); border: 1px solid #0077ff; }
@@ -2694,6 +2696,13 @@
                                'Porta de Correr': 'bf-correr', 'Serralheria': 'bf-serralheria', 'Avulso': 'bf-avulso' };
         const chipSistema = s => (!s || s === 'Sem sistema')
             ? '<span class="chip-sistema sem">Sem sistema</span>' : `<span class="chip-sistema">Com sistema: ${escapeHtml(s)}</span>`;
+        // Só na lista (a descrição gravada não muda): porta de giro e basculante mostram "Altura × Largura" e escondem as
+        // medidas dos furos, que continuam na descrição salva e na tela de edição.
+        const FRENTES_MEDIDA_NO_CARD = ['Porta de giro', 'Porta basculante'];
+        const descricaoDoCard = it => FRENTES_MEDIDA_NO_CARD.includes(it.frente)
+            ? String(it.descricao || '').replace(/ \| Furos: [^|]*/, '') : it.descricao;
+        const medidasDoCard = it => (FRENTES_MEDIDA_NO_CARD.includes(it.frente) && Number(it.altura) > 0 && Number(it.largura) > 0)
+            ? `<small class="medidas-item">Altura × Largura: <b>${escapeHtml(String(Number(it.altura)))} × ${escapeHtml(String(Number(it.largura)))} mm</b></small>` : '';
         function renderItens() {
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
@@ -2713,7 +2722,7 @@
                     <tr class="${[it.historico ? 'com-pct' : '', it.precoMudou ? 'preco-mudou' : ''].join(' ').trim()}">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente ${BADGE_FRENTE[it.frente] || 'bf-serralheria'}">${escapeHtml(it.frente === 'Avulso' ? (it.detalhes?.categoria || 'Avulso') : it.frente)}</span></td>
-                        <td>${escapeHtml(it.descricao)}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}<small class="peso-item" data-peso="${i}" hidden></small></td>
+                        <td>${escapeHtml(descricaoDoCard(it))}${it.frente === 'Porta de Correr' ? chipSistema(it.detalhes?.sistema) : ''}${medidasDoCard(it)}<small class="peso-item" data-peso="${i}" hidden></small></td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
