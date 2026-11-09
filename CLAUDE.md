@@ -29,6 +29,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Calendário de pedidos** (`calendario.html`, `calendario_dia.html`, `calendario.js`, `calendario_dia.js`, `calendario_comum.js`, `rotas/calendario.js`, `calculo/calendario.js`): mês inteiro e página de cada dia com a previsão de finalização (`ped_orc.DATA_PRONTO`) dos Pedidos, filtro "Em aberto" x "Todos", selo de atraso e o mesmo menu do botão direito do Início (alterar data de pronto, mudar situação, PDFs, Zebra, cortes, checklist, DANFE). Só lê; permissão `pedidos.ver`. Regras na seção 5, "Calendário de pedidos".
 - **Etapas de produção** (`etapas_producao.html/.js/.css`, `rotas/etapas_producao.js`, `rotas/etapas_banco.js`, `calculo/etapas_producao.js`): "sub-situação" de cada pedido em produção, com 6 etapas fixas (Perfil cortado, Vidro cortado, Perfil pintado, Vidro pintado, Portas montadas, Pedido finalizado); cada setor dá OK na sua (permissão por etapa), N/A automático quando o pedido não tem perfil/vidro (serralheria: só Perfil cortado, Perfil pintado e Finalizado se aplicam; Perfil cortado só manual), OK automático quando o corte real é confirmado com todas as peças cortadas, histórico por etapa; **"Pedido finalizado" marca o pedido como Pronto** (mesma função do menu de situação). Tabela com um botão grande por etapa (cartões no celular); sem atualização automática (botão "Atualizar"). Regras na seção 5, "Etapas de produção".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
+- **Baixa de estoque por QR** (`baixa_qr.html/.js`, `etiquetas_qr.html/.js`, `rotas/estoque_qr.js`, `calculo/estoque_qr.js`, `vendor/`): o funcionário que só retira material (perfil com apenas `estoque.ver` + `estoque.movimentar`) cai direto na câmera do celular, lê o QR da etiqueta (= `estoque.CODIGO_BARRA`), confere nome/saldo, ajusta a quantidade e dá baixa pela saída de estoque de sempre (`POST /estoque/saida`); `etiquetas_qr.html` imprime as etiquetas com QR (`estoque.editar`). **Não testado em aparelho real.** Regras na seção 5, "Baixa de estoque por QR".
 - **Notas de compra pela SEFAZ** (`notas_compra.html`, `notas_compra.js`, `local/sefaz.js`): o serviço local do PC da empresa (o mesmo do salvador de PDF, porta 3917) busca na SEFAZ as NF-e emitidas contra o CNPJ da empresa com o certificado A1, dá a Ciência da operação e guarda os XML; a tela leva o XML para a entrada de estoque existente. O certificado nunca sai do PC. Regras na seção 5, "Notas de compra pela SEFAZ".
 - **Nota fiscal em PDF (DANFE) pelo pedido** (`danfe_envio.html`, `danfe_envio.js`, `danfe_pedido.js`, `rotas/danfe.js`, `calculo/danfe.js`): os PDFs das notas (nome = chave de acesso de 44 dígitos) são enviados pela tela para o banco da web e abrem pelo botão direito do Pedido, de qualquer lugar. Regras na seção 5, "Nota fiscal em PDF (DANFE)".
 - **Leitura de projeto técnico em PDF** na tela de orçamentos (botão "📄 Ler projeto (PDF)", `leitura/`, `leitura_pdf.js`): o servidor lê o PDF pela API do Claude e o vendedor confere cada valor antes de importar (seção 5, "Leitura de PDF").
@@ -46,6 +47,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   estoque_movimentos.js  Entrada, saída, ajuste, histórico, estornos
   estoque_saida.js       Saída de estoque compartilhada (travarProdutos, conferirSaldo, gravarSaidas): usada por POST /estoque/saida e pela baixa das varas novas do plano de corte
   estoque_analises.js    Previsão de falta, ABC, parados
+  estoque_qr.js          Baixa por QR: GET /estoque/por_codigo/:codigo (só codigo/nome/unidade/qtd; 409 se o código se repete) e GET /estoque/etiquetas (somente leitura; a baixa usa POST /estoque/saida)
   nfe_xml.js             Leitura do XML da NF-e (recusa DOCTYPE)
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
@@ -70,6 +72,7 @@ calculo/                 Funções puras (testáveis sem banco)
   calendario.js          Calendário de pedidos: validação de mês/data/situação, "em aberto", atraso, agrupamento por dia (puras)
   etapas_producao.js     Etapas de produção: as 6 etapas, N/A automático, estado efetivo, validação da mudança (permissão, finalizar exige anteriores, forçar), corte completo, decisão do automático, fila (puras)
   entregas.js            Máquina de status das entregas (`proximo`, `pedidoPara`) e validação de anexo
+  estoque_qr.js          Baixa por QR: validação do código lido (1 a 20 caracteres) e projeção do item/etiquetas (puras)
   engenharia.js          Regras de engenharia das portas
   leitura_vb.js / linhas_vb.js   Conversão banco<->tela no formato do VB
   nomes.js               Normalização/semelhança de nomes de produtos
@@ -103,6 +106,9 @@ gestao.html/.js          Tela da Central de Gestão (barras em CSS, sem bibliote
 calendario.html/.js, calendario_dia.html/.js, calendario_comum.js, calendario.css   Telas do calendário de pedidos (mês e dia); o menu do botão direito é o `inicio_menu.js`
 etapas_producao.html/.js/.css   Tela das etapas de produção (tabela de botões-estado; cartões no celular; menu próprio no botão direito/Shift+F10/"⋯")
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
+baixa_qr.html/.js        Tela do celular: câmera + jsQR, cartão do item, quantidade e "Dar baixa" (lógica pura testada no Node)
+etiquetas_qr.html/.js    Folha de etiquetas com QR para imprimir (itens ativos com código de barras)
+vendor/                  Bibliotecas de terceiros copiadas (sem build): jsQR.js 1.4.0 (Apache-2.0) e qrcode.js 1.4.4 (MIT); ver vendor/LEIA-ME.txt
 DESIGN.md                Regras da identidade visual (cores, fonte, componentes, do's and don'ts); espelha o tema.css
 *.html, layout.js, login.js, ranking.js, custos_precos.js, importar_itens.js, leitura_pdf.js, style.css, tema.css   Front-end (layout.js = menu lateral e permissões na tela)
 test/                    Testes (node:test); test/apoio/ = banco/pool falsos, servidor de teste, XMLs de NF-e
@@ -171,6 +177,10 @@ Fila de pedidos Pronto, agenda e baixa pelo motorista (`web_entregas*`); a web s
 ### Etapas de produção (sub-situação do pedido, tabelas `web_producao_etapas` e `web_producao_etapas_eventos`)
 6 etapas fixas por pedido (pendente/ok/na; origem manual ou corte); sem linha = pendente ou N/A automático (peças/pendências do plano de corte + tipo dos itens: serralheria = `TIPO_PRODUTO` 'Metalons' ou linha em `ped_orc_serralheria`, com perfil e sem vidro/portas montadas; misto = o que qualquer item exigir); permissão por etapa (`etapas.*`, `etapas.gerir` mexe em todas e força); **OK em "Pedido finalizado" grava `SITUACAO='Pronto'` (escrita em tabela do VB) por `aplicarSituacaoPedido` de `rotas/ped_orc.js`, exige as anteriores OK/N/A, pergunta se mantém a `DATA_PRONTO` ou usa hoje e roda `sincronizarFila`**; desfazer não volta a situação, a menos que o usuário com `pedidos.situacao` peça e não haja entrega ativa; o corte confirmado com todas as peças cortadas e sem pendência marca "Perfil/Vidro cortado" (transação própria depois do commit do corte); cancelar o pedido desmarca só o que veio do corte; excluir apaga.
 > Regras completas: `docs/regras/etapas-producao.md` (ler antes de mexer neste módulo).
+
+### Baixa de estoque por QR (celular)
+O QR é o `estoque.CODIGO_BARRA` (o banco não garante unicidade: repetido = 409); a resposta usa `qtd` e nunca `saldo` (o `redeDeValores` apagaria); a mesma `chave` vale até a baixa dar certo (409 = "já registrada"); só `estoque.ver` + `estoque.movimentar` e nenhuma outra permissão entra direto em `baixa_qr.html`. **NÃO testado em aparelho real (Android e iPhone): câmera, leitura de QR, QR gerado e impressão das etiquetas.**
+> Regras completas: `docs/regras/baixa-qr.md` (ler antes de mexer neste módulo).
 
 ### Calendário de pedidos (previsão de finalização por dia)
 Data = `ped_orc.DATA_PRONTO` (só Pedido); "em aberto" = tudo menos Entregue/Retirado/Cancelado; atrasado = data anterior a hoje e ainda em produção/situação desconhecida (Pronto não atrasa); `pedidos.ver`, estados e `valores.ver` como `/dados_lista`; o menu do botão direito é o `inicio_menu.js` do Início (opção `voltar`).
