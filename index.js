@@ -103,6 +103,12 @@ const pool = mysql.createPool({
   waitForConnections: true,
   dateStrings: true,
   multipleStatements: false,
+  // Conexões quentes: o mysql2 fecha a conexão parada há 60 s (idleTimeout padrão) e a próxima requisição paga uma conexão nova, ~1 s
+  // a ~190 ms de ida e volta até o HostGator (wait_timeout dele = 3600 s). 20 min fica bem antes do corte do servidor; o keep-alive
+  // TCP evita que o caminho (NAT/firewall) derrube uma conexão ociosa sem avisar.
+  idleTimeout: 20 * 60 * 1000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   ssl: sslBanco
 });
 
@@ -378,8 +384,11 @@ registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
       ${est.sql ? JOIN_CLIENTE : ''}
       WHERE p.TIPO = ? ${est.sql ? 'AND ' + est.sql : ''}
       ORDER BY p.NUMERO DESC`;
-    const [rows] = await pool.execute(sql, [tipo, ...est.params]);
-    const composicao = await composicaoDosDocumentos(tipo);
+    // a lista e a composição (ícones) não dependem uma da outra: saem juntas (cada ida ao banco custa ~190 ms no Render)
+    const [[rows], composicao] = await Promise.all([
+      pool.execute(sql, [tipo, ...est.params]),
+      composicaoDosDocumentos(tipo)
+    ]);
     const comIcones = comDatasSeguras(rows).map(r => ({ ...r, ...(composicao.get(Number(r.numero)) || composicaoPedido.SEM_COMPOSICAO) }));
     res.json(semValores(req, comIcones, ['valor']));
   } catch (err) {
