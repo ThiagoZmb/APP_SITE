@@ -1737,7 +1737,11 @@ registro.rota('post', '/fluxo/situacao', ['financeiro.lancar', 'valores.ver'], a
   if (!ids.length) return res.status(400).json({ error: 'Favor escolher um item para ser alterado!' });
   if (!SITUACOES_FLUXO.includes(situacao)) return res.status(400).json({ error: 'Situação inválida' });
   try {
-    const [r] = await pool.execute(`UPDATE fluxo_de_caixa SET SITUACAO = ? WHERE ID IN (${ids.map(() => '?').join(',')})`, [situacao, ...ids]);
+    // mysql2 conta como affectedRows as linhas que CASARAM, não as que mudaram; por isso o filtro
+    // "SITUACAO diferente" faz o contador valer só para quem realmente trocou de situação.
+    const [r] = await pool.execute(
+      `UPDATE fluxo_de_caixa SET SITUACAO = ? WHERE ID IN (${ids.map(() => '?').join(',')}) AND (SITUACAO IS NULL OR SITUACAO <> ?)`,
+      [situacao, ...ids, situacao]);
     res.json({ ok: true, alterados: r.affectedRows });
   } catch (err) {
     console.error('Erro /fluxo/situacao:', err.message);

@@ -892,7 +892,8 @@
                 carregarResumo();
                 carregarGastos();
                 carregarOpcoes();
-                toast(`${r.alterados} registro(s) alterado(s) para ${situacao}`, 'ok');
+                if (!r.alterados) toast(`Nenhum registro mudou: já estava(m) como ${situacao}`, 'info');
+                else toast(`${r.alterados} registro(s) alterado(s) para ${situacao}`, 'ok');
             } catch (err) { toast(err.message, 'erro'); }
         }
         async function excluirRegistros(ids) {
