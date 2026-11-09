@@ -1,5 +1,6 @@
 -- ============================================================================
--- Índices de desempenho — PROPOSTA (nada aqui foi executado; só o dono roda, no MySQL Workbench).
+-- Índices de desempenho — EXECUTADO pelo dono em 2026-11-09 (os 9 índices foram criados e conferidos; ocupam ~15 MB, não 3 MB).
+-- Resultado medido depois: o subselect de Entregas caiu de 103 ms para 0,2 ms; as demais consultas de itens, de 3-10 ms para ~0.
 -- Banco: thia1272_db_elegance (MySQL 5.7.44). Diagnóstico feito em 2026-11-09 só com SELECT/EXPLAIN.
 --
 -- POR QUE: as 6 tabelas de itens de pedido do VB (ped_orc_lista_itens, ped_orc_itens_v4, ped_orc_serralheria,
@@ -17,7 +18,7 @@
 -- SEGURANÇA: índice novo não muda dados nem o que o VB lê/grava; o VB continua igual. Em InnoDB 5.7,
 -- ADD INDEX com ALGORITHM=INPLACE, LOCK=NONE roda sem travar escrita (tabelas de até 23 mil linhas: segundos).
 -- Faça fora do horário de uso mesmo assim. Cada ALTER é independente: se um falhar, os outros seguem.
--- ESPAÇO: todos juntos ocupam menos de 3 MB.
+-- ESPAÇO: todos juntos ocuparam cerca de 15 MB (a estimativa inicial de 3 MB estava errada; continua pouco para um banco de 124 MB).
 -- ============================================================================
 
 USE thia1272_db_elegance;

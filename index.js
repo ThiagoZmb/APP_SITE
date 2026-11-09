@@ -21,6 +21,7 @@ const { redeDeValores, semValores, preservarValores, podeVerValores } = require(
 const { filtroEstados } = require('./seguranca/acesso');
 const { acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
+const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
 const { criarAcessoPortal } = require('./portal/acesso');
@@ -105,6 +106,11 @@ const pool = mysql.createPool({
   ssl: sslBanco
 });
 
+// Medidor de desempenho (desempenho/medidor.js): conta consultas e tempo no banco por requisição e, no log do Render, mostra só as
+// requisições lentas, o resumo por hora e a ida e volta ao banco. Nunca nos testes (eles trocam os métodos do pool).
+const medidor = process.env.NODE_ENV === 'test' ? null : criarMedidor();
+if (medidor) medidor.instrumentarPool(pool);
+
 app.use(helmet());
 // Configuração do portal do cliente: lida uma vez; sem ela o portal responde 503 e o resto não muda.
 const configPortal = lerConfigPortal();
@@ -113,6 +119,7 @@ app.use(cors(criarOpcoesCors(configPortal)));
 // Cabeçalhos do portal (páginas e API em /portal): sem cache, sem referrer, CSP estrita (nada de script/estilo inline).
 app.use(cabecalhosPortal);
 app.use(express.json({ limit: '100kb' }));
+if (medidor) app.use(medidor.middleware); // depois do express.json: a leitura do corpo perde o contexto da requisição
 // Páginas do portal (login, convite, termo, início) na mesma origem da API. Só GET/HEAD; arquivo inexistente segue para as
 // rotas (/portal/api/*) e depois 404. cacheControl desligado: vale o no-store de cabecalhosPortal (o static poria max-age=0).
 app.use('/portal', express.static(path.join(__dirname, 'portal', 'public'), {
@@ -1849,6 +1856,7 @@ async function iniciar() {
     await limpar();
     setInterval(limpar, 24 * 60 * 60 * 1000).unref();
     marcarAtrasados(); // na subida (sem await); o login repete no máximo 1x por hora
+    medidor.iniciarRelatorio(pool); // ida e volta ao banco na subida e a cada hora, com o resumo das rotas (log do Render)
   }
   registro.verificar();
   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
