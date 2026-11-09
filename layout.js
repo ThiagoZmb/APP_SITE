@@ -45,6 +45,8 @@
         { href: 'estoque.html', texto: 'Estoque', icone: 'estoque' },
         { href: 'custos.html', texto: 'Custos e preços', icone: 'precos', sub: true },   // subitem do Estoque (o custo vem das compras)
         { href: 'tintas.html', texto: 'Tintas', icone: 'tintas', sub: true },   // subitem do Estoque (cadastro de tintas e insumos de pintura)
+        { href: 'baixa_qr.html', texto: 'Baixa por QR', icone: 'estoque', sub: true },   // subitem do Estoque (baixa lendo o QR da etiqueta pelo celular)
+        { href: 'etiquetas_qr.html', texto: 'Etiquetas de QR', icone: 'estoque', sub: true },   // subitem do Estoque (impressão das etiquetas com QR)
         { href: 'notas_compra.html', texto: 'Notas de compra (SEFAZ)', icone: 'estoque', sub: true },   // subitem do Estoque (NF-e de compra pelo serviço local do PC)
         { href: 'produtos.html', texto: 'Produtos', icone: 'produtos' },
         { href: 'pesos.html', texto: 'Pesos', icone: 'produtos', sub: true },   // subitem de Produtos (peso por produto, para o peso das portas)
@@ -88,6 +90,8 @@
         'calendario_dia.html': ['pedidos.ver'],
         'estoque.html': ['estoque.ver'],
         'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
+        'baixa_qr.html': ['estoque.ver', 'estoque.movimentar'],
+        'etiquetas_qr.html': ['estoque.ver', 'estoque.editar'],
         'produtos.html': ['produtos.ver'],
         'fornecedores.html': ['fornecedores.ver'],
         'notas_fiscais.html': ['notas.ver'],
@@ -128,7 +132,13 @@
     };
     const atendeItem = (item, tem) => typeof item === 'string' ? tem.includes(item) : (item?.algum || []).some(c => tem.includes(c));
     // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona); null = nenhuma
-    const primeiraPaginaDe = acesso => Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
+    // Estoquista: só estoque.ver + estoque.movimentar (e nenhuma outra) entra direto na leitura de QR; qualquer permissão a mais mantém a primeira página de sempre
+    const PERMISSOES_BAIXA_QR = ['estoque.ver', 'estoque.movimentar'];
+    const somenteBaixa = acesso => {
+        const tem = acesso?.permissoes || [];
+        return tem.length === PERMISSOES_BAIXA_QR.length && PERMISSOES_BAIXA_QR.every(c => tem.includes(c));
+    };
+    const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html')) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
         && !(atendAtivoPara(acesso) && atendBloqueia(p))
         && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
     const podePagina = arquivo => {
