@@ -5,7 +5,7 @@
 Spec: `docs/superpowers/specs/2026-11-09-baixa-estoque-qr-design.md`.
 
 ### O que é
-O funcionário que só retira material entra pelo celular e cai na câmera (`baixa_qr.html`); lê o QR da etiqueta, vê nome/unidade/saldo, ajusta a quantidade (começa em 1) e toca em "Dar baixa". A baixa é a saída de estoque que já existia (`POST /estoque/saida`, sem alteração). Etiquetas com QR são impressas em `etiquetas_qr.html`.
+O funcionário que só retira material entra pelo celular e cai na câmera (`baixa_qr.html`); lê o QR da etiqueta, vê nome, unidade e quantidade em estoque, ajusta a quantidade (começa em 1) e toca em "Dar baixa". A baixa é a saída de estoque que já existia (`POST /estoque/saida`, sem alteração). Etiquetas com QR são impressas em `etiquetas_qr.html`.
 
 ### Tabela `estoque` e o código de barras
 - O QR carrega o texto de `estoque.CODIGO_BARRA` (até 20 caracteres; o cadastro web gera EAN-13, mas itens vindos do VB podem ter outro formato). Nenhum identificador novo.
@@ -33,7 +33,7 @@ Ambas em `rotas/estoque_qr.js`, criadas por `registro.rota(...)`; só leem; fun�
 | `GET /estoque/etiquetas` | `estoque.ver` + `estoque.editar` |
 | `POST /estoque/saida` (existente) | `estoque.ver` + `estoque.movimentar` |
 
-Páginas (`PAGINAS` do `layout.js`): `baixa_qr.html` = `estoque.ver` + `estoque.movimentar`; `etiquetas_qr.html` = `estoque.ver` + `estoque.editar` (botão "Etiquetas de QR" em `estoque.html`). CSP das duas: só `'self'`, sem script nem estilo inline; dado da API só entra por `textContent`/`createElementNS`.
+Páginas (`PAGINAS` do `layout.js`): `baixa_qr.html` = `estoque.ver` + `estoque.movimentar`; `etiquetas_qr.html` = `estoque.ver` + `estoque.editar` (botão "Etiquetas de QR" em `estoque.html`). CSP padrão do projeto (inclui `'unsafe-inline'` e `cdn.jsdelivr.net`, como as demais páginas); as duas páginas não têm `<script>` nem `style=""` inline e carregam `vendor/` do próprio domínio; dado da API só entra por `textContent` e o QR é montado por `createElementNS`.
 
 ### Bibliotecas em `vendor/` (copiadas, sem build; detalhes em `vendor/LEIA-ME.txt`)
 - `jsQR.js` 1.4.0, licença Apache-2.0 (leitura do QR; só foi acrescentada a linha de licença no topo).
