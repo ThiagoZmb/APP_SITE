@@ -51,9 +51,13 @@ async function lerDocumento(db, tipo, numero, { travar = false } = {}) {
   const [cab] = await db.execute(`SELECT * FROM ped_orc WHERE NUMERO = ? AND TIPO = ?${travar ? ' FOR UPDATE' : ''}`, [numero, tipo]);
   if (!cab.length) return null;
   const linhas = { cab: cab[0], vidros: [], perfis: [] };
-  for (const [tabela, chave] of Object.entries(TABELAS_DOC)) [linhas[chave]] = await db.execute(`SELECT * FROM ${tabela} WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo]);
+  // As leituras das tabelas do documento são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render). Dentro de uma transação
+  // (`db` = uma conexão) o mysql2 as enfileira na mesma conexão, então nada muda ali; no pool elas usam conexões diferentes.
+  const pedidos = Object.entries(TABELAS_DOC).map(([tabela, chave]) => [chave, db.execute(`SELECT * FROM ${tabela} WHERE NUMERO = ? AND TIPO = ? ORDER BY id`, [numero, tipo])]);
   // vidros/perfis não têm TIPO: só pertencem ao pedido (spec da parte 1, §5.5)
-  if (tipo === 'Pedido') for (const t of ['vidros', 'perfis']) [linhas[t]] = await db.execute(`SELECT * FROM ${t} WHERE NUMERO = ? ORDER BY id`, [numero]);
+  if (tipo === 'Pedido') for (const t of ['vidros', 'perfis']) pedidos.push([t, db.execute(`SELECT * FROM ${t} WHERE NUMERO = ? ORDER BY id`, [numero])]);
+  const resultados = await Promise.all(pedidos.map(([, p]) => p));
+  pedidos.forEach(([chave], i) => { [linhas[chave]] = resultados[i]; });
   return linhas;
 }
 
@@ -118,12 +122,15 @@ async function aplicarDataPronto(conn, req, alvo, cab, nova, { origem = null } =
 // sistemas de correr citados nas descrições ("Sist: X") — a tradução precisa do desconto e dos itens de cada um
 async function sistemasDoDocumento(db, linhas) {
   const sistemas = {};
+  // cada sistema distinto é lido uma vez; as leituras de sistemas diferentes saem juntas (cada ida ao banco custa ~190 ms no Render)
+  const nomes = new Set();
   for (const l of linhas.lista) {
     const m = /Sist:\s*([^|]*?)\s*(\||$)/.exec(String(l.DESCRICAO || ''));
-    if (!m || !m[1] || m[1] === 'Sem sistema' || sistemas[m[1]]) continue;
-    const s = await lerSistemaCorrer(db, m[1], 2);
-    if (s) sistemas[m[1]] = { descontoAltura: s.descontoAltura, itens: s.itens };
+    if (!m || !m[1] || m[1] === 'Sem sistema') continue;
+    nomes.add(m[1]);
   }
+  const lidos = await Promise.all([...nomes].map(nome => lerSistemaCorrer(db, nome, 2)));
+  [...nomes].forEach((nome, i) => { const s = lidos[i]; if (s) sistemas[nome] = { descontoAltura: s.descontoAltura, itens: s.itens }; });
   return sistemas;
 }
 
@@ -486,11 +493,17 @@ function registrarPedOrc({ rota, pool }) {
     try {
       const linhas = await lerDocumento(pool, tipo, numero);
       if (!linhas) return res.status(404).json({ error: `${tipo} nº ${numero} não encontrado.` });
-      const [cli] = await pool.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]);
+      // cliente, componentes da serralheria e sistemas de correr são independentes entre si: saem JUNTOS (cada ida ao banco custa ~190 ms)
+      const produtosSerr = [...new Set(linhas.serralheria.map(s => s.PRODUTO))];
+      const [[cli], componentes, sistemas] = await Promise.all([
+        pool.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]),
+        Promise.all(produtosSerr.map(p => leitor.componentesSerralheria(p))),
+        sistemasDoDocumento(pool, linhas)
+      ]);
       if (foraDosEstados(req, cli[0]?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
       const componentesSerr = {};
-      for (const s of linhas.serralheria) if (!componentesSerr[s.PRODUTO]) componentesSerr[s.PRODUTO] = await leitor.componentesSerralheria(s.PRODUTO);
-      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas: await sistemasDoDocumento(pool, linhas), componentesSerr });
+      produtosSerr.forEach((p, i) => { componentesSerr[p] = componentes[i]; });
+      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas, componentesSerr });
       const p = req.acesso.permissoes;
       res.json({ cabecalho: { ...cabecalho, clienteCodigo: cli[0]?.CODIGO ?? null }, itens, impressao: impressaoDigital(linhas, tipo),
         podeEditar: p.has('orcamentos.salvar') && (tipo === 'Orçamento' || p.has('pedidos.criar')) });

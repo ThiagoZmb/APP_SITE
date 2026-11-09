@@ -13,14 +13,18 @@ function criarAcesso({ pool, ttlMs = 60000, agora = () => Date.now() }) {
   const cache = new Map();
 
   async function buscar(codigo) {
-    const [usuarios] = await pool.execute(
-      'SELECT CODIGO, NOME, CARGO, RAZAO_SOCIAL, SITUACAO FROM cliente_usuarios WHERE CODIGO = ? LIMIT 1', [codigo]);
+    // Cada ida ao banco custa ~190 ms (Render -> HostGator): as 3 leituras que só dependem do código saem JUNTAS (eram 4 em série).
+    // Só as permissões do perfil dependem do resultado (perfil_id): uma segunda ida, não três. Os SQLs são os mesmos de sempre.
+    const [[usuarios], [webs], [ex]] = await Promise.all([
+      pool.execute('SELECT CODIGO, NOME, CARGO, RAZAO_SOCIAL, SITUACAO FROM cliente_usuarios WHERE CODIGO = ? LIMIT 1', [codigo]),
+      pool.execute(
+        `SELECT a.perfil_id, a.estados, a.ativo, p.nome AS perfil_nome, p.ativo AS perfil_ativo
+         FROM web_usuario_acesso a LEFT JOIN web_perfis p ON p.id = a.perfil_id
+         WHERE a.usuario_codigo = ? LIMIT 1`, [codigo]),
+      pool.execute('SELECT permissao, tipo FROM web_usuario_excecoes WHERE usuario_codigo = ?', [codigo])
+    ]);
     if (!usuarios.length) return null;
     const u = usuarios[0];
-    const [webs] = await pool.execute(
-      `SELECT a.perfil_id, a.estados, a.ativo, p.nome AS perfil_nome, p.ativo AS perfil_ativo
-       FROM web_usuario_acesso a LEFT JOIN web_perfis p ON p.id = a.perfil_id
-       WHERE a.usuario_codigo = ? LIMIT 1`, [codigo]);
     const web = webs[0] || null;
     const ativo = !!web && Number(web.ativo) === 1 && String(u.SITUACAO || '').toUpperCase() !== 'INATIVO';
     let permissoesPerfil = [];
@@ -30,7 +34,6 @@ function criarAcesso({ pool, ttlMs = 60000, agora = () => Date.now() }) {
         const [pp] = await pool.execute('SELECT permissao FROM web_perfil_permissoes WHERE perfil_id = ?', [web.perfil_id]);
         permissoesPerfil = pp.map(r => r.permissao);
       }
-      const [ex] = await pool.execute('SELECT permissao, tipo FROM web_usuario_excecoes WHERE usuario_codigo = ?', [codigo]);
       excecoes = ex;
     }
     return {

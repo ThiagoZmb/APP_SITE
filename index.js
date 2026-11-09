@@ -1034,16 +1034,20 @@ const TABELAS_CATALOGO = {
   cores:         ['cores', 'NOME_COR', '']
 };
 registro.rota('get', '/catalogos', ['orcamentos.criar'], async (req, res) => {
-  const saida = {};
-  for (const [chave, [tabela, coluna, where]] of Object.entries(TABELAS_CATALOGO)) {
+  // As leituras de cada catálogo são independentes: saem JUNTAS (eram ~13 idas ao banco em série, ~190 ms cada no Render = mais de 2 s).
+  // A ordem das chaves da resposta é a de TABELAS_CATALOGO, como antes.
+  const entradas = Object.entries(TABELAS_CATALOGO);
+  const listas = await Promise.all(entradas.map(async ([, [tabela, coluna, where]]) => {
     try {
       const [rows] = await pool.execute(
         `SELECT DISTINCT ${coluna} AS nome FROM ${tabela} ${where || ''} ORDER BY ${coluna}`);
-      saida[chave] = rows.map(r => r.nome).filter(n => n);
+      return rows.map(r => r.nome).filter(n => n);
     } catch (e) {
-      saida[chave] = []; // tabela ausente → combo vazio, página continua
+      return []; // tabela ausente → combo vazio, página continua
     }
-  }
+  }));
+  const saida = {};
+  entradas.forEach(([chave], i) => { saida[chave] = listas[i]; });
   res.json(saida);
 });
 
