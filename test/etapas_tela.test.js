@@ -192,6 +192,7 @@ test('listas: o quadro rola na vertical e o cabeçalho (th) gruda; tema.css dá 
   // tema.css: padrão para todas as listas (quadros conhecidos), com especificidade zero para a página poder definir a sua
   assert.match(tema, /:where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) \{ overflow: auto; max-height: max\(320px, calc\(100vh - 220px\)\); \}/);
   assert.match(tema, /body :where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) thead th \{ position: sticky; top: 0; z-index: 3; \}/);
+  assert.match(tema, /thead th \{\s*color: var\(--text-dark\) !important; border-bottom: 2px solid var\(--primary-color\) !important;\s*box-shadow:/);   // destaque do cabeçalho fixo
   assert.match(ler('DESIGN.md'), /Toda lista com rolagem mantém o cabeçalho das colunas sempre visível/);
 });
 
