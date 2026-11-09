@@ -194,18 +194,18 @@
            Hierarquia: cliente (campo que manda) > datas > cliente final > observação.
            Linha 1: cliente largo + datas curtas. Linha 2: cliente final + observação. */
         .grid-form .cab-linha { grid-column: 1 / -1; display: grid; gap: 10px 16px; align-items: end; min-width: 0; }
-        .cab-linha-cliente { grid-template-columns: minmax(0, 1fr) auto; }
-        .cab-linha-apoio { grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); align-items: start; margin-top: 4px; }
+        .cab-linha-cliente { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .cab-linha-pares { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 210px; justify-content: start; align-items: start; gap: 10px 28px; margin-top: 4px; }
+        .cab-par { display: grid; gap: 8px; }
         .cab-cliente { min-width: 0; margin: 0; }
-        .cab-datas { display: grid; grid-template-columns: repeat(2, 168px); gap: 10px; }
         .cab-campo { min-width: 0; display: flex; flex-direction: column; }
         html body .cab-campo label { font-size: 12px !important; font-weight: 700 !important; color: var(--text-mid) !important; margin-bottom: 3px !important; }
-        html body .cab-campo input { box-sizing: border-box; width: 100%; height: 40px !important; min-height: 40px !important; padding: 6px 10px !important; font-size: 14px !important; }
-        html body .cab-datas .cab-campo input[readonly] { color: var(--text-mid); }
+        html body .cab-campo input, html body .cab-campo select { box-sizing: border-box; width: 100%; height: 40px !important; min-height: 40px !important; padding: 6px 10px !important; font-size: 14px !important; }
+        html body .cab-par .cab-campo input[readonly] { color: var(--text-mid); }
         /* observação: texto livre, destaque discreto no tom do acento (sem laranja gritante) */
         html body .cab-campo.obs-geral label { color: var(--primary-color) !important; }
-        #ped-obs { box-sizing: border-box; width: 100%; min-height: 40px; height: 40px; resize: vertical; } /* começa baixa; dá para puxar o canto */
-        @media (max-width: 900px) { .cab-linha-cliente, .cab-linha-apoio { grid-template-columns: minmax(0, 1fr); } .cab-datas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        html body #ped-obs { box-sizing: border-box; width: 100%; min-height: 40px; height: 40px; resize: none; overflow: hidden; padding: 9px 10px; } /* começa baixa; dá para puxar o canto */
+        @media (max-width: 900px) { .cab-linha-cliente { grid-template-columns: minmax(0, 1fr); } .cab-linha-pares { grid-auto-flow: row; grid-auto-columns: auto; } }
         /* observação do item (abaixo do desenho) */
         #f-obs { width: 100%; box-sizing: border-box; min-height: 36px; height: 36px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; font-size: 13px; }
         /* porta de correr: com × sem sistema bem visível */
@@ -224,7 +224,7 @@
         .tipo-toggle button[aria-pressed="true"] { background:var(--gradient-primary); color:var(--on-primary); }
         .numero-datas { margin-left:auto; display:flex; align-items:center; gap:8px; }
         .numero-rotulo { font-size:11.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-light); }
-        html body #ped-numero { width:132px; height:40px; min-height:40px; box-sizing:border-box; font-family:var(--font-mono, ui-monospace, Consolas, monospace); font-size:20px; font-weight:700; text-align:center; color:var(--primary-color); font-variant-numeric:tabular-nums; }
+        html body #ped-numero { width:132px; height:40px; min-height:40px; box-sizing:border-box; background:var(--primary-tint); border:1px solid var(--primary-ring); border-radius:6px; font-family:var(--font-mono, ui-monospace, Consolas, monospace); font-size:20px; font-weight:700; text-align:center; color:var(--primary-color); font-variant-numeric:tabular-nums; }
         .correr-larguras { margin: 6px 0 10px; padding: 8px 12px; border: 1px dashed var(--border-strong, #d9d9e3); border-radius: 8px; }
         .correr-larguras > small { display: block; margin-bottom: 6px; color: var(--text-light); font-weight: 600; }
         .correr-larguras .cl-linha { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -309,7 +309,7 @@
         body.so-leitura .btn-cancelar-doc, body.so-leitura .btn-excluir-doc { display: none !important; }
 
         /* barra de ações do documento (seção 1): botões do mesmo tamanho, ícone sobre o rótulo; risco separado à direita */
-        html body .acoes-linha.acoes-topo { --bw: 118px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 20px; margin: 0 0 14px !important; }
+        html body .acoes-linha.acoes-topo { --bw: 92px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 20px; margin: 0 0 14px !important; }
         html body .acoes-linha.acoes-topo.acoes-rodape { margin: 18px 0 0 !important; }
         html body .acoes-topo .acoes-grupo { display: grid; grid-auto-flow: column; grid-auto-columns: var(--bw); gap: 8px; }
         html body .acoes-topo .acoes-risco { padding-left: 20px; border-left: 1px solid var(--border-color); }
@@ -584,33 +584,34 @@
                     </div>
                 </div>
                 <div class="grid-form">
-                    <!-- Linha 1: cliente (o campo que manda, largo e destacado) + datas (curtas, lado a lado) -->
+                    <!-- Linha 1: o card dividido ao meio, cliente | cliente final -->
                     <div class="cab-linha cab-linha-cliente">
                         <div class="form-group cab-cliente">
                             <label for="sel-cliente">Nome do cliente</label>
                             <select id="sel-cliente"><option value="">Carregando clientes...</option></select>
                         </div>
-                        <div class="cab-datas">
-                            <div class="cab-campo"><label for="ped-data">Data</label><input type="date" id="ped-data" readonly title="Data do documento (gravada ao salvar)"></div>
-                            <div class="cab-campo"><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
-                        </div>
-                    </div>
-                    <!-- Linha 2: apoio (cliente final, curto) + observação (texto livre, largo) -->
-                    <div class="cab-linha cab-linha-apoio">
-                        <select id="ped-tipo" aria-label="Tipo do documento" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
                         <div class="cab-campo cab-final">
                             <label for="ped-cliente-final">Cliente final</label>
                             <input type="text" id="ped-cliente-final" maxlength="190">
                         </div>
-                        <div class="cab-campo obs-geral">
-                            <label for="ped-obs">Observação geral do pedido</label>
-                            <textarea id="ped-obs" rows="2" maxlength="5000"></textarea>
+                        <select id="ped-tipo" aria-label="Tipo do documento" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"><option value="Orçamento">Orçamento</option><option value="Pedido">Pedido</option></select>
+                    </div>
+                    <!-- Linha 2: pares empilhados (situação/financeiro e data/entrega) -->
+                    <div class="cab-linha cab-linha-pares">
+                        <div class="cab-par" id="ped-campos-pedido" style="display:none">
+                            <div class="cab-campo"><label for="ped-situacao">Situação do pedido</label><select id="ped-situacao"><option value="">—</option><option>Cancelado</option><option>Em Produção</option><option>Entregue</option><option>Retirado</option></select></div>
+                            <div class="cab-campo"><label for="ped-financeiro">Situação financeiro</label><select id="ped-financeiro"><option value="">—</option><option>Recebido</option><option>A Receber</option><option>Atrasado</option><option>Sem custo</option></select></div>
+                        </div>
+                        <div class="cab-par">
+                            <div class="cab-campo"><label for="ped-data">Data</label><input type="date" id="ped-data" readonly title="Data do documento (gravada ao salvar)"></div>
+                            <div class="cab-campo"><label for="ped-entrega">Data de entrega</label><input type="date" id="ped-entrega"></div>
                         </div>
                     </div>
-                    <div class="form-group full" id="ped-campos-pedido" style="display:none">
-                        <div class="ped-pedido-grid">
-                            <div><label for="ped-situacao">Situação</label><select id="ped-situacao"><option value="">—</option><option>Cancelado</option><option>Em Produção</option><option>Entregue</option><option>Retirado</option></select></div>
-                            <div><label for="ped-financeiro">Financeiro</label><select id="ped-financeiro"><option value="">—</option><option>Recebido</option><option>A Receber</option><option>Atrasado</option><option>Sem custo</option></select></div>
+                    <!-- Linha 3: observação, uma linha, largura total -->
+                    <div class="cab-linha">
+                        <div class="cab-campo obs-geral">
+                            <label for="ped-obs">Observação geral do pedido</label>
+                            <textarea id="ped-obs" rows="1" maxlength="5000"></textarea>
                         </div>
                     </div>
                 </div>
