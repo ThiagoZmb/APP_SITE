@@ -14,3 +14,5 @@ sefaz.estado.json
 
 # arquivos compactados (o APP_SITE.rar já levou senha do banco ao histórico)
 *.rar
+
+agency-agents/
