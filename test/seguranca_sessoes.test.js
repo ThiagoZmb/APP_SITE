@@ -213,3 +213,67 @@ test('layout.js chama /logout antes de removeItem(auth) nos dois pontos de saíd
 test('POST /logout é rota autenticada sem permissão exigida', () => {
   assert.ok(registro.rotasAutenticadas().some(r => r.metodo === 'post' && r.caminho === '/logout'));
 });
+
+// ---------- cache curto da validação (cada consulta custa ~190 ms entre o Render e o HostGator) ----------
+const selecoes = f => f.chamadas.filter(c => /SELECT id FROM web_sessoes/.test(c.sql)).length;
+
+test('cache: a 2ª validação dentro do prazo não vai ao banco; passado o prazo, confere de novo', async () => {
+  const { f } = bancoSessoes();
+  let agora = new Date('2026-11-03T10:00:00Z');
+  const s = criarSessoes({ pool: f, agora: () => agora, cacheMs: 30000 });
+  const id = await s.criar(7, null);
+  assert.equal(await s.valida(id, 7), true); assert.equal(selecoes(f), 1);
+  assert.equal(await s.valida(id, 7), true); assert.equal(selecoes(f), 1, 'veio do cache');
+  agora = new Date('2026-11-03T10:00:29Z');
+  assert.equal(await s.valida(id, 7), true); assert.equal(selecoes(f), 1);
+  agora = new Date('2026-11-03T10:00:31Z');
+  assert.equal(await s.valida(id, 7), true); assert.equal(selecoes(f), 2, 'passou de 30 s: confere no banco');
+});
+
+test('cache: só guarda o que deu CERTO e só vale para o mesmo usuário; cacheMs 0 desliga', async () => {
+  const { f } = bancoSessoes();
+  const s = criarSessoes({ pool: f, cacheMs: 30000 });
+  const id = await s.criar(7, null);
+  assert.equal(await s.valida(id, 8), false); assert.equal(await s.valida(id, 8), false);
+  assert.equal(selecoes(f), 2, 'resultado falso nunca é guardado');
+  assert.equal(await s.valida(id, 7), true);
+  assert.equal(await s.valida(id, 8), false, 'sid guardado para o usuário 7 não vale para o 8');
+  const { f: g } = bancoSessoes();
+  const sem = criarSessoes({ pool: g, cacheMs: 0 });
+  const id2 = await sem.criar(7, null);
+  await sem.valida(id2, 7); await sem.valida(id2, 7);
+  assert.equal(selecoes(g), 2, 'cacheMs 0 = confere no banco toda vez');
+});
+
+test('cache: logout (revogar) e troca de senha (revogarTodas) valem NA HORA, sem esperar o prazo', async () => {
+  const { f } = bancoSessoes();
+  const s = criarSessoes({ pool: f, cacheMs: 30000 });
+  const a = await s.criar(7, null), b = await s.criar(7, null), c = await s.criar(9, null);
+  for (const [id, u] of [[a, 7], [b, 7], [c, 9]]) assert.equal(await s.valida(id, u), true);
+  await s.revogar(a);
+  assert.equal(await s.valida(a, 7), false, 'logout vale na hora');
+  assert.equal(await s.valida(b, 7), true);
+  await s.revogarTodas(7, { exceto: b });
+  assert.equal(await s.valida(b, 7), true, 'a sessão de quem trocou a senha continua');
+  await s.revogarTodas(7);
+  assert.equal(await s.valida(b, 7), false, 'troca de senha derruba as outras na hora');
+  assert.equal(await s.valida(c, 9), true, 'outro usuário intacto');
+});
+
+test('cache: uma validação que estava no ar durante a revogação não guarda o resultado antigo', async () => {
+  const { f, linhas } = bancoSessoes();
+  const s = criarSessoes({ pool: f, cacheMs: 30000 });
+  const id = await s.criar(7, null);
+  // atrasa só o SELECT: ele lê "válida", a revogação acontece, e só então o SELECT devolve
+  const original = f.execute.bind(f); let solta;
+  const segurado = new Promise(r => { solta = r; });
+  f.execute = async (sql, p) => { const r = await original(sql, p); if (/SELECT id FROM web_sessoes/.test(sql)) await segurado; return r; };
+  const emVoo = s.valida(id, 7);
+  await new Promise(r => setTimeout(r, 5));
+  f.execute = original;
+  await s.revogar(id);
+  solta();
+  assert.equal(await emVoo, true, 'quem já estava no ar recebe o resultado que leu');
+  assert.equal(linhas[0].revogada, 1);
+  assert.equal(await s.valida(id, 7), false, 'mas a revogação não foi desfeita pelo cache: a próxima já vê');
+});

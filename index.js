@@ -178,7 +178,8 @@ async function autenticar(req, res, next) {
   if (payload.v !== 2) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
   // Token de outro tipo (ex.: cliente do portal) nunca vale aqui; sem `tipo` também é recusado.
   if (payload.tipo !== 'funcionario') return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
-  // Sessão conferida no banco a cada requisição (chave primária, sem cache): logout e troca de senha valem na hora.
+  // Sessão conferida no banco (chave primária) com cache de 30 s só dos resultados certos (seguranca/sessoes.js): logout e troca de senha
+  // limpam o cache na hora, então continuam valendo na hora.
   // Token sem `sid` (emitido antes das sessões) é recusado.
   try {
     if (!(await sessoes.valida(payload.sid, payload.id))) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
