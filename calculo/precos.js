@@ -221,6 +221,8 @@ async function calcularPrecoItem(b, cliente, leitor) {
       diag: { ...ultimo.diag, ...(largVaria ? { largurasFolhas: largs } : {}), ...(posVaria ? { posicoesFolhas: poss.slice(0, nFolhas) } : {}) } };
   }
   if (poss.length) b = { ...b, posicaoPuxador: posDaFolha(0) }; // a lista por folha é a fonte; todas dão a mesma conta
+  // várias folhas de larguras IGUAIS: a lista por folha é a fonte (a tela manda em `largura` a automática do vão)
+  if (largs.length > 1) b = { ...b, largura: largs[0] };
   const altura = parseFloat(b.altura) || 0;
   const largura = parseFloat(b.largura) || 0;
 

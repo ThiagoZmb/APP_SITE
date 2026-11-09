@@ -66,6 +66,35 @@ test('preço: soma o preço de cada porta (perímetro × perfil), unitário = m�
   assert.equal(iguais.total, 600);
 });
 
+// bug: folhas iguais editadas ([500, 500]) usavam a `largura` automática do vão (a tela a manda) em vez de 500
+test('preço: folhas iguais editadas usam a largura da folha, não a automática do vão', async () => {
+  const cli = { isFixo: false, desconto: 0 };
+  const b = { frente: 'Porta de Correr', altura: 1000, largura: 500, perfil: 'P', qtd: 2, largurasFolhas: [500, 500] };
+  const certo = await calcularPrecoItem(b, cli, leitor);
+  const comAuto = await calcularPrecoItem({ ...b, largura: 951 }, cli, leitor);
+  assert.equal(comAuto.total, certo.total);
+  assert.equal(certo.total, 600);
+});
+
+test('preço: continuidade entre [500, 500] e [500, 501] com largura automática 951', async () => {
+  const cli = { isFixo: false, desconto: 0 };
+  const b = { frente: 'Porta de Correr', altura: 1900, largura: 951, perfil: 'P', qtd: 2 };
+  const a = await calcularPrecoItem({ ...b, largurasFolhas: [500, 500] }, cli, leitor);
+  const c = await calcularPrecoItem({ ...b, largurasFolhas: [500, 501] }, cli, leitor);
+  assert.ok(Math.abs(c.total - a.total) < 5, `diferença ${c.total - a.total}`);
+});
+
+test('preço: caso real (vão 2250×1901, 2 folhas de 500) e 1 folha seguem iguais', async () => {
+  const cli = { isFixo: false, desconto: 0 };
+  const b = { frente: 'Porta de Correr', altura: 1901, perfil: 'P', qtd: 2 };
+  const real = await calcularPrecoItem({ ...b, largura: 951, largurasFolhas: [500, 500] }, cli, leitor);
+  const ref = await calcularPrecoItem({ ...b, largura: 500, largurasFolhas: [500, 500] }, cli, leitor);
+  assert.equal(real.total, ref.total);
+  const uma = await calcularPrecoItem({ ...b, qtd: 1, largura: 800 }, cli, leitor);
+  const umaLista = await calcularPrecoItem({ ...b, qtd: 1, largura: 800, largurasFolhas: [800] }, cli, leitor);
+  assert.equal(uma.total, umaLista.total);
+});
+
 // ida e volta pelo que a gravação escreve: itens_v4 por configuração + descrição com o transpasse
 function linhasGravadas(item, { descontoAlturaSistema = 40 } = {}) {
   const folhas = folhasDoItem(item, { descontoAlturaSistema });
