@@ -59,6 +59,10 @@ function bancoEstoque() {
       const r = estado.reposicao.find(x => x.produto_codigo === produto_codigo);
       if (r) Object.assign(r, { prazo_dias, atualizado_em, atualizado_por }); else estado.reposicao.push({ produto_codigo, prazo_dias, atualizado_em, atualizado_por });
       return { affectedRows: 1 }; }],
+    // baixa por QR: leitura por código de barras e etiquetas
+    [/FROM estoque WHERE CODIGO_BARRA = \? LIMIT 2/, (sql, [cb]) => estoque.filter(e => e.CODIGO_BARRA === cb).slice(0, 2).map(e => ({ ...e }))],
+    [/FROM estoque WHERE SITUACAO = 'Ativo' ORDER BY NOME_PRODUTO/, () => estoque.filter(e => e.SITUACAO === 'Ativo')
+      .sort((a, b) => a.NOME_PRODUTO.localeCompare(b.NOME_PRODUTO)).map(e => ({ ...e }))],
     // listas
     [/FROM estoque WHERE \(SITUACAO = 'Ativo' OR/, (sql, [like, cod]) => {
       const termo = String(like || '%%').replace(/%/g, '').toLowerCase();
