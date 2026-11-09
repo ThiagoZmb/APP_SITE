@@ -5,6 +5,7 @@
 // ==========================================================================
 const CATALOGO = [
   { codigo: 'paineis.ver', nome: 'Ver início e painéis', area: 'Painéis' },
+  { codigo: 'indicadores.ver', nome: 'Ver os indicadores "Operação agora" e "Resultado do período" em Pedidos e Orçamentos', area: 'Painéis' },
   { codigo: 'pedidos.ver', nome: 'Ver pedidos e orçamentos', area: 'Pedidos' },
   { codigo: 'pedidos.pdf', nome: 'Abrir PDF de pedido/orçamento', area: 'Pedidos' },
   { codigo: 'pedidos.checklist', nome: 'Imprimir o checklist de produção (PDF enviado ao sistema)', area: 'Pedidos' },
@@ -76,7 +77,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS.filter(c => c !== 'atendimento.modo') },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir' && c !== 'indicadores.ver') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

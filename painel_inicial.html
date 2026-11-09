@@ -309,14 +309,14 @@
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
                 <!-- ===== OPERAÇÃO AGORA ===== -->
-                <section class="painel so-geral" style="margin-bottom:12px">
+                <section class="painel so-geral" data-perm="indicadores.ver" style="margin-bottom:12px">
                     <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
                     <div class="operacao" id="operacao"></div>
                 </section>
 
                 <!-- ===== RESULTADO DO PERÍODO ===== -->
-                <div class="bloco-tit so-geral">Resultado do período</div>
-                <section class="kpis so-geral" id="kpis-periodo"></section>
+                <div class="bloco-tit so-geral" data-perm="indicadores.ver">Resultado do período</div>
+                <section class="kpis so-geral" data-perm="indicadores.ver" id="kpis-periodo"></section>
 
                 <!-- ===== LISTA ===== -->
                 <section class="painel" style="margin-bottom:18px">
@@ -491,8 +491,10 @@
                 ['Ticket médio', moeda(r.ticket), `${j.iniAnt ? seta(variacao(r.ticket, r.ticketA)) : ''} por pedido`, COR.roxo]
             ];
             if (!cliente) kp.push(['Clientes compradores', num(r.clientes), 'compraram no período', COR.turquesa]);
+            if (Acesso.pode('indicadores.ver')) { // sem a permissão os números nem entram na página
             $('kpis-periodo').innerHTML = kp.map(([t, v, s, c]) => `<div class="kpi" style="--k:${c}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
             $('kpis-periodo').style.gridTemplateColumns = `repeat(${kp.length}, minmax(0, 1fr))`;
+            }
             resumo = r;
         }
 
@@ -559,7 +561,7 @@
                 ['Entregas atrasadas', num(atrasadas.length), atrasadas.length ? moeda(soma(atrasadas)) : 'nenhuma', atrasadas.length > 0],
                 ['A receber (pedidos)', moeda(soma(aReceber)), atrasoFin.length ? `<span class="down">${moeda(soma(atrasoFin))} em atraso</span>` : `${aReceber.length} pedido(s)`]
             ];
-            $('operacao').innerHTML = op.map(([t, v, s, al]) => `<div class="op${al ? ' alerta' : ''}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
+            if (Acesso.pode('indicadores.ver')) $('operacao').innerHTML = op.map(([t, v, s, al]) => `<div class="op${al ? ' alerta' : ''}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
         }
 
         // ================= LEITURA RÁPIDA =================

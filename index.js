@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
 const { criarSessoesPortal } = require('./portal/sessoes');
@@ -1839,6 +1839,7 @@ async function iniciar() {
     if ((await require('./seguranca/coluna_imagem').garantirColunaImagemProduto(pool)).feito) console.log('[banco] coluna cadastro_de_produtos.IMAGEM criada');
   } catch (err) { console.error('[banco] não foi possível criar a coluna IMAGEM:', err.code || 'sem código'); }
   if ((await acrescentarPermissoesPortal(pool)).feito) console.log('[permissões] portal.gerir acrescentada ao Administrador');
+  if ((await acrescentarPermissoesIndicadores(pool)).feito) console.log('[permissões] indicadores.ver acrescentada ao Administrador');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
   if (process.env.NODE_ENV !== 'test') {

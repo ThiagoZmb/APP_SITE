@@ -902,6 +902,9 @@ const acrescentarPermissoesGestao = pool => darAoAdministrador(pool, 'permissoes
 // Portal do cliente: gerenciar (liberar empresas, convidar, suspender, reiniciar o 2º fator) só para o Administrador
 const acrescentarPermissoesPortal = pool => darAoAdministrador(pool, 'permissoes_portal', ['portal.gerir']);
 
+// Indicadores de Pedidos e Orçamentos (Operação agora / Resultado do período): só o Administrador na migração
+const acrescentarPermissoesIndicadores = pool => darAoAdministrador(pool, 'permissoes_indicadores', ['indicadores.ver']);
+
 // Plano de corte: ver e planejar para Administrador e Interno completo; parâmetros e retalhos manuais só para o Administrador
 const PERMISSOES_CORTE = { 'Administrador': ['corte.ver', 'corte.planejar', 'corte.parametros'], 'Interno completo': ['corte.ver', 'corte.planejar'] };
 async function acrescentarPermissoesCorte(pool) {
@@ -1093,4 +1096,4 @@ async function acrescentarPermissoesEtapas(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
