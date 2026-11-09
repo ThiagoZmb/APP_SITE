@@ -212,6 +212,7 @@ Cantos curtos e consistentes: **6px** (controles, botões, linhas de ranking), *
 ### Inputs / Fields
 - Fundo Grafite de Fundo (mais escuro que o painel), filete firme, raio 6px, altura mínima 42px; rótulo 12px/700 Tinta Média sem maiúsculas.
 - **Foco:** borda âmbar + anel de 3px. **Somente leitura:** número em âmbar. **Desabilitado:** `#181a1f`, borda tracejada, cursor bloqueado.
+- **Anotação em post-it amarelo** (observação geral do pedido, `#ped-obs`): fundo `--post-it-bg` (`#fff9c4`) fixo nos dois temas, texto `--post-it-texto` (`#1a1a1a`), cursor igual ao texto, placeholder `--post-it-placeholder` (`#5c5c5c`). Texto claro do tema escuro sobre amarelo é ilegível; contraste ~16:1.
 - Busca com lupa clara à esquerda; seleção com seta própria; checkbox com `accent-color` âmbar; `color-scheme: dark` para controles nativos.
 
 ### Tables
