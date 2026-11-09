@@ -89,3 +89,12 @@ test('sem acessórios, o preço com acessórios é o mesmo da tela (revisão: 70
   const servidor = await require('../calculo/precos').precoComAcessorios(e, semDesconto, leitor, []);
   assert.equal(servidor.unitario, tela.unitario);
 });
+
+test('leitor do cadastro prefere o produto ativo, mas aceita o inativo (orçamento antigo com material inativado)', async () => {
+  const pool = criarPoolFalso([[/FROM cadastro_de_produtos/, [{ CODIGO: 2179, MODELO: 'Tubo inativo', VALOR_FIXO: 64.7, DESCONTO_VIDRO: 0, TIPO_PUXADOR: '', DESC_PERF_PUX: 0 }]]]);
+  const p = await criarLeitor(pool).produto('Tubo inativo');
+  assert.equal(p.valorFixo, 64.7);
+  const sql = pool.chamadas[0].sql;
+  assert.match(sql, /SITUACAO IN \('Ativo', 'Inativo'\)/);
+  assert.match(sql, /ORDER BY \(SITUACAO = 'Ativo'\) DESC/); // ativo primeiro quando houver os dois
+});

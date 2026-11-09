@@ -12,7 +12,10 @@ function criarLeitor(pool) {
       if (!nome) return null;
       const [rows] = await pool.execute(
         `SELECT CODIGO, MODELO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX
-         FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO = 'Ativo' LIMIT 1`, [nome]);
+         FROM cadastro_de_produtos WHERE TRIM(MODELO) = TRIM(?) AND SITUACAO IN ('Ativo', 'Inativo')
+         ORDER BY (SITUACAO = 'Ativo') DESC LIMIT 1`, [nome]);
+      // Prefere o ativo, mas aceita o inativo: o orçamento/pedido já feito com um material que depois foi inativado
+      // precisa continuar abrindo e salvando (as listas da tela seguem mostrando só os ativos).
       if (!rows.length) return null;
       return {
         valorFixo: parseFloat(rows[0].VALOR_FIXO) || 0,
