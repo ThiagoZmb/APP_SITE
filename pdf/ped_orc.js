@@ -114,11 +114,16 @@ function descricaoItem(tipoProduto, grupos = {}) {
       const c = nome => textoVB(d[nome]);
       const perfil = c('PERFIL'), acabPerfil = c('ACABAMENTO_PERFIL'), corPerfil = c('COR_PERFIL');
       const revestimento = c('REVESTIMENTO'), corRevest = c('COR_REVESTIMENTO');
-      const puxador = c('PUXADOR'), acabPuxador = c('ACABAMENTO_PUXADOR'), corPuxador = c('COR_PUXADOR');
+      let puxador = c('PUXADOR'); const acabPuxador = c('ACABAMENTO_PUXADOR'), corPuxador = c('COR_PUXADOR');
       const qtdPuxador = c('QTD_PUXADOR'), posPuxador = c('POSICAO_PUXADOR'), tamPuxador = c('TAM_PUXADOR');
       const altura = c('ALTURA'), largura = c('LARGURA'), porta = c('PORTA');
       // VB: puxador <> Nothing And qtdPuxador <> Nothing → as duas colunas não vazias (sem Trim)
-      const temPuxador = puxador !== '' && qtdPuxador !== '';
+      // Puxador sem produto próprio (tipo "Sobreposto": o perfil faz o papel de puxador) também precisa sair no PDF,
+      // com quantidade, posição e tamanho para o corte/usinagem: na porta de correr vale quando a quantidade é maior que zero.
+      const qtdPuxNum = parseFloat(String(d.QTD_PUXADOR ?? '').replace(',', '.')) || 0;
+      const puxadorSemProduto = tipoProduto === 'Porta de correr' && puxador === '' && qtdPuxNum > 0; // giro segue o VB (exige o nome)
+      const temPuxador = (puxador !== '' && qtdPuxador !== '') || puxadorSemProduto;
+      if (puxadorSemProduto) puxador = c('TIPO_PUXADOR') || 'Puxador';
       const linhaPerfil = 'Perfil: ' + perfil + ' ' + acabPerfil + (corPerfil !== '' ? ' | Cor: ' + corPerfil : '');
 
       if (tipoProduto === 'Porta de giro' || tipoProduto === 'Porta basculante' || tipoProduto === 'Frente de gaveta') {
@@ -194,7 +199,11 @@ function descricaoItem(tipoProduto, grupos = {}) {
   // complementos (ped_orc_complementos): qualquer tipo de item
   if ((grupos.complementos || []).length) {
     add('Complementos: ', 'normal');
-    for (const r of grupos.complementos) add(textoVB(r.QTD) + ' - ' + textoVB(r.COMPLEMENTO), 'normal');
+    for (const r of grupos.complementos) {
+      // peça cortada sob medida (ex.: trilho): o tamanho de corte vai na mesma linha
+      const tam = parseFloat(String(r.TAMANHO ?? '').replace(',', '.')) || 0;
+      add(textoVB(r.QTD) + ' - ' + textoVB(r.COMPLEMENTO) + (tam > 0 ? '   |   Tamanho p/ corte: ' + textoVB(Math.round(tam)) + ' mm' : ''), 'normal');
+    }
   }
 
   // serralheria (bloco 11d): só quando o item é "Metalons"

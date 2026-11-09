@@ -263,3 +263,22 @@ test('PDF de porta de correr: mostra Qtd = nº de folhas e unitário = total ÷ 
   dados.itens = [it]; dados.v4 = v4.map(v => ({ ...v, ITEM_PEDIDO: 1 }));
   desenhar(dados, { comPrecos: true });
 });
+
+test('complemento cortado sob medida (trilho) mostra o tamanho de corte; sem tamanho fica como antes', () => {
+  const comp = [{ QTD: 3, COMPLEMENTO: 'Trilho Superior 3086', TAMANHO: 1700 }, { QTD: 3, COMPLEMENTO: 'KIT AL86', TAMANHO: 0 }];
+  assert.deepEqual(textos(descricaoItem('Porta de correr', { complementos: comp })),
+    ['Complementos: ', '3 - Trilho Superior 3086   |   Tamanho p/ corte: 1700 mm', '3 - KIT AL86']);
+});
+
+test('porta de correr: puxador sobreposto (sem produto de puxador) sai com quantidade, posição e tamanho', () => {
+  const v4 = [
+    { PORTA: 'Folha 1', QTD: 1, ALTURA: 2436, LARGURA: 580, PERFIL: 'Sottile', ACABAMENTO_PERFIL: 'Pintura', COR_PERFIL: 'Preto',
+      PUXADOR: '', QTD_PUXADOR: 2, TAM_PUXADOR: 200, TIPO_PUXADOR: 'Sobreposto', POSICAO_PUXADOR: 'LATERAL ESQUERDA CENTRO, LATERAL DIREITA CENTRO' },
+    { PORTA: 'Folha 2', QTD: 1, ALTURA: 2436, LARGURA: 580, PUXADOR: '', QTD_PUXADOR: 0, TAM_PUXADOR: 200, TIPO_PUXADOR: 'Sobreposto', POSICAO_PUXADOR: '' }
+  ];
+  const t = textos(descricaoItem('Porta de correr', { v4 }));
+  assert.ok(t.includes('Puxador: 2 - Sobreposto '));
+  assert.ok(t.includes('Posição: LATERAL ESQUERDA CENTRO, LATERAL DIREITA CENTRO'));
+  assert.ok(t.includes('Tamanho: 200 mm'));
+  assert.equal(t.filter(x => x.startsWith('Puxador:')).length, 1); // folha 2 tem quantidade 0: sem puxador
+});
