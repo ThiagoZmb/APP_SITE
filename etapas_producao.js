@@ -36,7 +36,7 @@
       sub = ef.origem === 'corte' ? 'pelo corte' : primeiroNome(ef.usuario);
       detalhe = `OK${ef.usuario ? ' por ' + ef.usuario : ''}${ef.quando ? ' em ' + dataHoraBR(ef.quando) : ''}${ef.origem === 'corte' ? ' (marcado sozinho pela confirmação do corte)' : ''}`;
     } else if (ef.estado === 'na') {
-      classe = 'est-na'; texto = 'N/A';
+      classe = 'est-na inerte'; texto = 'N/A';   // inerte: não clicável, sem reação ao mouse
       sub = ef.origem === 'auto' ? 'não se aplica' : primeiroNome(ef.usuario);
       detalhe = ef.origem === 'auto' ? 'não se aplica (o pedido não tem peças deste tipo)' : `N/A${ef.usuario ? ' por ' + ef.usuario : ''}${ef.quando ? ' em ' + dataHoraBR(ef.quando) : ''}`;
     } else {
@@ -45,11 +45,12 @@
     }
     if (ef.observacao) detalhe += ` — ${ef.observacao}`;
     const bloqueado = !pode;
-    return { classe: classe + (bloqueado ? ' bloq' : ''), texto, sub, bloqueado, titulo: `${nome}: ${detalhe}${bloqueado ? ' (só leitura: sem permissão para esta etapa)' : ''}` };
+    return { classe: classe + (bloqueado ? ' bloq' : ''), texto, sub, bloqueado, inerte: ef.estado === 'na', titulo: `${nome}: ${detalhe}${bloqueado ? ' (só leitura: sem permissão para esta etapa)' : ''}` };
   }
 
-  // o que o clique faz: 'ok' (pendente -> OK), 'ok_na' (N/A -> OK, com confirmação) ou 'desfazer' (OK -> pendente, com confirmação)
-  const acaoDoClique = ef => (ef.estado === 'ok' ? 'desfazer' : ef.estado === 'na' ? 'ok_na' : 'ok');
+  // o que o clique faz: 'ok' (pendente -> OK), 'desfazer' (OK -> pendente, com confirmação) ou null (N/A: a célula não é clicável,
+  // pois a etapa não se aplica ao pedido; reverter um N/A marcado à mão é pelo menu do botão direito/⋯: "Desfazer")
+  const acaoDoClique = ef => (ef.estado === 'ok' ? 'desfazer' : ef.estado === 'na' ? null : 'ok');
 
   // etapas anteriores ao finalizado que ainda não estão OK nem N/A
   const pendentesAntes = p => (p.etapas || []).filter(e => e.codigo !== FINAL && e.estado !== 'ok' && e.estado !== 'na').map(e => e.codigo);
@@ -80,7 +81,8 @@
     // finalizado OK com o pedido de volta em produção (menu de situação ou VB): "Marcar OK" fica ativo para marcar Pronto de novo
     const reaplicar = etapa === FINAL && ef.estado === 'ok' && !norm(p.situacao).includes('pronto');
     if (pode) {
-      L.push({ acao: 'ok', icone: '✓', rotulo: reaplicar ? 'Marcar OK de novo (o pedido volta a Pronto)' : 'Marcar OK', desativado: ef.estado === 'ok' && !reaplicar });
+      // etapa N/A não vira OK: ela não se aplica ao pedido (para mudar, "Desfazer" volta a pendente)
+      L.push({ acao: 'ok', icone: '✓', rotulo: reaplicar ? 'Marcar OK de novo (o pedido volta a Pronto)' : 'Marcar OK', desativado: (ef.estado === 'ok' && !reaplicar) || ef.estado === 'na' });
       L.push({ acao: 'desfazer', icone: '↺', rotulo: 'Desfazer (voltar a pendente)', desativado: ef.estado === 'pendente' });
       if (etapa !== FINAL) L.push({ acao: 'na', icone: '–', rotulo: 'Marcar N/A (não se aplica)', desativado: ef.estado === 'na' });
     }
@@ -116,7 +118,7 @@
       const salvando = ctx.salvando && ctx.salvando.has(`${p.numero}|${e.codigo}`);
       const minha = ctx.destacar && ctx.minhas && ctx.minhas.has(e.codigo);
       return `<td class="etp-c${minha ? ' etp-minha' : ''}"><button type="button" class="etp-cel ${c.classe}${salvando ? ' salvando' : ''}" data-numero="${esc(p.numero)}" data-etapa="${e.codigo}" data-nome="${esc(e.curto || e.nome)}"`
-        + ` title="${esc(c.titulo)}" aria-label="${esc(`Pedido ${p.numero}, ${c.titulo}`)}"${c.bloqueado ? ' aria-disabled="true"' : ''}${salvando ? ' aria-busy="true"' : ''}>`
+        + ` title="${esc(c.titulo)}" aria-label="${esc(`Pedido ${p.numero}, ${c.titulo}`)}"${c.bloqueado || c.inerte ? ' aria-disabled="true"' : ''}${salvando ? ' aria-busy="true"' : ''}>`
         + `<span>${esc(c.texto)}</span>${c.sub ? `<small>${esc(c.sub)}</small>` : ''}</button></td>`;
     }).join('');
     const atraso = p.atrasado ? '<span class="selo perigo">Atrasado</span>' : '';
@@ -357,10 +359,6 @@
         if (r) await gravar(p, etapa, { estado: 'na' });
         return;
       }
-      if (acao === 'ok_na') {
-        const r = await janela({ titulo: `Marcar "${nomeDe(estado.etapas, etapa)}" como OK?`, sub: `Pedido nº ${p.numero}: esta etapa está como N/A (não se aplica).`, textoOk: 'Marcar OK' });
-        if (!r) return;
-      }
       if (etapa === FINAL) return finalizar(p);
       await gravar(p, etapa, { estado: 'ok' });
     }
@@ -439,7 +437,9 @@
       const etapa = b.dataset.etapa;
       if (!podeEtapa(etapa)) { toast(`Sem permissão para "${nomeDe(estado.etapas, etapa)}" (só leitura).`, 'info'); return; }
       const ef = (p.etapas || []).find(x => x.codigo === etapa) || { estado: 'pendente' };
-      executar(acaoDoClique(ef), p, etapa);
+      const acao = acaoDoClique(ef);
+      if (!acao) return;   // N/A não é clicável
+      executar(acao, p, etapa);
     });
     // botão direito; a tecla de menu e Shift+F10 disparam "contextmenu" no botão focado
     corpo.addEventListener('contextmenu', e => {

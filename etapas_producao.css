@@ -75,6 +75,7 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .etp-cel.est-auto { background: var(--selo-info-bg); color: var(--selo-info-fg); border-color: var(--info-color); }
 .etp-cel.est-na { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); border-style: dashed; }
 .etp-cel.est-pendente { background: var(--bg); color: var(--text-mid); }
+.etp-cel.inerte, .etp-cel.inerte:hover { cursor: default; border-color: var(--border-strong); }   /* N/A: só informa, não é clicável */
 .etp-cel.bloq { cursor: not-allowed; opacity: .72; }
 .etp-cel.bloq:hover { border-color: var(--border-strong); }
 .etp-cel.salvando { opacity: .6; cursor: progress; }

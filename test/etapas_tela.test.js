@@ -29,9 +29,9 @@ test('celula: OK manual, OK do corte, N/A automático, N/A manual, pendente e bl
   assert.equal(bloq.bloqueado, true); assert.match(bloq.classe, /\bbloq\b/); assert.match(bloq.titulo, /só leitura/);
 });
 
-test('acaoDoClique: pendente -> OK; N/A -> OK (pergunta); OK -> desfazer (pergunta)', () => {
+test('acaoDoClique: pendente -> OK; N/A -> nada (não é clicável); OK -> desfazer (pergunta)', () => {
   assert.equal(T.acaoDoClique({ estado: 'pendente' }), 'ok');
-  assert.equal(T.acaoDoClique({ estado: 'na' }), 'ok_na');
+  assert.equal(T.acaoDoClique({ estado: 'na' }), null);
   assert.equal(T.acaoDoClique({ estado: 'ok' }), 'desfazer');
 });
 
@@ -193,4 +193,22 @@ test('listas: o quadro rola na vertical e o cabeçalho (th) gruda; tema.css dá 
   assert.match(tema, /:where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) \{ overflow: auto; max-height: max\(320px, calc\(100vh - 220px\)\); \}/);
   assert.match(tema, /body :where\(\.tabela-wrap, \.lista-wrap, \.rolagem, \.etp-rolagem\) thead th \{ position: sticky; top: 0; z-index: 3; \}/);
   assert.match(ler('DESIGN.md'), /Toda lista com rolagem mantém o cabeçalho das colunas sempre visível/);
+});
+
+// ---------- N/A não é clicável (decisão do dono, 2026-11-09) ----------
+test('célula N/A é inerte: classe, aria-disabled e "Marcar OK" desativado no menu; histórico e "Desfazer" (N/A manual) continuam', () => {
+  const c = T.celula('Perfil pintado', { estado: 'na', origem: 'auto', usuario: '' }, true);
+  assert.equal(c.inerte, true);
+  assert.match(c.classe, /est-na inerte/);
+  assert.equal(T.celula('Perfil pintado', { estado: 'pendente' }, true).inerte, false);
+  assert.match(T.htmlLinha(pedido(), { etapas: T.ETAPAS_PADRAO, podeEtapa: () => true, link: null }), /est-na inerte[^>]*aria-disabled="true"/);
+  const menu = (estado, origem) => T.itensMenuCelula({ etapas: [{ codigo: 'perfil_pintado', estado, origem }], situacao: 'Em Produção' }, 'perfil_pintado', true);
+  const m = menu('na', 'manual');
+  assert.equal(m.find(i => i.acao === 'ok').desativado, true, 'N/A não vira OK');
+  assert.equal(m.find(i => i.acao === 'desfazer').desativado, false, 'N/A marcado à mão volta a pendente pelo menu');
+  assert.equal(m.find(i => i.acao === 'na').desativado, true);
+  assert.ok(m.some(i => i.acao === 'historico'));
+  assert.equal(menu('pendente').find(i => i.acao === 'ok').desativado, false);
+  assert.match(ler('etapas_producao.css'), /\.etp-cel\.inerte, \.etp-cel\.inerte:hover \{ cursor: default;/);
+  assert.doesNotMatch(ler('etapas_producao.js'), /ok_na/);
 });
