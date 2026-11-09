@@ -228,3 +228,17 @@ test('abaDoStatus: aba em que cada status aparece (link entregas.html?pedido=N)'
   assert.equal(E.abaDoStatus('cancelada'), 'concluidas');
   assert.equal(E.abaDoStatus('xx'), null);
 });
+
+test('eventoExibicao: "saiu de Pronto" vira Encerrada/Suspensa na linha do tempo; cancelamento real continua Cancelada', () => {
+  const saiu = (id, quando) => ({ id, tipo: 'cancelada', usuario: 'sistema', motivo: 'Pedido saiu de Pronto', quando });
+  const eventos = [saiu(2, 'a'), { id: 3, tipo: 'criada', usuario: 'sistema', motivo: 'Pedido voltou a Pronto' }, saiu(4, 'b')];
+  const enc = { statusExibicao: 'encerrada' };
+  assert.equal(E.eventoExibicao(eventos[2], enc, eventos).rotulo, 'Encerrada');
+  assert.match(E.eventoExibicao(eventos[2], enc, eventos).motivo, /fora do sistema/);
+  assert.equal(E.eventoExibicao(eventos[0], enc, eventos).rotulo, 'Suspensa'); // já reabriu depois dele
+  assert.equal(E.eventoExibicao(eventos[2], { statusExibicao: 'suspensa' }, eventos).rotulo, 'Suspensa');
+  const real = { id: 5, tipo: 'cancelada', usuario: 'sistema', motivo: 'Pedido cancelado' };
+  assert.equal(E.eventoExibicao(real, { statusExibicao: 'cancelada' }, [real]).rotulo, 'Cancelada');
+  const manual = { id: 6, tipo: 'cancelada', usuario: '7', motivo: null };
+  assert.equal(E.eventoExibicao(manual, { statusExibicao: 'cancelada' }, [manual]).rotulo, 'Cancelada');
+});

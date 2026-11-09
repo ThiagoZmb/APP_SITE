@@ -39,6 +39,19 @@
   const corStatus = s => COR_STATUS[s] || 'neutro';
   const rotuloTipo = t => ROTULO_TIPO[t] || '—';
   const rotuloEvento = t => ROTULO_EVENTO[t] || String(t ?? '');
+  // Linha do tempo: o cancelamento automático por "saiu de Pronto" acompanha o selo (Encerrada/Suspensa), e não "Cancelada".
+  // Só o último evento reflete a situação atual do pedido; os anteriores (a entrega já reabriu depois deles) foram Suspensa.
+  const MOTIVO_SAIU = 'Pedido saiu de Pronto';
+  function eventoExibicao(v, entrega, eventos) {
+    const base = { rotulo: rotuloEvento(v.tipo), motivo: v.motivo ?? null };
+    if (!v || v.tipo !== 'cancelada' || v.usuario !== 'sistema' || v.motivo !== MOTIVO_SAIU) return base;
+    const cancelamentos = (eventos || []).filter(x => x.tipo === 'cancelada');
+    const ultimo = cancelamentos.length ? cancelamentos[cancelamentos.length - 1] : null;
+    if (ultimo && ultimo.id === v.id && entrega && entrega.statusExibicao === 'encerrada') {
+      return { rotulo: ROTULO_STATUS.encerrada, motivo: 'Pedido concluído fora do sistema (Entregue/Retirado)' };
+    }
+    return { rotulo: ROTULO_STATUS.suspensa, motivo: v.motivo };
+  }
 
   function filtrarAba(lista, aba) {
     const def = ABAS.find(a => a.id === aba);
@@ -311,8 +324,8 @@
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
       $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span></li>`).join('') : '<li class="cinza">Sem itens.</li>';
-      $('d-eventos').innerHTML = eventos.map(v => `<li><strong>${esc(rotuloEvento(v.tipo))}</strong> <span class="cinza">${esc(dataHoraBR(v.quando))} · ${esc(v.usuario)}</span>` +
-        (textoEvento(v) ? `<div>${esc(textoEvento(v))}</div>` : '') + '</li>').join('');
+      $('d-eventos').innerHTML = eventos.map(v => { const x = eventoExibicao(v, e, eventos); return `<li><strong>${esc(x.rotulo)}</strong> <span class="cinza">${esc(dataHoraBR(v.quando))} · ${esc(v.usuario)}</span>` +
+        (textoEvento({ ...v, motivo: x.motivo }) ? `<div>${esc(textoEvento({ ...v, motivo: x.motivo }))}</div>` : '') + '</li>'; }).join('');
       const caixa = $('d-anexos');
       caixa.innerHTML = anexos.length ? '' : '<p class="cinza">Nenhum comprovante.</p>';
       anexos.forEach(a => carregarAnexo(e.id, a, caixa));
@@ -545,6 +558,6 @@
     carregar();
   }
 
-  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
 });
