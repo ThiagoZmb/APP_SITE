@@ -529,8 +529,12 @@
                 .sort((a, b) => a.quando - b.quando); // todos os atrasados e dos próximos 7 dias; a lista rola (#entregas)
             $('entregas').innerHTML = entregas.map(p => {
                 const dias = Math.round((p.quando - zero) / 86400000);
-                const atrasado = dias < 0;
-                const quando = atrasado ? `atrasado ${-dias} dia${dias === -1 ? '' : 's'}` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
+                // Pedido já Pronto cuja data é só a previsão "Pronto em" não está atrasado (a produção terminou, como no calendário):
+                // fica aguardando entrega, e o selo mostra há quanto tempo está pronto. Entrega/agendamento vencido continua atrasado.
+                const jaPronto = p.rotulo === 'Pronto em' && pronto(p.situacao);
+                const atrasado = dias < 0 && !jaPronto;
+                const quando = jaPronto && dias < 0 ? `pronto há ${-dias} dia${dias === -1 ? '' : 's'}`
+                    : atrasado ? `atrasado ${-dias} dia${dias === -1 ? '' : 's'}` : dias === 0 ? 'hoje' : dias === 1 ? 'amanhã' : `em ${dias} dias`;
                 return `<li data-numero="${escapeHtml(p.numero)}">
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
                     <div class="meio"><b>${escapeHtml(p.cliente)}</b><small>${p.rotulo} ${escapeHtml(p.dataTxt)}${p.entregaStatus && !(p.entregaStatus === 'agendada' && p.rotulo === 'Agendada') ? ' · <span class="status' + (p.entregaStatus === 'a_programar' ? ' programar' : '') + '">' + escapeHtml(ROT_ENTREGA[p.entregaStatus] || p.entregaStatus) + '</span>' : ''}</small></div>
