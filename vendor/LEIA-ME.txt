@@ -1,0 +1,9 @@
+Bibliotecas de terceiros copiadas para o projeto (sem build).
+
+jsQR.js
+  Nome:     jsQR (leitor de QR Code em JavaScript puro)
+  Versão:   1.4.0
+  Licença:  Apache-2.0
+  Origem:   pacote npm "jsqr@1.4.0" (package/dist/jsQR.js), https://github.com/cozmo/jsQR
+  Uso:      baixa_qr.html (leitura do QR da etiqueta pela câmera do celular)
+  Obs.:     conteúdo original; só foi acrescentada a primeira linha de comentário com a licença.

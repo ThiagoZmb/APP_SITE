@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; media-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Baixa por QR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
+        [hidden] { display: none !important; }
+        /* mobile primeiro: sem moldura, uma coluna */
+        body { background: var(--bg); color: var(--text-dark); min-height: 100vh; }
+        .container { display: grid; grid-template-columns: 1fr; grid-template-areas: "header" "main"; min-height: 100vh; background: var(--white); }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 18px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 50px; background: var(--primary-light); }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: none; }
+        .sidebar { grid-area: sidebar; }
+        main { grid-area: main; padding: 16px 14px 40px; min-width: 0; max-width: 640px; }
+        .welcome-title { font-size: 24px; margin-bottom: 4px; font-weight: 700; }
+        .welcome-subtitle { font-size: 14px; color: var(--text-light); margin-bottom: 14px; }
+
+        .camera { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 70vh; border-radius: 16px; overflow: hidden; background: var(--bg); border: 1px solid var(--border-color); margin-bottom: 14px; }
+        .camera video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .camera .mira { position: absolute; inset: 18%; border: 3px solid var(--primary-color); border-radius: 16px; pointer-events: none; }
+        .cinza { color: var(--text-light); font-size: 14px; }
+        .aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
+        .erro-form { color: var(--danger-color); font-size: 16px; min-height: 22px; margin: 4px 0 10px; font-weight: 600; overflow-wrap: anywhere; }
+
+        .cartao { background: var(--white); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: var(--shadow-light); padding: 16px; margin-bottom: 14px; position: relative; overflow: hidden; }
+        .cartao::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .cartao h2 { font-size: 22px; margin: 8px 0 6px; overflow-wrap: anywhere; }
+        .cartao p { font-size: 16px; margin-bottom: 6px; overflow-wrap: anywhere; }
+        .seletor { display: grid; grid-template-columns: 72px 1fr 72px; gap: 10px; align-items: center; margin: 16px 0; }
+        .seletor .qtd { text-align: center; font-size: 40px; font-weight: 700; line-height: 1; }
+        .seletor .un { display: block; font-size: 14px; font-weight: 500; color: var(--text-light); margin-top: 4px; }
+        .feito-saldo { font-size: 28px; font-weight: 700; color: var(--success-color); margin: 8px 0 12px; }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+        .form-group input { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 17px; background: var(--white); color: var(--text-dark); }
+        .form-group input:focus { outline: none; border-color: var(--primary-color); }
+
+        .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .acoes > :only-child { grid-column: 1 / -1; }
+        .btn { padding: 14px 16px; border: none; border-radius: 14px; font-weight: 700; font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; min-height: 56px; width: 100%; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-nav { padding: 0; font-size: 30px; min-height: 64px; }
+        .btn:disabled { opacity: .6; cursor: wait; }
+        .rodape { display: grid; gap: 10px; margin-top: 24px; }
+
+        @media (min-width: 769px) {
+            body { padding: 20px; }
+            .container { grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main"; min-height: calc(100vh - 40px); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden; }
+            header { padding: 0 40px; }
+            .logo { font-size: 28px; }
+            .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+            .user-cargo { font-size: 11px; opacity: 0.8; }
+            main { padding: 40px; }
+        }
+    </style>
+    <script src="layout.js?v=202611061400" defer></script>
+    <script src="entregas_comum.js?v=202610271400" defer></script>
+    <script src="vendor/jsQR.js?v=1.4.0" defer></script>
+    <script src="baixa_qr.js?v=202611091000" defer></script>
+    <link rel="stylesheet" href="tema.css?v=202611061000">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Baixa por QR</h1>
+            <p class="welcome-subtitle">Aponte a câmera para o QR da etiqueta do item.</p>
+
+            <!-- leitura: câmera e campo de digitar o código -->
+            <section id="vista-leitura">
+                <div class="camera" id="area-camera">
+                    <video id="video" playsinline muted></video>
+                    <div class="mira"></div>
+                </div>
+                <canvas id="quadro" hidden></canvas>
+                <p class="aviso" id="msg-camera" hidden></p>
+                <p class="erro-form" id="msg-leitura" role="alert"></p>
+                <button type="button" class="btn btn-primary" id="btn-tentar-outra" hidden>Ler outro item</button>
+                <form id="form-codigo" autocomplete="off">
+                    <div class="form-group">
+                        <label for="codigo-manual">Ou digite o código</label>
+                        <input id="codigo-manual" maxlength="20" inputmode="text" autocapitalize="characters" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Buscar item</button>
+                </form>
+            </section>
+
+            <!-- cartão do item: quantidade e confirmação -->
+            <section id="vista-cartao" hidden>
+                <article class="cartao">
+                    <h2 id="c-nome"></h2>
+                    <p class="cinza" id="c-saldo"></p>
+                    <div class="seletor">
+                        <button type="button" class="btn btn-secondary btn-nav" id="btn-menos" aria-label="Diminuir quantidade">−</button>
+                        <div class="qtd"><span id="c-qtd">1</span><span class="un" id="c-unidade"></span></div>
+                        <button type="button" class="btn btn-secondary btn-nav" id="btn-mais" aria-label="Aumentar quantidade">+</button>
+                    </div>
+                    <p class="erro-form" id="msg-cartao" role="alert"></p>
+                    <div class="acoes">
+                        <button type="button" class="btn btn-primary" id="btn-baixa" data-perm="estoque.movimentar">Dar baixa</button>
+                        <button type="button" class="btn btn-secondary" id="btn-cancelar">Cancelar</button>
+                    </div>
+                </article>
+            </section>
+
+            <!-- baixa gravada -->
+            <section id="vista-feito" hidden>
+                <article class="cartao">
+                    <h2>Baixa registrada</h2>
+                    <p id="f-nome"></p>
+                    <p class="feito-saldo" id="f-saldo"></p>
+                    <div class="acoes"><button type="button" class="btn btn-primary" id="btn-proximo">Ler outro item</button></div>
+                </article>
+            </section>
+
+            <div class="rodape">
+                <a class="btn btn-secondary" id="link-sistema" href="inicio.html" hidden>Ir para o sistema</a>
+                <button type="button" class="btn btn-secondary" id="btn-sair">Sair</button>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
