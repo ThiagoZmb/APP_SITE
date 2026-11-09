@@ -44,10 +44,18 @@ test('acrescentarPermissoesIndicadores: só o Administrador, uma vez', async () 
   assert.ok(!ja.chamadas.some(c => /INSERT/.test(c.sql)));
 });
 
-test('painel_inicial: os dois blocos exigem indicadores.ver (data-perm) e só escrevem os números com a permissão', () => {
+test('painel_inicial: os dois blocos exigem indicadores.ver (data-perm) e os números vêm do servidor, não do navegador', () => {
   assert.match(html, /data-perm="indicadores\.ver"[^>]*>\s*<div class="cab"><h3>Operação agora/);
   assert.match(html, /data-perm="indicadores\.ver">Resultado do período/);
   assert.match(html, /data-perm="indicadores\.ver" id="kpis-periodo"/);
-  assert.match(html, /if \(Acesso\.pode\('indicadores\.ver'\)\) \{[^]*?\$\('kpis-periodo'\)\.innerHTML/);
-  assert.match(html, /if \(Acesso\.pode\('indicadores\.ver'\)\) \$\('operacao'\)\.innerHTML/);
+  // sem a permissão nem se pede ao servidor
+  assert.match(html, /async function carregarIndicadores\(\) \{\s*if \(!Acesso\.pode\('indicadores\.ver'\)\) return;/);
+  assert.match(html, /api\('\/painel\/indicadores\?periodo='/);
+  // os dois renders só recebem a resposta do servidor; as contas locais não escrevem HTML nos dois blocos
+  assert.match(html, /function renderOperacao\(d\)/);
+  assert.match(html, /function renderPeriodo\(d\)/);
+  const calc = html.slice(html.indexOf('function calcularResumo'), html.indexOf('async function carregarIndicadores'));
+  assert.ok(!/kpis-periodo|innerHTML/.test(calc));
+  const calcOp = html.slice(html.indexOf('function calcularOperacao'), html.indexOf('function renderOperacao'));
+  assert.ok(!/\$\('operacao'\)|innerHTML/.test(calcOp));
 });

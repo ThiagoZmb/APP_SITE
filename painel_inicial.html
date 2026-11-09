@@ -456,9 +456,10 @@
             $('titulo').textContent = cliente || 'Pedidos e Orçamentos';
             $('subtitulo').textContent = cliente ? 'Pedidos e orçamentos deste cliente — vendas, conversão, produção e mix de produtos.'
                 : 'Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.';
-            renderPeriodo(j);
+            calcularResumo(j);
             renderMensal();
-            renderOperacao();
+            calcularOperacao();
+            carregarIndicadores();
             renderInsights();
             renderStatus(j);
             renderDiario();
@@ -466,9 +467,11 @@
             renderLista();
         }
 
-        // ================= RESULTADO DO PERÍODO =================
+        // ================= RESUMO LOCAL (só para "Leitura rápida" e ranking de clientes) =================
+        // Os blocos "Operação agora" e "Resultado do período" NÃO usam estas contas: os números deles vêm do servidor
+        // (GET /painel/indicadores, calculo/indicadores_painel.js) e só são pedidos com indicadores.ver.
         let resumo = null;
-        function renderPeriodo(j) {
+        function calcularResumo(j) {
             const P = doCliente(pedidos), O = doCliente(orcamentos);
             const validos = l => l.filter(x => x.s !== 'cancelado');
             const p = validos(entre(P, j.ini, j.fim)), pa = validos(entre(P, j.iniAnt, j.fimAnt));
@@ -477,25 +480,46 @@
                 canc: entre(P, j.ini, j.fim).filter(x => x.s === 'cancelado'), clientes: new Set(p.map(x => x.cliente)).size, p, j };
             r.ticket = r.qtd ? r.fat / r.qtd : 0; r.ticketA = r.qtdA ? r.fatA / r.qtdA : 0;
             r.conv = r.orc > 0 ? r.fat / r.orc : null; r.convA = r.orcA > 0 ? r.fatA / r.orcA : null;
-            const ref = j.iniAnt ? ` vs ${j.ref}` : '';
-            const vc = r.conv != null && r.convA != null ? r.conv - r.convA : null;
-            // sem valores.ver: só quantidades
-            const kp = !Acesso.pode('valores.ver') ? [
-                ['Pedidos fechados', num(r.qtd), `${j.iniAnt ? seta(variacao(r.qtd, r.qtdA)) : ''} pedido(s)${ref}`, COR.vinho],
-                ['Orçamentos emitidos', num(r.oqtd), `${j.iniAnt ? seta(variacao(r.oqtd, oa.length)) : ''} orçamento(s)`, COR.azul],
-                ['Cancelados', num(r.canc.length), 'pedidos cancelados no período', COR.vermelho]
-            ] : [
-                ['Pedidos fechados', moeda(r.fat), `${j.iniAnt ? seta(variacao(r.fat, r.fatA)) : ''} ${num(r.qtd)} pedido(s)${ref}`, COR.vinho],
-                ['Orçamentos emitidos', moeda(r.orc), `${j.iniAnt ? seta(variacao(r.orc, r.orcA)) : ''} ${num(r.oqtd)} orçamento(s)`, COR.azul],
-                ['Conversão (valor)', r.conv != null ? pct(r.conv) : '—', vc != null ? (Math.abs(vc) < .005 ? '<span class="neutro">estável</span>' : `<span class="${vc > 0 ? 'up' : 'down'}">${vc > 0 ? '▲' : '▼'} ${Math.abs(vc * 100).toFixed(0)} p.p.</span>`) + ref : 'pedidos ÷ orçamentos', COR.verde],
-                ['Ticket médio', moeda(r.ticket), `${j.iniAnt ? seta(variacao(r.ticket, r.ticketA)) : ''} por pedido`, COR.roxo]
-            ];
-            if (!cliente) kp.push(['Clientes compradores', num(r.clientes), 'compraram no período', COR.turquesa]);
-            if (Acesso.pode('indicadores.ver')) { // sem a permissão os números nem entram na página
+            resumo = r;
+        }
+
+        // ================= INDICADORES DO SERVIDOR (Operação agora + Resultado do período) =================
+        let seqIndicadores = 0;
+        async function carregarIndicadores() {
+            if (!Acesso.pode('indicadores.ver')) return; // sem a permissão nem se pede ao servidor
+            const meu = ++seqIndicadores;
+            try {
+                const d = await api('/painel/indicadores?periodo=' + encodeURIComponent($('periodo').value) + (cliente ? '&cliente=' + encodeURIComponent(cliente) : ''));
+                if (meu !== seqIndicadores) return; // chegou uma resposta mais nova
+                renderOperacao(d);
+                renderPeriodo(d);
+            } catch (e) {
+                if (meu !== seqIndicadores) return;
+                $('operacao').innerHTML = '<div class="op"><span>Não foi possível carregar os indicadores: ' + esc(e.message) + '</span></div>';
+                $('kpis-periodo').innerHTML = '';
+            }
+        }
+
+        // ================= RESULTADO DO PERÍODO (números do servidor) =================
+        function renderPeriodo(d) {
+            const R = d.resultado, V = d.valores?.resultado, ant = d.periodo.temAnterior, ref = ant ? ` vs ${d.periodo.ref}` : '';
+            // sem valores.ver o servidor nem envia o dinheiro: só quantidades
+            const kp = !V ? [
+                ['Pedidos fechados', num(R.qtdPedidos), `${ant ? seta(variacao(R.qtdPedidos, R.qtdPedidosAnt)) : ''} pedido(s)${ref}`, COR.vinho],
+                ['Orçamentos emitidos', num(R.qtdOrcamentos), `${ant ? seta(variacao(R.qtdOrcamentos, R.qtdOrcamentosAnt)) : ''} orçamento(s)`, COR.azul],
+                ['Cancelados', num(R.qtdCancelados), 'pedidos cancelados no período', COR.vermelho]
+            ] : (() => {
+                const vc = V.conversao != null && V.conversaoAnt != null ? V.conversao - V.conversaoAnt : null;
+                return [
+                    ['Pedidos fechados', moeda(V.pedidos), `${ant ? seta(variacao(V.pedidos, V.pedidosAnt)) : ''} ${num(R.qtdPedidos)} pedido(s)${ref}`, COR.vinho],
+                    ['Orçamentos emitidos', moeda(V.orcamentos), `${ant ? seta(variacao(V.orcamentos, V.orcamentosAnt)) : ''} ${num(R.qtdOrcamentos)} orçamento(s)`, COR.azul],
+                    ['Conversão (valor)', V.conversao != null ? pct(V.conversao) : '—', vc != null ? (Math.abs(vc) < .005 ? '<span class="neutro">estável</span>' : `<span class="${vc > 0 ? 'up' : 'down'}">${vc > 0 ? '▲' : '▼'} ${Math.abs(vc * 100).toFixed(0)} p.p.</span>`) + ref : 'pedidos ÷ orçamentos', COR.verde],
+                    ['Ticket médio', moeda(V.ticketMedio), `${ant ? seta(variacao(V.ticketMedio, V.ticketMedioAnt)) : ''} por pedido`, COR.roxo]
+                ];
+            })();
+            if (!cliente) kp.push(['Clientes compradores', num(R.qtdClientes), 'compraram no período', COR.turquesa]);
             $('kpis-periodo').innerHTML = kp.map(([t, v, s, c]) => `<div class="kpi" style="--k:${c}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
             $('kpis-periodo').style.gridTemplateColumns = `repeat(${kp.length}, minmax(0, 1fr))`;
-            }
-            resumo = r;
         }
 
         // ================= EVOLUÇÃO MENSAL (Orçamentos x Pedidos + % de fechamento) =================
@@ -536,10 +560,10 @@
         }
 
         // ================= OPERAÇÃO AGORA =================
+        // lista local, só para a "Leitura rápida" (alertas); o bloco "Operação agora" usa os números do servidor (renderOperacao)
         let operacao = null;
-        function renderOperacao() {
+        function calcularOperacao() {
             const P = doCliente(pedidos);
-            const hojeBR = hoje.toLocaleDateString('pt-BR');
             const prod = P.filter(x => x.s === 'producao'), pronto = P.filter(x => x.s === 'pronto');
             const finalizado = x => ['entregue', 'retirado', 'cancelado'].includes(x.s);
             const previsto = x => deBR(x.dataEntrega) || deBR(x.prontoEm);
@@ -547,21 +571,24 @@
             const prontoParado = pronto.filter(x => deBR(x.prontoEm) && (hoje - deBR(x.prontoEm)) / DIA > 7);
             const aReceber = P.filter(x => x.s !== 'cancelado' && /receber|atras|protest/.test(norm(x.financeiro)));
             const atrasoFin = aReceber.filter(x => /atras|protest/.test(norm(x.financeiro)));
-            const hojeP = P.filter(x => x.data === hojeBR), hojeO = doCliente(orcamentos).filter(x => x.data === hojeBR);
             operacao = { prod, pronto, atrasadas, prontoParado, aReceber, atrasoFin };
-            const op = !Acesso.pode('valores.ver') ? [
-                ['Hoje', `${hojeP.length} / ${hojeO.length}`, 'pedidos / orçamentos'],
-                ['Em produção', num(prod.length), 'pedido(s)'],
-                ['Prontos aguardando', num(pronto.length), prontoParado.length ? `${prontoParado.length} há +7 dias` : 'pedido(s)'],
-                ['Entregas atrasadas', num(atrasadas.length), atrasadas.length ? 'pedido(s)' : 'nenhuma', atrasadas.length > 0]
+        }
+        // bloco "Operação agora": números do servidor
+        function renderOperacao(d) {
+            const O = d.operacao, V = d.valores?.operacao;
+            const op = !V ? [
+                ['Hoje', `${O.qtdHojePedidos} / ${O.qtdHojeOrcamentos}`, 'pedidos / orçamentos'],
+                ['Em produção', num(O.qtdEmProducao), 'pedido(s)'],
+                ['Prontos aguardando', num(O.qtdProntos), O.qtdProntosParados ? `${O.qtdProntosParados} há +7 dias` : 'pedido(s)'],
+                ['Entregas atrasadas', num(O.qtdAtrasadas), O.qtdAtrasadas ? 'pedido(s)' : 'nenhuma', O.qtdAtrasadas > 0]
             ] : [
-                ['Hoje', `${hojeP.length} / ${hojeO.length}`, `pedidos / orçamentos · ${moeda(soma(hojeP))}`],
-                ['Em produção', num(prod.length), moeda(soma(prod))],
-                ['Prontos aguardando', num(pronto.length), `${moeda(soma(pronto))}${prontoParado.length ? ` · ${prontoParado.length} há +7 dias` : ''}`],
-                ['Entregas atrasadas', num(atrasadas.length), atrasadas.length ? moeda(soma(atrasadas)) : 'nenhuma', atrasadas.length > 0],
-                ['A receber (pedidos)', moeda(soma(aReceber)), atrasoFin.length ? `<span class="down">${moeda(soma(atrasoFin))} em atraso</span>` : `${aReceber.length} pedido(s)`]
+                ['Hoje', `${O.qtdHojePedidos} / ${O.qtdHojeOrcamentos}`, `pedidos / orçamentos · ${moeda(V.hoje)}`],
+                ['Em produção', num(O.qtdEmProducao), moeda(V.emProducao)],
+                ['Prontos aguardando', num(O.qtdProntos), `${moeda(V.prontos)}${O.qtdProntosParados ? ` · ${O.qtdProntosParados} há +7 dias` : ''}`],
+                ['Entregas atrasadas', num(O.qtdAtrasadas), O.qtdAtrasadas ? moeda(V.atrasadas) : 'nenhuma', O.qtdAtrasadas > 0],
+                ['A receber (pedidos)', moeda(V.aReceber), V.qtdAtrasoFinanceiro ? `<span class="down">${moeda(V.atrasoFinanceiro)} em atraso</span>` : `${V.qtdAReceber} pedido(s)`]
             ];
-            if (Acesso.pode('indicadores.ver')) $('operacao').innerHTML = op.map(([t, v, s, al]) => `<div class="op${al ? ' alerta' : ''}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
+            $('operacao').innerHTML = op.map(([t, v, s, al]) => `<div class="op${al ? ' alerta' : ''}"><span>${t}</span><b title="${esc(v)}">${v}</b><small>${s}</small></div>`).join('');
         }
 
         // ================= LEITURA RÁPIDA =================

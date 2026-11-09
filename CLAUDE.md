@@ -63,6 +63,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   gestao.js              Central de Gestão: /gestao/painel, /gestao/orcamento, /gestao/metas_vb (leitura) e PUT /gestao/meta e /gestao/orcamento (gravam só em web_gestao_*)
   desenhos.js            Tela de orçamentos: funções puras da captura/envio do desenho da porta (caixa, redução do PNG, PUT por item)
   calendario.js          Calendário de pedidos: GET /calendario/pedidos (mês, agrupado por dia) e GET /calendario/dia (somente leitura; estados do usuário; valor só com valores.ver)
+  indicadores.js         Indicadores do painel (Operação agora, Resultado do período): GET /painel/indicadores (pedidos.ver + indicadores.ver; contas em calculo/indicadores_painel.js)
   etapas_producao.js     Etapas de produção: GET /etapas/fila, PUT /etapas/pedido/:numero/:etapa (finalizado = Pronto por aplicarSituacaoPedido de ped_orc.js), GET /etapas/pedido/:numero/historico
   etapas_banco.js        Etapas de produção: leitura/gravação de web_producao_etapas(_eventos), reavaliarEtapaCorte (chamada pelo corte depois do commit), desmarcarEtapasDoCorte / apagarEtapasDoPedido (cancelar/excluir pedido); sem require de outras rotas
   entregas.js            Entregas: varredura da fila (`sincronizarFila`), agenda, anexos, rotas da equipe (`/entregas*`) e do motorista (`/minhas_entregas*`)

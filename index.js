@@ -44,6 +44,7 @@ const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precific
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
 const { registrarCalendario } = require('./rotas/calendario');
+const { registrarIndicadores } = require('./rotas/indicadores');
 const { registrarEtapasProducao } = require('./rotas/etapas_producao');
 const { registrarFornecedores } = require('./rotas/fornecedores');
 const { registrarTintas } = require('./rotas/tintas');
@@ -1776,6 +1777,7 @@ registrarEstoqueQr({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
 registrarCalendario({ rota: registro.rota, pool });
+registrarIndicadores({ rota: registro.rota, pool });
 registrarEtapasProducao({ rota: registro.rota, pool });
 registrarFornecedores({ rota: registro.rota, pool });
 registrarFuncionarios({ rota: registro.rota, pool });
