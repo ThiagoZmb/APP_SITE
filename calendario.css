@@ -36,7 +36,7 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 /* barra FIXA do topo (.cal-fixo = navegação + resumo + filtros + pesquisa): gruda no topo da janela logo abaixo do cabeçalho de 24px do tema.css enquanto a lista/grade rola (a janela rola, o main do tema é overflow:visible).
    --cal-fixo-altura é medida pelo calendario.js (ResizeObserver) e alimenta o scroll-margin do resultado da pesquisa; o valor daqui é só reserva. z-index 20 < cabeçalho (30) < menu do botão direito (1000). */
 :root { --cal-topo-tema: 24px; --cal-fixo-altura: 150px; }
-.cal-fixo { position: sticky; top: var(--cal-topo-tema); z-index: 20; background: var(--white); border-bottom: 1px solid var(--border-color); border-radius: var(--radius) var(--radius) 0 0; min-width: 0; }
+.cal-fixo { position: sticky; top: var(--cal-topo-tema); z-index: 20; background: var(--white); border-bottom: 1px solid var(--border-color); border-radius: var(--radius) var(--radius) 0 0; min-width: 0; box-shadow: inset 0 2px 0 var(--primary-color), var(--shadow-medium); }
 .cal-fixo .cal-topo { padding-top: 14px; }
 /* barra do topo: navegação, resumo e alternador Em aberto | Todos */
 .cal-topo { display: flex; align-items: center; gap: 8px; padding: 18px 16px 12px; flex-wrap: wrap; }
@@ -171,7 +171,7 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
     .ld-acoes { grid-column: 2; }
 }
 @media print {
-    .cal-fixo { position: static; background: none; border: 0; border-radius: 0; }
+    .cal-fixo { position: static; background: none; border: 0; border-radius: 0; box-shadow: none; }
     body { padding: 0; background: white; color: black; }
     .container { display: block; box-shadow: none; border-radius: 0; background: white; }
     header, .sidebar, .cal-topo button, .cal-busca, .titulo-linha .tipo-toggle, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
