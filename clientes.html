@@ -559,7 +559,7 @@
         const lerNumero = t => { const x = String(t ?? '').replace(/[R$\s]/g, ''); const n = parseFloat(x.includes(',') ? x.replace(/\./g, '').replace(',', '.') : x); return isFinite(n) ? n : 0; };
         const paraCampo = v => String(Math.round((Number(v) || 0) * 100) / 100).replace('.', ',');
         const dataBR = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
-        let opcoesCliente = null, fichaAtual = null, alterado = false, situacao = 'Ativo', tipoDesconto = '', filtroTodos = '0', graficoHist = null, finDados = null;
+        let opcoesCliente = null, fichaAtual = null, alterado = false, situacao = 'Ativo', tipoDesconto = '', filtroTodos = '0', graficoHist = null, finDados = null, recebimentoPendente = null;
 
         async function api(caminho, opts = {}) {
             const res = await fetch(API_BASE + caminho, { ...opts, headers: { 'Authorization': 'Bearer ' + getToken(), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
@@ -895,23 +895,29 @@
             const credito = finDados.resumo.credito || 0;
             const zerarCredito = credito !== 0 && await confirmar('Crédito do cliente', `O cliente tem ${moeda(credito)} de crédito, que será descontado do recebimento. Deseja eliminar o crédito do cliente?`);
             const marcarRecebido = await confirmar('Pedidos', "Deseja atualizar para 'Recebido' na tabela de PEDIDOS?");
-            try {
-                await api('/clientes/receber', { method: 'POST', body: JSON.stringify({ codigo: fichaAtual.codigo, pedidos: nums, zerarCredito, marcarRecebido }) });
-            } catch (e) { return toast(e.message, 'erro'); }
+            // Nada é gravado ainda: pedidos "Recebido" e crédito zerado só valem se o lançamento no caixa for SALVO.
+            // Se a gaveta for cancelada, o pedido continua "A Receber" e o crédito continua com o cliente.
+            recebimentoPendente = { codigo: fichaAtual.codigo, pedidos: nums, zerarCredito, marcarRecebido };
             // abre a gaveta do fluxo de caixa com a entrada já preenchida (como o VB faz com o frm_Fluxo_Caixa),
             // por cima desta mesma tela: ao salvar ou fechar, o financeiro do cliente é atualizado e fica aberto
             const q = new URLSearchParams({ novo: 'entrada', embed: '1', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido' });
             const frame = $('cf-fluxo-frame');
             frame.src = 'financeiro.html?' + q;
             frame.hidden = false;
-            carregarFinanceiro(); // os pedidos já foram atualizados no servidor
         });
-        window.addEventListener('message', e => {
+        window.addEventListener('message', async e => {
             if (e.origin !== location.origin || !e.data || e.data.origem !== 'elegance-fluxo') return;
             const frame = $('cf-fluxo-frame');
             if (e.data.tipo === 'fechado' || e.data.tipo === 'salvo') {
                 frame.hidden = true; frame.removeAttribute('src');
                 if (e.data.tipo === 'salvo' && e.data.mensagem) toast(String(e.data.mensagem), 'ok');
+                // o lançamento foi salvo: agora sim marca os pedidos como Recebido e zera o crédito (como escolhido antes)
+                const pendente = recebimentoPendente;
+                recebimentoPendente = null;   // "fechado" (cancelar) descarta; "salvo" consome uma única vez
+                if (e.data.tipo === 'salvo' && pendente) {
+                    try { await api('/clientes/receber', { method: 'POST', body: JSON.stringify(pendente) }); }
+                    catch (err) { toast('O lançamento foi salvo, mas não foi possível atualizar os pedidos/crédito: ' + err.message + ' Marque os pedidos como Recebido manualmente.', 'erro'); }
+                }
                 if (fichaAtual) carregarFinanceiro();
             }
         });
