@@ -412,6 +412,17 @@
         @media (max-width: 600px) { .ranking li { grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-areas: "pos nome val" "pos barra barra" "pos info info"; } }
         .categoria { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; background: var(--secondary-color); }
         .categoria .grid-form { gap: 10px; }
+        /* recebimento dividido em várias formas (fluxo_divisao.js) */
+        #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden] { display: none; }
+        .div-dica { font-size: 12px; color: var(--text-muted, #6c757d); margin: 0 0 10px; }
+        .div-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; padding: 12px; margin-bottom: 10px; border: 1px dashed var(--border-color); border-radius: 10px; }
+        .div-linha .d-cab { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
+        .div-linha .full { grid-column: 1 / -1; }
+        .div-linha .d-remover { background: none; border: none; cursor: pointer; font-size: 16px; color: inherit; padding: 2px 6px; }
+        .div-resumo { margin-top: 12px; font-size: 13px; line-height: 1.5; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .div-resumo.aviso { border-color: #f2a33a; background: rgba(242, 163, 58, .12); }
+        .div-quitar { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; cursor: pointer; }
+        @media (max-width: 720px) { .div-linha { grid-template-columns: 1fr; } }
         .categoria select:disabled { background: hsla(210, 60%, 55%, .14); color: var(--text-dark); cursor: not-allowed; }
         .cat-status { font-size: 12px; font-weight: 600; margin-top: 10px; color: var(--text-light); }
         .cat-status.travado { color: hsl(188, 78%, 72%); }
@@ -424,6 +435,7 @@
     </style>
     <link rel="stylesheet" href="tema.css?v=202611091200">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="fluxo_divisao.js?v=202611101300"></script>
 </head>
 <body>
     <div class="container">
@@ -601,6 +613,16 @@
                     <div class="form-group"><label for="f-nf">Nota fiscal</label><input id="f-nf"></div>
                 </div>
             </section>
+            <section class="bloco" id="bloco-divisao" hidden>
+                <div class="bloco-cab"><span class="ico">➗</span><h3>Dividir em mais formas</h3></div>
+                <div class="bloco-corpo">
+                    <p class="div-dica">Para receber o mesmo pedido em mais de uma forma (ex.: Pix + cartão), a forma de cima é a primeira; adicione as outras aqui. Tudo é salvo de uma vez.</p>
+                    <div id="div-linhas"></div>
+                    <button type="button" class="btn btn-secondary" id="div-add">＋ Adicionar forma de pagamento</button>
+                    <div class="div-resumo" id="div-resumo" aria-live="polite" hidden></div>
+                    <label class="div-quitar" id="div-quitar-rotulo" hidden><input type="checkbox" id="div-quitar"> Pedido quitado: marcar como Recebido</label>
+                </div>
+            </section>
             <section class="bloco">
                 <div class="bloco-cab"><span class="ico">🏷️</span><h3>Categoria</h3></div>
                 <div class="bloco-corpo categoria form-group">
@@ -712,6 +734,7 @@
         let opcoes = { clientes: [], fornecedores: [], formas: [], bancos: [], situacoes: [], proximoId: 1 };
         let movimento = '';
         let alterado = false;
+        let Divisao = null;   // recebimento dividido em várias formas (fluxo_divisao.js); criado antes do INIT
         let grafico = null;
         let graficoGastos = null;
         let agruparGastos = 'fornecedor';
@@ -1204,6 +1227,7 @@
                 if (![...$('f-situacao').options].some(o => o.value === atual)) $('f-situacao').add(new Option(atual, atual));
                 $('f-situacao').value = atual;
             }
+            if (Divisao) Divisao.atualizarVisibilidade();
         }
         document.querySelectorAll('.tipo-mov button').forEach(b => b.addEventListener('click', () => {
             if (b.dataset.mov !== movimento) { definirMovimento(b.dataset.mov, false); marcarAlterado(); sugerirCategoria(false); }
@@ -1238,6 +1262,7 @@
             $('f-data').value = hojeISO();
             $('f-valor').value = moeda(0);
             movimento = '';
+            if (Divisao) { Divisao.reiniciar(); Divisao.atualizarVisibilidade(); }
             document.querySelectorAll('.tipo-mov button').forEach(b => b.classList.remove('on'));
             $('f-situacao').innerHTML = '<option value="">— escolha o tipo —</option>';
             $('l-nome').textContent = 'Cliente / Fornecedor';
@@ -1313,11 +1338,16 @@
             if (d.valor === 0) return falha('Favor inserir um valor!', 'f-valor');
             if (!d.situacao) return falha('Favor escolher a situação desse registro!', 'f-situacao');
             if (!d.codClassificacao) return falha('Favor escolher uma categoria!', 'cat-tipo');
+            const dividido = !!(Divisao && Divisao.ativo());
+            if (dividido) { const p = Divisao.conferir(); if (p) return falha(p); }
             const btn = $('btn-salvar');
             btn.disabled = true;
             btn.textContent = 'Salvando...';
             try {
-                const r = await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
+                const r = dividido
+                    ? await api('/fluxo/salvar_varios', { method: 'POST', body: JSON.stringify(Divisao.montarEnvio(d)) })
+                    : await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
+                if (Divisao) Divisao.reiniciar();
                 toast(r.mensagem, 'ok');
                 avisarPai('salvo', r.mensagem);
                 fecharGaveta(true);
@@ -1332,6 +1362,7 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = $('f-id').value ? '💾 Atualizar' : '💾 Salvar';
+                if (Divisao) Divisao.recalcular();   // refaz o rótulo "Salvar N recebimentos" quando há formas extras
             }
         }
         $('btn-salvar').addEventListener('click', salvarMovimento);
@@ -1392,6 +1423,8 @@
                 });
             } catch { /* gráfico é complementar */ }
         }
+
+        Divisao = FluxoDivisao.iniciar({ $, api, lerNumero, moeda, escapeHtml, hojeISO, pode: c => Acesso.pode(c), getMovimento: () => movimento });
 
         // ============ INIT ============
         document.addEventListener('DOMContentLoaded', () => {

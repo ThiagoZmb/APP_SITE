@@ -15,7 +15,7 @@ Funcionalidades (páginas HTML na raiz):
 - Clientes e análise de cliente (`clientes.html`, `cliente_analise.html`).
 - Produtos/cadastro (`produtos.html`), orçamentos e pedidos com cálculo de preço de portas, serralheria e venda avulsa (`orcamentos.html`, `calculo/precos.js`, `rotas/ped_orc.js`), geração de PDF (pdfkit).
 - Estoque: entrada manual e por XML de NF-e, saída, ajuste, histórico, estornos, análises (previsão de falta, curva ABC, itens parados) (`estoque.html`, `movimentacao_estoque.html`, `rotas/estoque_*.js`, `rotas/nfe_xml.js`).
-- Financeiro / fluxo de caixa (`financeiro.html`) e gráficos de pedidos (`graficos_pedidos.html`).
+- Financeiro / fluxo de caixa (`financeiro.html`) e gráficos de pedidos (`graficos_pedidos.html`). **Recebimento dividido** (Pix + cartão numa operação só, `fluxo_divisao.js`, `rotas/fluxo_varios.js`): regras em `docs/regras/recebimento-dividido.md`.
 - Custos e **formação de preço** (`custos.html`, `custos_precos.js`, `rotas/custos.js`, `rotas/precos_formacao.js`): calcula custo real dos materiais pelas compras e sugere o `VALOR_FIXO`.
 - **Entregas** (`entregas.html`, `minhas_entregas.html`, `rotas/entregas.js`): fila de pedidos Pronto, agenda (motorista, retirada, outro estado), baixa pelo motorista no celular com foto do canhoto, ocorrências e histórico; também aparece em Início, Pedidos (selo) e Financeiro do cliente (somente leitura). Regras na seção 5, "Entregas".
 - **Fornecedores e funcionários** (`fornecedores.html`, `funcionarios.html`, `rotas/fornecedores.js`, `rotas/funcionarios.js`): cadastros das tabelas do VB `cadastro_fornecedores` e `funcionarios`, com busca e CEP (ViaCEP). Regras na seção 5, "Cadastros".
