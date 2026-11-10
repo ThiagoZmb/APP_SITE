@@ -282,6 +282,29 @@ test('migração entregas: reexecutar já migrado não faz nada; estados parciai
   assert.deepEqual(altersEntregas(nenhuma), ['ALTER TABLE web_entregas ADD UNIQUE KEY uk_numero_seq (numero, sequencia)']);
 });
 
+// ---- observação POR ITEM da entrega (web_entrega_itens.observacao VARCHAR(255) NULL): CREATE novo e ALTER só quando falta ----
+test('web_entrega_itens: observacao VARCHAR(255) NULL no CREATE e ALTER idempotente (confere information_schema antes)', async () => {
+  const criada = criarPoolFalso([]);
+  await instalarTabelas(criada);
+  assert.match(criada.chamadas.find(c => /CREATE TABLE IF NOT EXISTS `web_entrega_itens`/.test(c.sql)).sql, /observacao VARCHAR\(255\) NULL/);
+  const poolItens = presente => criarPoolFalso([
+    [/TABLE_NAME = 'web_entrega_itens' AND COLUMN_NAME = 'observacao'/, [{ n: presente ? 1 : 0 }]],
+    [/information_schema\.COLUMNS/, [{ n: 1 }]],
+    JA_MIGRADO_ENTREGAS
+  ]);
+  const alters = p => p.chamadas.map(c => c.sql).filter(s => /^ALTER TABLE web_entrega_itens/.test(s));
+  const antiga = poolItens(false);
+  await instalarTabelas(antiga);
+  assert.deepEqual(alters(antiga), ['ALTER TABLE web_entrega_itens ADD COLUMN observacao VARCHAR(255) NULL AFTER unidade']);
+  const consulta = antiga.chamadas.findIndex(c => /TABLE_NAME = 'web_entrega_itens' AND COLUMN_NAME = 'observacao'/.test(c.sql));
+  assert.ok(consulta >= 0 && consulta < antiga.chamadas.findIndex(c => /^ALTER TABLE web_entrega_itens/.test(c.sql)), 'confere antes de alterar');
+  assert.ok(!antiga.chamadas.some(c => /^\s*(DELETE|TRUNCATE|DROP|UPDATE web_entrega_itens)/i.test(c.sql)), 'nada é apagado nem reescrito');
+  const nova = poolItens(true);
+  await instalarTabelas(nova);
+  await instalarTabelas(nova); // reexecutar
+  assert.deepEqual(alters(nova), []);
+});
+
 function poolCadastros({ jaFeito = false } = {}) {
   return criarPoolFalso([
     [/FROM web_auditoria WHERE acao = 'permissoes_cadastros'/, jaFeito ? [{ id: 9 }] : []],

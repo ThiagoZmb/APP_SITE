@@ -76,18 +76,18 @@ function bancoEntregas() {
       entregas.filter(e => e.numero === numero).sort((a, b) => (a.sequencia - b.sequencia) || (a.id - b.id)).map(e => ({ ...e }))],
     [/^SELECT \* FROM web_entregas WHERE numero IN/, (sql, nums) =>
       entregas.filter(e => nums.includes(e.numero)).sort((a, b) => (a.numero - b.numero) || (a.sequencia - b.sequencia) || (a.id - b.id)).map(e => ({ ...e }))],
-    [/^SELECT i\.entrega_id, i\.numero_item, i\.descricao, i\.quantidade, i\.unidade FROM web_entrega_itens i\s+JOIN web_entregas e/, (sql, nums) => {
+    [/^SELECT i\.entrega_id, i\.numero_item, i\.descricao, i\.quantidade, i\.unidade, i\.observacao FROM web_entrega_itens i\s+JOIN web_entregas e/, (sql, nums) => {
       const ids = entregas.filter(e => nums.includes(e.numero)).map(e => e.id);
       return estado.entregaItens.filter(i => ids.includes(i.entrega_id)).sort((a, b) => (a.entrega_id - b.entrega_id) || (a.numero_item - b.numero_item) || (a.id - b.id))
-        .map(i => ({ entrega_id: i.entrega_id, numero_item: i.numero_item, descricao: i.descricao, quantidade: String(i.quantidade), unidade: i.unidade ?? null }));
+        .map(i => ({ entrega_id: i.entrega_id, numero_item: i.numero_item, descricao: i.descricao, quantidade: String(i.quantidade), unidade: i.unidade ?? null, observacao: i.observacao ?? null }));
     }],
     [/^SELECT numero, numero_item, descricao, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero IN/, (sql, nums) =>
       estado.encerradas.filter(x => nums.includes(x.numero)).map(x => ({ ...x, quantidade: String(x.quantidade) }))],
     [/^SELECT numero_item, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero = \?$/, (sql, [numero]) =>
       estado.encerradas.filter(x => x.numero === numero).map(x => ({ numero_item: x.numero_item, quantidade: String(x.quantidade), hash_itens: x.hash_itens ?? null }))],
-    [/^SELECT NUMERO, ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, nums) =>
+    [/^SELECT NUMERO, ITEM, DESCRICAO, QTD, PRODUTO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, nums) =>
       estado.itens.filter(i => i.TIPO === 'Pedido' && nums.includes(i.NUMERO)).sort((a, b) => (a.NUMERO - b.NUMERO) || (a.ITEM - b.ITEM))
-        .map(i => ({ NUMERO: i.NUMERO, ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+        .map(i => ({ NUMERO: i.NUMERO, ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD, PRODUTO: i.PRODUTO ?? null, OBSERVACAO: i.OBSERVACAO ?? null }))],
     [/^SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c/, (sql, [numero, ...estados]) => {
       const cli = clienteDe(pedidos.find(p => p.NUMERO === numero && p.TIPO === 'Pedido'));
       return cli && estados.includes(cli.ESTADO) ? [{ ok: 1 }] : [];

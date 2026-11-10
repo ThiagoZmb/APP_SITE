@@ -109,7 +109,7 @@ function hashItensPedido(itensPedido) {
 }
 
 // Linha de web_entrega_itens -> { item, descricao, qtd, unidade }
-const doBanco = l => ({ item: Number(l.numero_item), descricao: String(l.descricao ?? ''), qtd: r4(l.quantidade), unidade: l.unidade ?? null });
+const doBanco = l => ({ item: Number(l.numero_item), descricao: String(l.descricao ?? ''), qtd: r4(l.quantidade), unidade: l.unidade ?? null, observacao: l.observacao ?? null });
 
 // itens - (soma das listas em `subtrair`), sem negativos nem zeros
 function descontar(itensPedido, subtrair) {
@@ -153,7 +153,18 @@ function ordemNoPedido(entregas, id) {
   return { ordemEntrega: validas.findIndex(e => Number(e.id) === Number(id)) + 1, qtdEntregasPedido: validas.length };
 }
 
-// Corpo de "Separar em outra entrega": { itens: [{ numeroItem, quantidade }], observacao? }.
+// Observação POR ITEM (web_entrega_itens.observacao, VARCHAR(255)): só texto; tira caracteres de controle, junta espaços e quebras de
+// linha num espaço só e apara. Vazio = null (sem observação). Acima de 255 = 400 (nunca corta em silêncio).
+const LIMITE_OBS_ITEM = 255;
+function lerObservacaoItem(bruto, erro = msg => Object.assign(new Error(msg), { status: 400 })) {
+  if (bruto === undefined || bruto === null) return null;
+  if (typeof bruto !== 'string') throw erro('Observação do item inválida: use texto.');
+  const t = bruto.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (t.length > LIMITE_OBS_ITEM) throw erro(`Observação do item muito longa (máximo ${LIMITE_OBS_ITEM} caracteres).`);
+  return t || null;
+}
+
+// Corpo de "Separar em outra entrega": { itens: [{ numeroItem, quantidade, observacao? }], observacao? } (a observação de fora é da entrega nova).
 // Quantidade: número > 0 com até 4 casas decimais (aceita texto "1.5"). Devolve { itens, observacao } ou lança Error com .status 400.
 function lerSeparacao(b) {
   const erro = msg => Object.assign(new Error(msg), { status: 400 });
@@ -170,7 +181,8 @@ function lerSeparacao(b) {
     const q = typeof bruto === 'string' && /^\d+(\.\d{1,4})?$/.test(bruto.trim()) ? Number(bruto) : bruto;
     if (typeof q !== 'number' || !Number.isFinite(q) || q <= 0 || q > 1e9) throw erro('Quantidade inválida: use um número maior que zero.');
     if (Math.abs(r4(q) - q) > TOLERANCIA) throw erro('Quantidade com casas decimais demais (máximo 4).');
-    return { numeroItem, quantidade: r4(q) };
+    const observacao = lerObservacaoItem(i?.observacao, erro);
+    return { numeroItem, quantidade: r4(q), ...(observacao ? { observacao } : {}) };
   });
   const obs = corpo.observacao === undefined || corpo.observacao === null ? '' : String(corpo.observacao).trim();
   if (obs.length > 500) throw erro('Observação muito longa (máximo 500 caracteres).');
@@ -191,7 +203,8 @@ function separarItens(disponiveis, pedidos) {
     if (p.quantidade > d.qtd + TOLERANCIA) {
       return { erro: { status: 409, msg: `Quantidade de "${d.descricao}" maior que a disponível nesta entrega (${String(d.qtd).replace('.', ',')}).` } };
     }
-    nova.push({ item: d.item, descricao: d.descricao, qtd: r4(p.quantidade), unidade: d.unidade ?? null });
+    // a observação digitada vale só para a entrega NOVA; a origem mantém a que já tinha (ver `...d` em resto)
+    nova.push({ item: d.item, descricao: d.descricao, qtd: r4(p.quantidade), unidade: d.unidade ?? null, observacao: p.observacao ?? null });
     tirar.set(d.item, p.quantidade);
   }
   if (!nova.length) return { erro: { status: 400, msg: 'Marque ao menos um item para separar.' } };

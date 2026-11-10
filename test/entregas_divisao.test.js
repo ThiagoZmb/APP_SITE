@@ -476,11 +476,15 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   const h = ler('entregas.html');
   for (const id of ['btn-separar', 'btn-restante', 'btn-confirmar-separar', 'btn-confirmar-encerrar']) assert.match(h, new RegExp(`id="${id}"[^>]*data-perm="entregas\\.programar"`), id);
   for (const id of ['vista-separar', 'vista-encerrar', 'sp-itens', 'sp-obs', 'en-motivo', 'd-aviso', 'd-itens-titulo']) assert.match(h, new RegExp(`id="${id}"`), id);
-  assert.match(h, /\.sep-linha \{ display: grid; grid-template-columns: minmax\(0, 1fr\) 110px/);
+  assert.match(h, /#painel \.sep-cartao \{ display: flex; flex-direction: column;/);
+  assert.match(h, /\.sep-passo \{ flex: 0 0 auto; width: 44px; height: 44px;/, 'botões − e + com área de toque de 44 px');
+  assert.doesNotMatch(h, /\.sep-linha/);
+  assert.match(h, /id="sp-resumo"[^>]*aria-live="polite"/);
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611101800/);
-  assert.match(h, /entregas\.js\?v=202611101800/);
+  assert.match(h, /entregas\.js\?v=202611101900/);
+  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611101900/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611101800/);
   const js = ler('entregas.js');
   assert.ok(js.includes("data-sobra=\"gerar\"") && js.includes('Gerar entrega do saldo') && js.includes('Encerrar saldo'));
@@ -525,4 +529,163 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {
   assert.ok(ler('portal/public/pedidos.js').includes('texto(p.entrega)'));
   assert.ok(ler('portal/public/pedido.js').includes("getElementById('entrega').textContent = texto(p.entrega)"));
+});
+
+// ======================= observação POR ITEM (cartão do "Separar em outra entrega") =======================
+test('lerSeparacao: observação por item é aparada, saneada (controles e quebras viram espaço), vazia vira ausente e acima de 255 = 400', () => {
+  const r = lerSeparacao({ itens: [
+    { numeroItem: 1, quantidade: 1, observacao: '  levar \n com\tferragem\u0007 separada  ' },
+    { numeroItem: 2, quantidade: 1, observacao: '   ' },
+    { numeroItem: 3, quantidade: 1 },
+    { numeroItem: 4, quantidade: 1, observacao: null }] });
+  assert.deepEqual(r.itens, [{ numeroItem: 1, quantidade: 1, observacao: 'levar com ferragem separada' }, { numeroItem: 2, quantidade: 1 },
+    { numeroItem: 3, quantidade: 1 }, { numeroItem: 4, quantidade: 1 }]);
+  assert.equal(lerSeparacao({ itens: [{ numeroItem: 1, quantidade: 1, observacao: 'x'.repeat(255) }] }).itens[0].observacao.length, 255);
+  for (const ruim of ['x'.repeat(256), 123, { a: 1 }, ['x']]) {
+    assert.throws(() => lerSeparacao({ itens: [{ numeroItem: 1, quantidade: 1, observacao: ruim }] }), e => e.status === 400, String(ruim).slice(0, 20));
+  }
+  // a observação da entrega nova (de fora) continua com o limite de 500
+  assert.equal(lerSeparacao({ itens: [{ numeroItem: 1, quantidade: 1 }], observacao: 'y'.repeat(500) }).observacao.length, 500);
+});
+
+test('separarItens: a observação vai só para o item da entrega NOVA; o resto da origem mantém a que já tinha', () => {
+  const disp = [{ item: 1, descricao: 'Porta', qtd: 3, unidade: null, observacao: 'da origem' }, { item: 2, descricao: 'Trilho', qtd: 2, unidade: null, observacao: null }];
+  const s = separarItens(disp, [{ numeroItem: 1, quantidade: 1, observacao: 'nova' }]);
+  assert.deepEqual(s.nova.map(i => [i.item, i.qtd, i.observacao]), [[1, 1, 'nova']]);
+  assert.deepEqual(s.resto.map(i => [i.item, i.qtd, i.observacao]), [[1, 2, 'da origem'], [2, 2, null]]);
+});
+
+test('separar: observação por item gravada na cópia da entrega NOVA; devolvida em itensDetalhe e itens; produto e obs do orçamento só leitura', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  const origem = cenario(banco);
+  Object.assign(banco.itens.find(i => i.ITEM === 1), { PRODUTO: 'Estrutura metálica editável', OBSERVACAO: 'conferir o gabarito' });
+  const r = await separar(chamar, origem.id, [{ numeroItem: 1, quantidade: 1, observacao: '  levar com a ferragem separada ' }, { numeroItem: 2, quantidade: 1 }]);
+  assert.equal(r.status, 201, JSON.stringify(await r.clone().json()));
+  const nova = banco.entregas.find(e => e.sequencia === 2);
+  const grav = banco.entregaItens.filter(i => i.entrega_id === nova.id).sort((a, b) => a.numero_item - b.numero_item).map(i => [i.numero_item, i.observacao ?? null]);
+  assert.deepEqual(grav, [[1, 'levar com a ferragem separada'], [2, null]]);
+  assert.ok(banco.entregaItens.filter(i => i.entrega_id === origem.id).every(i => (i.observacao ?? null) === null), 'a origem não herda a observação');
+  const d = await (await chamar(`/entregas/${nova.id}`)).json();
+  assert.deepEqual(d.itensDetalhe.find(i => i.item === 1), { item: 1, descricao: 'Porta', qtd: 1, observacao: 'levar com a ferragem separada',
+    produto: 'Estrutura metálica editável', obsPedido: 'conferir o gabarito' });
+  assert.deepEqual(d.itensDetalhe.find(i => i.item === 2), { item: 2, descricao: 'Trilho', qtd: 1 }, 'sem observação nem produto: formato antigo');
+  assert.deepEqual(d.itens, [{ descricao: 'Porta', qtd: 1, observacao: 'levar com a ferragem separada' }, { descricao: 'Trilho', qtd: 1 }]);
+  // dividir de novo a nova: o que fica nela mantém a observação
+  assert.equal((await separar(chamar, nova.id, [{ numeroItem: 2, quantidade: 1 }])).status, 201);
+  assert.deepEqual(listaDe(banco, nova.id), [[1, 1]]);
+  assert.equal(banco.entregaItens.find(i => i.entrega_id === nova.id && i.numero_item === 1).observacao, 'levar com a ferragem separada');
+});
+
+test('separar: observação do item acima de 255 caracteres ou que não é texto = 400 e nada é gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  const origem = cenario(banco);
+  for (const observacao of ['x'.repeat(256), 5]) {
+    const r = await separar(chamar, origem.id, [{ numeroItem: 1, quantidade: 1, observacao }]);
+    assert.equal(r.status, 400);
+  }
+  assert.equal(banco.entregas.length, 1);
+  assert.equal(banco.entregaItens.length, 0);
+  assert.equal(banco.f.chamadas.filter(c => /^(INSERT|DELETE|UPDATE)/.test(c.sql)).length, 0);
+});
+
+test('motorista: o detalhe da entrega mostra a observação de cada item (e a lista de itens continua igual sem ela)', async t => {
+  const equipe = await prepararEntregas(t);
+  const banco = equipe.banco;
+  const origem = cenario(banco);
+  assert.equal((await separar(equipe.chamar, origem.id, [{ numeroItem: 1, quantidade: 1, observacao: 'levar com a ferragem separada' }, { numeroItem: 2, quantidade: 1 }])).status, 201);
+  const nova = banco.entregas.find(e => e.sequencia === 2);
+  Object.assign(nova, { status: 'agendada', tipo: 'motorista', motorista_codigo: 21, data_agendada: hojeLocal() });
+  Object.assign(banco.itens.find(i => i.ITEM === 1), { OBSERVACAO: 'conferir o gabarito' });
+  const { chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: { codigo: 21, nome: 'Motorista Um' }, banco });
+  const d = await (await chamar(`/minhas_entregas/${nova.id}`)).json();
+  assert.deepEqual(d.itens, [{ descricao: 'Porta', qtd: 1, observacao: 'levar com a ferragem separada' }, { descricao: 'Trilho', qtd: 1 }]);
+  assert.ok(!JSON.stringify(d).includes('conferir'), 'a observação do orçamento não vai ao motorista');
+});
+
+// ---- tela: ficha, passos, resumo e cartão ----
+test('tela: fichaDoItem separa o nome e as etiquetas "Rótulo: valor" sem inventar nada', () => {
+  const desc = 'Tam: 660x400mm | Per: 1036 Pintura Sólida Alumínio | Pux: 2018 E | Rev: Tela expandida (1,5mm) Pintado Sólido | Portas: 2 | Furos: 2';
+  const f = E.fichaDoItem(desc, 'Estrutura metálica editável', 3);
+  assert.equal(f.nome, 'Estrutura metálica editável');
+  assert.deepEqual(f.etiquetas.map(e => [e.rotulo, e.texto]), [['Tamanho', '660x400mm'], ['Perfil', '1036 Pintura Sólida Alumínio'], ['Puxador', '2018 E'],
+    ['Revestimento', 'Tela expandida (1,5mm) Pintado Sólido'], ['Portas', '2'], ['Furos', '2']]);
+  assert.equal(E.fichaDoItem(desc, '', 7).nome, 'Item 7', 'sem produto nem nome no texto: "Item N"');
+  const comNome = E.fichaDoItem('Porta de giro Tam: 800x2100 | Furos: 2', '', 1);
+  assert.equal(comNome.nome, 'Porta de giro');
+  assert.deepEqual(comNome.etiquetas.map(e => [e.rotulo, e.texto]), [['Tamanho', '800x2100'], ['Furos', '2']]);
+  assert.deepEqual(E.fichaDoItem('Porta simples', '', 1), { nome: 'Porta simples', etiquetas: [] });
+  assert.deepEqual(E.fichaDoItem('Tam: 1 | texto solto', '', 2).etiquetas.map(e => [e.rotulo, e.texto]), [['Tamanho', '1'], ['', 'texto solto']]);
+  assert.deepEqual(E.fichaDoItem('', null, 4), { nome: 'Item 4', etiquetas: [] });
+});
+
+test('tela: passo e limites da quantidade (inteiro de 1 em 1; fracionado de 0,5 em 0,5; nunca abaixo de 0 nem acima do disponível)', () => {
+  assert.equal(E.passoDe(2), 1);
+  assert.equal(E.passoDe(1.5), 0.5);
+  assert.equal(E.ajustarQuantidade(0, -1, 2, 1), 0);
+  assert.equal(E.ajustarQuantidade(1, 1, 2, 1), 2);
+  assert.equal(E.ajustarQuantidade(2, 1, 2, 1), 2);
+  assert.equal(E.ajustarQuantidade(1, 1, 1.5, 0.5), 1.5);
+  assert.equal(E.ajustarQuantidade(NaN, 1, 3, 1), 1, 'campo inválido conta como 0');
+  assert.equal(E.ajustarQuantidade(2.5, 1, 2.5, 1), 2.5, 'máximo fracionado respeitado');
+});
+
+test('tela: resumo do "Separar" (itens · unidades), aviso de marcar tudo e botão só quando dá para dividir', () => {
+  const l = E.linhasSeparacao(DET);
+  const com = (a, b) => l.map((x, k) => ({ ...x, separar: [a, b][k] }));
+  assert.deepEqual(E.resumoSeparacao(com(0, 0)), { itens: 0, unidades: 0, texto: 'Nenhum item selecionado', podeEnviar: false, aviso: '' });
+  assert.deepEqual(E.resumoSeparacao(com(2, 0)), { itens: 1, unidades: 2, texto: '1 item selecionado · 2 unidades', podeEnviar: true, aviso: '' });
+  assert.equal(E.resumoSeparacao(com(1, 0)).texto, '1 item selecionado · 1 unidade');
+  assert.equal(E.resumoSeparacao(com(1.5, 2)).texto, '2 itens selecionados · 3,5 unidades');
+  const tudo = E.resumoSeparacao(com(3, 2));
+  assert.equal(tudo.podeEnviar, false);
+  assert.match(tudo.aviso, /marcou todos os itens/);
+  const alto = E.resumoSeparacao(com(4, 0));
+  assert.equal(alto.podeEnviar, false);
+  assert.match(alto.aviso, /Quantidade inválida/);
+  // observação do item acima de 255 caracteres impede o envio
+  const longa = E.validarSeparacao(l.map((x, k) => ({ ...x, separar: k === 0 ? 1 : 0, observacao: 'x'.repeat(256) })));
+  assert.match(longa[0], /passa de 255 caracteres/);
+  // observação de item que não vai (quantidade 0) não é enviada nem conta
+  assert.deepEqual(E.corpoSeparar(l.map((x, k) => ({ ...x, separar: k === 0 ? 1 : 0, observacao: k === 0 ? ' levar com a ferragem ' : 'não vai' })), ''),
+    { itens: [{ numeroItem: 1, quantidade: 1, observacao: 'levar com a ferragem' }] });
+});
+
+test('tela: cartão do item é estático (sem style=), escapa o texto, tem rótulos associados e o campo de observação', () => {
+  const l = { item: 3, descricao: 'Tam: 660x400mm | Per: 1036 <b>x</b> | Pux: 2018 E', produto: 'Estrutura <i>metálica</i>', obsPedido: 'conferir "gabarito"', qtd: 2, separar: 1, observacao: 'a<b' };
+  const h = E.htmlCartaoSeparacao(l, 0);
+  assert.doesNotMatch(h, /\sstyle=/);
+  assert.doesNotMatch(h, /<b>x<\/b>|<i>/, 'HTML vindo do banco não entra cru');
+  assert.match(h, /Estrutura &lt;i&gt;metálica&lt;\/i&gt;/);
+  assert.match(h, /<b>Tamanho<\/b>660x400mm/);
+  assert.match(h, /Item 3/);
+  assert.match(h, /Disponível: 2/);
+  assert.match(h, /Obs\. do pedido: conferir &quot;gabarito&quot;/);
+  assert.match(h, /id="sp-item-0"[^>]*min="0"[^>]*max="2"[^>]*step="any"[^>]*value="1"/);
+  assert.match(h, /data-acao="menos"[^>]*aria-label="Diminuir/);
+  assert.match(h, /data-acao="mais"[^>]*aria-label="Aumentar/);
+  assert.match(h, /data-acao="todos"/);
+  assert.match(h, /de 2<\/span>/);
+  assert.match(h, /<label for="sp-obs-0">Observação deste item<\/label>/);
+  assert.match(h, /<textarea id="sp-obs-0"[^>]*maxlength="255"[^>]*placeholder="ex\.: levar com a ferragem separada">a&lt;b<\/textarea>/);
+  // quantidade fracionada: "de 1,5" e max com ponto
+  const f = E.htmlCartaoSeparacao({ item: 1, descricao: 'Trilho', qtd: 1.5, separar: 0 }, 1);
+  assert.match(f, /max="1\.5"/);
+  assert.match(f, /Disponível: 1,5/);
+  assert.doesNotMatch(f, /Obs\. do pedido/);
+});
+
+test('tela: "Gerar entrega do restante" pré-preenche os cartões e a tela liga o resumo, o botão e a delegação dos passos', () => {
+  const r = E.restanteDaOcorrencia([{ item: 1, descricao: 'Porta', qtd: 3, produto: 'Estrutura', obsPedido: 'x' }, { item: 2, descricao: 'Trilho', qtd: 2 }],
+    [{ id: 1, tipo: 'parcial', detalhe: { itensEntregues: [{ descricao: 'Porta', qtd: 2 }] } }]);
+  assert.equal(r.inferido, true);
+  assert.deepEqual(r.linhas.map(x => [x.item, x.separar, x.observacao]), [[1, 1, ''], [2, 2, '']]);
+  assert.equal(r.linhas[0].produto, 'Estrutura');
+  assert.match(E.htmlCartaoSeparacao(r.linhas[0], 0), /id="sp-item-0"[^>]*value="1"/);
+  const js = ler('entregas.js');
+  for (const trecho of ["$('sp-itens').addEventListener('click', mexerNoCartao)", "$('sp-itens').addEventListener('input', atualizarSeparacao)",
+    "$('btn-confirmar-separar').disabled = !r.podeEnviar", 'atualizarSeparacao();', "'sp-resumo-texto'"]) assert.ok(js.includes(trecho), trecho);
+  assert.ok(js.includes('restante ? restanteDaOcorrencia(det.itensDetalhe, det.eventos) : { inferido: false, linhas: linhasSeparacao(det.itensDetalhe) }'), 'restante e saldo usam o mesmo formulário');
+  assert.ok(js.includes('Obs.: ${esc(i.observacao)}'), 'detalhe da equipe mostra a observação do item');
+  assert.ok(ler('minhas_entregas.js').includes('Obs.: ${esc(i.observacao)}'), 'cartão do motorista mostra a observação do item');
+  assert.match(ler('minhas_entregas.html'), /\.obs-item \{[^}]*var\(--/);
 });

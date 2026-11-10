@@ -397,6 +397,7 @@ const TABELAS = [
      descricao VARCHAR(300) NOT NULL,
      quantidade DECIMAL(14,4) NOT NULL,
      unidade VARCHAR(20) NULL,
+     observacao VARCHAR(255) NULL,
      criado_em DATETIME NOT NULL,
      KEY idx_entrega (entrega_id)
    ) ${OPCOES}`,
@@ -606,6 +607,10 @@ async function migrarEntregasVarias(pool) {
   if (nomes.has('uk_numero')) passos.push('DROP INDEX uk_numero');
   if (!nomes.has('uk_numero_seq')) passos.push('ADD UNIQUE KEY uk_numero_seq (numero, sequencia)');
   if (passos.length) await pool.execute(`ALTER TABLE web_entregas ${passos.join(', ')}`);
+  // observação POR ITEM da entrega (escrita ao separar; web_entrega_itens criada antes dela ganha a coluna, nunca apaga nada)
+  const [[ob] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_entrega_itens' AND COLUMN_NAME = 'observacao'");
+  if (!Number(ob?.n)) await pool.execute('ALTER TABLE web_entrega_itens ADD COLUMN observacao VARCHAR(255) NULL AFTER unidade');
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo

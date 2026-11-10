@@ -189,7 +189,7 @@
       let itens = '';
       if (det) {
         itens = '<h4>Itens</h4>' + (det.itens && det.itens.length
-          ? `<ul class="itens">${det.itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span></li>`).join('')}</ul>`
+          ? `<ul class="itens">${det.itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span>${i.observacao ? `<div class="obs-item">Obs.: ${esc(i.observacao)}</div>` : ''}</li>`).join('')}</ul>`
           : '<p class="cinza">Sem itens.</p>') + (det.observacao ? `<h4>Observação</h4><p>${esc(det.observacao)}</p>` : '');
       } else itens = `<p class="cinza">${esc(e.qtdItens)} ${e.qtdItens === 1 ? 'item' : 'itens'}</p>`;
       const oc = e.status === 'ocorrencia' && det ? motivoOcorrencia(det.eventos) : null;

@@ -187,10 +187,10 @@ async function lerDivisoes(db, numeros, entregasLidas = null) {
   const m = marcas(nums);
   const [entregas, itens, encerradas, itensPed] = await Promise.all([
     entregasLidas ? entregasLidas : db.execute(`SELECT * FROM web_entregas WHERE numero IN (${m}) ORDER BY numero, sequencia, id`, nums).then(x => x[0]),
-    db.execute(`SELECT i.entrega_id, i.numero_item, i.descricao, i.quantidade, i.unidade FROM web_entrega_itens i
+    db.execute(`SELECT i.entrega_id, i.numero_item, i.descricao, i.quantidade, i.unidade, i.observacao FROM web_entrega_itens i
                 JOIN web_entregas e ON e.id = i.entrega_id WHERE e.numero IN (${m}) ORDER BY i.entrega_id, i.numero_item, i.id`, nums).then(x => x[0]),
     db.execute(`SELECT numero, numero_item, descricao, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero IN (${m}) ORDER BY id`, nums).then(x => x[0]),
-    db.execute(`SELECT NUMERO, ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${m}) ORDER BY NUMERO, ITEM`, nums).then(x => x[0])
+    db.execute(`SELECT NUMERO, ITEM, DESCRICAO, QTD, PRODUTO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${m}) ORDER BY NUMERO, ITEM`, nums).then(x => x[0])
   ]);
   for (const n of nums) {
     const ents = entregas.filter(e => Number(e.numero) === n).map(e => ({ ...e, id: Number(e.id) }));
@@ -202,7 +202,9 @@ async function lerDivisoes(db, numeros, entregasLidas = null) {
       if (!itensPorEntrega.has(k)) itensPorEntrega.set(k, []);
       itensPorEntrega.get(k).push(i);
     }
-    const itensPedido = itensPed.filter(i => Number(i.NUMERO) === n).map(i => ({ item: Number(i.ITEM), descricao: i.DESCRICAO || '', qtd: Number(i.QTD) || 0 }));
+    // PRODUTO e OBSERVACAO (do orçamento) só informam a tela; não entram no hash nem em nenhuma conta
+    const itensPedido = itensPed.filter(i => Number(i.NUMERO) === n).map(i => ({ item: Number(i.ITEM), descricao: i.DESCRICAO || '', qtd: Number(i.QTD) || 0,
+      produto: String(i.PRODUTO ?? '').trim() || null, obsPedido: String(i.OBSERVACAO ?? '').trim() || null }));
     const enc = encerradas.filter(x => Number(x.numero) === n);
     r.set(n, { entregas: ents, itensPorEntrega, itensPedido, encerradas: enc, ...situacaoDivisao({ entregas: ents, itensPorEntrega, itensPedido, encerradas: enc }) });
   }
@@ -230,8 +232,8 @@ async function travarPedidoDividido(conn, req, numero, msg404 = 'Pedido não enc
 // grava a lista de itens de uma entrega num INSERT só (cópia: número do ITEM, descrição e quantidade no momento da divisão)
 async function inserirItens(conn, entregaId, itens, agora) {
   if (!itens.length) return;
-  const params = itens.flatMap(i => [entregaId, i.item, String(i.descricao ?? '').slice(0, 300), i.qtd, i.unidade ?? null, agora]);
-  await conn.execute(`INSERT INTO web_entrega_itens (entrega_id, numero_item, descricao, quantidade, unidade, criado_em) VALUES ${itens.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`, params);
+  const params = itens.flatMap(i => [entregaId, i.item, String(i.descricao ?? '').slice(0, 300), i.qtd, i.unidade ?? null, i.observacao ? String(i.observacao).slice(0, 255) : null, agora]);
+  await conn.execute(`INSERT INTO web_entrega_itens (entrega_id, numero_item, descricao, quantidade, unidade, observacao, criado_em) VALUES ${itens.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}`, params);
 }
 
 const evento = (conn, id, agora, usuario, tipo, motivo, detalhe) => conn.execute(
@@ -441,10 +443,16 @@ function registrarEntregas({ rota, pool }) {
       const d = divisoes.get(Number(r.numero));
       // itens DESTA entrega: a lista dela; sem lista = o pedido inteiro (menos o que outras entregas do pedido levam)
       const itensEntrega = d?.porEntrega.get(Number(id)) || [];
-      const itens = itensEntrega.map(i => ({ descricao: i.descricao, qtd: i.qtd }));
+      const itens = itensEntrega.map(i => ({ descricao: i.descricao, qtd: i.qtd, ...(i.observacao ? { observacao: i.observacao } : {}) }));
       const ordem = ordemNoPedido(d?.entregas || [], id);
+      // produto e observação do orçamento (só leitura, só para a equipe): ligados pelo número do ITEM; com o pedido alterado
+      // depois da divisão os números podem ter mudado, então nada é ligado
+      const doPedido = new Map(d && !d.alterado ? d.itensPedido.map(p => [p.item, p]) : []);
       res.json({
-        itensDetalhe: itensResumo(itensEntrega),
+        // campos novos só aparecem quando existem (o formato antigo { item, descricao, qtd } não muda)
+        itensDetalhe: itensEntrega.map(i => ({ item: i.item, descricao: i.descricao, qtd: i.qtd, ...(i.observacao ? { observacao: i.observacao } : {}),
+          ...(doPedido.get(i.item)?.produto ? { produto: doPedido.get(i.item).produto } : {}),
+          ...(doPedido.get(i.item)?.obsPedido ? { obsPedido: doPedido.get(i.item).obsPedido } : {}) })),
         divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
           podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && r.situacao_pedido === 'Pronto' && !d?.alterado && itensEntrega.length > 0,
           itensSemEntrega: d ? itensResumo(d.sobra) : [] },
@@ -848,7 +856,7 @@ function registrarEntregas({ rota, pool }) {
         pool.execute('SELECT quando, tipo, motivo, entregue_a FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]),
         pool.execute('SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?) ORDER BY id', [id, String(DONO(req))])]);
       const d = divisoes.get(Number(e.numero));
-      const itens = (d?.porEntrega.get(Number(id)) || []).map(i => ({ descricao: i.descricao, qtd: i.qtd }));
+      const itens = (d?.porEntrega.get(Number(id)) || []).map(i => ({ descricao: i.descricao, qtd: i.qtd, ...(i.observacao ? { observacao: i.observacao } : {}) }));
       const ordem = ordemNoPedido(d?.entregas || [], id);
       res.json({
         ...itemMotorista({ ...e, ...(ficha || {}), qtd_entregas_pedido: ordem.qtdEntregasPedido, ordem_entrega: ordem.ordemEntrega }, itens.length), itens, observacao: e.observacao ?? null,

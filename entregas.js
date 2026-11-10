@@ -177,8 +177,77 @@
   const numeroBR = n => String(r4(n)).replace('.', ',');
 
   // linhas do formulário "Separar em outra entrega": itens desta entrega (itensDetalhe da API) com a quantidade a separar
+  // `produto` e `obsPedido` (observação do orçamento) vêm da API só para leitura; `observacao` é a do item, digitada aqui
   const linhasSeparacao = (itensDetalhe, separar = {}) => (Array.isArray(itensDetalhe) ? itensDetalhe : [])
-    .map(i => ({ item: i.item, descricao: i.descricao, qtd: r4(i.qtd), separar: r4(separar[i.item] || 0) }));
+    .map(i => ({ item: i.item, descricao: i.descricao, produto: i.produto || '', obsPedido: i.obsPedido || '', qtd: r4(i.qtd), separar: r4(separar[i.item] || 0), observacao: '' }));
+
+  // Ficha do item: o nome (PRODUTO do orçamento, ou o texto antes das etiquetas) e as etiquetas "Rótulo: valor" separadas por " | ".
+  // Ex.: "Tam: 660x400mm | Per: 1036 Pintura Sólida Alumínio | Pux: 2018 E" -> Tamanho, Perfil e Puxador. Nada é inventado: texto sem
+  // rótulo vira etiqueta sem rótulo, e sem nome nenhum o cartão se chama "Item N".
+  const ROTULO_FICHA = { Tam: 'Tamanho', Per: 'Perfil', Pux: 'Puxador', Rev: 'Revestimento' };
+  const RE_ETIQUETA = /^([A-Za-zÀ-ÿ]{2,12})\s*:\s*(.+)$/;
+  function fichaDoItem(descricao, produto, numeroItem) {
+    const partes = txt(descricao).split('|').map(p => txt(p)).filter(Boolean);
+    let titulo = '';
+    const etiquetas = [];
+    partes.forEach((p, k) => {
+      let m = RE_ETIQUETA.exec(p);
+      if (!m && k === 0) { // "Nome do item Tam: 660x400mm": o nome vem antes da primeira etiqueta
+        const corte = /^(.*?\S)\s+([A-Za-zÀ-ÿ]{2,12}\s*:\s*\S.*)$/.exec(p);
+        if (corte) { titulo = corte[1]; m = RE_ETIQUETA.exec(corte[2]); }
+      }
+      if (m) etiquetas.push({ rotulo: ROTULO_FICHA[m[1]] || m[1], texto: m[2].trim() });
+      else if (!etiquetas.length && !titulo) titulo = p;
+      else etiquetas.push({ rotulo: '', texto: p });
+    });
+    const nome = txt(produto) || titulo || `Item ${numeroItem}`;
+    if (txt(produto) && titulo && titulo !== txt(produto)) etiquetas.unshift({ rotulo: '', texto: titulo });
+    return { nome, etiquetas };
+  }
+
+  // quantidade em passos: item de quantidade inteira anda de 1 em 1; com fração, de 0,5 em 0,5 (o campo aceita qualquer valor)
+  const passoDe = qtd => (Math.abs(r4(qtd) - Math.round(qtd)) < TOL ? 1 : 0.5);
+  const ajustarQuantidade = (atual, direcao, max, passo) => {
+    const base = Number.isFinite(atual) ? atual : 0;
+    return Math.min(r4(max), Math.max(0, r4(base + direcao * passo)));
+  };
+  const MSG_NADA_SEPARADO = 'Informe a quantidade a separar de pelo menos um item.';
+  const MSG_TUDO_SEPARADO = 'Você marcou todos os itens: deixe ao menos um item nesta entrega (isso não é divisão).';
+  const LIMITE_OBS_ITEM = 255;
+
+  // Resumo do formulário (antes dos botões) e se o "Separar" pode ser clicado. `aviso` explica o que impede; sem nada marcado
+  // não há aviso (o resumo já diz "Nenhum item selecionado").
+  function resumoSeparacao(linhas) {
+    const l = Array.isArray(linhas) ? linhas : [];
+    const marcadas = l.filter(x => Number.isFinite(x.separar) && x.separar > TOL);
+    const unidades = r4(marcadas.reduce((s, x) => s + x.separar, 0));
+    const erros = validarSeparacao(l);
+    const texto = marcadas.length
+      ? `${marcadas.length} ${marcadas.length === 1 ? 'item selecionado' : 'itens selecionados'} · ${numeroBR(unidades)} ${unidades === 1 ? 'unidade' : 'unidades'}`
+      : 'Nenhum item selecionado';
+    return { itens: marcadas.length, unidades, texto, podeEnviar: erros.length === 0, aviso: erros[0] && erros[0] !== MSG_NADA_SEPARADO ? erros[0] : '' };
+  }
+
+  // HTML (estático, sem style=) do cartão de um item do formulário "Separar". Só esc() em dado da API.
+  function htmlCartaoSeparacao(l, k) {
+    const f = fichaDoItem(l.descricao, l.produto, l.item);
+    const nome = esc(f.nome);
+    const etiquetas = f.etiquetas.map(e => `<li>${e.rotulo ? `<b>${esc(e.rotulo)}</b>` : ''}${esc(e.texto)}</li>`).join('');
+    const max = esc(String(l.qtd)), disp = esc(numeroBR(l.qtd));
+    return `<li class="sep-cartao" id="sp-cartao-${k}">` +
+      `<div class="sep-topo"><span class="sep-nome" id="sp-nome-${k}">${nome}</span><span class="sep-numero">Item ${esc(l.item)}</span></div>` +
+      (etiquetas ? `<ul class="sep-ficha" aria-label="Detalhes do item ${esc(l.item)}">${etiquetas}</ul>` : '') +
+      `<p class="sep-info"><span class="sep-disp">Disponível: ${disp}</span></p>` +
+      (l.obsPedido ? `<p class="sep-obsped">Obs. do pedido: ${esc(l.obsPedido)}</p>` : '') +
+      `<div class="sep-qtd" role="group" aria-labelledby="sp-rot-${k}"><span class="sep-rotulo" id="sp-rot-${k}">Separar</span>` +
+      `<button type="button" class="sep-passo" data-acao="menos" data-linha="${k}" id="sp-menos-${k}" aria-label="Diminuir a quantidade de ${nome}">−</button>` +
+      `<input type="number" class="sep-campo" inputmode="decimal" id="sp-item-${k}" data-linha="${k}" min="0" max="${max}" step="any" value="${esc(l.separar)}" aria-label="Quantidade a separar de ${nome}, de ${disp}">` +
+      `<button type="button" class="sep-passo" data-acao="mais" data-linha="${k}" id="sp-mais-${k}" aria-label="Aumentar a quantidade de ${nome}">+</button>` +
+      `<span class="sep-de">de ${disp}</span>` +
+      `<button type="button" class="sep-todos" data-acao="todos" data-linha="${k}" aria-label="Separar todos os ${disp} de ${nome}">Todos</button></div>` +
+      `<div class="form-group sep-obs" id="sp-obsw-${k}" hidden><label for="sp-obs-${k}">Observação deste item</label>` +
+      `<textarea id="sp-obs-${k}" data-linha="${k}" maxlength="${LIMITE_OBS_ITEM}" rows="2" placeholder="ex.: levar com a ferragem separada">${esc(l.observacao || '')}</textarea></div></li>`;
+  }
 
   // Ocorrência "parcial" do motorista: o restante (não entregue) de cada item, a partir de itensEntregues do ÚLTIMO evento de
   // ocorrência. O motorista informa descrição e quantidade; só dá para inferir se cada descrição casa com UM item desta entrega.
@@ -214,12 +283,15 @@
     const l = Array.isArray(linhas) ? linhas : [];
     const ruim = l.find(x => !Number.isFinite(x.separar) || x.separar < 0 || x.separar > x.qtd + TOL || Math.abs(r4(x.separar) - x.separar) > TOL);
     if (ruim) return [`Quantidade inválida em "${txt(ruim.descricao)}" (de 0 a ${numeroBR(ruim.qtd)}, até 4 casas decimais).`];
-    if (!l.some(x => x.separar > TOL)) return ['Informe a quantidade a separar de pelo menos um item.'];
-    if (l.every(x => x.separar >= x.qtd - TOL)) return ['Você marcou todos os itens: deixe ao menos um item nesta entrega (isso não é divisão).'];
+    if (!l.some(x => x.separar > TOL)) return [MSG_NADA_SEPARADO];
+    if (l.every(x => x.separar >= x.qtd - TOL)) return [MSG_TUDO_SEPARADO];
+    const longa = l.find(x => x.separar > TOL && txt(x.observacao).length > LIMITE_OBS_ITEM);
+    if (longa) return [`A observação de "${txt(longa.descricao)}" passa de ${LIMITE_OBS_ITEM} caracteres.`];
     return [];
   }
+  // só os itens com quantidade levam observação (a do item que fica nesta entrega não é enviada)
   const corpoSeparar = (linhas, observacao) => {
-    const b = { itens: linhas.filter(x => x.separar > TOL).map(x => ({ numeroItem: x.item, quantidade: r4(x.separar) })) };
+    const b = { itens: linhas.filter(x => x.separar > TOL).map(x => ({ numeroItem: x.item, quantidade: r4(x.separar), ...(txt(x.observacao) ? { observacao: txt(x.observacao) } : {}) })) };
     if (txt(observacao)) b.observacao = txt(observacao);
     return b;
   };
@@ -442,7 +514,7 @@
         linhaInfo('Rastreio', e.rastreio) + linhaInfo('Previsão', dataBR(e.previsao)) + linhaInfo('Observação', e.observacao);
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
-      $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span></li>`).join('') : '<li class="cinza">Sem itens.</li>';
+      $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span>${i.observacao ? `<div class="cinza">Obs.: ${esc(i.observacao)}</div>` : ''}</li>`).join('') : '<li class="cinza">Sem itens.</li>';
       $('d-eventos').innerHTML = eventos.map(v => { const x = eventoExibicao(v, e, eventos); return `<li><strong>${esc(x.rotulo)}</strong> <span class="cinza">${esc(dataHoraBR(v.quando))} · ${esc(v.usuario)}</span>` +
         (textoEvento({ ...v, motivo: x.motivo }) ? `<div>${esc(textoEvento({ ...v, motivo: x.motivo }))}</div>` : '') + '</li>'; }).join('');
       const caixa = $('d-anexos');
@@ -614,15 +686,48 @@
         ? (r.inferido ? 'Já preenchido com o que o motorista NÃO entregou. Confira e confirme: vai para uma entrega nova, A programar.'
           : 'Não deu para saber pelo relato do motorista o que faltou: marque a quantidade de cada item que vai para a entrega nova.')
         : 'Marque a quantidade de cada item que vai para a entrega nova (A programar, sem data nem motorista). O resto fica nesta entrega.';
-      $('sp-itens').innerHTML = r.linhas.map((l, k) => `<div class="sep-linha"><label for="sp-item-${k}">${esc(l.descricao)} <span class="cinza">(disponível ${esc(String(l.qtd).replace('.', ','))})</span></label>` +
-        `<input type="number" inputmode="decimal" id="sp-item-${k}" data-linha="${k}" min="0" max="${esc(l.qtd)}" step="any" value="${esc(l.separar)}"></div>`).join('') ||
-        '<p class="cinza">Esta entrega não tem itens.</p>';
+      $('sp-itens').innerHTML = r.linhas.map(htmlCartaoSeparacao).join('') || '<li class="cinza">Esta entrega não tem itens.</li>';
       $('sp-obs').value = '';
       $('erro-separar').textContent = '';
       mostrar('vista-separar');
+      atualizarSeparacao();
+    }
+    // lê os cartões: quantidade e observação de cada item (a observação só conta se o item tem quantidade)
+    const lerLinhasSeparacao = () => estado.separar.linhas.map((l, k) => ({ ...l, separar: lerNumero($(`sp-item-${k}`).value), observacao: $(`sp-obs-${k}`).value }));
+    // reflete o que foi digitado: cartão marcado, campo de observação, passos, resumo (aria-live) e o botão Separar
+    function atualizarSeparacao() {
+      if (!estado.separar) return;
+      const linhas = lerLinhasSeparacao();
+      linhas.forEach((l, k) => {
+        const marcado = Number.isFinite(l.separar) && l.separar > TOL;
+        $(`sp-cartao-${k}`).classList.toggle('sep-ativo', marcado);
+        $(`sp-obsw-${k}`).hidden = !marcado;
+        $(`sp-menos-${k}`).disabled = !marcado;
+        $(`sp-mais-${k}`).disabled = Number.isFinite(l.separar) && l.separar >= l.qtd - TOL;
+      });
+      const r = resumoSeparacao(linhas);
+      $('sp-resumo-texto').textContent = r.texto;
+      $('sp-aviso').textContent = r.aviso;
+      $('sp-aviso').hidden = !r.aviso;
+      $('btn-confirmar-separar').disabled = !r.podeEnviar;
+    }
+    // botões − / + / Todos e digitação dentro dos cartões (delegação: os cartões são refeitos a cada abertura)
+    function mexerNoCartao(ev) {
+      const b = ev.target.closest && ev.target.closest('button[data-acao]');
+      if (!b || !estado.separar) return;
+      const k = Number(b.getAttribute('data-linha'));
+      const l = estado.separar.linhas[k];
+      const campo = $(`sp-item-${k}`);
+      if (!l || !campo) return;
+      const atual = lerNumero(campo.value);
+      const acao = b.getAttribute('data-acao');
+      const novo = acao === 'todos' ? l.qtd : ajustarQuantidade(atual, acao === 'mais' ? 1 : -1, l.qtd, passoDe(l.qtd));
+      campo.value = String(novo);
+      atualizarSeparacao();
+      campo.focus();
     }
     function enviarSeparar() {
-      const linhas = estado.separar.linhas.map((l, k) => ({ ...l, separar: lerNumero($(`sp-item-${k}`).value) }));
+      const linhas = lerLinhasSeparacao();
       const erros = validarSeparacao(linhas);
       $('erro-separar').textContent = erros.join(' ');
       if (erros.length) return;
@@ -729,6 +834,8 @@
       $('btn-comprovante').addEventListener('click', () => abrirForm('vista-comprovante', ['k-entregue', 'k-foto']));
       $('btn-separar').addEventListener('click', () => abrirSeparar(false));
       $('btn-restante').addEventListener('click', () => abrirSeparar(true));
+      $('sp-itens').addEventListener('click', mexerNoCartao);
+      $('sp-itens').addEventListener('input', atualizarSeparacao);
       $('f-tipo').addEventListener('change', ajustarCamposTipo);
       $('btn-usar-endereco').addEventListener('click', usarEnderecoCliente);
       $('btn-cep').addEventListener('click', buscarCep);
@@ -759,5 +866,5 @@
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
-    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, iniciar };
+    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, iniciar };
 });

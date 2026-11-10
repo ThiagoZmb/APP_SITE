@@ -155,17 +155,43 @@
         .sobras tbody tr { cursor: default; }
         .sobras td.acao button + button { margin-left: 6px; }
         .filtro-pedido { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--border-color); }
-        .sep-itens { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 8px 0 14px; min-width: 0; }
-        .sep-linha { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 12px; align-items: center; min-width: 0; }
-        .sep-linha label { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
-        .sep-linha input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background: var(--white); text-align: right; }
-        .sep-linha input:focus { outline: none; border-color: var(--primary-color); }
-        @media (max-width: 360px) { .sep-linha { grid-template-columns: minmax(0, 1fr); } }
+        /* "Separar em outra entrega": um CARTÃO por item, em linha inteira (nome, ficha técnica em etiquetas, quantidade em passos, observação) */
+        #painel .sep-itens { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 8px 0 14px; min-width: 0; padding: 0; list-style: none; }
+        #painel .sep-cartao { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--surface-2); }
+        .sep-cartao.sep-ativo { border-color: var(--primary-color); }
+        .sep-topo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; min-width: 0; }
+        .sep-nome { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-dark); min-width: 0; overflow-wrap: anywhere; }
+        .sep-numero { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+        #painel .sep-ficha { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+        #painel .sep-ficha li { max-width: 100%; padding: 2px 8px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg); font-size: 12px; line-height: 1.5; color: var(--text-mid); overflow-wrap: anywhere; }
+        .sep-ficha b { font-weight: 600; color: var(--text-light); margin-right: 4px; }
+        .sep-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 12px; color: var(--text-light); min-width: 0; }
+        .sep-disp { padding: 1px 8px; border-radius: 999px; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); font-size: 11.5px; white-space: nowrap; }
+        .sep-obsped { margin: 0; font-size: 12px; color: var(--text-light); overflow-wrap: anywhere; }
+        .sep-qtd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+        .sep-rotulo { font-size: 13px; font-weight: 600; color: var(--text-mid); margin-right: 2px; }
+        .sep-passo { flex: 0 0 auto; width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; line-height: 1; cursor: pointer;
+                     border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-dark); }
+        .sep-passo:hover:not(:disabled) { border-color: var(--primary-color); color: var(--primary-color); }
+        .sep-passo:disabled { opacity: .45; cursor: not-allowed; }
+        .sep-passo:focus-visible, .sep-campo:focus-visible, .sep-todos:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; }
+        .sep-campo { flex: 0 1 76px; width: 76px; min-width: 56px; height: 44px; padding: 0 8px; text-align: center; font-size: 16px; color: var(--text-dark); background: var(--bg);
+                     border: 1px solid var(--border-strong); border-radius: var(--radius-sm); -moz-appearance: textfield; appearance: textfield; }
+        .sep-campo::-webkit-outer-spin-button, .sep-campo::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .sep-campo:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-ring); }
+        .sep-de { font-size: 13px; color: var(--text-light); white-space: nowrap; }
+        .sep-todos { margin-left: auto; min-height: 44px; padding: 0 12px; cursor: pointer; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: transparent; color: var(--primary-color); font-size: 13px; font-weight: 600; }
+        .sep-todos:hover { background: var(--primary-light); }
+        .sep-obs { margin: 0; }
+        .sep-obs textarea { min-height: 64px; }
+        .sep-resumo { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--surface-2); font-size: 13px; color: var(--text-mid); }
+        .sep-resumo strong { color: var(--text-dark); }
+        .sep-resumo .aviso-divisao { margin: 8px 0 0; }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611161500">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202611101800" defer></script>
-    <script src="entregas.js?v=202611101800" defer></script>
+    <script src="entregas.js?v=202611101900" defer></script>
 </head>
 <body>
     <div class="container">
@@ -316,8 +342,12 @@
                     <form id="vista-separar" hidden>
                         <h2 id="sp-titulo">Separar em outra entrega</h2>
                         <p class="cinza" id="sp-ajuda"></p>
-                        <div class="sep-itens" id="sp-itens"></div>
+                        <ul class="sep-itens" id="sp-itens" aria-label="Itens desta entrega"></ul>
                         <div class="form-group"><label for="sp-obs">Observação da entrega nova</label><textarea id="sp-obs" maxlength="500"></textarea></div>
+                        <div class="sep-resumo" id="sp-resumo" aria-live="polite" aria-atomic="true">
+                            <span id="sp-resumo-texto">Nenhum item selecionado</span>
+                            <p class="aviso-divisao" id="sp-aviso" hidden></p>
+                        </div>
                         <p class="erro-form" id="erro-separar" role="alert"></p>
                         <div class="acoes">
                             <button type="submit" class="btn btn-primary" id="btn-confirmar-separar" data-perm="entregas.programar">Separar</button>
