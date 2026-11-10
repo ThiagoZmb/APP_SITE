@@ -242,3 +242,15 @@ test('eventoExibicao: "saiu de Pronto" vira Encerrada/Suspensa na linha do tempo
   const manual = { id: 6, tipo: 'cancelada', usuario: '7', motivo: null };
   assert.equal(E.eventoExibicao(manual, { statusExibicao: 'cancelada' }, [manual]).rotulo, 'Cancelada');
 });
+
+test('entregas.html: layout do endereço de entrega em grade, sem estilo inline e sem estourar o painel', () => {
+  const h = ler('entregas.html');
+  assert.doesNotMatch(h, /\sstyle="/);
+  assert.doesNotMatch(h, /linha3/);
+  for (const c of ['endereco-grid', 'end-num-cep', 'end-cidade-uf', 'cep-grupo']) assert.match(h, new RegExp('class="[^"]*' + c));
+  assert.match(h, /fieldset \{[^}]*min-width: 0/);
+  assert.match(h, /\.end-cidade-uf \{ grid-template-columns: minmax\(0, 1fr\) 72px/);
+  // ordem dos campos preservada
+  const ordem = ['f-rua', 'f-numero', 'f-cep', 'btn-cep', 'f-bairro', 'f-cidade', 'f-uf', 'f-ref', 'btn-usar-endereco', 'f-contato', 'f-obs'].map(i => h.indexOf('id="' + i + '"'));
+  assert.ok(ordem.every((p, i) => p > 0 && (i === 0 || p > ordem[i - 1])));
+});

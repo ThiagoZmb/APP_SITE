@@ -85,9 +85,20 @@
         .form-group textarea { resize: vertical; min-height: 80px; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
         .linha2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-        .linha3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+        .linha2 .form-group { margin-bottom: 0; }
         .erro-form { color: var(--danger-color); font-size: 13px; min-height: 18px; margin: 4px 0; }
-        fieldset { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px 4px; margin-bottom: 12px; }
+        fieldset { border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px 14px; margin: 0 0 12px; min-width: 0; }
+        fieldset > :last-child { margin-bottom: 0; }
+        .form-group label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .form-group input, .form-group select, .form-group textarea { min-width: 0; }
+        /* endereço de entrega: Rua, Bairro e Referência em linha inteira; Número+CEP+lupa e Cidade+UF lado a lado */
+        .endereco-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+        .endereco-grid .form-group, .end-linha .form-group { margin-bottom: 0; min-width: 0; }
+        .end-linha { display: grid; gap: 12px; min-width: 0; }
+        .end-num-cep { grid-template-columns: minmax(64px, 1fr) minmax(150px, 1.6fr); }
+        .end-cidade-uf { grid-template-columns: minmax(0, 1fr) 72px; }
+        #f-uf { text-align: center; text-transform: uppercase; padding-left: 6px; padding-right: 6px; }
+        #btn-usar-endereco { width: 100%; justify-content: center; }
         legend { font-size: 12px; font-weight: 700; color: var(--text-light); padding: 0 6px; text-transform: uppercase; }
 
         .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
@@ -109,6 +120,7 @@
         .toast.info { background: var(--text-dark); }
 
         @media (max-width: 1100px) { .workspace { grid-template-columns: 1fr; } .lista-wrap { max-height: 420px; } }
+        @media (max-width: 360px) { .end-num-cep { grid-template-columns: minmax(0, 1fr); } }
         @media (max-width: 768px) {
             body { padding: 0; }
             .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
@@ -118,9 +130,9 @@
             .user-info { display: none; }
             main { padding: 20px 16px; }
             .welcome-title { font-size: 26px; }
-            .linha2, .linha3 { grid-template-columns: 1fr; }
+            .linha2 { grid-template-columns: 1fr; }
         }
-        .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
+        .cep-grupo { display: flex; gap: 6px; align-items: stretch; min-width: 0; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; width: 44px; justify-content: center; padding: 0; min-height: 0; }
         .cal-topo { display: flex; align-items: center; gap: 8px; padding: 12px 14px; flex-wrap: wrap; }
         .cal-topo h3 { font-size: 17px; margin: 0 8px; }
         .cal { padding: 0 8px 14px; min-width: 640px; }
@@ -206,19 +218,20 @@
                         <div class="form-group" id="w-motorista" hidden><label for="f-motorista">Motorista</label><select id="f-motorista"></select></div>
                         <fieldset id="w-endereco" hidden>
                             <legend>Endereço de entrega</legend>
-                            <div class="linha3">
+                            <div class="endereco-grid">
                                 <div class="form-group"><label for="f-rua">Rua</label><input id="f-rua" maxlength="190"></div>
-                                <div class="form-group"><label for="f-numero">Número</label><input id="f-numero" maxlength="30"></div>
-                                <div class="form-group"><label for="f-cep">CEP</label><div class="cep-grupo"><input id="f-cep" maxlength="12" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-secondary btn-mini" id="btn-cep" title="Buscar endereço pelo CEP" aria-label="Buscar endereço pelo CEP"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></div></div>
-                            </div>
-                            <div class="linha3">
+                                <div class="end-linha end-num-cep">
+                                    <div class="form-group"><label for="f-numero">Número</label><input id="f-numero" maxlength="30"></div>
+                                    <div class="form-group"><label for="f-cep">CEP</label><div class="cep-grupo"><input id="f-cep" maxlength="12" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-secondary btn-mini" id="btn-cep" title="Buscar endereço pelo CEP" aria-label="Buscar endereço pelo CEP"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></div></div>
+                                </div>
                                 <div class="form-group"><label for="f-bairro">Bairro</label><input id="f-bairro" maxlength="120"></div>
-                                <div class="form-group"><label for="f-cidade">Cidade</label><input id="f-cidade" maxlength="120"></div>
-                                <div class="form-group"><label for="f-uf">UF</label><input id="f-uf" maxlength="2"></div>
+                                <div class="end-linha end-cidade-uf">
+                                    <div class="form-group"><label for="f-cidade">Cidade</label><input id="f-cidade" maxlength="120"></div>
+                                    <div class="form-group"><label for="f-uf">UF</label><input id="f-uf" maxlength="2"></div>
+                                </div>
+                                <div class="form-group"><label for="f-ref">Referência</label><input id="f-ref" maxlength="190"></div>
+                                <button type="button" class="btn btn-secondary btn-mini" id="btn-usar-endereco">Usar endereço do cliente</button>
                             </div>
-                            <div class="form-group"><label for="f-ref">Referência</label><input id="f-ref" maxlength="190"></div>
-                            <button type="button" class="btn btn-secondary btn-mini" id="btn-usar-endereco">Usar endereço do cliente</button>
-                            <div style="height:12px"></div>
                         </fieldset>
                         <fieldset id="w-outro" hidden>
                             <legend>Envio para outro estado</legend>
