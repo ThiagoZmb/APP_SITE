@@ -12,10 +12,10 @@ async function carregarComposicao(pool, tipo, numeros) {
   const [[itens], [vidros], [serr], [tipos]] = await Promise.all([
     pool.execute(`SELECT NUMERO, ITEM, ITEM_PEDIDO, PERFIL, ACABAMENTO_PERFIL, REVESTIMENTO FROM ped_orc_itens_v4 WHERE TIPO = ?${filtro}`, params),
     pool.execute(`SELECT DISTINCT NUMERO, ITEM FROM vidros${filtroVidros}`, filtrado ? numeros : []),
-    pool.execute(`SELECT DISTINCT NUMERO FROM ped_orc_serralheria WHERE TIPO = ?${filtro}`, params),
+    pool.execute(`SELECT DISTINCT NUMERO, ACABAMENTO FROM ped_orc_serralheria WHERE TIPO = ?${filtro}`, params),
     pool.execute(`SELECT DISTINCT NUMERO, TIPO_PRODUTO FROM ped_orc_lista_itens WHERE TIPO = ?${filtro}`, params)
   ]);
-  return composicaoPedido.compor({ itens, vidros, serralheria: (serr || []).map(r => r.NUMERO), tipos });
+  return composicaoPedido.compor({ itens, vidros, serralheria: serr || [], tipos });
 }
 
 module.exports = { carregarComposicao };

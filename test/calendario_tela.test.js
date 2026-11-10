@@ -59,11 +59,11 @@ test('somarMeses, somarDias, mesDe, nomeMes, dataExtenso e validadores', () => {
 });
 
 test('lerConsulta: mês e data da URL, inválidos caem no padrão', () => {
-  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&situacao=todos', '2026-11-05'), { mes: '2026-03', situacao: 'todos', visao: 'grade' });
-  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&visao=lista', '2026-11-05'), { mes: '2026-03', situacao: 'abertos', visao: 'lista' });
-  assert.deepEqual(Mes.lerConsulta('?mes=2026-99&situacao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
-  assert.deepEqual(Mes.lerConsulta('?visao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
-  assert.deepEqual(Mes.lerConsulta('', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'grade' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&situacao=todos', '2026-11-05'), { mes: '2026-03', situacao: 'todos', visao: 'lista' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-03&visao=grade', '2026-11-05'), { mes: '2026-03', situacao: 'abertos', visao: 'grade' });
+  assert.deepEqual(Mes.lerConsulta('?mes=2026-99&situacao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'lista' });
+  assert.deepEqual(Mes.lerConsulta('?visao=zzz', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'lista' });
+  assert.deepEqual(Mes.lerConsulta('', '2026-11-05'), { mes: '2026-11', situacao: 'abertos', visao: 'lista' });
   assert.deepEqual(Dia.lerConsulta('?data=2028-02-29&situacao=todos'), { data: '2028-02-29', situacao: 'todos' });
   assert.deepEqual(Dia.lerConsulta('?data=2027-02-29'), { data: null, situacao: 'abertos' });
   assert.deepEqual(Dia.lerConsulta(''), { data: null, situacao: 'abertos' });
@@ -226,9 +226,9 @@ test('calendario.css: sem cores soltas (só variáveis do tema) e a grade vira l
   assert.doesNotMatch(c, /\.chip\b/, '"chip" é classe do tema.css');
 });
 
-test('layout.js: item no menu logo depois de Minhas entregas, em PAGINAS com pedidos.ver, subpágina acende o calendário; minhas_entregas segue por último', () => {
+test('layout.js: item no menu logo depois de Corte de vidros (seção Comercial), em PAGINAS com pedidos.ver, subpágina acende o calendário; minhas_entregas segue por último', () => {
   const l = ler('layout.js');
-  assert.match(l, /\{ href: 'minhas_entregas\.html'[^\n]*\n\s*\{ href: 'calendario\.html', texto: 'Calendário de pedidos', icone: 'calendario' \}/);
+  assert.match(l, /\{ href: 'corte_vidros\.html'[^\n]*\n\s*\{ href: 'calendario\.html', texto: 'Calendário de pedidos', icone: 'calendario' \}/);
   assert.match(l, /'calendario\.html': \['pedidos\.ver'\]/);
   assert.match(l, /'calendario_dia\.html': \['pedidos\.ver'\]/);
   assert.match(l, /'calendario_dia\.html': 'calendario\.html'/);
@@ -265,13 +265,15 @@ test('visão em lista: um bloco por dia com pedido (data e dia da semana), uma l
 
 test('alternador Calendário | Lista e endereço da visão', () => {
   assert.equal(K.visaoValida('lista'), 'lista');
-  assert.equal(K.visaoValida('x'), 'grade');
+  assert.equal(K.visaoValida('x'), 'lista');   // padrão = Lista (inversão deliberada no commit a31b881)
+  assert.equal(K.visaoValida('grade'), 'grade');
   assert.match(K.htmlVisao('lista'), /data-visao="lista"[^>]*aria-pressed="true"/);
   assert.match(K.htmlVisao('lista'), /data-visao="grade"[^>]*aria-pressed="false"/);
   const html = fs.readFileSync(path.join(__dirname, '..', 'calendario.html'), 'utf8');   // o alternador fica ao lado do título e não na barra do mês
   assert.match(html, /<h1 class="welcome-title">Calendário de pedidos<\/h1>\s*<div id="cal-visao" class="tipo-toggle"/);
   assert.doesNotMatch(html.slice(html.indexOf('class="cal-topo"')), /id="cal-visao"/);
-  assert.equal(K.urlMes('2026-11', 'abertos', 'lista'), 'calendario.html?mes=2026-11&situacao=abertos&visao=lista');
+  assert.equal(K.urlMes('2026-11', 'abertos', 'grade'), 'calendario.html?mes=2026-11&situacao=abertos&visao=grade');   // só a visão que NÃO é o padrão vai na URL
+  assert.equal(K.urlMes('2026-11', 'abertos', 'lista'), 'calendario.html?mes=2026-11&situacao=abertos');
   assert.equal(K.urlMes('2026-11', 'abertos'), 'calendario.html?mes=2026-11&situacao=abertos');
 });
 
@@ -285,4 +287,93 @@ test('alternadores: a opção escolhida tem a classe "ativo" e o contêiner não
   const css = fs.readFileSync(path.join(__dirname, '..', 'calendario.css'), 'utf8');
   assert.doesNotMatch(css, /data-visao="lista"\]/);
   assert.match(css, /#cal-corpo:not\(\[data-modo="lista"\]\) \.btn-imprimir \{ display: none; \}/);
+});
+
+// ---------- pesquisa (só destaca, nunca filtra) ----------
+const pesq = [
+  ped(23392, { cliente: 'P & G Comércio', clienteFinal: 'Gilma Goulart' }),
+  ped(23400, { cliente: 'Comunica', clienteFinal: 'Dávila' }),
+  ped(23405, { cliente: 'Oceanstop' }),
+  ped(777, { cliente: 'Wellington Lucena', clienteFinal: 'Comunicação Visual' })
+];
+
+test('pedidoCasa: número, cliente e cliente final; sem acento, sem maiúscula; "#" e "P " valem como o número; vazio nunca casa', () => {
+  assert.equal(K.pedidoCasa(pesq[0], '2339'), true);               // parte do número
+  assert.equal(K.pedidoCasa(pesq[0], '#23392'), true);
+  assert.equal(K.pedidoCasa(pesq[0], 'P 23392'), true);
+  assert.equal(K.pedidoCasa(pesq[0], 'p & g'), true);              // cliente, sem diferenciar maiúscula
+  assert.equal(K.pedidoCasa(pesq[1], 'DAVILA'), true);             // cliente final, sem acento
+  assert.equal(K.pedidoCasa(pesq[1], 'dávila'), true);
+  assert.equal(K.pedidoCasa(pesq[3], 'comunicacao'), true);        // "Comunicação" sem cedilha/til
+  assert.equal(K.pedidoCasa(pesq[2], 'gilma'), false);
+  assert.equal(K.pedidoCasa(pesq[2], ''), false);
+  assert.equal(K.pedidoCasa(pesq[2], '   '), false);
+  assert.equal(K.pedidoCasa(pesq[2], null), false);
+  assert.equal(K.pedidoCasa({ numero: 1 }, 'x'), false);           // sem cliente/cliente final não quebra
+  assert.equal(K.pedidoCasa(ped(5, { cliente: 'Pedro' }), 'pedro'), true, '"p" no começo de um nome não é prefixo de número');
+});
+
+test('localizar: conta pedidos e dias na ordem da tela, sem alterar a grade', () => {
+  const sem = K.montarGrade([dia('2026-11-05', [pesq[0], pesq[1]]), dia('2026-11-09', [pesq[2], pesq[3]])], '2026-11', '2026-11-05');
+  const antes = JSON.stringify(sem);
+  const r = K.localizar(sem.flat(), 'comunic');
+  assert.deepEqual(r.numeros, ['23400', '777']);
+  assert.equal(r.qtdPedidos, 2);
+  assert.equal(r.qtdDias, 2);
+  assert.equal(JSON.stringify(sem), antes);
+  assert.deepEqual(K.localizar(sem.flat(), 'zzz'), { numeros: [], qtdPedidos: 0, qtdDias: 0 });
+  assert.equal(K.localizar(sem.flat(), '').qtdPedidos, 0);
+  assert.equal(K.localizar(null, 'a').qtdPedidos, 0);
+});
+
+test('textoBusca: contagem, vazio sem termo e aviso quando nada casa no mês (com dica do filtro Em aberto)', () => {
+  assert.equal(K.textoBusca('', { qtdPedidos: 0, qtdDias: 0 }, 'abertos'), '');
+  assert.equal(K.textoBusca('x', { qtdPedidos: 3, qtdDias: 2 }, 'abertos'), '3 pedido(s) encontrado(s) em 2 dia(s).');
+  assert.match(K.textoBusca('x', { qtdPedidos: 0, qtdDias: 0 }, 'abertos'), /Nenhum pedido encontrado no mês exibido.*Todos/);
+  assert.doesNotMatch(K.textoBusca('x', { qtdPedidos: 0, qtdDias: 0 }, 'todos'), /Todos/);
+});
+
+test('destaque nas três visões: pedido e dia marcados, todos os pedidos continuam na tela, rótulo acessível diz "encontrado"', () => {
+  const sem = K.montarGrade([dia('2026-11-05', [pesq[0], pesq[1]]), dia('2026-11-09', [pesq[2]])], '2026-11', '');
+  const conta = (h, re) => (h.match(re) || []).length;
+  for (const [nome, h, rePed] of [
+    ['grade', K.htmlGrade(sem, 'abertos', 'davila'), /<li class="etq /g],
+    ['folha', K.htmlFolha(sem, 'abertos', 'davila'), /<li class="folha-linha/g],
+    ['celular', K.htmlListaDias(sem, 'abertos', 'davila'), /<li class="etq /g]
+  ]) {
+    assert.equal(conta(h, rePed), 3, `${nome}: nenhum pedido some`);
+    assert.equal(conta(h, /class="[^"]* achou[" ]/g), 1, `${nome}: só o pedido que casou`);
+    assert.equal(conta(h, /dia-achou/g), 1, `${nome}: só o dia do pedido`);
+    assert.match(h, /encontrado na pesquisa/);
+  }
+  const grade = K.htmlGrade(sem, 'abertos', 'davila');
+  assert.match(grade, /<div class="cel dia-achou" data-dia="2026-11-05">/);
+  assert.doesNotMatch(grade, /<div class="cel dia-achou" data-dia="2026-11-09">/);
+  // sem termo, nada é destacado
+  assert.doesNotMatch(K.htmlGrade(sem, 'abertos', ''), /achou/);
+  assert.doesNotMatch(K.htmlFolha(sem, 'abertos'), /achou/);
+});
+
+test('célula cheia: pedido que casou com a pesquisa não fica escondido em "+N mais"', () => {
+  const muitos = Array.from({ length: 12 }, (_, i) => ped(100 + i, { cliente: i === 11 ? 'Alvo Final' : 'Outro' }));
+  const sem = K.montarGrade([dia('2026-11-05', muitos)], '2026-11', '');
+  const normal = K.htmlGrade(sem, 'abertos', '');
+  assert.match(normal, /\+4 mais/);
+  assert.doesNotMatch(normal, /data-numero="111"/);
+  const achando = K.htmlGrade(sem, 'abertos', 'alvo');
+  assert.match(achando, /data-numero="111"/);
+  assert.match(achando, /\+3 mais/);
+});
+
+test('pesquisa: campo, botões e resultado existem em calendario.html e o CSS só usa variáveis do tema (sem cor solta)', () => {
+  const html = ler('calendario.html');
+  for (const id of ['cal-busca', 'cal-busca-limpar', 'cal-busca-ant', 'cal-busca-prox', 'cal-busca-resultado']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /<label for="cal-busca"/);
+  assert.match(html, /id="cal-busca-resultado"[^>]*aria-live="polite"/);
+  const css = ler('calendario.css');
+  const bloco = css.slice(css.indexOf('/* pesquisa:'), css.indexOf('/* celular: lista'));
+  assert.ok(bloco.length > 200);
+  assert.doesNotMatch(bloco, /#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+  assert.match(bloco, /font-weight: 800/);   // o destaque do pedido não depende só de cor
+  assert.match(ler('calendario.js'), /cal-busca/);
 });

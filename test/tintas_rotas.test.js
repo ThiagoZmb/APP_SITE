@@ -17,7 +17,7 @@ test('tintas: cria (código MAX+1, cor em maiúsculas, auditada sem valores); va
   assert.equal(banco.tintas[0].COR, 'FF1A2B3C');
   assert.equal(banco.tintas[0].VALOR, 40.5);
   assert.equal(banco.auditoria[0].acao, 'tinta_criada');
-  assert.ok(!JSON.stringify(banco.auditoria[0]).includes('40'));
+  assert.ok(!JSON.stringify({ alvo: banco.auditoria[0].alvo, detalhe: banco.auditoria[0].detalhe }).includes('40'));   // não olhar 'quando': data/hora com "40" deixava o teste instável
   r = await salvar(chamar, { ...TINTA, refFabricante: 'TX-11' });
   assert.equal((await r.json()).codigo, 2);
   for (const mudanca of [{ classe: '' }, { valor: '1.234,56' }, { cor: 'ZZ' }, { porcentagem: '101' }]) {

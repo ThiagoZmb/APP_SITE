@@ -92,6 +92,21 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .folha-atraso { font-weight: 700; color: var(--selo-perigo-fg); font-size: 12px; }
 .folha-linha.atraso { box-shadow: inset 3px 0 0 var(--danger-color); }
 
+/* pesquisa: só destaca, nada é escondido. Dia = fundo/borda na cor primária; pedido = fundo cheio, negrito e contorno (não depende só de cor) */
+.cal-busca { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 16px 12px; }
+.cal-busca-rotulo { font-size: 13px; font-weight: 600; color: var(--text-light); }
+.cal-busca input { flex: 1 1 260px; max-width: 420px; }
+.cal-busca button[hidden] { display: none; }
+.cel.dia-achou { background: var(--primary-light); box-shadow: inset 0 0 0 2px var(--primary-color); }
+.cel.dia-achou:hover:not(.fora) { background: var(--primary-light); }
+.folha-dia.dia-achou, .dia-lista.dia-achou { background: var(--primary-light); box-shadow: inset 4px 0 0 var(--primary-color); padding-left: 10px; }
+.folha-dia.dia-achou h3::after, .dia-lista.dia-achou h3::after { content: "◆ com pedido encontrado"; margin-left: 10px; font-size: 12px; font-weight: 700; color: var(--primary-color); }
+.etq.achou, .folha-linha.achou { background: var(--primary-color); color: var(--on-primary); font-weight: 800; border-left-color: var(--on-primary); box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 4px var(--primary-color); }
+.etq.achou .etq-atraso, .etq.achou .etq-sit, .folha-linha.achou .folha-final, .folha-linha.achou .folha-sit, .folha-linha.achou .folha-atraso { color: var(--on-primary); opacity: 1; }
+.folha-linha.achou:hover { background: var(--primary-dark); }
+.etq.achou.atual, .folha-linha.achou.atual { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
+.etq.achou:focus-visible, .folha-linha.achou:focus-visible { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
+
 /* celular: lista dos dias com pedido em vez da grade */
 .cal-lista { display: none; padding: 0 16px 16px; }
 .dia-lista { padding: 12px 0; border-top: 1px solid var(--border-color); }
@@ -150,7 +165,7 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 @media print {
     body { padding: 0; background: white; color: black; }
     .container { display: block; box-shadow: none; border-radius: 0; background: white; }
-    header, .sidebar, .cal-topo button, .titulo-linha .tipo-toggle, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
+    header, .sidebar, .cal-topo button, .cal-busca, .titulo-linha .tipo-toggle, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }
     main { padding: 0; overflow: visible; }
     .welcome-subtitle { display: none; }
     .painel { border: none; box-shadow: none; }

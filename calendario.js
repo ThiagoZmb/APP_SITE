@@ -24,7 +24,7 @@
     if (!base) return;
     const { doc, $, chamar, toast, getAuth } = base;
     const hoje = K.hojeISO(win);
-    const estado = Object.assign({ pedidos: new Map(), consulta: 0 }, lerConsulta(win.location.search, hoje));
+    const estado = Object.assign({ pedidos: new Map(), consulta: 0, busca: '', semanas: [], atual: -1 }, lerConsulta(win.location.search, hoje));
 
     function desenhar(d) {
       const semanas = K.montarGrade(d.dias, estado.mes, d.hoje || hoje);
@@ -33,10 +33,56 @@
       $('cal-visao').innerHTML = K.htmlVisao(estado.visao);
       $('cal-situacao').innerHTML = K.htmlSituacao(estado.situacao);
       $('cal-corpo').dataset.modo = estado.visao;   // não pode ser data-visao: é o atributo dos botões e o closest() pegaria o contêiner
-      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao);
-      $('cal-grade').innerHTML = K.htmlGrade(semanas, estado.situacao);
-      $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao);
+      estado.semanas = semanas;
+      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao, estado.busca);
+      $('cal-grade').innerHTML = K.htmlGrade(semanas, estado.situacao, estado.busca);
+      $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao, estado.busca);
+      atualizarBusca();
     }
+
+    // Pesquisa: só destaca (dia e pedido); nada sai da tela. Roda sobre o mês já carregado, sem nova consulta.
+    // Os três desenhos (lista, grade, lista do celular) existem juntos no HTML; só o que está visível conta para anterior/próximo.
+    const achados = () => [...doc.querySelectorAll('#cal-corpo li.achou')].filter(el => el.offsetParent !== null);
+    function atualizarBusca() {
+      const resultado = K.localizar(estado.semanas.flat(), estado.busca);
+      const tem = !!K.normalizarBusca(estado.busca);
+      $('cal-busca-resultado').textContent = K.textoBusca(estado.busca, resultado, estado.situacao);
+      $('cal-busca-limpar').hidden = !estado.busca;
+      for (const id of ['cal-busca-ant', 'cal-busca-prox']) { $(id).hidden = !tem; $(id).disabled = !resultado.qtdPedidos; }
+      estado.atual = -1;
+    }
+    function irParaAchado(passo) {
+      const lista = achados();
+      if (!lista.length) return;
+      estado.atual = (estado.atual + passo + lista.length) % lista.length;
+      doc.querySelectorAll('#cal-corpo .achou.atual').forEach(el => el.classList.remove('atual'));
+      const el = lista[estado.atual];
+      el.classList.add('atual');
+      el.scrollIntoView({ block: 'center', behavior: 'auto' });
+      el.focus({ preventScroll: true });
+      $('cal-busca-resultado').textContent = `Resultado ${estado.atual + 1} de ${lista.length}: pedido ${el.dataset.numero}.`;
+    }
+    function redesenharBusca() {
+      if (!estado.semanas.length) return;
+      $('cal-folha').innerHTML = K.htmlFolha(estado.semanas, estado.situacao, estado.busca);
+      $('cal-grade').innerHTML = K.htmlGrade(estado.semanas, estado.situacao, estado.busca);
+      $('cal-lista').innerHTML = K.htmlListaDias(estado.semanas, estado.situacao, estado.busca);
+      atualizarBusca();
+    }
+    let espera = null;
+    const campo = $('cal-busca');
+    campo.addEventListener('input', () => { // pequena espera para não redesenhar a cada tecla
+      win.clearTimeout(espera);
+      espera = win.setTimeout(() => { estado.busca = campo.value; redesenharBusca(); }, 200);
+    });
+    function limparBusca() { win.clearTimeout(espera); campo.value = ''; estado.busca = ''; redesenharBusca(); campo.focus(); }
+    campo.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape') { limparBusca(); ev.preventDefault(); }
+      else if (ev.key === 'Enter') { win.clearTimeout(espera); estado.busca = campo.value; redesenharBusca(); irParaAchado(ev.shiftKey ? -1 : 1); ev.preventDefault(); }
+    });
+    $('cal-busca-limpar').addEventListener('click', limparBusca);
+    $('cal-busca-ant').addEventListener('click', () => irParaAchado(-1));
+    $('cal-busca-prox').addEventListener('click', () => irParaAchado(1));
 
     async function carregar() {
       const minha = ++estado.consulta;

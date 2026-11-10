@@ -12,11 +12,11 @@
     <meta name="apple-mobile-web-app-title" content="Elegance">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>Elegance Dashboard - Calendário de pedidos</title>
-    <link rel="stylesheet" href="calendario.css?v=202611062000">
+    <link rel="stylesheet" href="calendario.css?v=202611101700">
     <link rel="stylesheet" href="tema.css?v=202611161500">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="calendario_comum.js?v=202611062000" defer></script>
+    <script src="calendario_comum.js?v=202611101700" defer></script>
     <script src="inicio_menu.js?v=202611061200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
@@ -25,7 +25,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
-    <script src="calendario.js?v=202611061700" defer></script>
+    <script src="calendario.js?v=202611101700" defer></script>
 </head>
 <body>
     <div class="container">
@@ -58,6 +58,14 @@
                     <span class="cinza" id="cal-resumo"></span>
                     <div id="cal-situacao"></div>
                     <button type="button" class="btn btn-mini btn-secondary btn-imprimir" data-imprimir aria-label="Imprimir a lista do mês">Imprimir</button>
+                </div>
+                <div class="busca cal-busca" role="search">
+                    <label for="cal-busca" class="cal-busca-rotulo">Pesquisar</label>
+                    <input type="search" id="cal-busca" placeholder="Nº do pedido, cliente ou cliente final" autocomplete="off" aria-describedby="cal-busca-resultado">
+                    <button type="button" class="btn btn-mini btn-secondary" id="cal-busca-limpar" hidden aria-label="Limpar pesquisa">Limpar</button>
+                    <button type="button" class="btn btn-mini btn-secondary" id="cal-busca-ant" hidden aria-label="Resultado anterior">‹ Anterior</button>
+                    <button type="button" class="btn btn-mini btn-secondary" id="cal-busca-prox" hidden aria-label="Próximo resultado">Próximo ›</button>
+                    <span class="cinza" id="cal-busca-resultado" role="status" aria-live="polite"></span>
                 </div>
                 <div id="cal-grade"></div>
                 <div id="cal-lista" class="cal-lista"></div>

@@ -42,6 +42,31 @@ test('serralheria: linha em ped_orc_serralheria ou tipo Metalons; tipo Perfil so
   assert.equal(m.get(8), undefined);   // tipo sem ícone não cria entrada
 });
 
+test('serralheria com acabamento de pintura liga Pintura (e Serralheria); galvanizado, sem acabamento e negação não ligam', () => {
+  const m = compor({ serralheria: [
+    { NUMERO: 23378, ACABAMENTO: 'Pintura Metálica Aço Carbono' }, { NUMERO: 23378, ACABAMENTO: 'Galvanizado' },
+    { NUMERO: 2, ACABAMENTO: 'Galvanizado' }, { NUMERO: 3, ACABAMENTO: '' }, { NUMERO: 4, ACABAMENTO: null }, { NUMERO: 5 }, 6,
+    { NUMERO: 7, ACABAMENTO: 'Sem pintura' }, { NUMERO: 8, ACABAMENTO: 'Não pintar' }, { NUMERO: 9, ACABAMENTO: 'PINTURA eletrostática' }
+  ] });
+  assert.deepEqual(m.get(23378), { comPerfil: false, comVidro: false, comSerralheria: true, comPintura: true });
+  for (const n of [2, 3, 4, 5, 6, 7, 8]) assert.deepEqual(m.get(n), { comPerfil: false, comVidro: false, comSerralheria: true, comPintura: false }, 'pedido ' + n);
+  assert.equal(m.get(9).comPintura, true);
+  // perfil e vidro continuam como antes, e a serralheria soma no mesmo pedido
+  const mix = compor({ itens: [it(1, 1, { PERFIL: 'P1', ACABAMENTO_PERFIL: 'Anodizado' })], serralheria: [{ NUMERO: 1, ACABAMENTO: 'Pintura Metálica Aço Carbono' }] });
+  assert.deepEqual(mix.get(1), { comPerfil: true, comVidro: false, comSerralheria: true, comPintura: true });
+  assert.equal(compor({ itens: [it(1, 1, { PERFIL: 'P1', ACABAMENTO_PERFIL: 'Anodizado' })] }).get(1).comPintura, false);
+});
+
+test('carregarComposicao: o ACABAMENTO de ped_orc_serralheria chega ao compor (ícone de Pintura da serralheria)', async () => {
+  const { carregarComposicao } = require('../calculo/composicao_documentos');
+  const pool = { async execute(sql) {
+    if (/FROM ped_orc_serralheria/.test(sql)) { assert.match(sql, /ACABAMENTO/); return [[{ NUMERO: 23378, ACABAMENTO: 'Pintura Metálica Aço Carbono' }], []]; }
+    if (/FROM ped_orc_lista_itens/.test(sql)) return [[{ NUMERO: 23378, TIPO_PRODUTO: 'Metalons' }], []];
+    return [[], []];
+  } };
+  assert.deepEqual((await carregarComposicao(pool, 'Pedido', [23378])).get(23378), { comPerfil: false, comVidro: false, comSerralheria: true, comPintura: true });
+});
+
 test('os nomes dos campos não casam com REGEX_VALOR (senão o filtro de dinheiro os apaga)', () => {
   for (const k of Object.keys(SEM_COMPOSICAO)) assert.equal(REGEX_VALOR.test(k), false, k);
 });

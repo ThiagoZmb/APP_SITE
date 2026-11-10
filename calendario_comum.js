@@ -69,6 +69,32 @@
     return semanas;
   }
 
+  // ---------- pesquisa (só destaca; nunca tira pedido da tela) ----------
+  // Sem acento, sem diferença de maiúscula, espaços repetidos viram um. "#123" e "P 123" valem como "123".
+  const normalizarBusca = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/^(p ?|#)(?=\d)/, '');
+  // `termo` pode vir cru: é normalizado aqui. Casa por parte do número, do cliente ou do cliente final. Termo vazio nunca casa.
+  function pedidoCasa(p, termo) {
+    const t = normalizarBusca(termo);
+    if (!t || !p) return false;
+    return [p.numero, p.cliente, p.clienteFinal].some(v => normalizarBusca(v).includes(t));
+  }
+  // `celulas` = células de montarGrade (ou [{ dia, pedidos }]). Devolve { numeros (na ordem da tela), qtdPedidos, qtdDias }.
+  function localizar(celulas, termo) {
+    const numeros = []; let qtdDias = 0;
+    for (const c of Array.isArray(celulas) ? celulas : []) {
+      const achados = (c.pedidos || []).filter(p => pedidoCasa(p, termo));
+      if (achados.length) { qtdDias++; achados.forEach(p => numeros.push(String(p.numero))); }
+    }
+    return { numeros, qtdPedidos: numeros.length, qtdDias };
+  }
+  function textoBusca(termo, achou, situacao) {
+    if (!normalizarBusca(termo)) return '';
+    if (!achou.qtdPedidos) return `Nenhum pedido encontrado no mês exibido${situacao === 'abertos' ? ' (mostrando só os em aberto; use "Todos" para incluir os finalizados)' : ''}.`;
+    return `${achou.qtdPedidos} pedido(s) encontrado(s) em ${achou.qtdDias} dia(s).`;
+  }
+  const classeAchou = (p, termo) => (pedidoCasa(p, termo) ? ' achou' : '');
+  const rotuloAchou = (p, termo) => (pedidoCasa(p, termo) ? ', encontrado na pesquisa' : '');
+
   // ---------- textos e HTML ----------
   function abreviar(nome, max = 16) {
     const t = String(nome ?? '').trim().replace(/\s+/g, ' ');
@@ -85,45 +111,49 @@
   };
 
   // Etiqueta do pedido no calendário (classe etq: "chip" já é do tema.css). É um <li data-numero> focável: o InicioMenu abre o menu pelo botão direito, pela tecla de menu e por Shift+F10.
-  function htmlEtiqueta(p, situacao) {
+  function htmlEtiqueta(p, situacao, busca) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="etq-sit">${esc(SIGLA_CLASSE[p.classe])}</span>` : '';
-    return `<li class="etq ${COR_CLASSE[p.classe] || 'aviso'}${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
+    const rot = rotuloPedido(p) + rotuloAchou(p, busca);
+    return `<li class="etq ${COR_CLASSE[p.classe] || 'aviso'}${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
       `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${iconesItens(p)}${sit}` +
       (p.atrasado ? ' <span class="etq-atraso">Atrasado</span>' : '') + '</li>';
   }
-  function htmlCelula(c, situacao) {
-    const vistos = c.pedidos.slice(0, MAX_ETIQUETAS), mais = c.pedidos.length - vistos.length;
+  function htmlCelula(c, situacao, busca) {
+    // quem casou com a pesquisa nunca fica escondido em "+N mais"
+    const vistos = c.pedidos.filter((p, i) => i < MAX_ETIQUETAS || pedidoCasa(p, busca)), mais = c.pedidos.length - vistos.length;
+    const achou = c.doMes && c.pedidos.some(p => pedidoCasa(p, busca));
     const rotulo = `${dataBR(c.dia)}${c.qtdPedidos ? `: ${c.qtdPedidos} pedido(s)${c.qtdAtrasados ? `, ${c.qtdAtrasados} atrasado(s)` : ''}` : ''}`;
-    return `<div class="cel${c.doMes ? '' : ' fora'}${c.hoje ? ' hoje' : ''}"${c.doMes ? ` data-dia="${esc(c.dia)}"` : ''}>` +
-      (c.doMes ? `<a class="num" href="${esc(urlDia(c.dia, situacao))}" aria-label="${esc(rotulo)}"${c.hoje ? ' aria-current="date"' : ''}>${c.num}</a>` : `<span class="num">${c.num}</span>`) +
-      (vistos.length ? `<ul class="etqs">${vistos.map(p => htmlEtiqueta(p, situacao)).join('')}</ul>` : '') +
+    return `<div class="cel${c.doMes ? '' : ' fora'}${c.hoje ? ' hoje' : ''}${achou ? ' dia-achou' : ''}"${c.doMes ? ` data-dia="${esc(c.dia)}"` : ''}>` +
+      (c.doMes ? `<a class="num" href="${esc(urlDia(c.dia, situacao))}" aria-label="${esc(rotulo + (achou ? ', tem pedido encontrado na pesquisa' : ''))}"${c.hoje ? ' aria-current="date"' : ''}>${c.num}</a>` : `<span class="num">${c.num}</span>`) +
+      (vistos.length ? `<ul class="etqs">${vistos.map(p => htmlEtiqueta(p, situacao, busca)).join('')}</ul>` : '') +
       (mais > 0 ? `<a class="mais" href="${esc(urlDia(c.dia, situacao))}">+${mais} mais</a>` : '') + '</div>';
   }
-  function htmlGrade(semanas, situacao) {
+  function htmlGrade(semanas, situacao, busca) {
     return `<div class="cal"><div class="cal-sem">${DIAS_SEMANA.map(d => `<span>${d}</span>`).join('')}</div>` +
-      semanas.map(sem => `<div class="cal-linha">${sem.map(c => htmlCelula(c, situacao)).join('')}</div>`).join('') + '</div>';
+      semanas.map(sem => `<div class="cal-linha">${sem.map(c => htmlCelula(c, situacao, busca)).join('')}</div>`).join('') + '</div>';
   }
   // Celular: em vez da grade, uma lista só dos dias que têm pedido
-  function htmlListaDias(semanas, situacao) {
+  function htmlListaDias(semanas, situacao, busca) {
     const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
     if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
-    return dias.map(c => `<section class="dia-lista${c.hoje ? ' hoje' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(DIAS_SEMANA[new Date(c.dia + 'T00:00:00Z').getUTCDay()])}, ${esc(dataBR(c.dia).slice(0, 5))}</a>` +
+    return dias.map(c => `<section class="dia-lista${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(DIAS_SEMANA[new Date(c.dia + 'T00:00:00Z').getUTCDay()])}, ${esc(dataBR(c.dia).slice(0, 5))}</a>` +
       `<span class="cinza">${c.qtdPedidos} pedido(s)${c.qtdAtrasados ? ` · ${c.qtdAtrasados} atrasado(s)` : ''}</span></h3>` +
-      `<ul class="etqs">${c.pedidos.map(p => htmlEtiqueta(p, situacao)).join('')}</ul></section>`).join('');
+      `<ul class="etqs">${c.pedidos.map(p => htmlEtiqueta(p, situacao, busca)).join('')}</ul></section>`).join('');
   }
   // Visão em lista, como a folha de papel da produção: cada dia com pedido vira um bloco (data e dia da semana) e uma linha por pedido
   // "P 23392 - Cliente | Cliente final". A linha é <li data-numero>: o menu do botão direito funciona como no calendário.
-  function htmlLinhaFolha(p, situacao) {
+  function htmlLinhaFolha(p, situacao, busca) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
-    return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
+    const rot = rotuloPedido(p) + rotuloAchou(p, busca);
+    return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
       `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${iconesItens(p)}${sit}` +
       (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
   }
-  function htmlFolha(semanas, situacao) {
+  function htmlFolha(semanas, situacao, busca) {
     const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
     if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
-    return dias.map(c => `<section class="folha-dia${c.hoje ? ' hoje' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
-      `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao)).join('')}</ul></section>`).join('');
+    return dias.map(c => `<section class="folha-dia${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
+      `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao, busca)).join('')}</ul></section>`).join('');
   }
   // alternador "Calendário | Lista" ao lado do título: só os botões (o contêiner #cal-visao é o .tipo-toggle do tema.css, o mesmo de Pedidos | Orçamentos no Início)
   function htmlVisao(visao) {
@@ -178,5 +208,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

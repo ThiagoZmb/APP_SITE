@@ -79,7 +79,7 @@ const montar = (linhas, hoje = '2026-11-05') => linhas.map(l => K.montarPedido(l
 
 test('montarPedido: classe, atraso, datas e valor numérico', () => {
   const p = K.montarPedido(linha(7, 'Em Produção', '2026-11-01 00:00:00', { data_entrega: '0001-01-01', cliente: ' Fulano  ' }), '2026-11-05');
-  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', valor: 100.5 });
+  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', comPerfil: false, comVidro: false, comSerralheria: false, comPintura: false, valor: 100.5 });   // linha sem composição = nenhum ícone
 });
 
 test('agruparPorDia: abertos tira entregue/retirado/cancelado; todos mantém; ordem por data e número; contagens', () => {
