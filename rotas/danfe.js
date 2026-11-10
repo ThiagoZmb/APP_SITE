@@ -1,4 +1,4 @@
-// Nota fiscal em PDF (DANFE) pelo pedido. Os PDFs são ENVIADOS pela tela "Enviar DANFEs" para a tabela da web `web_danfe`
+// Nota fiscal em PDF (DANFE) pelo pedido. Os PDFs são ENVIADOS pela tela "Enviar arquivos" para a tabela da web `web_danfe`
 // (assim abrem de fora da empresa); nenhuma tabela do VB é alterada.
 // Ligação pedido -> nota: (1) vínculo manual (web_danfe_vinculos), que vem primeiro; (2) automática pelo financeiro:
 // fluxo_de_caixa.PEDIDO = nº do pedido e fluxo_de_caixa.NOTA_FISCAL (pode vir "8862/8887") = numero_nf do DANFE, só nota modelo 55 emitida

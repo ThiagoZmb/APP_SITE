@@ -1,5 +1,5 @@
 // "Imprimir checklist" do menu do botão direito do Pedido (igual ao VB: um PDF fixo de checklist de produção, sem depender do pedido).
-// O PDF vigente fica no banco da web (tabela web_checklist, enviado pela tela "Enviar DANFEs", aba Checklist) e vem de GET /checklist/pdf
+// O PDF vigente fica no banco da web (tabela web_checklist, enviado pela tela "Enviar arquivos", aba Checklist) e vem de GET /checklist/pdf
 // com o token: funciona de qualquer lugar, inclusive no celular, sem o serviço local do PC.
 // ChecklistPedido.abrir({ apiBase, loginUrl, token: () => string })
 (function () {

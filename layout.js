@@ -56,7 +56,7 @@
         { href: 'funcionarios.html', texto: 'Funcionários', icone: 'funcionarios' },
         { href: 'financeiro.html', texto: 'Financeiro', icone: 'financeiro' },
         { href: 'notas_fiscais.html', texto: 'Notas fiscais', icone: 'financeiro', sub: true },   // subitem do Financeiro (notas de entrada e saída, só cabeçalho)
-        { href: 'danfe_envio.html', texto: 'Enviar DANFEs', icone: 'financeiro', sub: true },   // subitem do Financeiro (envio dos PDFs das notas fiscais e vínculo com o pedido)
+        { href: 'danfe_envio.html', texto: 'Enviar arquivos', icone: 'financeiro', sub: true },   // subitem do Financeiro (envio dos PDFs das notas fiscais e vínculo com o pedido)
         { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' },
         { href: 'portal_admin.html', texto: 'Portal do cliente', icone: 'usuarios', sub: true }   // subitem de Usuários (liberar empresas do portal e convidar)

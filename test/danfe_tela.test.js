@@ -83,7 +83,7 @@ test('scripts novos e alterados compilam', () => {
 
 test('layout.js: Enviar DANFEs no menu (subitem do Financeiro) e em PAGINAS com enviar OU vincular', () => {
   const l = ler('layout.js');
-  assert.match(l, /href: 'danfe_envio\.html', texto: 'Enviar DANFEs'.*sub: true/);
+  assert.match(l, /href: 'danfe_envio\.html', texto: 'Enviar arquivos'.*sub: true/);
   assert.ok(l.indexOf("href: 'danfe_envio.html'") > l.indexOf("href: 'notas_fiscais.html'") && l.indexOf("href: 'danfe_envio.html'") < l.indexOf("href: 'usuarios.html'"));
   assert.match(l, /'danfe_envio\.html': \[\{ algum: \['danfe\.enviar', 'danfe\.vincular', 'checklist\.enviar'\] \}\]/);
 });

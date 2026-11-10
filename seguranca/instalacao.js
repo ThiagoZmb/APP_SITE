@@ -220,7 +220,7 @@ const TABELAS = [
      UNIQUE KEY ux_nota_chave (chave),
      KEY ix_nota_data (tipo, data_emissao)
    ) ${OPCOES}`,
-  // DANFE (nota fiscal em PDF) enviado pela tela "Enviar DANFEs": a chave de acesso (44 dígitos, nome do arquivo) é única; sem FK.
+  // DANFE (nota fiscal em PDF) enviado pela tela "Enviar arquivos": a chave de acesso (44 dígitos, nome do arquivo) é única; sem FK.
   // cnpj_emitente/modelo/serie/numero_nf/data_emissao_aamm vêm da própria chave (conferida no envio). O vínculo manual (pedido x chave) vence a ligação automática pelo financeiro.
   `CREATE TABLE IF NOT EXISTS \`web_danfe\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
