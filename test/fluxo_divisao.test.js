@@ -58,7 +58,7 @@ test('financeiro.html: carrega fluxo_divisao.js antes do script principal e liga
   assert.ok(tag > 0 && tag < h.indexOf("const SITUACOES = {"), 'o arquivo carrega antes do script principal');
   for (const id of ['bloco-divisao', 'div-linhas', 'div-add', 'div-resumo', 'div-quitar-rotulo', 'div-quitar']) assert.match(h, new RegExp(`id="${id}"`), id);
   assert.match(h, /FluxoDivisao\.iniciar\(/);
-  assert.match(h, /api\('\/fluxo\/salvar_varios'/);
+  assert.match(h, /api\(Divisao\.caminho\(\), \{ method: 'POST'/);
   assert.match(h, /Divisao\.ativo\(\)/);
   assert.match(h, /Divisao\.reiniciar\(\)/);
   assert.match(h, /Divisao\.atualizarVisibilidade\(\)/);
@@ -115,4 +115,41 @@ test('clientes.html: manda total, crédito e maior data de pronto à gaveta e ma
   const reg = c.indexOf("e.data.tipo === 'salvo' && e.data.restante && pendente");
   assert.ok(reg > 0 && reg < c.indexOf("api('/clientes/receber'"), 'decide antes de chamar /clientes/receber');
   assert.match(c.slice(reg, reg + 120), /pendente\.marcarRecebido = true/);
+});
+
+test('Editar movimento: soma das parcelas x valor original (diferença = só aviso)', () => {
+  const l = (valor, situacao = 'A Receber') => ({ valor, situacao });
+  assert.deepEqual(D.avaliarEdicao(1149.28, [l(600), l(549.28)]), { soma: 1149.28, falta: 0, diferente: false });
+  assert.deepEqual(D.avaliarEdicao(1149.28, [l(600)]), { soma: 600, falta: 549.28, diferente: true });
+  assert.deepEqual(D.avaliarEdicao(1000, [l(600), l(500)]), { soma: 1100, falta: -100, diferente: true });
+  assert.equal(D.avaliarEdicao(100, [l(99.999)]).diferente, false, 'menos de meio centavo não conta');
+  assert.match(D.textoEdicao(D.avaliarEdicao(1000, [l(600)]), 1000, fmt).texto, /falta distribuir R\$ 400,00.*o total do movimento vai mudar/);
+  assert.match(D.textoEdicao(D.avaliarEdicao(1000, [l(600), l(500)]), 1000, fmt).texto, /passou R\$ 100,00/);
+  assert.deepEqual(D.textoEdicao(D.avaliarEdicao(1000, [l(600), l(400)]), 1000, fmt), { texto: 'Valor original R$ 1000,00 · soma das parcelas R$ 1000,00 · tudo distribuído.', aviso: false });
+});
+
+test('Editar movimento: parcela que falta nunca é negativa; rótulo do botão de salvar', () => {
+  assert.equal(D.restanteEdicao(1149.28, [{ valor: 600 }]), 549.28);
+  assert.equal(D.restanteEdicao(1000, [{ valor: 600 }, { valor: 500 }]), 0);
+  assert.equal(D.rotuloSalvarEdicao(0), '💾 Atualizar');
+  assert.equal(D.rotuloSalvarEdicao(1), '💾 Atualizar e criar 1 registro');
+  assert.equal(D.rotuloSalvarEdicao(3), '💾 Atualizar e criar 3 registros');
+});
+
+test('situações por tipo e forma em branco: iguais às do servidor', () => {
+  const S = require('../calculo/fluxo_varios');
+  assert.deepEqual([...D.SITUACOES_SAIDA].sort(), [...S.SITUACOES_SAIDA].sort());
+  assert.deepEqual([...D.SEM_FORMA].sort(), [...S.SEM_FORMA].sort());
+});
+
+test('financeiro.html: botão "Dividir este valor" no cabeçalho de Pagamento e documentos, tipo travado na edição', () => {
+  const h = fs.readFileSync(path.join(__dirname, '..', 'financeiro.html'), 'utf8');
+  const cab = h.slice(h.indexOf('<h3>Pagamento e documentos</h3>'), h.indexOf('<h3>Pagamento e documentos</h3>') + 400);
+  assert.match(cab, /id="btn-dividir-valor"[^>]*data-perm="financeiro\.lancar"[^>]*hidden>✂️ Dividir este valor/);
+  for (const id of ['div-titulo', 'div-dica']) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /Divisao\.definirEdicao\(\{ id: it\.id, valorOriginal: it\.valor \}\)/);
+  assert.match(h, /travarTipo\(ehEntrada\(it\) \? 'Entrada' : 'Saída'\)/);
+  assert.match(h, /travarTipo\(null\)/);
+  assert.match(h, /if \(\$\('f-id'\)\.value\) return;/, 'clicar no tipo oposto em edição não faz nada');
+  assert.match(h, /\.tipo-mov button:disabled/);
 });

@@ -1,5 +1,7 @@
 # Recebimento dividido em várias formas de pagamento (financeiro.html)
 
+> Duas entradas: **Novo movimento** (Entrada, várias formas + restante automático) e **Editar movimento** (dividir um registro que já existe, Entrada ou Saída; seção "Dividir um movimento existente" no fim).
+
 - **O que é**: na gaveta "Novo movimento" de uma **Entrada nova**, o bloco "Dividir em mais formas" permite receber o mesmo pedido em mais de uma forma (ex.: Pix + cartão) numa operação só. A forma de cima é a primeira; as outras são linhas extras (forma, banco, valor, data, situação). Dados comuns (cliente, pedido, PDV, pré-nota, nota fiscal, categoria, observação) valem uma vez. Edição de lançamento existente continua uma linha por vez.
 - **Gravação** (`rotas/fluxo_varios.js`, validação pura em `calculo/fluxo_varios.js`): `POST /fluxo/salvar_varios` (`financeiro.lancar` + `valores.ver`). 2 a 10 linhas, só `Entrada`, situação de entrada (Recebido, A Receber, Faturado, Protestado, Atrasado), valor > 0. **Tudo ou nada** numa transação; IDs em sequência a partir de `MAX(ID)` travado com `FOR UPDATE`; `INSERT` simples (nunca sobrescreve; colisão de ID = 409 "Nada foi salvo"). Cada linha é uma linha normal de `fluxo_de_caixa`, como o VB grava.
 - **Soma das linhas = só aviso**, nunca bloqueia (decisão do dono, 2026-11-10).
@@ -11,3 +13,13 @@
 - **Quitar**: caixinha "Pedido quitado: marcar como Recebido" (vem marcada quando o recebido cobre o total; linhas `A Receber` não contam). Fora do botão Receber da ficha (sem restante automático), marcada, `ped_orc.FINANCEIRO` vira `Recebido` na mesma transação (**escrita em tabela do VB**, mesma regra do `/clientes/receber`); exige `clientes.receber`, um único número de pedido existente.
 - **Front**: `fluxo_divisao.js` (contas puras testadas no Node + ligação da tela). **Não testado no navegador real.**
 - Testes: `test/fluxo_varios.test.js`, `test/fluxo_divisao.test.js`, `test/financeiro_tela.test.js`.
+
+## Dividir um movimento existente (Editar movimento, Entrada ou Saída) — 2026-11-16
+
+- **Botão** "✂️ Dividir este valor" no cabeçalho de "Pagamento e documentos", só em *Editar movimento* e com `financeiro.lancar`. Liga/desliga ("✖ Cancelar divisão"). Ao ligar abre o bloco "Dividir este valor" com a **Parcela 2** e leva o foco ao valor da parcela 1.
+- **Parcela 1 = o registro que já existe** (o valor dela passa a ser o que for digitado no campo Valor); as demais viram registros **novos** (Parcela 2, 3... até 10 no total). Forma, banco, valor, data e situação por parcela; cliente/fornecedor, pedido, PDV, pré-nota, nota fiscal, categoria e observação são copiados.
+- **Parcela automática**: a última parcela extra recebe sozinha o que falta para fechar o valor original (mudar o valor da parcela 1 a atualiza); digitar nela tira o modo automático. Rodapé: "Valor original X · soma das parcelas Y · falta distribuir Z / tudo distribuído". **Soma diferente do original = só aviso** (o total do movimento muda).
+- **Servidor** (`rotas/fluxo_varios.js`, validação em `calculo/fluxo_varios.js`): `POST /fluxo/dividir` (`financeiro.lancar` + `valores.ver`), corpo `{ id, movimento, nome, pedido, pdv, preNota, notaFiscal, observacao, codClassificacao, linhas[] }`. Transação: trava o registro (`FOR UPDATE`; inexistente = 404), `UPDATE` da 1ª parcela pelo ID, `INSERT` das demais com `MAX(ID)+1` travado (colisão = 409 "Nada foi salvo"). **O tipo não muda**: Entrada tem cliente em `RAZAO_SOCIAL`, Saída tem fornecedor em `RAZAO_FABRICANTE`; trocar = 409.
+- **Situações por tipo**: Entrada = Recebido, A Receber, Faturado, Protestado, Atrasado; Saída = A Pagar, Pago, Faturado, Protestado, Atrasado. **Forma em branco só em "A Receber" e "A Pagar"** (a forma só se sabe no dia do pagamento).
+- **Tipo travado na edição**: em *Editar movimento* o botão do tipo oposto fica desabilitado (`travarTipo`) e o clique não faz nada; *Novo movimento* libera os dois. O servidor também recusa a troca.
+- **Front**: `fluxo_divisao.js` (`definirEdicao`, `caminho()`, `avaliarEdicao`/`textoEdicao`). Testes: `test/fluxo_dividir.test.js` (rota e validação), `test/fluxo_divisao.test.js` (contas e ligação). A lógica da tela foi verificada com um DOM real (jsdom) fora do projeto; **não testada no navegador real**.

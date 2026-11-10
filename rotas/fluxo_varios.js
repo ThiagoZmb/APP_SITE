@@ -1,10 +1,12 @@
 // Recebimento dividido em várias formas de pagamento, numa operação só (tabela do VB `fluxo_de_caixa`).
 // POST /fluxo/salvar_varios (financeiro.lancar + valores.ver): grava todas as linhas ou nenhuma; opcionalmente marca o pedido como Recebido
 //   (precisa de clientes.receber, a mesma permissão do /clientes/receber).
+// POST /fluxo/dividir (financeiro.lancar + valores.ver): divide um movimento JÁ EXISTENTE (Editar movimento), Entrada ou Saída: a 1ª parcela atualiza o
+//   registro, as demais viram registros novos; tudo ou nada.
 // GET  /fluxo/pedido_resumo?numero= (financeiro.ver + valores.ver): total do pedido, já recebido e quanto falta (só leitura).
 // Nenhuma linha é sobrescrita: o ID novo vem de MAX(ID)+1 travado na transação e o INSERT é simples (colisão = erro, nunca overwrite).
 const { ErroUsuario, emTransacao } = require('./transacao');
-const { validarDivisao, numeroUnicoDoPedido, saldoDoPedido } = require('../calculo/fluxo_varios');
+const { validarDivisao, validarDivisaoEdicao, numeroUnicoDoPedido, saldoDoPedido } = require('../calculo/fluxo_varios');
 
 const ESCREVER = ['financeiro.lancar', 'valores.ver'];
 const LER = ['financeiro.ver', 'valores.ver'];
@@ -30,6 +32,53 @@ function registrarFluxoVarios({ rota, pool }) {
       console.error('Erro GET /fluxo/pedido_resumo:', err.message);
       res.status(500).json({ error: 'Erro de servidor' });
     }
+  });
+
+  // ID novo por MAX(ID)+1 travado na transação; INSERT simples (colisão = 409, nunca sobrescreve)
+  async function inserirLinhas(conn, ids, comum, linhas, movimento) {
+    const [[mx]] = await conn.execute('SELECT MAX(ID) AS m FROM fluxo_de_caixa FOR UPDATE');
+    let id = (parseInt(mx?.m, 10) || 0);
+    const fabricante = movimento === 'Saída' ? comum.nome : null, social = movimento === 'Saída' ? null : comum.nome;
+    for (const l of linhas) {
+      id += 1;
+      try {
+        await conn.execute(
+          `INSERT INTO fluxo_de_caixa (ID, DATA, RAZAO_FABRICANTE, RAZAO_SOCIAL, PEDIDO, PDV, PRE_NOTA_FISCAL, NOTA_FISCAL, FORMA_PGTO,
+             BANCO, SITUACAO, VALOR, OBSERVACAO_GERAL, COD_CLASSIFICACAO)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [id, l.data, fabricante, social, comum.pedido, comum.pdv, comum.preNota, comum.notaFiscal,
+           l.formaPgto, l.banco, l.situacao, l.valor, comum.observacao, comum.classificacao]);
+      } catch (err) {
+        if (err && err.errno === 1062) throw new ErroUsuario(409, 'Outro lançamento foi gravado ao mesmo tempo. Nada foi salvo; tente de novo.');
+        throw err;
+      }
+      ids.push(id);
+    }
+  }
+
+  rota('post', '/fluxo/dividir', ESCREVER, async (req, res) => {
+    const v = validarDivisaoEdicao(req.body);
+    if (!v.ok) return res.status(400).json({ error: v.erro });
+    const r = await emTransacao(pool, res, 'POST /fluxo/dividir', async conn => {
+      const [[atual]] = await conn.execute('SELECT ID, RAZAO_SOCIAL, RAZAO_FABRICANTE FROM fluxo_de_caixa WHERE ID = ? FOR UPDATE', [v.id]);
+      if (!atual) throw new ErroUsuario(404, 'Registro não encontrado.');
+      // o tipo não muda por aqui: Entrada tem cliente (RAZAO_SOCIAL), Saída tem fornecedor (RAZAO_FABRICANTE)
+      const ehEntrada = String(atual.RAZAO_SOCIAL ?? '').trim() !== '', ehSaida = String(atual.RAZAO_FABRICANTE ?? '').trim() !== '';
+      if ((v.movimento === 'Entrada' && ehSaida && !ehEntrada) || (v.movimento === 'Saída' && ehEntrada && !ehSaida)) {
+        throw new ErroUsuario(409, 'O tipo do movimento (Entrada ou Saída) não pode mudar ao dividir.');
+      }
+      const [primeira, ...demais] = v.linhas;
+      const fabricante = v.movimento === 'Saída' ? v.comum.nome : null, social = v.movimento === 'Saída' ? null : v.comum.nome;
+      await conn.execute(
+        `UPDATE fluxo_de_caixa SET DATA = ?, RAZAO_FABRICANTE = ?, RAZAO_SOCIAL = ?, PEDIDO = ?, PDV = ?, PRE_NOTA_FISCAL = ?, NOTA_FISCAL = ?, FORMA_PGTO = ?,
+           BANCO = ?, SITUACAO = ?, VALOR = ?, OBSERVACAO_GERAL = ?, COD_CLASSIFICACAO = ? WHERE ID = ?`,
+        [primeira.data, fabricante, social, v.comum.pedido, v.comum.pdv, v.comum.preNota, v.comum.notaFiscal, primeira.formaPgto,
+         primeira.banco, primeira.situacao, primeira.valor, v.comum.observacao, v.comum.classificacao, v.id]);
+      const ids = [];
+      await inserirLinhas(conn, ids, v.comum, demais, v.movimento);
+      return { ok: true, id: v.id, ids, mensagem: `Registro dividido em ${v.linhas.length} parcelas com sucesso!` };
+    });
+    if (r) res.json(r);
   });
 
   rota('post', '/fluxo/salvar_varios', ESCREVER, async (req, res) => {

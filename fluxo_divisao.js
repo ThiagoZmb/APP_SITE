@@ -5,6 +5,10 @@
 (function (raiz) {
   'use strict';
   const SITUACOES_ENTRADA = ['A Receber', 'Atrasado', 'Faturado', 'Protestado', 'Recebido'];
+  const SITUACOES_SAIDA = ['A Pagar', 'Atrasado', 'Faturado', 'Pago', 'Protestado'];
+  const situacoesDe = mov => (mov === 'Saída' ? SITUACOES_SAIDA : SITUACOES_ENTRADA);
+  // "ainda por vir": a forma de pagamento só se sabe no dia em que o dinheiro entra ou sai, então pode ficar em branco (igual ao servidor)
+  const SEM_FORMA = ['A Receber', 'A Pagar'];
   const MAX_LINHAS = 10;
   const arred = n => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -60,15 +64,35 @@
     return melhor;
   }
 
-  const api = { SITUACOES_ENTRADA, MAX_LINHAS, somar, avaliar, textoResumo, rotuloSalvar, calcularRestante, maiorDataPronto };
+  // Dividir um movimento que já existe (Editar movimento): a soma das parcelas deve dar o valor original; diferença = só aviso.
+  // `falta` = quanto ainda não foi distribuído (negativo = passou do original); fmt = formatador de moeda.
+  function avaliarEdicao(original, linhas) {
+    const soma = somar(linhas).soma, falta = arred(Number(original) - soma);
+    return { soma, falta: Math.abs(falta) < 0.005 ? 0 : falta, diferente: Math.abs(falta) >= 0.005 };
+  }
+  function textoEdicao(av, original, fmt) {
+    let t = `Valor original ${fmt(original)} · soma das parcelas ${fmt(av.soma)}`;
+    if (!av.diferente) return { texto: t + ' · tudo distribuído.', aviso: false };
+    t += av.falta > 0 ? ` · falta distribuir ${fmt(av.falta)}.` : ` · passou ${fmt(-av.falta)} do valor original.`;
+    return { texto: t + ' Atenção: o total do movimento vai mudar.', aviso: true };
+  }
+  // parcela que ainda falta para completar o valor original (nunca negativa)
+  const restanteEdicao = (original, linhas) => Math.max(0, avaliarEdicao(original, linhas).falta);
+  function rotuloSalvarEdicao(extras) { return extras > 0 ? `💾 Atualizar e criar ${extras} ${extras > 1 ? 'registros' : 'registro'}` : '💾 Atualizar'; }
+
+  const api = { SITUACOES_ENTRADA, SITUACOES_SAIDA, SEM_FORMA, MAX_LINHAS, somar, avaliar, textoResumo, rotuloSalvar, calcularRestante, maiorDataPronto,
+    avaliarEdicao, textoEdicao, restanteEdicao, rotuloSalvarEdicao };
 
   function iniciar(d) {
     const { $, lerNumero, moeda, escapeHtml } = d;
     const bloco = $('bloco-divisao'), lista = $('div-linhas'), resumoEl = $('div-resumo');
     const quitarRotulo = $('div-quitar-rotulo'), quitar = $('div-quitar');
     const infoTotal = $('info-total'), restCaixa = $('rest-caixa'), restTexto = $('rest-texto'), restData = $('rest-data');
+    const btnDividir = $('btn-dividir-valor'), divTitulo = $('div-titulo'), divDica = $('div-dica'), addBtn = $('div-add');
     let resumo = null, buscaN = 0, quitarMexido = false;
     let contexto = null;   // { base, totalPedidos, credito, pedidos, entrega }: só quando a gaveta abre pelo botão Receber da ficha do cliente
+    let edicao = null;     // { id, valorOriginal }: quando a gaveta é "Editar movimento" (dividir um registro que já existe)
+    let edicaoLigada = false;   // o usuário clicou em "Dividir este valor"
 
     const extras = () => [...lista.querySelectorAll('.div-linha')];
     const lerLinha = el => ({
@@ -82,16 +106,42 @@
     const todas = () => [principal(), ...extras().map(lerLinha)];
     const entradaNova = () => d.getMovimento() === 'Entrada' && !$('f-id').value;
     const restante = () => (contexto && entradaNova() ? calcularRestante(contexto.base, todas()) : 0);
-    const ativo = () => entradaNova() && (extras().length > 0 || restante() > 0);
+    const emEdicao = () => !!$('f-id').value;
+    const ativo = () => (entradaNova() && (extras().length > 0 || restante() > 0)) || (emEdicao() && edicaoLigada && !!edicao && extras().length > 0);
+    const caminho = () => (emEdicao() ? '/fluxo/dividir' : '/fluxo/salvar_varios');
+    const rotuloLinha = i => (emEdicao() ? `Parcela ${i}` : `Forma de pagamento ${i}`);
 
     function numeroPedido() { const t = $('f-pedido').value.trim(); return /^\d{1,9}$/.test(t) ? t : ''; }
 
     function renomear() {
-      extras().forEach((el, i) => { el.querySelector('.d-titulo').textContent = `Forma de pagamento ${i + 2}`; });
-      $('div-add').disabled = extras().length + 1 >= MAX_LINHAS;
+      extras().forEach((el, i) => { el.querySelector('.d-titulo').textContent = rotuloLinha(i + 2); });
+      addBtn.disabled = extras().length + 1 >= MAX_LINHAS;
+    }
+
+    // Editar movimento: a última parcela extra "automática" recebe o que falta para fechar o valor original (some quando o usuário digita nela)
+    function autoPreencher() {
+      if (!edicao) return;
+      const linhas = extras();
+      const alvo = [...linhas].reverse().find(el => el.dataset.auto === '1');
+      if (!alvo) return;
+      const outros = [principal(), ...linhas.filter(el => el !== alvo).map(lerLinha)];
+      alvo.querySelector('.d-valor').value = moeda(restanteEdicao(edicao.valorOriginal, outros));
+    }
+
+    function recalcularEdicao() {
+      infoTotal.hidden = true; restCaixa.hidden = true; quitarRotulo.hidden = true;
+      const mostrar = edicaoLigada && !!edicao && extras().length > 0;
+      resumoEl.hidden = !mostrar;
+      if (edicao) autoPreencher();
+      if (edicao) $('btn-salvar').textContent = rotuloSalvarEdicao(edicaoLigada ? extras().length : 0);
+      if (!mostrar) return;
+      const av = avaliarEdicao(edicao.valorOriginal, todas()), r = textoEdicao(av, edicao.valorOriginal, moeda);
+      resumoEl.textContent = r.texto;
+      resumoEl.classList.toggle('aviso', r.aviso);
     }
 
     function recalcular() {
+      if (emEdicao()) { recalcularEdicao(); return; }
       const mostrar = extras().length > 0;
       const rest = restante();
       resumoEl.hidden = !mostrar;
@@ -128,38 +178,60 @@
     async function buscarResumo() {
       const n = numeroPedido(), minha = ++buscaN;
       resumo = null;
-      if (n && extras().length && !contexto) {
+      if (n && extras().length && !contexto && !emEdicao()) {
         try { const r = await d.api('/fluxo/pedido_resumo?numero=' + encodeURIComponent(n)); if (minha === buscaN) resumo = r; }
         catch { /* sem resumo: só mostra a soma */ }
       }
       if (minha === buscaN) recalcular();
     }
 
-    function adicionar() {
+    function adicionar({ semFoco = false } = {}) {
       if (extras().length + 1 >= MAX_LINHAS) return;
       const li = document.createElement('div');
       li.className = 'div-linha';
-      const falta = contexto ? restante() : resumo ? arred(Math.max(0, avaliar(todas(), resumo).falta)) : 0;
+      const mov = d.getMovimento(), situacoes = situacoesDe(mov), editando = emEdicao() && !!edicao;
+      const falta = editando ? restanteEdicao(edicao.valorOriginal, todas()) : contexto ? restante() : resumo ? arred(Math.max(0, avaliar(todas(), resumo).falta)) : 0;
+      if (editando) { extras().forEach(el => { el.dataset.auto = '0'; }); li.dataset.auto = '1'; }
       li.innerHTML = `
         <div class="d-cab"><strong class="d-titulo"></strong><button type="button" class="d-remover" aria-label="Remover esta forma">✕</button></div>
         <div class="form-group"><label>Forma de pagamento</label><input class="d-forma" list="lista-formas"></div>
         <div class="form-group"><label>Banco</label><input class="d-banco" list="lista-bancos"></div>
         <div class="form-group"><label>Valor</label><input class="num dec d-valor" value="${escapeHtml(moeda(falta))}"></div>
         <div class="form-group"><label>Data</label><input type="date" class="d-data" value="${escapeHtml($('f-data').value || d.hojeISO())}"></div>
-        <div class="form-group full"><label>Situação</label><select class="d-situacao">${SITUACOES_ENTRADA.map(s => `<option>${s}</option>`).join('')}</select></div>`;
-      li.querySelector('.d-situacao').value = SITUACOES_ENTRADA.includes($('f-situacao').value) ? $('f-situacao').value : 'Recebido';
+        <div class="form-group full"><label>Situação</label><select class="d-situacao">${situacoes.map(s => `<option>${escapeHtml(s)}</option>`).join('')}</select></div>`;
+      li.querySelector('.d-situacao').value = situacoes.includes($('f-situacao').value) ? $('f-situacao').value : situacoes[situacoes.length - 1];
       lista.appendChild(li);
       renomear();
-      if (!resumo) buscarResumo(); else recalcular();
-      li.querySelector('.d-forma').focus();
+      if (!resumo && !editando) buscarResumo(); else recalcular();
+      if (!semFoco) li.querySelector('.d-forma').focus();
     }
 
     function reiniciar() {
       lista.innerHTML = '';
-      resumo = null; buscaN++; quitarMexido = false; quitar.checked = false; contexto = null;
+      resumo = null; buscaN++; quitarMexido = false; quitar.checked = false; contexto = null; edicao = null; edicaoLigada = false;
       resumoEl.textContent = ''; resumoEl.hidden = true; quitarRotulo.hidden = true;
       infoTotal.hidden = true; infoTotal.textContent = ''; restCaixa.hidden = true; restData.value = '';
+      btnDividir.hidden = true;
       renomear();
+    }
+
+    // chamado ao abrir um movimento existente (Editar movimento), depois de preencher os campos e de reiniciar
+    function definirEdicao(e) {
+      edicao = e && e.id ? { id: e.id, valorOriginal: arred(e.valorOriginal) } : null;
+      edicaoLigada = false;
+      lista.innerHTML = '';
+      renomear();
+      atualizarVisibilidade();
+    }
+
+    // botão "Dividir este valor" (liga e desliga); ao ligar, já abre a parcela 2 e leva o foco ao valor da parcela 1
+    function alternarDivisaoEdicao() {
+      if (!emEdicao() || !edicao) return;
+      edicaoLigada = !edicaoLigada;
+      if (edicaoLigada) { if (!extras().length) adicionar({ semFoco: true }); }
+      else { lista.innerHTML = ''; renomear(); }
+      atualizarVisibilidade();
+      if (edicaoLigada) { $('f-valor').focus(); $('f-valor').select(); }
     }
 
     // chamado quando a gaveta abre pelo botão Receber da ficha do cliente (depois de reiniciar)
@@ -172,9 +244,17 @@
     }
 
     function atualizarVisibilidade() {
-      const pode = d.getMovimento() === 'Entrada' && !$('f-id').value && d.pode('financeiro.lancar');
+      const editando = emEdicao(), lancar = d.pode('financeiro.lancar');
+      btnDividir.hidden = !(editando && !!edicao && lancar);
+      btnDividir.textContent = edicaoLigada ? '✖ Cancelar divisão' : '✂️ Dividir este valor';
+      const pode = lancar && (editando ? edicaoLigada && !!edicao : d.getMovimento() === 'Entrada');
       bloco.hidden = !pode;
-      if (!pode && extras().length) reiniciar();
+      divTitulo.textContent = editando ? 'Dividir este valor' : 'Dividir em mais formas';
+      divDica.textContent = editando
+        ? 'A parcela de cima é este registro: o valor dele passa a ser o que você digitar. As demais viram registros novos. Tudo é salvo de uma vez.'
+        : 'Para receber o mesmo pedido em mais de uma forma (ex.: Pix + cartão), a forma de cima é a primeira; adicione as outras aqui. Tudo é salvo de uma vez.';
+      addBtn.textContent = editando ? '＋ Adicionar parcela' : '＋ Adicionar forma de pagamento';
+      if (!pode && extras().length) { if (editando) { lista.innerHTML = ''; renomear(); } else reiniciar(); }
       recalcular();
     }
 
@@ -186,6 +266,10 @@
     }
 
     function montarEnvio(comum) {
+      if (emEdicao() && edicao) {
+        return { id: edicao.id, movimento: d.getMovimento(), nome: comum.nome, pedido: comum.pedido, pdv: comum.pdv, preNota: comum.preNota, notaFiscal: comum.notaFiscal,
+          observacao: comum.observacao, codClassificacao: comum.codClassificacao, linhas: todas() };
+      }
       return {
         movimento: 'Entrada', nome: comum.nome, pedido: comum.pedido, pdv: comum.pdv, preNota: comum.preNota, notaFiscal: comum.notaFiscal,
         observacao: comum.observacao, codClassificacao: comum.codClassificacao, linhas: linhasParaEnviar(),
@@ -195,12 +279,13 @@
 
     // cada linha precisa de forma e valor; devolve a mensagem do primeiro problema ou ''
     function conferir() {
-      const l = todas();
+      const l = todas(), situacoes = situacoesDe(d.getMovimento());
       for (let i = 0; i < l.length; i++) {
-        if (!l[i].formaPgto) return `Forma de pagamento ${i + 1}: favor escolher uma forma de pagamento!`;
-        if (!l[i].data) return `Forma de pagamento ${i + 1}: favor inserir uma data válida!`;
-        if (!(l[i].valor > 0)) return `Forma de pagamento ${i + 1}: favor inserir um valor maior que zero!`;
-        if (!SITUACOES_ENTRADA.includes(l[i].situacao)) return `Forma de pagamento ${i + 1}: favor escolher a situação desse registro!`;
+        const nome = rotuloLinha(i + 1);
+        if (!l[i].formaPgto && !SEM_FORMA.includes(l[i].situacao)) return `${nome}: favor escolher uma forma de pagamento!`;
+        if (!l[i].data) return `${nome}: favor inserir uma data válida!`;
+        if (!(l[i].valor > 0)) return `${nome}: favor inserir um valor maior que zero!`;
+        if (!situacoes.includes(l[i].situacao)) return `${nome}: favor escolher a situação desse registro!`;
       }
       if (restante() > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(restData.value)) return 'Informe o vencimento do restante a receber.';
       return '';
@@ -210,8 +295,10 @@
     lista.addEventListener('keypress', e => { if (e.target.classList.contains('d-valor') && e.key.length === 1 && !/[0-9,]/.test(e.key)) e.preventDefault(); });
     lista.addEventListener('focusin', e => { if (e.target.classList.contains('d-valor')) { e.target.value = String(lerNumero(e.target.value)).replace('.', ','); e.target.select(); } });
     lista.addEventListener('focusout', e => { if (e.target.classList.contains('d-valor')) { e.target.value = moeda(lerNumero(e.target.value)); recalcular(); } });
-    lista.addEventListener('input', recalcular);
+    // digitou no valor de uma parcela: ela deixa de ser a "automática" (que completa o valor original)
+    lista.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('d-valor')) { const li = e.target.closest('.div-linha'); if (li) li.dataset.auto = '0'; } recalcular(); });
     lista.addEventListener('change', recalcular);
+    btnDividir.addEventListener('click', alternarDivisaoEdicao);
     lista.addEventListener('click', e => { if (e.target.closest('.d-remover')) { e.target.closest('.div-linha').remove(); renomear(); recalcular(); } });
     $('div-add').addEventListener('click', adicionar);
     quitar.addEventListener('change', () => { quitarMexido = true; });
@@ -220,7 +307,7 @@
     $('f-valor').addEventListener('blur', recalcular);
     $('f-pedido').addEventListener('change', () => { quitarMexido = false; buscarResumo(); });
 
-    return { reiniciar, atualizarVisibilidade, ativo, montarEnvio, conferir, recalcular, buscarResumo, definirContexto, temRestante: () => restante() > 0 };
+    return { reiniciar, atualizarVisibilidade, ativo, caminho, montarEnvio, conferir, recalcular, buscarResumo, definirContexto, definirEdicao, temRestante: () => restante() > 0 };
   }
 
   api.iniciar = iniciar;

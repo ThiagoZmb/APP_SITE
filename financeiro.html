@@ -413,7 +413,9 @@
         .categoria { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; background: var(--secondary-color); }
         .categoria .grid-form { gap: 10px; }
         /* recebimento dividido em várias formas (fluxo_divisao.js) */
-        #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden], #info-total[hidden], #rest-caixa[hidden] { display: none; }
+        #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden], #info-total[hidden], #rest-caixa[hidden], #btn-dividir-valor[hidden] { display: none; }
+        .btn-dividir-valor { margin-left: auto; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+        .tipo-mov button:disabled { opacity: .4; cursor: not-allowed; }
         .info-total { font-size: 13px; line-height: 1.5; font-weight: 600; padding: 10px 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
         .info-total.aviso { border-color: #f2a33a; background: rgba(242, 163, 58, .12); }
         .rest-caixa { margin-top: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid #f2a33a; background: rgba(242, 163, 58, .12); font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
@@ -608,7 +610,8 @@
                 </div>
             </section>
             <section class="bloco">
-                <div class="bloco-cab"><span class="ico">🧾</span><h3>Pagamento e documentos</h3></div>
+                <div class="bloco-cab"><span class="ico">🧾</span><h3>Pagamento e documentos</h3>
+                    <button type="button" class="btn btn-secondary btn-dividir-valor" id="btn-dividir-valor" data-perm="financeiro.lancar" hidden>✂️ Dividir este valor</button></div>
                 <div class="bloco-corpo grid-form">
                     <div class="form-group"><label for="f-forma">Forma de pagamento</label><input id="f-forma" list="lista-formas"></div>
                     <div class="form-group"><label for="f-banco">Banco</label><input id="f-banco" list="lista-bancos"></div>
@@ -619,9 +622,9 @@
                 </div>
             </section>
             <section class="bloco" id="bloco-divisao" hidden>
-                <div class="bloco-cab"><span class="ico">➗</span><h3>Dividir em mais formas</h3></div>
+                <div class="bloco-cab"><span class="ico">➗</span><h3 id="div-titulo">Dividir em mais formas</h3></div>
                 <div class="bloco-corpo">
-                    <p class="div-dica">Para receber o mesmo pedido em mais de uma forma (ex.: Pix + cartão), a forma de cima é a primeira; adicione as outras aqui. Tudo é salvo de uma vez.</p>
+                    <p class="div-dica" id="div-dica">Para receber o mesmo pedido em mais de uma forma (ex.: Pix + cartão), a forma de cima é a primeira; adicione as outras aqui. Tudo é salvo de uma vez.</p>
                     <div id="div-linhas"></div>
                     <button type="button" class="btn btn-secondary" id="div-add">＋ Adicionar forma de pagamento</button>
                     <div class="div-resumo" id="div-resumo" aria-live="polite" hidden></div>
@@ -1239,8 +1242,13 @@
             if (Divisao) Divisao.atualizarVisibilidade();
         }
         document.querySelectorAll('.tipo-mov button').forEach(b => b.addEventListener('click', () => {
+            if ($('f-id').value) return;   // movimento já gravado: o tipo (Entrada/Saída) não muda, evita erro de lançamento
             if (b.dataset.mov !== movimento) { definirMovimento(b.dataset.mov, false); marcarAlterado(); sugerirCategoria(false); }
         }));
+        // Editar movimento: o botão do outro tipo fica bloqueado; Novo movimento libera os dois
+        function travarTipo(mov) {
+            document.querySelectorAll('.tipo-mov button').forEach(b => { b.disabled = !!mov && b.dataset.mov !== mov; });
+        }
         function marcarAlterado(sim = true) { alterado = sim; $('alteracoes').classList.toggle('visivel', sim); }
         $('form').addEventListener('input', () => marcarAlterado());
         $('form').addEventListener('submit', e => e.preventDefault());
@@ -1272,6 +1280,7 @@
             $('f-valor').value = moeda(0);
             movimento = '';
             if (Divisao) { Divisao.reiniciar(); Divisao.atualizarVisibilidade(); }
+            travarTipo(null);
             document.querySelectorAll('.tipo-mov button').forEach(b => b.classList.remove('on'));
             $('f-situacao').innerHTML = '<option value="">— escolha o tipo —</option>';
             $('l-nome').textContent = 'Cliente / Fornecedor';
@@ -1301,6 +1310,10 @@
             $('btn-salvar').textContent = '💾 Atualizar';
             definirCategoria(it.codClassificacao, true, 'Verificando categoria...');
             sugerirCategoria(true);
+            travarTipo(ehEntrada(it) ? 'Entrada' : 'Saída');
+            // "Dividir este valor": o registro atual vira a parcela 1 e as demais são criadas
+            Divisao.reiniciar();
+            Divisao.definirEdicao({ id: it.id, valorOriginal: it.valor });
             marcarAlterado(false);
             abrirGaveta();
         }
@@ -1355,7 +1368,7 @@
             btn.textContent = 'Salvando...';
             try {
                 const r = dividido
-                    ? await api('/fluxo/salvar_varios', { method: 'POST', body: JSON.stringify(Divisao.montarEnvio(d)) })
+                    ? await api(Divisao.caminho(), { method: 'POST', body: JSON.stringify(Divisao.montarEnvio(d)) })
                     : await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
                 if (Divisao) Divisao.reiniciar();
                 toast(r.mensagem, 'ok');
