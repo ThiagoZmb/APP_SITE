@@ -2,6 +2,7 @@
 // Para o cliente que decide a forma de pagar depois do pedido feito (ex.: à vista). Duas formas, como o "Alterar valor" do orçamento:
 //   (1) Desconto adicional (%) → o total é calculado;  (2) caixinha "Valor final" → o % é calculado a partir do total digitado.
 // As contas são de calculo/desconto_pedido.js (as mesmas do servidor, que recalcula tudo). Grava só DESCONTO e TOTAL do pedido.
+// Visual: estilos `dv-*` no tema.css (reaproveita os `dp-*`). Nome do cliente e valores entram por textContent, nunca como HTML cru.
 // AjustarDesconto.abrir({ numero, apiBase, loginUrl, token: () => string, recarregar: () => void })
 (function () {
   'use strict';
@@ -25,32 +26,49 @@
     const mk = (tag, cls, txt) => { const el = document.createElement(tag); if (cls) el.className = cls; if (txt !== undefined) el.textContent = txt; return el; };
 
     const fundo = mk('div', 'dp-fundo');
-    const caixa = mk('div', 'dp-caixa');
+    const caixa = mk('div', 'dp-caixa dv-caixa');
     caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-label', 'Ajustar desconto adicional');
     caixa.append(mk('div', 'dp-titulo', 'Ajustar desconto adicional'), mk('div', 'dp-sub', `Pedido nº ${dados.numero}${dados.cliente ? ' · ' + dados.cliente : ''}`));
 
+    // situação de hoje: três blocos, rótulo pequeno sobre o valor
     const resumo = mk('div', 'dv-resumo');
     const celula = (rot, val) => { const c = mk('div'); c.append(mk('small', '', rot), mk('strong', '', val)); return c; };
-    resumo.append(celula('Subtotal', moeda(dados.subTotal)), celula('Desconto atual', pctTexto(dados.descontoPct) + ' %'), celula('Total atual', moeda(dados.total)));
+    resumo.append(celula('Subtotal', moeda(dados.subTotal)), celula('Desconto', pctTexto(dados.descontoPct) + ' %'), celula('Total atual', moeda(dados.total)));
 
-    const rPct = mk('label', 'dp-rotulo', 'Desconto adicional (%)'); const inPct = mk('input', 'dp-data'); inPct.id = 'dv-pct'; inPct.inputMode = 'decimal'; inPct.autocomplete = 'off'; rPct.htmlFor = inPct.id;
-    const linhaFinal = mk('label', 'dv-final-chk'); const chk = mk('input'); chk.type = 'checkbox'; chk.id = 'dv-final-chk'; linhaFinal.append(chk, document.createTextNode(' Valor final (digitar o total e calcular o %)'));
-    const rTot = mk('label', 'dp-rotulo', 'Total final (R$)'); const inTot = mk('input', 'dp-data'); inTot.id = 'dv-total'; inTot.inputMode = 'decimal'; inTot.autocomplete = 'off'; rTot.htmlFor = inTot.id;
+    // os dois campos lado a lado: o % e o total final se acompanham
+    const campos = mk('div', 'dv-campos');
+    const campo = (rotulo, id, entrada) => {
+      const c = mk('div', 'dv-campo'); const l = mk('label', 'dp-rotulo', rotulo); l.htmlFor = id;
+      entrada.id = id; entrada.inputMode = 'decimal'; entrada.autocomplete = 'off';
+      c.append(l, entrada); return c;
+    };
+    const inPct = mk('input', 'dp-data num'), inTot = mk('input', 'dp-data num');
+    campos.append(campo('Desconto adicional (%)', 'dv-pct', inPct), campo('Total final (R$)', 'dv-total', inTot));
+
+    const linhaFinal = mk('label', 'dv-final-chk');
+    const chk = mk('input'); chk.type = 'checkbox'; chk.id = 'dv-final-chk';
+    const txtFinal = mk('span'); txtFinal.append(mk('b', '', 'Informar pelo valor final'), mk('small', '', 'Digite o total e o percentual é calculado para o valor bater ao centavo.'));
+    linhaFinal.append(chk, txtFinal);
+
+    // resultado: novo total em destaque e a variação ao lado
     const dif = mk('div', 'dv-dif'); dif.setAttribute('aria-live', 'polite');
+    const novoBloco = mk('div', 'dv-novo'); const novoValor = mk('strong', 'dv-valor-novo', moeda(dados.total)); novoBloco.append(mk('small', '', 'Novo total'), novoValor);
+    const variacao = mk('span', 'dv-var', '');
+    dif.append(novoBloco, variacao);
     const erro = mk('div', 'dv-erro'); erro.setAttribute('role', 'alert');
 
     const acoes = mk('div', 'dp-acoes');
     const bCancelar = mk('button', 'dp-btn', 'Cancelar'); bCancelar.type = 'button';
     const bSalvar = mk('button', 'dp-btn dp-btn-ok', 'Aplicar'); bSalvar.type = 'button';
     acoes.append(bCancelar, bSalvar);
-    caixa.append(resumo, rPct, inPct, linhaFinal, rTot, inTot, dif, erro, acoes);
+    caixa.append(resumo, campos, linhaFinal, dif, erro, acoes);
     fundo.append(caixa);
 
     // estado: resultado calculado da forma escolhida (ou null se inválido / sem mudança)
     let calc = null;
     const entrada = () => (chk.checked ? { subTotal: dados.subTotal, totalFinal: inTot.value } : { subTotal: dados.subTotal, descontoPct: inPct.value });
     function atualizar(origem) {
-      erro.textContent = ''; dif.textContent = ''; dif.className = 'dv-dif';
+      erro.textContent = ''; variacao.textContent = ''; dif.className = 'dv-dif'; novoValor.textContent = moeda(dados.total);
       const vazio = chk.checked ? !inTot.value.trim() : !inPct.value.trim();
       const r = vazio ? null : D.calcular(entrada());
       calc = null;
@@ -60,9 +78,9 @@
         if (!chk.checked && origem !== 'total') inTot.value = r.total.toFixed(2).replace('.', ',');
         const d = D.arred2(r.total - dados.total);
         const igual = Math.abs(r.total - dados.total) < 0.005 && Math.abs(r.descontoPct - dados.descontoPct) < 0.00005;
-        dif.textContent = igual ? 'Sem mudança em relação ao atual.' : `Total: ${moeda(dados.total)} → ${moeda(r.total)} · ${d < 0 ? '▼' : '▲'} ${moeda(Math.abs(d))}`;
-        dif.classList.add(d < 0 ? 'desce' : 'sobe');
-        if (!igual) calc = r;
+        novoValor.textContent = moeda(r.total);
+        variacao.textContent = igual ? 'Sem mudança' : `${d < 0 ? '▼' : '▲'} ${moeda(Math.abs(d))}`;
+        if (!igual) { dif.classList.add(d < 0 ? 'desce' : 'sobe'); calc = r; }
       } else if (r && !r.ok) {
         erro.textContent = r.erro;
       } else if (!chk.checked) { inTot.value = ''; }

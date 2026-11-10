@@ -70,9 +70,9 @@ test('forma 1: digitar o % calcula o total, mostra a diferença e Aplicar envia 
   const j = T.janela(), pct = T.achar(j, porId('dv-pct')), tot = T.achar(j, porId('dv-total')), ok = T.achar(j, porRotulo('Aplicar'));
   T.digitar(pct, '5');
   assert.equal(tot.value, '950,00');
-  const dif = T.achar(j, n => n.className.startsWith('dv-dif'));
-  assert.match(dif.textContent, /950,00/);
-  assert.match(dif.textContent, /▼/);
+  const novo = T.achar(j, n => n.className === 'dv-valor-novo'), variacao = T.achar(j, n => n.className === 'dv-var');
+  assert.match(novo.textContent, /950,00/);
+  assert.match(variacao.textContent, /▼.*30,00/);
   assert.equal(ok.disabled, false);
   T.emitir(ok, 'click');
   await new Promise(r => setImmediate(r));
@@ -154,5 +154,32 @@ test('menus e páginas: item "Ajustar desconto adicional" (Pedido não cancelado
     const h = ler(f);
     const a = h.indexOf('calculo/desconto_pedido.js'), b = h.indexOf('desconto_pedido_tela.js');
     assert.ok(a > 0 && b > a, `${f}: a conta carrega antes da janela`);
+  }
+});
+
+test('visual: rótulo e valor em elementos separados (nada colado), campos lado a lado e estilos no tema.css', () => {
+  const css = ler('tema.css'), js = ler('desconto_pedido_tela.js');
+  assert.match(js, /celula = \(rot, val\) => \{ const c = mk\('div'\); c\.append\(mk\('small', '', rot\), mk\('strong', '', val\)\)/);
+  for (const cls of ['dv-caixa', 'dv-resumo', 'dv-campos', 'dv-campo', 'dv-final-chk', 'dv-dif', 'dv-novo', 'dv-var', 'dv-erro', 'dv-travado']) {
+    assert.ok(new RegExp(String.raw`\.${cls}\b`).test(css), `falta .${cls} no tema.css`);
+  }
+  // rótulo pequeno em maiúsculas com espaçamento, números em fonte monoespaçada
+  assert.match(css, /\.dv-resumo small \{[^}]*letter-spacing: \.05em[^}]*text-transform: uppercase/);
+  assert.match(css, /\.dv-resumo strong \{ font: 600 15px\/1\.2 var\(--font-mono\)/);
+  // somente leitura = número em âmbar (DESIGN.md); sem cor solta
+  assert.match(css, /\.dv-campo \.dp-data\.dv-travado \{[^}]*color: var\(--primary-color\)/);
+  const bloco = css.slice(css.indexOf('/* janela "Ajustar desconto adicional"'));
+  assert.doesNotMatch(bloco, /#[0-9a-fA-F]{3,8}\b/, 'o bloco usa só variáveis do tema');
+  // celular: resumo vira linhas (rótulo à esquerda, valor à direita) e os campos empilham
+  assert.match(bloco, /@media \(max-width: 460px\)[\s\S]*\.dv-resumo \{ grid-template-columns: 1fr; \}[\s\S]*\.dv-campos \{ grid-template-columns: 1fr; \}/);
+});
+
+test('versão do tema.css única em todas as páginas e o script da janela com a versão nova nas quatro que o carregam', () => {
+  const htmls = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html'));
+  const versoes = new Set();
+  for (const f of htmls) { const m = ler(f).match(/tema\.css\?v=(\d+)/); if (m) versoes.add(m[1]); }
+  assert.equal(versoes.size, 1, 'uma única versão do tema: ' + [...versoes]);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html', 'painel_inicial.html']) {
+    assert.match(ler(f), /desconto_pedido_tela\.js\?v=202611161500/, f);
   }
 });

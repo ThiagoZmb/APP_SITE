@@ -804,14 +804,33 @@ select option:disabled { color: #6b7280; }
 .dp-btn-ok { background: var(--primary-color); color: var(--on-primary); border-color: var(--primary-color); }
 .dp-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* janela "Ajustar desconto adicional" (desconto_pedido_tela.js): reaproveita os dp-*; só o que é próprio dela */
-.dv-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
-.dv-resumo small { display: block; color: var(--text-light); font-size: 11px; }
-.dv-resumo strong { font-size: 13px; }
-.dv-final-chk { display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: 13px; cursor: pointer; }
-.dv-travado { opacity: .6; }
-.dv-dif { min-height: 20px; margin-top: 10px; font-size: 13px; font-weight: 700; }
-.dv-dif.desce { color: var(--success-color); }
-.dv-dif.sobe { color: var(--warning-color); }
-.dv-erro { min-height: 18px; margin-top: 4px; font-size: 13px; color: var(--danger-color); }
-@media (max-width: 420px) { .dv-resumo { grid-template-columns: 1fr; } }
+/* janela "Ajustar desconto adicional" (desconto_pedido_tela.js): reaproveita os dp-*; só o que é próprio dela.
+   Resumo em três blocos (rótulo pequeno sobre o valor), campos lado a lado, quadro de resultado em destaque. Somente leitura = número em âmbar. */
+.dv-caixa { max-width: 440px; }
+.dv-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0 0 20px; background: var(--border-color); border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; }
+.dv-resumo > div { display: flex; flex-direction: column; gap: 5px; padding: 11px 12px; background: var(--bg); }
+.dv-resumo small { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); }
+.dv-resumo strong { font: 600 15px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-dark); white-space: nowrap; }
+.dv-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.dv-campo .dp-rotulo { margin-bottom: 7px; font-size: 12px; font-weight: 700; color: var(--text-mid); }
+.dv-campo .dp-data { min-height: 42px; text-align: right; font-size: 15px; letter-spacing: .01em; }
+.dv-campo .dp-data.dv-travado { color: var(--primary-color); border-color: var(--border-color); cursor: default; }
+.dv-final-chk { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0 0; line-height: 1.4; cursor: pointer; }
+.dv-final-chk input { flex: none; margin-top: 3px; accent-color: var(--primary-color); }
+.dv-final-chk span { display: flex; flex-direction: column; gap: 3px; }
+.dv-final-chk b { font-size: 13px; font-weight: 600; }
+.dv-final-chk small { font-size: 12px; font-weight: 500; color: var(--text-light); }
+.dv-dif { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin-top: 18px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.dv-novo { display: flex; flex-direction: column; gap: 4px; }
+.dv-novo small { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); }
+.dv-novo strong { font: 600 17px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.dv-var { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.dv-dif.desce { border-color: var(--success-color); } .dv-dif.desce .dv-var { color: var(--success-color); }
+.dv-dif.sobe { border-color: var(--warning-color); } .dv-dif.sobe .dv-var { color: var(--warning-color); }
+.dv-erro { margin-top: 10px; font-size: 13px; line-height: 1.4; color: var(--danger-color); }
+.dv-erro:empty { display: none; }
+@media (max-width: 460px) {
+  .dv-resumo { grid-template-columns: 1fr; }
+  .dv-resumo > div { flex-direction: row; align-items: baseline; justify-content: space-between; padding: 10px 12px; }
+  .dv-campos { grid-template-columns: 1fr; }
+}
