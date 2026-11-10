@@ -6,6 +6,7 @@ const { semValores } = require('../seguranca/valores');
 const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco } = require('../calculo/precos');
 const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
+const DescontoPedido = require('../calculo/desconto_pedido');
 const express = require('express');
 const { validarPng } = require('../calculo/png');
 const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
@@ -749,6 +750,54 @@ function registrarPedOrc({ rota, pool }) {
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, dataPronto: nova });
+  });
+
+  // valores atuais para a janela "Ajustar desconto adicional" (só leitura; uma consulta): subtotal, desconto, total e situações. Mesma permissão do ajuste.
+  rota('get', '/ped_orc/:tipo/:numero/desconto', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'O ajuste de desconto vale só para Pedido. Para orçamento, abra para editar.' });
+    try {
+      const [[cab]] = await pool.execute('SELECT * FROM ped_orc WHERE NUMERO = ? AND TIPO = ?', [alvo.numero, alvo.tipo]);
+      if (!cab) return res.status(404).json({ error: `Pedido nº ${alvo.numero} não encontrado.` });
+      await conferirEstadosDoCliente(pool, req, cab.RAZAO_SOCIAL);
+      res.json({ numero: alvo.numero, cliente: cab.RAZAO_SOCIAL || '', subTotal: parseFloat(cab.SUB_TOTAL) || 0, descontoPct: parseFloat(cab.DESCONTO) || 0,
+        total: parseFloat(cab.TOTAL) || 0, financeiro: cab.FINANCEIRO || '', situacao: cab.SITUACAO || '' });
+    } catch (err) {
+      if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
+      console.error('Erro GET /ped_orc/desconto:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
+  });
+
+  // ajustar o DESCONTO ADICIONAL de um Pedido já feito (cliente que decide a forma de pagar depois, ex.: à vista), pelo menu do botão direito.
+  // Grava SÓ ped_orc.DESCONTO e ped_orc.TOTAL (TOTAL = SUB_TOTAL × (100 − DESCONTO) ÷ 100, ou o total exato digitado); itens, caixa e entrega não mudam.
+  // Corpo: { descontoPct } ou { totalFinal } + { conferencia: { descontoPct, total } } (o que a tela viu; mudou no meio = 409). Cancelado e Recebido são recusados.
+  // Mesma permissão de "Abrir para editar" (orcamentos.criar + valores.ver). Audita desconto_adicional_alterado (antes e depois).
+  rota('post', '/ped_orc/:tipo/:numero/desconto', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
+    const alvo = validarAlvo(req, res); if (!alvo) return;
+    if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'O ajuste de desconto vale só para Pedido. Para orçamento, abra para editar.' });
+    const b = req.body || {};
+    const conf = b.conferencia;
+    if (!conf || isNaN(DescontoPedido.numeroBR(conf.descontoPct)) || isNaN(DescontoPedido.numeroBR(conf.total))) return res.status(400).json({ error: 'Reabra o ajuste: faltam os valores vistos na tela.' });
+    const r = await emTransacao(pool, res, 'POST /ped_orc/desconto', async conn => {
+      const { cab } = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      if (String(cab.SITUACAO || '') === 'Cancelado') throw new ErroUsuario(409, `O pedido nº ${alvo.numero} está cancelado e não muda de desconto.`);
+      if (String(cab.FINANCEIRO || '').trim().toLowerCase() === 'recebido') {
+        throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está como Recebido: mudar o total agora desencontra o caixa. Ajuste o financeiro antes.`);
+      }
+      const sub = parseFloat(cab.SUB_TOTAL) || 0, descAtual = parseFloat(cab.DESCONTO) || 0, totalAtual = parseFloat(cab.TOTAL) || 0;
+      if (Math.abs(descAtual - DescontoPedido.numeroBR(conf.descontoPct)) > 0.00005 || Math.abs(totalAtual - DescontoPedido.numeroBR(conf.total)) > 0.004) {
+        throw new ErroUsuario(409, `O pedido nº ${alvo.numero} foi alterado por outra pessoa. Feche e abra o ajuste de novo.`, { erro: 'alterado' });
+      }
+      const c = DescontoPedido.calcular({ subTotal: sub, descontoPct: b.descontoPct, totalFinal: b.totalFinal });
+      if (!c.ok) throw new ErroUsuario(400, c.erro);
+      if (c.total === DescontoPedido.arred2(totalAtual) && Math.abs(c.descontoPct - descAtual) < 0.00005) throw new ErroUsuario(409, `O pedido nº ${alvo.numero} já está com esse desconto.`);
+      await conn.execute('UPDATE ped_orc SET DESCONTO = ?, TOTAL = ? WHERE NUMERO = ? AND TIPO = ?', [c.descontoPct, c.total, alvo.numero, alvo.tipo]);
+      await auditarDoc(conn, req, 'desconto_adicional_alterado', alvo.tipo, alvo.numero, { cliente: cab.RAZAO_SOCIAL, modo: c.modo, subTotal: sub,
+        de: { descontoPct: descAtual, total: totalAtual }, para: { descontoPct: c.descontoPct, total: c.total } });
+      return { ok: true, subTotal: sub, descontoPct: c.descontoPct, total: c.total, totalAnterior: totalAtual };
+    });
+    if (r) res.json({ ...r, tipo: alvo.tipo, numero: alvo.numero });
   });
 
   // excluir: apaga o cabeçalho e todas as linhas do documento (mesmas tabelas que o salvar regrava); sem desfazer

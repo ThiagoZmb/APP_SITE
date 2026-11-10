@@ -26,3 +26,14 @@ _Movido do CLAUDE.md sem alteração; o CLAUDE.md guarda só o resumo._
 
 - **Porta de correr, larguras iguais editadas** (`calculo/precos.js`): com mais de uma folha em `largurasFolhas`, a lista por folha é sempre a fonte da largura, mesmo quando todas são iguais (ex.: [500, 500]); a `largura` enviada pela tela é a automática do vão e não vale para o preço.
 - O VB calcula cada folha pela própria largura (frmPortasCorrer); [500, 500] e [500, 501] não podem dar totais muito diferentes (teste em `test/correr_larguras_diferentes.test.js`).
+
+
+## Ajustar desconto adicional de um Pedido já feito (menu do botão direito)
+
+- **Para quê**: cliente que decide a forma de pagar depois do pedido (ex.: à vista) e ganha desconto adicional, sem abrir pedido por pedido. Item **"💲 Ajustar desconto adicional"** no menu do botão direito do Pedido não cancelado (Pedidos e Orçamentos, Início e Calendário): `inicio_menu.js` e o menu próprio de `painel_inicial.html`.
+- **Regra do pedido**: `ped_orc.SUB_TOTAL`, `DESCONTO` (%, o "desconto adicional") e `TOTAL = SUB_TOTAL × (100 − DESCONTO) ÷ 100` (2 casas). A rota grava **só `DESCONTO` e `TOTAL`**; itens, caixa, entrega e observação não mudam; o PDF já sai com o total novo.
+- **Duas formas, como o "Alterar valor"** (`orcamentos.html`): (1) **Desconto adicional (%)** calcula o total; (2) caixinha **"Valor final"** digita o total e o % é calculado, com 2 a 10 casas até o total bater ao centavo; o total digitado é gravado exato. Contas puras em `calculo/desconto_pedido.js` (as mesmas na tela e no servidor, que recalcula tudo). Desconto de 0 a 100%; total final entre 0 e o subtotal (acrescentar valor = "Abrir para editar"); % com até 4 casas.
+- **Rotas** (`rotas/ped_orc.js`; permissão `orcamentos.criar` + `valores.ver`, a mesma de "Abrir para editar"): `GET /ped_orc/Pedido/:numero/desconto` (valores atuais, uma consulta, só leitura) e `POST /ped_orc/Pedido/:numero/desconto` (corpo `{ descontoPct }` ou `{ totalFinal }` + `conferencia: { descontoPct, total }`). Pedido travado (`FOR UPDATE`) numa transação; estados do usuário conferidos; **Cancelado e Recebido são recusados (409)**; `A Receber` e `Atrasado` passam; conferência diferente do banco = 409 `alterado`; mesmo desconto = 409. Auditoria `desconto_adicional_alterado` com antes e depois, modo e subtotal. Só Pedido (orçamento = 400).
+- **Tela**: `desconto_pedido_tela.js` (`AjustarDesconto.abrir`), estilos `dv-*` no `tema.css` (reaproveita os `dp-*`); prévia ao vivo "Total: R$ 980,00 → R$ 950,00 · ▼ R$ 30,00"; nome do cliente por `textContent`.
+- **Limite conhecido**: o tipo da coluna `ped_orc.DESCONTO` no banco não foi conferido (sem acesso de leitura em 2026-11-10). Se guardar só 2 casas, o `TOTAL` continua exato, mas o % salvo pode ficar arredondado. **Não testado no navegador real.**
+- Testes: `test/desconto_pedido.test.js` (contas e rotas) e `test/desconto_pedido_tela.test.js` (janela com DOM falso).

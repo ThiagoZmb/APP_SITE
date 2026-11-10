@@ -88,6 +88,7 @@
       add('pedidos.checklist', '✅', 'Imprimir checklist', () => window.ChecklistPedido.abrir({ apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
       sep();
       add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
+      if (!cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, recarregar: cfg.recarregar }));
       if (!cancelado) {
         add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${enc(n)}`; });
         add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${enc(n)}`; });

@@ -803,3 +803,15 @@ select option:disabled { color: #6b7280; }
 .dp-btn { padding: 10px 16px; border-radius: var(--radius-sm); font: inherit; font-weight: 700; cursor: pointer; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-strong); }
 .dp-btn-ok { background: var(--primary-color); color: var(--on-primary); border-color: var(--primary-color); }
 .dp-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* janela "Ajustar desconto adicional" (desconto_pedido_tela.js): reaproveita os dp-*; só o que é próprio dela */
+.dv-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.dv-resumo small { display: block; color: var(--text-light); font-size: 11px; }
+.dv-resumo strong { font-size: 13px; }
+.dv-final-chk { display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: 13px; cursor: pointer; }
+.dv-travado { opacity: .6; }
+.dv-dif { min-height: 20px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+.dv-dif.desce { color: var(--success-color); }
+.dv-dif.sobe { color: var(--warning-color); }
+.dv-erro { min-height: 18px; margin-top: 4px; font-size: 13px; color: var(--danger-color); }
+@media (max-width: 420px) { .dv-resumo { grid-template-columns: 1fr; } }
