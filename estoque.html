@@ -260,13 +260,13 @@
                 <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
                 <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
                 <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
-                <a class="aba-est" data-aba="analises" href="movimentacao_estoque.html?aba=analises">Análises</a>
+                <a class="aba-est" data-aba="analises" data-perm="administrativo.ver" href="movimentacao_estoque.html?aba=analises">Análises</a>
                 <a class="aba-est" data-perm="estoque.editar" href="etiquetas_qr.html">Etiquetas de QR</a>
             </nav>
             <p class="welcome-subtitle">Cadastre, consulte e acompanhe os itens em estoque. Pressione <kbd>F5</kbd> para pesquisar.</p>
 
             <!-- ===== RESUMO ===== -->
-            <section class="cards">
+            <section class="cards" data-perm="administrativo.ver">
                 <div class="card" data-valor>
                     <div class="card-header"><span class="card-title">Valor total em estoque</span><div class="card-icon">💰</div></div>
                     <div class="card-value" id="c-valor">—</div>
@@ -384,7 +384,7 @@
                             <p class="dica">Para Revestimento, o tamanho multiplica o valor no total do estoque.</p>
                         </div>
                         <div class="aba-conteudo" data-aba="movimento">
-                            <div class="grafico-box"><canvas id="grafico"></canvas></div>
+                            <div class="grafico-box" data-perm="administrativo.ver"><canvas id="grafico"></canvas></div>
                             <div class="grafico-vazio" id="grafico-vazio">Selecione um produto salvo para ver entradas e saídas dos últimos 12 meses.</div>
                         </div>
                     </form>
@@ -543,10 +543,13 @@
         async function carregarResumo() {
             try {
                 const r = await api('/estoque/resumo');
-                document.getElementById('c-valor').textContent = moeda(r.valorTotal);
-                document.getElementById('c-ativos').textContent = r.ativos;
-                document.getElementById('c-minimo').textContent = r.minimo;
-                document.getElementById('c-falta').textContent = r.falta;
+                // totais e contagens só vêm para quem tem a chave administrativa; o operador recebe só os filtros
+                if (r.ativos !== undefined) {
+                    document.getElementById('c-valor').textContent = moeda(r.valorTotal);
+                    document.getElementById('c-ativos').textContent = r.ativos;
+                    document.getElementById('c-minimo').textContent = r.minimo;
+                    document.getElementById('c-falta').textContent = r.falta;
+                }
                 preencherSelect('f-classe', CLASSES_PADRAO, r.classes);
                 preencherSelect('f-unidade', UNIDADES_PADRAO, r.unidades);
                 document.getElementById('lista-fornecedores').innerHTML = r.fornecedores.map(f => `<option value="${escapeHtml(f)}">`).join('');
@@ -784,7 +787,7 @@
         }
         async function carregarMovimentacao(produto) {
             limparGrafico();
-            if (typeof Chart === 'undefined') return;
+            if (typeof Chart === 'undefined' || !Acesso.pode('administrativo.ver')) return;   // gráfico de entradas x saídas é administrativo
             try {
                 const meses = await api('/estoque/movimentacao?produto=' + encodeURIComponent(produto));
                 if (!meses.some(m => m.entrada || m.saida)) {

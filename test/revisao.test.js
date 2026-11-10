@@ -62,7 +62,7 @@ test('com administrador existente, garantirAdministrador não mexe em nada', asy
 
 // ---------- Important 2 e 3: estados na análise do cliente e nas gravações de cliente ----------
 const USUARIOS = {
-  2: { nome: 'Ana', permissoes: new Set(['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'clientes.ver', 'valores.ver']), estados: ['RJ'] },
+  2: { nome: 'Ana', permissoes: new Set(['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'clientes.ver', 'valores.ver', 'administrativo.ver']), estados: ['RJ'] }, // administrativa com região (a análise do cliente exige a chave)
   5: { nome: 'Vera', permissoes: new Set(['clientes.ver', 'clientes.editar', 'clientes.permissao', 'clientes.credito', 'clientes.receber', 'valores.ver']), estados: ['RJ'] }
 };
 const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });

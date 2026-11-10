@@ -68,11 +68,20 @@ const CATALOGO = [
   { codigo: 'etapas.finalizar', nome: 'Dar OK em Pedido finalizado (marca o pedido como Pronto)', area: 'Etapas de produção' },
   { codigo: 'etapas.gerir', nome: 'Gerir todas as etapas de produção: qualquer etapa, N/A, desfazer e forçar o finalizado', area: 'Etapas de produção' },
   { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos e Gestão; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
+  { codigo: 'administrativo.ver', nome: 'Acesso administrativo: gráficos, indicadores, resumos e totais, telas de gestão e valores em dinheiro (sem ela o usuário é operador; com "Valores financeiros" e sem esta, é "só valores")', area: 'Especial' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' },
   { codigo: 'portal.gerir', nome: 'Gerenciar o portal do cliente: liberar empresas, convidar, suspender e reiniciar o 2º fator', area: 'Administração' }
 ];
 const CODIGOS = new Set(CATALOGO.map(p => p.codigo));
+
+// Divisão do sistema em administrativo × operador (decisão do dono, 2026-11-10). `administrativo.ver` é a CHAVE: quem tem vê gráficos, indicadores,
+// resumos, telas de gestão e dinheiro (recebe valores.ver junto). Sem a chave, estas permissões não existem, mesmo que o perfil ou uma exceção
+// "liberar" as tenha. valores.ver NÃO está na lista: Vendedor e Representante veem preço para montar orçamento sem ser administrativos.
+const PERMISSOES_ADMINISTRATIVAS = [
+  'paineis.ver', 'indicadores.ver', 'financeiro.ver', 'financeiro.lancar', 'financeiro.excluir', 'gestao.ver', 'gestao.editar',
+  'precos.ver', 'precos.editar', 'precos.gravar', 'clientes.receber', 'clientes.credito'
+];
 const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
@@ -82,7 +91,11 @@ const PERFIS_INICIAIS = [
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },
   { nome: 'Representante', descricao: 'Pedidos e clientes da sua região, com valores',
-    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.situacao', 'clientes.ver', 'valores.ver'] }
+    permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.situacao', 'clientes.ver', 'valores.ver'] },
+  // operador: faz saída de estoque, atualiza status e as etapas da produção; nada de gráficos, resumos, gestão nem dinheiro
+  { nome: 'Operador', descricao: 'Operação do dia a dia (saída de estoque, status do pedido, etapas, entregas), sem informações administrativas',
+    permissoes: ['estoque.ver', 'estoque.movimentar', 'pedidos.ver', 'pedidos.pdf', 'pedidos.situacao', 'etapas.ver', 'etapas.corte_perfil', 'etapas.corte_vidro',
+      'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'entregas.ver', 'corte.ver'] }
 ];
 
 // perfil + exceções "liberar" − exceções "bloquear"; inativo = nada; códigos fora do catálogo são ignorados
@@ -95,7 +108,18 @@ function permissoesFinais({ permissoesPerfil = [], excecoes = [], ativo }) {
     if (e.tipo === 'liberar') final.add(e.permissao);
     else if (e.tipo === 'bloquear') final.delete(e.permissao);
   }
+  // a chave administrativa decide: com ela vem o dinheiro; sem ela as permissões administrativas somem
+  if (final.has('administrativo.ver')) final.add('valores.ver');
+  else for (const c of PERMISSOES_ADMINISTRATIVAS) final.delete(c);
   return final;
+}
+
+// Classe do usuário, só para exibir (nunca guardada): 'administrativo' (tem a chave), 'so_valores' (valores.ver sem a chave: vendedor/representante)
+// ou 'operador' (nenhuma das duas). Recebe o conjunto de permissões FINAIS.
+function classeDoAcesso(permissoes) {
+  const p = permissoes instanceof Set ? permissoes : new Set(permissoes || []);
+  if (p.has('administrativo.ver')) return 'administrativo';
+  return p.has('valores.ver') ? 'so_valores' : 'operador';
 }
 
 // exige: lista em que todos os itens precisam ser atendidos; { algum: [...] } basta um deles
@@ -108,4 +132,4 @@ function atende(perms, exige) {
   return { ok: faltando.length === 0, faltando };
 }
 
-module.exports = { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende };
+module.exports = { CATALOGO, CODIGOS, PERFIS_INICIAIS, PERMISSOES_ADMINISTRATIVAS, permissoesFinais, classeDoAcesso, atende };

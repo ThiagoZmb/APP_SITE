@@ -15,7 +15,9 @@ const USUARIOS = {
   1: { nome: 'Admin', perfil: 'Administrador', permissoes: perms('Administrador'), estados: [] },
   2: { nome: 'Ana', perfil: 'Representante', permissoes: perms('Representante'), estados: ['RJ'] },
   3: { nome: 'Caio', perfil: 'Estoquista', permissoes: perms('Estoquista'), estados: [] },
-  4: { nome: 'Edu', perfil: 'Estoque sem valores', permissoes: new Set(['estoque.ver', 'estoque.editar', 'produtos.ver', 'clientes.ver']), estados: [] }
+  4: { nome: 'Edu', perfil: 'Estoque sem valores', permissoes: new Set(['estoque.ver', 'estoque.editar', 'produtos.ver', 'clientes.ver']), estados: [] },
+  // só nos testes de defesa em profundidade: na prática a chave traz valores.ver junto (permissoesFinais), mas a rota não pode depender disso
+  5: { nome: 'Raul', perfil: 'Chave sem valores', permissoes: new Set(['clientes.ver', 'administrativo.ver']), estados: [] }
 };
 const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
@@ -52,11 +54,15 @@ test('item de estoque sem valores.ver não traz VALOR, FRETE nem IPI', async t =
   assert.ok(!JSON.stringify(d).match(/"(valor|VALOR|frete|FRETE|ipi|IPI)"/), JSON.stringify(d));
 });
 
-test('resumo do estoque sem valores.ver não tem valorTotal', async t => {
-  const { chamar } = await preparar(t, [[/SUM\(CASE/, [{ total: 999, ativos: 2, falta: 0, minimo: 1 }]]]);
-  const d = await (await chamar(3, '/estoque/resumo')).json();
-  assert.equal(d.valorTotal, undefined);
-  assert.equal(d.ativos, 2);
+test('resumo do estoque: o operador (sem a chave) recebe só os filtros; o administrativo recebe também os totais', async t => {
+  const { chamar, f } = await preparar(t, [[/SUM\(CASE/, [{ total: 999, ativos: 2, falta: 0, minimo: 1 }]], [/SELECT DISTINCT CLASSE AS v/, [{ v: 'Perfil' }]]]);
+  const op = await (await chamar(3, '/estoque/resumo')).json();
+  for (const campo of ['valorTotal', 'ativos', 'falta', 'minimo']) assert.equal(op[campo], undefined, 'operador não recebe ' + campo);
+  assert.deepEqual(Object.keys(op).sort(), ['classes', 'fornecedores', 'unidades'], 'só os filtros que a tela precisa');
+  assert.ok(!f.chamadas.some(c => /SUM\(CASE/.test(c.sql)), 'nem consulta os totais');
+  const adm = await (await chamar(1, '/estoque/resumo')).json();
+  assert.equal(adm.valorTotal, 999);   // administrador tem a chave, logo valores.ver
+  assert.equal(adm.ativos, 2);
 });
 
 test('representante RJ: /dados_lista filtra ESTADO IN (?) com RJ e sem valor', async t => {
@@ -69,7 +75,13 @@ test('representante RJ: /dados_lista filtra ESTADO IN (?) com RJ e sem valor', a
   assert.equal((await r.json())[0].valor, 50); // representante tem valores.ver
 });
 
-test('usuário com clientes.ver sem valores.ver: análise sem dinheiro', async t => {
+test('análise do cliente é administrativa: sem a chave 403 (operador e quem só tem valores)', async t => {
+  const { chamar } = await preparar(t, [[/FROM cadastro_clientes WHERE CODIGO/, [{ CODIGO: 5, RAZAO_SOCIAL: 'CLI', ESTADO: 'ES' }]]]);
+  assert.equal((await chamar(4, '/clientes/analise/5')).status, 403, 'clientes.ver sem a chave');
+  assert.equal((await chamar(2, '/clientes/analise/5')).status, 403, 'Representante tem valores.ver, mas não a chave');
+});
+
+test('[reserva] análise do cliente sem dinheiro: se a chave existisse sem valores, o servidor ainda esconderia o dinheiro', async t => {
   const { chamar } = await preparar(t, [
     [/FROM cadastro_clientes WHERE CODIGO/, [{ CODIGO: 5, RAZAO_SOCIAL: 'CLI', ESTADO: 'ES', DESCONTO: 10, CREDITO: 100 }]],
     [/COUNT\(\*\) AS qtd, SUM\(TOTAL\)/, [{ primeiro: '2025-01-01', qtd: 3, total: 900 }]],
@@ -78,7 +90,7 @@ test('usuário com clientes.ver sem valores.ver: análise sem dinheiro', async t
     [/SUM\(VALOR\) AS total, COUNT/, [{ total: 300, qtd: 2 }]],
     [/FROM ped_orc WHERE RAZAO_SOCIAL = \? AND DATA/, [{ NUMERO: 1, TIPO: 'Pedido', DATA: '2026-01-01', TOTAL: 300 }]]
   ]);
-  const d = await (await chamar(4, '/clientes/analise/5')).json();
+  const d = await (await chamar(5, '/clientes/analise/5')).json();
   const texto = JSON.stringify(d);
   for (const campo of ['pedidos12m', 'orcamentos12m', 'totalVida', 'receber', 'recebido12m', 'desconto', 'credito', 'valor']) {
     assert.ok(!texto.includes(`"${campo}"`), `não deveria ter ${campo}: ${texto}`);
@@ -156,4 +168,21 @@ test('produtos/salvar: produto novo grava VALOR_CHEIO = VALOR_FIXO (o VB ainda l
   const cols = ins.sql.match(/\(([^)]+)\)\s*VALUES/)[1].split(',').map(c => c.trim());
   assert.equal(ins.params[cols.indexOf('VALOR_CHEIO')], 55.5);
   assert.equal(ins.params[cols.indexOf('VALOR_FIXO')], 55.5);
+});
+
+// ---------- Administrativo × Operador: rotas de gráficos, rankings e resumos exigem a chave `administrativo.ver` ----------
+test('rankings, compras x orçamentos e gráfico do item: 403 sem a chave (mesmo com pedidos.ver e valores.ver); 200 com a chave', async t => {
+  const { chamar } = await preparar(t, []);
+  for (const caminho of ['/ranking_produtos', '/ranking_clientes', '/dados_compras_orcamentos', '/estoque/movimentacao?produto=Perfil']) {
+    assert.equal((await chamar(2, caminho)).status, 403, 'Representante (valores, sem a chave): ' + caminho);
+    assert.equal((await chamar(3, caminho)).status, 403, 'Estoquista: ' + caminho);
+    assert.equal((await chamar(1, caminho)).status, 200, 'Administrador: ' + caminho);
+  }
+});
+
+test('o que é operacional continua liberado ao operador: lista de estoque, saída e lista de pedidos de quem tem pedidos.ver', async t => {
+  const { chamar } = await preparar(t, [[/FROM estoque/, [{ CODIGO: 1, NOME_PRODUTO: 'Perfil', QTD_ESTOQUE: 3 }]]]);
+  assert.equal((await chamar(3, '/estoque')).status, 200);
+  assert.equal((await chamar(3, '/estoque/resumo')).status, 200, 'só os filtros');
+  assert.equal((await chamar(3, '/estoque/por_codigo/7890000000011')).status !== 403, true);
 });

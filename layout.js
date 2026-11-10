@@ -84,9 +84,9 @@
     const PAGINAS = {
         'inicio.html': ['paineis.ver'],
         'painel_inicial.html': ['pedidos.ver'],
-        'graficos_pedidos.html': ['pedidos.ver'],
+        'graficos_pedidos.html': ['pedidos.ver', 'administrativo.ver'],
         'clientes.html': ['clientes.ver'],
-        'cliente_analise.html': ['clientes.ver', 'valores.ver'],
+        'cliente_analise.html': ['clientes.ver', 'valores.ver', 'administrativo.ver'],
         'entregas.html': ['entregas.ver'],
         'calendario.html': ['pedidos.ver'],
         'calendario_dia.html': ['pedidos.ver'],

@@ -905,6 +905,45 @@ const acrescentarPermissoesPortal = pool => darAoAdministrador(pool, 'permissoes
 // Indicadores de Pedidos e Orçamentos (Operação agora / Resultado do período): só o Administrador na migração
 const acrescentarPermissoesIndicadores = pool => darAoAdministrador(pool, 'permissoes_indicadores', ['indicadores.ver']);
 
+// Divisão administrativo × operador (2026-11-10): a permissão-chave `administrativo.ver` passa a mandar nas permissões administrativas
+// (seguranca/permissoes.js). Para NINGUÉM perder a gestão que já usa: recebem a chave o Administrador, o Interno completo, qualquer outro perfil
+// que já tenha financeiro.ver, gestao.ver ou precos.ver e quem tem uma exceção "liberar" dessas três. Vendedor e Representante NÃO recebem
+// (ficam "só valores"). Cria o perfil Operador se ele não existir. Roda uma única vez; a auditoria guarda quem recebeu a chave.
+const PERMISSOES_QUE_PEDEM_A_CHAVE = ['financeiro.ver', 'gestao.ver', 'precos.ver'];
+async function acrescentarPermissoesAdministrativo(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_administrativo' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const marcas = PERMISSOES_QUE_PEDEM_A_CHAVE.map(() => '?').join(', ');
+    const [perfis] = await conn.execute(
+      `SELECT DISTINCT p.id FROM web_perfis p LEFT JOIN web_perfil_permissoes pp ON pp.perfil_id = p.id
+       WHERE p.nome IN ('Administrador', 'Interno completo') OR pp.permissao IN (${marcas}) ORDER BY p.id`, PERMISSOES_QUE_PEDEM_A_CHAVE);
+    for (const p of perfis) await conn.execute("INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, 'administrativo.ver')", [p.id]);
+    const [usuarios] = await conn.execute(
+      `SELECT DISTINCT usuario_codigo FROM web_usuario_excecoes WHERE tipo = 'liberar' AND permissao IN (${marcas}) ORDER BY usuario_codigo`, PERMISSOES_QUE_PEDEM_A_CHAVE);
+    for (const u of usuarios) await conn.execute("INSERT IGNORE INTO web_usuario_excecoes (usuario_codigo, permissao, tipo) VALUES (?, 'administrativo.ver', 'liberar')", [u.usuario_codigo]);
+    const [jaTem] = await conn.execute("SELECT id FROM web_perfis WHERE nome = 'Operador' LIMIT 1");
+    let operadorCriado = false;
+    if (!jaTem.length) {
+      const modelo = PERFIS_INICIAIS.find(p => p.nome === 'Operador');
+      const [r] = await conn.execute('INSERT INTO web_perfis (nome, descricao, ativo, criado_em) VALUES (?, ?, 1, NOW())', [modelo.nome, modelo.descricao]);
+      for (const permissao of modelo.permissoes) await conn.execute('INSERT INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [r.insertId, permissao]);
+      operadorCriado = true;
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_administrativo', '', JSON.stringify({ perfisComChave: perfis.map(p => p.id), usuariosComChave: usuarios.map(u => u.usuario_codigo), operadorCriado })]);
+    await conn.commit();
+    return { feito: true, perfis: perfis.length, usuarios: usuarios.length, operadorCriado };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 // Plano de corte: ver e planejar para Administrador e Interno completo; parâmetros e retalhos manuais só para o Administrador
 const PERMISSOES_CORTE = { 'Administrador': ['corte.ver', 'corte.planejar', 'corte.parametros'], 'Interno completo': ['corte.ver', 'corte.planejar'] };
 async function acrescentarPermissoesCorte(pool) {
@@ -1096,4 +1135,4 @@ async function acrescentarPermissoesEtapas(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

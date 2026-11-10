@@ -13,7 +13,7 @@ const { PERFIS_INICIAIS } = require('../seguranca/permissoes');
 // banco simulado com estado: 1 = Thiago (Administrador), 2 = Caio (Estoquista), 3 = Ana (Interno completo)
 function bancoComEstado() {
   const perfis = PERFIS_INICIAIS.map((p, i) => ({ id: i + 1, nome: p.nome, ativo: 1, permissoes: [...p.permissoes] }));
-  perfis.push({ id: 6, nome: 'Admin antigo (desativado)', ativo: 0, permissoes: ['admin.usuarios'] });
+  perfis.push({ id: 7, nome: 'Admin antigo (desativado)', ativo: 0, permissoes: ['admin.usuarios'] });
   const usuarios = {
     1: { CODIGO: 1, NOME: 'Thiago', CARGO: 'Administrador', RAZAO_SOCIAL: 'ELEGANCE', SITUACAO: 'ATIVO' },
     2: { CODIGO: 2, NOME: 'Caio', CARGO: 'Produção', RAZAO_SOCIAL: 'ELEGANCE', SITUACAO: 'ATIVO' },
@@ -33,6 +33,11 @@ function bancoComEstado() {
     [/SELECT permissao FROM web_perfil_permissoes WHERE perfil_id = \?/, (sql, [id]) => (perfilPor(id)?.permissoes || []).map(permissao => ({ permissao }))],
     [/SELECT permissao, tipo FROM web_usuario_excecoes WHERE usuario_codigo = \?/, (sql, [c]) => excecoes.filter(e => e.usuario_codigo === Number(c))],
     // rotas/admin.js
+    [/FROM cliente_usuarios u\s+LEFT JOIN web_usuario_acesso a/, () => Object.values(usuarios).map(u => {
+      const a = acessos[u.CODIGO]; const p = a && perfilPor(a.perfil_id);
+      return { ...u, perfil_id: a ? a.perfil_id : null, perfil_nome: p?.nome ?? null, estados: a ? a.estados : null, ativo: a ? a.ativo : null,
+        perfil_ativo: p ? p.ativo : null, qtd_excecoes: excecoes.filter(e => e.usuario_codigo === u.CODIGO).length };
+    })],
     [/FROM web_usuario_acesso a JOIN cliente_usuarios u/, () => Object.entries(acessos).map(([c, a]) => ({
       usuario_codigo: Number(c), perfil_id: a.perfil_id, ativo: a.ativo, perfil_ativo: perfilPor(a.perfil_id)?.ativo, SITUACAO: usuarios[c].SITUACAO }))],
     [/SELECT id, ativo FROM web_perfis$/, () => perfis.map(p => ({ id: p.id, ativo: p.ativo }))],
@@ -198,7 +203,34 @@ test('ficha do usuário traz exceções e permissões finais', async t => {
 
 test('mover o último admin para um perfil desativado (mesmo com admin.usuarios) é recusado', async t => {
   const { chamar } = await preparar(t);
-  const r = await chamar(1, '/admin/usuarios/1', 'PUT', { perfilId: 6 });
+  const r = await chamar(1, '/admin/usuarios/1', 'PUT', { perfilId: 7 });
   assert.equal(r.status, 409);
   assert.deepEqual(await r.json(), { error: 'Não é possível deixar o sistema sem nenhum administrador ativo.' });
+});
+
+// ---------- classe do usuário na lista (administrativo × operador): calculada com as permissões finais, só para exibir ----------
+test('/admin/usuarios devolve a classe de cada um: administrativo, só valores ou operador', async t => {
+  const { banco, chamar } = await preparar(t);
+  banco.usuarios[4] = { CODIGO: 4, NOME: 'Vera', CARGO: 'Vendas', RAZAO_SOCIAL: 'ELEGANCE', SITUACAO: 'ATIVO' };
+  banco.usuarios[5] = { CODIGO: 5, NOME: 'Rui', CARGO: 'Produção', RAZAO_SOCIAL: 'ELEGANCE', SITUACAO: 'ATIVO' };
+  const idDo = nome => banco.perfis.find(p => p.nome === nome).id;
+  banco.acessos[4] = { perfil_id: idDo('Vendedor'), estados: null, ativo: 1 };
+  banco.acessos[5] = { perfil_id: idDo('Operador'), estados: null, ativo: 1 };
+  const r = await chamar(1, '/admin/usuarios');
+  assert.equal(r.status, 200);
+  const por = Object.fromEntries((await r.json()).map(u => [u.nome, u.classe]));
+  assert.equal(por.Thiago, 'administrativo');   // Administrador
+  assert.equal(por.Ana, 'administrativo');      // Interno completo
+  assert.equal(por.Vera, 'so_valores');         // Vendedor: preço sem gráficos
+  assert.equal(por.Rui, 'operador');            // perfil Operador
+  assert.equal(por.Caio, 'operador');           // Estoquista
+});
+
+test('classe: exceção "liberar" da chave torna o usuário administrativo; "bloquear" derruba para "só valores" (o perfil ainda tem valores.ver)', async t => {
+  const { banco, chamar } = await preparar(t);
+  banco.excecoes.push({ usuario_codigo: 2, permissao: 'administrativo.ver', tipo: 'liberar' });   // Caio (Estoquista)
+  banco.excecoes.push({ usuario_codigo: 3, permissao: 'administrativo.ver', tipo: 'bloquear' });  // Ana (Interno completo)
+  const por = Object.fromEntries((await (await chamar(1, '/admin/usuarios')).json()).map(u => [u.nome, u.classe]));
+  assert.equal(por.Caio, 'administrativo');
+  assert.equal(por.Ana, 'so_valores', 'sem a chave perde gráficos e gestão, mas o perfil Interno completo ainda tem valores.ver');
 });

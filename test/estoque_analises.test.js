@@ -13,9 +13,12 @@ function comHistorico() {
   return b;
 }
 
-test('permissões: Estoquista vê, só ver o estoque não', async t => {
-  const { chamar } = await prepararEstoque(t, { perfil: 'Estoquista', banco: comHistorico() });
-  assert.equal((await chamar('/estoque/analises')).status, 200);
+test('permissões: só o administrativo (chave administrativo.ver) vê as análises; Estoquista e Operador não', async t => {
+  const adm = await prepararEstoque(t, { perfil: 'Interno completo', banco: comHistorico() });
+  assert.equal((await adm.chamar('/estoque/analises')).status, 200);
+  const est = await prepararEstoque(t, { perfil: 'Estoquista', banco: comHistorico() });
+  assert.equal((await est.chamar('/estoque/analises')).status, 403, 'operador: curva ABC e previsão são administrativas');
+  assert.equal((await est.chamar('/estoque/analises/prazo/1', 'PUT', { prazoDias: 10 })).status, 403);
 });
 test('só ver o estoque: 403', async t => {
   const { chamar } = await prepararEstoque(t, { perfil: 'Somente ver' });

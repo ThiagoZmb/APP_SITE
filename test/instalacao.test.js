@@ -42,7 +42,7 @@ test('mapeia representante, admin e demais', async () => {
   const acessos = pool.chamadas.filter(c => /INSERT INTO web_usuario_acesso/.test(c.sql)).map(c => c.params);
   // params: [usuario_codigo, perfil_id, estados]
   assert.deepEqual(acessos.map(p => p.slice(0, 3)), [[1, 1, null], [2, 5, 'RJ'], [3, 2, null]]);
-  assert.equal(pool.chamadas.filter(c => /INSERT INTO web_perfis/.test(c.sql)).length, 5);
+  assert.equal(pool.chamadas.filter(c => /INSERT INTO web_perfis/.test(c.sql)).length, 6); // + Operador
   assert.ok(pool.chamadas.some(c => /INSERT INTO web_perfil_permissoes/.test(c.sql)));
   assert.ok(pool.chamadas.some(c => /INSERT INTO web_auditoria/.test(c.sql) && c.params.includes('migracao_inicial')));
   assert.deepEqual(pool.chamadas.filter(c => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(c.sql)).map(c => c.sql), ['BEGIN', 'COMMIT']);

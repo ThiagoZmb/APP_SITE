@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
@@ -473,7 +473,7 @@ function filtroPedidos12m(req) {
 }
 
 // Tipos de produto mais vendidos (itens dos pedidos)
-registro.rota('get', '/ranking_produtos', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }], async (req, res) => {
+registro.rota('get', '/ranking_produtos', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }, 'administrativo.ver'], async (req, res) => {
   try {
     const f = filtroPedidos12m(req);
     const [rows] = await pool.execute(
@@ -492,7 +492,7 @@ registro.rota('get', '/ranking_produtos', [{ algum: ['paineis.ver', 'pedidos.ver
 });
 
 // Clientes que mais compraram
-registro.rota('get', '/ranking_clientes', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }], async (req, res) => {
+registro.rota('get', '/ranking_clientes', [{ algum: ['paineis.ver', 'pedidos.ver', 'clientes.ver'] }, 'administrativo.ver'], async (req, res) => {
   try {
     const f = filtroPedidos12m(req);
     const [rows] = await pool.execute(
@@ -775,7 +775,7 @@ registro.rota('post', '/clientes/receber', ['clientes.receber', 'valores.ver'], 
 
 // ================= ANÁLISE DO CLIENTE (visão de diretoria) =================
 // Junta, num só pedido, tudo que a página de análise precisa; os indicadores são calculados na tela.
-registro.rota('get', '/clientes/analise/:codigo', ['clientes.ver'], async (req, res) => {
+registro.rota('get', '/clientes/analise/:codigo', ['clientes.ver', 'administrativo.ver'], async (req, res) => {
   try {
     const [cliRows] = await pool.execute('SELECT * FROM cadastro_clientes WHERE CODIGO = ? LIMIT 1', [req.params.codigo]);
     if (!cliRows.length) return res.status(404).json({ error: 'Cliente não encontrado' });
@@ -863,7 +863,7 @@ registro.rota('get', '/clientes/historico/:codigo', ['clientes.ver'], async (req
 });
 
 // ================= GRÁFICO: ORÇAMENTOS x PEDIDOS (últimos 6 meses) =================
-registro.rota('get', '/dados_compras_orcamentos', [{ algum: ['paineis.ver', 'pedidos.ver'] }, 'valores.ver'], async (req, res) => {
+registro.rota('get', '/dados_compras_orcamentos', [{ algum: ['paineis.ver', 'pedidos.ver'] }, 'valores.ver', 'administrativo.ver'], async (req, res) => {
   try {
     const cliente = req.query.cliente;
     const est = condicaoEstado(req, 'c.ESTADO');
@@ -1255,21 +1255,25 @@ registro.rota('get', '/estoque/resumo', ['estoque.ver'], async (req, res) => {
       const [r] = await pool.execute(`SELECT DISTINCT ${col} AS v FROM estoque WHERE ${col} IS NOT NULL AND ${col} <> '' ORDER BY ${col}`);
       return r.map(x => x.v);
     };
-    // as 4 leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render; eram 4 em série)
+    // Totais e contagens (valor em estoque, ativos, em falta, abaixo do mínimo) são RESUMO administrativo: só com a chave `administrativo.ver`.
+    // O operador recebe só os filtros que a tela precisa (classes, unidades, fornecedores) para listar os itens e dar baixa.
+    const administrativo = req.acesso.permissoes.has('administrativo.ver');
+    // as leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render)
     const [[[tot]], classes, unidades, fornecedores] = await Promise.all([
-      pool.execute(
+      administrativo ? pool.execute(
         `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
                 SUM(SITUACAO = 'Ativo') AS ativos,
                 SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE <= 0) AS falta,
                 SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE > 0 AND MIN_ESTOQUE > 0 AND QTD_ESTOQUE <= MIN_ESTOQUE) AS minimo
-         FROM estoque`),
+         FROM estoque`) : Promise.resolve([[{}]]),
       distintos('CLASSE'), distintos('UNIDADE'), distintos('FORNECEDOR')
     ]);
-    res.json(semValores(req, {
+    const filtros = { classes, unidades, fornecedores };
+    res.json(administrativo ? semValores(req, {
       valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0,
       falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0,
-      classes, unidades, fornecedores
-    }, ['valorTotal']));
+      ...filtros
+    }, ['valorTotal']) : filtros);
   } catch (err) {
     console.error('Erro /estoque/resumo:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -1371,7 +1375,7 @@ registro.rota('post', '/estoque/codigo_barras', ['estoque.editar'], async (req, 
 });
 
 // BackgroundWorker2: entradas x saídas dos últimos 12 meses + médias dos meses com movimento
-registro.rota('get', '/estoque/movimentacao', ['estoque.ver'], async (req, res) => {
+registro.rota('get', '/estoque/movimentacao', ['estoque.ver', 'administrativo.ver'], async (req, res) => {
   const produto = txtEstq(req.query.produto);
   if (!produto) return res.json([]);
   const porMes = async tabela => {
@@ -1868,6 +1872,7 @@ async function iniciar() {
   } catch (err) { console.error('[banco] não foi possível criar a coluna IMAGEM:', err.code || 'sem código'); }
   if ((await acrescentarPermissoesPortal(pool)).feito) console.log('[permissões] portal.gerir acrescentada ao Administrador');
   if ((await acrescentarPermissoesIndicadores(pool)).feito) console.log('[permissões] indicadores.ver acrescentada ao Administrador');
+  { const a = await acrescentarPermissoesAdministrativo(pool); if (a.feito) console.log(`[permissões] administrativo.ver concedida a ${a.perfis} perfil(is) e ${a.usuarios} usuário(s) por exceção; perfil Operador ${a.operadorCriado ? 'criado' : 'já existia'}`); }
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
   if (process.env.NODE_ENV !== 'test') {

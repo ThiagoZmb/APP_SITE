@@ -18,11 +18,13 @@ test('indicadores.ver está no catálogo (área Painéis) e só o Administrador 
   for (const perfil of PERFIS_INICIAIS) assert.equal(perfil.permissoes.includes('indicadores.ver'), perfil.nome === 'Administrador', perfil.nome);
 });
 
-test('permissoesFinais: sem a permissão não vem; com perfil ou exceção "liberar" vem; "bloquear" tira', () => {
-  assert.ok(!permissoesFinais({ permissoesPerfil: ['pedidos.ver'], ativo: true }).has('indicadores.ver'));
-  assert.ok(permissoesFinais({ permissoesPerfil: ['pedidos.ver', 'indicadores.ver'], ativo: true }).has('indicadores.ver'));
-  assert.ok(permissoesFinais({ permissoesPerfil: ['pedidos.ver'], excecoes: [{ permissao: 'indicadores.ver', tipo: 'liberar' }], ativo: true }).has('indicadores.ver'));
-  assert.ok(!permissoesFinais({ permissoesPerfil: ['indicadores.ver'], excecoes: [{ permissao: 'indicadores.ver', tipo: 'bloquear' }], ativo: true }).has('indicadores.ver'));
+test('permissoesFinais: sem a permissão não vem; com perfil ou exceção "liberar" vem (SÓ com a chave administrativa); "bloquear" tira', () => {
+  const CHAVE = 'administrativo.ver'; // indicadores são administrativos: sem a chave a permissão some, venha de onde vier
+  assert.ok(!permissoesFinais({ permissoesPerfil: ['pedidos.ver', CHAVE], ativo: true }).has('indicadores.ver'));
+  assert.ok(permissoesFinais({ permissoesPerfil: ['pedidos.ver', 'indicadores.ver', CHAVE], ativo: true }).has('indicadores.ver'));
+  assert.ok(permissoesFinais({ permissoesPerfil: ['pedidos.ver', CHAVE], excecoes: [{ permissao: 'indicadores.ver', tipo: 'liberar' }], ativo: true }).has('indicadores.ver'));
+  assert.ok(!permissoesFinais({ permissoesPerfil: ['indicadores.ver', CHAVE], excecoes: [{ permissao: 'indicadores.ver', tipo: 'bloquear' }], ativo: true }).has('indicadores.ver'));
+  assert.ok(!permissoesFinais({ permissoesPerfil: ['pedidos.ver', 'indicadores.ver'], ativo: true }).has('indicadores.ver'), 'sem a chave, nada de indicadores');
 });
 
 function poolInd({ jaFeito = false } = {}) {

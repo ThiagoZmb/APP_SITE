@@ -347,7 +347,7 @@
                 </section>
 
                 <!-- ===== EVOLUÇÃO + LEITURA ===== -->
-                <section class="larga so-geral">
+                <section class="larga so-geral" data-perm="administrativo.ver">
                     <div class="painel">
                         <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small><span data-valor>valores e % de fechamento</span><span data-sem-valor>quantidade emitida</span> · últimos 12 meses</small></div>
                         <div class="graf"><canvas id="g-mensal"></canvas></div>
@@ -358,7 +358,7 @@
                     </div>
                 </section>
 
-                <section class="duas so-geral">
+                <section class="duas so-geral" data-perm="administrativo.ver">
                     <div class="painel">
                         <div class="cab"><h3>Situação dos pedidos</h3><small id="status-sub">no período</small></div>
                         <div class="graf baixo"><canvas id="g-status"></canvas></div>
@@ -370,8 +370,8 @@
                 </section>
 
                 <!-- ===== O QUE VENDE / QUEM COMPRA ===== -->
-                <section class="painel so-geral" id="ranking-produtos"></section>
-                <section class="painel so-geral" id="ranking-clientes"></section>
+                <section class="painel so-geral" id="ranking-produtos" data-perm="administrativo.ver"></section>
+                <section class="painel so-geral" id="ranking-clientes" data-perm="administrativo.ver"></section>
 
             </div>
         </main>
@@ -680,6 +680,8 @@
 
         // ================= RANKINGS (o que vende / quem compra) =================
         function renderRankings(j) {
+            // rankings de vendas são administrativos: sem a chave nem chamam o servidor (que responderia 403)
+            if (!Acesso.pode('administrativo.ver')) { $('ranking-produtos').hidden = true; $('ranking-clientes').hidden = true; return; }
             Ranking.montar($('ranking-produtos'), {
                 titulo: 'Tipos de produto mais vendidos — últimos 12 meses',
                 subtitulo: (t, m) => (cliente ? 'Pedidos deste cliente · ' : 'Itens de pedidos · ') + (m.id === 'valor' ? `Total vendido: <b>${moeda(t)}</b>` : `Total: <b>${num(Math.round(t))} un.</b>`),

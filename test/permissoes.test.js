@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 67 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 67);
-  assert.equal(CODIGOS.size, 67);
+test('catálogo tem 68 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 68);
+  assert.equal(CODIGOS.size, 68);
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
   assert.ok(CODIGOS.has('precos.ver') && CODIGOS.has('precos.editar'));
@@ -15,11 +15,11 @@ test('catálogo tem 67 permissões e códigos únicos', () => {
 
 test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e excluir', () => {
   const p = perfil('Interno completo');
-  assert.equal(p.permissoes.length, 48); // + etapas.ver e as 5 etapas de produção (não finalizar nem gerir), + perfis.desenho, + danfe.ver, orcamentos.situacao, pesos.*, notas.*, atendimento.modo, + fornecedores.*, tintas.*, corte.ver/planejar, compras_nfe.* e pedidos.checklist/checklist.enviar
+  assert.equal(p.permissoes.length, 49); // + etapas.ver e as 5 etapas de produção (não finalizar nem gerir), + perfis.desenho, + danfe.ver, orcamentos.situacao, pesos.*, notas.*, atendimento.modo, + fornecedores.*, tintas.*, corte.ver/planejar, compras_nfe.* e pedidos.checklist/checklist.enviar
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil("Administrador").permissoes.length, 66);
+  assert.equal(perfil("Administrador").permissoes.length, 67);
   assert.ok(p.permissoes.includes('corte.ver') && p.permissoes.includes('corte.planejar')); // plano de corte: Interno completo planeja
   assert.ok(!p.permissoes.includes('corte.parametros')); // parâmetros e retalhos manuais: só o Administrador
   assert.ok(!p.permissoes.includes('gestao.ver') && !p.permissoes.includes('gestao.editar')); // Central de Gestão: só o Administrador na migração
@@ -112,4 +112,55 @@ test('etapas de produção: no catálogo (área Etapas de produção); Interno c
   assert.ok(!ic.includes('etapas.finalizar') && !ic.includes('etapas.gerir'));
   for (const c of etapas) assert.ok(perfil('Administrador').permissoes.includes(c), c);
   for (const n of ['Vendedor', 'Estoquista', 'Representante']) assert.ok(!perfil(n).permissoes.some(c => c.startsWith('etapas.')), n);
+});
+
+// ---------- Administrativo × Operador (decisão do dono, 2026-11-10): a permissão-chave `administrativo.ver` ----------
+const { PERMISSOES_ADMINISTRATIVAS } = require('../seguranca/permissoes');
+const finais = (permissoesPerfil, excecoes = []) => permissoesFinais({ permissoesPerfil, excecoes, ativo: true });
+
+test('administrativo.ver existe no catálogo, na área Especial, e é uma permissão como as outras', () => {
+  const p = CATALOGO.find(x => x.codigo === 'administrativo.ver');
+  assert.ok(p && p.area === 'Especial' && CODIGOS.has('administrativo.ver'));
+});
+
+test('com a chave: o usuário ganha valores.ver sozinho (a classe administrativa vê dinheiro)', () => {
+  const f = finais(['administrativo.ver', 'financeiro.ver']);
+  assert.ok(f.has('valores.ver') && f.has('financeiro.ver') && f.has('administrativo.ver'));
+});
+
+test('sem a chave: as permissões administrativas SOMEM, venham do perfil ou de exceção "liberar"', () => {
+  const todas = ['paineis.ver', 'indicadores.ver', 'financeiro.ver', 'financeiro.lancar', 'financeiro.excluir', 'gestao.ver', 'gestao.editar',
+    'precos.ver', 'precos.editar', 'precos.gravar', 'clientes.receber', 'clientes.credito'];
+  assert.deepEqual([...PERMISSOES_ADMINISTRATIVAS].sort(), [...todas].sort());
+  const doPerfil = finais([...todas, 'estoque.ver', 'pedidos.ver']);
+  for (const c of todas) assert.ok(!doPerfil.has(c), c);
+  assert.ok(doPerfil.has('estoque.ver') && doPerfil.has('pedidos.ver'), 'o que é operacional fica');
+  const porExcecao = finais(['estoque.ver'], todas.map(c => ({ permissao: c, tipo: 'liberar' })));
+  for (const c of todas) assert.ok(!porExcecao.has(c), 'exceção liberar não vale sem a chave: ' + c);
+});
+
+test('a chave pode vir de exceção "liberar" e ser derrubada por "bloquear"', () => {
+  assert.ok(finais(['estoque.ver'], [{ permissao: 'administrativo.ver', tipo: 'liberar' }]).has('valores.ver'));
+  const f = finais(['administrativo.ver', 'financeiro.ver'], [{ permissao: 'administrativo.ver', tipo: 'bloquear' }]);
+  assert.ok(!f.has('financeiro.ver') && !f.has('valores.ver'), 'sem a chave, nada administrativo');
+});
+
+test('terceira situação: valores.ver SEM a chave continua valendo (Vendedor e Representante veem preço, sem gráficos nem gestão)', () => {
+  for (const nome of ['Vendedor', 'Representante']) {
+    const f = finais(perfil(nome).permissoes);
+    assert.ok(f.has('valores.ver') && f.has('pedidos.ver'), nome);
+    assert.ok(!f.has('paineis.ver') && !f.has('administrativo.ver'), nome + ' perde o Início, mas não o preço');
+  }
+});
+
+test('Administrador e Interno completo têm a chave; Operador é perfil pronto, sem a chave e sem valores', () => {
+  assert.ok(perfil('Administrador').permissoes.includes('administrativo.ver'));
+  assert.ok(perfil('Interno completo').permissoes.includes('administrativo.ver'));
+  const op = perfil('Operador');
+  assert.ok(op, 'perfil Operador');
+  for (const proibido of ['administrativo.ver', 'valores.ver', ...PERMISSOES_ADMINISTRATIVAS, 'admin.usuarios', 'estoque.ajustar', 'estoque.editar']) {
+    assert.ok(!op.permissoes.includes(proibido), proibido);
+  }
+  for (const c of ['estoque.ver', 'estoque.movimentar', 'pedidos.ver', 'pedidos.situacao', 'etapas.ver', 'entregas.ver']) assert.ok(op.permissoes.includes(c), c);
+  assert.ok(op.permissoes.every(c => CODIGOS.has(c)), 'só códigos do catálogo');
 });

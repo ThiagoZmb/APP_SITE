@@ -159,7 +159,7 @@
                 <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
                 <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
                 <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
-                <a class="aba-est" data-aba="analises" href="movimentacao_estoque.html?aba=analises">Análises</a>
+                <a class="aba-est" data-aba="analises" data-perm="administrativo.ver" href="movimentacao_estoque.html?aba=analises">Análises</a>
             </nav>
             <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico dos movimentos</p>
 
@@ -465,7 +465,7 @@
 
         // ===================== ABAS =====================
         const ORDEM_ABAS = ['entrada', 'saida', 'ajuste', 'historico', 'analises'];
-        const PERM_ABA = { entrada: 'estoque.movimentar', saida: 'estoque.movimentar', ajuste: 'estoque.ajustar', historico: '', analises: '' };
+        const PERM_ABA = { entrada: 'estoque.movimentar', saida: 'estoque.movimentar', ajuste: 'estoque.ajustar', historico: '', analises: 'administrativo.ver' };   // curva ABC, previsão de falta e itens parados: só o administrativo
         const iniciadores = {};
         const iniciadas = new Set();
         const abaPermitida = nome => ORDEM_ABAS.includes(nome) && (!PERM_ABA[nome] || pode(PERM_ABA[nome]));

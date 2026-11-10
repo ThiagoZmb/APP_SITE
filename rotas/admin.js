@@ -3,7 +3,7 @@
 // Tabelas do VB: só grava em cliente_usuarios (NOME, SENHA, CARGO ao editar,
 // e a linha nova ao criar). Todo o resto vive nas tabelas web_*.
 // ==========================================================================
-const { CATALOGO, CODIGOS, permissoesFinais } = require('../seguranca/permissoes');
+const { CATALOGO, CODIGOS, permissoesFinais, classeDoAcesso } = require('../seguranca/permissoes');
 const { parseEstados } = require('../seguranca/acesso');
 const { CUSTO_BCRYPT } = require('../seguranca/login_limite');
 
@@ -83,13 +83,32 @@ function registrarAdmin({ rota, pool, acesso, bcrypt, sessoes }) {
   rota('get', '/admin/usuarios', ADMIN, async (req, res) => {
     try {
       const [rows] = await pool.execute(
-        `SELECT u.CODIGO, u.NOME, u.CARGO, u.RAZAO_SOCIAL, u.SITUACAO, a.perfil_id, p.nome AS perfil_nome, a.estados, a.ativo,
+        `SELECT u.CODIGO, u.NOME, u.CARGO, u.RAZAO_SOCIAL, u.SITUACAO, a.perfil_id, p.nome AS perfil_nome, a.estados, a.ativo, p.ativo AS perfil_ativo,
                 (SELECT COUNT(*) FROM web_usuario_excecoes e WHERE e.usuario_codigo = u.CODIGO) AS qtd_excecoes
          FROM cliente_usuarios u
          LEFT JOIN web_usuario_acesso a ON a.usuario_codigo = u.CODIGO
          LEFT JOIN web_perfis p ON p.id = a.perfil_id
          ORDER BY u.NOME`);
+      // classe (administrativo / só valores / operador): calculada com as permissões finais de cada um (2 leituras em bloco, sem N consultas);
+      // se a leitura falhar, a lista sai sem classe (nunca derruba a tela de usuários)
+      let permsDoPerfil = null, excecoesDe = null;
+      try {
+        const [pp, ex] = await Promise.all([
+          pool.execute('SELECT perfil_id, permissao FROM web_perfil_permissoes'),
+          pool.execute('SELECT usuario_codigo, permissao, tipo FROM web_usuario_excecoes')
+        ]);
+        permsDoPerfil = new Map();
+        for (const x of pp[0]) { if (!permsDoPerfil.has(x.perfil_id)) permsDoPerfil.set(x.perfil_id, []); permsDoPerfil.get(x.perfil_id).push(x.permissao); }
+        excecoesDe = new Map();
+        for (const x of ex[0]) { if (!excecoesDe.has(x.usuario_codigo)) excecoesDe.set(x.usuario_codigo, []); excecoesDe.get(x.usuario_codigo).push(x); }
+      } catch { permsDoPerfil = null; }
+      const classeDe = r => !permsDoPerfil ? null : classeDoAcesso(permissoesFinais({
+        permissoesPerfil: Number(r.perfil_ativo) === 1 ? (permsDoPerfil.get(r.perfil_id) || []) : [],
+        excecoes: excecoesDe.get(r.CODIGO) || [],
+        ativo: Number(r.ativo) === 1 && String(r.SITUACAO || '').toUpperCase() !== 'INATIVO'
+      }));
       res.json(rows.map(r => ({
+        classe: classeDe(r),
         codigo: r.CODIGO, nome: r.NOME, cargo: r.CARGO || '', empresa: r.RAZAO_SOCIAL || '',
         situacaoVB: r.SITUACAO || '', perfil: r.perfil_id != null ? { id: r.perfil_id, nome: r.perfil_nome || '' } : null,
         estados: parseEstados(r.estados), ativoWeb: Number(r.ativo) === 1, qtdExcecoes: Number(r.qtd_excecoes) || 0

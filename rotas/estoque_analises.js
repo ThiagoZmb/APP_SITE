@@ -110,6 +110,7 @@ function calcularAnalises({ hoje, janela, verValores, itens, saidasPorProduto, s
 
 const { hojeLocal, agoraLocal } = require('./estoque_movimentos');
 const VER = 'estoque.ver';
+const ADMIN = 'administrativo.ver';   // curva ABC, previsão de falta e itens parados são análises administrativas: o operador não vê
 
 function registrarEstoqueAnalises({ rota, pool }) {
   const falha = (res, rotaNome, err) => {
@@ -118,7 +119,7 @@ function registrarEstoqueAnalises({ rota, pool }) {
   };
 
   // tudo somado no banco: nenhuma consulta devolve linha por linha de movimento
-  rota('get', '/estoque/analises', [VER, { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }], async (req, res) => {
+  rota('get', '/estoque/analises', [VER, { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }, ADMIN], async (req, res) => {
     const janela = JANELAS.includes(Number(req.query.janela)) ? Number(req.query.janela) : 90;
     const classe = String(req.query.classe || '').trim().slice(0, 45);
     const hoje = hojeLocal();
@@ -151,7 +152,7 @@ function registrarEstoqueAnalises({ rota, pool }) {
   });
 
   // prazo de reposição do item (tabela só da web; sem linha = 15 dias)
-  rota('put', '/estoque/analises/prazo/:codigo', [VER, 'estoque.editar'], async (req, res) => {
+  rota('put', '/estoque/analises/prazo/:codigo', [VER, 'estoque.editar', ADMIN], async (req, res) => {
     const prazo = req.body?.prazoDias;
     if (!Number.isInteger(prazo) || prazo < 1 || prazo > 365) return res.status(400).json({ error: 'Prazo de reposição: número inteiro de 1 a 365 dias.' });
     const codigo = parseInt(req.params.codigo, 10) || 0;

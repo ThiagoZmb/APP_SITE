@@ -165,7 +165,7 @@
                     </div>
                     <div class="rolagem">
                         <table class="tabela" id="lista-usuarios">
-                            <thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th>Estados</th><th>Situação</th><th></th></tr></thead>
+                            <thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th>Classe</th><th>Estados</th><th>Situação</th><th></th></tr></thead>
                             <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
                         </table>
                     </div>
@@ -333,19 +333,23 @@
             const termo = semAcento($('busca').value.trim());
             const lista = usuarios.filter(u => !termo || semAcento([u.nome, u.cargo, u.perfil?.nome].join(' ')).includes(termo));
             const tbody = $('lista-usuarios').querySelector('tbody');
-            if (!lista.length) { tbody.innerHTML = `<tr><td colspan="6" class="vazio">${usuarios.length ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}</td></tr>`; return; }
+            if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="vazio">${usuarios.length ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}</td></tr>`; return; }
             tbody.innerHTML = lista.map(u => {
                 const [sit, cls] = situacaoDe(u);
                 return `<tr data-codigo="${u.codigo}">
                     <td><b>${esc(u.nome)}</b></td>
                     <td>${esc(u.cargo || '—')}</td>
                     <td>${esc(u.perfil?.nome || '—')}</td>
+                    <td>${seloClasse(u.classe)}</td>
                     <td>${u.estados.length ? esc(u.estados.join(', ')) : 'Todos'}</td>
                     <td><span class="selo ${cls}">${sit}</span></td>
                     <td>${u.qtdExcecoes ? `<span class="selo aviso">${u.qtdExcecoes} ${u.qtdExcecoes === 1 ? 'exceção' : 'exceções'}</span>` : ''}</td>
                 </tr>`;
             }).join('');
         }
+        // classe calculada pelo servidor: administrativo (tem a chave), só valores (preço, sem gráficos nem gestão) ou operador
+        const CLASSES = { administrativo: ['Administrativo', 'ok'], so_valores: ['Só valores', 'aviso'], operador: ['Operador', ''] };
+        const seloClasse = c => (CLASSES[c] ? `<span class="selo ${CLASSES[c][1]}">${CLASSES[c][0]}</span>` : '—');
         async function carregarUsuarios() {
             try { usuarios = await api('/admin/usuarios'); renderUsuarios(); }
             catch (e) { $('lista-usuarios').querySelector('tbody').innerHTML = `<tr><td colspan="6" class="vazio">${esc(e.message)}</td></tr>`; }
