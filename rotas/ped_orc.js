@@ -19,6 +19,8 @@ const TIPOS = ['Orçamento', 'Pedido'];
 const SITUACOES_PEDIDO = ['Em Produção', 'Entregue', 'Cancelado', 'Retirado'];
 const FINANCEIROS = ['Recebido', 'A Receber', 'Atrasado', 'Sem custo'];
 const FRENTES_PORTA = ['Porta de giro', 'Porta basculante', 'Frente de gaveta', 'Porta de Correr'];
+// o banco/VB pode guardar "A receber", "em produção" ou com espaço sobrando: acha o valor canônico da lista sem diferenciar caixa
+const canonico = (lista, v) => { const t = String(v ?? '').trim().toLowerCase(); return lista.find(x => x.toLowerCase() === t); };
 const MAX_ITENS = 200;
 const MAX_QTD_ITEM = 500; // folhas/peças por item (cada folha vira um objeto na engenharia)
 const corta = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -558,6 +560,7 @@ function registrarPedOrc({ rota, pool }) {
     const b = req.body || {};
     if (b.tipo === 'Pedido' && !req.acesso.permissoes.has('pedidos.criar'))
       return res.status(403).json({ error: 'Sem permissão para salvar como pedido.', faltando: ['pedidos.criar'] });
+    if (b.tipo === 'Pedido') { b.situacao = canonico(SITUACOES_PEDIDO, b.situacao) ?? b.situacao; b.financeiro = canonico(FINANCEIROS, b.financeiro) ?? b.financeiro; }
     const erro = validar(b);
     if (erro) return res.status(400).json({ error: erro });
 

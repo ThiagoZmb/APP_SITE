@@ -3464,6 +3464,7 @@
             $s('ped-data').value = hojeISO();
             $s('ped-tipo').value = 'Orçamento';
             configurarTipo();
+            sincronizarTipoToggle();
             aplicarModoLeitura(false);
             mostrarNumero();
             mostrarMsgSalvar('');
@@ -3481,8 +3482,10 @@
         // select com o valor gravado mesmo que ele não esteja na lista (dados antigos do VB)
         function escolherOpcao(id, valor) {
             const sel = $s(id);
-            if (valor && ![...sel.options].some(o => o.value === valor)) sel.add(new Option(valor, valor));
-            sel.value = valor || '';
+            // "A receber" do banco = opção "A Receber" (caixa/espaços não contam); senão o servidor recusava o Salvar
+            const igual = valor ? [...sel.options].find(o => o.value.trim().toLowerCase() === String(valor).trim().toLowerCase()) : null;
+            if (valor && !igual) sel.add(new Option(valor, valor));
+            sel.value = igual ? igual.value : (valor || '');
         }
         // ============ ABRIR (Carregar_Pedido_Com_DNA) ============
         async function abrirDocumento(tipo, numero, { confirmar = true, silencioso = false } = {}) {
@@ -3515,6 +3518,7 @@
             docAberto = { tipo: c.tipo, numero: c.numero, impressao: j.impressao, data: c.data || '', podeEditar: !!j.podeEditar };
             atualizarCamposPedido();
             mostrarNumero();
+            sincronizarTipoToggle(); // value atribuído por código não dispara 'change': sem isto o alternador ficava em "Orçamento"
             aplicarModoLeitura(!j.podeEditar);
             renderItens();
             return true;

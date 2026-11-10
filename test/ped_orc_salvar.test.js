@@ -239,3 +239,26 @@ test('cor do revestimento vazia não reprova o item', async t => {
   const r = await salvar(chamar, pedido({ itens: [giro({ detalhes: { ...giro().detalhes, corRevest: '' } })] }));
   assert.equal(r.status, 200);
 });
+
+// Regressão (pedido 23376): o banco/VB guarda "A receber" (r minúsculo) e a tela mostrava isso ao abrir; o servidor comparava
+// com maiúsculas/minúsculas exatas e recusava o Salvar com "Favor escolher a situação financeira do pedido!".
+test('situação e financeiro: aceita caixa/espaços diferentes e grava o valor canônico', async t => {
+  for (const [fin, sit] of [['A receber', 'Em Produção'], [' a receber ', 'Em produção'], ['RECEBIDO', 'entregue']]) {
+    const { banco, chamar } = await prepararPedOrc(t);
+    const r = await salvar(chamar, pedido({ financeiro: fin, situacao: sit }));
+    assert.equal(r.status, 200, `${fin} / ${sit}`);
+    const cab = banco.pedOrc[0];
+    assert.ok(['Recebido', 'A Receber'].includes(cab.FINANCEIRO), cab.FINANCEIRO);
+    assert.ok(['Em Produção', 'Entregue'].includes(cab.SITUACAO), cab.SITUACAO);
+  }
+  const { chamar } = await prepararPedOrc(t);
+  assert.equal((await salvar(chamar, pedido({ financeiro: 'Qualquer' }))).status, 400);
+});
+
+test('orcamentos.html: abrir documento escolhe a opção sem diferenciar caixa e sincroniza o alternador Pedido/Orçamento', () => {
+  const h = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'orcamentos.html'), 'utf8');
+  const esc = /function escolherOpcao[\s\S]*?\n        }/.exec(h)[0];
+  assert.match(esc, /toLowerCase\(\)/);
+  const abrir = /async function abrirDocumento[\s\S]*?return true;/.exec(h)[0];
+  assert.match(abrir, /sincronizarTipoToggle\(\)/);
+});
