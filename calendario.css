@@ -23,7 +23,7 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
 .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: var(--on-primary); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
 
-.painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
+.painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; overflow: clip; }   /* clip (não hidden): hidden viraria o contêiner de rolagem e mataria o sticky da barra .cal-fixo */
 .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
 .cinza { color: var(--text-light); font-size: 13px; }
 .vazio { text-align: center; padding: 40px; color: var(--text-light); list-style: none; }
@@ -33,6 +33,11 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
 .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
 
+/* barra FIXA do topo (.cal-fixo = navegação + resumo + filtros + pesquisa): gruda no topo da janela logo abaixo do cabeçalho de 24px do tema.css enquanto a lista/grade rola (a janela rola, o main do tema é overflow:visible).
+   --cal-fixo-altura é medida pelo calendario.js (ResizeObserver) e alimenta o scroll-margin do resultado da pesquisa; o valor daqui é só reserva. z-index 20 < cabeçalho (30) < menu do botão direito (1000). */
+:root { --cal-topo-tema: 24px; --cal-fixo-altura: 150px; }
+.cal-fixo { position: sticky; top: var(--cal-topo-tema); z-index: 20; background: var(--white); border-bottom: 1px solid var(--border-color); border-radius: var(--radius) var(--radius) 0 0; min-width: 0; }
+.cal-fixo .cal-topo { padding-top: 14px; }
 /* barra do topo: navegação, resumo e alternador Em aberto | Todos */
 .cal-topo { display: flex; align-items: center; gap: 8px; padding: 18px 16px 12px; flex-wrap: wrap; }
 .cal-topo h2 { font-size: 19px; margin: 0 8px; }
@@ -95,7 +100,8 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 /* pesquisa: só destaca, nada é escondido. Dia = fundo/borda na cor primária; pedido = fundo cheio, negrito e contorno (não depende só de cor) */
 .cal-busca { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 16px 12px; }
 .cal-busca-rotulo { font-size: 13px; font-weight: 600; color: var(--text-light); }
-.cal-busca input { flex: 1 1 260px; max-width: 420px; }
+/* a lupa (.busca::before do tema.css) é posicionada em relação ao .busca: por isso o campo tem o próprio .busca (.cal-busca-campo) e a linha .cal-busca NÃO é .busca; antes a lupa ia para o canto da linha, por cima do rótulo */
+.cal-busca-campo { flex: 1 1 260px; max-width: 420px; min-width: min(100%, 200px); }
 .cal-busca button[hidden] { display: none; }
 .cel.dia-achou { background: var(--primary-light); box-shadow: inset 0 0 0 2px var(--primary-color); }
 .cel.dia-achou:hover:not(.fora) { background: var(--primary-light); }
@@ -104,8 +110,8 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .etq.achou, .folha-linha.achou { background: var(--primary-color); color: var(--on-primary); font-weight: 800; border-left-color: var(--on-primary); box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 4px var(--primary-color); }
 .etq.achou .etq-atraso, .etq.achou .etq-sit, .folha-linha.achou .folha-final, .folha-linha.achou .folha-sit, .folha-linha.achou .folha-atraso { color: var(--on-primary); opacity: 1; }
 .folha-linha.achou:hover { background: var(--primary-dark); }
-/* rolagem até o resultado: folga para o topo fixo (24px) e a barra do celular não cobrirem o destaque */
-.etq.achou, .folha-linha.achou { scroll-margin-block: 96px; }
+/* rolagem até o resultado: no topo, a folga é cabeçalho do tema (24px) + altura real da barra fixa (--cal-fixo-altura, medida pelo JS; muda quando a barra quebra em duas linhas no celular) + 16px; embaixo, 24px */
+.etq.achou, .folha-linha.achou { scroll-margin-block: calc(var(--cal-topo-tema) + var(--cal-fixo-altura) + 16px) 24px; }
 .etq.achou.atual, .folha-linha.achou.atual { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
 .etq.achou:focus-visible, .folha-linha.achou:focus-visible { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
 
@@ -165,6 +171,7 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
     .ld-acoes { grid-column: 2; }
 }
 @media print {
+    .cal-fixo { position: static; background: none; border: 0; border-radius: 0; }
     body { padding: 0; background: white; color: black; }
     .container { display: block; box-shadow: none; border-radius: 0; background: white; }
     header, .sidebar, .cal-topo button, .cal-busca, .titulo-linha .tipo-toggle, #cal-situacao, .cal-ajuda, #toasts, .painel::before { display: none !important; }

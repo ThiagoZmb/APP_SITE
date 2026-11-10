@@ -411,8 +411,61 @@ test('calendario.js: a digitação rola até o 1º destaque visível sem mover o
 });
 
 test('calendario.css: destaque com scroll-margin (topo fixo não cobre o resultado) e versões ?v= subidas juntas', () => {
-  assert.match(ler('calendario.css'), /\.etq\.achou, \.folha-linha\.achou \{ scroll-margin-block: \d+px; \}/);
+  assert.match(ler('calendario.css'), /\.etq\.achou, \.folha-linha\.achou \{ scroll-margin-block: calc\(var\(--cal-topo-tema\) \+ var\(--cal-fixo-altura\) \+ 16px\) 24px; \}/);
   const v = h => [...h.matchAll(/calendario(?:_comum)?\.(?:css|js)\?v=(\d+)/g)].map(m => m[1]);
   const mes = v(ler('calendario.html')), diaV = v(ler('calendario_dia.html'));
   assert.equal(new Set([...mes, ...diaV]).size, 1, 'mesma versão em calendario.html e calendario_dia.html');
+});
+
+// ---------- barra fixa (sticky) do topo e lupa da pesquisa ----------
+test('alturaBarraFixa: px medido vira valor de variável CSS; medida inválida vira vazio (não sobrescreve a reserva)', () => {
+  assert.equal(K.alturaBarraFixa(131.2), '132px');
+  assert.equal(K.alturaBarraFixa(88), '88px');
+  for (const ruim of [0, -5, NaN, undefined, null, Infinity]) assert.equal(K.alturaBarraFixa(ruim), '', String(ruim));
+});
+
+test('calendario.html: topo e pesquisa dentro de UMA barra #cal-fixo; a lupa tem o próprio .busca (não é o da linha inteira)', () => {
+  const html = ler('calendario.html');
+  const fixo = html.slice(html.indexOf('id="cal-fixo"'), html.indexOf('id="cal-grade"'));
+  assert.match(html, /<div class="cal-fixo" id="cal-fixo">/);
+  for (const trecho of ['class="cal-topo"', 'id="cal-titulo"', 'id="cal-resumo"', 'id="cal-situacao"', 'data-imprimir', 'role="search"', 'id="cal-busca"', 'id="cal-busca-limpar"', 'id="cal-busca-ant"', 'id="cal-busca-prox"', 'id="cal-busca-resultado"']) assert.ok(fixo.includes(trecho), trecho + ' dentro da barra fixa');
+  assert.doesNotMatch(html, /class="busca cal-busca"/, 'a linha da pesquisa não pode ser .busca: a lupa iria para o canto, por cima do rótulo');
+  assert.match(html, /<div class="busca cal-busca-campo">\s*<input type="search" id="cal-busca"/, 'a lupa fica dentro do campo');
+  assert.doesNotMatch(html, /style=/, 'sem estilo inline');
+});
+
+test('calendario.css: barra sticky logo abaixo do cabeçalho do tema, opaca, abaixo de menu/cabeçalho; painel sem overflow:hidden puro', () => {
+  const css = ler('calendario.css');
+  const regra = css.match(/\.cal-fixo \{([^}]*)\}/)[1];
+  assert.match(regra, /position: sticky/);
+  assert.match(regra, /top: var\(--cal-topo-tema\)/);
+  assert.match(regra, /background: var\(--white\)/, 'fundo opaco pela variável do tema');
+  assert.match(regra, /border-bottom: 1px solid var\(--border-color\)/);
+  const z = Number(regra.match(/z-index: (\d+)/)[1]);
+  assert.ok(z > 0 && z < 30, 'abaixo do cabeçalho do tema (30)');
+  assert.ok(z < Number(css.match(/#menu-ctx \{[^}]*z-index: (\d+)/)[1]), 'abaixo do menu do botão direito');
+  assert.match(css, /:root \{ --cal-topo-tema: 24px; --cal-fixo-altura: \d+px; \}/);
+  assert.match(ler('tema.css'), /height: 24px;/, 'cabeçalho do tema segue com 24px (o top da barra)');
+  assert.match(css, /\.painel \{[^}]*overflow: clip;/, 'overflow:hidden no painel desligaria o sticky');
+  assert.doesNotMatch(regra, /#[0-9a-f]{3,6}\b|rgb\(/i, 'sem cor solta');
+});
+
+test('calendario.css: lupa só dentro do campo e impressão sem barra fixa', () => {
+  const css = ler('calendario.css');
+  assert.match(css, /\.cal-busca-campo \{[^}]*flex: 1 1 260px/);
+  assert.doesNotMatch(css, /\.cal-busca input \{/);
+  assert.match(ler('tema.css'), /body \.busca::before[^{]*\{[^}]*position: absolute/, 'a lupa do tema é absoluta em relação ao .busca');
+  const imp = css.slice(css.indexOf('@media print'));
+  assert.match(imp, /\.cal-fixo \{ position: static;/);
+  assert.match(imp, /\.cal-busca[^{]*\{ display: none !important; \}/, 'pesquisa não sai impressa');
+});
+
+test('calendario.js: mede a barra fixa (ResizeObserver, resize e antes de rolar) e grava --cal-fixo-altura', () => {
+  const js = ler('calendario.js');
+  assert.match(js, /\$\('cal-fixo'\)/);
+  assert.match(js, /K\.alturaBarraFixa\(barraFixa\.getBoundingClientRect\(\)\.height\)/);
+  assert.match(js, /style\.setProperty\('--cal-fixo-altura', v\)/);
+  assert.match(js, /new win\.ResizeObserver\(medirBarraFixa\)\.observe\(barraFixa\)/);
+  assert.match(js, /addEventListener\('resize', medirBarraFixa\)/);
+  assert.match(js.slice(js.indexOf('function marcarAtual'), js.indexOf('function irParaAchado')), /medirBarraFixa\(\);\s*doc\.querySelectorAll/, 'mede antes de rolar');
 });

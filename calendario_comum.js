@@ -98,6 +98,8 @@
     return !!t && t !== normalizarBusca(termoRolado) && qtdVisiveis > 0;
   };
   const comportamentoRolagem = reduzirMovimento => (reduzirMovimento ? 'auto' : 'smooth');
+  // altura medida da barra fixa -> valor da variável CSS --cal-fixo-altura; vazio quando a medida não presta (barra escondida, 0, NaN)
+  const alturaBarraFixa = px => (Number.isFinite(px) && px > 0 ? `${Math.ceil(px)}px` : '');
   const classeAchou = (p, termo) => (pedidoCasa(p, termo) ? ' achou' : '');
   const rotuloAchou = (p, termo) => (pedidoCasa(p, termo) ? ', encontrado na pesquisa' : '');
 
@@ -214,5 +216,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

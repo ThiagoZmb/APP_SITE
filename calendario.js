@@ -51,9 +51,19 @@
       for (const id of ['cal-busca-ant', 'cal-busca-prox']) { $(id).hidden = !tem; $(id).disabled = !resultado.qtdPedidos; }
       estado.atual = -1;
     }
-    // Rola até o destaque (suave, ou instantâneo com prefers-reduced-motion). O CSS dá scroll-margin ao destaque por causa do topo fixo.
+    // Rola até o destaque (suave, ou instantâneo com prefers-reduced-motion). O CSS dá scroll-margin ao destaque por causa do topo fixo e da barra fixa.
     const reduzirMovimento = () => !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    // Barra fixa (#cal-fixo, sticky): a altura real vai para --cal-fixo-altura, que o CSS soma ao scroll-margin do resultado (a barra quebra em duas linhas no celular)
+    const barraFixa = $('cal-fixo');
+    function medirBarraFixa() {
+      const v = barraFixa ? K.alturaBarraFixa(barraFixa.getBoundingClientRect().height) : '';
+      if (v) doc.documentElement.style.setProperty('--cal-fixo-altura', v);
+    }
+    if (barraFixa && typeof win.ResizeObserver === 'function') new win.ResizeObserver(medirBarraFixa).observe(barraFixa);
+    win.addEventListener('resize', medirBarraFixa);
+    medirBarraFixa();
     function marcarAtual(el) {
+      medirBarraFixa();
       doc.querySelectorAll('#cal-corpo .achou.atual').forEach(x => x.classList.remove('atual'));
       el.classList.add('atual');
       el.scrollIntoView({ block: 'center', behavior: K.comportamentoRolagem(reduzirMovimento()) });
