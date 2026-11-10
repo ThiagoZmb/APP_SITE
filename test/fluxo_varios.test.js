@@ -160,3 +160,20 @@ test('GET /fluxo/pedido_resumo: total, já recebido e falta; 400 sem número ún
   const vazio = await preparar(t, []);
   assert.equal((await vazio.chamar(2, '/fluxo/pedido_resumo?numero=5')).status, 404);
 });
+
+test('restante "A Receber" pode ir sem forma de pagamento; as demais situações continuam exigindo', async t => {
+  const restante = { formaPgto: '', banco: '', valor: 500, data: '2026-09-30', situacao: 'A Receber' };
+  assert.equal(validarDivisao(corpo({ linhas: [corpo().linhas[0], restante] })).ok, true);
+  assert.match(validarDivisao(corpo({ linhas: [corpo().linhas[0], { ...restante, situacao: 'Recebido' }] })).erro, /Linha 2: .*forma de pagamento/);
+  const { f, chamar } = await preparar(t, [maximo(9267)]);
+  const r = await chamar(2, '/fluxo/salvar_varios', corpo({ linhas: [corpo().linhas[0], restante] }));
+  assert.equal(r.status, 200);
+  const ins = inserts(f);
+  assert.equal(ins.length, 2);
+  assert.deepEqual([ins[0].params[10], ins[1].params[10]], ['Recebido', 'A Receber']);
+  assert.equal(ins[1].params[8], '');                 // FORMA_PGTO em branco
+  assert.equal(ins[1].params[11], 500);               // o restante
+  assert.equal(ins[1].params[1], '2026-09-30');       // vencimento
+  assert.equal(ins[1].params[3], ins[0].params[3]);   // mesmo cliente
+  assert.equal(ins[1].params[4], ins[0].params[4]);   // mesmo pedido
+});

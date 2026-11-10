@@ -207,6 +207,7 @@
     <link rel="stylesheet" href="tema.css?v=202611091200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
+    <script src="fluxo_divisao.js?v=202611101500"></script>
 </head>
 <body>
     <div class="container">
@@ -900,7 +901,11 @@
             recebimentoPendente = { codigo: fichaAtual.codigo, pedidos: nums, zerarCredito, marcarRecebido };
             // abre a gaveta do fluxo de caixa com a entrada já preenchida (como o VB faz com o frm_Fluxo_Caixa),
             // por cima desta mesma tela: ao salvar ou fechar, o financeiro do cliente é atualizado e fica aberto
-            const q = new URLSearchParams({ novo: 'entrada', embed: '1', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido' });
+            // a gaveta mostra o total dos pedidos e, se o valor recebido for menor, gera o restante como "A Receber"
+            // com vencimento na maior data de pronto dos pedidos marcados
+            const entrega = FluxoDivisao.maiorDataPronto(finDados.pedidos.filter(p => nums.includes(Number(p.numero))).map(p => p.entrega));
+            const q = new URLSearchParams({ novo: 'entrada', embed: '1', nome: fichaAtual.razaoSocial, valor: String(Math.round((soma - credito) * 100) / 100), pedido: nums.join('/'), situacao: 'Recebido',
+              totalPedidos: String(Math.round(soma * 100) / 100), credito: String(credito), entrega });
             const frame = $('cf-fluxo-frame');
             frame.src = 'financeiro.html?' + q;
             frame.hidden = false;
@@ -914,6 +919,9 @@
                 // o lançamento foi salvo: agora sim marca os pedidos como Recebido e zera o crédito (como escolhido antes)
                 const pendente = recebimentoPendente;
                 recebimentoPendente = null;   // "fechado" (cancelar) descarta; "salvo" consome uma única vez
+                // sobrou valor e o caixa ganhou uma linha "A Receber": o saldo passa a vir dela, então o pedido TEM de ficar Recebido
+                // (senão o saldo do cliente contaria o total do pedido e o restante, em dobro)
+                if (e.data.tipo === 'salvo' && e.data.restante && pendente) pendente.marcarRecebido = true;
                 if (e.data.tipo === 'salvo' && pendente) {
                     try { await api('/clientes/receber', { method: 'POST', body: JSON.stringify(pendente) }); }
                     catch (err) { toast('O lançamento foi salvo, mas não foi possível atualizar os pedidos/crédito: ' + err.message + ' Marque os pedidos como Recebido manualmente.', 'erro'); }

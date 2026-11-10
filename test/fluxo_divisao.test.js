@@ -70,3 +70,49 @@ test('fluxo_divisao.js: valores do banco só entram por escapeHtml/valor e nunca
   assert.ok(usos.length > 0);
   for (const l of usos) assert.match(l, /escapeHtml\(/, l.trim());
 });
+
+test('restante: 1000 com 500 recebidos sobram 500; valor igual ou maior não gera restante; só vale com a linha de cima Recebido', () => {
+  assert.equal(D.calcularRestante(1000, [L(500)]), 500);
+  assert.equal(D.calcularRestante(1000, [L(1000)]), 0);
+  assert.equal(D.calcularRestante(1000, [L(1200)]), 0);
+  assert.equal(D.calcularRestante(1000, [L(400), L(100)]), 500, 'formas extras também abatem');
+  assert.equal(D.calcularRestante(1000, [L(500, 'A Receber')]), 0, 'linha de cima A Receber: não gera restante');
+  assert.equal(D.calcularRestante(1000, [L(500), L(100, 'A Receber')]), 500, 'linha A Receber extra não conta como recebida');
+  assert.equal(D.calcularRestante(0, [L(500)]), 0);
+  assert.equal(D.calcularRestante(1217.39, [L(600.2), L(500.1)]), 117.09);
+  assert.equal(D.calcularRestante(100, [L(99.999)]), 0, 'diferença menor que meio centavo não conta');
+});
+
+test('maior data de pronto entre os pedidos (dd/mm/aaaa → aaaa-mm-dd), ignorando vazias e inválidas', () => {
+  assert.equal(D.maiorDataPronto(['30/09/2026', '22/09/2026']), '2026-09-30');
+  assert.equal(D.maiorDataPronto(['22/09/2026', '', '05/10/2026', 'xx', '31/02/2026']), '2026-10-05');
+  assert.equal(D.maiorDataPronto(['', '01/01/0001']), '');
+  assert.equal(D.maiorDataPronto([]), '');
+  assert.equal(D.maiorDataPronto(undefined), '');
+});
+
+test('todo id que o fluxo_divisao.js busca com $(...) existe no financeiro.html (um id faltando derrubaria a tela)', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'fluxo_divisao.js'), 'utf8');
+  const h = fs.readFileSync(path.join(__dirname, '..', 'financeiro.html'), 'utf8');
+  const ids = [...new Set([...js.matchAll(/\$\('([\w-]+)'\)/g)].map(m => m[1]))];
+  assert.ok(ids.length > 15);
+  for (const id of ids) assert.match(h, new RegExp(`id="${id}"`), `id ausente: ${id}`);
+});
+
+test('financeiro.html: total no topo, restante e dados vindos da ficha do cliente', () => {
+  const h = fs.readFileSync(path.join(__dirname, '..', 'financeiro.html'), 'utf8');
+  for (const id of ['info-total', 'rest-caixa', 'rest-texto', 'rest-data']) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /q\.has\('totalPedidos'\)\) Divisao\.definirContexto\(/);
+  assert.match(h, /avisarPai\('salvo', r\.mensagem, \{ restante: comRestante \}\)/);
+  assert.match(h, /const comRestante = dividido && Divisao\.temRestante\(\)/);
+});
+
+test('clientes.html: manda total, crédito e maior data de pronto à gaveta e marca Recebido quando há restante', () => {
+  const c = fs.readFileSync(path.join(__dirname, '..', 'clientes.html'), 'utf8');
+  assert.match(c, /src="fluxo_divisao\.js/);
+  assert.match(c, /FluxoDivisao\.maiorDataPronto\(/);
+  assert.match(c, /totalPedidos: String\(Math\.round\(soma \* 100\) \/ 100\), credito: String\(credito\), entrega/);
+  const reg = c.indexOf("e.data.tipo === 'salvo' && e.data.restante && pendente");
+  assert.ok(reg > 0 && reg < c.indexOf("api('/clientes/receber'"), 'decide antes de chamar /clientes/receber');
+  assert.match(c.slice(reg, reg + 120), /pendente\.marcarRecebido = true/);
+});

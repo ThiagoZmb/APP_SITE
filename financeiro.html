@@ -413,7 +413,11 @@
         .categoria { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px; background: var(--secondary-color); }
         .categoria .grid-form { gap: 10px; }
         /* recebimento dividido em várias formas (fluxo_divisao.js) */
-        #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden] { display: none; }
+        #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden], #info-total[hidden], #rest-caixa[hidden] { display: none; }
+        .info-total { font-size: 13px; line-height: 1.5; font-weight: 600; padding: 10px 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .info-total.aviso { border-color: #f2a33a; background: rgba(242, 163, 58, .12); }
+        .rest-caixa { margin-top: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid #f2a33a; background: rgba(242, 163, 58, .12); font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+        .rest-caixa input[type=date] { max-width: 220px; }
         .div-dica { font-size: 12px; color: var(--text-muted, #6c757d); margin: 0 0 10px; }
         .div-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; padding: 12px; margin-bottom: 10px; border: 1px dashed var(--border-color); border-radius: 10px; }
         .div-linha .d-cab { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
@@ -590,6 +594,7 @@
             <section class="bloco">
                 <div class="bloco-cab"><span class="ico">💵</span><h3>Movimento</h3></div>
                 <div class="bloco-corpo">
+                    <div class="info-total" id="info-total" aria-live="polite" hidden></div>
                     <div class="tipo-mov">
                         <button type="button" class="e" data-mov="Entrada">⬇️ Entrada</button>
                         <button type="button" class="s" data-mov="Saída">⬆️ Saída</button>
@@ -620,6 +625,10 @@
                     <div id="div-linhas"></div>
                     <button type="button" class="btn btn-secondary" id="div-add">＋ Adicionar forma de pagamento</button>
                     <div class="div-resumo" id="div-resumo" aria-live="polite" hidden></div>
+                    <div class="rest-caixa" id="rest-caixa" hidden>
+                        <div id="rest-texto"></div>
+                        <input type="date" id="rest-data" aria-label="Vencimento do restante a receber">
+                    </div>
                     <label class="div-quitar" id="div-quitar-rotulo" hidden><input type="checkbox" id="div-quitar"> Pedido quitado: marcar como Recebido</label>
                 </div>
             </section>
@@ -1237,7 +1246,7 @@
         $('form').addEventListener('submit', e => e.preventDefault());
 
         const EMBED = document.documentElement.classList.contains('embed');
-        const avisarPai = (tipo, mensagem) => { if (EMBED && window.parent !== window) window.parent.postMessage({ origem: 'elegance-fluxo', tipo, mensagem }, location.origin); };
+        const avisarPai = (tipo, mensagem, extra) => { if (EMBED && window.parent !== window) window.parent.postMessage({ origem: 'elegance-fluxo', tipo, mensagem, ...(extra || {}) }, location.origin); };
         function abrirGaveta() {
             $('gaveta').classList.add('aberta');
             $('gaveta-fundo').classList.add('aberta');
@@ -1340,6 +1349,7 @@
             if (!d.codClassificacao) return falha('Favor escolher uma categoria!', 'cat-tipo');
             const dividido = !!(Divisao && Divisao.ativo());
             if (dividido) { const p = Divisao.conferir(); if (p) return falha(p); }
+            const comRestante = dividido && Divisao.temRestante();   // sobrou valor: vira linha "A Receber" e os pedidos passam a Recebido
             const btn = $('btn-salvar');
             btn.disabled = true;
             btn.textContent = 'Salvando...';
@@ -1349,7 +1359,7 @@
                     : await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
                 if (Divisao) Divisao.reiniciar();
                 toast(r.mensagem, 'ok');
-                avisarPai('salvo', r.mensagem);
+                avisarPai('salvo', r.mensagem, { restante: comRestante });
                 fecharGaveta(true);
                 carregarOpcoes();
                 mesRef = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -1393,6 +1403,8 @@
             $('f-pedido').value = q.get('pedido') || '';
             const sit = q.get('situacao');
             if (sit && [...$('f-situacao').options].some(o => o.value === sit)) $('f-situacao').value = sit;
+            // vindo do botão Receber da ficha do cliente: mostra o total dos pedidos e gera o restante "A Receber" se o valor for menor
+            if (q.has('totalPedidos')) Divisao.definirContexto({ base: lerNumero(q.get('valor')), totalPedidos: lerNumero(q.get('totalPedidos')), credito: lerNumero(q.get('credito')), pedidos: (q.get('pedido') || '').split('/').join(', '), entrega: q.get('entrega') || '' });
             await sugerirCategoria(false);   // cliente cadastrado → categoria 1, como o VB faz no recebimento
             marcarAlterado();
             $('f-data').focus();

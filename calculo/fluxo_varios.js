@@ -32,7 +32,8 @@ function validarDivisao(b) {
   for (let i = 0; i < brutas.length; i++) {
     const l = brutas[i] || {}, n = `Linha ${i + 1}: `;
     const formaPgto = txt(l.formaPgto, 100);
-    if (!formaPgto) return { ok: false, erro: n + 'favor escolher uma forma de pagamento!' };
+    // "A Receber" é o restante ainda por receber: a forma só se sabe no dia em que o cliente pagar, então pode ficar em branco
+    if (!formaPgto && txt(l.situacao, 50) !== 'A Receber') return { ok: false, erro: n + 'favor escolher uma forma de pagamento!' };
     const data = String(l.data || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || isNaN(new Date(data + 'T00:00:00'))) return { ok: false, erro: n + 'favor inserir uma data válida!' };
     const valor = arredondar(numero(l.valor));
