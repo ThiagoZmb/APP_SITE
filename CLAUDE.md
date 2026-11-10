@@ -6,9 +6,11 @@ Não havia README nem CLAUDE.md anterior; este arquivo foi gerado a partir da le
 
 > **Visual (qualquer tela, botão, tabela, modal ou cor):** antes de criar ou mexer em interface, leia `DESIGN.md` (raiz). Ele é a fonte única das regras visuais; a implementação está em `tema.css`, que toda página interna carrega por último. Use as variáveis do tema, não cores soltas, e mantenha `DESIGN.md` e `tema.css` em sincronia ao mudar o padrão.
 
+> **Decisão do dono (2026-11-10): o VB deixou de ser referência.** Daqui para frente, qualquer solução nova é pensada **só para a web (HTML + API)**: "compatível com o VB", "fiel ao VB" e "não pode quebrar o VB" não são mais critério de desenho nem argumento contra uma opção; tabelas `web_*` novas e regras próprias da web são bem-vindas. As referências ao VB neste arquivo e nos comentários do código descrevem o **comportamento histórico** e continuam valendo para o que **já existe**: não mude esse comportamento, nem apague ou migre dados do banco compartilhado, sem combinar com o dono antes.
+
 ## 1. O que o sistema faz
 
-Versão web (front-end + API) de um sistema de gestão que já existe em **VB (Visual Basic)** para uma empresa de esquadrias/portas/serralheria ("ELEGANCE"). A web lê e grava **as mesmas tabelas do banco do VB**; muitos comentários dizem "fiel ao VB" e citam formulários/módulos do VB (ex.: `frm_Pedido2`, `ModPedOrc`, `MotorFinanceiro`).
+Versão web (front-end + API) de um sistema de gestão que existe em **VB (Visual Basic)** para uma empresa de esquadrias/portas/serralheria ("ELEGANCE"). Hoje a web lê e grava **as mesmas tabelas do banco do VB** (herança, não regra para o que for novo); muitos comentários dizem "fiel ao VB" e citam formulários/módulos do VB (ex.: `frm_Pedido2`, `ModPedOrc`, `MotorFinanceiro`).
 
 Funcionalidades (páginas HTML na raiz):
 - Login com JWT (`login.html`), painel inicial (`inicio.html`, `painel_inicial.html`).
@@ -256,7 +258,7 @@ Identidade externa (convite, senha, 2º fator, sessão opaca no cookie `__Host-p
 > Regras completas: `docs/regras/recebimentos-atrasados.md` (ler antes de mexer neste módulo).
 
 ### Outras regras não óbvias
-- **Fidelidade ao VB**: cálculos devem reproduzir o VB (comentários citam `MotorFinanceiro`, `MotorPrecificacaoSerralheria`, `frmPortasAbrir`, etc.). Antes de "corrigir" uma conta, confirme se é comportamento do VB.
+- **Fidelidade ao VB (histórico, a partir de 2026-11-10 não vale para código novo)**: os cálculos existentes reproduzem o VB (comentários citam `MotorFinanceiro`, `MotorPrecificacaoSerralheria`, `frmPortasAbrir`, etc.). Antes de "corrigir" uma conta **já existente**, confirme com o dono se a regra atual deve mudar; não use o VB como argumento para novas funções.
 - **Puxador**: valor mínimo R$ 20 por unidade (`precos.js:208`, "fiel ao VB"). Puxador "Total" desconta o lado do perímetro do perfil (`precos.js:199-204`). Divisores: `qtdDivH` = horizontais, `qtdDivV` = verticais (`precos.js:215`). Dedução do divisor no revestimento usa fator 0,015 (`precos.js:232`).
 - **Posição do puxador é POR FOLHA e só pelo desenho**: A posição do puxador é por folha (`posicoesFolhas[]`) e só pelo desenho; o preço é calculado por folha (`chavePosicaoPreco`). Detalhe: `docs/regras/outras-regras.md`.
 - **Percentuais** (`"+10;-5"`): na rota `/calcular_preco` são compostos (`aplicarPercentuais`, `precos.js:87`); no histórico do VB (`fatorHistorico`, `precos.js:99`) são **sobre a base** (não composto): "+100;+10" = ×2,1.
