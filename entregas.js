@@ -238,7 +238,7 @@
       `<div class="sep-topo"><span class="sep-nome" id="sp-nome-${k}">${nome}</span><span class="sep-numero">Item ${esc(l.item)}</span></div>` +
       (etiquetas ? `<ul class="sep-ficha" aria-label="Detalhes do item ${esc(l.item)}">${etiquetas}</ul>` : '') +
       `<p class="sep-info"><span class="sep-disp">Disponível: ${disp}</span></p>` +
-      (l.obsPedido ? `<p class="sep-obsped">Obs. do pedido: ${esc(l.obsPedido)}</p>` : '') +
+      (l.obsPedido ? `<p class="sep-obsped">Obs.: ${esc(l.obsPedido)}</p>` : '') +
       `<div class="sep-qtd" role="group" aria-labelledby="sp-rot-${k}"><span class="sep-rotulo" id="sp-rot-${k}">Separar</span>` +
       `<button type="button" class="sep-passo" data-acao="menos" data-linha="${k}" id="sp-menos-${k}" aria-label="Diminuir a quantidade de ${nome}">−</button>` +
       `<input type="number" class="sep-campo" inputmode="decimal" id="sp-item-${k}" data-linha="${k}" min="0" max="${max}" step="any" value="${esc(l.separar)}" aria-label="Quantidade a separar de ${nome}, de ${disp}">` +
