@@ -5,7 +5,8 @@
 // ==========================================================================
 const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
-const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo } = require('../calculo/entregas');
+const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, fechamentoDoPedido,
+  STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
@@ -94,7 +95,8 @@ const lerImagem = (req, res, next) => rawImagem(req, res, err => {
 });
 
 // Mantém a fila A programar em dia com os pedidos do VB, de forma idempotente e em lote (poucas idas ao banco remoto):
-//  - todo pedido Pronto sem registro ganha um (UNIQUE(numero) + INSERT IGNORE ... SELECT: duas varreduras simultâneas não duplicam)
+//  - todo pedido Pronto sem registro ganha um, com sequencia 1 (UNIQUE(numero, sequencia) + INSERT IGNORE ... SELECT: duas varreduras
+//    simultâneas não duplicam; pedido que já tem qualquer entrega, inclusive dividida, não ganha outra)
 //    e toda entrega sem nenhum evento ganha o evento 'criada';
 //  - registro A programar/Agendada/Ocorrência cujo pedido foi Cancelado vira cancelado ('Pedido cancelado'); Em rota nunca é cancelado aqui;
 //  - registro A programar cujo pedido deixou de estar Pronto vira cancelado ('Pedido saiu de Pronto');
@@ -105,8 +107,8 @@ async function sincronizarFila(pool, res) {
     const agora = agoraLocal();
     let reabertas = 0, canceladas = 0;
     const [criadas] = await conn.execute(
-      `INSERT IGNORE INTO web_entregas (numero, status, criado_em, atualizado_em)
-       SELECT p.NUMERO, 'a_programar', ?, ? FROM ped_orc p WHERE p.TIPO = 'Pedido' AND p.SITUACAO = 'Pronto'
+      `INSERT IGNORE INTO web_entregas (numero, sequencia, status, criado_em, atualizado_em)
+       SELECT p.NUMERO, 1, 'a_programar', ?, ? FROM ped_orc p WHERE p.TIPO = 'Pedido' AND p.SITUACAO = 'Pronto'
          AND NOT EXISTS (SELECT 1 FROM web_entregas e WHERE e.numero = p.NUMERO)`, [agora, agora]);
     await conn.execute(
       `INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo)
@@ -167,6 +169,102 @@ async function itensDoPedido(conn, numero) {
   const [linhas] = await conn.execute(
     "SELECT DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = ? ORDER BY ITEM", [numero]);
   return linhas.map(l => ({ descricao: l.DESCRICAO || '', qtd: Number(l.QTD) || 0 }));
+}
+
+// ---- Divisão da entrega (várias entregas por pedido, etapas 4 a 6) ----
+const marcas = arr => arr.map(() => '?').join(', ');
+const MSG_ALTERADO = 'O pedido foi alterado depois da divisão: confira os itens. Nada foi dividido nem gerado.';
+const MSG_NAO_PRONTO = s => `Só pedido Pronto tem a entrega dividida (situação atual: ${s || '—'}).`;
+
+// Lê tudo o que a divisão precisa de um ou mais pedidos (as leituras independentes saem juntas): entregas, listas de itens,
+// sobras encerradas e itens do pedido (ped_orc_lista_itens). `entregasLidas` (opcional) = linhas de web_entregas já lidas
+// com trava (dentro da transação): não são relidas. Devolve Map(numero -> { entregas, itensPorEntrega, itensPedido, encerradas,
+// ...situacaoDivisao }). Só lê descrição e quantidade dos itens (nunca preço).
+async function lerDivisoes(db, numeros, entregasLidas = null) {
+  const nums = [...new Set((numeros || []).map(Number))];
+  const r = new Map();
+  if (!nums.length) return r;
+  const m = marcas(nums);
+  const [entregas, itens, encerradas, itensPed] = await Promise.all([
+    entregasLidas ? entregasLidas : db.execute(`SELECT * FROM web_entregas WHERE numero IN (${m}) ORDER BY numero, sequencia, id`, nums).then(x => x[0]),
+    db.execute(`SELECT i.entrega_id, i.numero_item, i.descricao, i.quantidade, i.unidade FROM web_entrega_itens i
+                JOIN web_entregas e ON e.id = i.entrega_id WHERE e.numero IN (${m}) ORDER BY i.entrega_id, i.numero_item, i.id`, nums).then(x => x[0]),
+    db.execute(`SELECT numero, numero_item, descricao, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero IN (${m}) ORDER BY id`, nums).then(x => x[0]),
+    db.execute(`SELECT NUMERO, ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${m}) ORDER BY NUMERO, ITEM`, nums).then(x => x[0])
+  ]);
+  for (const n of nums) {
+    const ents = entregas.filter(e => Number(e.numero) === n).map(e => ({ ...e, id: Number(e.id) }));
+    const ids = new Set(ents.map(e => e.id));
+    const itensPorEntrega = new Map();
+    for (const i of itens) {
+      const k = Number(i.entrega_id);
+      if (!ids.has(k)) continue;
+      if (!itensPorEntrega.has(k)) itensPorEntrega.set(k, []);
+      itensPorEntrega.get(k).push(i);
+    }
+    const itensPedido = itensPed.filter(i => Number(i.NUMERO) === n).map(i => ({ item: Number(i.ITEM), descricao: i.DESCRICAO || '', qtd: Number(i.QTD) || 0 }));
+    const enc = encerradas.filter(x => Number(x.numero) === n);
+    r.set(n, { entregas: ents, itensPorEntrega, itensPedido, encerradas: enc, ...situacaoDivisao({ entregas: ents, itensPorEntrega, itensPedido, encerradas: enc }) });
+  }
+  return r;
+}
+
+// Trava, NESTA ORDEM, o pedido (ped_orc FOR UPDATE) e todas as entregas do número (web_entregas FOR UPDATE): a mesma ordem
+// da baixa, das etapas e do excluir pedido (ped_orc -> web_entregas), então duas divisões do mesmo pedido ficam em fila e a
+// segunda relê o que a primeira gravou. Confere o filtro de estados do usuário. Depois lê listas, sobras e itens do pedido.
+async function travarPedidoDividido(conn, req, numero, msg404 = 'Pedido não encontrado.') {
+  const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
+  if (!ped[0]) throw new ErroUsuario(404, msg404);
+  const est = filtroEstados(req, 'c.ESTADO');
+  if (est.sql) {
+    const [ok] = await conn.execute(
+      `SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido' AND ${est.sql}`,
+      [numero, ...est.params]);
+    if (!ok.length) throw new ErroUsuario(404, msg404);
+  }
+  const [entregas] = await conn.execute('SELECT * FROM web_entregas WHERE numero = ? ORDER BY sequencia, id FOR UPDATE', [numero]);
+  const d = (await lerDivisoes(conn, [numero], entregas)).get(Number(numero));
+  return { situacao: ped[0].SITUACAO, ...d };
+}
+
+// grava a lista de itens de uma entrega num INSERT só (cópia: número do ITEM, descrição e quantidade no momento da divisão)
+async function inserirItens(conn, entregaId, itens, agora) {
+  if (!itens.length) return;
+  const params = itens.flatMap(i => [entregaId, i.item, String(i.descricao ?? '').slice(0, 300), i.qtd, i.unidade ?? null, agora]);
+  await conn.execute(`INSERT INTO web_entrega_itens (entrega_id, numero_item, descricao, quantidade, unidade, criado_em) VALUES ${itens.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`, params);
+}
+
+const evento = (conn, id, agora, usuario, tipo, motivo, detalhe) => conn.execute(
+  'INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  [id, agora, usuario, tipo, motivo, detalhe ? JSON.stringify(detalhe) : null, null]);
+const auditar = (conn, agora, quem, acao, numero, detalhe) => conn.execute(
+  'INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)', [agora, quem, acao, String(numero), JSON.stringify(detalhe)]);
+const itensResumo = itens => itens.map(i => ({ item: i.item, descricao: i.descricao, qtd: i.qtd }));
+
+// Cria uma entrega nova do pedido dividido: sequencia = MAX + 1 (as entregas do número já estão travadas), "A programar",
+// SEM data, SEM motorista e SEM tipo (quem agenda escolhe; nada herda status, tipo nem motorista da origem). O endereço de
+// entrega e o contato no local vêm de `endereco` (cópia da origem na separação; vazio no saldo). Grava os itens e o evento 'criada'.
+// "Entrega n de N" nas listas (mesma regra de ordemNoPedido): N = não canceladas do pedido; n = posição por sequência, depois id
+const SQL_ORDEM = `(SELECT COUNT(*) FROM web_entregas x WHERE x.numero = e.numero AND x.status <> 'cancelada') AS qtd_entregas_pedido,
+                (SELECT COUNT(*) FROM web_entregas x WHERE x.numero = e.numero AND x.status <> 'cancelada'
+                   AND (x.sequencia < e.sequencia OR (x.sequencia = e.sequencia AND x.id <= e.id))) AS ordem_entrega`;
+// só entram na resposta quando o pedido tem MAIS de uma entrega não cancelada e esta não é cancelada (pedido de uma entrega: igual a antes)
+function camposOrdem(l) {
+  const n = Number(l.qtd_entregas_pedido) || 0;
+  return n > 1 && l.status !== 'cancelada' ? { ordemEntrega: Number(l.ordem_entrega) || 0, qtdEntregasPedido: n } : {};
+}
+
+const COLUNAS_ENDERECO_COPIA = ['endereco_rua', 'endereco_numero', 'endereco_bairro', 'endereco_cidade', 'endereco_uf', 'endereco_cep', 'endereco_ref', 'contato_local'];
+async function criarEntregaDividida(conn, req, { numero, entregas, itens, hash, observacao = null, endereco = {}, motivo, detalhe }) {
+  const agora = agoraLocal();
+  const sequencia = Math.max(0, ...entregas.map(e => Number(e.sequencia) || 0)) + 1;
+  const cols = { numero: Number(numero), sequencia, status: STATUS.A_PROGRAMAR, observacao, hash_itens: hash, criado_em: agora, atualizado_em: agora, ...endereco };
+  const ks = Object.keys(cols);
+  const [ins] = await conn.execute(`INSERT INTO web_entregas (${ks.join(', ')}) VALUES (${marcas(ks)})`, ks.map(k => cols[k]));
+  const id = ins.insertId;
+  await inserirItens(conn, id, itens, agora);
+  await evento(conn, id, agora, req.acesso.nome, 'criada', motivo, detalhe);
+  return { id, sequencia, linha: { id, ...cols } };
 }
 
 // motoristas = usuários ativos com entregas.baixar pelo perfil ou liberado por exceção, menos os bloqueados
@@ -240,6 +338,30 @@ function lerAgenda(b, { exigirTipo }) {
 }
 
 function registrarEntregas({ rota, pool }) {
+  // "Saldo a entregar": pedidos Pronto já divididos (alguma entrega com lista de itens ou hash) em que sobra item sem entrega
+  // (ex.: uma entrega parcial foi cancelada) ou cujos itens mudaram depois da divisão. Uma consulta acha os candidatos; só
+  // havendo algum, as leituras da divisão saem juntas para todos de uma vez. Respeita o filtro de estados. Nenhum dinheiro:
+  // os nomes evitam "saldo" (REGEX_VALOR) e as contagens usam qtd*.
+  async function sobrasDosPedidos(req) {
+    const est = filtroEstados(req, 'c.ESTADO');
+    const [cand] = await pool.execute(
+      `SELECT DISTINCT p.NUMERO AS numero, p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, CAST(p.DATA_PRONTO AS CHAR) AS pronto_em,
+              c.CIDADE AS cidade, c.ESTADO AS uf
+       FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
+       WHERE p.SITUACAO = 'Pronto' AND (e.hash_itens IS NOT NULL OR EXISTS (SELECT 1 FROM web_entrega_itens i WHERE i.entrega_id = e.id))${est.sql ? ` AND ${est.sql}` : ''}
+       ORDER BY p.NUMERO`, est.sql ? est.params : []);
+    if (!cand.length) return [];
+    const div = await lerDivisoes(pool, cand.map(c => c.numero));
+    const vistos = new Set();
+    return cand.filter(c => !vistos.has(Number(c.numero)) && vistos.add(Number(c.numero))).map(c => {
+      const d = div.get(Number(c.numero));
+      return { numero: Number(c.numero), cliente: c.cliente || '', clienteFinal: c.cliente_final || '', cidade: c.cidade || '', uf: c.uf || '',
+        dataPrometida: c.pronto_em ? String(c.pronto_em).slice(0, 10) : null, alterado: !!d?.alterado,
+        itensSemEntrega: d ? itensResumo(d.sobra) : [], qtdItensSemEntrega: d ? d.sobra.length : 0 };
+    }).filter(s => s.qtdItensSemEntrega > 0 || s.alterado);
+  }
+
   rota('get', '/entregas', VER, async (req, res) => {
     const status = String(req.query.status || '').trim();
     if (status && !Object.values(STATUS).includes(status)) return res.status(400).json({ error: 'Status inválido.' });
@@ -252,27 +374,31 @@ function registrarEntregas({ rota, pool }) {
       if (busca) { where.push('(CAST(e.numero AS CHAR) LIKE ? OR p.RAZAO_SOCIAL LIKE ? OR p.CLIENTE_FINAL LIKE ?)'); params.push(`%${busca}%`, `%${busca}%`, `%${busca}%`); }
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) { where.push(est.sql); params.push(...est.params); }
-      const [linhas] = await pool.execute(
+      // a lista e as sobras dos pedidos divididos são independentes: saem juntas (uma ida ao banco a menos de espera)
+      const [[linhas], sobras] = await Promise.all([pool.execute(
         `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
                 p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
                 u.NOME AS motorista, p.SITUACAO AS situacao_pedido,
                 (SELECT v.usuario FROM web_entrega_eventos v WHERE v.entrega_id = e.id AND v.tipo = 'cancelada' ORDER BY v.id DESC LIMIT 1) AS cancelada_por,
                 (SELECT COUNT(*) FROM web_entrega_eventos v WHERE v.entrega_id = e.id
-                   AND v.tipo IN (${OCORRENCIAS.map(o => `'${o}'`).join(', ')})) AS qtd_ocorrencias
+                   AND v.tipo IN (${OCORRENCIAS.map(o => `'${o}'`).join(', ')})) AS qtd_ocorrencias,
+                ${SQL_ORDEM}
          FROM web_entregas e
          JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
          LEFT JOIN cliente_usuarios u ON u.CODIGO = e.motorista_codigo
          WHERE ${where.join(' AND ')}
-         ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero`, params);
+         ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero, e.sequencia`, params),
+      sobrasDosPedidos(req).catch(err => { console.error('Erro GET /entregas (sobras):', err.message); return []; })]);
       res.json({ entregas: linhas.map(l => ({
         id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null,
         statusExibicao: statusExibicao({ status: l.status, situacaoPedido: l.situacao_pedido, canceladaPor: l.cancelada_por }), cliente: l.cliente || '', clienteFinal: l.cliente_final || '', cidade: l.cidade || '', uf: l.uf || '',
         dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
-        motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0
-      })) });
+        motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0,
+        ...camposOrdem(l)
+      })), sobras });
     } catch (err) {
       console.error('Erro GET /entregas:', err.message);
       if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
@@ -307,12 +433,21 @@ function registrarEntregas({ rota, pool }) {
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
          WHERE e.id = ?${est.sql ? ` AND ${est.sql}` : ''}`, [id, ...(est.sql ? est.params : [])]);
       if (!r) return nao_encontrada(res);
-      const [eventos] = await pool.execute(
-        'SELECT id, quando, usuario, tipo, motivo, entregue_a, detalhe FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]);
-      const itens = await itensDoPedido(pool, r.numero);
-      const [anexos] = await pool.execute(
-        'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND evento_id IS NOT NULL ORDER BY id', [id]);
+      // histórico, comprovantes e divisão do pedido são independentes: saem juntos
+      const [[eventos], [anexos], divisoes] = await Promise.all([
+        pool.execute('SELECT id, quando, usuario, tipo, motivo, entregue_a, detalhe FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]),
+        pool.execute('SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND evento_id IS NOT NULL ORDER BY id', [id]),
+        lerDivisoes(pool, [r.numero])]);
+      const d = divisoes.get(Number(r.numero));
+      // itens DESTA entrega: a lista dela; sem lista = o pedido inteiro (menos o que outras entregas do pedido levam)
+      const itensEntrega = d?.porEntrega.get(Number(id)) || [];
+      const itens = itensEntrega.map(i => ({ descricao: i.descricao, qtd: i.qtd }));
+      const ordem = ordemNoPedido(d?.entregas || [], id);
       res.json({
+        itensDetalhe: itensResumo(itensEntrega),
+        divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
+          podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && r.situacao_pedido === 'Pronto' && !d?.alterado && itensEntrega.length > 0,
+          itensSemEntrega: d ? itensResumo(d.sobra) : [] },
         entrega: { ...paraEntrega(r), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
           canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
@@ -328,16 +463,35 @@ function registrarEntregas({ rota, pool }) {
   // Grava uma mudança na entrega: trava a linha, confere visibilidade (estados) e status, atualiza, e registra
   // evento no histórico + auditoria, tudo na mesma transação. `acao` = nome em proximo(); null = sem mudar o status.
   // `montar(conn, atual)` devolve { cols, motivo?, detalhe?, entregueA?, depois? } (ou lança ErroUsuario);
-  // `depois(conn, { eventoId, status })` roda na mesma transação, logo após o evento (vínculo de anexos, baixa no pedido).
-  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false } = {}) {
+  // `depois(conn, { eventoId, status, pedido })` roda na mesma transação, logo após o evento (vínculo de anexos, baixa no pedido);
+  // o que ele devolver (objeto) entra no detalhe da auditoria.
+  // `travarPedido` (baixas): trava o pedido ANTES da entrega (ordem de trava ped_orc -> web_entregas, a mesma das etapas e do
+  // excluir pedido). O número vem de uma leitura comum FORA da transação: assim as primeiras leituras da transação são as travas
+  // e as leituras comuns seguintes já enxergam tudo o que foi gravado antes de o pedido ser travado (duas baixas do mesmo pedido
+  // ficam em fila no pedido e a segunda vê a primeira concluída).
+  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false, travarPedido = false } = {}) {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const est = filtroEstados(req, 'c.ESTADO');
+    let numeroPrevio = null;
+    if (travarPedido) {
+      try {
+        const [[r]] = await pool.execute('SELECT numero FROM web_entregas WHERE id = ?', [id]);
+        numeroPrevio = r ? r.numero : null;
+      } catch (err) { return falha(res, nomeRota, err); }
+    }
     const entrega = await emTransacao(pool, res, nomeRota, async conn => {
+      let pedido = null;
+      if (numeroPrevio !== null) {
+        const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numeroPrevio]);
+        pedido = ped[0] || null;
+      }
       // motorista: só a própria entrega (buscarDoMotorista); equipe: qualquer uma, respeitando o filtro de estados
       const atual = motorista ? await buscarDoMotorista(conn, id, req.user.id, { travar: true })
         : (await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [id]))[0][0];
       if (!atual) throw new ErroUsuario(404, 'Entrega não encontrada.');
+      // o número de uma entrega nunca muda; se não bate, o pedido travado não é o dela: refaz do zero
+      if (travarPedido && Number(atual.numero) !== Number(numeroPrevio)) throw new ErroUsuario(409, 'A entrega mudou enquanto era gravada; tente de novo.');
       if (!motorista && est.sql) { // a trava fica só na linha da web; a conferência de estado é leitura comum
         const [ok] = await conn.execute(
           `SELECT 1 AS ok FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
@@ -360,9 +514,9 @@ function registrarEntregas({ rota, pool }) {
       const json = detalhe ? JSON.stringify(detalhe) : null;
       const [ev] = await conn.execute('INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [id, agora, req.acesso.nome, tipoEvento, motivo, json, entregueA]);
-      if (depois) await depois(conn, { eventoId: ev.insertId, status });
+      const extra = depois ? await depois(conn, { eventoId: ev.insertId, status, pedido }) : null;
       await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
-        [agora, req.acesso.nome, `entrega_${tipoEvento}`, String(atual.numero), JSON.stringify({ entregaId: id, ...(motivo ? { motivo } : {}), ...(detalhe || {}) })]);
+        [agora, req.acesso.nome, `entrega_${tipoEvento}`, String(atual.numero), JSON.stringify({ entregaId: id, ...(motivo ? { motivo } : {}), ...(detalhe || {}), ...(extra || {}) })]);
       return paraEntrega({ ...atual, ...novo });
     });
     if (entrega) res.json({ entrega });
@@ -458,29 +612,75 @@ function registrarEntregas({ rota, pool }) {
 
   // Como o VB (Pedido_Entregue/Pedido_Retirado): grava SITUACAO e DATA_ENTREGA (data da entrega). Nunca sobrescreve pedido Cancelado.
   // Se o UPDATE não atingir linha, o SELECT distingue "já está no destino" (sucesso, p.ex. o VB já marcou) de cancelado/excluído (409 e rollback).
+  const PEDIDO_CANCELADO = 'O pedido foi cancelado ou excluído no sistema; fale com a equipe.';
   async function baixarPedido(c, numero, situacao) {
     const [up] = await c.execute(
       "UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = 'Pedido' AND SITUACAO <> 'Cancelado'", [situacao, hojeLocal(), numero]);
     if (up.affectedRows === 1) return;
     const [[p]] = await c.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido'", [numero]);
     if (p && p.SITUACAO === situacao) return;
-    throw new ErroUsuario(409, 'O pedido foi cancelado ou excluído no sistema; fale com a equipe.');
+    throw new ErroUsuario(409, PEDIDO_CANCELADO);
+  }
+
+  // Várias entregas por pedido: relê, com trava e DEPOIS do UPDATE desta entrega, todas as entregas do pedido e decide se esta
+  // baixa é a última (calculo/entregas.js, fechamentoDoPedido). Uma ida ao banco no caso comum (entregas sem lista de itens);
+  // as listas de itens e os itens do pedido só são lidos quando todas as entregas válidas têm lista.
+  async function fechamento(c, atual, status) {
+    const [linhas] = await c.execute(
+      `SELECT e.id, e.status, e.hash_itens, (SELECT COUNT(*) FROM web_entrega_itens i WHERE i.entrega_id = e.id) AS qtd_linhas_itens
+       FROM web_entregas e WHERE e.numero = ? FOR UPDATE`, [atual.numero]);
+    const outras = linhas.filter(e => Number(e.id) !== Number(atual.id));
+    const daAtual = linhas.find(e => Number(e.id) === Number(atual.id));
+    const entregas = [...outras.map(e => ({ id: Number(e.id), status: e.status, comLista: Number(e.qtd_linhas_itens) > 0, hash: e.hash_itens || null })),
+      { id: Number(atual.id), status, comLista: Number(daAtual?.qtd_linhas_itens) > 0, hash: daAtual?.hash_itens || null }];
+    const validas = entregas.filter(e => e.status !== 'cancelada');
+    const itensPorEntrega = new Map();
+    let itensPedido = [], itensEncerrados = [], alterado = false;
+    // só vale ler listas, sobras encerradas e itens do pedido se todas as válidas estão concluídas e o pedido foi dividido
+    // (todas com lista, ou alguma com hash da divisão); senão a decisão já está tomada. Pedido de uma entrega: nenhuma leitura a mais.
+    const dividido = validas.length && (validas.every(e => e.comLista) || validas.some(e => e.hash));
+    if (dividido && validas.every(e => pedidoPara(e.status))) {
+      const ids = validas.map(e => e.id);
+      const [itens] = await c.execute(
+        `SELECT entrega_id, numero_item, quantidade FROM web_entrega_itens WHERE entrega_id IN (${ids.map(() => '?').join(', ')})`, ids);
+      for (const i of itens) {
+        const k = Number(i.entrega_id);
+        if (!itensPorEntrega.has(k)) itensPorEntrega.set(k, []);
+        itensPorEntrega.get(k).push(i);
+      }
+      const [ped] = await c.execute("SELECT ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = ? ORDER BY ITEM", [atual.numero]);
+      itensPedido = ped.map(x => ({ item: Number(x.ITEM), descricao: x.DESCRICAO || '', qtd: Number(x.QTD) || 0 }));
+      const [enc] = await c.execute('SELECT numero_item, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero = ?', [atual.numero]);
+      itensEncerrados = enc;
+      // pedido editado depois da divisão: os números de ITEM das listas podem não bater mais; nunca fecha sozinho
+      const hashAtual = hashItensPedido(itensPedido);
+      alterado = [...validas.map(e => e.hash), ...enc.map(x => x.hash_itens)].some(h => h && h !== hashAtual);
+    }
+    return fechamentoDoPedido({ entregas, itensPorEntrega, itensPedido, itensEncerrados, alterado });
   }
 
   // evento + vínculo dos anexos + SITUACAO do pedido, tudo dentro da transação de gravar()
+  // Regra da última baixa: o pedido só vira Entregue/Retirado (com DATA_ENTREGA) quando esta baixa conclui a última entrega
+  // não cancelada e não sobra item sem entrega; senão continua como está (Pronto) e a baixa fica só na entrega (evento + auditoria).
+  // Com UMA entrega por pedido (todas as anteriores à divisão) é exatamente o comportamento de antes.
   const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, usuario }) => async (conn, atual) => ({
     cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}) },
-    depois: async (c, { eventoId, status }) => {
+    depois: async (c, { eventoId, status, pedido }) => {
       await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
-      const situacao = pedidoPara(status);
-      if (situacao) await baixarPedido(c, atual.numero, situacao);
+      if (!pedidoPara(status)) return null;
+      const fim = await fechamento(c, atual, status);
+      if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao); return null; }
+      // baixa que não é a última: o pedido não muda, mas pedido Cancelado ou excluído continua recusando a baixa
+      if (!pedido || pedido.SITUACAO === 'Cancelado') throw new ErroUsuario(409, PEDIDO_CANCELADO);
+      return { pedidoFechado: false, motivoPedidoAberto: fim.motivo };
     }
   });
+  const BAIXA = { travarPedido: true };
 
   rota('post', '/entregas/:id/retirada', PROGRAMAR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds) }));
-    if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }));
+    if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
   });
 
   rota('post', '/entregas/:id/enviada', PROGRAMAR, async (req, res) => {
@@ -497,7 +697,103 @@ function registrarEntregas({ rota, pool }) {
   rota('post', '/entregas/:id/comprovante', PROGRAMAR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }) }));
-    if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }));
+    if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
+  });
+
+  // ==== Divisão da entrega (etapas 4 e 5): só a equipe (entregas.programar); o motorista nunca divide ====
+  // Tudo numa transação: trava o pedido e DEPOIS as entregas do número (travarPedidoDividido), relê listas e itens já
+  // protegidos, valida e grava. O número vem de uma leitura comum FORA da transação (como nas baixas).
+  const numeroDaEntrega = async id => { const [[r]] = await pool.execute('SELECT numero FROM web_entregas WHERE id = ?', [id]); return r ? Number(r.numero) : null; };
+  const numeroDe = req => (/^\d+$/.test(String(req.params.numero)) ? Number(req.params.numero) : null);
+
+  // "Separar em outra entrega" (e "Gerar entrega do restante" da ocorrência parcial, que usa esta mesma rota com a lista
+  // pré-preenchida na tela). Corpo: { itens: [{ numeroItem, quantidade }], observacao? }.
+  // A origem (A programar, Agendada ou Ocorrência) fica com o resto; a nova nasce A programar, sem data/motorista/tipo,
+  // com o endereço de entrega e o contato copiados da origem. Se a origem não tinha lista ("pedido inteiro"), a lista dela
+  // é gerada agora a partir dos itens do pedido. As duas guardam o hash_itens dos itens do pedido de agora.
+  rota('post', '/entregas/:id/separar', PROGRAMAR, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    let pedidoSep;
+    try { pedidoSep = lerSeparacao(req.body); } catch (err) { return res.status(400).json({ error: err.message }); }
+    let numero;
+    try { numero = await numeroDaEntrega(id); } catch (err) { return falha(res, 'POST /entregas/:id/separar', err); }
+    if (numero === null) return nao_encontrada(res);
+    const r = await emTransacao(pool, res, 'POST /entregas/:id/separar', async conn => {
+      const d = await travarPedidoDividido(conn, req, numero, 'Entrega não encontrada.');
+      const origem = d.entregas.find(e => e.id === id);
+      if (!origem) throw new ErroUsuario(409, 'A entrega mudou enquanto era gravada; tente de novo.');
+      if (!STATUS_DIVISIVEIS.includes(origem.status)) {
+        throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[origem.status] || origem.status}' e não pode ser dividida: só A programar, Agendada ou Ocorrência.`);
+      }
+      if (d.situacao !== 'Pronto') throw new ErroUsuario(409, MSG_NAO_PRONTO(d.situacao));
+      if (d.alterado) throw new ErroUsuario(409, MSG_ALTERADO);
+      const s = separarItens(d.porEntrega.get(id) || [], pedidoSep.itens);
+      if (s.erro) throw new ErroUsuario(s.erro.status, s.erro.msg);
+      const agora = agoraLocal();
+      await conn.execute('DELETE FROM web_entrega_itens WHERE entrega_id = ?', [id]);
+      await inserirItens(conn, id, s.resto, agora);
+      await conn.execute('UPDATE web_entregas SET hash_itens = ?, atualizado_em = ? WHERE id = ?', [d.hashAtual, agora, id]);
+      const endereco = Object.fromEntries(COLUNAS_ENDERECO_COPIA.map(k => [k, origem[k] ?? null]));
+      const nova = await criarEntregaDividida(conn, req, { numero, entregas: d.entregas, itens: s.nova, hash: d.hashAtual, observacao: pedidoSep.observacao,
+        endereco, motivo: `Separada da entrega ${origem.sequencia}`, detalhe: { origemId: id, itens: itensResumo(s.nova) } });
+      await evento(conn, id, agora, req.acesso.nome, 'dividida', `Itens separados para a entrega ${nova.sequencia}`,
+        { novaEntregaId: nova.id, itens: itensResumo(s.nova), ficaram: itensResumo(s.resto) });
+      await auditar(conn, agora, req.acesso.nome, 'entrega_dividida', numero, { origemId: id, novaId: nova.id, sequencia: nova.sequencia,
+        itens: itensResumo(s.nova), ficaram: itensResumo(s.resto), ...(pedidoSep.observacao ? { observacao: pedidoSep.observacao } : {}) });
+      return { entrega: paraEntrega(nova.linha), origemId: id };
+    });
+    if (r) res.status(201).json(r);
+  });
+
+  // "Gerar entrega do saldo": cria uma entrega A programar com os itens do pedido dividido que estão sem entrega.
+  rota('post', '/entregas/pedido/:numero/saldo', PROGRAMAR, async (req, res) => {
+    const numero = numeroDe(req);
+    if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const b = req.body || {};
+    const observacao = String(b.observacao ?? '').trim();
+    if (observacao.length > 500) return res.status(400).json({ error: 'Observação muito longa (máximo 500 caracteres).' });
+    const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/saldo', async conn => {
+      const d = await travarPedidoDividido(conn, req, numero);
+      if (d.situacao !== 'Pronto') throw new ErroUsuario(409, MSG_NAO_PRONTO(d.situacao));
+      if (d.alterado) throw new ErroUsuario(409, MSG_ALTERADO);
+      if (!d.sobra.length) throw new ErroUsuario(409, 'Este pedido não tem itens sem entrega.');
+      const nova = await criarEntregaDividida(conn, req, { numero, entregas: d.entregas, itens: d.sobra, hash: d.hashAtual, observacao: observacao || null,
+        motivo: 'Entrega do saldo (itens que estavam sem entrega)', detalhe: { itens: itensResumo(d.sobra) } });
+      await auditar(conn, agoraLocal(), req.acesso.nome, 'entrega_saldo_gerada', numero, { novaId: nova.id, sequencia: nova.sequencia, itens: itensResumo(d.sobra) });
+      return { entrega: paraEntrega(nova.linha) };
+    });
+    if (r) res.status(201).json(r);
+  });
+
+  // "Encerrar saldo" (motivo obrigatório): a sobra passa a contar como coberta (web_entrega_sobras_encerradas, com o hash de agora).
+  // Se com isso todas as entregas não canceladas já estão concluídas e nada mais sobra, o pedido fecha aqui (Entregue/Retirado
+  // com DATA_ENTREGA de hoje), pela mesma regra da última baixa; senão fecha na última baixa que faltar.
+  rota('post', '/entregas/pedido/:numero/saldo/encerrar', PROGRAMAR, async (req, res) => {
+    const numero = numeroDe(req);
+    if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const motivo = String(req.body?.motivo ?? '').trim();
+    if (motivo.length < 3 || motivo.length > 500) return res.status(400).json({ error: 'Informe o motivo (3 a 500 caracteres).' });
+    const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/saldo/encerrar', async conn => {
+      const d = await travarPedidoDividido(conn, req, numero);
+      if (d.situacao !== 'Pronto') throw new ErroUsuario(409, MSG_NAO_PRONTO(d.situacao));
+      if (d.alterado) throw new ErroUsuario(409, MSG_ALTERADO);
+      if (!d.sobra.length) throw new ErroUsuario(409, 'Este pedido não tem itens sem entrega.');
+      const agora = agoraLocal();
+      const params = d.sobra.flatMap(i => [numero, i.item, String(i.descricao).slice(0, 300), i.qtd, d.hashAtual, motivo, req.acesso.nome, agora]);
+      await conn.execute(`INSERT INTO web_entrega_sobras_encerradas (numero, numero_item, descricao, quantidade, hash_itens, motivo, usuario, criado_em)
+        VALUES ${d.sobra.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`, params);
+      // o histórico fica na entrega mais recente do pedido (a de maior sequência)
+      const ultima = [...d.entregas].sort((a, b) => (Number(b.sequencia) || 0) - (Number(a.sequencia) || 0) || b.id - a.id)[0];
+      if (ultima) await evento(conn, ultima.id, agora, req.acesso.nome, 'sobra_encerrada', motivo, { itens: itensResumo(d.sobra) });
+      const encerrados = [...d.encerradas, ...d.sobra.map(i => ({ numero_item: i.item, quantidade: i.qtd }))];
+      const fim = fechamentoDoPedido({ entregas: d.entregas, itensPorEntrega: d.itensPorEntrega, itensPedido: d.itensPedido, itensEncerrados: encerrados });
+      if (fim.fechar) await baixarPedido(conn, numero, fim.situacao);
+      await auditar(conn, agora, req.acesso.nome, 'entrega_saldo_encerrado', numero, { motivo, itens: itensResumo(d.sobra), pedidoFechado: !!fim.fechar,
+        ...(fim.fechar ? { situacao: fim.situacao } : { motivoPedidoAberto: fim.motivo }) });
+      return { ok: true, pedidoFechado: !!fim.fechar, situacao: fim.fechar ? fim.situacao : null };
+    });
+    if (r) res.json(r);
   });
 
   // ==== Rotas do motorista (/minhas_entregas) ====
@@ -514,7 +810,7 @@ function registrarEntregas({ rota, pool }) {
       uf: r.endereco_uf ?? null, cep: r.endereco_cep ?? null, ref: r.endereco_ref ?? null };
     const vazio = Object.values(end).every(v => !v);
     const item = { id: r.id, numero: r.numero, status: r.status, dataAgendada: dia(r.data_agendada), cliente: r.cliente || '', telefone: r.cli_telefone || '',
-      endereco: vazio ? null : end, contatoLocal: r.contato_local ?? null, qtdItens: Number(qtdItens) || 0 };
+      endereco: vazio ? null : end, contatoLocal: r.contato_local ?? null, qtdItens: Number(qtdItens) || 0, ...camposOrdem(r) };
     if (vazio) item.enderecoCliente = { rua: r.cli_rua || '', numero: r.cli_numero || '', bairro: r.cli_bairro || '', cidade: r.cli_cidade || '', uf: r.cli_uf || '', cep: r.cli_cep || '' };
     return item;
   }
@@ -524,8 +820,11 @@ function registrarEntregas({ rota, pool }) {
     if (diaPedido !== null && !validarData(diaPedido)) return res.status(400).json({ error: 'Data inválida: use AAAA-MM-DD.' });
     try {
       const [linhas] = await pool.execute(
+        // qtd_itens = itens DESTA entrega (a lista dela); sem lista = os itens do pedido inteiro (como antes da divisão)
         `SELECT e.*, ${FICHA_SQL},
-                (SELECT COUNT(*) FROM ped_orc_lista_itens i WHERE i.TIPO = 'Pedido' AND i.NUMERO = e.numero) AS qtd_itens
+                COALESCE(NULLIF((SELECT COUNT(*) FROM web_entrega_itens ei WHERE ei.entrega_id = e.id), 0),
+                         (SELECT COUNT(*) FROM ped_orc_lista_itens i WHERE i.TIPO = 'Pedido' AND i.NUMERO = e.numero)) AS qtd_itens,
+                ${SQL_ORDEM}
          FROM web_entregas e
          LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
@@ -542,14 +841,17 @@ function registrarEntregas({ rota, pool }) {
     try {
       const e = await buscarDoMotorista(pool, id, DONO(req));
       if (!e) return nao_encontrada(res);
-      const [[ficha]] = await pool.execute(
-        `SELECT ${FICHA_SQL} FROM ped_orc p LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido'`, [e.numero]);
-      const itens = await itensDoPedido(pool, e.numero);
-      const [eventos] = await pool.execute('SELECT quando, tipo, motivo, entregue_a FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]);
-      const [anexos] = await pool.execute(
-        'SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?) ORDER BY id', [id, String(DONO(req))]);
+      // ficha, divisão (itens só DESTA entrega), histórico e anexos são independentes: saem juntos
+      const [[[ficha]], divisoes, [eventos], [anexos]] = await Promise.all([
+        pool.execute(`SELECT ${FICHA_SQL} FROM ped_orc p LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido'`, [e.numero]),
+        lerDivisoes(pool, [e.numero]),
+        pool.execute('SELECT quando, tipo, motivo, entregue_a FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]),
+        pool.execute('SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?) ORDER BY id', [id, String(DONO(req))])]);
+      const d = divisoes.get(Number(e.numero));
+      const itens = (d?.porEntrega.get(Number(id)) || []).map(i => ({ descricao: i.descricao, qtd: i.qtd }));
+      const ordem = ordemNoPedido(d?.entregas || [], id);
       res.json({
-        ...itemMotorista({ ...e, ...(ficha || {}) }, itens.length), itens, observacao: e.observacao ?? null,
+        ...itemMotorista({ ...e, ...(ficha || {}), qtd_entregas_pedido: ordem.qtdEntregasPedido, ordem_entrega: ordem.ordemEntrega }, itens.length), itens, observacao: e.observacao ?? null,
         eventos: eventos.map(v => ({ quando: v.quando, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null })),
         anexos: anexos.map(a => ({ id: a.id, tipo: a.tipo, mime: a.mime, criadoEm: a.criado_em }))
       });
@@ -604,7 +906,7 @@ function registrarEntregas({ rota, pool }) {
     if (!lido) return;
     const usuario = DONO(req);
     const montarBaixa = baixa({ ...lido, usuario });
-    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => montarBaixa(conn, atual), MOTORISTA);
+    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => montarBaixa(conn, atual), { ...MOTORISTA, ...BAIXA });
   });
 
   // ocorrência: tipo, motivo (3-500) e, no parcial, o que foi entregue

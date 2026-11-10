@@ -31,8 +31,13 @@ const tem = (mapa, k) => typeof k === 'string' && Object.prototype.hasOwnPropert
 function projetarPedido(linha) {
   const l = linha || {};
   const situacao = tem(ROTULO_SITUACAO, l.SITUACAO) ? ROTULO_SITUACAO[l.SITUACAO] : 'Em andamento';
-  const entrega = tem(ROTULO_ENTREGA, l.ENTREGA_STATUS) ? ROTULO_ENTREGA[l.ENTREGA_STATUS] : null;
   const finalizado = l.SITUACAO === 'Entregue' || l.SITUACAO === 'Retirado';
+  // várias entregas por pedido: o cliente vê só o resumo ("Entregue parcialmente: 1 de 2"), nunca o detalhe por entrega.
+  // Com uma entrega só (ou sem contagens) o rótulo é o de sempre.
+  const qtd = Number(l.QTD_ENTREGAS) || 0, concluidas = Number(l.QTD_ENTREGAS_CONCLUIDAS) || 0;
+  const parcial = !finalizado && qtd > 1 && concluidas > 0 && concluidas < qtd;
+  const entrega = parcial ? `Entregue parcialmente: ${concluidas} de ${qtd}`
+    : tem(ROTULO_ENTREGA, l.ENTREGA_STATUS) ? ROTULO_ENTREGA[l.ENTREGA_STATUS] : null;
   const agendado = l.ENTREGA_STATUS === 'agendada' || l.ENTREGA_STATUS === 'em_rota';
   return {
     numero: Number(l.NUMERO),

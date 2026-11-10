@@ -823,6 +823,9 @@
         // ---------- financeiro ----------
         const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
         const seloEntrega = st => st ? `<span class="pill entrega">Entrega: ${escapeHtml(ROT_ENTREGA[st] || st)}</span>` : '';
+        // pedido com várias entregas (entrega parcial): selo "1 de 2 entregues"; com uma entrega só, nada muda
+        const andamentoEntregas = p => (Number(p.qtdEntregas) > 1 ? `${Number(p.qtdEntregasConcluidas) || 0} de ${Number(p.qtdEntregas)} entregues` : '');
+        const seloAndamento = p => andamentoEntregas(p) ? `<span class="pill entrega">${escapeHtml(andamentoEntregas(p))}</span>` : '';
         function pillFin(s) {
             const n = String(s || '').toLowerCase();
             return n.includes('atrasad') || n.includes('protest') ? 'alerta' : n.includes('receber') ? 'aberto' : n.includes('recebid') ? 'ok' : '';
@@ -841,7 +844,7 @@
                     <td><input type="checkbox" class="chk" data-num="${p.numero}" aria-label="Selecionar pedido"></td>
                     <td><b style="color:var(--primary-color)">${escapeHtml(p.numero)}</b></td><td>${escapeHtml(p.clienteFinal || '-')}</td>
                     <td>${dataBR(p.data)}</td><td>${escapeHtml(p.entrega || '-')}</td><td class="td-valor">${moeda(p.valor)}</td>
-                    <td>${escapeHtml(p.observacao || '-')}</td><td>${escapeHtml(p.situacao)}${seloEntrega(p.entregaStatus)}</td>
+                    <td>${escapeHtml(p.observacao || '-')}</td><td>${escapeHtml(p.situacao)}${seloEntrega(p.entregaStatus)}${seloAndamento(p)}</td>
                     <td><span class="pill ${pillFin(p.financeiro)}">${escapeHtml(p.financeiro || '-')}</span></td>
                 </tr>`).join('') || '<tr><td colspan="9" class="vazio">Nenhum pedido em aberto</td></tr>';
             $('cf-fluxo').innerHTML = fluxo.map(f => `

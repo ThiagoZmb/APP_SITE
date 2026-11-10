@@ -730,10 +730,26 @@ function registrarPedOrc({ rota, pool }) {
     const escolhida = (nova === 'Entregue' || nova === 'Retirado') && (req.body || {}).dataEntrega !== undefined ? validarData((req.body || {}).dataEntrega) : null;
     if ((nova === 'Entregue' || nova === 'Retirado') && (req.body || {}).dataEntrega !== undefined && !escolhida) return res.status(400).json({ error: 'Data de entrega inválida.' });
     if (escolhida && escolhida > hojeLocal()) return res.status(400).json({ error: 'A data de entrega não pode ser futura.' });
+    // Várias entregas por pedido (decisão do dono): marcar Entregue/Retirado à mão com entrega ainda aberta AVISA, não bloqueia.
+    // Sem `confirmarEntregasAbertas: true` a resposta é 409 com { aviso: 'entregas_abertas', entregasAbertas: n } e nada é gravado;
+    // a tela pergunta e reenvia com a confirmação (auditada à parte: pedido_situacao_entregas_abertas). Aberta = A programar, Agendada,
+    // Em rota, Ocorrência ou Enviada. As entregas abertas não são mexidas aqui (a varredura cancela só as A programar).
+    const confirmarAbertas = (req.body || {}).confirmarEntregasAbertas === true;
     let dataEntrega = null;
     const r = await emTransacao(pool, res, 'POST /ped_orc/situacao', async conn => {
       const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
+      let abertas = 0;
+      if ((nova === 'Entregue' || nova === 'Retirado') && linhas.cab.SITUACAO !== nova && linhas.cab.SITUACAO !== 'Cancelado') {
+        const [[c] = []] = await conn.execute(
+          "SELECT COUNT(*) AS n FROM web_entregas WHERE numero = ? AND status IN ('a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada')", [alvo.numero]);
+        abertas = Number(c?.n) || 0;
+        if (abertas && !confirmarAbertas) {
+          throw new ErroUsuario(409, `O pedido nº ${alvo.numero} tem ${abertas} entrega(s) em aberto. Marcar como ${nova} mesmo assim?`,
+            { aviso: 'entregas_abertas', entregasAbertas: abertas });
+        }
+      }
       ({ dataEntrega } = await aplicarSituacaoPedido(conn, req, alvo, linhas.cab, { nova, manterData, usarDataPronto, escolhida }));
+      if (abertas) await auditarDoc(conn, req, 'pedido_situacao_entregas_abertas', alvo.tipo, alvo.numero, { para: nova, entregasAbertas: abertas });
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
@@ -822,9 +838,11 @@ function registrarPedOrc({ rota, pool }) {
         const [entregas] = await conn.execute('SELECT id FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
         for (const { id } of entregas) {
           await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
+          await conn.execute('DELETE FROM web_entrega_itens WHERE entrega_id = ?', [id]); // itens da entrega (entrega parcial)
           await conn.execute('DELETE FROM web_entrega_eventos WHERE entrega_id = ?', [id]);
           await conn.execute('DELETE FROM web_entregas WHERE id = ?', [id]);
         }
+        await conn.execute('DELETE FROM web_entrega_sobras_encerradas WHERE numero = ?', [alvo.numero]); // sobra encerrada do pedido dividido
         if (entregas.length) {
           await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)',
             [agoraLocal(), req.acesso?.nome || req.usuario?.nome || '', 'entrega_removida_com_pedido', String(alvo.numero), JSON.stringify({ entregaIds: entregas.map(e => e.id) })]);

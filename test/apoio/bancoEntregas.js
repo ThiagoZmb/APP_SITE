@@ -28,7 +28,9 @@ function bancoEntregas() {
     eventos: [],   // web_entrega_eventos
     anexos: [],    // web_entrega_anexos
     auditoria: [], // web_auditoria
-    itens: [],     // itens do pedido
+    itens: [],     // itens do pedido (ped_orc_lista_itens: NUMERO, TIPO, ITEM, DESCRICAO, QTD)
+    entregaItens: [], // web_entrega_itens: { id, entrega_id, numero_item, quantidade, descricao }
+    encerradas: [],   // web_entrega_sobras_encerradas: { id, numero, numero_item, descricao, quantidade, hash_itens, motivo, usuario, criado_em }
     usuarios: [    // cliente_usuarios
       { CODIGO: 21, NOME: 'Motorista Um' },
       { CODIGO: 22, NOME: 'Motorista Dois' },
@@ -55,13 +57,93 @@ function bancoEntregas() {
     return { cliente: ped?.RAZAO_SOCIAL ?? null, cli_telefone: cli?.TELEFONE ?? null, cli_rua: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null,
       cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null, cli_uf: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null };
   };
+  // "Entrega n de N" (mesma regra do SQL_ORDEM da rota)
+  const ordemDe = e => {
+    const validas = entregas.filter(x => x.numero === e.numero && x.status !== 'cancelada').sort((a, b) => (a.sequencia - b.sequencia) || (a.id - b.id));
+    return { qtd_entregas_pedido: String(validas.length), ordem_entrega: String(validas.filter(x => x.sequencia < e.sequencia || (x.sequencia === e.sequencia && x.id <= e.id)).length) };
+  };
+  const colunasInsert = sql => /\(([^)]+)\)\s*VALUES/.exec(sql)[1].split(',').map(c => c.trim());
+  // INSERT de várias linhas (VALUES (...), (...)): devolve um objeto por linha
+  const linhasInsert = (sql, params) => {
+    const cols = colunasInsert(sql); const r = [];
+    for (let i = 0; i < params.length; i += cols.length) r.push(Object.fromEntries(cols.map((c, k) => [c, params[i + k]])));
+    return r;
+  };
+  const itensDoPedidoFalso = numero => estado.itens.filter(i => i.NUMERO === numero && i.TIPO === 'Pedido').sort((a, b) => a.ITEM - b.ITEM);
   const regras = [
+    // ---- divisão da entrega (etapas 4 e 5) ----
+    [/^SELECT \* FROM web_entregas WHERE numero = \? ORDER BY sequencia, id FOR UPDATE$/, (sql, [numero]) =>
+      entregas.filter(e => e.numero === numero).sort((a, b) => (a.sequencia - b.sequencia) || (a.id - b.id)).map(e => ({ ...e }))],
+    [/^SELECT \* FROM web_entregas WHERE numero IN/, (sql, nums) =>
+      entregas.filter(e => nums.includes(e.numero)).sort((a, b) => (a.numero - b.numero) || (a.sequencia - b.sequencia) || (a.id - b.id)).map(e => ({ ...e }))],
+    [/^SELECT i\.entrega_id, i\.numero_item, i\.descricao, i\.quantidade, i\.unidade FROM web_entrega_itens i\s+JOIN web_entregas e/, (sql, nums) => {
+      const ids = entregas.filter(e => nums.includes(e.numero)).map(e => e.id);
+      return estado.entregaItens.filter(i => ids.includes(i.entrega_id)).sort((a, b) => (a.entrega_id - b.entrega_id) || (a.numero_item - b.numero_item) || (a.id - b.id))
+        .map(i => ({ entrega_id: i.entrega_id, numero_item: i.numero_item, descricao: i.descricao, quantidade: String(i.quantidade), unidade: i.unidade ?? null }));
+    }],
+    [/^SELECT numero, numero_item, descricao, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero IN/, (sql, nums) =>
+      estado.encerradas.filter(x => nums.includes(x.numero)).map(x => ({ ...x, quantidade: String(x.quantidade) }))],
+    [/^SELECT numero_item, quantidade, hash_itens FROM web_entrega_sobras_encerradas WHERE numero = \?$/, (sql, [numero]) =>
+      estado.encerradas.filter(x => x.numero === numero).map(x => ({ numero_item: x.numero_item, quantidade: String(x.quantidade), hash_itens: x.hash_itens ?? null }))],
+    [/^SELECT NUMERO, ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, nums) =>
+      estado.itens.filter(i => i.TIPO === 'Pedido' && nums.includes(i.NUMERO)).sort((a, b) => (a.NUMERO - b.NUMERO) || (a.ITEM - b.ITEM))
+        .map(i => ({ NUMERO: i.NUMERO, ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+    [/^SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c/, (sql, [numero, ...estados]) => {
+      const cli = clienteDe(pedidos.find(p => p.NUMERO === numero && p.TIPO === 'Pedido'));
+      return cli && estados.includes(cli.ESTADO) ? [{ ok: 1 }] : [];
+    }],
+    [/^INSERT INTO web_entregas \(/, (sql, params) => {
+      const [l] = linhasInsert(sql, params);
+      if (entregas.some(e => e.numero === l.numero && e.sequencia === l.sequencia)) throw duplicado(); // UNIQUE(numero, sequencia)
+      const id = Math.max(0, ...entregas.map(e => e.id)) + 1;
+      entregas.push({ id, tipo: null, data_agendada: null, motorista_codigo: null, endereco_rua: null, endereco_numero: null, endereco_bairro: null, endereco_cidade: null,
+        endereco_uf: null, endereco_cep: null, endereco_ref: null, contato_local: null, transportadora: null, rastreio: null, previsao: null, observacao: null, hash_itens: null, ...l });
+      return { affectedRows: 1, insertId: id };
+    }],
+    [/^INSERT INTO web_entrega_itens \(/, (sql, params) => {
+      const ls = linhasInsert(sql, params);
+      for (const l of ls) estado.entregaItens.push({ id: Math.max(0, ...estado.entregaItens.map(i => i.id)) + 1, ...l });
+      return { affectedRows: ls.length };
+    }],
+    [/^DELETE FROM web_entrega_itens WHERE entrega_id = \?$/, (sql, [id]) => {
+      const fica = estado.entregaItens.filter(i => i.entrega_id !== id);
+      const n = estado.entregaItens.length - fica.length;
+      estado.entregaItens.splice(0, estado.entregaItens.length, ...fica);
+      return { affectedRows: n };
+    }],
+    [/^INSERT INTO web_entrega_sobras_encerradas \(/, (sql, params) => {
+      const ls = linhasInsert(sql, params);
+      for (const l of ls) estado.encerradas.push({ id: estado.encerradas.length + 1, ...l });
+      return { affectedRows: ls.length };
+    }],
+    // "Saldo a entregar": pedidos Pronto com alguma entrega com lista ou hash
+    [/^SELECT DISTINCT p\.NUMERO AS numero/, (sql, estados) => {
+      const nums = [...new Set(entregas.filter(e => (e.hash_itens || estado.entregaItens.some(i => i.entrega_id === e.id)) && ehPronto(pedidoDe(e) || {})).map(e => e.numero))];
+      return nums.sort((a, b) => a - b).map(n => {
+        const ped = pedidos.find(p => p.NUMERO === n && p.TIPO === 'Pedido'); const cli = clienteDe(ped);
+        return { numero: n, cliente: ped.RAZAO_SOCIAL, cliente_final: ped.CLIENTE_FINAL ?? null, pronto_em: ped.DATA_PRONTO ?? null, cidade: cli?.CIDADE ?? null, uf: cli?.ESTADO ?? null };
+      }).filter(x => !sql.includes('c.ESTADO IN') || estados.includes(x.uf));
+    }],
+
+    // ---- baixa com várias entregas por pedido (etapa 3): trava do pedido antes da entrega e releitura das entregas ----
+    [/^SELECT numero FROM web_entregas WHERE id = \?$/, (sql, [id]) => entregas.filter(e => e.id === id).map(e => ({ numero: e.numero }))],
+    [/^SELECT SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido' FOR UPDATE$/, (sql, [numero]) =>
+      pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO }))],
+    [/^SELECT e\.id, e\.status, e\.hash_itens, \(SELECT COUNT\(\*\) FROM web_entrega_itens i WHERE i\.entrega_id = e\.id\) AS qtd_linhas_itens\s+FROM web_entregas e WHERE e\.numero = \? FOR UPDATE$/, (sql, [numero]) =>
+      entregas.filter(e => e.numero === numero).map(e => ({ id: e.id, status: e.status, hash_itens: e.hash_itens ?? null, qtd_linhas_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length) }))],
+    [/^SELECT entrega_id, numero_item, quantidade FROM web_entrega_itens WHERE entrega_id IN/, (sql, ids) =>
+      estado.entregaItens.filter(i => ids.includes(i.entrega_id)).map(i => ({ entrega_id: i.entrega_id, numero_item: i.numero_item, quantidade: String(i.quantidade) }))],
+    [/^SELECT ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = \?/, (sql, [numero]) => itensDoPedidoFalso(numero)
+      .map(i => ({ ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+
     // ---- rotas do motorista (T6): o dono é sempre motorista_codigo ----
     [/AS qtd_itens/, (sql, [uid, data]) => entregas
       .filter(e => e.motorista_codigo === uid && e.tipo === 'motorista' && ['agendada', 'em_rota', 'ocorrencia'].includes(e.status) && e.data_agendada
         && (sql.includes('<= ?') ? e.data_agendada <= data : e.data_agendada === data))
       .sort((a, b) => String(a.data_agendada).localeCompare(String(b.data_agendada)) || a.numero - b.numero)
-      .map(e => ({ ...e, ...fichaDe(e), qtd_itens: String(estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
+      .map(e => ({ ...e, ...fichaDe(e), ...ordemDe(e),
+        // itens DESTA entrega (lista dela); sem lista = itens do pedido inteiro
+        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
     [/FROM web_entregas WHERE id = \? AND motorista_codigo = \?/, (sql, [id, uid]) =>
       entregas.filter(e => e.id === id && e.motorista_codigo === uid && e.tipo === 'motorista').map(e => ({ ...e }))],
     [/^SELECT p\.RAZAO_SOCIAL AS cliente, c\.TELEFONE AS cli_telefone/, (sql, [numero]) => {
@@ -95,14 +177,15 @@ function bancoEntregas() {
           data_prometida: ped.DATA_PRONTO || null, data_pedido: ped.DATA || null, cliente: ped.RAZAO_SOCIAL,
           cidade: e.endereco_cidade || cli?.CIDADE || null, uf: e.endereco_uf || cli?.ESTADO || null,
           motorista: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME || null,
-          qtd_ocorrencias: String(eventos.filter(v => v.entrega_id === e.id && OCORRENCIAS.includes(v.tipo)).length)
+          qtd_ocorrencias: String(eventos.filter(v => v.entrega_id === e.id && OCORRENCIAS.includes(v.tipo)).length),
+          ...ordemDe(e)
         }));
     }],
-    // varredura em lote: INSERT IGNORE ... SELECT dos pedidos Pronto sem registro (UNIQUE(numero)) e eventos 'criada' das entregas sem evento
-    [/^INSERT IGNORE INTO web_entregas \(numero, status, criado_em, atualizado_em\)\s+SELECT/, (sql, [criado_em, atualizado_em]) => {
+    // varredura em lote: INSERT IGNORE ... SELECT dos pedidos Pronto sem registro (UNIQUE(numero, sequencia), sequencia 1) e eventos 'criada' das entregas sem evento
+    [/^INSERT IGNORE INTO web_entregas \(numero, sequencia, status, criado_em, atualizado_em\)\s+SELECT p\.NUMERO, 1, 'a_programar'/, (sql, [criado_em, atualizado_em]) => {
       const novos = pedidos.filter(p => ehPronto(p) && !entregas.some(e => e.numero === p.NUMERO));
       for (const p of novos) {
-        entregas.push({ id: entregas.length + 1, numero: p.NUMERO, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
+        entregas.push({ id: entregas.length + 1, numero: p.NUMERO, sequencia: 1, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
           endereco_rua: null, endereco_numero: null, endereco_bairro: null, endereco_cidade: null, endereco_uf: null, endereco_cep: null,
           endereco_ref: null, contato_local: null, transportadora: null, rastreio: null, previsao: null, observacao: null, criado_em, atualizado_em });
       }
@@ -147,13 +230,13 @@ function bancoEntregas() {
       const e = entregas.find(x => x.id === id); if (!e) return [];
       const ped = pedidoDe(e); const cli = clienteDe(ped);
       if (sql.includes('c.ESTADO IN') && !(cli && estados.includes(cli.ESTADO))) return [];
-      return [{ ...e, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_PRONTO ?? null, data_pedido: ped?.DATA ?? null,
+      return [{ ...e, situacao_pedido: ped?.SITUACAO ?? null, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_PRONTO ?? null, data_pedido: ped?.DATA ?? null,
         cli_endereco: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null, cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null,
         cli_estado: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null, cli_telefone: cli?.TELEFONE ?? null }];
     }],
     [/FROM web_entrega_eventos WHERE entrega_id = \? ORDER BY/, (sql, [id]) => eventos.filter(v => v.entrega_id === id)],
     [/FROM ped_orc_lista_itens/, (sql, [numero]) => estado.itens.filter(i => i.NUMERO === numero && i.TIPO === 'Pedido')
-      .sort((a, b) => a.ITEM - b.ITEM).map(i => ({ DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+      .sort((a, b) => a.ITEM - b.ITEM).map(i => ({ DESCRICAO: i.DESCRICAO, QTD: i.QTD }))], // itensDoPedido (só descrição e quantidade)
     // motoristas: ativos, com entregas.baixar pelo perfil ou liberado, e não bloqueado
     [/FROM cliente_usuarios u JOIN web_usuario_acesso/, () => {
       const exc = (u, tipo) => estado.excecoes.some(x => x.usuario_codigo === u.CODIGO && x.permissao === 'entregas.baixar' && x.tipo === tipo);
@@ -239,12 +322,16 @@ function bancoEntregas() {
     pedido: (p = {}) => { const x = { NUMERO: pedidos.length + 100, TIPO: 'Pedido', SITUACAO: 'Pronto', RAZAO_SOCIAL: 'CLIENTE TESTE LTDA', DATA_ENTREGA: null, DATA_PRONTO: null, DATA: null, ...p }; pedidos.push(x); return x; },
     // registro de web_entregas já existente (para testar o que a varredura não pode mexer)
     entrega: (e = {}) => {
-      const x = { id: entregas.length + 1, numero: 100, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
+      const x = { id: entregas.length + 1, numero: 100, sequencia: 1, status: 'a_programar', tipo: null, data_agendada: null, motorista_codigo: null,
         endereco_rua: null, endereco_numero: null, endereco_bairro: null, endereco_cidade: null, endereco_uf: null, endereco_cep: null,
         endereco_ref: null, contato_local: null, transportadora: null, rastreio: null, previsao: null, observacao: null,
         criado_em: '2026-10-01 08:00:00', atualizado_em: '2026-10-01 08:00:00', ...e };
       entregas.push(x); return x;
     },
+    // linha de web_entrega_itens (entrega com lista de itens = entrega parcial)
+    entregaItem: (i = {}) => { const x = { id: estado.entregaItens.length + 1, entrega_id: 1, numero_item: 1, quantidade: 1, descricao: 'Item', ...i }; estado.entregaItens.push(x); return x; },
+    // item do pedido (ped_orc_lista_itens)
+    item: (i = {}) => { const x = { NUMERO: 100, TIPO: 'Pedido', ITEM: estado.itens.length + 1, DESCRICAO: 'Item', QTD: 1, ...i }; estado.itens.push(x); return x; },
     evento: (v = {}) => { const x = { id: eventos.length + 1, entrega_id: 1, quando: '2026-10-01 08:00:00', usuario: 'sistema', tipo: 'criada', motivo: null, entregue_a: null, detalhe: null, ...v }; eventos.push(x); return x; }
   };
   return { f, regras, estado, ...estado, semear };

@@ -394,7 +394,7 @@
             const res = await fetch(API_BASE + caminho, { ...opcoes, headers: { ...(opcoes.headers || {}), 'Authorization': 'Bearer ' + getToken() } });
             if (res.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
             const d = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(d.error || `Erro HTTP: ${res.status}`);
+            if (!res.ok) { const e = new Error(d.error || `Erro HTTP: ${res.status}`); e.status = res.status; e.dados = d; throw e; }
             return d;
         }
         // a tela de orçamentos volta para esta página (com o mesmo filtro da URL) depois de salvar um documento aberto daqui
@@ -748,13 +748,16 @@
                     <td class="order-number">${esc(x.numero)}${iconesItens(x)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
-                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}</td>
+                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}</td>
                 </tr>`).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
         // status interno da entrega (web_entregas) -> rótulo; só pedidos com registro de entrega têm selo
         const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
         const seloEntrega = st => st ? `<span class="st entrega">${esc(ROT_ENTREGA[st] || st)}</span>` : '';
+        // pedido com várias entregas (entrega parcial): selo "1 de 2 entregues"; com uma entrega só, nada muda
+        const andamentoEntregas = x => (Number(x && x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '');
+        const seloAndamento = x => andamentoEntregas(x) ? `<span class="st entrega">${esc(andamentoEntregas(x))}</span>` : '';
         // cancelar / excluir: sempre pergunta antes; o servidor confere a permissão e registra quem fez
         async function acaoNoDocumento(acao, numero) {
             const x = (tipoLista === 'Pedido' ? pedidos : orcamentos).find(d => String(d.numero) === String(numero));
@@ -794,8 +797,15 @@
                 manterData = escolha === 'manter'; usarDataPronto = escolha === 'pronto';
                 dataEscolhida = (/^data:(\d{4}-\d{2}-\d{2})$/.exec(escolha) || [])[1] || '';
             } else if (!confirm(`Mudar a situação do pedido nº ${numero}${x ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
+            // com entrega ainda aberta o servidor AVISA (409 + aviso 'entregas_abertas'); confirmado, reenvia com confirmarEntregasAbertas
+            const enviar = confirmarAbertas => api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}), ...(dataEscolhida ? { dataEntrega: dataEscolhida } : {}),
+                ...(confirmarAbertas ? { confirmarEntregasAbertas: true } : {}) }) });
             try {
-                await api(`/ped_orc/Pedido/${encodeURIComponent(numero)}/situacao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}), ...(dataEscolhida ? { dataEntrega: dataEscolhida } : {}) }) });
+                try { await enviar(false); } catch (err) {
+                    if (!(err.status === 409 && err.dados && err.dados.aviso === 'entregas_abertas')) throw err;
+                    if (!confirm(`Este pedido tem ${Number(err.dados.entregasAbertas) || 0} entrega(s) em aberto. Marcar como ${nome} mesmo assim?`)) return;
+                    await enviar(true);
+                }
                 await carregar();
             } catch (err) { alert(err.message); }
         }
@@ -888,7 +898,9 @@
             }
             if (ehPedido && x.entregaStatus && Acesso.pode('entregas.ver')) {
                 sep();
-                L.push({ icone: '🚚', rotulo: `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
+                // com várias entregas abre a lista de TODAS as entregas do pedido (entregas.html?pedido=N)
+                const andamento = Number(x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '';
+                L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
             }
             sep();
             const perigos = [];

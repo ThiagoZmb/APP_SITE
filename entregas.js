@@ -14,7 +14,7 @@
   'use strict';
   // helpers compartilhados com a tela do motorista (entregas_comum.js, carregado antes no navegador)
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
-  const { esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem } = C;
+  const { esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, rotuloSequencia } = C;
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
@@ -23,7 +23,8 @@
   const ROTULO_TIPO = { motorista: 'Entrega', retirada: 'Retirado pelo cliente', outro_estado: 'Entrega em outro estado' };
   const ROTULO_EVENTO = { criada: 'Entrou na fila', agendada: 'Agendada', reagendada: 'Reagendada', saiu: 'Saiu para a entrega', entregue: 'Entregue',
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
-    ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial' };
+    ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial',
+    dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado' };
   const ABAS = [
     { id: 'fila', rotulo: 'Fila', status: ['a_programar'] },
     { id: 'agenda', rotulo: 'Agenda', status: ['agendada'] },
@@ -168,11 +169,81 @@
   const validarComprovante = f => (f.temFoto ? null : 'Anexe a foto do comprovante.');
   const validarCancelamento = m => (txt(m).length >= 3 ? null : 'Informe o motivo (mínimo 3 caracteres).');
 
+  // ---- Várias entregas por pedido: divisão, restante da ocorrência parcial, saldo e ?pedido=N ----
+  const TOL = 1e-9;
+  const r4 = x => Math.round((Number(x) || 0) * 1e4) / 1e4;
+  // "1,5" ou "1.5" -> 1.5; vazio -> 0; texto inválido -> NaN
+  const lerNumero = v => { const t = txt(v).replace(',', '.'); return t === '' ? 0 : (/^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN); };
+  const numeroBR = n => String(r4(n)).replace('.', ',');
+
+  // linhas do formulário "Separar em outra entrega": itens desta entrega (itensDetalhe da API) com a quantidade a separar
+  const linhasSeparacao = (itensDetalhe, separar = {}) => (Array.isArray(itensDetalhe) ? itensDetalhe : [])
+    .map(i => ({ item: i.item, descricao: i.descricao, qtd: r4(i.qtd), separar: r4(separar[i.item] || 0) }));
+
+  // Ocorrência "parcial" do motorista: o restante (não entregue) de cada item, a partir de itensEntregues do ÚLTIMO evento de
+  // ocorrência. O motorista informa descrição e quantidade; só dá para inferir se cada descrição casa com UM item desta entrega.
+  // Devolve { inferido, linhas }: inferido = false -> lista completa com zero para a equipe marcar.
+  const OCORRENCIAS_TELA = ['ausente', 'endereco_errado', 'recusa', 'parcial'];
+  function ultimaOcorrencia(eventos) {
+    const oc = (Array.isArray(eventos) ? eventos : []).filter(v => OCORRENCIAS_TELA.includes(v.tipo));
+    return oc.length ? oc[oc.length - 1] : null;
+  }
+  function restanteDaOcorrencia(itensDetalhe, eventos) {
+    const vazio = { inferido: false, linhas: linhasSeparacao(itensDetalhe) };
+    const ult = ultimaOcorrencia(eventos);
+    const entregues = ult && ult.tipo === 'parcial' && ult.detalhe && Array.isArray(ult.detalhe.itensEntregues) ? ult.detalhe.itensEntregues : null;
+    if (!entregues || !entregues.length) return vazio;
+    const itens = Array.isArray(itensDetalhe) ? itensDetalhe : [];
+    const chave = s => txt(s).toLowerCase();
+    const entregue = {};
+    for (const x of entregues) {
+      const casam = itens.filter(i => chave(i.descricao) === chave(x.descricao));
+      if (casam.length !== 1) return vazio; // descrição repetida ou desconhecida: a equipe marca à mão
+      entregue[casam[0].item] = (entregue[casam[0].item] || 0) + (Number(x.qtd) || 0);
+    }
+    const separar = {};
+    for (const i of itens) separar[i.item] = Math.max(0, r4(i.qtd - (entregue[i.item] || 0)));
+    return { inferido: true, linhas: linhasSeparacao(itens, separar) };
+  }
+  // botão "Gerar entrega do restante": entrega em Ocorrência cuja última ocorrência foi "parcial" e que pode ser dividida
+  const podeGerarRestante = det => !!(det && det.entrega && det.entrega.status === 'ocorrencia' && det.divisao && det.divisao.podeSeparar &&
+    (ultimaOcorrencia(det.eventos) || {}).tipo === 'parcial');
+
+  // confere as quantidades digitadas (linhas com `separar` já lido por lerNumero)
+  function validarSeparacao(linhas) {
+    const l = Array.isArray(linhas) ? linhas : [];
+    const ruim = l.find(x => !Number.isFinite(x.separar) || x.separar < 0 || x.separar > x.qtd + TOL || Math.abs(r4(x.separar) - x.separar) > TOL);
+    if (ruim) return [`Quantidade inválida em "${txt(ruim.descricao)}" (de 0 a ${numeroBR(ruim.qtd)}, até 4 casas decimais).`];
+    if (!l.some(x => x.separar > TOL)) return ['Informe a quantidade a separar de pelo menos um item.'];
+    if (l.every(x => x.separar >= x.qtd - TOL)) return ['Você marcou todos os itens: deixe ao menos um item nesta entrega (isso não é divisão).'];
+    return [];
+  }
+  const corpoSeparar = (linhas, observacao) => {
+    const b = { itens: linhas.filter(x => x.separar > TOL).map(x => ({ numeroItem: x.item, quantidade: r4(x.separar) })) };
+    if (txt(observacao)) b.observacao = txt(observacao);
+    return b;
+  };
+
+  // ?pedido=N: TODAS as entregas do pedido (qualquer status), na ordem em que foram criadas; a primeira ativa abre o detalhe
+  const FINAIS_TELA = ['entregue', 'retirado', 'cancelada'];
+  function entregasDoPedido(lista, numero) {
+    return (Array.isArray(lista) ? lista : []).filter(e => String(e.numero) === String(numero)).slice().sort((a, b) => a.id - b.id);
+  }
+  const entregaParaAbrir = doPedido => doPedido.find(e => !FINAIS_TELA.includes(e.status)) || doPedido[doPedido.length - 1] || null;
+
+  // "Saldo a entregar" filtrado pela busca da tela (número ou cliente)
+  const filtrarSobras = (sobras, busca) => (Array.isArray(sobras) ? sobras : []).filter(s => {
+    const b = txt(busca).toLowerCase();
+    return !b || String(s.numero).includes(b) || String(s.cliente || '').toLowerCase().includes(b) || String(s.clienteFinal || '').toLowerCase().includes(b);
+  });
+  const textoItens = itens => (Array.isArray(itens) ? itens : []).map(i => `${i.descricao} × ${numeroBR(i.qtd)}`).join('; ');
+
   // ============ TELA (só no navegador) ============
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false, mes: null, diaAberto: null };
+    const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false, mes: null, diaAberto: null,
+      sobras: [], pedidoFiltro: '', sobraAlvo: null, separar: null };
 
     const { getAuth, chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
@@ -191,17 +262,25 @@
     }
 
     // ---------- lista ----------
-    // ?pedido=N (link do menu do botão direito em Pedidos): na primeira carga abre a aba e o detalhe da entrega desse pedido
+    // ?pedido=N (link do menu do botão direito em Pedidos/Início): na primeira carga a lista mostra TODAS as entregas desse pedido
+    // (qualquer status, com "Entrega n de N") e abre o detalhe da primeira ainda aberta; "Mostrar todas" (ou uma aba) volta ao normal
     let pedidoDoLink = '';
     try { pedidoDoLink = (new win.URLSearchParams(win.location.search).get('pedido') || '').trim(); } catch { /* sem query */ }
+    if (!/^\d+$/.test(pedidoDoLink)) pedidoDoLink = '';
     async function carregar() {
       try {
         const d = await chamar('/entregas');
         estado.lista = Array.isArray(d.entregas) ? d.entregas : [];
-      } catch (err) { toast(err.message, 'erro'); estado.lista = []; }
-      const alvo = pedidoDoLink && estado.lista.find(e => String(e.numero) === pedidoDoLink);
-      pedidoDoLink = '';
-      if (alvo) { estado.aba = abaDoStatus(alvo.status) || estado.aba; desenharLista(); await abrirDetalhe(alvo.id); return; }
+        estado.sobras = Array.isArray(d.sobras) ? d.sobras : [];
+      } catch (err) { toast(err.message, 'erro'); estado.lista = []; estado.sobras = []; }
+      if (pedidoDoLink) {
+        estado.pedidoFiltro = pedidoDoLink;
+        const alvo = entregaParaAbrir(entregasDoPedido(estado.lista, pedidoDoLink));
+        pedidoDoLink = '';
+        desenharLista();
+        if (alvo) await abrirDetalhe(alvo.id);
+        return;
+      }
       desenharLista();
     }
 
@@ -224,8 +303,10 @@
       });
     }
 
+    // número do pedido + "Entrega n de N" (só quando o pedido tem mais de uma entrega não cancelada)
+    const celulaNumero = e => `<td>${esc(e.numero)}${rotuloSequencia(e) ? `<span class="seq">${esc(rotuloSequencia(e))}</span>` : ''}</td>`;
     function linha(e, aba) {
-      const tdBase = `<td>${esc(e.numero)}</td>${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
+      const tdBase = `${celulaNumero(e)}${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
       if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
@@ -250,7 +331,7 @@
       if (!estado.mes) { const h = new win.Date(); estado.mes = { ano: h.getFullYear(), mes: h.getMonth() }; }
       const { ano, mes } = estado.mes;
       const semanas = montarMes(estado.lista.filter(casa), ano, mes, hojeISO());
-      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero} — ${e.cliente || ''} (${rotuloStatus(e.status)})`)}">` +
+      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(e.status)})`)}">` +
         `<strong>${esc(e.numero)}</strong> ${esc(e.cliente || '')}</button>`;
       const celula = c => {
         const aberto = estado.diaAberto === c.dia;
@@ -270,18 +351,45 @@
         semanas.map(sem => `<div class="cal-linha">${sem.map(celula).join('')}</div>`).join('') + '</div>';
     }
 
+    // "Saldo a entregar": pedido dividido com item sem entrega (ou alterado depois da divisão). Botões só com entregas.programar.
+    function htmlSobras(sobras) {
+      if (!sobras.length) return '';
+      const linhaSobra = s => `<tr class="sobra-linha"><td>${esc(s.numero)}</td><td>${esc(s.cliente)}</td>` +
+        `<td>${s.qtdItensSemEntrega ? esc(textoItens(s.itensSemEntrega)) : '—'}${s.alterado ? '<p class="aviso-divisao">Pedido alterado depois da divisão: confira os itens.</p>' : ''}</td>` +
+        `<td class="acao">${s.alterado || !s.qtdItensSemEntrega ? '' :
+          `<button type="button" class="btn btn-mini btn-secondary" data-sobra="gerar" data-numero="${esc(s.numero)}" data-perm="entregas.programar">Gerar entrega do saldo</button> ` +
+          `<button type="button" class="btn btn-mini btn-perigo" data-sobra="encerrar" data-numero="${esc(s.numero)}" data-perm="entregas.programar">Encerrar saldo</button>`}</td></tr>`;
+      return `<div class="sobras"><h3>Saldo a entregar</h3><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Itens sem entrega</th><th></th></tr></thead>` +
+        `<tbody>${sobras.map(linhaSobra).join('')}</tbody></table></div>`;
+    }
+
+    // ?pedido=N: todas as entregas do pedido, de qualquer aba
+    function desenharDoPedido() {
+      const doPedido = entregasDoPedido(estado.lista, estado.pedidoFiltro);
+      const topo = `<div class="filtro-pedido"><strong>Entregas do pedido ${esc(estado.pedidoFiltro)}</strong><span class="cinza">${doPedido.length} entrega(s)</span>` +
+        '<button type="button" class="btn btn-mini btn-secondary" data-limpar-pedido>Mostrar todas</button></div>';
+      const sobras = estado.sobras.filter(s => String(s.numero) === estado.pedidoFiltro);
+      const corpo = doPedido.length
+        ? `<table><thead><tr>${CABECALHO.outras.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>` +
+          `<tbody>${doPedido.map(e => linha(e, 'outras')).join('')}</tbody></table>`
+        : '<p class="vazio">Nenhuma entrega deste pedido.</p>';
+      $('lista').innerHTML = topo + htmlSobras(sobras) + corpo;
+    }
+
     function desenharLista() {
       desenharAbas();
+      if (estado.pedidoFiltro) { desenharDoPedido(); return; }
       if (estado.aba === 'agenda') { desenharCalendario(); return; }
       const itens = filtrarAba(estado.lista, estado.aba).filter(casa);
       const alvo = $('lista');
-      if (!itens.length) { alvo.innerHTML = '<p class="vazio">Nada por aqui.</p>'; return; }
+      const sobras = estado.aba === 'fila' ? htmlSobras(filtrarSobras(estado.sobras, estado.busca)) : '';
+      if (!itens.length) { alvo.innerHTML = sobras + '<p class="vazio">Nada por aqui.</p>'; return; }
       const cab = CABECALHO[estado.aba] || CABECALHO.outras;
-      alvo.innerHTML = `<table><thead><tr>${cab.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${itens.map(e => linha(e, estado.aba)).join('')}</tbody></table>`;
+      alvo.innerHTML = sobras + `<table><thead><tr>${cab.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${itens.map(e => linha(e, estado.aba)).join('')}</tbody></table>`;
     }
 
     // ---------- painel ----------
-    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-enviada', 'vista-comprovante'];
+    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar'];
     function mostrar(nome) { VISTAS.forEach(v => { $(v).hidden = v !== nome; }); }
     function limparUrls() { estado.urls.forEach(u => URL.revokeObjectURL(u)); estado.urls = []; }
 
@@ -313,9 +421,20 @@
 
     function desenharDetalhe() {
       const { entrega: e, eventos, itens, anexos } = estado.det;
+      const div = estado.det.divisao || {};
       mostrar('vista-detalhe');
-      $('d-titulo').textContent = `Pedido ${e.numero}`;
+      const seq = rotuloSequencia(div);
+      $('d-titulo').textContent = `Pedido ${e.numero}${seq ? ' · ' + seq : ''}`;
       $('d-status').innerHTML = selo(e.statusExibicao || e.status);
+      // pedido editado depois da divisão: aviso fixo; a divisão fica bloqueada e o pedido não fecha sozinho na última baixa
+      const avisos = [];
+      if (div.alterado) avisos.push('O pedido foi alterado depois da divisão: confira os itens. Ele não vira Entregue sozinho na última baixa.');
+      if (!div.alterado && Array.isArray(div.itensSemEntrega) && div.itensSemEntrega.length) avisos.push('Saldo a entregar: ' + textoItens(div.itensSemEntrega) + '.');
+      $('d-aviso').textContent = avisos.join(' ');
+      $('d-aviso').hidden = !avisos.length;
+      $('btn-separar').hidden = !div.podeSeparar;
+      $('btn-restante').hidden = !podeGerarRestante(estado.det);
+      $('d-itens-titulo').textContent = div.dividido ? 'Itens desta entrega' : 'Itens do pedido';
       $('d-info').innerHTML = linhaInfo('Cliente', e.cliente) + linhaInfo('Tipo', e.tipo ? rotuloTipo(e.tipo) : '') +
         linhaInfo('Data do pedido', dataBR(e.dataPedido)) + linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
         linhaInfo('Motorista', (estado.motoristas || []).find(m => m.codigo === e.motoristaCodigo)?.nome || (e.motoristaCodigo ? '#' + e.motoristaCodigo : '')) +
@@ -485,6 +604,75 @@
       });
     }
 
+    // ---------- Separar em outra entrega / Gerar entrega do restante ----------
+    function abrirSeparar(restante) {
+      const det = estado.det;
+      const r = restante ? restanteDaOcorrencia(det.itensDetalhe, det.eventos) : { inferido: false, linhas: linhasSeparacao(det.itensDetalhe) };
+      estado.separar = { linhas: r.linhas };
+      $('sp-titulo').textContent = (restante ? 'Gerar entrega do restante' : 'Separar em outra entrega') + ` — pedido ${det.entrega.numero}`;
+      $('sp-ajuda').textContent = restante
+        ? (r.inferido ? 'Já preenchido com o que o motorista NÃO entregou. Confira e confirme: vai para uma entrega nova, A programar.'
+          : 'Não deu para saber pelo relato do motorista o que faltou: marque a quantidade de cada item que vai para a entrega nova.')
+        : 'Marque a quantidade de cada item que vai para a entrega nova (A programar, sem data nem motorista). O resto fica nesta entrega.';
+      $('sp-itens').innerHTML = r.linhas.map((l, k) => `<div class="sep-linha"><label for="sp-item-${k}">${esc(l.descricao)} <span class="cinza">(disponível ${esc(String(l.qtd).replace('.', ','))})</span></label>` +
+        `<input type="number" inputmode="decimal" id="sp-item-${k}" data-linha="${k}" min="0" max="${esc(l.qtd)}" step="any" value="${esc(l.separar)}"></div>`).join('') ||
+        '<p class="cinza">Esta entrega não tem itens.</p>';
+      $('sp-obs').value = '';
+      $('erro-separar').textContent = '';
+      mostrar('vista-separar');
+    }
+    function enviarSeparar() {
+      const linhas = estado.separar.linhas.map((l, k) => ({ ...l, separar: lerNumero($(`sp-item-${k}`).value) }));
+      const erros = validarSeparacao(linhas);
+      $('erro-separar').textContent = erros.join(' ');
+      if (erros.length) return;
+      const e = estado.det.entrega;
+      return ocupado(async () => {
+        try {
+          await chamar(`/entregas/${encodeURIComponent(e.id)}/separar`, { metodo: 'POST', corpo: corpoSeparar(linhas, $('sp-obs').value) });
+        } catch (err) { $('erro-separar').textContent = err.message; return; }
+        toast('Entrega separada: a nova está na fila, A programar.', 'ok');
+        await recarregarTudo(e.id);
+      });
+    }
+
+    // ---------- Saldo a entregar: gerar entrega / encerrar ----------
+    function gerarSobra(numero) {
+      if (!win.confirm(`Criar uma entrega nova (A programar) com os itens sem entrega do pedido ${numero}?`)) return;
+      return ocupado(async () => {
+        await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/saldo`, { metodo: 'POST', corpo: {} });
+        toast('Entrega do saldo criada na fila.', 'ok');
+        await carregar();
+      });
+    }
+    function abrirEncerrar(numero) {
+      const s = estado.sobras.find(x => String(x.numero) === String(numero));
+      if (!s) return;
+      estado.sobraAlvo = s.numero;
+      $('en-titulo').textContent = `Encerrar saldo — pedido ${s.numero}`;
+      $('en-itens').innerHTML = (s.itensSemEntrega || []).map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(String(i.qtd).replace('.', ','))}</span></li>`).join('');
+      $('en-motivo').value = '';
+      $('erro-encerrar').textContent = '';
+      mostrar('vista-encerrar');
+    }
+    function enviarEncerrar() {
+      const motivo = $('en-motivo').value;
+      const erro = validarCancelamento(motivo);
+      $('erro-encerrar').textContent = erro || '';
+      if (erro || !estado.sobraAlvo) return;
+      const numero = estado.sobraAlvo;
+      return ocupado(async () => {
+        let r;
+        try {
+          r = await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/saldo/encerrar`, { metodo: 'POST', corpo: { motivo: txt(motivo) } });
+        } catch (err) { $('erro-encerrar').textContent = err.message; return; }
+        toast(r && r.pedidoFechado ? `Saldo encerrado. O pedido ${numero} foi marcado como ${r.situacao}.` : 'Saldo encerrado.', 'ok');
+        estado.sobraAlvo = null;
+        await carregar();
+        if (estado.det) await abrirDetalhe(estado.det.entrega.id); else mostrar('vazio-painel');
+      });
+    }
+
     async function recarregarTudo(id) {
       await carregar();
       await abrirDetalhe(id);
@@ -499,9 +687,16 @@
 
     // ---------- eventos ----------
     function ligar() {
-      doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); desenharLista(); }));
+      doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); estado.pedidoFiltro = ''; desenharLista(); }));
       $('busca').addEventListener('input', ev => { estado.busca = ev.target.value.trim(); desenharLista(); });
       $('lista').addEventListener('click', ev => {
+        if (ev.target.closest('[data-limpar-pedido]')) { estado.pedidoFiltro = ''; desenharLista(); return; }
+        const sobra = ev.target.closest('button[data-sobra]');
+        if (sobra) {
+          const numero = sobra.getAttribute('data-numero');
+          if (sobra.getAttribute('data-sobra') === 'gerar') gerarSobra(numero); else abrirEncerrar(numero);
+          return;
+        }
         const nav = ev.target.closest('[data-mes]');
         if (nav) {
           const h = new win.Date(), m = estado.mes || { ano: h.getFullYear(), mes: h.getMonth() };
@@ -532,6 +727,8 @@
         $('e-transp').value = estado.det.entrega.transportadora || '';
       });
       $('btn-comprovante').addEventListener('click', () => abrirForm('vista-comprovante', ['k-entregue', 'k-foto']));
+      $('btn-separar').addEventListener('click', () => abrirSeparar(false));
+      $('btn-restante').addEventListener('click', () => abrirSeparar(true));
       $('f-tipo').addEventListener('change', ajustarCamposTipo);
       $('btn-usar-endereco').addEventListener('click', usarEnderecoCliente);
       $('btn-cep').addEventListener('click', buscarCep);
@@ -543,6 +740,8 @@
       envio('vista-retirada', enviarRetirada);
       envio('vista-enviada', enviarEnviada);
       envio('vista-comprovante', enviarComprovante);
+      envio('vista-separar', enviarSeparar);
+      envio('vista-encerrar', enviarEncerrar);
     }
 
     // ---------- init ----------
@@ -559,5 +758,6 @@
   }
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
-    validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem, iniciar };
+    validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
+    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, iniciar };
 });

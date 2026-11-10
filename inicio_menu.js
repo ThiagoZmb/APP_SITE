@@ -7,6 +7,9 @@
   const SITUACOES = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
   const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
+  // várias entregas por pedido: "1 de 2 entregues" só quando o pedido tem mais de uma entrega não cancelada
+  const andamentoEntregas = x => (Number(x && x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '');
+  const avisoEntregasAbertas = (n, nome) => `Este pedido tem ${Number(n) || 0} entrega(s) em aberto. Marcar como ${nome} mesmo assim?`;
 
   function iniciar(cfg) {
     const enc = encodeURIComponent;
@@ -49,10 +52,19 @@
         dataEscolhida = (/^data:(\d{4}-\d{2}-\d{2})$/.exec(escolha) || [])[1] || '';
       } else if (!confirm(`Mudar a situação do pedido nº ${x.numero}${x.cliente ? ' (' + x.cliente + ')' : ''} para "${nome}"?`)) return;
       try {
-        const r = await fetch(`${cfg.apiBase}/ped_orc/Pedido/${enc(x.numero)}/situacao`, { method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token() }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}), ...(dataEscolhida ? { dataEntrega: dataEscolhida } : {}) }) });
+        // com entrega ainda aberta o servidor AVISA (409 + aviso 'entregas_abertas'); confirmado, reenvia com confirmarEntregasAbertas
+        const enviar = confirmarAbertas => fetch(`${cfg.apiBase}/ped_orc/Pedido/${enc(x.numero)}/situacao`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.token() }, body: JSON.stringify({ situacao: nome, ...(manterData ? { manterData: true } : {}), ...(usarDataPronto ? { usarDataPronto: true } : {}), ...(dataEscolhida ? { dataEntrega: dataEscolhida } : {}),
+            ...(confirmarAbertas ? { confirmarEntregasAbertas: true } : {}) }) });
+        let r = await enviar(false);
         if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
-        const d = await r.json().catch(() => ({}));
+        let d = await r.json().catch(() => ({}));
+        if (r.status === 409 && d.aviso === 'entregas_abertas') {
+          if (!confirm(avisoEntregasAbertas(d.entregasAbertas, nome))) return;
+          r = await enviar(true);
+          if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
+          d = await r.json().catch(() => ({}));
+        }
         if (!r.ok) throw new Error(d.error || `Erro HTTP: ${r.status}`);
         cfg.recarregar();
       } catch (err) { alert(err.message); }
@@ -99,7 +111,9 @@
         for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual }); }
       }
       if (x.entregaStatus && cfg.pode('entregas.ver')) {
-        sep(); L.push({ icone: '🚚', rotulo: `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${enc(n)}`; } });
+        // com várias entregas abre a lista de TODAS as entregas do pedido (entregas.html?pedido=N)
+        const andamento = andamentoEntregas(x);
+        sep(); L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${enc(n)}`; } });
       }
       while (L.length && L[L.length - 1].sep) L.pop();
       return L;
@@ -159,5 +173,5 @@
     return { itensDoMenu, fechar };
   }
 
-  window.InicioMenu = { iniciar };
+  window.InicioMenu = { iniciar, andamentoEntregas, avisoEntregasAbertas };
 })();

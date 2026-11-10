@@ -13,7 +13,7 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
-  const { esc, txt, dataBR } = C;
+  const { esc, txt, dataBR, rotuloSequencia } = C;
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', cancelada: 'Cancelada' };
@@ -199,7 +199,7 @@
       const botoes = (acoes.includes('iniciar') ? '<button type="button" class="btn btn-primary btn-grande" data-acao="iniciar" data-perm="entregas.baixar">Iniciar rota</button>' : '') +
         (acoes.includes('baixar') ? '<button type="button" class="btn btn-primary btn-grande" data-acao="baixar" data-perm="entregas.baixar">Dar baixa</button>' : '');
       return `<article class="cartao" data-id="${esc(e.id)}">
-        <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}</strong>${selo(e.status)}</div>
+        <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}${rotuloSequencia(e) ? ` · ${esc(rotuloSequencia(e))}` : ''}</strong>${selo(e.status)}</div>
         <h3>${esc(e.cliente)}</h3>
         ${htmlTelefone(e.telefone)}
         ${enderecoHtml}

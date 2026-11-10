@@ -359,10 +359,13 @@ const TABELAS = [
      atualizado_em DATETIME NULL,
      atualizado_por VARCHAR(190) NULL
    ) ${OPCOES}`,
-  // módulo Entregas: cabeçalho, histórico (eventos) e comprovantes (foto/assinatura)
+  // módulo Entregas: cabeçalho, histórico (eventos) e comprovantes (foto/assinatura).
+  // Várias entregas por pedido: `sequencia` (1, 2, ...) por número; a chave única é (numero, sequencia); a varredura grava 1.
+  // `hash_itens` = impressão digital dos itens do pedido no momento da divisão (só a divisão, etapa 4, grava).
   `CREATE TABLE IF NOT EXISTS \`web_entregas\` (
      id INT AUTO_INCREMENT PRIMARY KEY,
      numero INT NOT NULL,
+     sequencia INT NOT NULL DEFAULT 1,
      status VARCHAR(20) NOT NULL,
      tipo VARCHAR(20) NULL,
      data_agendada DATE NULL,
@@ -379,9 +382,37 @@ const TABELAS = [
      rastreio VARCHAR(120) NULL,
      previsao DATE NULL,
      observacao VARCHAR(500) NULL,
+     hash_itens VARCHAR(64) NULL,
      criado_em DATETIME NOT NULL,
      atualizado_em DATETIME NOT NULL,
-     UNIQUE KEY uk_numero (numero)
+     UNIQUE KEY uk_numero_seq (numero, sequencia)
+   ) ${OPCOES}`,
+  // itens e quantidades de cada entrega (cópia: editar o pedido apaga e regrava os itens com nova numeração).
+  // Sem linha para a entrega = a entrega leva o pedido inteiro (caso de todas as entregas anteriores à divisão).
+  `CREATE TABLE IF NOT EXISTS \`web_entrega_itens\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     entrega_id INT NOT NULL,
+     numero_item INT NOT NULL,
+     item_pedido INT NULL,
+     descricao VARCHAR(300) NOT NULL,
+     quantidade DECIMAL(14,4) NOT NULL,
+     unidade VARCHAR(20) NULL,
+     criado_em DATETIME NOT NULL,
+     KEY idx_entrega (entrega_id)
+   ) ${OPCOES}`,
+  // sobra do pedido dividido que a equipe ENCERROU ("Encerrar saldo", com motivo): conta como coberta na regra da última baixa.
+  // Uma linha por item, com a quantidade encerrada e o hash_itens do pedido naquele momento. Só da web; apagada com o pedido.
+  `CREATE TABLE IF NOT EXISTS \`web_entrega_sobras_encerradas\` (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     numero INT NOT NULL,
+     numero_item INT NOT NULL,
+     descricao VARCHAR(300) NOT NULL,
+     quantidade DECIMAL(14,4) NOT NULL,
+     hash_itens VARCHAR(64) NULL,
+     motivo VARCHAR(500) NOT NULL,
+     usuario VARCHAR(190) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     KEY idx_numero (numero)
    ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_entrega_eventos\` (
      id INT AUTO_INCREMENT PRIMARY KEY,
@@ -555,6 +586,26 @@ async function instalarTabelas(pool) {
   const [[sr] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_perfil_secoes' AND COLUMN_NAME = 'semente_rev'");
   if (!Number(sr?.n)) await pool.execute('ALTER TABLE web_perfil_secoes ADD COLUMN semente_rev INT NULL');
+  await migrarEntregasVarias(pool);
+}
+
+// Várias entregas por pedido (etapa 2): web_entregas criada antes de `sequencia`/`hash_itens` e com UNIQUE(numero).
+// Idempotente e reexecutável: cada passo confere o information_schema antes; nada é apagado (as entregas existentes ficam sequencia = 1).
+// A troca da chave única é UM ALTER (DROP + ADD juntos): nunca há janela sem unicidade por número.
+async function migrarEntregasVarias(pool) {
+  const [[sq] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_entregas' AND COLUMN_NAME = 'sequencia'");
+  if (!Number(sq?.n)) await pool.execute('ALTER TABLE web_entregas ADD COLUMN sequencia INT NOT NULL DEFAULT 1 AFTER numero');
+  const [[hi] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_entregas' AND COLUMN_NAME = 'hash_itens'");
+  if (!Number(hi?.n)) await pool.execute('ALTER TABLE web_entregas ADD COLUMN hash_itens VARCHAR(64) NULL AFTER observacao');
+  const [indices] = await pool.execute(
+    "SELECT DISTINCT INDEX_NAME AS nome FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_entregas' AND INDEX_NAME IN ('uk_numero', 'uk_numero_seq')");
+  const nomes = new Set((indices || []).map(i => i.nome ?? i.INDEX_NAME));
+  const passos = [];
+  if (nomes.has('uk_numero')) passos.push('DROP INDEX uk_numero');
+  if (!nomes.has('uk_numero_seq')) passos.push('ADD UNIQUE KEY uk_numero_seq (numero, sequencia)');
+  if (passos.length) await pool.execute(`ALTER TABLE web_entregas ${passos.join(', ')}`);
 }
 
 // usuário designado vira Administrador; cargo com "representante" vira Representante (RJ); demais, Interno completo

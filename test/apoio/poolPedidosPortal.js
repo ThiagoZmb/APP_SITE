@@ -5,9 +5,12 @@
 //
 // pedidos:  linhas de ped_orc  { NUMERO, TIPO, RAZAO_SOCIAL, DATA, SITUACAO, DATA_ENTREGA, TOTAL, ... } (datas já 'YYYY-MM-DD')
 // clientes: { CODIGO, RAZAO_SOCIAL }
-// entregas: { numero, status, data_agendada }
-// A linha devolvida tem SÓ as 6 colunas que a consulta seleciona (o resto do pedido nunca sai do "banco").
+// entregas: { id, numero, status, data_agendada } (várias por pedido: a junção é simulada pelo texto do SQL, ver juncaoEntregas.js)
+// A linha devolvida tem SÓ as colunas que a consulta seleciona (o resto do pedido nunca sai do "banco").
+const { juntarEntregas } = require('./juncaoEntregas');
+
 function criarPoolPedidos({ pedidos = [], clientes = [], entregas = [] } = {}) {
+  entregas = entregas.map((e, i) => ({ id: i + 1, ...e }));
   const chamadas = [];
   async function execute(sql, params = []) {
     chamadas.push({ sql, params });
@@ -28,18 +31,18 @@ function criarPoolPedidos({ pedidos = [], clientes = [], entregas = [] } = {}) {
       return true;
     });
     if (/ORDER BY p\.NUMERO DESC/.test(sql)) linhas = [...linhas].sort((a, b) => b.NUMERO - a.NUMERO);
-    const lim = /LIMIT (\d+)/.exec(sql);
+    // junção com as entregas ANTES do LIMIT, como no MySQL (o LIMIT 1 da subconsulta da entrega principal não conta: vale o último)
+    const juntas = linhas.flatMap(p => juntarEntregas(sql, p.NUMERO, entregas).map(j => ({ p, ...j })));
+    const lim = /LIMIT (\d+)(?![\s\S]*LIMIT)/.exec(sql);
     const off = /OFFSET (\d+)/.exec(sql);
     const de = off ? Number(off[1]) : 0;
-    if (lim) linhas = linhas.slice(de, de + Number(lim[1]));
+    const pagina = lim ? juntas.slice(de, de + Number(lim[1])) : juntas;
 
-    return [linhas.map(p => {
-      const en = entregas.find(e => e.numero === p.NUMERO);
-      return {
-        NUMERO: p.NUMERO, DATA: p.DATA, SITUACAO: p.SITUACAO, DATA_ENTREGA: p.DATA_ENTREGA ?? null,
-        ENTREGA_STATUS: en ? en.status : null, DATA_AGENDADA: en ? (en.data_agendada ?? null) : null
-      };
-    }), []];
+    return [pagina.map(({ p, en, qtd }) => ({
+      NUMERO: p.NUMERO, DATA: p.DATA, SITUACAO: p.SITUACAO, DATA_ENTREGA: p.DATA_ENTREGA ?? null,
+      ENTREGA_STATUS: en ? en.status : null, DATA_AGENDADA: en ? (en.data_agendada ?? null) : null,
+      ...(/AS QTD_ENTREGAS\b/.test(sql) ? { QTD_ENTREGAS: qtd.qtdEntregas, QTD_ENTREGAS_CONCLUIDAS: qtd.qtdEntregasConcluidas } : {})
+    })), []];
   }
   return { execute, query: execute, chamadas };
 }

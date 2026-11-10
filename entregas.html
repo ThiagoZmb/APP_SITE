@@ -147,11 +147,25 @@
         .etiqueta.ok { background: #16a34a; } .etiqueta.neutro { background: #6b7280; }
         .etiqueta:hover, .etiqueta:focus-visible { filter: brightness(1.15); outline: 2px solid var(--primary-color); outline-offset: 1px; }
         .mais { border: none; background: none; color: var(--primary-color); font-size: 11.5px; font-weight: 600; text-align: left; cursor: pointer; padding: 1px 4px; }
+        /* várias entregas por pedido: "Entrega n de N", aviso de pedido alterado, saldo a entregar, filtro ?pedido=N e formulário de separar */
+        .seq { display: block; font-size: 12px; color: var(--text-light); white-space: nowrap; }
+        .aviso-divisao { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .sobras { padding: 12px 14px 4px; border-bottom: 1px solid var(--border-color); }
+        .sobras h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .4px; color: var(--selo-aviso-fg); margin-bottom: 8px; }
+        .sobras tbody tr { cursor: default; }
+        .sobras td.acao button + button { margin-left: 6px; }
+        .filtro-pedido { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--border-color); }
+        .sep-itens { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 8px 0 14px; min-width: 0; }
+        .sep-linha { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 12px; align-items: center; min-width: 0; }
+        .sep-linha label { font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+        .sep-linha input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background: var(--white); text-align: right; }
+        .sep-linha input:focus { outline: none; border-color: var(--primary-color); }
+        @media (max-width: 360px) { .sep-linha { grid-template-columns: minmax(0, 1fr); } }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611161500">
     <script src="layout.js?v=202611091200" defer></script>
-    <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="entregas.js?v=202611061900" defer></script>
+    <script src="entregas_comum.js?v=202611101800" defer></script>
+    <script src="entregas.js?v=202611101800" defer></script>
 </head>
 <body>
     <div class="container">
@@ -193,6 +207,7 @@
                     <div id="vista-detalhe" hidden>
                         <h2 id="d-titulo"></h2>
                         <span id="d-status"></span>
+                        <p class="aviso-divisao" id="d-aviso" role="status" hidden></p>
                         <dl class="info" id="d-info"></dl>
                         <div class="acoes">
                             <button type="button" class="btn btn-primary" id="btn-agendar" data-perm="entregas.programar" hidden>Agendar</button>
@@ -200,9 +215,11 @@
                             <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
                             <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
                             <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.programar" hidden>Anexar comprovante</button>
+                            <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.programar" hidden>Separar em outra entrega</button>
+                            <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.programar" hidden>Gerar entrega do restante</button>
                             <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="entregas.programar" hidden>Cancelar entrega</button>
                         </div>
-                        <h3>Itens do pedido</h3>
+                        <h3 id="d-itens-titulo">Itens do pedido</h3>
                         <ul id="d-itens"></ul>
                         <h3>Linha do tempo</h3>
                         <ol id="d-eventos"></ol>
@@ -292,6 +309,30 @@
                         <p class="erro-form" id="erro-comprovante" role="alert"></p>
                         <div class="acoes">
                             <button type="submit" class="btn btn-primary" id="btn-confirmar-comprovante" data-perm="entregas.programar">Confirmar entrega</button>
+                            <button type="button" class="btn btn-secondary voltar">Voltar</button>
+                        </div>
+                    </form>
+
+                    <form id="vista-separar" hidden>
+                        <h2 id="sp-titulo">Separar em outra entrega</h2>
+                        <p class="cinza" id="sp-ajuda"></p>
+                        <div class="sep-itens" id="sp-itens"></div>
+                        <div class="form-group"><label for="sp-obs">Observação da entrega nova</label><textarea id="sp-obs" maxlength="500"></textarea></div>
+                        <p class="erro-form" id="erro-separar" role="alert"></p>
+                        <div class="acoes">
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-separar" data-perm="entregas.programar">Separar</button>
+                            <button type="button" class="btn btn-secondary voltar">Voltar</button>
+                        </div>
+                    </form>
+
+                    <form id="vista-encerrar" hidden>
+                        <h2 id="en-titulo">Encerrar saldo</h2>
+                        <p class="cinza">Estes itens deixam de ser esperados em alguma entrega; o pedido pode fechar sem eles.</p>
+                        <ul id="en-itens"></ul>
+                        <div class="form-group"><label for="en-motivo">Motivo</label><textarea id="en-motivo" maxlength="500"></textarea></div>
+                        <p class="erro-form" id="erro-encerrar" role="alert"></p>
+                        <div class="acoes">
+                            <button type="submit" class="btn btn-perigo" id="btn-confirmar-encerrar" data-perm="entregas.programar">Encerrar saldo</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>

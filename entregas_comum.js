@@ -48,6 +48,10 @@
     return enderecoDoViaCep(dados);
   }
 
+  // "Entrega n de N" (pedido dividido em várias entregas): a API só manda ordemEntrega/qtdEntregasPedido quando N > 1
+  // e a entrega não está cancelada; nos outros casos o rótulo é vazio (pedido de uma entrega fica como sempre).
+  const rotuloSequencia = e => (e && Number(e.qtdEntregasPedido) > 1 && Number(e.ordemEntrega) > 0 ? `Entrega ${Number(e.ordemEntrega)} de ${Number(e.qtdEntregasPedido)}` : '');
+
   // maior lado limitado a `max`, sem ampliar
   function escalaImagem(w, h, max) {
     const f = Math.min(1, max / Math.max(w, h));
@@ -117,5 +121,6 @@
     throw new Error('A foto continua grande demais. Tente outra.');
   }
 
-  return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem };
+  return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem,
+    rotuloSequencia };
 });

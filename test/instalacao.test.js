@@ -24,11 +24,14 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
   ]);
 }
 
-test('cria as 44 tabelas web_', async () => {
+// instalação já com a chave única nova de web_entregas (várias entregas por pedido): nenhum ALTER de índice
+const JA_MIGRADO_ENTREGAS = [/information_schema\.STATISTICS/, [{ nome: 'uk_numero_seq' }]];
+
+test('cria as 47 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_checklist', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_danfe', 'web_danfe_vinculos', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_checklist', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_danfe', 'web_danfe_vinculos', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entrega_itens', 'web_entrega_sobras_encerradas', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
     'web_perfil_permissoes', 'web_perfil_secoes', 'web_perfis', 'web_pesos', 'web_portal_auditoria', 'web_portal_convites', 'web_portal_empresas', 'web_portal_permissoes', 'web_portal_recuperacao', 'web_portal_sessoes', 'web_portal_usuarios', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_producao_etapas', 'web_producao_etapas_eventos', 'web_retalhos', 'web_sessoes', 'web_usuario_acesso', 'web_usuario_excecoes', 'web_vidro_config', 'web_vidro_planos', 'web_vidro_retalhos']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);
@@ -169,7 +172,7 @@ test('composição: coluna componente_id no CREATE e ALTER só quando falta', as
   await instalarTabelas(sem);
   assert.match(sem.chamadas.find(c => /`web_custo_ligacoes`/.test(c.sql)).sql, /componente_id INT NULL/);
   assert.ok(sem.chamadas.some(c => c.sql === 'ALTER TABLE web_custo_ligacoes ADD COLUMN componente_id INT NULL'));
-  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]], JA_MIGRADO_ENTREGAS]);
   await instalarTabelas(com);
   assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
   assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /quantidade DECIMAL\(14,4\) NULL/);
@@ -181,7 +184,7 @@ test('composição por quantidade: acrescenta a coluna e converte a participaç�
   const sqls = sem.chamadas.map(c => c.sql);
   assert.ok(sqls.includes('ALTER TABLE web_custo_componentes ADD COLUMN quantidade DECIMAL(14,4) NULL'));
   assert.ok(sqls.includes('UPDATE web_custo_componentes SET quantidade = participacao_pct / 100 WHERE quantidade IS NULL'));
-  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]], JA_MIGRADO_ENTREGAS]);
   await instalarTabelas(com);
   assert.ok(!com.chamadas.some(c => /^ALTER|^UPDATE/.test(c.sql)));
 });
@@ -190,7 +193,7 @@ test('custo informado: colunas no CREATE e ALTER só quando faltam', async () =>
   const sem = criarPoolFalso([[/COLUMN_NAME = 'custo_informado'/, [{ n: 0 }]], [/information_schema\.COLUMNS/, [{ n: 1 }]]]);
   await instalarTabelas(sem);
   assert.ok(sem.chamadas.some(c => c.sql === 'ALTER TABLE web_custo_componentes ADD COLUMN custo_informado DECIMAL(14,4) NULL, ADD COLUMN informado_em DATETIME NULL, ADD COLUMN informado_por VARCHAR(190) NULL'));
-  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]], JA_MIGRADO_ENTREGAS]);
   await instalarTabelas(com);
   assert.match(com.chamadas.find(c => /`web_custo_componentes`/.test(c.sql)).sql, /custo_informado DECIMAL\(14,4\) NULL/);
   assert.ok(!com.chamadas.some(c => /^ALTER/.test(c.sql)));
@@ -204,29 +207,79 @@ test('quantidade por item: coluna nas ligações e passagem da qtd do componente
   assert.ok(sqls.includes('ALTER TABLE web_custo_ligacoes ADD COLUMN quantidade DECIMAL(14,4) NULL'));
   assert.ok(sqls.includes('UPDATE web_custo_ligacoes l JOIN web_custo_componentes c ON c.id = l.componente_id SET l.quantidade = c.quantidade WHERE c.quantidade IS NOT NULL AND c.quantidade <> 1'));
   assert.ok(sqls.includes('UPDATE web_custo_componentes SET quantidade = 1 WHERE quantidade IS NOT NULL AND quantidade <> 1'));
-  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]]]);
+  const com = criarPoolFalso([[/information_schema\.COLUMNS/, [{ n: 1 }]], JA_MIGRADO_ENTREGAS]);
   await instalarTabelas(com);
   assert.ok(!com.chamadas.some(c => /^ALTER|^UPDATE/.test(c.sql)));
   assert.match(com.chamadas.find(c => /`web_custo_ligacoes`/.test(c.sql)).sql, /quantidade DECIMAL\(14,4\) NULL/);
 });
 
-test('tabelas de entregas: número único, índice dos eventos, anexo em MEDIUMBLOB, sem nome de coluna de dinheiro', async () => {
+test('tabelas de entregas: (número, sequência) único, índice dos eventos, anexo em MEDIUMBLOB, sem nome de coluna de dinheiro', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const sql = n => pool.chamadas.find(c => new RegExp('`' + n + '`').test(c.sql)).sql;
   assert.match(sql('web_entregas'), /numero INT NOT NULL/);
-  assert.match(sql('web_entregas'), /UNIQUE KEY uk_numero \(numero\)/);
+  // várias entregas por pedido (troca proposital da chave antiga UNIQUE(numero))
+  assert.match(sql('web_entregas'), /sequencia INT NOT NULL DEFAULT 1/);
+  assert.match(sql('web_entregas'), /UNIQUE KEY uk_numero_seq \(numero, sequencia\)/);
+  assert.doesNotMatch(sql('web_entregas'), /UNIQUE KEY uk_numero \(numero\)/);
+  assert.match(sql('web_entregas'), /hash_itens VARCHAR\(64\) NULL/);
   assert.match(sql('web_entregas'), /status VARCHAR\(20\) NOT NULL/);
+  assert.match(sql('web_entrega_itens'), /entrega_id INT NOT NULL/);
+  assert.match(sql('web_entrega_itens'), /quantidade DECIMAL\(14,4\) NOT NULL/);
+  assert.match(sql('web_entrega_itens'), /KEY idx_entrega \(entrega_id\)/);
+  assert.doesNotMatch(sql('web_entrega_itens'), /FOREIGN KEY/);
   assert.match(sql('web_entrega_eventos'), /KEY idx_entrega \(entrega_id, id\)/);
   assert.match(sql('web_entrega_eventos'), /entregue_a VARCHAR\(190\) NULL/);
   assert.match(sql('web_entrega_anexos'), /dados MEDIUMBLOB/);
   assert.match(sql('web_entrega_anexos'), /evento_id INT NULL/);
   const { REGEX_VALOR } = require('../seguranca/valores');
-  for (const n of ['web_entregas', 'web_entrega_eventos', 'web_entrega_anexos']) {
-    const colunas = [...sql(n).matchAll(/^\s+([a-z_]+) (?:INT|VARCHAR|DATE|DATETIME|JSON|MEDIUMBLOB|CHAR|TEXT)/gm)].map(m => m[1]);
+  assert.match(sql('web_entrega_sobras_encerradas'), /quantidade DECIMAL\(14,4\) NOT NULL/);
+  assert.match(sql('web_entrega_sobras_encerradas'), /KEY idx_numero \(numero\)/);
+  for (const n of ['web_entregas', 'web_entrega_eventos', 'web_entrega_anexos', 'web_entrega_itens', 'web_entrega_sobras_encerradas']) {
+    const colunas = [...sql(n).matchAll(/^\s+([a-z_]+) (?:INT|VARCHAR|DATE|DATETIME|JSON|MEDIUMBLOB|CHAR|TEXT|DECIMAL)/gm)].map(m => m[1]);
     assert.ok(colunas.length >= 5, n);
     for (const col of colunas) assert.ok(!REGEX_VALOR.test(col), n + '.' + col);
   }
+});
+
+// ---- migração das entregas para várias por pedido (etapa 2): idempotente, sem apagar dados ----
+const migracaoEntregas = (colunas, indices) => {
+  const pool = criarPoolFalso([
+    [/TABLE_NAME = 'web_entregas' AND COLUMN_NAME = 'sequencia'/, [{ n: colunas.includes('sequencia') ? 1 : 0 }]],
+    [/TABLE_NAME = 'web_entregas' AND COLUMN_NAME = 'hash_itens'/, [{ n: colunas.includes('hash_itens') ? 1 : 0 }]],
+    [/information_schema\.COLUMNS/, [{ n: 1 }]],
+    [/information_schema\.STATISTICS/, indices.map(nome => ({ nome }))]
+  ]);
+  return pool;
+};
+const altersEntregas = pool => pool.chamadas.map(c => c.sql).filter(s => /^ALTER TABLE web_entregas/.test(s));
+
+test('migração entregas: instalação antiga (UNIQUE(numero), sem colunas) ganha as colunas e troca a chave num ALTER só', async () => {
+  const pool = migracaoEntregas([], ['uk_numero']);
+  await instalarTabelas(pool);
+  assert.deepEqual(altersEntregas(pool), [
+    'ALTER TABLE web_entregas ADD COLUMN sequencia INT NOT NULL DEFAULT 1 AFTER numero',
+    'ALTER TABLE web_entregas ADD COLUMN hash_itens VARCHAR(64) NULL AFTER observacao',
+    'ALTER TABLE web_entregas DROP INDEX uk_numero, ADD UNIQUE KEY uk_numero_seq (numero, sequencia)'
+  ]);
+  const sqls = pool.chamadas.map(c => c.sql);
+  assert.ok(!sqls.some(s => /^\s*(DELETE|TRUNCATE|DROP TABLE|UPDATE web_entregas)/i.test(s)), 'nada de apagar ou reescrever entregas');
+  // a sequência entra antes da chave nova (que depende dela)
+  assert.ok(sqls.indexOf(altersEntregas(pool)[0]) < sqls.indexOf(altersEntregas(pool)[2]));
+});
+
+test('migração entregas: reexecutar já migrado não faz nada; estados parciais fazem só o que falta', async () => {
+  const feito = migracaoEntregas(['sequencia', 'hash_itens'], ['uk_numero_seq']);
+  await instalarTabelas(feito);
+  assert.deepEqual(altersEntregas(feito), []);
+  // as duas chaves (alguém recriou a antiga): só remove a antiga
+  const duas = migracaoEntregas(['sequencia', 'hash_itens'], ['uk_numero', 'uk_numero_seq']);
+  await instalarTabelas(duas);
+  assert.deepEqual(altersEntregas(duas), ['ALTER TABLE web_entregas DROP INDEX uk_numero']);
+  // nenhuma chave: só acrescenta a nova
+  const nenhuma = migracaoEntregas(['sequencia', 'hash_itens'], []);
+  await instalarTabelas(nenhuma);
+  assert.deepEqual(altersEntregas(nenhuma), ['ALTER TABLE web_entregas ADD UNIQUE KEY uk_numero_seq (numero, sequencia)']);
 });
 
 function poolCadastros({ jaFeito = false } = {}) {

@@ -1,16 +1,18 @@
 'use strict';
 // Portal do cliente, etapa 3a: pedidos e status (somente leitura).
 // A empresa vem SEMPRE da sessão (req.portal.empresaCodigo); nenhum parâmetro, cabeçalho ou corpo escolhe a empresa.
-// A consulta é fixa e seleciona só as 6 colunas da lista fechada (nunca valores, observações nem cliente final).
+// A consulta é fixa e seleciona só as colunas da lista fechada + as contagens de entregas (qtd*; nunca valores, observações
+// nem cliente final). Com várias entregas por pedido, a junção traz UMA linha por pedido (rotas/entregas_resumo.js).
 const { projetarPedido, paginaValida, numeroValido, TAMANHO_PAGINA, PAGINA_MAXIMA } = require('../calculo/portal_pedidos');
 const { criarLimiteLeitura } = require('../portal/limite_leitura');
+const { juntarEntregaPrincipal, colunasQtdEntregas } = require('./entregas_resumo');
 
 const SELECIONAR = `SELECT p.NUMERO AS NUMERO, DATE_FORMAT(p.DATA, '%Y-%m-%d') AS DATA, p.SITUACAO AS SITUACAO,
        DATE_FORMAT(p.DATA_ENTREGA, '%Y-%m-%d') AS DATA_ENTREGA, en.status AS ENTREGA_STATUS,
-       DATE_FORMAT(en.data_agendada, '%Y-%m-%d') AS DATA_AGENDADA
+       DATE_FORMAT(en.data_agendada, '%Y-%m-%d') AS DATA_AGENDADA, ${colunasQtdEntregas('QTD_ENTREGAS', 'QTD_ENTREGAS_CONCLUIDAS')}
   FROM ped_orc p
   JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
-  LEFT JOIN web_entregas en ON en.numero = p.NUMERO
+  ${juntarEntregaPrincipal()}
  WHERE c.CODIGO = ? AND p.TIPO = 'Pedido'`;
 
 const NAO_ENCONTRADO = { error: 'Pedido não encontrado.' };
