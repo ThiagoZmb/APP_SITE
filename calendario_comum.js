@@ -92,6 +92,12 @@
     if (!achou.qtdPedidos) return `Nenhum pedido encontrado no mês exibido${situacao === 'abertos' ? ' (mostrando só os em aberto; use "Todos" para incluir os finalizados)' : ''}.`;
     return `${achou.qtdPedidos} pedido(s) encontrado(s) em ${achou.qtdDias} dia(s).`;
   }
+  // Rolagem automática depois da digitação: só quando o termo (normalizado) é novo em relação ao último já levado à tela e há destaque visível.
+  const deveRolarBusca = (termoRolado, termo, qtdVisiveis) => {
+    const t = normalizarBusca(termo);
+    return !!t && t !== normalizarBusca(termoRolado) && qtdVisiveis > 0;
+  };
+  const comportamentoRolagem = reduzirMovimento => (reduzirMovimento ? 'auto' : 'smooth');
   const classeAchou = (p, termo) => (pedidoCasa(p, termo) ? ' achou' : '');
   const rotuloAchou = (p, termo) => (pedidoCasa(p, termo) ? ', encontrado na pesquisa' : '');
 
@@ -208,5 +214,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

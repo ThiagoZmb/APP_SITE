@@ -377,3 +377,42 @@ test('pesquisa: campo, botões e resultado existem em calendario.html e o CSS s�
   assert.match(bloco, /font-weight: 800/);   // o destaque do pedido não depende só de cor
   assert.match(ler('calendario.js'), /cal-busca/);
 });
+
+// ---------- pesquisa: rolagem automática até o resultado ----------
+test('deveRolarBusca: só com termo novo (normalizado) e destaque visível; mesmo termo, vazio ou sem resultado não rola', () => {
+  assert.equal(K.deveRolarBusca('', '23270', 1), true);
+  assert.equal(K.deveRolarBusca('', 'Dávila', 3), true);
+  assert.equal(K.deveRolarBusca('23270', '23270', 1), false, 'mesmo termo: trocar visão/mês/filtro não pula a tela');
+  assert.equal(K.deveRolarBusca('davila', ' DÁVILA ', 2), false, 'mesmo termo depois de normalizar');
+  assert.equal(K.deveRolarBusca('2327', '23270', 1), true, 'termo mudou');
+  assert.equal(K.deveRolarBusca('', '23270', 0), false, 'sem resultado visível (ou só em visão escondida)');
+  assert.equal(K.deveRolarBusca('23270', '', 5), false, 'termo vazio');
+  assert.equal(K.deveRolarBusca('', '   ', 5), false);
+});
+
+test('comportamentoRolagem: suave, ou instantâneo com prefers-reduced-motion', () => {
+  assert.equal(K.comportamentoRolagem(false), 'smooth');
+  assert.equal(K.comportamentoRolagem(true), 'auto');
+});
+
+test('calendario.js: a digitação rola até o 1º destaque visível sem mover o foco; Anterior/Próximo/Enter rolam e focam', () => {
+  const js = ler('calendario.js');
+  assert.match(js, /scrollIntoView\(\{ block: 'center', behavior: K\.comportamentoRolagem\(reduzirMovimento\(\)\) \}\)/);
+  assert.match(js, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/);
+  assert.match(js, /\.filter\(el => el\.offsetParent !== null\)/, 'só elemento visível (a visão escondida não conta)');
+  const rolar = js.slice(js.indexOf('function rolarSeTermoNovo'), js.indexOf('function redesenharBusca'));
+  assert.match(rolar, /K\.deveRolarBusca\(estado\.termoRolado, estado\.busca, lista\.length\)/);
+  assert.match(rolar, /achados\(\)/);
+  assert.doesNotMatch(rolar, /\.focus\(/, 'a digitação não rouba o foco do campo');
+  assert.match(js, /redesenharBusca\(true\); \}, 200\)/, 'só o fim da digitação (debounce) rola');
+  assert.doesNotMatch(js.slice(js.indexOf('function desenhar'), js.indexOf('// Pesquisa:')), /rolarSeTermoNovo|scrollIntoView/, 'recarregar/trocar visão não rola');
+  assert.match(js.slice(js.indexOf('function irParaAchado'), js.indexOf('function rolarSeTermoNovo')), /marcarAtual\(el\);\s*el\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(js, /function limparBusca\(\) \{[^}]*estado\.termoRolado = ''/);
+});
+
+test('calendario.css: destaque com scroll-margin (topo fixo não cobre o resultado) e versões ?v= subidas juntas', () => {
+  assert.match(ler('calendario.css'), /\.etq\.achou, \.folha-linha\.achou \{ scroll-margin-block: \d+px; \}/);
+  const v = h => [...h.matchAll(/calendario(?:_comum)?\.(?:css|js)\?v=(\d+)/g)].map(m => m[1]);
+  const mes = v(ler('calendario.html')), diaV = v(ler('calendario_dia.html'));
+  assert.equal(new Set([...mes, ...diaV]).size, 1, 'mesma versão em calendario.html e calendario_dia.html');
+});

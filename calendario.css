@@ -104,6 +104,8 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .etq.achou, .folha-linha.achou { background: var(--primary-color); color: var(--on-primary); font-weight: 800; border-left-color: var(--on-primary); box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 4px var(--primary-color); }
 .etq.achou .etq-atraso, .etq.achou .etq-sit, .folha-linha.achou .folha-final, .folha-linha.achou .folha-sit, .folha-linha.achou .folha-atraso { color: var(--on-primary); opacity: 1; }
 .folha-linha.achou:hover { background: var(--primary-dark); }
+/* rolagem até o resultado: folga para o topo fixo (24px) e a barra do celular não cobrirem o destaque */
+.etq.achou, .folha-linha.achou { scroll-margin-block: 96px; }
 .etq.achou.atual, .folha-linha.achou.atual { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
 .etq.achou:focus-visible, .folha-linha.achou:focus-visible { box-shadow: 0 0 0 2px var(--on-primary), 0 0 0 5px var(--text-dark); }
 

@@ -24,7 +24,7 @@
     if (!base) return;
     const { doc, $, chamar, toast, getAuth } = base;
     const hoje = K.hojeISO(win);
-    const estado = Object.assign({ pedidos: new Map(), consulta: 0, busca: '', semanas: [], atual: -1 }, lerConsulta(win.location.search, hoje));
+    const estado = Object.assign({ pedidos: new Map(), consulta: 0, busca: '', termoRolado: '', semanas: [], atual: -1 }, lerConsulta(win.location.search, hoje));
 
     function desenhar(d) {
       const semanas = K.montarGrade(d.dias, estado.mes, d.hoje || hoje);
@@ -51,31 +51,49 @@
       for (const id of ['cal-busca-ant', 'cal-busca-prox']) { $(id).hidden = !tem; $(id).disabled = !resultado.qtdPedidos; }
       estado.atual = -1;
     }
+    // Rola até o destaque (suave, ou instantâneo com prefers-reduced-motion). O CSS dá scroll-margin ao destaque por causa do topo fixo.
+    const reduzirMovimento = () => !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function marcarAtual(el) {
+      doc.querySelectorAll('#cal-corpo .achou.atual').forEach(x => x.classList.remove('atual'));
+      el.classList.add('atual');
+      el.scrollIntoView({ block: 'center', behavior: K.comportamentoRolagem(reduzirMovimento()) });
+    }
     function irParaAchado(passo) {
       const lista = achados();
       if (!lista.length) return;
       estado.atual = (estado.atual + passo + lista.length) % lista.length;
-      doc.querySelectorAll('#cal-corpo .achou.atual').forEach(el => el.classList.remove('atual'));
+      estado.termoRolado = K.normalizarBusca(estado.busca);   // quem já foi levado ao resultado não é levado de novo pela digitação
       const el = lista[estado.atual];
-      el.classList.add('atual');
-      el.scrollIntoView({ block: 'center', behavior: 'auto' });
+      marcarAtual(el);
       el.focus({ preventScroll: true });
       $('cal-busca-resultado').textContent = `Resultado ${estado.atual + 1} de ${lista.length}: pedido ${el.dataset.numero}.`;
     }
-    function redesenharBusca() {
+    // Depois da digitação: só rola se o termo é novo e há destaque visível (sem foco: a pessoa continua digitando no campo).
+    function rolarSeTermoNovo() {
+      const lista = achados();
+      if (!K.deveRolarBusca(estado.termoRolado, estado.busca, lista.length)) {
+        if (!K.normalizarBusca(estado.busca)) estado.termoRolado = '';
+        return;
+      }
+      estado.termoRolado = K.normalizarBusca(estado.busca);
+      estado.atual = 0;
+      marcarAtual(lista[0]);
+    }
+    function redesenharBusca(rolar) {
       if (!estado.semanas.length) return;
       $('cal-folha').innerHTML = K.htmlFolha(estado.semanas, estado.situacao, estado.busca);
       $('cal-grade').innerHTML = K.htmlGrade(estado.semanas, estado.situacao, estado.busca);
       $('cal-lista').innerHTML = K.htmlListaDias(estado.semanas, estado.situacao, estado.busca);
       atualizarBusca();
+      if (rolar) rolarSeTermoNovo();
     }
     let espera = null;
     const campo = $('cal-busca');
     campo.addEventListener('input', () => { // pequena espera para não redesenhar a cada tecla
       win.clearTimeout(espera);
-      espera = win.setTimeout(() => { estado.busca = campo.value; redesenharBusca(); }, 200);
+      espera = win.setTimeout(() => { estado.busca = campo.value; redesenharBusca(true); }, 200);
     });
-    function limparBusca() { win.clearTimeout(espera); campo.value = ''; estado.busca = ''; redesenharBusca(); campo.focus(); }
+    function limparBusca() { win.clearTimeout(espera); campo.value = ''; estado.busca = ''; estado.termoRolado = ''; redesenharBusca(); campo.focus(); }
     campo.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') { limparBusca(); ev.preventDefault(); }
       else if (ev.key === 'Enter') { win.clearTimeout(espera); estado.busca = campo.value; redesenharBusca(); irParaAchado(ev.shiftKey ? -1 : 1); ev.preventDefault(); }
