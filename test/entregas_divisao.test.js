@@ -520,7 +520,7 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611101800/);
-  assert.match(h, /entregas\.js\?v=202611111200/);
+  assert.match(h, /entregas\.js\?v=202611111500/);
   assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611101900/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611101800/);
   const js = ler('entregas.js');
@@ -699,8 +699,8 @@ test('tela: cartão do item é estático (sem style=), escapa o texto, tem rótu
   assert.match(h, /Estrutura &lt;i&gt;metálica&lt;\/i&gt;/);
   assert.match(h, /<b>Tamanho<\/b>660x400mm/);
   assert.match(h, /Item 3/);
-  assert.match(h, /Disponível: 2/);
-  assert.match(h, /Obs\. do pedido: conferir &quot;gabarito&quot;/);
+  assert.match(h, /<li class="sep-etq-disp"><b>Disponível<\/b>2<\/li>/);
+  assert.match(h, /<li class="sep-etq-obs"><b>Obs\. do pedido<\/b>conferir &quot;gabarito&quot;<\/li>/);
   assert.match(h, /id="sp-item-0"[^>]*min="0"[^>]*max="2"[^>]*step="any"[^>]*value="1"/);
   assert.match(h, /data-acao="menos"[^>]*aria-label="Diminuir/);
   assert.match(h, /data-acao="mais"[^>]*aria-label="Aumentar/);
@@ -711,7 +711,7 @@ test('tela: cartão do item é estático (sem style=), escapa o texto, tem rótu
   // quantidade fracionada: "de 1,5" e max com ponto
   const f = E.htmlCartaoSeparacao({ item: 1, descricao: 'Trilho', qtd: 1.5, separar: 0 }, 1);
   assert.match(f, /max="1\.5"/);
-  assert.match(f, /Disponível: 1,5/);
+  assert.match(f, /<b>Disponível<\/b>1,5/);
   assert.doesNotMatch(f, /Obs\. do pedido/);
 });
 

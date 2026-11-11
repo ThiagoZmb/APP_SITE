@@ -233,13 +233,14 @@
   function htmlCartaoSeparacao(l, k) {
     const f = fichaDoItem(l.descricao, l.produto, l.item);
     const nome = esc(f.nome);
-    const etiquetas = f.etiquetas.map(e => `<li>${e.rotulo ? `<b>${esc(e.rotulo)}</b>` : ''}${esc(e.texto)}</li>`).join('');
     const max = esc(String(l.qtd)), disp = esc(numeroBR(l.qtd));
+    // todos os dados do item no mesmo formato de etiqueta (rótulo + valor): ficha técnica, quantidade disponível e observação do pedido
+    const etiquetas = f.etiquetas.map(e => `<li>${e.rotulo ? `<b>${esc(e.rotulo)}</b>` : ''}${esc(e.texto)}</li>`).join('') +
+      `<li class="sep-etq-disp"><b>Disponível</b>${disp}</li>` +
+      (l.obsPedido ? `<li class="sep-etq-obs"><b>Obs. do pedido</b>${esc(l.obsPedido)}</li>` : '');
     return `<li class="sep-cartao" id="sp-cartao-${k}">` +
       `<div class="sep-topo"><span class="sep-nome" id="sp-nome-${k}">${nome}</span><span class="sep-numero">Item ${esc(l.item)}</span></div>` +
-      (etiquetas ? `<ul class="sep-ficha" aria-label="Detalhes do item ${esc(l.item)}">${etiquetas}</ul>` : '') +
-      `<p class="sep-info"><span class="sep-disp">Disponível: ${disp}</span></p>` +
-      (l.obsPedido ? `<p class="sep-obsped">Obs.: ${esc(l.obsPedido)}</p>` : '') +
+      `<ul class="sep-ficha" aria-label="Detalhes do item ${esc(l.item)}">${etiquetas}</ul>` +
       `<div class="sep-qtd" role="group" aria-labelledby="sp-rot-${k}"><span class="sep-rotulo" id="sp-rot-${k}">Separar</span>` +
       `<button type="button" class="sep-passo" data-acao="menos" data-linha="${k}" id="sp-menos-${k}" aria-label="Diminuir a quantidade de ${nome}">−</button>` +
       `<input type="number" class="sep-campo" inputmode="decimal" id="sp-item-${k}" data-linha="${k}" min="0" max="${max}" step="any" value="${esc(l.separar)}" aria-label="Quantidade a separar de ${nome}, de ${disp}">` +
