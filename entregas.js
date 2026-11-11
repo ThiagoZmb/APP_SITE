@@ -235,9 +235,9 @@
     const nome = esc(f.nome);
     const max = esc(String(l.qtd)), disp = esc(numeroBR(l.qtd));
     // todos os dados do item no mesmo formato de etiqueta (rótulo + valor): ficha técnica, quantidade disponível e observação do pedido
-    const etiquetas = f.etiquetas.map(e => `<li>${e.rotulo ? `<b>${esc(e.rotulo)}</b>` : ''}${esc(e.texto)}</li>`).join('') +
-      `<li class="sep-etq-disp"><b>Disponível</b>${disp}</li>` +
-      (l.obsPedido ? `<li class="sep-etq-obs"><b>Obs. do pedido</b>${esc(l.obsPedido)}</li>` : '');
+    const etiquetas = f.etiquetas.map(e => `<li>${e.rotulo ? `<span class="rot">${esc(e.rotulo)}:</span> ` : ''}<b>${esc(e.texto)}</b></li>`).join('') +
+      `<li class="sep-etq-disp"><span class="rot">Disponível:</span> <b>${disp}</b></li>` +
+      (l.obsPedido ? `<li class="sep-etq-obs"><span class="rot">Obs. do pedido:</span> <b>${esc(l.obsPedido)}</b></li>` : '');
     return `<li class="sep-cartao" id="sp-cartao-${k}">` +
       `<div class="sep-topo"><span class="sep-nome" id="sp-nome-${k}">${nome}</span><span class="sep-numero">Item ${esc(l.item)}</span></div>` +
       `<ul class="sep-ficha" aria-label="Detalhes do item ${esc(l.item)}">${etiquetas}</ul>` +
@@ -247,8 +247,7 @@
       `<button type="button" class="sep-passo" data-acao="mais" data-linha="${k}" id="sp-mais-${k}" aria-label="Aumentar a quantidade de ${nome}">+</button>` +
       `<span class="sep-de">de ${disp}</span>` +
       `<button type="button" class="sep-todos" data-acao="todos" data-linha="${k}" aria-label="Separar todos os ${disp} de ${nome}">Todos</button></div>` +
-      `<div class="form-group sep-obs" id="sp-obsw-${k}" hidden><label for="sp-obs-${k}">Observação deste item</label>` +
-      `<textarea id="sp-obs-${k}" data-linha="${k}" maxlength="${LIMITE_OBS_ITEM}" rows="2" placeholder="ex.: levar com a ferragem separada">${esc(l.observacao || '')}</textarea></div></li>`;
+      `</li>`;
   }
 
   // Ocorrência "parcial" do motorista: o restante (não entregue) de cada item, a partir de itensEntregues do ÚLTIMO evento de
@@ -695,7 +694,7 @@
       atualizarSeparacao();
     }
     // lê os cartões: quantidade e observação de cada item (a observação só conta se o item tem quantidade)
-    const lerLinhasSeparacao = () => estado.separar.linhas.map((l, k) => ({ ...l, separar: lerNumero($(`sp-item-${k}`).value), observacao: $(`sp-obs-${k}`).value }));
+    const lerLinhasSeparacao = () => estado.separar.linhas.map((l, k) => ({ ...l, separar: lerNumero($(`sp-item-${k}`).value), observacao: '' }));
     // reflete o que foi digitado: cartão marcado, campo de observação, passos, resumo (aria-live) e o botão Separar
     function atualizarSeparacao() {
       if (!estado.separar) return;
@@ -703,7 +702,6 @@
       linhas.forEach((l, k) => {
         const marcado = Number.isFinite(l.separar) && l.separar > TOL;
         $(`sp-cartao-${k}`).classList.toggle('sep-ativo', marcado);
-        $(`sp-obsw-${k}`).hidden = !marcado;
         $(`sp-menos-${k}`).disabled = !marcado;
         $(`sp-mais-${k}`).disabled = Number.isFinite(l.separar) && l.separar >= l.qtd - TOL;
       });

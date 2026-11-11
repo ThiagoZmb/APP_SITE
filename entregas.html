@@ -162,11 +162,11 @@
         .sep-topo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; min-width: 0; }
         .sep-nome { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-dark); min-width: 0; overflow-wrap: anywhere; }
         .sep-numero { font-size: 13.5px; color: var(--text-light); white-space: nowrap; }
-        #painel .sep-ficha { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
-        #painel .sep-ficha li { max-width: 100%; padding: 4px 11px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg); font-size: 14px; line-height: 1.45; color: var(--text-dark); overflow-wrap: anywhere; }
-        .sep-ficha b { font-weight: 600; color: var(--text-light); margin-right: 5px; }
-        #painel .sep-ficha li.sep-etq-disp { background: var(--selo-neutro-bg); border-color: transparent; color: var(--selo-neutro-fg); }
-        #painel .sep-ficha li.sep-etq-disp b { color: inherit; }
+        #painel .sep-ficha { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+        #painel .sep-ficha li { max-width: 100%; font-size: 14.5px; line-height: 1.5; color: var(--text-dark); overflow-wrap: anywhere; }
+        .sep-ficha .rot { color: var(--text-light); }
+        .sep-ficha b { font-weight: 700; color: var(--text-dark); }
+        #painel .sep-ficha li.sep-etq-obs { flex-basis: 100%; }
         .sep-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 12px; color: var(--text-light); min-width: 0; }
         .sep-disp { padding: 1px 8px; border-radius: 999px; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); font-size: 11.5px; white-space: nowrap; }
         .sep-obsped { margin: 0; font-size: 12px; color: var(--text-light); overflow-wrap: anywhere; }
@@ -184,8 +184,6 @@
         .sep-de { font-size: 15px; color: var(--text-light); white-space: nowrap; }
         .sep-todos { margin-left: auto; min-height: 44px; padding: 0 14px; cursor: pointer; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: transparent; color: var(--primary-color); font-size: 15px; font-weight: 600; }
         .sep-todos:hover { background: var(--primary-light); }
-        .sep-obs { margin: 0; }
-        .sep-obs textarea { min-height: 48px; padding: 8px 10px; }
         .sep-resumo { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--surface-2); font-size: 13px; color: var(--text-mid); }
         .sep-resumo strong { color: var(--text-dark); }
         .sep-resumo .aviso-divisao { margin: 8px 0 0; }
@@ -193,7 +191,7 @@
     <link rel="stylesheet" href="tema.css?v=202611161500">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202611101800" defer></script>
-    <script src="entregas.js?v=202611111500" defer></script>
+    <script src="entregas.js?v=202611111700" defer></script>
 </head>
 <body>
     <div class="container">
