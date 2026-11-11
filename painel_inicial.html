@@ -971,6 +971,11 @@
                 const andamento = Number(x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '';
                 L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
             }
+            // pedido Pronto ou Em Produção ainda sem entrega: cria e programa a partir daqui (regra do dono, 2026-11-11)
+            if (ehPedido && !x.entregaStatus && ['pronto', 'em producao'].includes(String(x.situacao || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()) && Acesso.pode('entregas.programar')) {
+                sep();
+                L.push({ icone: '🚚', rotulo: 'Programar entrega', fn: () => { location.href = `entregas.html?criar=${encodeURIComponent(numero)}`; } });
+            }
             sep();
             const perigos = [];
             if (ehPedido && !cancelado && Acesso.pode('pedidos.cancelar')) perigos.push({ icone: '🚫', rotulo: 'Cancelar pedido', fn: () => acaoNoDocumento('cancelar', numero), perigo: true });

@@ -1007,6 +1007,11 @@
     $('user-avatar').textContent = (auth.user.nome || 'E').charAt(0).toUpperCase();
     if (win.Acesso && !win.Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
     ligar();
+    // vindo do menu do pedido ("Programar entrega"): abre o formulário de criar já com o número preenchido
+    try {
+      const criar = (new win.URLSearchParams(win.location.search).get('criar') || '').trim();
+      if (/^\d{1,10}$/.test(criar) && $('btn-criar-entrega')) { abrirForm('vista-criar', ['cr-numero']); $('cr-numero').value = criar; }
+    } catch { /* sem query */ }
     mostrar('vazio-painel');
     carregar();
   }

@@ -125,6 +125,10 @@
         const andamento = andamentoEntregas(x);
         sep(); L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${enc(n)}`; } });
       }
+      // pedido Pronto ou Em Produção ainda sem entrega: cria e programa a partir daqui (regra do dono, 2026-11-11)
+      if (!x.entregaStatus && ['pronto', 'em producao'].includes(norm(x.situacao)) && cfg.pode('entregas.programar')) {
+        sep(); L.push({ icone: '🚚', rotulo: 'Programar entrega', fn: () => { location.href = `entregas.html?criar=${enc(n)}`; } });
+      }
       while (L.length && L[L.length - 1].sep) L.pop();
       return L;
     }
