@@ -414,6 +414,8 @@ body .busca::before, body .search-box::before {
     z-index: 1; pointer-events: none; position: absolute; top: 50%; transform: translateY(-50%);
 }
 body .busca, body .search-box { position: relative; }
+/* Reserva espaço para a unidade nos campos com sufixo, evitando que ela cubra o número digitado. */
+body .form-group .sufixo input { padding-right: 44px !important; }
 body input[type="checkbox"] { accent-color: var(--primary-color); width: 17px; height: 17px; min-height: 0; cursor: pointer; vertical-align: middle; }
 body .viz-check { display: inline-flex !important; align-items: center; gap: 8px; cursor: pointer; }
 body .sufixo::after { color: var(--text-light) !important; }
