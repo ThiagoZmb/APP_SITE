@@ -415,7 +415,7 @@ body .busca::before, body .search-box::before {
 }
 body .busca, body .search-box { position: relative; }
 /* Reserva espaço para a unidade nos campos com sufixo, evitando que ela cubra o número digitado. */
-body .form-group .sufixo input { padding-right: 44px !important; }
+body .form-group input#f-desc-vidro, body .form-group input#f-desc-pux { padding-right: 48px !important; }
 body input[type="checkbox"] { accent-color: var(--primary-color); width: 17px; height: 17px; min-height: 0; cursor: pointer; vertical-align: middle; }
 body .viz-check { display: inline-flex !important; align-items: center; gap: 8px; cursor: pointer; }
 body .sufixo::after { color: var(--text-light) !important; }
