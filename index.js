@@ -43,7 +43,7 @@ const composicaoPedido = require('./calculo/composicao_pedido');
 const { carregarComposicao } = require('./calculo/composicao_documentos');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco, ErroCadastro, novoRastro, leitorRegistrado } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
-const { registrarEntregas, criarDisparadorFila } = require('./rotas/entregas');
+const { registrarEntregas, sincronizarFila } = require('./rotas/entregas');
 const { statusNaLista } = require('./calculo/entregas');
 const { juntarEntregaPrincipal, colunasQtdEntregas } = require('./rotas/entregas_resumo');
 const { registrarCalendario } = require('./rotas/calendario');
@@ -264,9 +264,13 @@ function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
 const limiteLogin = criarLimiteLogin();
 // recebimentos A Receber vencidos -> Atrasado (escrita em fluxo_de_caixa do VB); no máx. 1x por hora, sem await
 const marcarAtrasados = criarMarcadorAtrasados(pool);
-// varredura da fila de Entregas em segundo plano (mudanças feitas pelo VB): na subida, antes das listas de pedidos (no máx. 1x/60 s,
-// sem await) e logo depois do menu de situação (forçada). Nunca nos testes.
-const varrerEntregas = criarDisparadorFila(pool, { ativo: process.env.NODE_ENV !== 'test' });
+// Varredura da fila de Entregas SÓ por ação do usuário (decisão do dono, 2026-11-11: nada roda sozinho por tempo nem em segundo plano):
+// o botão "Atualizar" das listas manda ?varrer=1 e a rota varre ANTES de montar a lista, aguardando. Falha da varredura não derruba a lista.
+// Assim mudanças feitas pelo VB (ex.: pedido Retirado) chegam a web_entregas; entre um clique e outro vale a projeção statusNaLista.
+async function varrerSePedido(req) {
+  if (req.query.varrer !== '1') return;
+  try { await sincronizarFila(pool); } catch (err) { console.error('Erro na varredura de entregas (Atualizar):', err?.code || 'sem código'); }
+}
 // Nome tentado em forma canônica (o MySQL, utf8mb4_unicode_ci, ignora caixa, acento, largura e invisíveis).
 const nomeCanonico = s => s.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[­​-‏⁠﻿]/g, '').toLowerCase().trim();
 // Auditoria do login: quem = nome da conta no banco, ou '(inexistente)' (o texto digitado pode ser
@@ -377,7 +381,7 @@ const ENTREGA_DO_PEDIDO = juntarEntregaPrincipal({ condicao: " AND p.TIPO = 'Ped
 
 // ================= LISTA ÚNICA (Pedido ou Orçamento) =================
 registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
-  varrerEntregas(); // sem await: mudança feita pelo VB (ex.: pedido Retirado) chega à fila e às próximas listas
+  await varrerSePedido(req); // só com ?varrer=1 (botão Atualizar)
   try {
     const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
     const est = condicaoEstado(req, 'c.ESTADO');
@@ -410,7 +414,7 @@ registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
 
 // Mantidos por compatibilidade
 registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
-  varrerEntregas(); // sem await (ver /dados_lista)
+  await varrerSePedido(req); // só com ?varrer=1 (botão Atualizar)
   try {
     const est = condicaoEstado(req, 'c.ESTADO');
     const where = est.sql ? `${JOIN_CLIENTE} WHERE ${est.sql} AND p.TIPO='Pedido'` : `WHERE p.TIPO='Pedido'`;
@@ -429,7 +433,7 @@ registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
 });
 
 registro.rota('get', '/dados_pedidos_rj', ['pedidos.ver'], async (req, res) => {
-  varrerEntregas(); // sem await (ver /dados_lista)
+  await varrerSePedido(req); // só com ?varrer=1 (botão Atualizar)
   try {
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
@@ -720,7 +724,7 @@ registro.rota('post', '/clientes/permissao', ['clientes.permissao'], clienteNosE
 
 // Aba Financeiro: pedidos e fluxo de caixa (em aberto ou todos) + Carregar_Resumo
 registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valores.ver'], async (req, res) => {
-  varrerEntregas(); // sem await (ver /dados_lista)
+  await varrerSePedido(req); // só com ?varrer=1 (botão Atualizar)
   try {
     const razao = await razaoPermitida(req, res, req.params.codigo);
     if (!razao) return;
@@ -1840,7 +1844,7 @@ registrarPortalDocumentos({ portal: registro.portal, pool });
 registrarPortalUsuarios({ portal: registro.portal, pool, sessoes: sessoesPortal, email: emailPortal, config: configPortal });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarEstoqueQr({ rota: registro.rota, pool });
-registrarPedOrc({ rota: registro.rota, pool, varrerEntregas });
+registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
 registrarCalendario({ rota: registro.rota, pool });
 registrarIndicadores({ rota: registro.rota, pool });
@@ -1917,7 +1921,6 @@ async function iniciar() {
     await limpar();
     setInterval(limpar, 24 * 60 * 60 * 1000).unref();
     marcarAtrasados(); // na subida (sem await); o login repete no máximo 1x por hora
-    varrerEntregas(); // na subida (sem await): acerta a fila com o que mudou pelo VB enquanto o servidor estava parado
     medidor.iniciarRelatorio(pool); // ida e volta ao banco na subida e a cada hora, com o resumo das rotas (log do Render)
   }
   registro.verificar();

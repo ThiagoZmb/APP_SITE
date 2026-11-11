@@ -218,32 +218,6 @@ async function encerrarEntregasDoPedido(conn, { situacao, quem, entregas }) {
   return alvo.length;
 }
 
-// Varredura em segundo plano para as mudanças feitas FORA da web (VB): no máximo 1 vez a cada `intervalo` ms por processo (memória),
-// nunca duas ao mesmo tempo. Quem chama não dá await (não atrasa a lista) e a função nunca lança. `forcar: true` ignora o intervalo
-// (depois de uma mudança de situação pela web); se já houver uma rodando, roda mais uma vez ao terminar. `ativo: false` (testes) = nada.
-const INTERVALO_VARREDURA_MS = 60 * 1000;
-function criarDisparadorFila(pool, { intervalo = INTERVALO_VARREDURA_MS, agora = Date.now, ativo = true } = {}) {
-  let ultimo = null, rodando = null, deNovo = false;
-  async function rodar() {
-    try {
-      do {
-        deNovo = false;
-        const t = agora();
-        // falha também conta como tentativa: com o banco fora do ar, cada lista não dispara outra varredura (tenta de novo após o intervalo)
-        try { await sincronizarFila(pool); } catch (err) { console.error('Erro na varredura de entregas (segundo plano):', err?.code || 'sem código'); }
-        ultimo = t;
-      } while (deNovo);
-    } finally { rodando = null; }
-  }
-  return function disparar({ forcar = false } = {}) {
-    if (!ativo) return null;
-    if (rodando) { if (forcar) deNovo = true; return rodando; }
-    if (!forcar && ultimo !== null && agora() - ultimo < intervalo) return null;
-    rodando = rodar();
-    return rodando;
-  };
-}
-
 // itens do pedido para exibir na entrega (e na baixa): só descrição e quantidade, nunca preços
 async function itensDoPedido(conn, numero) {
   const [linhas] = await conn.execute(
@@ -1022,4 +996,4 @@ function registrarEntregas({ rota, pool }) {
   });
 }
 
-module.exports = { registrarEntregas, sincronizarFila, encerrarEntregasDoPedido, criarDisparadorFila, INTERVALO_VARREDURA_MS, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };
+module.exports = { registrarEntregas, sincronizarFila, encerrarEntregasDoPedido, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };

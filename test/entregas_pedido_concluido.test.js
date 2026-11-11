@@ -10,7 +10,7 @@ const path = require('path');
 const C = require('../calculo/entregas');
 const { projetarPedido } = require('../calculo/portal_pedidos');
 const { prepararEntregas } = require('./apoio/bancoEntregas');
-const { criarDisparadorFila, sincronizarFila } = require('../rotas/entregas');
+const { sincronizarFila } = require('../rotas/entregas');
 
 const SITUACOES = ['Em Produção', 'Pronto', 'Entregue', 'Retirado', 'Cancelado', '', null];
 const STATUS = ['a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada', 'entregue', 'retirado', 'cancelada', null];
@@ -149,35 +149,6 @@ test('sincronizarFila devolve a contagem de encerradas', async t => {
   assert.equal(r.encerradas, 1);
 });
 
-// ---------------- disparo em segundo plano ----------------
-test('criarDisparadorFila: no máximo 1 vez por intervalo, forçar ignora o intervalo, inativo não faz nada, erro não sobe', async t => {
-  t.mock.method(console, 'error', () => {});
-  let agora = 0, n = 0, falhar = false;
-  const pool = { getConnection: async () => ({ beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release() {},
-    execute: async () => { if (falhar) throw new Error('fora do ar'); n++; return [[], []]; } }) };
-  const d = criarDisparadorFila(pool, { intervalo: 60000, agora: () => agora });
-  await d(); const primeira = n; assert.ok(primeira > 0);
-  assert.equal(d(), null, 'dentro do intervalo não roda');
-  agora = 30000; await d({ forcar: true }); assert.ok(n > primeira, 'forçada roda');
-  const depois = n; agora = 60000; assert.equal(d(), null); agora = 90001; await d(); assert.ok(n > depois);
-  falhar = true; agora = 200000; await assert.doesNotReject(d());
-  const inativo = criarDisparadorFila(pool, { ativo: false });
-  assert.equal(inativo({ forcar: true }), null);
-});
-
-test('criarDisparadorFila: forçar durante uma varredura em andamento roda mais uma vez ao terminar', async t => {
-  let rodadas = 0, soltar;
-  const trava = new Promise(r => { soltar = r; });
-  const pool = { getConnection: async () => ({ beginTransaction: async () => {}, commit: async () => { rodadas++; if (rodadas === 1) await trava; }, rollback: async () => {}, release() {},
-    execute: async () => [[], []] }) };
-  const d = criarDisparadorFila(pool, { intervalo: 60000 });
-  const p = d();
-  d({ forcar: true });
-  soltar();
-  await p;
-  assert.equal(rodadas, 2);
-});
-
 // ---------------- listas (projeção) ----------------
 const { app, pool: poolApp, acesso, sessoes } = require('../index.js');
 const jwt = require('jsonwebtoken');
@@ -226,15 +197,6 @@ test('/clientes/financeiro: entregaStatus projetado e pendentes sem as que só e
 
 // ---------------- ligações e telas ----------------
 const ler = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
-test('index.js: varredura em segundo plano na subida, antes das listas da equipe e forçada depois do menu de situação; nunca nos testes', () => {
-  const i = ler('index.js');
-  assert.match(i, /const varrerEntregas = criarDisparadorFila\(pool, \{ ativo: process\.env\.NODE_ENV !== 'test' \}\)/);
-  assert.equal((i.match(/^\s+varrerEntregas\(\);/gm) || []).length, 5, '4 rotas de lista + subida');
-  assert.match(i, /registrarPedOrc\(\{ rota: registro\.rota, pool, varrerEntregas \}\)/);
-  assert.match(ler('rotas/ped_orc.js'), /varrerEntregas\(\{ forcar: true \}\)/);
-  assert.doesNotMatch(ler('rotas/portal_pedidos.js'), /varrer|sincronizarFila/, 'o portal (cliente) nunca dispara escrita');
-});
-
 test('tela de Entregas: eventos "encerrada" e "reaberta" têm rótulo', () => {
   const E = require('../entregas.js');
   assert.equal(E.rotuloEvento('encerrada'), 'Encerrada com o pedido');
@@ -244,4 +206,46 @@ test('tela de Entregas: eventos "encerrada" e "reaberta" têm rótulo', () => {
 test('Pedidos (painel_inicial.html) explica na pergunta o que acontece com as entregas abertas', () => {
   const p = ler('painel_inicial.html');
   assert.ok(p.includes('err.dados.entregasEncerrar') && p.includes('err.dados.entregasEmCurso') && p.includes('junto como ${nome}'));
+});
+
+// ---------------- varredura só por ação do usuário (decisão do dono, 2026-11-11) ----------------
+const ESCRITA_ENTREGAS = /^INSERT IGNORE INTO web_entregas/;
+const LISTA = /p\.NUMERO as numero/, FIN = /^\s*SELECT p\.NUMERO, p\.CLIENTE_FINAL/;
+for (const [caminho, regraLista] of [['/dados_lista?tipo=Pedido', LISTA], ['/dados_pedidos', LISTA], ['/dados_pedidos_rj', LISTA], ['/clientes/financeiro/5', FIN]]) {
+  test(`${caminho}: carregamento normal NÃO varre; com varrer=1 (botão Atualizar) varre ANTES da lista e aguarda`, async t => {
+    const regras = [[/FROM cadastro_clientes WHERE CODIGO/, [{ CODIGO: 5, RAZAO_SOCIAL: 'CLI', ESTADO: 'RJ' }]], [regraLista, []],
+      [/AS qtd_entregas_pendentes/, [{ qtd_entregas_pendentes: 0 }]], [/AS atrasado/, [{ receber: 0, atrasado: 0 }]], [/SITUACAO <> 'Cancelado'/, [{ receber: 0 }]],
+      [/SELECT CREDITO FROM cadastro_clientes/, [{ CREDITO: 0 }]]];
+    const { f, chamar } = await prepararLista(t, regras);
+    assert.equal((await chamar(caminho)).status, 200);
+    assert.equal(f.chamadas.filter(c => ESCRITA_ENTREGAS.test(c.sql)).length, 0, 'sem clique, nenhuma escrita');
+    const antes = f.chamadas.length;
+    assert.equal((await chamar(caminho + (caminho.includes('?') ? '&' : '?') + 'varrer=1')).status, 200);
+    const novas = f.chamadas.slice(antes).map(c => c.sql);
+    const iVar = novas.findIndex(s => ESCRITA_ENTREGAS.test(s)), iLista = novas.findIndex(s => regraLista.test(s));
+    assert.ok(iVar >= 0 && iLista > iVar, 'varredura antes da lista');
+    assert.ok(novas.includes('COMMIT'), 'a varredura terminou (commit) antes da resposta');
+  });
+}
+
+test('varredura que falha não derruba a lista (varrer=1)', async t => {
+  t.mock.method(console, 'error', () => {});
+  const { chamar } = await prepararLista(t, [[ESCRITA_ENTREGAS, () => { throw Object.assign(new Error('x'), { code: 'ER_X' }); }], [/FROM ped_orc p/, LINHAS]]);
+  const r = await chamar('/dados_lista?tipo=Pedido&varrer=1');
+  assert.equal(r.status, 200);
+  assert.equal((await r.json())[0].entregaStatus, 'retirado', 'a projeção cobre');
+});
+
+test('nada roda sozinho: sem disparo por tempo/segundo plano/subida; só ?varrer=1, Entregas, menu e etapa', () => {
+  const i = ler('index.js');
+  assert.doesNotMatch(i, /varrerEntregas|criarDisparadorFila/);
+  assert.equal((i.match(/^\s+await varrerSePedido\(req\);/gm) || []).length, 4, '4 rotas de lista');
+  assert.match(i, /if \(req\.query\.varrer !== '1'\) return;/);
+  const e = ler('rotas/entregas.js');
+  assert.doesNotMatch(e, /setInterval|setTimeout|criarDisparadorFila/);
+  assert.doesNotMatch(ler('rotas/ped_orc.js'), /varrer/);
+  assert.doesNotMatch(ler('rotas/portal_pedidos.js'), /varrer|sincronizarFila/, 'o portal (cliente) nunca dispara escrita');
+  const p = ler('painel_inicial.html');
+  assert.ok(p.includes("$('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));"));
+  assert.ok(p.includes("api('/dados_lista?tipo=Pedido' + (varrer === true ? '&varrer=1' : ''))"));
 });

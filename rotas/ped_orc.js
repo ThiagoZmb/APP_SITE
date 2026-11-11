@@ -431,7 +431,7 @@ async function lerSistemaCorrer(db, nome, folhas) {
   };
 }
 
-function registrarPedOrc({ rota, pool, varrerEntregas = () => null }) {
+function registrarPedOrc({ rota, pool }) {
   const leitor = criarLeitor(pool);
 
   rota('get', '/ped_orc/acessorios_permitidos', ['orcamentos.criar'], async (req, res) => {
@@ -732,8 +732,9 @@ function registrarPedOrc({ rota, pool, varrerEntregas = () => null }) {
 
   // mudar a situação do pedido (menu do botão direito da lista). Entregue/Retirado gravam DATA_ENTREGA = hoje, como Pedido_Entregue/Pedido_Retirado do VB;
   // sair de Entregue/Retirado limpa a data. Com `manterData: true` a DATA_ENTREGA que já está gravada NÃO é tocada (o usuário escolhe na tela).
-  // Pedido Cancelado não muda por aqui. A fila de Entregas acompanha pela varredura, disparada em segundo plano logo depois do commit
-  // (Pronto entra; sair de Pronto antes de agendar cancela; Entregue/Retirado encerra as que esperavam; voltar daí reabre as encerradas).
+  // Pedido Cancelado não muda por aqui. Entregue/Retirado encerra junto (na mesma transação) as entregas que esperavam; o resto da fila
+  // acompanha pela varredura quando o usuário abre Entregas ou clica em Atualizar numa lista (Pronto entra; sair de Pronto antes de agendar
+  // cancela; voltar de Entregue/Retirado reabre as encerradas). Nada roda sozinho em segundo plano (decisão do dono, 2026-11-11).
   const SITUACOES_MUDAR = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
   rota('post', '/ped_orc/:tipo/:numero/situacao', ['pedidos.situacao'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;
@@ -776,8 +777,7 @@ function registrarPedOrc({ rota, pool, varrerEntregas = () => null }) {
       }
       return { ok: true };
     });
-    // a fila de Entregas acompanha já (Pronto entra, saiu de Pronto cancela A programar, voltou de Entregue/Retirado reabre), em segundo plano
-    if (r) { varrerEntregas({ forcar: true }); res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega }); }
+    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
   });
 
   // alterar a DATA DE PRONTO (ped_orc.DATA_PRONTO = "Pronto em" do PDF / data prometida; é o campo "data de entrega" da tela de orçamentos) pelo menu do botão direito.

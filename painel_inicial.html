@@ -444,10 +444,11 @@
         const soma = l => l.reduce((s, x) => s + x.v, 0);
 
         // ================= CARGA =================
-        async function carregar() {
+        // varrer = true só no clique em "Atualizar": o servidor acerta a fila de Entregas (mudanças do VB) antes de montar a lista
+        async function carregar({ varrer = false } = {}) {
             $('carregando').hidden = false; $('conteudo').hidden = true;
             try {
-                const [p, o] = await Promise.all([api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=' + encodeURIComponent('Orçamento'))]);
+                const [p, o] = await Promise.all([api('/dados_lista?tipo=Pedido' + (varrer === true ? '&varrer=1' : '')), api('/dados_lista?tipo=' + encodeURIComponent('Orçamento'))]);
                 const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
                 pedidos = p.map(prep); orcamentos = o.map(prep);
                 const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -977,7 +978,7 @@
             renderLista();
         }));
         $('search-input').addEventListener('input', renderLista);
-        $('refresh-btn').addEventListener('click', carregar);
+        $('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));
 
         // ================= FILTROS =================
         function aplicarCliente(nome) {
