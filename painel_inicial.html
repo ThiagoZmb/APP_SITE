@@ -216,6 +216,7 @@
         .chips-sit:empty { display: none; }
         .tabela-wrap { max-height: 520px; }
         #orders-tbody tr { cursor: pointer; }
+        #orders-tbody tr.divisor-semana td { border-top: 2px solid var(--primary-color); }
         td.num, th.num { text-align: right; }
         .st { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: var(--white); white-space: nowrap; }
         .st.producao { color: hsl(217, 78%, 72%); border-color: #b6cdf4; background: hsla(220, 86%, 55%, .14); }
@@ -787,14 +788,30 @@
             $('lista-qtd').textContent = `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
             $('lista-total').textContent = moeda(soma(lista));
             const MAX = 500;
-            $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => `
-                <tr data-numero="${esc(x.numero)}" tabindex="0"${tipoLista === 'Orçamento' && x.s === 'fechado' ? ' class="linha-fechada"' : ''}>
+            let semanaAnterior = null;
+            $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => {
+                const semana = semanaDaData(x.data);
+                const classes = [tipoLista === 'Orçamento' && x.s === 'fechado' ? 'linha-fechada' : '',
+                    semana && semanaAnterior && semana !== semanaAnterior ? 'divisor-semana' : ''].filter(Boolean).join(' ');
+                if (semana) semanaAnterior = semana;
+                return `
+                <tr data-numero="${esc(x.numero)}" tabindex="0"${classes ? ` class="${classes}"` : ''}>
                     <td class="order-number">${esc(x.numero)}${iconesItens(x)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
                     <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
                     <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}</td>
-                </tr>`).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
+                </tr>`;
+            }).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
+        }
+        // Agrupa visualmente por semana civil (segunda a domingo), usando a data do pedido/orçamento.
+        function semanaDaData(valor) {
+            const m = String(valor || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (!m) return '';
+            const d = new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+            if (Number.isNaN(d.getTime())) return '';
+            d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+            return d.toISOString().slice(0, 10);
         }
         // status interno da entrega (web_entregas) -> rótulo; só pedidos com registro de entrega têm selo
         const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };

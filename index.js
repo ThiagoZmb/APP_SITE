@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas } = require('./seguranca/instalacao');
+const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, acrescentarPermissoesProdutosDependencias, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
@@ -57,6 +57,7 @@ const { registrarChecklist } = require('./rotas/checklist');
 const { registrarEntregaChecklist } = require('./rotas/entrega_checklist');
 const { registrarFluxoVarios } = require('./rotas/fluxo_varios');
 const { registrarPerfilSecoes } = require('./rotas/perfil_secoes');
+const { registrarProdutosDependencias } = require('./rotas/produtos_dependencias');
 const { registrarPesoItens } = require('./rotas/peso_itens');
 const { registrarNotas } = require('./rotas/notas_fiscais');
 const { registrarImportacaoNotas } = require('./rotas/notas_importacao');
@@ -1861,6 +1862,7 @@ registrarDanfe({ rota: registro.rota, pool, foraDosEstados });
 registrarChecklist({ rota: registro.rota, pool });
 registrarFluxoVarios({ rota: registro.rota, pool });
 registrarPerfilSecoes({ rota: registro.rota, pool });
+registrarProdutosDependencias({ rota: registro.rota, pool });
 registrarPesoItens({ rota: registro.rota, pool });
 registrarNotas({ rota: registro.rota, pool, foraDosEstados });
 registrarImportacaoNotas({ publica: registro.publica, pool });
@@ -1906,6 +1908,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesOrcSituacao(pool)).feito) console.log('[permissões] orcamentos.situacao acrescentada ao Administrador, Interno completo e Representante');
   if ((await acrescentarPermissoesChecklist(pool)).feito) console.log('[permissões] pedidos.checklist acrescentada ao Administrador, Interno completo e auxiliares; checklist.enviar ao Administrador e Interno completo');
   if ((await acrescentarPermissoesPerfisDesenho(pool)).feito) console.log('[permissões] perfis.desenho acrescentada ao Administrador e Interno completo');
+  if ((await acrescentarPermissoesProdutosDependencias(pool)).feito) console.log('[permissões] produtos.dependencias acrescentada ao Administrador');
   if ((await acrescentarPermissoesEtapas(pool)).feito) console.log('[permissões] etapas.* acrescentadas ao Administrador; etapas.ver e as 5 etapas de produção ao Interno completo');
   try {
     const sem = await semearPerfilSecoes(pool);
