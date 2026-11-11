@@ -381,11 +381,11 @@ body .ferr-select:focus, body .search-box input:focus, body .busca input:focus, 
     outline: none !important; border-color: var(--primary-color) !important;
     box-shadow: 0 0 0 3px var(--primary-ring) !important; background: var(--bg) !important;
 }
-/* Post-it amarelo (observação geral do pedido): fundo claro fixo; texto, cursor e placeholder escuros, senão herdam o texto claro do tema escuro */
+/* Observação geral do pedido: fundo cinza igual ao do cliente final (--bg), texto claro do tema escuro */
 html body #ped-obs {
-    background: var(--post-it-bg) !important; color: var(--post-it-texto) !important; caret-color: var(--post-it-texto) !important;
+    background: var(--bg) !important; color: var(--text-dark) !important; caret-color: var(--text-dark) !important;
 }
-html body #ped-obs::placeholder { color: var(--post-it-placeholder) !important; opacity: 1; }
+html body #ped-obs::placeholder { color: var(--text-light) !important; opacity: 1; }
 body .form-group input[readonly] { background: var(--surface-2) !important; color: var(--primary-color) !important; font-weight: 700 !important; }
 body .form-group select:disabled, body .form-group input:disabled {
     background: #181a1f !important; color: #5f6673 !important; border-style: dashed !important; box-shadow: none !important;
