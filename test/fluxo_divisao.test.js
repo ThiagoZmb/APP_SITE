@@ -77,7 +77,8 @@ test('restante: 1000 com 500 recebidos sobram 500; valor igual ou maior não ger
   assert.equal(D.calcularRestante(1000, [L(1200)]), 0);
   assert.equal(D.calcularRestante(1000, [L(400), L(100)]), 500, 'formas extras também abatem');
   assert.equal(D.calcularRestante(1000, [L(500, 'A Receber')]), 0, 'linha de cima A Receber: não gera restante');
-  assert.equal(D.calcularRestante(1000, [L(500), L(100, 'A Receber')]), 500, 'linha A Receber extra não conta como recebida');
+  assert.equal(D.calcularRestante(1000, [L(500), L(100, 'A Receber')]), 400, 'linha A Receber extra também abate o restante');
+  assert.equal(D.calcularRestante(2661.24, [L(1330.62), L(1330.62, 'A Receber')]), 0, 'entrada + 1x a receber cobrem o total: nenhuma 3ª linha');
   assert.equal(D.calcularRestante(0, [L(500)]), 0);
   assert.equal(D.calcularRestante(1217.39, [L(600.2), L(500.1)]), 117.09);
   assert.equal(D.calcularRestante(100, [L(99.999)]), 0, 'diferença menor que meio centavo não conta');

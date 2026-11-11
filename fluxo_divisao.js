@@ -45,9 +45,11 @@
   // Restante a receber: quando a gaveta abre pela ficha do cliente (botão Receber), `base` é o total dos pedidos marcados
   // (já descontado o crédito). Se o que entra agora como Recebido for menor, o que sobra vira uma linha "A Receber".
   // Só vale quando a linha de cima é "Recebido"; arredonda em centavos e ignora diferença menor que meio centavo.
+  // Abate TODAS as linhas digitadas (Recebido ou A Receber, ex.: entrada + parcela no cartão): o que o usuário já distribuiu
+  // não pode gerar outro lançamento (decisão do dono, 2026-11-11).
   function calcularRestante(base, linhas) {
     if (!(Number(base) > 0) || !linhas.length || linhas[0].situacao !== 'Recebido') return 0;
-    const r = arred(Number(base) - somar(linhas).recebidoAgora);
+    const r = arred(Number(base) - somar(linhas).soma);
     return r > 0.004 ? r : 0;
   }
 
@@ -307,7 +309,8 @@
     $('f-valor').addEventListener('blur', recalcular);
     $('f-pedido').addEventListener('change', () => { quitarMexido = false; buscarResumo(); });
 
-    return { reiniciar, atualizarVisibilidade, ativo, caminho, montarEnvio, conferir, recalcular, buscarResumo, definirContexto, definirEdicao, temRestante: () => restante() > 0 };
+    return { reiniciar, atualizarVisibilidade, ativo, caminho, montarEnvio, conferir, recalcular, buscarResumo, definirContexto, definirEdicao, // sobrou valor, ou o usuário digitou parcela A Receber (ex.: entrada + cartão): o pedido passa a Recebido, senão o saldo conta em dobro
+      temRestante: () => restante() > 0 || (!!contexto && entradaNova() && todas().some(l => l.situacao === 'A Receber')) };
   }
 
   api.iniciar = iniciar;
