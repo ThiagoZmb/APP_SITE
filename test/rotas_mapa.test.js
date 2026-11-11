@@ -65,6 +65,24 @@ test('resumo do estoque: o operador (sem a chave) recebe só os filtros; o admin
   assert.equal(adm.ativos, 2);
 });
 
+test('resumo do estoque por parte: filtros não consultam os totais e totais não consultam os filtros (olho dos resumos)', async t => {
+  const { chamar, f } = await preparar(t, [[/SUM\(CASE/, [{ total: 999, ativos: 2, falta: 0, minimo: 1 }]], [/SELECT DISTINCT CLASSE AS v/, [{ v: 'Perfil' }]]]);
+  const filtros = await (await chamar(1, '/estoque/resumo?parte=filtros')).json();
+  assert.deepEqual(Object.keys(filtros).sort(), ['classes', 'fornecedores', 'unidades']);
+  assert.ok(!f.chamadas.some(c => /SUM\(CASE/.test(c.sql)), 'o administrativo também não paga a soma do estoque quando só quer os filtros');
+  const antes = f.chamadas.length;
+  const totais = await (await chamar(1, '/estoque/resumo?parte=totais')).json();
+  assert.equal(totais.valorTotal, 999);
+  assert.equal(totais.ativos, 2);
+  assert.equal(totais.classes, undefined);
+  assert.ok(!f.chamadas.slice(antes).some(c => /SELECT DISTINCT/.test(c.sql)), 'só a soma, sem as três listas');
+  const op = await (await chamar(3, '/estoque/resumo?parte=totais')).json();
+  assert.deepEqual(op, {}, 'operador não recebe total nenhum, nem pedindo');
+  const tudo = await (await chamar(1, '/estoque/resumo')).json();
+  assert.equal(tudo.valorTotal, 999);
+  assert.deepEqual(tudo.classes, ['Perfil']);
+});
+
 test('representante RJ: /dados_lista filtra ESTADO IN (?) com RJ e sem valor', async t => {
   const { f, chamar } = await preparar(t, [[/FROM ped_orc p/, [{ numero: 1, cliente: 'X', valor: 50 }]]]);
   const r = await chamar(2, '/dados_lista?tipo=Pedido');

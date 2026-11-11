@@ -1299,22 +1299,24 @@ registro.rota('get', '/estoque/resumo', ['estoque.ver'], async (req, res) => {
     // Totais e contagens (valor em estoque, ativos, em falta, abaixo do mínimo) são RESUMO administrativo: só com a chave `administrativo.ver`.
     // O operador recebe só os filtros que a tela precisa (classes, unidades, fornecedores) para listar os itens e dar baixa.
     const administrativo = req.acesso.permissoes.has('administrativo.ver');
+    // ?parte=filtros (o que a tela usa para trabalhar: classes, unidades, fornecedores) ou ?parte=totais (resumo, só com a chave,
+    // buscado pela tela só quando o olho dos resumos abre); sem o parâmetro vem tudo, como sempre.
+    const parte = req.query.parte === 'filtros' || req.query.parte === 'totais' ? req.query.parte : 'tudo';
+    const querTotais = administrativo && parte !== 'filtros';
+    const querFiltros = parte !== 'totais';
     // as leituras são independentes: saem JUNTAS (cada ida ao banco custa ~190 ms no Render)
     const [[[tot]], classes, unidades, fornecedores] = await Promise.all([
-      administrativo ? pool.execute(
+      querTotais ? pool.execute(
         `SELECT SUM(CASE WHEN CLASSE = 'Revestimento' THEN (TAMANHO * VALOR * QTD_ESTOQUE) ELSE (VALOR * QTD_ESTOQUE) END) AS total,
                 SUM(SITUACAO = 'Ativo') AS ativos,
                 SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE <= 0) AS falta,
                 SUM(SITUACAO = 'Ativo' AND QTD_ESTOQUE > 0 AND MIN_ESTOQUE > 0 AND QTD_ESTOQUE <= MIN_ESTOQUE) AS minimo
          FROM estoque`) : Promise.resolve([[{}]]),
-      distintos('CLASSE'), distintos('UNIDADE'), distintos('FORNECEDOR')
+      querFiltros ? distintos('CLASSE') : [], querFiltros ? distintos('UNIDADE') : [], querFiltros ? distintos('FORNECEDOR') : []
     ]);
-    const filtros = { classes, unidades, fornecedores };
-    res.json(administrativo ? semValores(req, {
-      valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0,
-      falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0,
-      ...filtros
-    }, ['valorTotal']) : filtros);
+    const filtros = querFiltros ? { classes, unidades, fornecedores } : {};
+    const totais = { valorTotal: numEstq(tot.total), ativos: Number(tot.ativos) || 0, falta: Number(tot.falta) || 0, minimo: Number(tot.minimo) || 0 };
+    res.json(querTotais ? semValores(req, { ...totais, ...filtros }, ['valorTotal']) : filtros);
   } catch (err) {
     console.error('Erro /estoque/resumo:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });

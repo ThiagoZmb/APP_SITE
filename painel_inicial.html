@@ -268,7 +268,7 @@
         #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
@@ -280,7 +280,7 @@
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
-    <script src="olho_resumos.js?v=202611181200"></script>
+    <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
     <div class="container">
@@ -351,7 +351,7 @@
                 </section>
 
                 <!-- ===== EVOLUÇÃO + LEITURA ===== -->
-                <section class="larga so-geral" data-perm="administrativo.ver">
+                <section class="larga so-geral" data-resumo data-perm="administrativo.ver">
                     <div class="painel">
                         <div class="cab"><h3>Orçamentos x Pedidos por mês</h3><small><span data-valor>valores e % de fechamento</span><span data-sem-valor>quantidade emitida</span> · últimos 12 meses</small></div>
                         <div class="graf"><canvas id="g-mensal"></canvas></div>
@@ -362,7 +362,7 @@
                     </div>
                 </section>
 
-                <section class="duas so-geral" data-perm="administrativo.ver">
+                <section class="duas so-geral" data-resumo data-perm="administrativo.ver">
                     <div class="painel">
                         <div class="cab"><h3>Situação dos pedidos</h3><small id="status-sub">no período</small></div>
                         <div class="graf baixo"><canvas id="g-status"></canvas></div>
@@ -374,8 +374,8 @@
                 </section>
 
                 <!-- ===== O QUE VENDE / QUEM COMPRA ===== -->
-                <section class="painel so-geral" id="ranking-produtos" data-perm="administrativo.ver"></section>
-                <section class="painel so-geral" id="ranking-clientes" data-perm="administrativo.ver"></section>
+                <section class="painel so-geral" id="ranking-produtos" data-resumo data-perm="administrativo.ver"></section>
+                <section class="painel so-geral" id="ranking-clientes" data-resumo data-perm="administrativo.ver"></section>
 
             </div>
         </main>
@@ -447,19 +447,46 @@
 
         // ================= CARGA =================
         // varrer = true só no clique em "Atualizar": o servidor acerta a fila de Entregas (mudanças do VB) antes de montar a lista
-        async function carregar({ varrer = false } = {}) {
+        // Olho fechado (padrao): so a lista do tipo ativo (Pedidos OU Orcamentos) e buscada. O outro tipo e as analises
+        // (indicadores, graficos, leitura rapida, rankings) so vem quando o olho abre ou o usuario troca o tipo da lista.
+        const carregado = { 'Pedido': false, 'Orçamento': false };
+        const OUTRO_TIPO = { 'Pedido': 'Orçamento', 'Orçamento': 'Pedido' };
+        const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
+        async function buscarTipo(tipo, varrer) {
+            const l = await api('/dados_lista?tipo=' + encodeURIComponent(tipo) + (varrer === true && tipo === 'Pedido' ? '&varrer=1' : ''));
+            if (tipo === 'Pedido') pedidos = l.map(prep); else orcamentos = l.map(prep);
+            carregado[tipo] = true;
+        }
+        function atualizarNomes() {
+            const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+            $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
+        }
+        // garante os tipos pedidos (so busca o que ainda nao veio); consultas independentes saem juntas
+        async function garantirTipos(tipos) {
+            const faltam = tipos.filter(t => !carregado[t]);
+            if (!faltam.length) return;
+            await Promise.all(faltam.map(t => buscarTipo(t, false)));
+            atualizarNomes();
+        }
+        let emCarga = Promise.resolve();
+        // varrer = true só no clique em "Atualizar": o servidor acerta a fila de Entregas (mudanças do VB) antes de montar a lista
+        function carregar({ varrer = false } = {}) {
+            emCarga = carregarAgora(varrer);
+            return emCarga;
+        }
+        async function carregarAgora(varrer) {
             $('carregando').hidden = false; $('conteudo').hidden = true;
             try {
-                const [p, o] = await Promise.all([api('/dados_lista?tipo=Pedido' + (varrer === true ? '&varrer=1' : '')), api('/dados_lista?tipo=' + encodeURIComponent('Orçamento'))]);
-                const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
-                pedidos = p.map(prep); orcamentos = o.map(prep);
-                const nomes = [...new Set([...pedidos, ...orcamentos].map(x => x.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-                $('l-clientes').innerHTML = nomes.map(n => `<option value="${esc(n)}">`).join('');
+                const tipos = [tipoLista, ...(OlhoResumos.visivel() ? [OUTRO_TIPO[tipoLista]] : [])];
+                carregado[OUTRO_TIPO[tipoLista]] = false; // o que nao e recarregado agora fica "velho" e vem na proxima necessidade
+                await Promise.all(tipos.map(t => buscarTipo(t, varrer)));
+                atualizarNomes();
                 $('carregando').hidden = true; $('conteudo').hidden = false;
                 renderTudo();
             } catch (e) { $('carregando').textContent = '⚠️ Erro ao carregar: ' + e.message; }
         }
 
+        // Parte de trabalho: cabecalho, chips e lista. As analises ficam em renderAnalises (atras do olho).
         function renderTudo() {
             const j = janela();
             $('periodo-txt').textContent = j.ini.getFullYear() > 1900 ? `${j.ini.toLocaleDateString('pt-BR')} a ${(j.fim < hoje ? j.fim : hoje).toLocaleDateString('pt-BR')}` : 'todo o histórico';
@@ -468,6 +495,20 @@
             $('titulo').textContent = cliente || 'Pedidos e Orçamentos';
             $('subtitulo').textContent = cliente ? 'Pedidos e orçamentos deste cliente — vendas, conversão, produção e mix de produtos.'
                 : 'Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.';
+            renderLista();
+            analises.atualizar(); // olho fechado: so marca como desatualizado; aberto: recarrega ja
+        }
+
+        // Analises (Operacao agora, Resultado do periodo, Leitura rapida, graficos, rankings): so rodam com o olho aberto
+        let seqAnalises = 0;
+        async function renderAnalises() {
+            const meu = ++seqAnalises;
+            try {
+                await emCarga;
+                await garantirTipos(['Pedido', 'Orçamento']);
+            } catch (e) { return; } // a propria carga da lista ja mostra o erro
+            if (meu !== seqAnalises) return; // filtro mudou enquanto buscava: a rodada mais nova assume
+            const j = janela();
             calcularResumo(j);
             renderMensal();
             calcularOperacao();
@@ -476,8 +517,8 @@
             renderStatus(j);
             renderDiario();
             renderRankings(j);
-            renderLista();
         }
+        const analises = OlhoResumos.carga(renderAnalises);
 
         // ================= RESUMO LOCAL (só para "Leitura rápida" e ranking de clientes) =================
         // Os blocos "Operação agora" e "Resultado do período" NÃO usam estas contas: os números deles vêm do servidor
@@ -499,7 +540,6 @@
         let seqIndicadores = 0;
         async function carregarIndicadores() {
             if (!Acesso.pode('indicadores.ver')) return; // sem a permissão nem se pede ao servidor
-            if (OlhoResumos.adiar(carregarIndicadores)) return; // olho fechado: nada de ida ao banco; a busca roda ao mostrar
             const meu = ++seqIndicadores;
             try {
                 const d = await api('/painel/indicadores?periodo=' + encodeURIComponent($('periodo').value) + (cliente ? '&cliente=' + encodeURIComponent(cliente) : ''));
@@ -980,7 +1020,13 @@
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
             tipoLista = b.dataset.tipo; filtroSit = '';
             document.querySelectorAll('.toggle-btn').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-            renderLista();
+            if (carregado[tipoLista]) { renderLista(); return; }
+            // olho fechado: este tipo ainda nao foi buscado (so o tipo ativo e carregado por padrao)
+            $('orders-tbody').innerHTML = '<tr><td colspan="10" class="vazio">Carregando...</td></tr>';
+            $('lista-qtd').textContent = '';
+            const tipoPedido = tipoLista;
+            garantirTipos([tipoPedido]).then(() => { if (tipoLista === tipoPedido) renderLista(); })
+                .catch(e => { $('lista-qtd').textContent = '⚠️ Erro ao carregar: ' + e.message; });
         }));
         $('search-input').addEventListener('input', renderLista);
         $('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));

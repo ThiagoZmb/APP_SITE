@@ -251,5 +251,6 @@ test('nada roda sozinho: sem disparo por tempo/segundo plano/subida; só ?varrer
   assert.doesNotMatch(ler('rotas/portal_pedidos.js'), /varrer|sincronizarFila/, 'o portal (cliente) nunca dispara escrita');
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("$('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));"));
-  assert.ok(p.includes("api('/dados_lista?tipo=Pedido' + (varrer === true ? '&varrer=1' : ''))"));
+  // a varredura só acompanha a lista de Pedido (o tipo é buscado por buscarTipo, com o olho dos resumos fechado só o tipo ativo)
+  assert.ok(p.includes("api('/dados_lista?tipo=' + encodeURIComponent(tipo) + (varrer === true && tipo === 'Pedido' ? '&varrer=1' : ''))"));
 });

@@ -302,7 +302,7 @@
 
         @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="inicio_menu.js?v=202611171200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
@@ -313,7 +313,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
-    <script src="olho_resumos.js?v=202611181200"></script>
+    <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
     <div class="container">
@@ -424,7 +424,7 @@
             </section>
 
             <!-- ===== GRÁFICO ===== -->
-            <section class="painel" data-valor>
+            <section class="painel" data-resumo data-valor>
                 <div class="painel-head">
                     <div class="painel-titulo">Orçamentos x Pedidos — últimos 6 meses</div>
                     <a class="ver-tudo" href="painel_inicial.html">Ver detalhes →</a>
@@ -483,19 +483,19 @@
 
         // ============ PEDIDOS E ORÇAMENTOS ============
         let pedidosInicio = []; // pedidos da última carga (usado pelo menu do botão direito)
-        async function carregarComercial() {
+        let orcamentosInicio = null; // só buscados para os cartões do mês (resumo atrás do olho)
+        // Cartões "Pedidos/Orçamentos no mês, Conversão, Em produção": resumo atrás do olho. Usam os pedidos já carregados para a
+        // lista; só os orçamentos (exclusivos dos cartões) vão ao servidor, e só com o olho aberto.
+        async function renderCartoes() {
             if (!Acesso.pode('pedidos.ver')) return;
-            let pedidos = [], orcamentos = [];
+            const pedidos = pedidosInicio;
             try {
-                [pedidos, orcamentos] = await Promise.all([api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=Orçamento')]);
-            } catch (e) {
-                ['ultimos', 'entregas'].forEach(id => $(id).innerHTML = `<li class="vazio">⚠️ ${escapeHtml(e.message)}</li>`);
-                return;
-            }
+                if (orcamentosInicio === null) orcamentosInicio = await api('/dados_lista?tipo=Orçamento');
+            } catch (e) { return; } // cartões são complementares; a lista já mostrou o que importa
+            const orcamentos = orcamentosInicio;
             const hoje = new Date();
             const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
             const soma = l => l.reduce((s, p) => s + (parseFloat(p.valor) || 0), 0);
-
             const pedMes = pedidos.filter(p => ehDoMes(p.data, hoje));
             const pedAnt = pedidos.filter(p => ehDoMes(p.data, mesPassado));
             const orcMes = orcamentos.filter(p => ehDoMes(p.data, hoje));
@@ -516,9 +516,23 @@
             const prontos = pedidos.filter(p => pronto(p.situacao));
             $('k-prod').textContent = producao.length;
             $('k-prod-sub').innerHTML = `<b>${prontos.length}</b> pronto(s) aguardando entrega`;
+        }
+        const cartoesCarga = OlhoResumos.carga(renderCartoes);
+        async function carregarComercial() {
+            if (!Acesso.pode('pedidos.ver')) return;
+            let pedidos = [];
+            try {
+                pedidos = await api('/dados_lista?tipo=Pedido'); // as listas só precisam dos pedidos; os orçamentos vêm com os cartões (olho)
+            } catch (e) {
+                ['ultimos', 'entregas'].forEach(id => $(id).innerHTML = `<li class="vazio">⚠️ ${escapeHtml(e.message)}</li>`);
+                return;
+            }
+            const hoje = new Date();
 
             // últimos 6 pedidos (lista já vem ordenada por número desc)
             pedidosInicio = pedidos; // o menu do botão direito procura o pedido aqui
+            orcamentosInicio = null; // orçamentos da carga anterior ficam velhos: os cartões buscam de novo quando o olho estiver aberto
+            cartoesCarga.atualizar(); // olho fechado: só marca; aberto: recalcula os cartões já
             $('ultimos').innerHTML = pedidos.slice(0, 6).map(p => `
                 <li data-numero="${escapeHtml(p.numero)}">
                     <span class="num-ped">#${escapeHtml(p.numero)}</span>
@@ -560,7 +574,8 @@
         // "Financeiro do mês" é um resumo (olho dos resumos): escondido, não busca /fluxo/resumo; busca ao mostrar
         function carregarFinanceiroMes() {
             if (!Acesso.pode('financeiro.ver valores.ver')) return;
-            if (OlhoResumos.adiar(carregarFinanceiroMes)) return;
+            // "Valor em estoque" é parte deste resumo: só os totais (?parte=totais), nunca junto da lista de alertas
+            if (Acesso.pode('estoque.ver')) api('/estoque/resumo?parte=totais').then(r => { if (r.valorTotal !== undefined) $('f-estoque').textContent = moeda(r.valorTotal); }).catch(() => {});
             api('/fluxo/resumo').then(r => {
                 $('f-recebido').textContent = moeda(r.recebido);
                 $('f-areceber').textContent = moeda(r.aReceber);
@@ -570,13 +585,13 @@
                 $('f-saldo').textContent = moeda(r.saldo);
             }).catch(() => { $('f-saldo').textContent = 'indisponível'; });
         }
+        const financeiroCarga = OlhoResumos.carga(carregarFinanceiroMes);
         async function carregarInterno() {
-            carregarFinanceiroMes();
+            financeiroCarga.atualizar(); // olho fechado: nada vai ao banco; abre e busca (uma vez)
 
             if (!Acesso.pode('estoque.ver')) return;
             try {
-                const [resumo, itens] = await Promise.all([api('/estoque/resumo'), api('/estoque')]);
-                if (Acesso.pode('valores.ver')) $('f-estoque').textContent = moeda(resumo.valorTotal);
+                const itens = await api('/estoque');
                 // mesma regra de alerta da página de estoque
                 const alertas = itens
                     .filter(it => it.situacao !== 'Inativo' && (it.qtd <= 0 || (it.minimo > 0 && it.qtd <= it.minimo)))
@@ -596,8 +611,10 @@
         }
 
         // ============ GRÁFICO ============
+        let graficoFeito = false;
         async function carregarGrafico() {
-            if (typeof Chart === 'undefined' || !Acesso.pode('valores.ver')) return;
+            if (typeof Chart === 'undefined' || !Acesso.pode('valores.ver') || graficoFeito) return;
+            graficoFeito = true;
             try {
                 const dados = await api('/dados_compras_orcamentos');
                 new Chart($('grafico'), {
@@ -616,8 +633,9 @@
                         scales: { y: { beginAtZero: true, ticks: { callback: v => moedaCurta(v) }, grid: { color: '#f1f3f5' } }, x: { grid: { display: false } } }
                     }
                 });
-            } catch { /* gráfico é complementar */ }
+            } catch { graficoFeito = false; /* gráfico é complementar */ }
         }
+        const graficoCarga = OlhoResumos.carga(carregarGrafico);
 
         // ============ INIT ============
         document.addEventListener('DOMContentLoaded', () => {
@@ -641,7 +659,7 @@
             }
             carregarComercial();
             carregarInterno();
-            carregarGrafico();
+            graficoCarga.atualizar(); // gráfico é resumo: só vai ao servidor com o olho aberto
         });
     </script>
 </body>

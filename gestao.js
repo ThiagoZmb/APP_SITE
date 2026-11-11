@@ -150,13 +150,12 @@
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
-    const estado = { mes: mesDeHoje(), ocupado: false, orcamento: null, vb: null, seq: 0 };
+    const estado = { mes: mesDeHoje(), ocupado: false, orcamento: null, vb: null, seqPainel: 0, seqOrc: 0 };
     const { chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
     const podeEditar = () => !!(win.Acesso && win.Acesso.pode('gestao.editar'));
 
     function mensagemEstado(id, texto, tipo) { $(id).innerHTML = `<p class="${tipo === 'erro' ? 'erro-estado' : 'vazio'}" role="${tipo === 'erro' ? 'alert' : 'status'}">${esc(texto)}</p>`; }
-    function emCarregamento() { for (const id of ['cartao-faturamento', 'cartao-despesa', 'caixa', 'alertas', 'orcamento']) mensagemEstado(id, 'Carregando…'); }
 
     function desenharPainel(d) {
       $('aviso-periodo').hidden = !d.avisoPeriodo;
@@ -188,24 +187,48 @@
         `<option value="${esc(c.id)}">${esc([c.classe1, c.classe2, c.classe3].filter(Boolean).join(' › ') || 'Categoria ' + c.id)}</option>`).join('');
       sel.value = atual;
     }
-    async function carregar() {
-      const seq = ++estado.seq;
-      emCarregamento();
-      $('mes').value = estado.mes;
-      $('titulo-mes').textContent = rotuloMes(estado.mes);
+    // Olho dos resumos: cartões, caixa, alertas e a tabela do orçamento são análise e ficam escondidos (e sem buscar) até o
+    // olho abrir. O que é trabalho (mês, formulários de meta e de orçamento) vale sempre; o formulário de orçamento precisa da
+    // lista de categorias, que vem de /gestao/orcamento: por isso quem pode editar busca essa rota mesmo com o olho fechado.
+    const olho = win.OlhoResumos || { carga: fn => ({ atualizar: () => fn() }) };
+    const msgErro = err => err.status === 403 ? 'Você não tem permissão para ver a Central de Gestão (é preciso também a permissão de valores financeiros).' : 'Não foi possível carregar: ' + err.message;
+    async function carregarPainel() {
+      const seq = ++estado.seqPainel;
       const q = '?mes=' + encodeURIComponent(estado.mes);
+      for (const id of ['cartao-faturamento', 'cartao-despesa', 'caixa', 'alertas']) mensagemEstado(id, 'Carregando…');
       try {
-        const [painel, orc] = await Promise.all([chamar('/gestao/painel' + q), chamar('/gestao/orcamento' + q)]);
-        if (seq !== estado.seq) return; // o usuário já trocou de mês
+        const painel = await chamar('/gestao/painel' + q);
+        if (seq !== estado.seqPainel) return; // o usuário já trocou de mês
         desenharPainel(painel);
+      } catch (err) {
+        if (seq !== estado.seqPainel) return;
+        for (const id of ['cartao-faturamento', 'cartao-despesa', 'caixa', 'alertas']) mensagemEstado(id, msgErro(err), 'erro');
+      }
+    }
+    async function carregarOrcamento() {
+      const seq = ++estado.seqOrc;
+      const q = '?mes=' + encodeURIComponent(estado.mes);
+      mensagemEstado('orcamento', 'Carregando…');
+      try {
+        const orc = await chamar('/gestao/orcamento' + q);
+        if (seq !== estado.seqOrc) return;
         estado.orcamento = orc;
         $('orcamento').innerHTML = htmlOrcamento(orc);
         preencherCategorias(orc);
       } catch (err) {
-        if (seq !== estado.seq) return;
-        const msg = err.status === 403 ? 'Você não tem permissão para ver a Central de Gestão (é preciso também a permissão de valores financeiros).' : 'Não foi possível carregar: ' + err.message;
-        for (const id of ['cartao-faturamento', 'cartao-despesa', 'caixa', 'alertas', 'orcamento']) mensagemEstado(id, msg, 'erro');
+        if (seq !== estado.seqOrc) return;
+        mensagemEstado('orcamento', msgErro(err), 'erro');
       }
+    }
+    const painelCarga = olho.carga(carregarPainel);
+    const orcamentoCarga = olho.carga(carregarOrcamento);
+    function carregar() {
+      $('mes').value = estado.mes;
+      $('titulo-mes').textContent = rotuloMes(estado.mes);
+      painelCarga.atualizar();
+      if (podeEditar()) return Promise.all([carregarOrcamento()]); // formulário de orçamento precisa das categorias
+      orcamentoCarga.atualizar();
+      return Promise.resolve();
     }
 
     async function salvarMeta(ev) {

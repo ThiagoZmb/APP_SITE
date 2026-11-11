@@ -127,7 +127,8 @@
         .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
         #form h2 { font-size: 22px; margin-bottom: 14px; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <script src="olho_resumos.js?v=202611191200"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="funcionarios.js?v=202611051200" defer></script>
@@ -154,12 +155,12 @@
             <div class="workspace">
                 <section class="painel">
                     <div class="painel-head">
-                        <div class="barra">
+                        <div class="barra" data-olho-destino>
                             <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por nome, cargo ou cidade" aria-label="Buscar por nome, cargo ou cidade"></div>
                             <select id="filtro-situacao" aria-label="Situação"><option value="Ativo">Ativos</option><option value="Inativo">Inativos</option><option value="Demitido">Demitidos</option><option value="">Todos</option></select>
                             <button type="button" class="btn btn-primary" id="btn-novo" data-perm="funcionarios.editar">+ Novo funcionário</button>
                         </div>
-                        <p class="cinza qtd-linha"><span id="qtd"></span><span class="custo-total" id="custo-lista" hidden></span></p>
+                        <p class="cinza qtd-linha"><span id="qtd"></span><span class="custo-total" id="custo-lista" data-resumo data-valor hidden></span></p>
                     </div>
                     <div class="lista-wrap" id="lista"><p class="vazio">Carregando…</p></div>
                 </section>

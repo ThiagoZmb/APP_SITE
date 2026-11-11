@@ -227,9 +227,9 @@
             .col-forn { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
     <script src="layout.js?v=202611091200" defer></script>
-    <script src="olho_resumos.js?v=202611181200"></script>
+    <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
     <div class="container">
@@ -297,6 +297,14 @@
                         <div class="painel-titulo">Produtos <span class="contagem" id="contagem">0</span></div>
                         <div class="busca"><input data-foco-busca type="search" id="pesquisa" placeholder="Pesquisar por código ou nome do produto (Enter)" autocomplete="off"></div>
                         <div class="chips" id="chips-classe"></div>
+                        <div class="chips" id="chips-alerta" role="group" aria-label="Atalho de situação do estoque">
+                            <button type="button" class="chip" data-alerta="minimo" aria-pressed="false" title="Mostrar só os itens no mínimo">⚠️ No mínimo</button>
+                            <button type="button" class="chip" data-alerta="falta" aria-pressed="false" title="Mostrar só os itens em falta">⛔ Em falta</button>
+                        </div>
+                        <div class="filtro-ativo" id="filtro-alerta" role="status" aria-live="polite" hidden>
+                            <span id="filtro-alerta-txt"></span>
+                            <button type="button" class="btn btn-secondary btn-mini" id="limpar-alerta">Limpar filtro ✕</button>
+                        </div>
                     </div>
                     <div class="tabela-wrap">
                         <table>
@@ -336,7 +344,7 @@
                         <button class="aba" data-aba="fornecedor">Fornecedor</button>
                         <button class="aba" data-aba="custos">Estoque<span data-valor> e custos</span></button>
                         <button class="aba" data-aba="medidas">Medidas</button>
-                        <button class="aba" data-aba="movimento">Movimentação</button>
+                        <button class="aba" data-aba="movimento" data-resumo data-perm="administrativo.ver">Movimentação</button>
                     </div>
 
                     <form id="form" autocomplete="off" onsubmit="return false">
@@ -384,7 +392,7 @@
                             </div>
                             <p class="dica">Para Revestimento, o tamanho multiplica o valor no total do estoque.</p>
                         </div>
-                        <div class="aba-conteudo" data-aba="movimento">
+                        <div class="aba-conteudo" data-aba="movimento" data-resumo data-perm="administrativo.ver">
                             <div class="grafico-box" data-perm="administrativo.ver"><canvas id="grafico"></canvas></div>
                             <div class="grafico-vazio" id="grafico-vazio">Selecione um produto salvo para ver entradas e saídas dos últimos 12 meses.</div>
                         </div>
@@ -541,16 +549,10 @@
             if (valor && ![...sel.options].some(o => o.value === valor)) sel.add(new Option(valor, valor));
             sel.value = valor || '';
         }
+        // Filtros e combos (classes, unidades, fornecedores): parte de trabalho, sempre carregada.
         async function carregarResumo() {
             try {
-                const r = await api('/estoque/resumo');
-                // totais e contagens só vêm para quem tem a chave administrativa; o operador recebe só os filtros
-                if (r.ativos !== undefined) {
-                    document.getElementById('c-valor').textContent = moeda(r.valorTotal);
-                    document.getElementById('c-ativos').textContent = r.ativos;
-                    document.getElementById('c-minimo').textContent = r.minimo;
-                    document.getElementById('c-falta').textContent = r.falta;
-                }
+                const r = await api('/estoque/resumo?parte=filtros');
                 preencherSelect('f-classe', CLASSES_PADRAO, r.classes);
                 preencherSelect('f-unidade', UNIDADES_PADRAO, r.unidades);
                 document.getElementById('lista-fornecedores').innerHTML = r.fornecedores.map(f => `<option value="${escapeHtml(f)}">`).join('');
@@ -558,26 +560,55 @@
                 chips.innerHTML = ['', ...r.classes].map(c =>
                     `<button class="chip${c === classeFiltro ? ' ativo' : ''}" data-classe="${escapeHtml(c)}">${escapeHtml(c || 'Todas')}</button>`).join('');
             } catch (e) {
+                toast('Não foi possível carregar os filtros do estoque: ' + e.message, 'erro');
+            }
+        }
+        // Totais (valor em estoque, ativos, no mínimo, em falta): resumo atrás do olho; só vai ao servidor com o olho aberto
+        // e só quem tem a chave administrativa os recebe.
+        async function carregarTotais() {
+            if (!Acesso.pode('administrativo.ver')) return;
+            try {
+                const r = await api('/estoque/resumo?parte=totais');
+                if (r.ativos !== undefined) {
+                    document.getElementById('c-valor').textContent = moeda(r.valorTotal);
+                    document.getElementById('c-ativos').textContent = r.ativos;
+                    document.getElementById('c-minimo').textContent = r.minimo;
+                    document.getElementById('c-falta').textContent = r.falta;
+                }
+            } catch (e) {
                 toast('Não foi possível carregar o resumo do estoque: ' + e.message, 'erro');
             }
         }
+        const totaisCarga = OlhoResumos.carga(carregarTotais);
         document.getElementById('chips-classe').addEventListener('click', e => {
             const chip = e.target.closest('.chip');
             if (!chip) return;
             classeFiltro = chip.dataset.classe;
             // cmb_Filtro limpa a pesquisa (e vice-versa)
             document.getElementById('pesquisa').value = '';
-            document.querySelectorAll('.chip').forEach(c => c.classList.toggle('ativo', c === chip));
+            document.querySelectorAll('#chips-classe .chip').forEach(c => c.classList.toggle('ativo', c === chip));
             carregarEstoque();
         });
-        ['minimo', 'falta'].forEach(tipo => {
-            document.getElementById('card-' + tipo).addEventListener('click', () => {
-                alertaFiltro = alertaFiltro === tipo ? '' : tipo;
-                document.getElementById('card-minimo').classList.toggle('ativo-filtro', alertaFiltro === 'minimo');
-                document.getElementById('card-falta').classList.toggle('ativo-filtro', alertaFiltro === 'falta');
-                renderLista();
+        // atalho "No mínimo" / "Em falta": os cartões do resumo (olho aberto) e os chips da área de trabalho fazem o mesmo filtro,
+        // sempre sobre a lista já carregada; com filtro ativo aparece a faixa "Mostrando só..." com o botão de limpar
+        const ROTULO_FILTRO = { minimo: 'itens no mínimo', falta: 'itens em falta' };
+        function definirAlerta(tipo) {
+            alertaFiltro = alertaFiltro === tipo ? '' : tipo;
+            ['minimo', 'falta'].forEach(t => {
+                document.getElementById('card-' + t).classList.toggle('ativo-filtro', alertaFiltro === t);
+                const chip = document.querySelector('#chips-alerta .chip[data-alerta="' + t + '"]');
+                chip.classList.toggle('ativo', alertaFiltro === t);
+                chip.setAttribute('aria-pressed', String(alertaFiltro === t));
             });
+            document.getElementById('filtro-alerta').hidden = !alertaFiltro;
+            document.getElementById('filtro-alerta-txt').textContent = alertaFiltro ? 'Mostrando só os ' + ROTULO_FILTRO[alertaFiltro] + ' da lista.' : '';
+            renderLista();
+        }
+        ['minimo', 'falta'].forEach(tipo => {
+            document.getElementById('card-' + tipo).addEventListener('click', () => definirAlerta(tipo));
+            document.querySelector('#chips-alerta .chip[data-alerta="' + tipo + '"]').addEventListener('click', () => definirAlerta(tipo));
         });
+        document.getElementById('limpar-alerta').addEventListener('click', () => { if (alertaFiltro) definirAlerta(alertaFiltro); });
 
         // ============ PESQUISA (txt_pesquisa + F5) ============
         const pesquisa = document.getElementById('pesquisa');
@@ -587,7 +618,7 @@
             timerBusca = setTimeout(() => {
                 if (classeFiltro) {
                     classeFiltro = '';
-                    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('ativo', c.dataset.classe === ''));
+                    document.querySelectorAll('#chips-classe .chip').forEach(c => c.classList.toggle('ativo', c.dataset.classe === ''));
                 }
                 carregarEstoque();
             }, 350);
@@ -660,6 +691,7 @@
             $('v-aguardando').textContent = '—';
             document.querySelectorAll('#tbody tr.selecionado').forEach(tr => tr.classList.remove('selecionado'));
             marcarAlterado(false);
+            produtoMov = null;
             limparGrafico();
             atualizarVisualEstoque();
         }
@@ -682,7 +714,8 @@
                 document.querySelectorAll('#tbody tr').forEach(tr => tr.classList.toggle('selecionado', tr.dataset.codigo === String(p.codigo)));
                 marcarAlterado(false);
                 atualizarVisualEstoque();
-                carregarMovimentacao(p.produto);
+                produtoMov = p.produto;
+                movCarga.atualizar(); // olho fechado: só marca; o gráfico é buscado ao abrir o olho
             } catch (e) {
                 toast('Erro ao carregar dados do produto: ' + e.message, 'erro');
             }
@@ -758,7 +791,7 @@
                 const r = await api('/estoque/salvar', { method: 'POST', body: JSON.stringify(d) });
                 toast(r.mensagem, 'ok');
                 marcarAlterado(false);
-                await Promise.all([carregarEstoque(), carregarResumo()]);
+                await Promise.all([carregarEstoque(), carregarResumo(), totaisCarga.atualizar()]);
                 await abrirProduto(r.codigo);
             } catch (e) {
                 toast(e.message, 'erro');
@@ -786,11 +819,15 @@
             $('grafico-vazio').style.display = '';
             $('grafico-vazio').textContent = 'Selecione um produto salvo para ver entradas e saídas dos últimos 12 meses.';
         }
+        // gráfico de entradas x saídas do item aberto: atrás do olho (a aba "Movimentação" só existe com o olho aberto)
+        let produtoMov = null;
+        const movCarga = OlhoResumos.carga(() => produtoMov ? carregarMovimentacao(produtoMov) : limparGrafico());
         async function carregarMovimentacao(produto) {
             limparGrafico();
             if (typeof Chart === 'undefined' || !Acesso.pode('administrativo.ver')) return;   // gráfico de entradas x saídas é administrativo
             try {
                 const meses = await api('/estoque/movimentacao?produto=' + encodeURIComponent(produto));
+                if (produto !== produtoMov) return; // outro item foi aberto enquanto buscava
                 if (!meses.some(m => m.entrada || m.saida)) {
                     $('grafico-vazio').textContent = 'Sem entradas ou saídas nos últimos 12 meses.';
                     return;
@@ -846,6 +883,9 @@
             limparDados();
             carregarResumo();
             carregarEstoque();
+            totaisCarga.atualizar(); // olho fechado: só marca; os totais vêm quando o olho abrir
+            // fechar o olho com a aba "Movimentação" aberta deixaria a ficha em branco: volta para "Geral"
+            OlhoResumos.aoMudar(visivel => { if (!visivel && document.querySelector('.aba.ativa[data-aba="movimento"]')) irParaAba('geral'); });
             pesquisa.focus();
         });
     </script>

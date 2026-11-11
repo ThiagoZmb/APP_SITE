@@ -29,10 +29,11 @@ test('movimentacao_estoque.html: a aba Análises exige a chave (aba, atalho e ab
 
 test('painel_inicial.html e clientes.html: gráficos e rankings só com a chave, e sem chamar o servidor sem ela', () => {
   const p = ler('painel_inicial.html'), c = ler('clientes.html');
-  for (const re of [/<section class="larga so-geral" data-perm="administrativo\.ver">/, /<section class="duas so-geral" data-perm="administrativo\.ver">/,
-    /id="ranking-produtos" data-perm="administrativo\.ver"/, /id="ranking-clientes" data-perm="administrativo\.ver"/]) assert.match(p, re);
+  // (o olho dos resumos acrescentou data-resumo a estes blocos: a permissão continua no mesmo elemento)
+  for (const re of [/<section class="larga so-geral" data-resumo data-perm="administrativo\.ver">/, /<section class="duas so-geral" data-resumo data-perm="administrativo\.ver">/,
+    /id="ranking-produtos" data-resumo data-perm="administrativo\.ver"/, /id="ranking-clientes" data-resumo data-perm="administrativo\.ver"/]) assert.match(p, re);
   assert.match(p, /function renderRankings\(j\) \{[^}]*!Acesso\.pode\('administrativo\.ver'\)/);
-  assert.match(c, /id="ranking-clientes" data-perm="administrativo\.ver"/);
+  assert.match(c, /id="ranking-clientes" data-resumo data-perm="administrativo\.ver"/);
   assert.match(c, /function carregarRankingClientes\(\) \{[^}]*!Acesso\.pode\('administrativo\.ver'\)/);
 });
 

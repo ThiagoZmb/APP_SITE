@@ -439,10 +439,10 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="fluxo_divisao.js?v=202611101300"></script>
-    <script src="olho_resumos.js?v=202611181200"></script>
+    <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
     <div class="container">
@@ -497,7 +497,7 @@
                 </div>
             </section>
 
-            <section class="painel" id="painel-gastos" style="margin-bottom:18px">
+            <section class="painel" id="painel-gastos" data-resumo style="margin-bottom:18px">
                 <div class="gastos-topo">
                     <div>
                         <div class="painel-titulo">Maiores gastos — <span id="gastos-mes">—</span></div>
@@ -778,6 +778,7 @@
         // ============ LISTA (Carregar_Dados / meses / situação / pesquisa) ============
         // ============ MAIORES GASTOS DO MÊS ============
         async function carregarGastos() {
+            if (OlhoResumos.adiar(carregarGastos)) return; // análise (ranking e rosca): só busca com o olho aberto
             $('gastos-mes').textContent = mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(' de ', '/');
             let r;
             try { r = await api(`/fluxo/gastos?mes=${mesISO()}&agrupar=${agruparGastos}`); }

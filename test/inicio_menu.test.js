@@ -50,7 +50,9 @@ test('início: listas com data-numero, script e menu ligados, CSP libera iframe 
 test('as listas do início (entregas da semana e últimos pedidos) e o menu usam SÓ pedidos (tipo Pedido), nunca orçamentos', () => {
   const h = ler('inicio.html'), m = ler('inicio_menu.js');
   // os dois cards saem da lista de pedidos; a de orçamentos só alimenta os indicadores
-  assert.ok(h.includes("api('/dados_lista?tipo=Pedido'), api('/dados_lista?tipo=Orçamento')"));
+  // (com o olho dos resumos fechado só os pedidos são buscados; os orçamentos vêm junto dos cartões, ao abrir o olho)
+  assert.ok(h.includes("pedidos = await api('/dados_lista?tipo=Pedido')"));
+  assert.ok(h.includes("orcamentosInicio = await api('/dados_lista?tipo=Orçamento')"));
   assert.ok(h.includes("$('ultimos').innerHTML = pedidos.slice(0, 6)") && h.includes('const entregas = pedidos\n') || h.includes('const entregas = pedidos\r\n'));
   assert.ok(!/const entregas = orcamentos|\$\('ultimos'\)\.innerHTML = orcamentos/.test(h));
   // o menu só fala com o tipo Pedido

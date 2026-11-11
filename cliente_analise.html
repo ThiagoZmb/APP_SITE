@@ -242,6 +242,7 @@
         .score .lbl b { display: block; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
         .score .lbl em { font-style: normal; font-size: 12px; color: var(--text-light); font-weight: 600; }
         .hero-acoes a { text-decoration: none !important; }
+        body:not(.resumos-on) .hero { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } /* sem a "Saúde do cliente" (resumo) a terceira coluna some */
         .hero-acoes { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--border-color); }
 
         .duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
@@ -290,10 +291,10 @@
             .hero-meta { grid-template-columns: 1fr 1fr; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611181200">
+    <link rel="stylesheet" href="tema.css?v=202611191200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
-    <script src="olho_resumos.js?v=202611181200"></script>
+    <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
     <div class="container">
@@ -320,7 +321,7 @@
                         </div>
                     </div>
                     <div class="hero-meta" id="h-meta"></div>
-                    <div class="score">
+                    <div class="score" data-resumo>
                         <svg viewBox="0 0 100 100" aria-hidden="true">
                             <circle cx="50" cy="50" r="42" fill="none" stroke="#ececf2" stroke-width="10"/>
                             <circle id="score-arco" cx="50" cy="50" r="42" fill="none" stroke="#1f9d55" stroke-width="10" stroke-linecap="round"
@@ -338,7 +339,7 @@
                 </section>
 
                 <!-- ===== LEITURA RÁPIDA + AÇÕES ===== -->
-                <section class="duas">
+                <section class="duas" data-resumo>
                     <div class="painel">
                         <div class="cab"><h3>Leitura rápida</h3><small>o que está acontecendo com este cliente</small></div>
                         <ul class="insights" id="insights"></ul>
@@ -354,7 +355,7 @@
                 <section class="kpis" id="kpis" data-resumo></section>
 
                 <!-- ===== FATURAMENTO + FUNIL ===== -->
-                <section class="larga">
+                <section class="larga" data-resumo>
                     <div class="painel">
                         <div class="cab"><h3>Faturamento mês a mês</h3><small>pedidos, orçamentos e média móvel de 3 meses · 24 meses</small></div>
                         <div class="graf"><canvas id="g-mensal"></canvas></div>
@@ -366,10 +367,10 @@
                 </section>
 
                 <!-- ===== MIX DE PRODUTOS ===== -->
-                <section class="painel" id="mix"></section>
+                <section class="painel" id="mix" data-resumo></section>
 
                 <!-- ===== RECEBÍVEIS / STATUS / PRAZO ===== -->
-                <section class="tres">
+                <section class="tres" data-resumo>
                     <div class="painel">
                         <div class="cab"><h3>Recebíveis por atraso</h3><small id="aging-sub">em aberto no fluxo de caixa</small></div>
                         <div class="graf baixo"><canvas id="g-aging"></canvas></div>
@@ -393,7 +394,7 @@
                     <div class="painel">
                         <div class="cab"><h3>Oportunidades em aberto</h3><small>orçamentos dos últimos 60 dias</small></div>
                         <div class="tabela-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Cliente final</th><th>Idade</th><th class="num">Valor</th></tr></thead><tbody id="t-oport"></tbody></table></div>
-                        <div class="rodape-p" id="oport-rodape"></div>
+                        <div class="rodape-p" id="oport-rodape" data-resumo></div>
                     </div>
                 </section>
             </div>
@@ -612,7 +613,7 @@
             plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } } }, ...extra });
 
         function render(d) {
-            const c = d.cliente, r = analisar(d), sd = saude(r, d), lt = leitura(r, d);
+            const c = d.cliente, r = analisar(d);
             document.title = `Elegance - Análise: ${c.razaoSocial}`;
             $('h-avatar').textContent = c.razaoSocial.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
             $('h-nome').textContent = c.razaoSocial;
@@ -629,6 +630,31 @@
                 <div><span>Última compra</span><b>${r.ultimo ? r.ultimo.toLocaleDateString('pt-BR') : '—'}</b>${r.diasSemComprar != null ? ` <small>(há ${r.diasSemComprar} dias)</small>` : ''}</div>
                 <div><span>Total histórico</span><b>${moeda(c.totalVida)}</b> <small>(${num(c.pedidosVida)} pedidos)</small></div>
                 <div><span>Representante</span><b>${esc(c.representante || 'Nenhum')}</b></div>`;
+            $('a-cadastro').href = `clientes.html?abrir=${c.codigo}`;
+            $('a-financeiro').href = `clientes.html?abrir=${c.codigo}&aba=financeiro`;
+            $('a-graficos').href = `painel_inicial.html?cliente=${encodeURIComponent(c.razaoSocial)}`;
+
+            // listas
+            $('t-maiores').innerHTML = r.maiores.map(x => `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
+                <td><span class="pill-s">${esc(x.situacao)}</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`).join('') || '<tr><td colspan="5" class="vazio">Nenhum pedido em 12 meses</td></tr>';
+            $('t-oport').innerHTML = r.oportunidades.slice(0, 12).map(x => { const idade = diasEntre(x.dt, hoje);
+                return `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
+                <td><span class="pill-s" style="${idade > 30 ? 'color:#b56a00;border-color:#f2c47a' : ''}">${idade} dia(s)</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`; }).join('')
+                || '<tr><td colspan="5" class="vazio">Nenhum orçamento nos últimos 60 dias</td></tr>';
+            const totOport = r.oportunidades.reduce((s, x) => s + x.valor, 0);
+            $('oport-rodape').innerHTML = `Total em aberto: <b>${moeda(totOport)}</b>${r.conv12 != null ? ` · com a conversão atual (${pct(r.conv12)}), a expectativa é de <b>${moeda(totOport * Math.min(1, r.conv12))}</b> em pedidos` : ''}`;
+
+            dadosAnalise = d;
+            analises.atualizar(); // olho fechado: só marca; os gráficos, a leitura rápida, os indicadores e o mix são desenhados ao abrir
+        }
+
+        // Análises (saúde do cliente, leitura rápida, indicadores, gráficos, mix): atrás do olho. O mix é o único que vai ao
+        // servidor por conta própria (/ranking_produtos); o resto sai da mesma resposta de /clientes/analise já carregada.
+        let dadosAnalise = null;
+        function renderAnalises() {
+            const d = dadosAnalise;
+            if (!d) return;
+            const c = d.cliente, r = analisar(d), sd = saude(r, d), lt = leitura(r, d);
             const circ = 2 * Math.PI * 42;
             $('score-arco').setAttribute('stroke-dasharray', `${(sd.s / 100) * circ} ${circ}`);
             $('score-arco').setAttribute('stroke', sd.cor);
@@ -636,10 +662,6 @@
             $('score-rotulo').textContent = sd.rotulo; $('score-rotulo').style.color = sd.cor;
             $('score-desc').textContent = sd.desc;
             $('score-fatores').innerHTML = `<b>Como a nota foi calculada:</b> ${sd.fatores.length ? sd.fatores.map(esc).join(' · ') : 'nenhum ponto de atenção'}`;
-            $('a-cadastro').href = `clientes.html?abrir=${c.codigo}`;
-            $('a-financeiro').href = `clientes.html?abrir=${c.codigo}&aba=financeiro`;
-            $('a-graficos').href = `painel_inicial.html?cliente=${encodeURIComponent(c.razaoSocial)}`;
-
             const icone = { pos: '↑', alerta: '!', risco: '!', info: 'i' };
             $('insights').innerHTML = lt.ins.map(i => `<li class="${i.tipo}"><span class="ic">${icone[i.tipo]}</span><span>${i.texto}</span></li>`).join('');
             $('acoes').innerHTML = lt.acoes.map((a, i) => `<li><span class="ic">${i + 1}</span><span>${a}</span></li>`).join('');
@@ -701,16 +723,6 @@
                 options: baseOpts({ plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + 'd' } }, x: { grid: { display: false } } } })
             });
 
-            // listas
-            $('t-maiores').innerHTML = r.maiores.map(x => `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
-                <td><span class="pill-s">${esc(x.situacao)}</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`).join('') || '<tr><td colspan="5" class="vazio">Nenhum pedido em 12 meses</td></tr>';
-            $('t-oport').innerHTML = r.oportunidades.slice(0, 12).map(x => { const idade = diasEntre(x.dt, hoje);
-                return `<tr><td><b style="color:var(--primary-color)">${esc(x.numero)}</b></td><td>${BR(x.data)}</td><td>${esc(x.clienteFinal || '-')}</td>
-                <td><span class="pill-s" style="${idade > 30 ? 'color:#b56a00;border-color:#f2c47a' : ''}">${idade} dia(s)</span></td><td class="num"><b>${moeda(x.valor)}</b></td></tr>`; }).join('')
-                || '<tr><td colspan="5" class="vazio">Nenhum orçamento nos últimos 60 dias</td></tr>';
-            const totOport = r.oportunidades.reduce((s, x) => s + x.valor, 0);
-            $('oport-rodape').innerHTML = `Total em aberto: <b>${moeda(totOport)}</b>${r.conv12 != null ? ` · com a conversão atual (${pct(r.conv12)}), a expectativa é de <b>${moeda(totOport * Math.min(1, r.conv12))}</b> em pedidos` : ''}`;
-
             // mix de produtos (mesmo componente dos outros rankings)
             Ranking.montar($('mix'), {
                 titulo: 'Mix de produtos — últimos 12 meses',
@@ -723,6 +735,7 @@
                 carregar: () => api('/ranking_produtos?cliente=' + encodeURIComponent(c.razaoSocial))
             });
         }
+        const analises = OlhoResumos.carga(renderAnalises);
 
         document.addEventListener('DOMContentLoaded', async () => {
             const auth = getAuth();

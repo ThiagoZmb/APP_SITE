@@ -10,6 +10,13 @@
 //   4) quem busca os números só para os resumos chama, no começo da função de carga:
 //        if (OlhoResumos.adiar(carregarX)) return;
 //      Escondido, a busca é adiada (zero ida e volta ao banco) e roda uma vez quando o usuário mostrar.
+//   5) análise que depende de filtros/dados da tela (gráficos, comparativos, rankings): em vez de chamar a função
+//      direto, crie  const analises = OlhoResumos.carga(renderAnalises)  e chame  analises.atualizar()  sempre que os
+//      dados ou filtros mudarem: escondido, só marca "desatualizado" (nada é buscado nem desenhado) e roda ao mostrar;
+//      mostrado, roda na hora. Abrir de novo sem mudança nenhuma reaproveita o que já foi carregado.
+// REGRA (decisão do dono, 2026-11-11): com o olho fechado a tela só mostra E só carrega o que é de trabalho (filtros,
+// busca, lista/tabela principal, ações). Informação analítica (resumo, indicador, gráfico, ranking, comparativo)
+// nasce atrás do olho: escondida por data-resumo e buscada só pela carga adiada.
 // O esconder por padrão vive no tema.css (body:not(.resumos-on) [data-resumo]), por isso não há "flash".
 (function (raiz, fabrica) {
     const api = fabrica();
@@ -48,26 +55,48 @@
         };
     }
 
+    // Carga adiada de uma análise: "desatualizado" começa verdadeiro. atualizar() marca desatualizado e, se o olho está
+    // aberto, executa já; fechado, deixa anotada (uma vez só, mesmo com muitas mudanças de filtro) para a próxima abertura.
+    // Aberto e sem mudança, nada é refeito: o que já foi carregado é reaproveitado.
+    function criarCarga(estadoOlho, fn) {
+        let desatualizado = true;
+        const executar = () => { desatualizado = false; return fn(); };
+        return {
+            atualizar() {
+                desatualizado = true;
+                if (estadoOlho.adiar(executar)) return false; // escondido: fica para quando o olho abrir
+                const r = executar();
+                if (r && typeof r.catch === 'function') r.catch(() => {});
+                return true;
+            },
+            desatualizado: () => desatualizado
+        };
+    }
+
     // ---------- navegador ----------
     const ICO_ABERTO = '<svg class="olho-ico olho-ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
     const ICO_FECHADO = '<svg class="olho-ico olho-ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>';
 
     const estado = criarEstado();
-    let botao = null;
+    const botoes = []; // um por data-olho-destino (ex.: a página e a ficha lateral); todos mostram o mesmo estado
+    const ouvintes = [];
 
     function aplicarNoBotao() {
-        if (!botao) return;
         const v = estado.visivel();
-        botao.setAttribute('aria-pressed', v ? 'true' : 'false');
         const rotulo = v ? 'Ocultar resumos' : 'Mostrar resumos';
-        botao.setAttribute('aria-label', rotulo);
-        botao.title = rotulo;
+        for (const b of botoes) {
+            b.setAttribute('aria-pressed', v ? 'true' : 'false');
+            b.setAttribute('aria-label', rotulo);
+            b.title = rotulo;
+        }
     }
 
     function definir(v) {
         const lista = estado.definir(v);
         document.body.classList.toggle('resumos-on', estado.visivel());
         aplicarNoBotao();
+        // quem precisa reagir ao abrir/fechar (ex.: sair de uma aba que só existe com o olho aberto)
+        for (const fn of ouvintes) { try { fn(estado.visivel()); } catch (e) { /* ouvinte com defeito não trava o olho */ } }
         // o que foi adiado enquanto escondido roda agora; falha de uma não impede as outras
         for (const fn of lista) {
             try { const r = fn(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (e) { /* a própria tela mostra o erro dela */ }
@@ -77,29 +106,35 @@
     function resumos() { return [...document.querySelectorAll('[data-resumo]')]; }
 
     function atualizarVisibilidadeDoBotao() {
-        if (!botao) return;
+        if (!botoes.length) return;
         const itens = resumos().map(el => ({ oculto: el.classList.contains('acesso-oculto'), soGeral: el.classList.contains('so-geral') }));
         const permitido = algumResumoPermitido(itens, document.body.classList.contains('modo-atendimento'));
-        botao.hidden = !permitido;
-        if (botao.parentElement && botao.parentElement.classList.contains('olho-barra')) botao.parentElement.hidden = !permitido;
+        for (const botao of botoes) {
+            botao.hidden = !permitido;
+            if (botao.parentElement && botao.parentElement.classList.contains('olho-barra')) botao.parentElement.hidden = !permitido;
+        }
     }
 
     function montar() {
         const alvos = resumos();
         if (!alvos.length) return;
-        botao = document.createElement('button');
-        botao.type = 'button';
-        botao.className = 'olho-resumos';
-        botao.hidden = true;
-        botao.innerHTML = ICO_ABERTO + ICO_FECHADO + '<span class="olho-txt">Resumos</span>';
-        botao.addEventListener('click', () => definir(!estado.visivel()));
-        const destino = document.querySelector('[data-olho-destino]');
-        if (destino) destino.insertBefore(botao, destino.firstChild);
+        const criarBotao = () => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'olho-resumos';
+            b.hidden = true;
+            b.innerHTML = ICO_ABERTO + ICO_FECHADO + '<span class="olho-txt">Resumos</span>';
+            b.addEventListener('click', () => definir(!estado.visivel()));
+            botoes.push(b);
+            return b;
+        };
+        const destinos = [...document.querySelectorAll('[data-olho-destino]')];
+        if (destinos.length) destinos.forEach(d => d.insertBefore(criarBotao(), d.firstChild));
         else {
             const barra = document.createElement('div');
             barra.className = 'olho-barra';
             barra.hidden = true;
-            barra.appendChild(botao);
+            barra.appendChild(criarBotao());
             alvos[0].parentNode.insertBefore(barra, alvos[0]);
         }
         aplicarNoBotao();
@@ -117,12 +152,14 @@
             mostrar: () => definir(true),
             ocultar: () => definir(false),
             alternar: () => definir(!estado.visivel()),
-            adiar: fn => estado.adiar(fn)
+            adiar: fn => estado.adiar(fn),
+            carga: fn => criarCarga(estado, fn),
+            aoMudar: fn => { if (typeof fn === 'function') ouvintes.push(fn); }
         };
         janela.OlhoResumos = api;
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar);
         else montar();
     }
 
-    return { algumResumoPermitido, criarEstado, iniciar };
+    return { algumResumoPermitido, criarEstado, criarCarga, iniciar };
 });

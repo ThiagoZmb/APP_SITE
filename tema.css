@@ -872,3 +872,8 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .olho-resumos[aria-pressed="true"] .olho-ico-off, .olho-resumos[aria-pressed="false"] .olho-ico-on { display: none; }
 @media (pointer: coarse) { body .olho-resumos { min-height: 44px; min-width: 44px; } }
 @media (prefers-reduced-motion: reduce) { body .olho-resumos { transition: none; } }
+
+/* ===== FAIXA DE FILTRO ATIVO =====
+   Quando um atalho (chip) filtra uma lista, a lista mostra esta faixa com o que está valendo e o botão "Limpar filtro". */
+.filtro-ativo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 8px 12px; border: 1px solid var(--primary-ring); background: var(--primary-light); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.filtro-ativo[hidden] { display: none; }
