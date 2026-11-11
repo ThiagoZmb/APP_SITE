@@ -51,8 +51,9 @@
 
   // Alterna um valor (grafia da lista) em `atual`; devolve lista nova.
   const alternar = (atual, valor, marcado) => {
-    const a = limpar(atual).filter(x => norm(x) !== norm(valor));
-    return marcado ? [...a, String(valor).trim()] : a;
+    const lista = limpar(atual);
+    if (marcado) return tem(lista, valor) ? lista : [...lista, String(valor).trim()];
+    return lista.filter(x => norm(x) !== norm(valor));
   };
 
   // Itens exibidos no grupo: opções do servidor + gravados + marcados que saíram das opções; os de `topo` (marcados ao carregar/copiar) vêm primeiro.

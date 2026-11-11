@@ -180,11 +180,16 @@ body .container > .sidebar .menu-item:hover, body .container > nav .menu-item:ho
     background: rgba(255, 255, 255, .06) !important; color: #fff !important;
 }
 body .container > .sidebar .menu-item.active, body .container > nav .menu-item.active {
-    color: var(--primary-color) !important;
-    background: var(--primary-light) !important;
-    box-shadow: none !important;
+    color: #ffd08a !important;
+    background: linear-gradient(90deg, rgba(242, 163, 58, .22), rgba(242, 163, 58, .08)) !important;
+    box-shadow: inset 0 0 0 1px rgba(242, 163, 58, .32) !important;
+    font-weight: 800 !important;
 }
-body .container > .sidebar .menu-item.active svg, body .container > nav .menu-item.active svg { opacity: 1; }
+body .container > .sidebar .menu-item.active::after, body .container > nav .menu-item.active::after {
+    content: ''; position: absolute; left: -1px; top: 6px; bottom: 6px; width: 3px;
+    border-radius: 0 3px 3px 0; background: var(--primary-color);
+}
+body .container > .sidebar .menu-item.active svg, body .container > nav .menu-item.active svg { opacity: 1; color: var(--primary-color); }
 body .container .menu-item[hidden] { display: none !important; }
 /* subitem do menu: recuado, com um traço ligando ao item pai */
 body .container > .sidebar .menu-item.sub, body .container > nav .menu-item.sub { position: relative; margin: 0 12px 1px 38px !important; padding: 6px 12px !important; font-size: 13.5px !important; }

@@ -273,6 +273,25 @@
         .perm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
         .perm-chips span { font-size: 13px; padding: 5px 10px; border-radius: 8px; background: var(--secondary-color); border: 1px solid var(--border-color); }
         .perm-vazio { font-size: 13px; color: #adb5bd; }
+        #modal-texto { white-space: pre-line; max-height: 50vh; overflow: auto; }
+        /* Editor de dependências do perfil (produtos_dependencias_tela.js) */
+        .dep-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+        .dep-barra select { flex: 1; min-width: 180px; max-width: 320px; }
+        .dep-grupo { margin-bottom: 16px; border: 1px solid var(--border-color); border-radius: 12px; }
+        .dep-rolo { max-height: 300px; overflow-y: auto; border-radius: 12px; }
+        .dep-cab { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; background: var(--secondary-color); border-bottom: 1px solid var(--border-color); }
+        .dep-cab h5 { font-size: 13px; font-weight: 700; margin: 0; flex: 1 1 140px; display: flex; gap: 8px; align-items: center; }
+        .dep-cont { font-weight: 600; font-size: 12px; color: var(--primary-color); background: var(--primary-light); border-radius: 10px; padding: 1px 8px; }
+        .dep-busca { flex: 1 1 160px; min-width: 0; padding: 8px 10px; }
+        .dep-itens { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 10px; padding: 8px 12px; }
+        .dep-item { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; cursor: pointer; }
+        .dep-item input { width: 18px; height: 18px; flex: none; }
+        .dep-item .fora { font-size: 11px; color: var(--warning-color); }
+        .dep-resumo { border: 1px dashed var(--border-color); border-radius: 12px; padding: 10px 12px; margin: 14px 0; font-size: 13px; }
+        .dep-resumo .mais { color: var(--success-color); font-weight: 700; } .dep-resumo .menos { color: var(--danger-color); font-weight: 700; }
+        .dep-resumo p { margin: 4px 0; }
+        .dep-erro { color: var(--danger-color); font-size: 13px; margin-bottom: 10px; }
+        @media (max-width: 640px) { .dep-itens { grid-template-columns: 1fr; } .dep-item { min-height: 44px; } }
 
         /* ===== ABA DESENHO 3D (perfil_editor.js): traçador, tabelas de pontos, prévia 3D. Só variáveis do tema; fundos sólidos. ===== */
         .aba.pe-oculta { display: none !important; }
@@ -518,7 +537,8 @@
                         </div>
                         <div class="aba-conteudo" data-aba="permissoes">
                             <div id="permissoes"><p class="perm-vazio">Selecione um produto salvo para ver o que ele tem permitido.</p></div>
-                            <p class="dica">Somente leitura. As permissões continuam sendo configuradas no sistema desktop.</p>
+                            <p class="dica" id="dica-permissoes">Somente leitura. As permissões continuam sendo configuradas no sistema desktop.</p>
+                            <div id="dep-editor" data-perm="produtos.dependencias" style="display:none"></div>
                         </div>
                     </form>
 
@@ -733,6 +753,7 @@
     <script src="calculo/perfil_traco.js?v=202611060100"></script>
     <script src="perfil_editor.js?v=202611060200"></script>
     <script src="perfil_auto.js?v=202611060200"></script>
+    <script src="produtos_dependencias_tela.js?v=202611111200"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -1043,6 +1064,173 @@
                 </div>`).join('');
         }
 
+        // ============ DEPENDÊNCIAS DO PERFIL (editor; só com produtos.dependencias e só produto salvo) ============
+        const DEP = window.ProdutosDependenciasTela;
+        const dep = { codigo: null, gravados: null, atuais: null, opcoes: null, topo: null, filtros: {}, visiveis: {}, copia: null, ocupado: false };
+        function dependenciasSujas() { return !!(dep.codigo !== null && dep.atuais && DEP.gruposAlterados(dep.gravados, dep.atuais).length); }
+        function mostrarSoLeitura(soLeitura) {
+            $('permissoes').style.display = soLeitura ? '' : 'none';
+            $('dica-permissoes').style.display = soLeitura ? '' : 'none';
+            $('dep-editor').style.display = soLeitura ? 'none' : '';
+        }
+        function encerrarEditorDependencias() {
+            dep.codigo = null; dep.gravados = dep.atuais = dep.opcoes = dep.topo = dep.copia = null; dep.filtros = {}; dep.ocupado = false;
+            $('dep-editor').innerHTML = '';
+            mostrarSoLeitura(true);
+        }
+        async function iniciarEditorDependencias(codigo) {
+            encerrarEditorDependencias();
+            if (!Acesso.pode('produtos.dependencias') || codigo === null || codigo === undefined) return;
+            dep.codigo = codigo;
+            $('dep-editor').innerHTML = '<p class="perm-vazio">Carregando dependências…</p>';
+            mostrarSoLeitura(false);
+            try {
+                const r = await api('/produtos/' + encodeURIComponent(codigo) + '/permitidos');
+                if (dep.codigo !== codigo) return;
+                dep.gravados = DEP.copiaListas(r.permitidos); dep.atuais = DEP.copiaListas(r.permitidos); dep.opcoes = r.opcoes || {};
+                dep.topo = DEP.copiaListas(dep.atuais);
+                renderEditorDependencias();
+            } catch (e) {
+                if (dep.codigo !== codigo) return;
+                encerrarEditorDependencias();
+                toast('Editor de dependências indisponível: ' + DEP.mensagemErro(e), 'erro');
+            }
+        }
+        function opcoesDePerfis() {
+            const lista = produtos.filter(p => String(p.codigo) !== String(dep.codigo) && (!classeSalva || p.classe === classeSalva))
+                .sort((a, b) => String(a.modelo).localeCompare(String(b.modelo), 'pt-BR'));
+            return '<option value="">Escolha um perfil…</option>' + lista.map(p => `<option value="${escapeHtml(p.codigo)}">${escapeHtml(p.modelo)}</option>`).join('');
+        }
+        function renderEditorDependencias() {
+            if (!dep.atuais) return;
+            $('dep-editor').innerHTML = `
+                <div class="dep-barra">
+                    <label for="dep-origem" class="dica" style="margin:0">Copiar de outro perfil:</label>
+                    <select id="dep-origem" aria-label="Perfil de origem para copiar">${opcoesDePerfis()}</select>
+                    <button type="button" class="btn btn-secondary btn-mini" id="dep-carregar">Carregar listas</button>
+                    <button type="button" class="btn btn-secondary btn-mini" id="dep-aplicar-todos" style="display:none">Aplicar todos os grupos</button>
+                    <span class="dica" id="dep-copia-info" style="margin:0"></span>
+                </div>
+                <div class="dep-erro" id="dep-erro" role="alert"></div>
+                ${DEP.GRUPOS.map(g => `
+                <section class="dep-grupo" data-g="${g.chave}">
+                    <div class="dep-rolo">
+                        <div class="dep-cab">
+                            <h5>${g.titulo} <span class="dep-cont"></span></h5>
+                            <button type="button" class="btn btn-secondary btn-mini dep-aplicar" style="display:none">Aplicar do outro perfil</button>
+                            <input type="search" class="dep-busca" placeholder="Buscar em ${g.titulo.toLowerCase()}" aria-label="Buscar em ${g.titulo}">
+                        </div>
+                        <div class="dep-itens" role="group" aria-label="${g.titulo}"></div>
+                    </div>
+                </section>`).join('')}
+                <div class="dep-resumo" id="dep-resumo" aria-live="polite"></div>
+                <div class="dep-barra">
+                    <button type="button" class="btn btn-primary" id="dep-salvar" disabled>Salvar dependências</button>
+                    <button type="button" class="btn btn-secondary" id="dep-desfazer" disabled>Descartar mudanças</button>
+                </div>`;
+            DEP.CHAVES.forEach(renderListaDependencias);
+            atualizarResumoDependencias();
+        }
+        function renderListaDependencias(chave) {
+            const sec = document.querySelector(`#dep-editor .dep-grupo[data-g="${chave}"]`);
+            if (!sec) return;
+            const itens = DEP.itensDoGrupo(dep.opcoes[chave], dep.gravados[chave], dep.atuais[chave], dep.topo[chave], dep.filtros[chave] || '');
+            dep.visiveis[chave] = itens;
+            sec.querySelector('.dep-itens').innerHTML = itens.length ? itens.map((it, i) =>
+                `<label class="dep-item"><input type="checkbox" data-i="${i}"${it.marcado ? ' checked' : ''}><span>${escapeHtml(it.valor)}${it.foraDasOpcoes ? ' <span class="fora">(fora das opções)</span>' : ''}</span></label>`).join('')
+                : '<span class="perm-vazio">Nenhuma opção encontrada.</span>';
+            atualizarContadorDependencias(chave);
+        }
+        function atualizarContadorDependencias(chave) {
+            const sec = document.querySelector(`#dep-editor .dep-grupo[data-g="${chave}"]`);
+            if (sec) sec.querySelector('.dep-cont').textContent = DEP.limpar(dep.atuais[chave]).length + ' marcados';
+        }
+        function atualizarResumoDependencias() {
+            const r = DEP.resumo(dep.gravados, dep.atuais), alterados = DEP.CHAVES.filter(c => r[c].alterado);
+            $('dep-resumo').innerHTML = alterados.length ? '<strong>O que vai mudar</strong>' + alterados.map(c => `<p><b>${escapeHtml(DEP.tituloDe(c))}</b>: ` +
+                (r[c].adicionados.length ? `<span class="mais">+ ${r[c].adicionados.length} adicionados</span> (${r[c].adicionados.map(escapeHtml).join(', ')}) ` : '') +
+                (r[c].removidos.length ? `<span class="menos">− ${r[c].removidos.length} removidos</span> (${r[c].removidos.map(escapeHtml).join(', ')})` : '') +
+                (r[c].ficaVazio ? ' <b>(ficará vazio)</b>' : '') + '</p>').join('') : '<span class="perm-vazio">Nenhuma mudança em relação ao que está gravado.</span>';
+            $('dep-salvar').disabled = !alterados.length || dep.ocupado;
+            $('dep-desfazer').disabled = !alterados.length || dep.ocupado;
+        }
+        function mostrarCopiaDependencias(info) {
+            const ok = !!dep.copia;
+            $('dep-copia-info').textContent = info || '';
+            $('dep-aplicar-todos').style.display = ok ? '' : 'none';
+            document.querySelectorAll('#dep-editor .dep-aplicar').forEach(b => { b.style.display = ok ? '' : 'none'; });
+        }
+        function aplicarCopiaDependencias(quais) {
+            if (!dep.copia) return;
+            const r = DEP.aplicarCopia(dep.atuais, dep.copia.permitidos, quais, dep.opcoes, dep.gravados);
+            dep.atuais = r.atuais;
+            (quais && quais.length ? quais : DEP.CHAVES).forEach(c => { dep.topo[c] = [...dep.atuais[c]]; renderListaDependencias(c); });
+            atualizarResumoDependencias();
+            const ign = Object.keys(r.ignorados);
+            if (ign.length) toast('Não existem neste perfil e foram ignorados: ' + ign.map(c => DEP.tituloDe(c) + ' (' + r.ignorados[c].join(', ') + ')').join('; '), 'info');
+            toast('Listas aplicadas só na tela. Confira o resumo e clique em "Salvar dependências".', 'info');
+        }
+        async function carregarCopiaDependencias() {
+            const cod = $('dep-origem').value;
+            if (!cod) { toast('Escolha o perfil de origem.', 'erro'); return; }
+            const meu = dep.codigo;
+            try {
+                const r = await api('/produtos/' + encodeURIComponent(cod) + '/permitidos');
+                if (dep.codigo !== meu) return;
+                dep.copia = { modelo: r.modelo, permitidos: r.permitidos };
+                mostrarCopiaDependencias('Listas de "' + r.modelo + '" carregadas (nada foi alterado ainda).');
+            } catch (e) { toast(DEP.mensagemErro(e), 'erro'); }
+        }
+        async function salvarDependencias() {
+            if (dep.codigo === null || dep.ocupado || !dependenciasSujas()) return;
+            const meu = dep.codigo, r = DEP.resumo(dep.gravados, dep.atuais), vazios = DEP.CHAVES.filter(c => r[c].ficaVazio);
+            if (DEP.precisaConfirmar(dep.gravados, dep.atuais) && !(await confirmar('Gravar dependências?', 'Estas remoções serão gravadas:\n' + DEP.textoConfirmacao(dep.gravados, dep.atuais)))) return;
+            const confirmados = [];
+            for (const c of vazios) {
+                if (!(await confirmar('Esvaziar "' + DEP.tituloDe(c) + '"?', 'Nenhum item ficará permitido em "' + DEP.tituloDe(c) + '" para este perfil. Confirma esvaziar este grupo?'))) return;
+                confirmados.push(c);
+            }
+            if (dep.codigo !== meu) return;
+            dep.ocupado = true; $('dep-erro').textContent = ''; atualizarResumoDependencias();
+            try {
+                await api('/produtos/' + encodeURIComponent(meu) + '/permitidos', { method: 'PUT', body: JSON.stringify(DEP.corpoPut(dep.gravados, dep.atuais, confirmados)) });
+                const novo = await api('/produtos/' + encodeURIComponent(meu) + '/permitidos');
+                if (dep.codigo !== meu) return;
+                dep.gravados = DEP.copiaListas(novo.permitidos); dep.atuais = DEP.copiaListas(novo.permitidos); dep.opcoes = novo.opcoes || dep.opcoes; dep.topo = DEP.copiaListas(dep.atuais);
+                acabamentosDoProduto = dep.gravados.acabamentos; renderPermissoes(novo.permitidos); avisarEditorPerfil(false);
+                dep.ocupado = false; renderEditorDependencias(); mostrarCopiaDependencias(dep.copia ? 'Listas de "' + dep.copia.modelo + '" ainda carregadas.' : '');
+                toast('Dependências gravadas.', 'ok');
+            } catch (e) {
+                dep.ocupado = false;
+                if (dep.codigo === meu) { $('dep-erro').textContent = DEP.mensagemErro(e); atualizarResumoDependencias(); }
+                toast(DEP.mensagemErro(e), 'erro');
+            }
+        }
+        $('dep-editor').addEventListener('change', e => {
+            e.stopPropagation(); // não marca o formulário do produto como alterado
+            const cb = e.target.closest('input[type=checkbox][data-i]');
+            if (!cb || !dep.atuais) return;
+            const chave = cb.closest('.dep-grupo').dataset.g, it = dep.visiveis[chave][Number(cb.dataset.i)];
+            if (!it) return;
+            dep.atuais[chave] = DEP.alternar(dep.atuais[chave], it.valor, cb.checked);
+            atualizarContadorDependencias(chave); atualizarResumoDependencias();
+        });
+        $('dep-editor').addEventListener('input', e => {
+            e.stopPropagation();
+            if (!e.target.classList.contains('dep-busca')) return;
+            const chave = e.target.closest('.dep-grupo').dataset.g;
+            dep.filtros[chave] = e.target.value; renderListaDependencias(chave);
+        });
+        $('dep-editor').addEventListener('click', e => {
+            const b = e.target.closest('button');
+            if (!b) return;
+            if (b.id === 'dep-carregar') carregarCopiaDependencias();
+            else if (b.id === 'dep-aplicar-todos') aplicarCopiaDependencias(null);
+            else if (b.classList.contains('dep-aplicar')) aplicarCopiaDependencias([b.closest('.dep-grupo').dataset.g]);
+            else if (b.id === 'dep-salvar') salvarDependencias();
+            else if (b.id === 'dep-desfazer') { dep.atuais = DEP.copiaListas(dep.gravados); dep.topo = DEP.copiaListas(dep.atuais); renderEditorDependencias(); mostrarCopiaDependencias(dep.copia ? 'Listas de "' + dep.copia.modelo + '" ainda carregadas.' : ''); }
+        });
+
         // ============ FICHA ============
         function limparFicha(codigoNovo) {
             $('f-codigo').value = codigoNovo ?? proximoCodigo;
@@ -1054,7 +1242,7 @@
             selecionado = null;
             fotoPendente = null;
             mostrarFoto(null);
-            renderPermissoes(null);
+            renderPermissoes(null); encerrarEditorDependencias();
             $('ficha-nome').textContent = 'Novo produto';
             $('ficha-cod').textContent = `Código ${$('f-codigo').value} · novo`;
             document.querySelectorAll('.prod-linha.selecionado').forEach(l => l.classList.remove('selecionado'));
@@ -1065,7 +1253,7 @@
             avisarEditorPerfil(true);
         }
         async function abrirProduto(codigo) {
-            if ((alterado || desenhoPerfilSujo()) && !(await confirmar('Descartar alterações?', 'Há alterações não salvas neste produto' + (desenhoPerfilSujo() ? ' (inclusive no desenho 3D)' : '') + '. Deseja descartá-las?'))) return;
+            if ((alterado || desenhoPerfilSujo() || dependenciasSujas()) && !(await confirmar('Descartar alterações?', 'Há alterações não salvas neste produto' + (desenhoPerfilSujo() ? ' (inclusive no desenho 3D)' : '') + (dependenciasSujas() ? ' (inclusive nas dependências do perfil)' : '') + '. Deseja descartá-las?'))) return;
             try {
                 const p = await api('/produtos/item/' + encodeURIComponent(codigo));
                 $('f-codigo').value = p.codigo;
@@ -1086,7 +1274,7 @@
                 $('ficha-nome').textContent = p.modelo;
                 $('ficha-cod').textContent = `Código ${p.codigo}${p.classe ? ' · ' + p.classe : ''}`;
                 document.querySelectorAll('.prod-linha').forEach(l => l.classList.toggle('selecionado', l.dataset.codigo === String(p.codigo)));
-                renderPermissoes(p.permitidos);
+                renderPermissoes(p.permitidos); iniciarEditorDependencias(p.codigo);
                 marcarAlterado(false);
                 classeSalva = p.classe || ''; temImagemSalva = !!p.temImagem; acabamentosDoProduto = (p.permitidos && p.permitidos.acabamentos) || [];
                 avisarEditorPerfil(true);

@@ -48,7 +48,7 @@ test('produtos.html: ganchos do editor (iniciar, produto mudou, descartar altera
   assert.match(html, /function avisarEditorPerfil\(recarregar\)/);
   assert.match(html, /\$\('f-classe'\)\.addEventListener\('change', \(\) => \{ aplicarRegrasClasse\(true\); avisarEditorPerfil\(false\); \}\)/);
   assert.equal((html.match(/avisarEditorPerfil\(true\)/g) || []).length, 2, 'ao abrir produto e ao limpar a ficha');
-  assert.match(html, /\(alterado \|\| desenhoPerfilSujo\(\)\) && !\(await confirmar\('Descartar alterações\?'/);
+  assert.match(html, /\(alterado \|\| desenhoPerfilSujo\(\) \|\| dependenciasSujas\(\)\) && !\(await confirmar\('Descartar alterações\?'/);
   assert.match(html, /beforeunload', e => \{ if \(alterado \|\| desenhoPerfilSujo\(\)\)/);
   // a classe GRAVADA vem da API (o select pode estar adiante)
   assert.match(html, /classeSalva = p\.classe \|\| ''/);

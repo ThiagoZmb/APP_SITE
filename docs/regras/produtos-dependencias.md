@@ -25,3 +25,13 @@ tabela do VB continuam intocáveis.
 
 ## Migração
 `acrescentarPermissoesProdutosDependencias` (`seguranca/instalacao.js`) dá a chave ao Administrador uma vez (auditoria `permissoes_produtos_dependencias`); Interno completo não recebe.
+
+## Tela (etapa 3, 2026-11-11): aba "Permissões" de `produtos.html`
+Código: `produtos_dependencias_tela.js` (lógica pura, global `ProdutosDependenciasTela`; teste `test/produtos_dependencias_tela.test.js`) + bloco "DEPENDÊNCIAS DO PERFIL" em `produtos.html`.
+- Só com `produtos.dependencias` (container `#dep-editor` com `data-perm` + `Acesso.pode`) e só em produto já salvo; sem a chave ou em cadastro novo continua a exibição somente leitura (`renderPermissoes`).
+- 5 grupos com caixas de marcar, busca por grupo (sem acento), contador "X marcados", marcados no topo (ordem fixada ao carregar/copiar, não pula a cada clique), valores gravados fora das opções continuam aparecendo ("fora das opções").
+- "Copiar de outro perfil": a lista de origem são os produtos da mesma classe do perfil aberto; carrega o GET do outro e aplica só na tela, por grupo ou todos. Valores do outro perfil que este não aceitaria (fora das opções e não gravados) são ignorados e avisados, para o PUT não dar 400.
+- Resumo ao vivo (`aria-live`) com "+ adicionados" e "− removidos" por grupo; "Salvar dependências" desabilitado sem mudança; o PUT leva só os grupos alterados. Confirmação na janela do tema listando os removidos; grupo que ficaria vazio tem confirmação própria e vai com `confirmarVazio: { grupo: true }`.
+- Erro do servidor (400 inválidos/gruposVazios, 403, 404, 409, 5xx) vira mensagem em português e as marcações ficam. Após salvar, relê o GET, atualiza `acabamentosDoProduto` e a exibição somente leitura.
+- Trocar de produto com dependências alteradas e não salvas pede "Descartar alterações?". Os eventos do editor não marcam o formulário do produto como alterado (o botão "Salvar" da ficha não participa).
+- **Não verificado em navegador real.**

@@ -32,7 +32,7 @@
         precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
     };
     const MENU = [
-        // "Início" saiu do menu: o logo "Elegance" do topo leva à primeira página liberada (inicio.html para quem vê os painéis)
+        // O logo Elegance leva à primeira página liberada; Pedidos e Orçamentos é o destino padrão.
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
@@ -79,11 +79,11 @@
         paginasBloqueadas: ATEND_BLOQUEADAS.slice(),
         alternar: () => { ss.gravar(ATEND_CHAVE, atendAtivoPara(auth()?.acesso) ? '0' : '1'); }
     };
-    // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem é a da "primeira página permitida" depois do login.
+    // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem define a página padrão após o login.
     // Página nova: acrescentar aqui e no MENU.
     const PAGINAS = {
-        'inicio.html': ['paineis.ver'],
         'painel_inicial.html': ['pedidos.ver'],
+        'inicio.html': ['paineis.ver'],
         'graficos_pedidos.html': ['pedidos.ver', 'administrativo.ver'],
         'clientes.html': ['clientes.ver'],
         'cliente_analise.html': ['clientes.ver', 'valores.ver', 'administrativo.ver'],

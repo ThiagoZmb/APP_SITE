@@ -19,7 +19,8 @@ Obs.: `acabamentos_permitidos` é por MODELO, não por tipo.
 
 ## Status
 - Etapas 1 e 2: **feitas** (2026-11-11, sem tela) em `rotas/produtos_dependencias.js`; dono autorizou a escrita nas 5 tabelas (decisão abaixo respondida: sim). Regras: `docs/regras/produtos-dependencias.md`.
-- Etapas 3 a 5: pendentes. O "desfazer" da etapa 4 pode usar o antes/depois já gravado em `web_auditoria` (`produto_dependencias_gravadas`).
+- Etapa 3 (tela em `produtos.html`): **feita** (2026-11-11), `produtos_dependencias_tela.js`; não verificada em navegador real.
+- Etapas 4 e 5: pendentes. O "desfazer" da etapa 4 pode usar o antes/depois já gravado em `web_auditoria` (`produto_dependencias_gravadas`).
 
 ## Etapas
 1. **Permissão + leitura segura** (pequena): chave nova `produtos.dependencias` em `seguranca/permissoes.js`
