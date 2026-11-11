@@ -140,8 +140,11 @@ test('editado mantém o valor da tela (não recalcula com o cadastro de hoje)', 
   const itens = comoTela(aberto);
   itens[0] = { ...itens[0], origem: { ...itens[0].origem, estado: 'editado' } };
   const r = await salvar(chamar, atualizar(aberto, { itens }));
-  assert.equal(r.status, 200); // a tela mostra o preço antigo: é ele que fica gravado, sem aviso
-  assert.equal((await r.json()).avisos, undefined);
+  assert.equal(r.status, 200); // a tela mostra o preço antigo: é ele que fica gravado...
+  const j = await r.json();       // ...e a resposta avisa que o preço de hoje é outro (decisão do dono, 2026-11-11)
+  assert.equal(j.avisos.precoDivergente.length, 1);
+  assert.equal(j.avisos.precoDivergente[0].valorTela, itens[0].valorTela);
+  assert.ok(j.avisos.precoDivergente[0].valorCalculado > j.avisos.precoDivergente[0].valorTela);
 });
 
 test('salvar com novo número a partir de um aberto: cópia nova, original intacto', async t => {

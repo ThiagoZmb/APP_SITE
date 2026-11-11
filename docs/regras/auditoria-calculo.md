@@ -1,0 +1,48 @@
+# Auditoria do cálculo de preço (orcamentos.html)
+
+_Criado em 2026-11-11 a partir da divergência do Orçamento 21440, item 3 (664,79 gravado x 684,50 ao reabrir sem mudar nada)._
+
+## O que é
+Uma gaveta lateral em `orcamentos.html` que mostra, a cada cálculo de preço, **o que foi enviado ao motor, o que o servidor leu do banco e o passo a passo das contas**, além do que a tela fez com o resultado. Guarda os últimos 20 cálculos da sessão (só na memória da página; recarregar zera) e destaca **o que mudou nas entradas** de um cálculo para o anterior da mesma origem. Botões "Copiar relatório" (texto) e "Copiar JSON" (estado atual + histórico).
+
+- **Quem vê:** só quem tem `administrativo.ver`. O botão "Auditoria" (aba vertical na borda direita; no celular, canto de baixo) nem é criado sem a chave, e a gaveta tem `data-perm="administrativo.ver"`. O servidor confere de novo: `POST /calcular_preco` só devolve `auditoria` quando o corpo traz `auditoria: true` (exatamente `true`) **e** o usuário tem a chave; sem isso o pedido é ignorado e a resposta é a de sempre.
+- **Como abrir:** botão "Auditoria" na borda direita da tela; fecha pelo ✕ ou Esc. Fechada por padrão; o estado aberto/fechado fica no `localStorage` (`orc.auditoria.aberta`, com try/catch: sem armazenamento só não lembra).
+- **Não muda o layout** da página: é uma camada fixa por cima (fundo sólido `var(--bg)`, sem fundo escurecido; dá para continuar mexendo no formulário com ela aberta). No celular ocupa a tela toda.
+
+## O que aparece
+1. **Agora na tela:** valor no campo "Valor unitário", o que seria gravado (campo × % da lista do item, a mesma conta de "Adicionar/Atualizar item"), se há cálculo pendente e, na edição, base salva × recalculada.
+2. **Cálculo selecionado** (o mais recente, ou o clicado no histórico): disparado por (último campo mudado, clique no desenho do puxador ou "abrir o item N para editar"), estado (`Aplicado no campo`, `Descartado (resposta antiga)`, `Erro`, `Calculando`), unitário/total do motor, campo antes → depois, entradas que mudaram, entrada enviada (achatada: `posicoesFolhas[2] = ""`), cliente (código, desconto, desconto fixo ou não), leituras do banco (produto: CODIGO, VALOR_FIXO, DESCONTO_VIDRO, TIPO_PUXADOR, DESC_PERF_PUX; taxa de acabamento em %; fixo da serralheria; solda; complementos; "NÃO ENCONTRADO" em destaque) e o passo a passo com fórmula e números.
+3. **Histórico** (20 linhas, cabeçalho fixo): nº, hora, origem, unitário, estado e campos que mudaram.
+
+Passos por frente (servidor, `calculo/precos.js`):
+- **Portas:** folhas (nº, larguras/posições por folha, chave de preço de cada folha; se variam, um passo "Grupo" por configuração com as contas daquele grupo), medidas, taxas de acabamento, tipo/posição do puxador (sobreposto/embutido/total, qtd de puxadores), perímetro, perfil (preço/m com acabamento), puxador (comprimento, qtd, custo × mínimo R$ 20; folha **sem posição** sai marcada), divisor, revestimento (descontos X/Y, área bruta, dedução do divisor, área líquida), subtotal, desconto do cliente, percentuais, resultado com arredondamento; acessórios (tabela, por metro, total) e resultado com acessórios.
+- **Serralheria:** por peça (metragem, material, solda, acabamento, fixo do produto, quantidade, desconto, resultado), soma das peças, complementos e resultado do conjunto. Na tela, o unitário do item é composto no navegador (peças × qtd + complementos ÷ conjuntos): o painel registra essa composição como origem "composição da serralheria (tela)".
+- **Avulso:** preço com acabamento, conta da categoria (por metro, m² ou unidade), desconto (só desconto fixo), percentuais, resultado.
+
+## Garantia: o rastro não muda o preço
+- O rastro é um parâmetro opcional (`aud`) de `calcularPrecoItem`, `precoComAcessorios`, `precificarAcessorios` e `precoSerralheria`; as leituras são anotadas por `leitorRegistrado` (embrulha o leitor, devolve exatamente o mesmo resultado). Toda anotação é `aud && anotar(...)`: sem rastro nem os argumentos são avaliados.
+- As contas não mudaram de lugar nem de ordem (só duas leituras viraram constantes antes de somar, mesma ordem de leitura).
+- `test/auditoria_calculo.test.js` prova resultados idênticos (`deepEqual`) com e sem rastro para portas (7 configurações × 3 clientes, com e sem acessórios), serralheria (com e sem complementos) e avulso (3 categorias × 3 clientes), e a regra de permissão da rota.
+- O leitor do cadastro passou a devolver também `codigo` e `modelo` (já vinham no SELECT); nenhuma conta usa.
+
+## Correções feitas junto (causa do Orçamento 21440 item 3)
+**Causa comprovada com o banco (só leitura):** o cadastro de hoje dá 684,50 para 580 × 800 com puxador nas 3 folhas (perfil 2,76 m × 171,60 + puxador 0,8 m × 99,879 + vidro 0,464 m² × 800,61 = 925,00 × 0,74). O valor gravado, 664,79 (total 1.994,37), é exatamente (2 × 684,50 + 625,37) ÷ 3, em que 625,37 é a folha **sem posição do puxador** (sem o puxador no preço). O desenho PNG gravado no clique de "Adicionar" (`web_item_desenhos`) mostra as 3 folhas com puxador no topo, e o item foi gravado com as 3 folhas "Topo Total". Ou seja: o campo ainda tinha o preço do estado anterior (2 folhas posicionadas, a 3ª ainda vazia) quando o item foi adicionado; o recálculo da última posição ainda estava agendado/em voo (espera de 400 ms + ida ao servidor). Os demais itens do orçamento batem com o cadastro de hoje.
+
+O que mudou na tela:
+- Cada cálculo ganha um número (`seqPreco`); só a resposta do mais novo escreve no campo. Resposta de estado antigo é descartada (aparece como "Descartado" no painel).
+- Enquanto há cálculo agendado ou em voo (`precoPendente`), "Adicionar/Atualizar item" fica desabilitado (título "Aguarde: o preço está sendo recalculado") e, se clicado mesmo assim, avisa e não adiciona. Na porta de correr com sistema, a busca do sistema também conta como pendente.
+- `limparForm` cancela o cálculo agendado e invalida o em voo (antes, uma resposta atrasada podia escrever valor no formulário já limpo).
+- **Edição (decisão do dono, 2026-11-11):** ao abrir um item salvo (lápis na lista), o campo mostra **o valor do banco** e **nada recalcula sozinho** (`edicaoPreco.manter`: `calcularPrecoAutomatico` sai cedo). O recálculo volta quando o usuário mexe no item: evento real (`isTrusted`) de digitação/escolha em `#form-item` (menos a observação) ou no cliente, clique num botão do formulário (menos Adicionar/Atualizar, Limpar, Posicionar puxador e Recalcular) ou clique no desenho do puxador; ou pelo botão **"↻ Recalcular valor"** (só aparece na edição). Abrir um pedido/orçamento nunca recalcula a lista.
+- **% da lista nunca duas vezes:** o valor salvo já vem com a % da lista. Enquanto o campo tiver o valor salvo (`edicaoPreco.campoTemSalvo`; qualquer escrita no campo depois da abertura desliga), "Atualizar item" grava o mesmo valor, sem reaplicar a %; quando o campo tem o valor do motor (base), a % é aplicada uma vez. Regra em `valorAoAtualizar` (`auditoria_calculo.js`, testada).
+- **Aviso `#aviso-recalculo`:** só aparece quando o usuário mexeu, houve recálculo e o recalculado difere da base salva (valor salvo sem a % da lista): "Você alterou o item: o valor recalculado R$ X difere do salvo R$ Y…". O campo fica com o recalculado e é ele que "Atualizar item" grava. Vale para todos os usuários da tela.
+- **Painel, sob demanda:** "Recalcular sem aplicar" calcula com o formulário atual e mostra salvo x recalculado (estado "Simulado (não aplicado)"), sem tocar no campo.
+
+## Servidor: valor da tela x preço calculado (decisão do dono, 2026-11-11)
+`POST /ped_orc/salvar` continua gravando o `valorTela` como veio (nunca bloqueia nem troca). Quando ele difere do preço que o servidor calcula para a configuração gravada **com a % da lista** (`preco.unitario × fatorHistorico`), com tolerância de 1 centavo, a resposta traz `avisos.precoDivergente: [{ item, valorTela, valorCalculado, diferenca }]` e a auditoria (`web_auditoria`) registra `preco_divergente` com a lista. Itens copiados sem alteração (`intacto`/`so_pct`/`travado`) não são conferidos. A tela mostra o aviso na mensagem do salvar ("item N gravado com R$ X, mas o preço calculado agora é R$ Y…") e não volta sozinha para a lista. Na serralheria, como o unitário é somado na tela, pode haver aviso por arredondamento de peças acima de 1 centavo.
+
+## Erro de banco no cálculo (decisão do dono, 2026-11-11)
+Toda leitura do cadastro do motor (`produto`, `taxaAcabamento`, `valorSolda`, `fixoSerralheria`, `componentesSerralheria` em `criarLeitor`) transforma falha real do banco em `ErroCadastro` (nunca 0). Registro que **não existe** (acabamento ou "Solda" sem linha) continua valendo 0. `POST /calcular_preco` responde **503** `{ error: 'Não foi possível calcular: erro ao ler o cadastro.', codigo: 'erro_cadastro' }` (o 400 continua sendo "item sem preço"); `POST /ped_orc/salvar` responde 503 e não grava nada. A tela mostra "Não foi possível calcular: erro ao ler o cadastro. Tente de novo.", limpa o valor e, como o valor fica vazio, "Adicionar/Atualizar item" fica travado até haver valor calculado válido.
+
+## Limites
+- Não testado em navegador real com usuário logado e API de verdade (só carregamento da página e da gaveta em Edge headless, com a API bloqueada): abrir item salvo, mexer, recalcular, aviso do salvar e erro 503 na tela foram conferidos por teste estático e de funções puras, não clicando. O histórico é da sessão da página; não vai para o servidor nem para outros usuários.
+- O painel mostra o que o servidor leu **no momento** de cada cálculo; ele não reconstrói cálculos antigos já gravados (para isso, comparar o item gravado com um cálculo novo, como feito no 21440).

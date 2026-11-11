@@ -85,15 +85,36 @@ test('validações com as mensagens do VB', async t => {
   assert.equal(banco.pedOrc.length, 0);
 });
 
-test('preço diferente do que o servidor calcularia: grava o da tela, sem aviso', async t => {
+// decisão do dono (2026-11-11): grava o da tela, mas AVISA na resposta e registra na auditoria (nunca bloqueia nem troca o valor)
+test('preço diferente do que o servidor calcularia: grava o da tela e avisa (precoDivergente + auditoria)', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const r = await salvar(chamar, corpo({ itens: [giro(), giro({ valorTela: 705.10 })] }));
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.equal(j.ok, true);
-  assert.equal(j.avisos, undefined);
+  const calculado = banco.listaItens[0].UNITARIO; // item 1 veio com o preço certo: sem aviso
+  assert.deepEqual(j.avisos, { precoDivergente: [{ item: 2, valorTela: 705.10, valorCalculado: calculado, diferenca: Math.round((705.10 - calculado) * 100) / 100 }] });
   assert.equal(banco.listaItens[1].UNITARIO, 705.10);
   assert.equal(banco.pedOrc.length, 1);
+  const aud = banco.auditoria.filter(a => a.acao === 'preco_divergente');
+  assert.equal(aud.length, 1);
+  assert.equal(JSON.parse(aud[0].detalhe).itens[0].item, 2);
+});
+
+test('diferença de até 1 centavo não avisa; a % da lista entra na comparação', async t => {
+  const { chamar, banco } = await prepararPedOrc(t);
+  const r0 = await (await salvar(chamar, corpo({ itens: [giro()] }))).json();
+  assert.equal(r0.avisos, undefined);
+  const base = banco.listaItens[0].UNITARIO;
+  const { chamar: c2 } = await prepararPedOrc(t);
+  const r1 = await (await salvar(c2, corpo({ itens: [giro({ valorTela: Math.round((base + 0.01) * 100) / 100 })] }))).json();
+  assert.equal(r1.avisos, undefined); // 1 centavo: tolerado
+  const { chamar: c3 } = await prepararPedOrc(t);
+  const r2 = await (await salvar(c3, corpo({ itens: [giro({ historico: '+10', valorTela: Math.round(base * 1.1 * 100) / 100 })] }))).json();
+  assert.equal(r2.avisos, undefined); // valor com +10% da lista = calculado × 1,1: não diverge
+  const { chamar: c4 } = await prepararPedOrc(t);
+  const r3 = await (await salvar(c4, corpo({ itens: [giro({ historico: '+10', valorTela: base })] }))).json();
+  assert.equal(r3.avisos.precoDivergente[0].item, 1); // sem a % aplicada: diverge
 });
 
 test('posição de puxador não reconhecida: salva mesmo assim (sem bloquear)', async t => {
@@ -192,13 +213,27 @@ test('acessório manual fora da lista de permitidos não trava mais o salvamento
   assert.equal(banco.pedOrc.length, 1);
 });
 
-test('o valor da tela é gravado como está, sem recalcular nem aviso', async t => {
+test('o valor da tela é gravado como está, sem recalcular (só avisa a divergência)', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const r = await salvar(chamar, corpo({ itens: [giro({ valorTela: 12345.67 })] }));
   assert.equal(r.status, 200);
   const j = await r.json();
-  assert.equal(j.avisos, undefined);
+  assert.equal(j.avisos.precoDivergente[0].valorTela, 12345.67);
   assert.equal(banco.listaItens[0].UNITARIO, 12345.67);
+});
+
+test('erro REAL do banco ao ler o cadastro: 503 claro e nada gravado (nunca preço com taxa 0)', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const { pool } = require('../index.js');
+  const orig = pool.execute;
+  t.mock.method(pool, 'execute', async (sql, params) => {
+    if (/FROM acabamentos/.test(sql)) throw Object.assign(new Error('perdeu a conexão'), { code: 'PROTOCOL_CONNECTION_LOST' });
+    return orig.call(pool, sql, params);
+  });
+  const r = await salvar(chamar, corpo({ itens: [giro({ detalhes: { ...giro().detalhes, acabamento: 'Anodizado' } })] }));
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).codigo, 'erro_cadastro');
+  assert.equal(banco.pedOrc.length, 0);
 });
 
 test('serralheria e avulso', async t => {

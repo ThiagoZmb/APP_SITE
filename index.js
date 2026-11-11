@@ -41,7 +41,7 @@ const { registrarEstoqueQr } = require('./rotas/estoque_qr');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const composicaoPedido = require('./calculo/composicao_pedido');
 const { carregarComposicao } = require('./calculo/composicao_documentos');
-const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco } = require('./calculo/precos');
+const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco, ErroCadastro, novoRastro, leitorRegistrado } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
 const { registrarEntregas } = require('./rotas/entregas');
 const { juntarEntregaPrincipal, colunasQtdEntregas } = require('./rotas/entregas_resumo');
@@ -1059,11 +1059,26 @@ registro.rota('get', '/catalogos', ['orcamentos.criar'], async (req, res) => {
 });
 
 // MOTOR FINANCEIRO — calculo/precos.js (o cadastro chega pelo leitor)
-const leitorCadastro = criarLeitor(pool);
-const buscarDadosProduto = nome => leitorCadastro.produto(nome);
+const leitorBase = criarLeitor(pool);
+const buscarDadosProduto = nome => leitorBase.produto(nome);
 
+// Auditoria do cálculo (painel lateral de orcamentos.html, docs/regras/auditoria-calculo.md): só com `auditoria: true` no corpo
+// E a chave `administrativo.ver`. O rastro só anota; os valores devolvidos são os mesmos com e sem ela.
+function respostaAuditoria(aud, cliente, b) {
+  return {
+    versao: 1,
+    frente: String(b.frente || ''),
+    cliente: cliente ? { encontrado: true, codigo: cliente.codigo, razaoSocial: cliente.razaoSocial, isFixo: cliente.isFixo, desconto: cliente.desconto }
+      : { encontrado: false },
+    leituras: aud.leituras.slice(0, 200),
+    passos: aud.passos.slice(0, 400)
+  };
+}
 registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
   const b = req.body || {};
+  const aud = b.auditoria === true && req.acesso && req.acesso.permissoes.has('administrativo.ver') ? novoRastro() : null;
+  const leitorCadastro = aud ? leitorRegistrado(leitorBase, aud) : leitorBase;
+  const comAuditoria = cliente => (aud ? { auditoria: respostaAuditoria(aud, cliente, b) } : {});
   try {
     const cliente = await lerCliente(pool, { clienteCodigo: b.clienteCodigo, cliente: b.cliente });
     // portas: acessórios somam ao item (frmPortasAbrir: base = portas + acessórios)
@@ -1076,22 +1091,27 @@ registro.rota('post', '/calcular_preco', ['orcamentos.criar', 'valores.ver'], as
       const comps = (Array.isArray(b.complementos) ? b.complementos : []).slice(0, 100)
         .filter(c => c && Number.isInteger(Number(c.id))).map(c => ({ id: Number(c.id), qtd: Math.min(99999, Math.max(0, parseFloat(c.qtd) || 0)) }));
       const pecas = Array.isArray(b.pecas) ? b.pecas.slice(0, 50).filter(p => p && typeof p === 'object') : undefined;
-      const r = await precoSerralheria({ ...b, pecas }, cliente, leitorCadastro, comps);
-      return res.json({ unitario: r.unitario, total: r.total, complementos: r.complementos, pecas: r.pecasDetalhe, ...(b.debug ? { diag: r.diag } : {}) });
+      const r = await precoSerralheria({ ...b, pecas }, cliente, leitorCadastro, comps, aud);
+      return res.json({ unitario: r.unitario, total: r.total, complementos: r.complementos, pecas: r.pecasDetalhe, ...(b.debug ? { diag: r.diag } : {}), ...comAuditoria(cliente) });
     }
     // porta ainda incompleta (sem perfil/medidas): só o preço dos acessórios já escolhidos
     if (b.somenteAcessorios === true && acessorios.length) {
-      const { precificados } = await precificarAcessorios(cliente, leitorCadastro, acessorios);
-      return res.json({ acessorios: precificados });
+      const { precificados } = await precificarAcessorios(cliente, leitorCadastro, acessorios, aud);
+      return res.json({ acessorios: precificados, ...comAuditoria(cliente) });
     }
     if (acessorios.length) {
-      const r = await precoComAcessorios(b, cliente, leitorCadastro, acessorios);
-      return res.json({ unitario: r.unitario, total: r.total, acessorios: r.acessorios, ...(b.debug ? { diag: r.diag } : {}) });
+      const r = await precoComAcessorios(b, cliente, leitorCadastro, acessorios, aud);
+      return res.json({ unitario: r.unitario, total: r.total, acessorios: r.acessorios, ...(b.debug ? { diag: r.diag } : {}), ...comAuditoria(cliente) });
     }
-    const r = await calcularPrecoItem(b, cliente, leitorCadastro);
-    res.json({ unitario: r.unitario, total: r.total, ...(b.debug ? { diag: r.diag } : {}) });
+    const r = await calcularPrecoItem(b, cliente, leitorCadastro, aud);
+    res.json({ unitario: r.unitario, total: r.total, ...(b.debug ? { diag: r.diag } : {}), ...comAuditoria(cliente) });
   } catch (err) {
     if (err instanceof ErroPreco) return res.status(400).json({ error: err.message });
+    // falha real ao ler o cadastro: o cálculo PARA (nunca vira preço 0); 503 é distinto do 400 "item sem preço"
+    if (err instanceof ErroCadastro) {
+      console.error('Erro /calcular_preco (cadastro):', err.origem, err.codigoBanco || '');
+      return res.status(503).json({ error: 'Não foi possível calcular: erro ao ler o cadastro.', codigo: 'erro_cadastro' });
+    }
     console.error('Erro /calcular_preco:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
   }

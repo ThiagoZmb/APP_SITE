@@ -3,7 +3,7 @@
 // e listas de apoio da tela (acessórios permitidos, itens do sistema de correr).
 // ==========================================================================
 const { semValores } = require('../seguranca/valores');
-const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco } = require('../calculo/precos');
+const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco, ErroCadastro } = require('../calculo/precos');
 const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const DescontoPedido = require('../calculo/desconto_pedido');
@@ -283,9 +283,15 @@ async function prepararItem(db, leitor, cliente, item, n) {
   // Só sem valor de tela válido (item novo vindo de fora, importação) o servidor usa o preço calculado.
   const valorTela = Number(item.valorTela);
   const temValorTela = item.valorTela !== null && item.valorTela !== '' && Number.isFinite(valorTela) && valorTela > 0 && valorTela < 1e9;
-  const valor = temValorTela ? arred2(valorTela) : arred2(preco.unitario * fatorHistorico(historico));
+  const valorCalculado = arred2(preco.unitario * fatorHistorico(historico));
+  const valor = temValorTela ? arred2(valorTela) : valorCalculado;
+  // Valor da tela diferente do preço que o servidor calcula para a configuração gravada (com a % da lista): AVISA, nunca bloqueia
+  // nem troca o valor gravado (decisão do dono, 2026-11-11; caso Orçamento 21440 item 3). Tolerância: 1 centavo.
+  const diferenca = arred2(valor - valorCalculado);
+  const divergencia = temValorTela && Math.round(Math.abs(diferenca) * 100) > 1
+    ? { item: n, valorTela: valor, valorCalculado, diferenca } : null;
   const qtdTela = Math.max(1, parseInt(item.qtd) || 1);
-  const r = { item, n, historico, valor, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios || [], folhas, grupos: [],
+  const r = { item, n, historico, valor, divergencia, totalItem: arred2(valor * qtdTela), acessorios: preco.acessorios || [], folhas, grupos: [],
     fator: fatorHistorico(historico), pecasSerr: preco.pecas, pecasDetalhe: preco.pecasDetalhe || [], complementosSerr: preco.complementos || [] };
 
   if (ehPorta) {
@@ -577,11 +583,17 @@ function registrarPedOrc({ rota, pool }) {
       }
     } catch (err) {
       if (err instanceof ErroItem) return res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
+      if (err instanceof ErroCadastro) {
+        console.error('Erro POST /ped_orc/salvar (cadastro):', err.origem, err.codigoBanco || '');
+        return res.status(503).json({ error: 'Não foi possível salvar: erro ao ler o cadastro. Nada foi gravado; tente de novo.', codigo: 'erro_cadastro' });
+      }
       console.error('Erro POST /ped_orc/salvar (preparo):', err.message);
       return res.status(500).json({ error: 'Erro de servidor' });
     }
     // o valor da tela é gravado como está (prepararItem), então não há mais aviso de preço recalculado
     const mudaram = [];
+    // ...mas quando ele difere do preço calculado agora para a configuração gravada, a resposta avisa (e a auditoria registra)
+    const divergentes = preparados.filter(p => !p.copia && p.divergencia).map(p => p.divergencia);
 
     // cliente com desconto fixo já tem o desconto no preço (a tela trava o desconto geral)
     // desconto adicional (txt_Desconto_Adicional do VB): sempre editável, por cima do desconto do cliente que já está nos itens
@@ -661,9 +673,11 @@ function registrarPedOrc({ rota, pool }) {
             [tipo, numero, p.n, d.png, carimbo, agoraLocal()]);
         }
       }
+      if (divergentes.length) await auditarDoc(conn, req, 'preco_divergente', tipo, numero, { itens: divergentes });
       return { numero };
     });
-    if (resultado) res.json({ ok: true, tipo, numero: resultado.numero, ...(mudaram.length ? { avisos: { precoMudou: mudaram } } : {}) });
+    const avisos = { ...(mudaram.length ? { precoMudou: mudaram } : {}), ...(divergentes.length ? { precoDivergente: divergentes } : {}) };
+    if (resultado) res.json({ ok: true, tipo, numero: resultado.numero, ...(Object.keys(avisos).length ? { avisos } : {}) });
   });
 
   // ---- cancelar / excluir (a tela sempre pergunta antes; aqui só o servidor decide e registra) ----

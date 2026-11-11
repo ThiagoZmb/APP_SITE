@@ -1,0 +1,98 @@
+/* Auditoria do cálculo (gaveta lateral de orcamentos.html) — regras em docs/regras/auditoria-calculo.md.
+   Só variáveis do tema (DESIGN.md / tema.css); camada sobreposta com fundo sólido; não muda o layout da página. */
+.aud-abrir {
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 37;
+    display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
+    min-width: 44px; min-height: 44px; padding: 10px 7px;
+    background: var(--surface-2); color: var(--text-mid);
+    border: 1px solid var(--border-strong); border-right: 0; border-radius: var(--radius-sm, 6px) 0 0 var(--radius-sm, 6px);
+    font: 600 11.5px/1 var(--font, 'Public Sans', 'Segoe UI', sans-serif); letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+}
+.aud-abrir span { writing-mode: vertical-rl; transform: rotate(180deg); }
+.aud-abrir svg { width: 18px; height: 18px; }
+.aud-abrir:hover, .aud-abrir.ativo { color: var(--primary-color); border-color: var(--primary-color); }
+.aud-abrir:focus-visible, .aud-gaveta button:focus-visible, .aud-gaveta summary:focus-visible, .aud-gaveta tr[data-reg]:focus-visible {
+    outline: none; box-shadow: 0 0 0 3px var(--primary-ring); border-color: var(--primary-color);
+}
+.aud-gaveta {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 38; width: min(560px, 100vw);
+    display: flex; flex-direction: column; background: var(--bg); color: var(--text-dark);
+    border-left: 1px solid var(--border-color); border-radius: 12px 0 0 12px;
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, .7);
+    transform: translateX(100%); visibility: hidden; transition: transform .22s ease, visibility 0s linear .22s;
+}
+.aud-gaveta.aberta { transform: none; visibility: visible; transition: transform .22s ease; }
+.aud-topo { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
+.aud-titulo { flex: 1; min-width: 0; }
+.aud-titulo h2 { font-size: 17px; font-weight: 700; color: var(--text-dark); }
+.aud-titulo small { font-size: 12px; color: var(--text-light); }
+.aud-fechar { width: 44px; height: 44px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-strong); background: var(--white); color: var(--text-mid); font-size: 16px; cursor: pointer; }
+.aud-fechar:hover { color: var(--text-dark); border-color: var(--text-light); }
+.aud-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border-color); background: var(--white); }
+.aud-btn { min-height: 36px; padding: 6px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-mid); font-size: 13px; font-weight: 600; cursor: pointer; }
+.aud-btn:hover { color: var(--primary-color); background: var(--primary-light); }
+.aud-copiado { font-size: 12.5px; color: var(--success-color); }
+.aud-corpo { flex: 1; overflow-y: auto; padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+.aud-bloco { background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; }
+.aud-bloco h3 { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.aud-bloco h3 small { font-size: 12px; font-weight: 500; color: var(--text-light); }
+.aud-bloco details { border-top: 1px solid var(--border-color); padding: 6px 0; }
+.aud-bloco summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-light); padding: 4px 0; border-radius: 4px; }
+.aud-bloco summary:hover { color: var(--text-dark); }
+.aud-agora dl, .aud-resumo { display: grid; grid-template-columns: minmax(130px, auto) 1fr; gap: 6px 12px; font-size: 13px; margin-bottom: 6px; }
+.aud-agora dt, .aud-resumo dt { color: var(--text-light); }
+.aud-agora dd, .aud-resumo dd { color: var(--text-dark); min-width: 0; overflow-wrap: anywhere; }
+.aud-num, .aud-mono-cel, .aud-formula { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.aud-num { color: var(--text-dark); }
+.aud-novo { color: var(--primary-color); }
+.aud-gatilho, .aud-linha { font-size: 13px; color: var(--text-mid); margin: 4px 0 8px; overflow-wrap: anywhere; }
+.aud-erro { font-size: 13px; color: var(--danger-color); margin: 4px 0 8px; }
+.aud-vazio { font-size: 12.5px; color: var(--text-light); padding: 4px 0; }
+.aud-igual { font-size: 12.5px; color: var(--text-light); }
+.aud-mudancas { list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; padding: 4px 0; }
+.aud-mudancas li { overflow-wrap: anywhere; color: var(--text-mid); }
+.aud-mudancas b { color: var(--text-dark); font-weight: 600; }
+.aud-passos { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.aud-passo { color: var(--text-mid); }
+.aud-passo-tit { color: var(--text-dark); font-weight: 600; }
+.aud-formula { font-size: 12px; color: var(--text-mid); overflow-wrap: anywhere; margin-top: 2px; }
+.aud-res { font-size: 12.5px; color: var(--text-light); margin-top: 2px; }
+.aud-res .aud-num { color: var(--primary-color); font-weight: 600; }
+.aud-passo-alerta .aud-passo-tit::before { content: '⚠ '; color: var(--warning-color); }
+.aud-passo-alerta .aud-formula { color: var(--warning-color); }
+.aud-sub { margin-top: 6px; border-top: 0 !important; padding: 0 !important; }
+.aud-sub summary { text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--text-mid); }
+.aud-rolagem { overflow: auto; max-height: 300px; border: 1px solid var(--border-color); border-radius: 6px; }
+.aud-rolagem-curta { max-height: 220px; }
+.aud-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.aud-tabela th { position: sticky; top: 0; z-index: 2; background: var(--surface-2); color: var(--text-dark); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    text-align: left; padding: 6px 8px !important; border-bottom: 2px solid var(--primary-color); box-shadow: 0 2px 4px rgba(0, 0, 0, .35); }
+.aud-tabela td { padding: 5px 8px !important; font-size: 12.5px !important; border-bottom: 1px solid var(--linha-tabela, var(--border-color)); color: var(--text-mid); vertical-align: top; overflow-wrap: anywhere; }
+.aud-hist { table-layout: fixed; }
+.aud-hist th:nth-child(1) { width: 34px; } .aud-hist th:nth-child(2) { width: 72px; } .aud-hist th:nth-child(4) { width: 78px; } .aud-hist th:nth-child(5) { width: 112px; }
+.aud-hist .aud-selo { white-space: normal; }
+.aud-hist tr[data-reg] { cursor: pointer; }
+.aud-hist tr[data-reg]:hover td { background: var(--hover-linha, rgba(255, 255, 255, .035)); }
+.aud-hist tr.aud-sel td { background: var(--primary-light); color: var(--text-dark); }
+.aud-linha-alerta td { color: var(--warning-color); }
+.aud-selo { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.aud-selo::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.aud-selo-ok { background: var(--selo-ok-bg); color: var(--success-color); }
+.aud-selo-aviso { background: var(--selo-aviso-bg); color: var(--warning-color); }
+.aud-selo-perigo { background: var(--selo-perigo-bg); color: var(--danger-color); }
+.aud-selo-neutro { background: var(--selo-neutro-bg); color: var(--text-mid); }
+/* aviso na própria tela (fora da gaveta): valor recalculado diferente do salvo, cálculo pendente */
+.aviso-recalculo { margin-top: 6px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--selo-aviso-bg); color: var(--text-dark); font-size: 12.5px; font-weight: 600; }
+.aviso-recalculo:empty { display: none; }
+.aviso-recalculo .aud-num { color: var(--warning-color); }
+@media (max-width: 700px) {
+    .aud-gaveta { width: 100vw; border-radius: 0; border-left: 0; }
+    .aud-abrir { top: auto; bottom: 84px; transform: none; }
+    .aud-agora dl, .aud-resumo { grid-template-columns: 1fr; gap: 2px; }
+    .aud-agora dd, .aud-resumo dd { margin-bottom: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .aud-gaveta, .aud-gaveta.aberta, .aud-abrir { transition: none; }
+}
+.aud-selo-info { background: var(--selo-info-bg); color: var(--info-color); }

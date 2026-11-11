@@ -551,6 +551,7 @@
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: var(--white); border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
     </style>
+    <link rel="stylesheet" href="auditoria_calculo.css?v=202611111800">
     <script src="layout.js?v=202611091200" defer></script>
 </head>
 <body>
@@ -837,6 +838,7 @@
                         <div class="acoes-linha acoes-item">
                             <button class="btn btn-secondary" id="btn-limpar-form">Limpar campos</button>
                             <button class="btn btn-primary" id="btn-adicionar">➕ Adicionar item</button>
+                            <button class="btn btn-secondary" id="btn-recalcular" type="button" hidden title="Recalcular o valor deste item com o cadastro de hoje (substitui o valor salvo no campo)">↻ Recalcular valor</button>
                             <span class="calc-status" id="calc-status"></span>
                         </div>
                         <div class="grid-form grid-valores">
@@ -846,6 +848,7 @@
                         </div>
                         </div>
                         <div class="nota-pct" id="nota-pct"></div>
+                        <div class="aviso-recalculo" id="aviso-recalculo" role="status" aria-live="polite"></div>
                     </div>
                     </aside>
                     </div>
@@ -1000,6 +1003,7 @@
     <script src="alteracao_valor.js?v=202611041200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
+    <script src="auditoria_calculo.js?v=202611111800"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -1056,6 +1060,15 @@
         const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
         // ✅ CORREÇÃO ④: estado do desconto do cliente vindo do backend
         let descontoJaAplicado = false; // true = tabela FIXO com desconto no item → trava o campo da tela
+        // ============ PREÇO EM DIA (correção 2026-11-11, Orçamento 21440 item 3) ============
+        // Cada cálculo pedido ganha um número; só a resposta do MAIS NOVO escreve no "Valor unitário" (uma resposta antiga
+        // que chega depois é descartada). Enquanto há cálculo agendado ou em voo, "Adicionar/Atualizar item" fica travado:
+        // antes, o clique lia o valor do estado ANTERIOR do formulário (ex.: com uma folha ainda sem puxador) e gravava esse valor.
+        let seqPreco = 0;
+        let precoPendente = false;
+        // item salvo aberto para edição: { item (nº), base (valor salvo sem a % da lista), valorSalvo, comparacao }
+        let edicaoPreco = null;
+        function definirPrecoPendente(v) { precoPendente = !!v; atualizarBotaoAdicionar(); }
         // ============ TRAVA DE CLIENTE (à prova de bala: por selectedIndex) ============
         function temClienteSelecionado() {
             const sel = document.getElementById('sel-cliente');
@@ -1095,16 +1108,19 @@
         }
         // "Adicionar item" só fica habilitado com valor unitário > 0. O valor é escrito por vários trechos (cálculo, edição, limpeza),
         // então a propriedade value do campo avisa sozinha quando muda.
-        function atualizarBotaoAdicionar() {
+        function atualizarBotaoAdicionar() { // (o valor no campo precisa ser > 0: erro de cálculo limpa o campo e trava o botão)
             const btn = document.getElementById('btn-adicionar'), campo = document.getElementById('f-valor');
             if (!btn || !campo) return;
             const v = parseFloat(String(campo.value || '').replace(',', '.')) || 0;
-            btn.disabled = !(v > 0);
-            btn.title = btn.disabled ? 'Disponível quando o item tiver valor maior que 0' : '';
+            btn.disabled = !(v > 0) || precoPendente;
+            btn.title = precoPendente ? 'Aguarde: o preço está sendo recalculado' : btn.disabled ? 'Disponível quando o item tiver valor maior que 0' : '';
         }
         (function () {
             const campo = document.getElementById('f-valor'), nativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-            Object.defineProperty(campo, 'value', { configurable: true, get() { return nativo.get.call(this); }, set(v) { nativo.set.call(this, v); atualizarBotaoAdicionar(); } });
+            Object.defineProperty(campo, 'value', { configurable: true, get() { return nativo.get.call(this); }, set(v) {
+                nativo.set.call(this, v);
+                if (edicaoPreco) edicaoPreco.campoTemSalvo = false; // o campo deixou de ter o valor salvo (com a % da lista)
+                atualizarBotaoAdicionar(); } });
             atualizarBotaoAdicionar();
         })();
         // ============ TOTAL DO ITEM (declarada antes de todos os usos) ============
@@ -1589,9 +1605,68 @@
         // ============ MOTOR FINANCEIRO ============
         let timerPreco = null;
         let seqAcessoriosSo = 0;
+        // Corpo do POST /calcular_preco com o estado atual do formulário (porta e avulso); null = item incompleto.
+        // Usado pelo cálculo automático e pelo "recalcular sem aplicar" do painel de auditoria.
+        function payloadPrecoAtual() {
+            const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+            const cliente = document.getElementById('sel-cliente');
+            const clienteNome = cliente.options[cliente.selectedIndex]?.text || '';
+            const clienteCodigo = cliente.value || '';
+            let payload = null;
+            if (frenteAtual === 'Serralheria') return null;
+            if (frenteAtual === 'Avulso') {
+                const cat = g('f-av-cat');
+                const alt = parseFloat(g('f-av-alt')) || 0, larg = parseFloat(g('f-av-larg')) || 0;
+                if (!cat || !g('f-av-produto') || (AV_LINEAR.includes(cat) && !alt) || (cat === 'Revestimento' && (!alt || !larg))) return null;
+                payload = { frente: 'Avulso',
+                            cliente: clienteNome, clienteCodigo,
+                            categoria: cat, produto: g('f-av-produto'),
+                            acabamento: AV_LINEAR.includes(cat) ? g('f-av-acab') : '',
+                            altura: alt, largura: larg,
+                            qtd: qtdEfetiva(),
+                            percentuais: '' };
+            } else {
+                if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) return null;
+                const mp = ehCorrer() && temSistemaCorrer() && sistemaCorrer ? medidasPortasCorrer() : null; // correr: preço pela medida da porta
+                payload = { frente: frenteAtual,
+                            cliente: clienteNome, clienteCodigo,
+                            altura: mp ? mp.altura : g('f-altura'), largura: mp ? mp.largura : g('f-largura'),
+                            ...(temLarguraEditada() ? { largurasFolhas: largurasDasFolhas() } : {}),
+                            acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })),
+                            qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
+                            perfil: g('f-perfil'), acabPerfil: g('f-acab'),
+                            puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
+                            tipoPuxador: tipoPuxadorDaPorta(),
+                            posicaoPuxador: posicoesFolhas[0] || '',
+                            posicoesFolhas: posicoesParaCalculo(),           // posição de CADA folha (preço por folha)
+                            tamanhoPuxador: g('f-tamanho-pux'),
+                            revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
+                            divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
+                            qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0,
+                            percentuais: '' };
+            }
+            return payload;
+        }
+        // Item salvo aberto para edição: o campo mostra o valor do banco e NADA recalcula sozinho (decisão do dono, 2026-11-11).
+        // O recálculo volta quando o usuário mexe no item (evento real de digitação/escolha/clique no formulário ou no desenho)
+        // ou clica em "Recalcular valor".
+        function liberarRecalculoEdicao() { if (edicaoPreco && edicaoPreco.manter) edicaoPreco.manter = false; }
+        const BOTOES_SEM_RECALCULO = new Set(['btn-adicionar', 'btn-limpar-form', 'btn-modo-pux', 'btn-recalcular']);
+        ['input', 'change'].forEach(tipo => document.addEventListener(tipo, e => {
+            const el = e.target;
+            if (!e.isTrusted || !el || !el.closest || el.id === 'f-obs') return; // observação não muda preço
+            if (el.closest('#form-item') || el.id === 'sel-cliente') liberarRecalculoEdicao();
+        }, true));
+        document.addEventListener('click', e => {
+            const b = e.isTrusted && e.target && e.target.closest ? e.target.closest('#form-item button') : null;
+            if (b && !BOTOES_SEM_RECALCULO.has(b.id)) liberarRecalculoEdicao();
+        }, true);
         async function calcularPrecoAutomatico() {
             clearTimeout(timerPreco); // descarta cálculo pendente de um estado anterior do formulário
+            const meu = ++seqPreco;   // e invalida a resposta de qualquer cálculo já em voo
+            definirPrecoPendente(false);
             atualizarPesoForm();      // peso do item em montagem (consulta própria, nunca atrapalha o preço)
+            if (edicaoPreco && edicaoPreco.manter) return; // item salvo recém-aberto: fica o valor do banco
             if (!temClienteSelecionado()) return;
             const status = document.getElementById('calc-status');
             if (frenteAtual === 'Serralheria') {
@@ -1620,13 +1695,7 @@
                     status.textContent = '';
                     return;
                 }
-                payload = { frente: 'Avulso',
-                            cliente: clienteNome, clienteCodigo,
-                            categoria: cat, produto: g('f-av-produto'),
-                            acabamento: AV_LINEAR.includes(cat) ? g('f-av-acab') : '',
-                            altura: alt, largura: larg,
-                            qtd: qtdEfetiva(),
-                            percentuais: '' };
+                payload = payloadPrecoAtual();
             } else {
                 if (!g('f-perfil') || !g('f-altura') || !g('f-largura')) {
                     document.getElementById('f-valor').value = '';
@@ -1650,32 +1719,34 @@
                     }
                     return;
                 }
-                const mp = ehCorrer() && temSistemaCorrer() && sistemaCorrer ? medidasPortasCorrer() : null; // correr: preço pela medida da porta
-                payload = { frente: frenteAtual,
-                            cliente: clienteNome, clienteCodigo,
-                            altura: mp ? mp.altura : g('f-altura'), largura: mp ? mp.largura : g('f-largura'),
-                            ...(temLarguraEditada() ? { largurasFolhas: largurasDasFolhas() } : {}),
-                            acessorios: acessoriosItem.map(a => ({ nome: a.nome, qtd: a.qtd, tamanho: a.tamanho || 0, origem: a.origem })),
-                            qtd: qtdEfetiva(),                                        // ✅ CORREÇÃO ③
-                            perfil: g('f-perfil'), acabPerfil: g('f-acab'),
-                            puxador: g('f-puxador'), acabPuxador: g('f-acab-pux'),
-                            tipoPuxador: tipoPuxadorDaPorta(),
-                            posicaoPuxador: posicoesFolhas[0] || '',
-                            posicoesFolhas: posicoesParaCalculo(),           // posição de CADA folha (preço por folha)
-                            tamanhoPuxador: g('f-tamanho-pux'),
-                            revestimento: g('f-revest'),   // VB: AcabRevestimento nunca é preenchido → taxa 0
-                            divisor: g('f-divisor'),                                  // ✅ CORREÇÃO ①
-                            qtdDivH: parseInt(g('f-div-h')) || 0, qtdDivV: parseInt(g('f-div-v')) || 0,
-                            percentuais: '' };
+                payload = payloadPrecoAtual();
             }
             clearTimeout(timerPreco);
             status.textContent = 'Calculando...';
+            definirPrecoPendente(true);
             timerPreco = setTimeout(async () => {
+                if (meu !== seqPreco) return;
+                const aud = window.AuditoriaCalculo || null;
+                const reg = aud ? aud.inicio({ origem: 'motor (' + frenteAtual + ')', payload, campoAntes: val('f-valor'),
+                    edicao: edicaoPreco ? { item: edicaoPreco.item, base: edicaoPreco.base } : null }) : null;
+                let d;
                 try {
-                    const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
+                    d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...payload, debug: true })
+                        body: JSON.stringify({ ...payload, debug: true, ...(aud && aud.pedir() ? { auditoria: true } : {}) })
                     });
+                } catch (e) {
+                    if (meu !== seqPreco) { if (aud) aud.fim(reg, { estado: 'descartado', erro: e.message, campoDepois: val('f-valor') }); return; }
+                    status.textContent = '⚠️ ' + mensagemErroPreco(e);
+                    document.getElementById('f-valor').value = '';
+                    atualizarTotalItem();
+                    definirPrecoPendente(false);
+                    if (aud) aud.fim(reg, { estado: 'erro', erro: e.message, campoDepois: '' });
+                    return;
+                }
+                // resposta de um estado ANTIGO do formulário (o usuário mexeu depois): não toca no campo
+                if (meu !== seqPreco) { if (aud) aud.fim(reg, { estado: 'descartado', resposta: d, campoDepois: val('f-valor') }); return; }
+                try {
                     document.getElementById('f-valor').value = (d.unitario || 0).toFixed(2);
                     if (Array.isArray(d.complementos)) {
                         d.complementos.forEach((c, i) => { if (complementosSerr[i] && complementosSerr[i].id === c.id) Object.assign(complementosSerr[i], { valorUnitario: c.valorUnitario, valorTotal: c.valorTotal }); });
@@ -1689,15 +1760,60 @@
                     descontoJaAplicado = !!(d.diag && d.diag.isFixo && d.diag.descontoCliente > 0);
                     atualizarTravaDesconto();
                     atualizarTotalItem();
+                    conferirRecalculoEdicao(d.unitario);
                     status.textContent = '✅ Calculado pelo motor';
                     setTimeout(() => { if (status.textContent === '✅ Calculado pelo motor') status.textContent = ''; }, 3000);
+                    if (aud) aud.fim(reg, { estado: 'aplicado', resposta: d, campoDepois: val('f-valor') });
                 } catch (e) {
-                    status.textContent = '⚠️ ' + (e.message === 'Erro HTTP: 400' ? 'Item sem preço no banco' : 'Erro no cálculo');
+                    status.textContent = '⚠️ ' + mensagemErroPreco(e);
                     document.getElementById('f-valor').value = '';
                     atualizarTotalItem();
+                    if (aud) aud.fim(reg, { estado: 'erro', resposta: d, erro: e.message, campoDepois: '' });
+                } finally {
+                    definirPrecoPendente(false);
                 }
             }, 400);
         }
+        const mensagemErroPreco = e => e && e.message === 'Erro HTTP: 400' ? 'Item sem preço no banco'
+            : e && e.message === 'Erro HTTP: 503' ? 'Não foi possível calcular: erro ao ler o cadastro. Tente de novo.' : 'Erro no cálculo';
+        // Edição de um item salvo: depois que o usuário MEXE no item, o recálculo substitui o valor do campo. Quando o recalculado
+        // é diferente do salvo, avisa na tela (nada é escolhido sozinho: o que estiver no campo é o que "Atualizar item" grava).
+        function conferirRecalculoEdicao(unitario) {
+            const aviso = document.getElementById('aviso-recalculo');
+            if (!aviso) return;
+            if (!edicaoPreco) { aviso.textContent = ''; return; }
+            const cmp = window.AuditoriaCalculo ? window.AuditoriaCalculo.compararSalvo(edicaoPreco.base, unitario) : null;
+            edicaoPreco.comparacao = cmp;
+            if (!cmp || !cmp.difere) { aviso.textContent = ''; return; }
+            const br = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            aviso.innerHTML = `⚠️ Você alterou o item: o valor recalculado <span class="aud-num">R$ ${br(cmp.recalculado)}</span> difere do salvo <span class="aud-num">R$ ${br(cmp.salvo)}</span>` +
+                ` (sem a % da lista). O campo mostra o recalculado; é ele que "Atualizar item" grava.`;
+        }
+        // Painel de auditoria: recalcula com o formulário atual SEM escrever no campo (salvo x recalculado sob demanda)
+        if (window.AuditoriaCalculo) window.AuditoriaCalculo.definirSimulador(async () => {
+            const aud = window.AuditoriaCalculo;
+            const payload = payloadPrecoAtual();
+            if (!temClienteSelecionado() || !payload) throw new Error(frenteAtual === 'Serralheria' ? 'Na serralheria o valor é a soma das peças (veja a composição).' : 'Item incompleto: escolha cliente, perfil/produto e medidas.');
+            const reg = aud.inicio({ origem: 'simulação (não aplica no campo)', payload, campoAntes: val('f-valor'),
+                edicao: edicaoPreco ? { item: edicaoPreco.item, base: edicaoPreco.base } : null });
+            try {
+                const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, debug: true, ...(aud.pedir() ? { auditoria: true } : {}) }) });
+                aud.fim(reg, { estado: 'simulado', resposta: d, campoDepois: val('f-valor') });
+                if (edicaoPreco && reg && reg.edicao) edicaoPreco.comparacao = reg.edicao.comparacao;
+                aud.renderizar();
+            } catch (e) { aud.fim(reg, { estado: 'erro', erro: mensagemErroPreco(e), campoDepois: val('f-valor') }); }
+        });
+        // Painel de auditoria (auditoria_calculo.js): o estado atual da tela para o bloco "Agora na tela"
+        if (window.AuditoriaCalculo) window.AuditoriaCalculo.definirContexto(() => {
+            const campo = val('f-valor');
+            const hist = editandoIndex >= 0 && itens[editandoIndex] ? (itens[editandoIndex].historico || '') : '';
+            const v = parseFloat(String(campo).replace(',', '.')) || 0;
+            const salvoNoCampo = !!(edicaoPreco && edicaoPreco.campoTemSalvo); // valor do banco: já tem a % da lista
+            return { valorCampo: campo, valorGravado: salvoNoCampo ? Number(edicaoPreco.valorSalvo) : v > 0 ? Math.round(aplicarHistorico(v, hist) * 100) / 100 : null,
+                historico: hist ? textoHistorico(hist) : '', pendente: precoPendente,
+                edicao: edicaoPreco ? { item: edicaoPreco.item, base: edicaoPreco.base, comparacao: edicaoPreco.comparacao, valorSalvoNoCampo: !!edicaoPreco.campoTemSalvo } : null };
+        });
         // ============================================================
         // 🖥️ MOTOR DE DESENHO GRÁFICO — fiel ao frmPortasAbrir.vb
         // ============================================================
@@ -2380,6 +2496,7 @@
             const status = document.getElementById('viz-status');
             if (ehCorrer()) {
                 if (alvo) {
+                    liberarRecalculoEdicao();
                     alternarPuxadorCorrer(alvo.folha, alvo.nome);
                     status.textContent = `Folha ${alvo.folha + 1}: ${posicoesFolhas[alvo.folha] || 'sem puxador'}`;
                 }
@@ -2387,10 +2504,12 @@
             }
             if (!alvo) {
                 // VB: clique fora dos fantasmas com a configuração ligada limpa as posições
-                if (posicoesFolhas.some(Boolean)) { posicoesFolhas = posicoesFolhas.map(() => ''); aposMudarPosicao(); }
+                if (posicoesFolhas.some(Boolean)) { liberarRecalculoEdicao(); posicoesFolhas = posicoesFolhas.map(() => ''); aposMudarPosicao(); }
                 atualizarVisualModoPux();
                 return;
             }
+            liberarRecalculoEdicao();
+            if (window.AuditoriaCalculo) window.AuditoriaCalculo.gatilho(`desenho: puxador da folha ${alvo.folha + 1} em "${alvo.nome}"`);
             const faltam = definirPosicaoPuxador(alvo.folha, alvo.nome);
             status.textContent = `Folha ${alvo.folha + 1}: ${posicoesFolhas[alvo.folha]}` + (faltam ? ` — falta posicionar ${faltam} folha(s)` : '');
         });
@@ -2526,6 +2645,7 @@
                     pecaEditando = -1;
                 }
                 set('f-valor', item.valor);
+                if (edicaoPreco) edicaoPreco.campoTemSalvo = true; // qualquer escrita depois (recálculo, limpeza) desliga
                 set('f-div-h', d.divH ?? 0); set('f-div-v', d.divV ?? 0);
                 setChk('chk-toda-ext', d.todaExt);
                 const tam = document.getElementById('f-tamanho-pux');
@@ -2588,6 +2708,10 @@
             sel.value = 'Sem sistema';
         }
         function limparForm() {
+            clearTimeout(timerPreco); seqPreco++; definirPrecoPendente(false); // resposta atrasada não escreve no formulário limpo
+            edicaoPreco = null;
+            { const av = document.getElementById('aviso-recalculo'); if (av) av.textContent = ''; }
+            { const br = document.getElementById('btn-recalcular'); if (br) br.hidden = true; }
             const catAvulso = val('f-av-cat');
             limparAcessorios();
             complementosSerr = []; renderComplementos();
@@ -2676,12 +2800,13 @@
                 const faltam = Array.from({ length: qtdFolhasAtual() }, (_, i) => posicoesFolhas[i] || '').filter(p => !p).length;
                 if (faltam && !confirm(`${faltam} folha(s) sem posição do puxador (o puxador dessas folhas não entra no preço nem no desenho).\n\nPara posicionar, clique em "🎯 Posicionar puxador" e depois no desenho, em cada folha.\n\nAdicionar mesmo assim?`)) return;
             }
+            if (precoPendente) { alert('O preço ainda está sendo recalculado com a última mudança. Aguarde o valor aparecer e clique de novo.'); return; }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
-            // o motor devolve a BASE (sem %); na edição o histórico de % do item é reaplicado sobre a base nova
-            item.valorBase = item.valor;
-            item.historico = editandoIndex >= 0 ? (itens[editandoIndex].historico || '') : '';
-            item.valor = Math.round(aplicarHistorico(item.valorBase, item.historico) * 100) / 100;
+            // valor salvo intacto (edição sem recálculo) já tem a % da lista: grava igual; valor do motor é a BASE: a % entra uma vez
+            Object.assign(item, AuditoriaCalculo.valorAoAtualizar({ valorCampo: item.valor, editando: editandoIndex >= 0,
+                campoTemSalvo: !!(edicaoPreco && edicaoPreco.campoTemSalvo), antigo: editandoIndex >= 0 ? itens[editandoIndex] : null,
+                baseSalva: edicaoPreco && edicaoPreco.base, fatorHistorico }));
             definirDesenho(item, capturarDesenho());
             if (editandoIndex >= 0) {
                 const antigo = itens[editandoIndex];
@@ -2701,8 +2826,30 @@
         const FRENTES_MEDIDA_NO_CARD = ['Porta de giro', 'Porta basculante'];
         const descricaoDoCard = it => FRENTES_MEDIDA_NO_CARD.includes(it.frente)
             ? String(it.descricao || '').replace(/ \| Furos: [^|]*/, '') : it.descricao;
-        const medidasDoCard = it => (FRENTES_MEDIDA_NO_CARD.includes(it.frente) && Number(it.altura) > 0 && Number(it.largura) > 0)
-            ? `<small class="medidas-item">Altura × Largura: <b>${escapeHtml(String(Number(it.altura)))} × ${escapeHtml(String(Number(it.largura)))} mm</b></small>` : '';
+        // Medidas na lista para TODO tipo de produto: portas e frente de gaveta = Altura × Largura; serralheria = uma linha por peça
+        // (altura × largura × profundidade); avulso = comprimento (perfil, trilho, puxador), altura × largura (revestimento) ou "sem medida".
+        const mmCard = n => String(Number(n) || 0);
+        const linhaMedida = (rotulo, valor) => `<small class="medidas-item">${rotulo}: <b>${escapeHtml(valor)}</b></small>`;
+        function medidasDoCard(it) {
+            const alt = Number(it.altura) || 0, larg = Number(it.largura) || 0;
+            if (it.frente === 'Serralheria') {
+                const pecas = Array.isArray(it.pecas) && it.pecas.length ? it.pecas
+                    : [{ altura: it.altura, largura: it.largura, profundidade: it.profundidade, qtd: 1 }];
+                return pecas.map((p, i) => {
+                    const dims = [p.altura, p.largura, p.profundidade].map(v => Number(v) || 0);
+                    const texto = dims.every(v => !v) ? 'sem medidas (só soldas)' : `${dims.map(mmCard).join(' × ')} mm`;
+                    const q = Number(p.qtd) > 1 ? ` · ${Number(p.qtd)} un` : '';
+                    return linhaMedida(pecas.length > 1 ? `Peça ${i + 1} (A × L × P)` : 'Altura × Largura × Profundidade', texto + q);
+                }).join('');
+            }
+            if (it.frente === 'Avulso') {
+                const cat = it.detalhes?.categoria || '';
+                if (['Perfil', 'Trilhos', 'Puxador'].includes(cat)) return linhaMedida('Comprimento', alt > 0 ? `${mmCard(alt)} mm` : 'não informado');
+                if (cat === 'Revestimento') return linhaMedida('Altura × Largura', alt > 0 && larg > 0 ? `${mmCard(alt)} × ${mmCard(larg)} mm` : 'não informado');
+                return linhaMedida('Medidas', 'não se aplica (vendido por unidade)');
+            }
+            return linhaMedida('Altura × Largura', alt > 0 && larg > 0 ? `${mmCard(alt)} × ${mmCard(larg)} mm` : 'não informado');
+        }
         function renderItens() {
             const tbody = document.getElementById('itens-tbody');
             tbody.innerHTML = itens.length === 0
@@ -2711,7 +2858,7 @@
                     <tr class="travado">
                         <td><b>${i + 1}</b></td>
                         <td><span class="badge-frente bf-serralheria">${escapeHtml(it.frente)}</span></td>
-                        <td><span class="cadeado" title="${escapeHtml('Só o VB edita este item: ' + it.motivo + (it.detalheTecnico ? ' [' + it.detalheTecnico + ']' : ''))}">🔒</span>${escapeHtml(it.descricao)}${it.detalheTecnico ? `<div class="detalhe-tecnico">Detalhe técnico: ${escapeHtml(it.detalheTecnico)}</div>` : ''}</td>
+                        <td><span class="cadeado" title="${escapeHtml('Só o VB edita este item: ' + it.motivo + (it.detalheTecnico ? ' [' + it.detalheTecnico + ']' : ''))}">🔒</span>${escapeHtml(it.descricao)}${it.detalheTecnico ? `<div class="detalhe-tecnico">Detalhe técnico: ${escapeHtml(it.detalheTecnico)}</div>` : ''}${(Number(it.altura) > 0 || Number(it.largura) > 0) ? medidasDoCard(it) : ''}</td>
                         <td>${it.qtd}</td>
                         <td>${formatCurrency(it.valor)}</td>
                         <td><b>${formatCurrency(it.qtd * it.valor)}</b></td>
@@ -2741,6 +2888,14 @@
         }
         function editarItem(i) {
             const it = itens[i];
+            clearTimeout(timerPreco); seqPreco++; definirPrecoPendente(false); // nada de resposta antiga caindo no item aberto
+            // manter: o valor do banco fica no campo e nada recalcula sozinho; campoTemSalvo: o campo ainda tem o valor salvo
+            // (que JÁ tem a % da lista: "Atualizar item" não aplica a % de novo enquanto isso for verdade)
+            edicaoPreco = { item: i + 1, valorSalvo: it.valor, base: window.AuditoriaCalculo ? window.AuditoriaCalculo.baseSalvaDoItem(it, fatorHistorico) : null,
+                comparacao: null, manter: true, campoTemSalvo: false };
+            { const av = document.getElementById('aviso-recalculo'); if (av) av.textContent = ''; }
+            { const br = document.getElementById('btn-recalcular'); if (br) br.hidden = false; }
+            if (window.AuditoriaCalculo) window.AuditoriaCalculo.gatilho(`abrir o item ${i + 1} para editar (sem mudar nada)`);
             document.querySelectorAll('.frente-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.frente === it.frente);
             });
@@ -2978,6 +3133,8 @@
                 valor.value = '';
             } else {
                 valor.value = (valorUnitarioSerralheria(pecasSerr, complementosSerr, qtd) || 0).toFixed(2);
+                if (window.AuditoriaCalculo) window.AuditoriaCalculo.composicaoSerralheria({ pecas: pecasSerr, complementos: complementosSerr, qtd, unitario: Number(valor.value) });
+                conferirRecalculoEdicao(Number(valor.value));
             }
             const total = (parseFloat(valor.value.replace(',', '.')) || 0) * qtd;
             document.getElementById('f-total-item').value = total.toFixed(2).replace('.', ',');
@@ -2991,20 +3148,24 @@
             precificandoPecasSerr.add(peca);
             const status = document.getElementById('calc-status');
             const cliente = document.getElementById('sel-cliente');
+            const aud = window.AuditoriaCalculo || null;
+            const corpoPeca = {
+                frente: 'Serralheria',
+                cliente: cliente.options[cliente.selectedIndex]?.text || '',
+                clienteCodigo: cliente.value || '',
+                produto: peca.produto,
+                pecas: [pecaParaEnvio(peca)],
+                complementos: [],
+                qtd: peca.qtd,
+                percentuais: ''
+            };
+            const reg = aud ? aud.inicio({ origem: 'peça da serralheria', payload: corpoPeca, campoAntes: val('f-valor') }) : null;
             try {
                 const d = await fetchAutenticado(`${API_BASE}/calcular_preco`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        frente: 'Serralheria',
-                        cliente: cliente.options[cliente.selectedIndex]?.text || '',
-                        clienteCodigo: cliente.value || '',
-                        produto: peca.produto,
-                        pecas: [pecaParaEnvio(peca)],
-                        complementos: [],
-                        qtd: peca.qtd,
-                        percentuais: ''
-                    })
+                    body: JSON.stringify({ ...corpoPeca, ...(aud && aud.pedir() ? { auditoria: true } : {}) })
                 });
+                if (aud) aud.fim(reg, { estado: pecasSerr.includes(peca) ? 'aplicado' : 'descartado', resposta: d, campoDepois: val('f-valor') });
                 if (!pecasSerr.includes(peca)) return;
                 const detalhe = d.pecas?.[0];
                 if (!detalhe || detalhe.unitario == null || !Number.isFinite(Number(detalhe.unitario))) {
@@ -3014,11 +3175,13 @@
                 atualizarValorSerralheria();
                 status.textContent = '✅ Peça calculada';
                 setTimeout(() => { if (status.textContent === '✅ Peça calculada') status.textContent = ''; }, 3000);
-            } catch {
+            } catch (e) {
+                if (aud && reg && reg.estado === 'pendente') aud.fim(reg, { estado: 'erro', erro: e && e.message, campoDepois: val('f-valor') });
                 if (!pecasSerr.includes(peca)) return;
                 peca.valor = null;
                 atualizarValorSerralheria();
-                status.textContent = '⚠️ Não foi possível calcular esta peça. Confira o material e tente novamente.';
+                status.textContent = e && e.message === 'Erro HTTP: 503' ? '⚠️ Não foi possível calcular: erro ao ler o cadastro. Tente de novo.'
+                    : '⚠️ Não foi possível calcular esta peça. Confira o material e tente novamente.';
             } finally {
                 precificandoPecasSerr.delete(peca);
             }
@@ -3245,6 +3408,7 @@
             }
             const q = new URLSearchParams({ nome: val('f-sistema'), folhas: qtdEfetiva(), larguraVao: vaoRealCorrer(),
                 desempenador: document.getElementById('chk-desempenador').checked ? '1' : '0', clienteCodigo: val('sel-cliente') });
+            definirPrecoPendente(true); // o preço só sai depois do sistema (calcularPrecoAutomatico abaixo libera)
             try {
                 const r = await fetchAutenticado(`${API_BASE}/ped_orc/sistema_correr?${q}`);
                 if (meu !== seqSistema) return; // chegou uma resposta mais nova
@@ -3431,7 +3595,10 @@
                 } catch { falhasDesenho = 0; }
                 // aberto pela lista ("Abrir para editar"): salvou sem pendências, volta para a mesma página da lista
                 const avisosPreco = (json.avisos && json.avisos.precoMudou) || [];
-                if (paginaDeRetorno && !falhasDesenho && !avisosPreco.length) {
+                // valor da tela diferente do preço que o servidor calcula hoje para o item gravado: gravou o da tela, mas avisa
+                const divergentes = (json.avisos && json.avisos.precoDivergente) || [];
+                const textoDivergentes = textoPrecoDivergente(divergentes);
+                if (paginaDeRetorno && !falhasDesenho && !avisosPreco.length && !divergentes.length) {
                     mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo. Voltando para a lista…`, 'ok');
                     setTimeout(() => { window.location.href = paginaDeRetorno; }, 700);
                     return;
@@ -3443,7 +3610,8 @@
                 else {
                     const dif = (json.avisos && json.avisos.precoMudou) || [];
                     mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo.${resumoDesenho ? ' ' + resumoDesenho : ''}` +
-                        (dif.length ? ` Atenção: o preço do item ${dif.join(', ')} foi recalculado e ficou diferente do mostrado na tela; confira.` : ''), dif.length ? 'erro' : 'ok');
+                        (dif.length ? ` Atenção: o preço do item ${dif.join(', ')} foi recalculado e ficou diferente do mostrado na tela; confira.` : '') +
+                        textoDivergentes, dif.length || divergentes.length ? 'erro' : 'ok');
                 }
                 return;
             }
@@ -3455,6 +3623,13 @@
                 b.addEventListener('click', () => abrirDocumento(docAberto.tipo, docAberto.numero, { confirmar: false }));
                 $s('msg-salvar').append(' ', b);
             }
+        }
+        // Aviso do servidor (avisos.precoDivergente): o valor gravado foi o da tela; o calculado hoje para a configuração é outro
+        function textoPrecoDivergente(lista) {
+            if (!Array.isArray(lista) || !lista.length) return '';
+            const br = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return ' Atenção: ' + lista.map(a => `item ${a.item} gravado com R$ ${br(a.valorTela)}, mas o preço calculado agora é R$ ${br(a.valorCalculado)}`).join('; ') +
+                '. Foi gravado o valor da tela; confira (abra o item e use "Recalcular valor" se quiser o preço de hoje).';
         }
         function limparDocumento() {
             itens = []; docAberto = null;
@@ -3906,6 +4081,13 @@
         // ============ INIT ============
         document.getElementById('btn-adicionar').addEventListener('click', adicionarItem);
         document.getElementById('btn-limpar-form').addEventListener('click', limparForm);
+        // "Recalcular valor" (só na edição): troca o valor salvo pelo preço de hoje, de propósito
+        document.getElementById('btn-recalcular').addEventListener('click', () => {
+            if (!edicaoPreco) return;
+            edicaoPreco.manter = false;
+            if (window.AuditoriaCalculo) window.AuditoriaCalculo.gatilho(`botão "Recalcular valor" do item ${edicaoPreco.item}`);
+            if (ehCorrer()) atualizarSistemaCorrer(); else calcularPrecoAutomatico();
+        });
         document.getElementById('btn-vazio').addEventListener('click', () => {
             if (itens.length && confirm('Esvaziar a lista de itens?')) { itens = []; renderItens(); }
         });

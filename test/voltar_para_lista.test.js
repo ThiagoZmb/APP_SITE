@@ -17,7 +17,8 @@ test('orçamentos: só volta para páginas do próprio sistema e só quando o sa
   const re = new RegExp(m.match(/test\(v\)/) ? m.match(/return (\/.*\/i)\.test\(v\)/)[1].slice(1, -2) : '', 'i');
   for (const ok of ['painel_inicial.html', 'painel_inicial.html?cliente=ACME']) assert.ok(re.test(ok), ok);
   for (const ruim of ['https://outro.site/x', '//outro.site', 'javascript:alert(1)', '../x.html', 'a.html#x']) assert.ok(!re.test(ruim), ruim);
-  assert.match(h, /if \(paginaDeRetorno && !falhasDesenho && !avisosPreco\.length\)/);
+  // com aviso de preço divergente (decisão do dono, 2026-11-11) também fica na tela para o usuário ler
+  assert.match(h, /if \(paginaDeRetorno && !falhasDesenho && !avisosPreco\.length && !divergentes\.length\)/);
   assert.match(h, /paginaDeRetorno = ''; \/\/ documento novo/);
 });
 
