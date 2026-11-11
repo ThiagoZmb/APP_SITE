@@ -99,7 +99,7 @@ body .container {
 body .container > header {
     grid-area: header;
     position: sticky; top: 0; z-index: 30;
-    height: 24px;
+    height: 24px !important; min-height: 24px !important;
     display: flex !important; align-items: center; justify-content: space-between; gap: 16px;
     padding: 0 32px !important;
     background: linear-gradient(180deg, var(--side-bg) 0%, var(--side-bg-2) 100%) !important;
