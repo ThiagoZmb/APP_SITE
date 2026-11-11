@@ -448,10 +448,8 @@
 
         // ================= CARGA =================
         // varrer = true só no clique em "Atualizar": o servidor acerta a fila de Entregas (mudanças do VB) antes de montar a lista
-        // Olho fechado (padrao): so a lista do tipo ativo (Pedidos OU Orcamentos) e buscada. O outro tipo e as analises
-        // (indicadores, graficos, leitura rapida, rankings) so vem quando o olho abre ou o usuario troca o tipo da lista.
+        // Nesta tela, pedidos, orçamentos e análises carregam sempre, mesmo com o olho fechado.
         const carregado = { 'Pedido': false, 'Orçamento': false };
-        const OUTRO_TIPO = { 'Pedido': 'Orçamento', 'Orçamento': 'Pedido' };
         const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
         async function buscarTipo(tipo, varrer) {
             const l = await api('/dados_lista?tipo=' + encodeURIComponent(tipo) + (varrer === true && tipo === 'Pedido' ? '&varrer=1' : ''));
@@ -478,8 +476,7 @@
         async function carregarAgora(varrer) {
             $('carregando').hidden = false; $('conteudo').hidden = true;
             try {
-                const tipos = [tipoLista, ...(OlhoResumos.visivel() ? [OUTRO_TIPO[tipoLista]] : [])];
-                carregado[OUTRO_TIPO[tipoLista]] = false; // o que nao e recarregado agora fica "velho" e vem na proxima necessidade
+                const tipos = ['Pedido', 'Orçamento'];
                 await Promise.all(tipos.map(t => buscarTipo(t, varrer)));
                 atualizarNomes();
                 $('carregando').hidden = true; $('conteudo').hidden = false;
@@ -487,7 +484,7 @@
             } catch (e) { $('carregando').textContent = '⚠️ Erro ao carregar: ' + e.message; }
         }
 
-        // Parte de trabalho: cabecalho, chips e lista. As analises ficam em renderAnalises (atras do olho).
+        // Atualiza a lista e as análises; o olho controla apenas a visibilidade dos resumos.
         function renderTudo() {
             const j = janela();
             $('periodo-txt').textContent = j.ini.getFullYear() > 1900 ? `${j.ini.toLocaleDateString('pt-BR')} a ${(j.fim < hoje ? j.fim : hoje).toLocaleDateString('pt-BR')}` : 'todo o histórico';
@@ -497,7 +494,7 @@
             $('subtitulo').textContent = cliente ? 'Pedidos e orçamentos deste cliente — vendas, conversão, produção e mix de produtos.'
                 : 'Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.';
             renderLista();
-            analises.atualizar(); // olho fechado: so marca como desatualizado; aberto: recarrega ja
+            analises.atualizar();
         }
 
         // Analises (Operacao agora, Resultado do periodo, Leitura rapida, graficos, rankings): so rodam com o olho aberto
@@ -519,7 +516,7 @@
             renderDiario();
             renderRankings(j);
         }
-        const analises = OlhoResumos.carga(renderAnalises);
+        const analises = { atualizar: renderAnalises };
 
         // ================= RESUMO LOCAL (só para "Leitura rápida" e ranking de clientes) =================
         // Os blocos "Operação agora" e "Resultado do período" NÃO usam estas contas: os números deles vêm do servidor
@@ -1038,7 +1035,7 @@
             tipoLista = b.dataset.tipo; filtroSit = '';
             document.querySelectorAll('.toggle-btn').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
             if (carregado[tipoLista]) { renderLista(); return; }
-            // olho fechado: este tipo ainda nao foi buscado (so o tipo ativo e carregado por padrao)
+            // A outra lista normalmente já foi carregada junto com a tela; mantém este fluxo como fallback.
             $('orders-tbody').innerHTML = '<tr><td colspan="10" class="vazio">Carregando...</td></tr>';
             $('lista-qtd').textContent = '';
             const tipoPedido = tipoLista;
