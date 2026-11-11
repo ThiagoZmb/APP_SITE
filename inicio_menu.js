@@ -9,7 +9,15 @@
   const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
   // várias entregas por pedido: "1 de 2 entregues" só quando o pedido tem mais de uma entrega não cancelada
   const andamentoEntregas = x => (Number(x && x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '');
-  const avisoEntregasAbertas = (n, nome) => `Este pedido tem ${Number(n) || 0} entrega(s) em aberto. Marcar como ${nome} mesmo assim?`;
+  // pergunta do menu "Entregue/Retirado" com entrega aberta: diz o que acontece com cada uma (encerrar = A programar/Agendada/Ocorrência,
+  // encerradas junto como o pedido; emCurso = Em rota/Enviada, que continuam abertas). Sem as contagens (servidor antigo) = texto curto.
+  const avisoEntregasAbertas = (n, nome, encerrar, emCurso) => {
+    const e = Number(encerrar) || 0, c = Number(emCurso) || 0;
+    return `Este pedido tem ${Number(n) || 0} entrega(s) em aberto.`
+      + (e ? ` ${e} (a programar, agendada ou com ocorrência) ${e === 1 ? 'será encerrada' : 'serão encerradas'} junto como ${nome}.` : '')
+      + (c ? ` ${c} em rota/enviada ${c === 1 ? 'continua aberta' : 'continuam abertas'}: conclua ou cancele na tela de Entregas.` : '')
+      + ` Marcar como ${nome} mesmo assim?`;
+  };
 
   function iniciar(cfg) {
     const enc = encodeURIComponent;
@@ -60,7 +68,7 @@
         if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
         let d = await r.json().catch(() => ({}));
         if (r.status === 409 && d.aviso === 'entregas_abertas') {
-          if (!confirm(avisoEntregasAbertas(d.entregasAbertas, nome))) return;
+          if (!confirm(avisoEntregasAbertas(d.entregasAbertas, nome, d.entregasEncerrar, d.entregasEmCurso))) return;
           r = await enviar(true);
           if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
           d = await r.json().catch(() => ({}));

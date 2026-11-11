@@ -803,7 +803,12 @@
             try {
                 try { await enviar(false); } catch (err) {
                     if (!(err.status === 409 && err.dados && err.dados.aviso === 'entregas_abertas')) throw err;
-                    if (!confirm(`Este pedido tem ${Number(err.dados.entregasAbertas) || 0} entrega(s) em aberto. Marcar como ${nome} mesmo assim?`)) return;
+                    // mesmo texto de avisoEntregasAbertas (inicio_menu.js): as que esperavam são encerradas junto; em rota/enviada continuam
+                    const nE = Number(err.dados.entregasEncerrar) || 0, nC = Number(err.dados.entregasEmCurso) || 0;
+                    if (!confirm(`Este pedido tem ${Number(err.dados.entregasAbertas) || 0} entrega(s) em aberto.`
+                        + (nE ? ` ${nE} (a programar, agendada ou com ocorrência) ${nE === 1 ? 'será encerrada' : 'serão encerradas'} junto como ${nome}.` : '')
+                        + (nC ? ` ${nC} em rota/enviada ${nC === 1 ? 'continua aberta' : 'continuam abertas'}: conclua ou cancele na tela de Entregas.` : '')
+                        + ` Marcar como ${nome} mesmo assim?`)) return;
                     await enviar(true);
                 }
                 await carregar();

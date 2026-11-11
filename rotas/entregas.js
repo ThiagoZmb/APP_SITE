@@ -6,7 +6,8 @@
 const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
 const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, fechamentoDoPedido,
-  STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens } = require('../calculo/entregas');
+  STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens,
+  STATUS_ENCERRAVEIS, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusDeReabertura, motivoEncerrada } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
@@ -27,6 +28,7 @@ const OCORRENCIAS = ['ausente', 'endereco_errado', 'recusa', 'parcial']; // tipo
 const MOTIVO_SAIU_DE_PRONTO = 'Pedido saiu de Pronto';
 const MOTIVO_VOLTOU_A_PRONTO = 'Pedido voltou a Pronto';
 const MOTIVO_PEDIDO_CANCELADO = 'Pedido cancelado';
+const MOTIVO_SAIU_DE_CONCLUIDO = 'Pedido deixou de estar Entregue/Retirado';
 const TIPOS_ANEXO = ['foto', 'assinatura'];
 const MAX_ANEXOS_PENDENTES = 10; // por entrega e por usuário (anexos enviados e ainda não vinculados a uma baixa)
 const MAX_ANEXOS_POR_BAIXA = 3;
@@ -100,12 +102,17 @@ const lerImagem = (req, res, next) => rawImagem(req, res, err => {
 //    e toda entrega sem nenhum evento ganha o evento 'criada';
 //  - registro A programar/Agendada/Ocorrência cujo pedido foi Cancelado vira cancelado ('Pedido cancelado'); Em rota nunca é cancelado aqui;
 //  - registro A programar cujo pedido deixou de estar Pronto vira cancelado ('Pedido saiu de Pronto');
-//  - cancelada pela varredura por ter saído de Pronto, cujo pedido voltou a Pronto, reabre como A programar.
+//  - cancelada pela varredura por ter saído de Pronto, cujo pedido voltou a Pronto, reabre como A programar;
+//  - (2026-11-11) pedido Entregue/Retirado fora das Entregas (VB ou menu): A programar/Agendada/Ocorrência são ENCERRADAS como
+//    concluídas do mesmo tipo do pedido (evento 'encerrada', status anterior no detalhe); a cancelada pela própria varredura por
+//    "saiu de Pronto" (último evento) também, pois era o mesmo caso. Em rota/Enviada não são mexidas;
+//  - (2026-11-11) entrega encerrada com o pedido cujo pedido deixou de estar Entregue/Retirado volta ao status que tinha
+//    (evento 'reaberta'); as regras seguintes da mesma varredura valem para ela (ex.: pedido Em Produção cancela A programar).
 // Qualquer outro registro nunca é alterado aqui. Devolve `null` se `res` já recebeu o erro.
 async function sincronizarFila(pool, res) {
   const executar = async conn => {
     const agora = agoraLocal();
-    let reabertas = 0, canceladas = 0;
+    let reabertas = 0, canceladas = 0, encerradas = 0;
     const [criadas] = await conn.execute(
       `INSERT IGNORE INTO web_entregas (numero, sequencia, status, criado_em, atualizado_em)
        SELECT p.NUMERO, 1, 'a_programar', ?, ? FROM ped_orc p WHERE p.TIPO = 'Pedido' AND p.SITUACAO = 'Pronto'
@@ -114,6 +121,35 @@ async function sincronizarFila(pool, res) {
       `INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo)
        SELECT e.id, ?, 'sistema', 'criada', NULL FROM web_entregas e
        WHERE NOT EXISTS (SELECT 1 FROM web_entrega_eventos v WHERE v.entrega_id = e.id)`, [agora]);
+    // encerrada com o pedido, mas o pedido não está mais Entregue/Retirado: volta ao status de antes (antes das regras de cancelamento)
+    const [desfazer] = await conn.execute(
+      `SELECT e.id, e.status, v.detalhe FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       JOIN web_entrega_eventos v ON v.entrega_id = e.id AND v.id = (SELECT MAX(v2.id) FROM web_entrega_eventos v2 WHERE v2.entrega_id = e.id)
+       WHERE e.status IN ('entregue', 'retirado') AND v.tipo = '${EVENTO_ENCERRADA}' AND COALESCE(p.SITUACAO, '') NOT IN ('Entregue', 'Retirado')
+       ORDER BY e.id`);
+    for (const { id, status, detalhe } of desfazer) {
+      const volta = statusDeReabertura(detalhe);
+      const [up] = await conn.execute('UPDATE web_entregas SET status = ?, atualizado_em = ? WHERE id = ? AND status = ?', [volta, agora, id, status]);
+      if (up.affectedRows !== 1) continue;
+      await evento(conn, id, agora, 'sistema', EVENTO_REABERTA, MOTIVO_SAIU_DE_CONCLUIDO, null);
+      reabertas++;
+    }
+    // pedido concluído fora das Entregas: as que esperavam viram concluídas do tipo do pedido (antes da regra "saiu de Pronto")
+    const [concluidos] = await conn.execute(
+      `SELECT e.id, e.status, p.SITUACAO AS situacao FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       WHERE p.SITUACAO IN ('Entregue', 'Retirado')
+         AND (e.status IN (${STATUS_ENCERRAVEIS.map(s => `'${s}'`).join(', ')})
+           OR (e.status = 'cancelada' AND EXISTS (SELECT 1 FROM web_entrega_eventos v WHERE v.entrega_id = e.id AND v.usuario = 'sistema'
+                 AND v.tipo = 'cancelada' AND v.motivo = ? AND v.id = (SELECT MAX(v2.id) FROM web_entrega_eventos v2 WHERE v2.entrega_id = e.id))))
+       ORDER BY e.id`, [MOTIVO_SAIU_DE_PRONTO]);
+    for (const { id, status, situacao } of concluidos) {
+      const para = statusConcluidoPara(situacao);
+      if (!para) continue;
+      const [up] = await conn.execute('UPDATE web_entregas SET status = ?, atualizado_em = ? WHERE id = ? AND status = ?', [para, agora, id, status]);
+      if (up.affectedRows !== 1) continue;
+      await evento(conn, id, agora, 'sistema', EVENTO_ENCERRADA, motivoEncerrada(situacao), { statusAnterior: status });
+      encerradas++;
+    }
     const cancelar = async (ids, motivo, de) => {
       for (const { id } of ids) {
         const [up] = await conn.execute(
@@ -147,7 +183,7 @@ async function sincronizarFila(pool, res) {
         [id, agora, 'sistema', 'criada', MOTIVO_VOLTOU_A_PRONTO]);
       reabertas++;
     }
-    return { criadas: criadas.affectedRows || 0, canceladas, reabertas };
+    return { criadas: criadas.affectedRows || 0, canceladas, reabertas, encerradas };
   };
   if (res) return emTransacao(pool, res, 'sincronizarFila', executar);
   const conn = await pool.getConnection(); // chamada sem rota (por exemplo, de outros módulos): o erro sobe
@@ -162,6 +198,50 @@ async function sincronizarFila(pool, res) {
   } finally {
     conn.release();
   }
+}
+
+// Menu "Mudar situação" (rotas/ped_orc.js) marcando Entregue/Retirado, DENTRO da transação dele e depois de travar ped_orc
+// (ordem ped_orc -> web_entregas, a mesma da baixa, das etapas e do excluir). `entregas` = [{ id, status }] do número já lidas
+// com FOR UPDATE. Encerra as A programar/Agendada/Ocorrência como concluídas do tipo do pedido (um UPDATE e um INSERT de
+// eventos, poucas idas ao banco); Em rota/Enviada ficam. Devolve quantas encerrou.
+async function encerrarEntregasDoPedido(conn, { situacao, quem, entregas }) {
+  const para = statusConcluidoPara(situacao);
+  const alvo = (entregas || []).filter(e => STATUS_ENCERRAVEIS.includes(e.status));
+  if (!para || !alvo.length) return 0;
+  const agora = agoraLocal();
+  const ids = alvo.map(e => Number(e.id));
+  await conn.execute(`UPDATE web_entregas SET status = ?, atualizado_em = ? WHERE id IN (${marcas(ids)}) AND status IN (${marcas(STATUS_ENCERRAVEIS)})`,
+    [para, agora, ...ids, ...STATUS_ENCERRAVEIS]);
+  const motivo = motivoEncerrada(situacao, 'pelo menu de situação');
+  await conn.execute(`INSERT INTO web_entrega_eventos (entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a) VALUES ${alvo.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+    alvo.flatMap(e => [Number(e.id), agora, quem, EVENTO_ENCERRADA, motivo, JSON.stringify({ statusAnterior: e.status }), null]));
+  return alvo.length;
+}
+
+// Varredura em segundo plano para as mudanças feitas FORA da web (VB): no máximo 1 vez a cada `intervalo` ms por processo (memória),
+// nunca duas ao mesmo tempo. Quem chama não dá await (não atrasa a lista) e a função nunca lança. `forcar: true` ignora o intervalo
+// (depois de uma mudança de situação pela web); se já houver uma rodando, roda mais uma vez ao terminar. `ativo: false` (testes) = nada.
+const INTERVALO_VARREDURA_MS = 60 * 1000;
+function criarDisparadorFila(pool, { intervalo = INTERVALO_VARREDURA_MS, agora = Date.now, ativo = true } = {}) {
+  let ultimo = null, rodando = null, deNovo = false;
+  async function rodar() {
+    try {
+      do {
+        deNovo = false;
+        const t = agora();
+        // falha também conta como tentativa: com o banco fora do ar, cada lista não dispara outra varredura (tenta de novo após o intervalo)
+        try { await sincronizarFila(pool); } catch (err) { console.error('Erro na varredura de entregas (segundo plano):', err?.code || 'sem código'); }
+        ultimo = t;
+      } while (deNovo);
+    } finally { rodando = null; }
+  }
+  return function disparar({ forcar = false } = {}) {
+    if (!ativo) return null;
+    if (rodando) { if (forcar) deNovo = true; return rodando; }
+    if (!forcar && ultimo !== null && agora() - ultimo < intervalo) return null;
+    rodando = rodar();
+    return rodando;
+  };
 }
 
 // itens do pedido para exibir na entrega (e na baixa): só descrição e quantidade, nunca preços
@@ -942,4 +1022,4 @@ function registrarEntregas({ rota, pool }) {
   });
 }
 
-module.exports = { registrarEntregas, sincronizarFila, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };
+module.exports = { registrarEntregas, sincronizarFila, encerrarEntregasDoPedido, criarDisparadorFila, INTERVALO_VARREDURA_MS, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };

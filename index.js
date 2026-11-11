@@ -43,7 +43,8 @@ const composicaoPedido = require('./calculo/composicao_pedido');
 const { carregarComposicao } = require('./calculo/composicao_documentos');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco, ErroCadastro, novoRastro, leitorRegistrado } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
-const { registrarEntregas } = require('./rotas/entregas');
+const { registrarEntregas, criarDisparadorFila } = require('./rotas/entregas');
+const { statusNaLista } = require('./calculo/entregas');
 const { juntarEntregaPrincipal, colunasQtdEntregas } = require('./rotas/entregas_resumo');
 const { registrarCalendario } = require('./rotas/calendario');
 const { registrarIndicadores } = require('./rotas/indicadores');
@@ -263,6 +264,9 @@ function preservarDoBanco({ sql, chave, mapa, mensagemNovo }) {
 const limiteLogin = criarLimiteLogin();
 // recebimentos A Receber vencidos -> Atrasado (escrita em fluxo_de_caixa do VB); no máx. 1x por hora, sem await
 const marcarAtrasados = criarMarcadorAtrasados(pool);
+// varredura da fila de Entregas em segundo plano (mudanças feitas pelo VB): na subida, antes das listas de pedidos (no máx. 1x/60 s,
+// sem await) e logo depois do menu de situação (forçada). Nunca nos testes.
+const varrerEntregas = criarDisparadorFila(pool, { ativo: process.env.NODE_ENV !== 'test' });
 // Nome tentado em forma canônica (o MySQL, utf8mb4_unicode_ci, ignora caixa, acento, largura e invisíveis).
 const nomeCanonico = s => s.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[­​-‏⁠﻿]/g, '').toLowerCase().trim();
 // Auditoria do login: quem = nome da conta no banco, ou '(inexistente)' (o texto digitado pode ser
@@ -373,6 +377,7 @@ const ENTREGA_DO_PEDIDO = juntarEntregaPrincipal({ condicao: " AND p.TIPO = 'Ped
 
 // ================= LISTA ÚNICA (Pedido ou Orçamento) =================
 registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
+  varrerEntregas(); // sem await: mudança feita pelo VB (ex.: pedido Retirado) chega à fila e às próximas listas
   try {
     const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
     const est = condicaoEstado(req, 'c.ESTADO');
@@ -395,7 +400,7 @@ registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
       pool.execute(sql, [tipo, ...est.params]),
       composicaoDosDocumentos(tipo)
     ]);
-    const comIcones = comDatasSeguras(rows).map(r => ({ ...r, ...(composicao.get(Number(r.numero)) || composicaoPedido.SEM_COMPOSICAO) }));
+    const comIcones = comDatasSeguras(rows).map(r => ({ ...r, entregaStatus: statusNaLista(r.situacao, r.entregaStatus), ...(composicao.get(Number(r.numero)) || composicaoPedido.SEM_COMPOSICAO) }));
     res.json(semValores(req, comIcones, ['valor']));
   } catch (err) {
     console.error('Erro /dados_lista:', err.message);
@@ -405,6 +410,7 @@ registro.rota('get', '/dados_lista', ['pedidos.ver'], async (req, res) => {
 
 // Mantidos por compatibilidade
 registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
+  varrerEntregas(); // sem await (ver /dados_lista)
   try {
     const est = condicaoEstado(req, 'c.ESTADO');
     const where = est.sql ? `${JOIN_CLIENTE} WHERE ${est.sql} AND p.TIPO='Pedido'` : `WHERE p.TIPO='Pedido'`;
@@ -415,7 +421,7 @@ registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
              CAST(p.DATA_ENTREGA AS CHAR) as dataEntrega,
              en.status as entregaStatus, DATE_FORMAT(en.data_agendada, '%Y-%m-%d') as dataAgendada, ${colunasQtdEntregas()}
       FROM ped_orc p ${ENTREGA_DO_PEDIDO} ${where} ORDER BY p.NUMERO DESC`, est.params);
-    res.json(semValores(req, comDatasSeguras(rows), ['valor']));
+    res.json(semValores(req, comDatasSeguras(rows).map(r => ({ ...r, entregaStatus: statusNaLista(r.situacao, r.entregaStatus) })), ['valor']));
   } catch (err) {
     console.error('Erro /dados_pedidos:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -423,6 +429,7 @@ registro.rota('get', '/dados_pedidos', ['pedidos.ver'], async (req, res) => {
 });
 
 registro.rota('get', '/dados_pedidos_rj', ['pedidos.ver'], async (req, res) => {
+  varrerEntregas(); // sem await (ver /dados_lista)
   try {
     const [rows] = await pool.execute(`
       SELECT p.NUMERO as numero, p.RAZAO_SOCIAL as cliente, p.CLIENTE_FINAL as clienteFinal,
@@ -435,7 +442,7 @@ registro.rota('get', '/dados_pedidos_rj', ['pedidos.ver'], async (req, res) => {
       ${JOIN_CLIENTE}
       WHERE c.ESTADO = 'RJ' AND p.TIPO='Pedido' ${filtroEstados(req, 'c.ESTADO').sql ? 'AND ' + filtroEstados(req, 'c.ESTADO').sql : ''}
       ORDER BY p.DATA DESC`, filtroEstados(req, 'c.ESTADO').params);
-    res.json(semValores(req, comDatasSeguras(rows), ['valor']));
+    res.json(semValores(req, comDatasSeguras(rows).map(r => ({ ...r, entregaStatus: statusNaLista(r.situacao, r.entregaStatus) })), ['valor']));
   } catch (err) {
     console.error('Erro /dados_pedidos_rj:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
@@ -713,6 +720,7 @@ registro.rota('post', '/clientes/permissao', ['clientes.permissao'], clienteNosE
 
 // Aba Financeiro: pedidos e fluxo de caixa (em aberto ou todos) + Carregar_Resumo
 registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valores.ver'], async (req, res) => {
+  varrerEntregas(); // sem await (ver /dados_lista)
   try {
     const razao = await razaoPermitida(req, res, req.params.codigo);
     if (!razao) return;
@@ -727,7 +735,9 @@ registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valor
     // entregas ainda em andamento (todos os pedidos do cliente, não só os listados); só leitura
     const [[pend]] = await pool.execute(
       `SELECT COUNT(*) AS qtd_entregas_pendentes FROM web_entregas en JOIN ped_orc p ON p.NUMERO = en.numero AND p.TIPO = 'Pedido'
-       WHERE p.RAZAO_SOCIAL = ? AND en.status IN ('a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada')`, [razao]);
+       WHERE p.RAZAO_SOCIAL = ? AND (en.status IN ('em_rota', 'enviada')
+         OR (en.status IN ('a_programar', 'agendada', 'ocorrencia') AND COALESCE(p.SITUACAO, '') NOT IN ('Entregue', 'Retirado')))`, [razao]);
+    // (pedido já Entregue/Retirado: as que só esperavam não contam; a varredura as encerra — statusNaLista em calculo/entregas.js)
     const [fluxo] = await pool.execute(
       `SELECT ID, DATE_FORMAT(DATA, '%Y-%m-%d') AS DATA, PEDIDO, NOTA_FISCAL, VALOR, OBSERVACAO_GERAL, SITUACAO
        FROM fluxo_de_caixa WHERE RAZAO_SOCIAL = ? ${todos ? '' : "AND SITUACAO IN ('A Receber', 'Atrasado', 'Protestado')"}
@@ -743,7 +753,7 @@ registro.rota('get', '/clientes/financeiro/:codigo', ['clientes.receber', 'valor
     const receberFluxo = numEstq(res1.receber), receberPedidos = numEstq(res2.receber), credito = numEstq(cli?.CREDITO);
     res.json({
       pedidos: pedidos.map(p => ({ numero: p.NUMERO, clienteFinal: p.CLIENTE_FINAL || '', data: p.DATA, entrega: dataBRSegura(p.DATA_PRONTO),
-        valor: numEstq(p.TOTAL), observacao: p.OBS_GERAL || '', situacao: p.SITUACAO || '', financeiro: p.FINANCEIRO || '', entregaStatus: p.ENTREGA_STATUS || null,
+        valor: numEstq(p.TOTAL), observacao: p.OBS_GERAL || '', situacao: p.SITUACAO || '', financeiro: p.FINANCEIRO || '', entregaStatus: statusNaLista(p.SITUACAO, p.ENTREGA_STATUS),
         qtdEntregas: Number(p.QTD_ENTREGAS) || 0, qtdEntregasConcluidas: Number(p.QTD_ENTREGAS_CONCLUIDAS) || 0 })),
       qtdEntregasPendentes: Number(pend?.qtd_entregas_pendentes ?? pend?.qtd) || 0,
       fluxo: fluxo.map(f => ({ id: f.ID, data: f.DATA, pedido: f.PEDIDO ?? '', notaFiscal: f.NOTA_FISCAL ?? '', valor: numEstq(f.VALOR),
@@ -1830,7 +1840,7 @@ registrarPortalDocumentos({ portal: registro.portal, pool });
 registrarPortalUsuarios({ portal: registro.portal, pool, sessoes: sessoesPortal, email: emailPortal, config: configPortal });
 registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarEstoqueQr({ rota: registro.rota, pool });
-registrarPedOrc({ rota: registro.rota, pool });
+registrarPedOrc({ rota: registro.rota, pool, varrerEntregas });
 registrarEntregas({ rota: registro.rota, pool });
 registrarCalendario({ rota: registro.rota, pool });
 registrarIndicadores({ rota: registro.rota, pool });
@@ -1907,6 +1917,7 @@ async function iniciar() {
     await limpar();
     setInterval(limpar, 24 * 60 * 60 * 1000).unref();
     marcarAtrasados(); // na subida (sem await); o login repete no máximo 1x por hora
+    varrerEntregas(); // na subida (sem await): acerta a fila com o que mudou pelo VB enquanto o servidor estava parado
     medidor.iniciarRelatorio(pool); // ida e volta ao banco na subida e a cada hora, com o resumo das rotas (log do Render)
   }
   registro.verificar();

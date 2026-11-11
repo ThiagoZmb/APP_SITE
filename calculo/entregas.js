@@ -227,6 +227,42 @@ function statusExibicao({ status, situacaoPedido, canceladaPor } = {}) {
   return 'suspensa';
 }
 
+// ---- Pedido concluído fora das Entregas (2026-11-11) ----
+// Pedido marcado Entregue/Retirado por qualquer caminho que não a baixa (VB, menu "Mudar situação"): as entregas que ainda
+// esperavam (A programar, Agendada, Ocorrência) não têm mais o que entregar e são ENCERRADAS como concluídas do mesmo tipo do
+// pedido (Retirado -> 'retirado', Entregue -> 'entregue'), com evento 'encerrada' (nunca "cancelada": o pedido foi entregue).
+// Em rota e Enviada NÃO são mexidas (a carga está com o motorista/transportadora): continuam visíveis como estão.
+const STATUS_ENCERRAVEIS = Object.freeze(['a_programar', 'agendada', 'ocorrencia']);
+const STATUS_EM_CURSO = Object.freeze(['em_rota', 'enviada']);
+const EVENTO_ENCERRADA = 'encerrada';
+const EVENTO_REABERTA = 'reaberta';
+
+// 'Entregue' -> 'entregue', 'Retirado' -> 'retirado'; qualquer outra situação -> null
+function statusConcluidoPara(situacaoPedido) {
+  const s = String(situacaoPedido ?? '').trim();
+  return s === 'Entregue' ? 'entregue' : s === 'Retirado' ? 'retirado' : null;
+}
+
+// Status da entrega principal mostrado nas listas da equipe (Pedidos, Início, Financeiro do cliente). Só corrige a janela entre a
+// mudança do pedido (ex.: pelo VB) e a próxima varredura: pedido Entregue/Retirado com entrega ainda A programar/Agendada/Ocorrência
+// aparece já como concluída. Em rota, Enviada, concluídas e canceladas voltam como vieram.
+function statusNaLista(situacaoPedido, status) {
+  const concluido = statusConcluidoPara(situacaoPedido);
+  return concluido && STATUS_ENCERRAVEIS.includes(status) ? concluido : (status ?? null);
+}
+
+// Para onde volta uma entrega encerrada com o pedido quando o pedido deixa de estar Entregue/Retirado: o status que ela tinha
+// (gravado no detalhe do evento 'encerrada') se ainda for um status de espera; senão (ex.: era 'cancelada' pela varredura) A programar.
+function statusDeReabertura(detalhe) {
+  let d = detalhe;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = null; } }
+  const anterior = d && typeof d === 'object' ? d.statusAnterior : null;
+  return STATUS_ENCERRAVEIS.includes(anterior) ? anterior : 'a_programar';
+}
+
+// Motivo do evento 'encerrada'
+const motivoEncerrada = (situacaoPedido, origem = 'fora das Entregas') => `Pedido marcado como ${situacaoPedido} ${origem}`;
+
 const LIMITE_ANEXO = 1048576; // 1 MiB
 
 // confere tamanho, assinatura (JPEG/PNG) e se o mime declarado bate com ela
@@ -242,4 +278,5 @@ function validarAnexo(buffer, mime) {
 }
 
 module.exports = { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, entregaPrincipal, resumoEntregas, fechamentoDoPedido,
-  STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens };
+  STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens,
+  STATUS_ENCERRAVEIS, STATUS_EM_CURSO, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusNaLista, statusDeReabertura, motivoEncerrada };

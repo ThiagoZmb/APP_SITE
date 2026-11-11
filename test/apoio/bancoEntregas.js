@@ -200,6 +200,24 @@ function bancoEntregas() {
       eventos.push({ id: eventos.length + 1, entrega_id, quando, usuario, tipo, motivo: motivo ?? null, entregue_a: null, detalhe: null });
       return { affectedRows: 1, insertId: eventos.length };
     }],
+    // (2026-11-11) encerrada com o pedido cujo pedido não está mais Entregue/Retirado (último evento = 'encerrada')
+    [/^SELECT e\.id, e\.status, v\.detalhe FROM web_entregas e JOIN ped_orc p/, () =>
+      entregas.filter(e => ['entregue', 'retirado'].includes(e.status)).map(e => {
+        const ped = pedidoDe(e); const ult = eventos.filter(v => v.entrega_id === e.id).sort((x, y) => y.id - x.id)[0];
+        return ped && ult && ult.tipo === 'encerrada' && !['Entregue', 'Retirado'].includes(ped.SITUACAO ?? '') ? { id: e.id, status: e.status, detalhe: ult.detalhe } : null;
+      }).filter(Boolean)],
+    // (2026-11-11) pedido Entregue/Retirado: A programar/Agendada/Ocorrência e a cancelada pela varredura por "saiu de Pronto" (último evento)
+    [/^SELECT e\.id, e\.status, p\.SITUACAO AS situacao FROM web_entregas e JOIN ped_orc p/, (sql, [motivo]) =>
+      entregas.map(e => ({ e, ped: pedidoDe(e) })).filter(({ e, ped }) => ped && ['Entregue', 'Retirado'].includes(ped.SITUACAO) && (
+        ['a_programar', 'agendada', 'ocorrencia'].includes(e.status)
+        || (e.status === 'cancelada' && (() => { const u = eventos.filter(v => v.entrega_id === e.id).sort((x, y) => y.id - x.id)[0];
+          return u && u.usuario === 'sistema' && u.tipo === 'cancelada' && u.motivo === motivo; })())))
+        .sort((a, b) => a.e.id - b.e.id).map(({ e, ped }) => ({ id: e.id, status: e.status, situacao: ped.SITUACAO }))],
+    [/^UPDATE web_entregas SET status = \?, atualizado_em = \? WHERE id = \? AND status = \?$/, (sql, [para, atualizado_em, id, de]) => {
+      const e = entregas.find(x => x.id === id && x.status === de);
+      if (!e) return { affectedRows: 0 };
+      Object.assign(e, { status: para, atualizado_em }); return { affectedRows: 1 };
+    }],
     // pedido Cancelado: A programar, Agendada e Ocorrência (Em rota fica)
     [/SELECT e\.id FROM web_entregas e JOIN ped_orc p [\s\S]*e\.status IN \('a_programar', 'agendada', 'ocorrencia'\)/, () =>
       entregas.filter(e => ['a_programar', 'agendada', 'ocorrencia'].includes(e.status)).filter(e => pedidoDe(e)?.SITUACAO === 'Cancelado').map(e => ({ id: e.id }))],

@@ -24,7 +24,8 @@
   const ROTULO_EVENTO = { criada: 'Entrou na fila', agendada: 'Agendada', reagendada: 'Reagendada', saiu: 'Saiu para a entrega', entregue: 'Entregue',
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
     ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial',
-    dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado' };
+    dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado',
+    encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
   const ABAS = [
     { id: 'fila', rotulo: 'Fila', status: ['a_programar'] },
     { id: 'agenda', rotulo: 'Agenda', status: ['agendada'] },

@@ -13,7 +13,9 @@ const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calcul
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 const { liberarPlanosDoPedido } = require('./corte');
 const { liberarPlanosVidroDoPedido } = require('./corte_vidros');
-const { desmarcarEtapasDoCorte, apagarEtapasDoPedido } = require('./etapas_banco');   // etapas de produção: cancelar desmarca o automático do corte; excluir apaga (número reaproveitado)
+const { desmarcarEtapasDoCorte, apagarEtapasDoPedido } = require('./etapas_banco');
+const { encerrarEntregasDoPedido } = require('./entregas');   // menu Entregue/Retirado: encerra junto as entregas que esperavam
+const { STATUS_ENCERRAVEIS, STATUS_EM_CURSO } = require('../calculo/entregas');   // etapas de produção: cancelar desmarca o automático do corte; excluir apaga (número reaproveitado)
 
 const TIPOS = ['Orçamento', 'Pedido'];
 const SITUACOES_PEDIDO = ['Em Produção', 'Entregue', 'Cancelado', 'Retirado'];
@@ -429,7 +431,7 @@ async function lerSistemaCorrer(db, nome, folhas) {
   };
 }
 
-function registrarPedOrc({ rota, pool }) {
+function registrarPedOrc({ rota, pool, varrerEntregas = () => null }) {
   const leitor = criarLeitor(pool);
 
   rota('get', '/ped_orc/acessorios_permitidos', ['orcamentos.criar'], async (req, res) => {
@@ -730,7 +732,8 @@ function registrarPedOrc({ rota, pool }) {
 
   // mudar a situação do pedido (menu do botão direito da lista). Entregue/Retirado gravam DATA_ENTREGA = hoje, como Pedido_Entregue/Pedido_Retirado do VB;
   // sair de Entregue/Retirado limpa a data. Com `manterData: true` a DATA_ENTREGA que já está gravada NÃO é tocada (o usuário escolhe na tela).
-  // Pedido Cancelado não muda por aqui. A fila de Entregas acompanha pela varredura (Pronto entra; sair de Pronto antes de agendar cancela).
+  // Pedido Cancelado não muda por aqui. A fila de Entregas acompanha pela varredura, disparada em segundo plano logo depois do commit
+  // (Pronto entra; sair de Pronto antes de agendar cancela; Entregue/Retirado encerra as que esperavam; voltar daí reabre as encerradas).
   const SITUACOES_MUDAR = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
   rota('post', '/ped_orc/:tipo/:numero/situacao', ['pedidos.situacao'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;
@@ -745,28 +748,36 @@ function registrarPedOrc({ rota, pool }) {
     if ((nova === 'Entregue' || nova === 'Retirado') && (req.body || {}).dataEntrega !== undefined && !escolhida) return res.status(400).json({ error: 'Data de entrega inválida.' });
     if (escolhida && escolhida > hojeLocal()) return res.status(400).json({ error: 'A data de entrega não pode ser futura.' });
     // Várias entregas por pedido (decisão do dono): marcar Entregue/Retirado à mão com entrega ainda aberta AVISA, não bloqueia.
-    // Sem `confirmarEntregasAbertas: true` a resposta é 409 com { aviso: 'entregas_abertas', entregasAbertas: n } e nada é gravado;
-    // a tela pergunta e reenvia com a confirmação (auditada à parte: pedido_situacao_entregas_abertas). Aberta = A programar, Agendada,
-    // Em rota, Ocorrência ou Enviada. As entregas abertas não são mexidas aqui (a varredura cancela só as A programar).
+    // Sem `confirmarEntregasAbertas: true` a resposta é 409 com { aviso: 'entregas_abertas', entregasAbertas: n, entregasEncerrar: a,
+    // entregasEmCurso: b } e nada é gravado; a tela pergunta e reenvia com a confirmação (auditada à parte: pedido_situacao_entregas_abertas).
+    // Aberta = A programar, Agendada, Em rota, Ocorrência ou Enviada. Confirmado (2026-11-11, "pedido entregue não tem o que entregar"):
+    // na MESMA transação, as A programar/Agendada/Ocorrência são encerradas como concluídas do tipo do pedido (evento 'encerrada');
+    // Em rota/Enviada continuam abertas (a carga está com o motorista/transportadora: ele conclui ou a equipe cancela).
     const confirmarAbertas = (req.body || {}).confirmarEntregasAbertas === true;
     let dataEntrega = null;
     const r = await emTransacao(pool, res, 'POST /ped_orc/situacao', async conn => {
       const linhas = await docParaAcao(conn, req, alvo.tipo, alvo.numero);
-      let abertas = 0;
+      let abertas = [];
       if ((nova === 'Entregue' || nova === 'Retirado') && linhas.cab.SITUACAO !== nova && linhas.cab.SITUACAO !== 'Cancelado') {
-        const [[c] = []] = await conn.execute(
-          "SELECT COUNT(*) AS n FROM web_entregas WHERE numero = ? AND status IN ('a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada')", [alvo.numero]);
-        abertas = Number(c?.n) || 0;
-        if (abertas && !confirmarAbertas) {
-          throw new ErroUsuario(409, `O pedido nº ${alvo.numero} tem ${abertas} entrega(s) em aberto. Marcar como ${nova} mesmo assim?`,
-            { aviso: 'entregas_abertas', entregasAbertas: abertas });
+        // ped_orc já está travado (docParaAcao): trava as entregas do número depois dele (ordem ped_orc -> web_entregas)
+        const [ents] = await conn.execute('SELECT id, status FROM web_entregas WHERE numero = ? FOR UPDATE', [alvo.numero]);
+        abertas = ents.filter(e => STATUS_ENCERRAVEIS.includes(e.status) || STATUS_EM_CURSO.includes(e.status));
+        if (abertas.length && !confirmarAbertas) {
+          const encerrar = abertas.filter(e => STATUS_ENCERRAVEIS.includes(e.status)).length;
+          throw new ErroUsuario(409, `O pedido nº ${alvo.numero} tem ${abertas.length} entrega(s) em aberto. Marcar como ${nova} mesmo assim?`,
+            { aviso: 'entregas_abertas', entregasAbertas: abertas.length, entregasEncerrar: encerrar, entregasEmCurso: abertas.length - encerrar });
         }
       }
       ({ dataEntrega } = await aplicarSituacaoPedido(conn, req, alvo, linhas.cab, { nova, manterData, usarDataPronto, escolhida }));
-      if (abertas) await auditarDoc(conn, req, 'pedido_situacao_entregas_abertas', alvo.tipo, alvo.numero, { para: nova, entregasAbertas: abertas });
+      if (abertas.length) {
+        const encerradas = await encerrarEntregasDoPedido(conn, { situacao: nova, quem: req.acesso?.nome || '', entregas: abertas });
+        await auditarDoc(conn, req, 'pedido_situacao_entregas_abertas', alvo.tipo, alvo.numero,
+          { para: nova, entregasAbertas: abertas.length, entregasEncerradas: encerradas });
+      }
       return { ok: true };
     });
-    if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega });
+    // a fila de Entregas acompanha já (Pronto entra, saiu de Pronto cancela A programar, voltou de Entregue/Retirado reabre), em segundo plano
+    if (r) { varrerEntregas({ forcar: true }); res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, situacao: nova, dataEntrega }); }
   });
 
   // alterar a DATA DE PRONTO (ped_orc.DATA_PRONTO = "Pronto em" do PDF / data prometida; é o campo "data de entrega" da tela de orçamentos) pelo menu do botão direito.

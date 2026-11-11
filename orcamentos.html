@@ -972,6 +972,7 @@
                 <div><small>Qtd</small><b id="avl-qtd">—</b></div>
                 <div><small>Alteração atual</small><b id="avl-hist-atual">—</b></div>
             </div>
+            <button type="button" class="btn btn-secondary" id="avl-zerar" title="Tira todas as porcentagens do item e volta o unitário para o valor original">↩ Voltar ao valor original (zerar porcentagens)</button>
             <label class="avl-final"><input type="checkbox" id="avl-final"> <span><b>Valor final</b><small>Digite o valor unitário final da peça; a diferença vira um percentual sobre o valor original e substitui as alterações anteriores</small></span></label>
             <div class="avl-bloco">
                 <div class="avl-pct-linha">
@@ -2969,6 +2970,7 @@
             $av('avl-hist-atual').textContent = textoHistorico(hist) || 'nenhuma';
             $av('avl-pct').value = '';
             $av('avl-final').checked = false;
+            $av('avl-zerar').disabled = !textoHistorico(hist);   // sem porcentagem não há o que zerar
             aplicarModoFinal();
             atualizarTelaAltv();
             $av('avl').scrollLeft = 0;
@@ -3016,6 +3018,15 @@
             if (fixo) focarAltv('avl-unit', true);
         }
         // txt_unitario_Leave (modo fixo): % total sobre a BASE; apaga as porcentagens anteriores
+        // Zera todas as porcentagens: o unitário volta para a base (valor original); só vale ao clicar em OK
+        function zerarPorcentagensAltv() {
+            if (!altv) return;
+            altv.historico = ''; altv.sessao = ''; altv.alvo = null;
+            $av('avl-final').checked = false;
+            $av('avl-pct').value = '';
+            aplicarModoFinal();
+            atualizarTelaAltv();
+        }
         function aplicarValorFinal() {
             if (!altv || !$av('avl-final').checked || !(altv.base > 0)) return;
             const novo = numBR($av('avl-unit').value);
@@ -4230,6 +4241,7 @@
         $av('avl-menos').addEventListener('click', () => adicionarOperacao(false));
         $av('avl-mais').addEventListener('click', () => adicionarOperacao(true));
         $av('avl-final').addEventListener('change', aplicarModoFinal);
+        $av('avl-zerar').addEventListener('click', zerarPorcentagensAltv);
         $av('avl-unit').addEventListener('change', aplicarValorFinal);
         // Enter só aplica o valor digitado (a confirmação é no OK)
         $av('avl-unit').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); aplicarValorFinal(); focarAltv('avl-unit', true); } });

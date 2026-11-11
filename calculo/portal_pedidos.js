@@ -36,9 +36,13 @@ function projetarPedido(linha) {
   // Com uma entrega só (ou sem contagens) o rótulo é o de sempre.
   const qtd = Number(l.QTD_ENTREGAS) || 0, concluidas = Number(l.QTD_ENTREGAS_CONCLUIDAS) || 0;
   const parcial = !finalizado && qtd > 1 && concluidas > 0 && concluidas < qtd;
+  // pedido já Entregue/Retirado (por qualquer caminho): a entrega nunca aparece como pendente nem cancelada para o cliente;
+  // o rótulo é o do próprio pedido (a varredura da equipe encerra as que esperavam; ver calculo/entregas.js)
+  const st = finalizado && l.ENTREGA_STATUS && l.ENTREGA_STATUS !== 'entregue' && l.ENTREGA_STATUS !== 'retirado'
+    ? (l.SITUACAO === 'Retirado' ? 'retirado' : 'entregue') : l.ENTREGA_STATUS;
   const entrega = parcial ? `Entregue parcialmente: ${concluidas} de ${qtd}`
-    : tem(ROTULO_ENTREGA, l.ENTREGA_STATUS) ? ROTULO_ENTREGA[l.ENTREGA_STATUS] : null;
-  const agendado = l.ENTREGA_STATUS === 'agendada' || l.ENTREGA_STATUS === 'em_rota';
+    : tem(ROTULO_ENTREGA, st) ? ROTULO_ENTREGA[st] : null;
+  const agendado = !finalizado && (st === 'agendada' || st === 'em_rota');
   return {
     numero: Number(l.NUMERO),
     data: l.DATA,

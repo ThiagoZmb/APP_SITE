@@ -375,31 +375,68 @@ function pedidoComEntregas(statuses) {
   const banco = bancoPedOrc();
   banco.pedOrc.push({ id: 5, TIPO: 'Pedido', NUMERO: 5, RAZAO_SOCIAL: 'CLIENTE TESTE', SITUACAO: 'Pronto', TOTAL: 100 });
   statuses.forEach((status, i) => banco.entregas.push({ id: i + 1, numero: 5, status }));
-  banco.f.regras.unshift([/^SELECT COUNT\(\*\) AS n FROM web_entregas WHERE numero = \? AND status IN \(([^)]*)\)/, (sql, [n]) => {
-    const abertos = /status IN \(([^)]*)\)/.exec(sql)[1].split(',').map(x => x.trim().replace(/'/g, ''));
-    return [{ n: banco.entregas.filter(e => e.numero === Number(n) && abertos.includes(e.status)).length }];
-  }]);
+  banco.f.regras.unshift(
+    // entregas do número, travadas depois do pedido (ordem ped_orc -> web_entregas)
+    [/^SELECT id, status FROM web_entregas WHERE numero = \? FOR UPDATE$/, (sql, [n]) =>
+      banco.entregas.filter(e => e.numero === Number(n)).map(e => ({ id: e.id, status: e.status }))],
+    // encerramento junto com o menu: UPDATE ... WHERE id IN (...) AND status IN (...)
+    [/^UPDATE web_entregas SET status = \?, atualizado_em = \? WHERE id IN \(([^)]*)\) AND status IN \(([^)]*)\)$/, (sql, params) => {
+      const nIds = /id IN \(([^)]*)\)/.exec(sql)[1].split(',').length;
+      const [para, quando, ...resto] = params; const ids = resto.slice(0, nIds), de = resto.slice(nIds);
+      const alvo = banco.entregas.filter(e => ids.includes(e.id) && de.includes(e.status));
+      alvo.forEach(e => { e.status = para; e.atualizado_em = quando; });
+      return { affectedRows: alvo.length };
+    }],
+    [/^INSERT INTO web_entrega_eventos \(entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a\) VALUES/, (sql, params) => {
+      for (let i = 0; i < params.length; i += 7) {
+        const [entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a] = params.slice(i, i + 7);
+        banco.entregaEventos.push({ id: banco.entregaEventos.length + 1, entrega_id, quando, usuario, tipo, motivo, detalhe, entregue_a });
+      }
+      return { affectedRows: params.length / 7 };
+    }]);
   return banco;
 }
 
-test('menu "Entregue" com entrega aberta: 409 com aviso (nada gravado); com confirmarEntregasAbertas grava como antes e audita o número', async t => {
+test('menu "Entregue" com entrega aberta: 409 com aviso (nada gravado); com confirmarEntregasAbertas grava e ENCERRA junto a que esperava', async t => {
   const banco = pedidoComEntregas(['entregue', 'agendada']);
   const { chamar } = await prepararPedOrc(t, { banco });
   let r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue' });
   assert.equal(r.status, 409);
   const d = await r.json();
-  assert.deepEqual([d.aviso, d.entregasAbertas], ['entregas_abertas', 1]);
+  assert.deepEqual([d.aviso, d.entregasAbertas, d.entregasEncerrar, d.entregasEmCurso], ['entregas_abertas', 1, 1, 0]);
   assert.match(d.error, /1 entrega\(s\) em aberto/);
   assert.equal(banco.pedOrc[0].SITUACAO, 'Pronto');
   assert.equal(banco.auditoria.length, 0);
+  assert.equal(banco.entregas.find(e => e.id === 2).status, 'agendada', 'sem confirmação nada muda');
   r = await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Entregue', confirmarEntregasAbertas: true });
   assert.equal(r.status, 200);
   assert.equal(banco.pedOrc[0].SITUACAO, 'Entregue');
   assert.equal(banco.pedOrc[0].DATA_ENTREGA, hojeLocal());
   assert.deepEqual(JSON.parse(banco.auditoria[0].detalhe), { cliente: 'CLIENTE TESTE', de: 'Pronto', para: 'Entregue' }, 'auditoria de sempre');
   assert.equal(banco.auditoria[1].acao, 'pedido_situacao_entregas_abertas');
-  assert.deepEqual(JSON.parse(banco.auditoria[1].detalhe), { para: 'Entregue', entregasAbertas: 1 });
-  assert.equal(banco.entregas.find(e => e.id === 2).status, 'agendada', 'a entrega aberta não é mexida pelo menu');
+  assert.deepEqual(JSON.parse(banco.auditoria[1].detalhe), { para: 'Entregue', entregasAbertas: 1, entregasEncerradas: 1 });
+  // decisão 2026-11-11: pedido entregue não tem o que entregar -> a Agendada vira 'entregue' (nunca 'cancelada'), com evento explicando
+  assert.equal(banco.entregas.find(e => e.id === 2).status, 'entregue');
+  assert.equal(banco.entregas.find(e => e.id === 1).status, 'entregue', 'a já concluída não muda');
+  const ev = banco.entregaEventos.filter(v => v.entrega_id === 2);
+  assert.equal(ev.length, 1);
+  assert.deepEqual([ev[0].tipo, ev[0].usuario, ev[0].motivo, JSON.parse(ev[0].detalhe).statusAnterior],
+    ['encerrada', 'Thiago', 'Pedido marcado como Entregue pelo menu de situação', 'agendada']);
+  // a trava das entregas vem DEPOIS da do pedido (ordem ped_orc -> web_entregas)
+  const sqls = banco.f.chamadas.map(c => c.sql);
+  const iPed = sqls.findIndex(s => /FROM ped_orc[\s\S]*FOR UPDATE/.test(s)), iEnt = sqls.findIndex(s => /^SELECT id, status FROM web_entregas WHERE numero = \? FOR UPDATE$/.test(s));
+  assert.ok(iPed >= 0 && iEnt > iPed, 'ped_orc travado antes de web_entregas');
+});
+
+test('menu "Retirado" com A programar + Ocorrência + Em rota: encerra as duas que esperavam como retirado; Em rota fica aberta', async t => {
+  const banco = pedidoComEntregas(['a_programar', 'ocorrencia', 'em_rota', 'cancelada']);
+  const { chamar } = await prepararPedOrc(t, { banco });
+  const d = await (await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Retirado' })).json();
+  assert.deepEqual([d.entregasAbertas, d.entregasEncerrar, d.entregasEmCurso], [3, 2, 1]);
+  assert.equal((await chamar('/ped_orc/Pedido/5/situacao', 'POST', { situacao: 'Retirado', confirmarEntregasAbertas: true })).status, 200);
+  assert.deepEqual(banco.entregas.map(e => e.status), ['retirado', 'retirado', 'em_rota', 'cancelada']);
+  assert.deepEqual(banco.entregaEventos.map(v => [v.entrega_id, v.tipo, JSON.parse(v.detalhe).statusAnterior]), [[1, 'encerrada', 'a_programar'], [2, 'encerrada', 'ocorrencia']]);
+  assert.deepEqual(JSON.parse(banco.auditoria[1].detalhe), { para: 'Retirado', entregasAbertas: 3, entregasEncerradas: 2 });
 });
 
 test('menu "Retirado" sem entrega aberta segue direto; "Em Produção" nunca pergunta; confirmação que não é true não vale', async t => {
@@ -483,7 +520,7 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611101800/);
-  assert.match(h, /entregas\.js\?v=202611101900/);
+  assert.match(h, /entregas\.js\?v=202611111200/);
   assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611101900/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611101800/);
   const js = ler('entregas.js');
@@ -509,7 +546,11 @@ test('menu do Início: "Ver entregas (1 de 2 entregues)" com várias entregas; u
   assert.equal(ver({ entregaStatus: 'agendada', qtdEntregas: 1, qtdEntregasConcluidas: 0 }), 'Ver entrega (Agendada)');
   assert.equal(ver({ entregaStatus: 'agendada' }), 'Ver entrega (Agendada)');
   assert.equal(M.andamentoEntregas({ qtdEntregas: 3, qtdEntregasConcluidas: 0 }), '0 de 3 entregues');
-  assert.equal(M.avisoEntregasAbertas(2, 'Entregue'), 'Este pedido tem 2 entrega(s) em aberto. Marcar como Entregue mesmo assim?');
+  assert.equal(M.avisoEntregasAbertas(2, 'Entregue'), 'Este pedido tem 2 entrega(s) em aberto. Marcar como Entregue mesmo assim?', 'sem contagens (servidor antigo): texto curto');
+  assert.equal(M.avisoEntregasAbertas(2, 'Retirado', 1, 1), 'Este pedido tem 2 entrega(s) em aberto. 1 (a programar, agendada ou com ocorrência) será encerrada junto como Retirado.'
+    + ' 1 em rota/enviada continua aberta: conclua ou cancele na tela de Entregas. Marcar como Retirado mesmo assim?');
+  assert.equal(M.avisoEntregasAbertas(3, 'Entregue', 3, 0), 'Este pedido tem 3 entrega(s) em aberto. 3 (a programar, agendada ou com ocorrência) serão encerradas junto como Entregue. Marcar como Entregue mesmo assim?');
+  assert.ok(ler('inicio_menu.js').includes('avisoEntregasAbertas(d.entregasAbertas, nome, d.entregasEncerrar, d.entregasEmCurso)'));
   const js = ler('inicio_menu.js');
   assert.ok(js.includes("d.aviso === 'entregas_abertas'") && js.includes('confirmarEntregasAbertas: true'));
 });
@@ -523,7 +564,7 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
   assert.ok(ler('clientes.html').includes('${seloAndamento(p)}'));
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("err.dados.aviso === 'entregas_abertas'") && p.includes('confirmarEntregasAbertas: true'));
-  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611101800/, f);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611111200/, f);
 });
 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {
