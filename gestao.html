@@ -104,10 +104,11 @@
             .linha2, .linha3 { grid-template-columns: 1fr; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611171200">
+    <link rel="stylesheet" href="tema.css?v=202611181200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
     <script src="gestao.js?v=202610272200" defer></script>
+    <script src="olho_resumos.js?v=202611181200"></script>
 </head>
 <body>
     <div class="container">
@@ -128,7 +129,7 @@
             <h1 class="welcome-title">Central de Gestão</h1>
             <p class="welcome-subtitle">Metas, caixa realizado e previsto, orçamento por categoria e alertas do mês. Os números vêm do sistema antigo (pedidos e fluxo de caixa); os alertas só informam, não bloqueiam nada.</p>
 
-            <div class="barra-mes">
+            <div class="barra-mes" data-olho-destino>
                 <button type="button" class="btn btn-secondary" id="mes-ant" aria-label="Mês anterior">‹</button>
                 <label for="mes" class="cinza">Mês</label>
                 <input type="month" id="mes" aria-label="Mês">
@@ -138,7 +139,7 @@
             </div>
             <p class="aviso-periodo" id="aviso-periodo" role="status" hidden></p>
 
-            <div class="cartoes">
+            <div class="cartoes" data-resumo>
                 <section class="painel" id="cartao-faturamento" aria-live="polite"><p class="vazio">Carregando…</p></section>
                 <section class="painel" id="cartao-despesa" aria-live="polite"><p class="vazio">Carregando…</p></section>
             </div>

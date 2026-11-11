@@ -235,5 +235,5 @@ test('visual: sem style= nem cor solta no JS, estilos hp-* no tema.css só com v
   assert.ok(/class[^]*'rolagem hp-rolagem'/.test(js) || js.includes("'rolagem hp-rolagem'"), 'a lista usa o quadro .rolagem (th sticky do tema)');
   assert.ok(/:where\(\.tabela-wrap, \.lista-wrap, \.rolagem/.test(css));
   const versoes = new Set(fs.readdirSync(path.join(__dirname, '..')).filter(f => f.endsWith('.html')).flatMap(f => [...ler(f).matchAll(/tema\.css\?v=(\d+)/g)].map(m => m[1])));
-  assert.deepEqual([...versoes], ['202611171200']);
+  assert.deepEqual([...versoes], ['202611181200']);
 });

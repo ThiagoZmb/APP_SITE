@@ -394,8 +394,9 @@
         .pe-raiz-btn:disabled, #pe-raiz .btn:disabled { opacity: .5; cursor: not-allowed; }
         @media (prefers-reduced-motion: reduce) { .pe-palco canvas { transition: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611171200">
+    <link rel="stylesheet" href="tema.css?v=202611181200">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="olho_resumos.js?v=202611181200"></script>
 </head>
 <body>
     <div class="container">
@@ -423,7 +424,7 @@
             <h1 class="welcome-title">Cadastro de Produtos</h1>
             <p class="welcome-subtitle">Produtos de venda usados nos orçamentos: perfis, puxadores, revestimentos, acessórios e sistemas.</p>
 
-            <section class="cards">
+            <section class="cards" data-resumo>
                 <div class="card">
                     <div class="card-header"><span class="card-title">Produtos cadastrados</span><div class="card-icon">🏷️</div></div>
                     <div class="card-value" id="c-total">—</div>

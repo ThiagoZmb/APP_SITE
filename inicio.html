@@ -302,7 +302,7 @@
 
         @media (max-width: 1100px) { .grade { grid-template-columns: 1fr; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611171200">
+    <link rel="stylesheet" href="tema.css?v=202611181200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="inicio_menu.js?v=202611171200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
@@ -313,6 +313,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
+    <script src="olho_resumos.js?v=202611181200"></script>
 </head>
 <body>
     <div class="container">
@@ -355,7 +356,7 @@
             </section>
 
             <!-- ===== INDICADORES DO MÊS ===== -->
-            <section class="cards" data-perm="pedidos.ver">
+            <section class="cards" data-resumo data-perm="pedidos.ver">
                 <div class="card">
                     <div class="card-header"><span class="card-title">Pedidos no mês</span><div class="card-icon">📦</div></div>
                     <div class="card-value" id="k-ped-valor">—</div>
@@ -398,7 +399,7 @@
 
             <!-- ===== EQUIPE INTERNA: FINANCEIRO + ESTOQUE ===== -->
             <section class="grade" id="bloco-interno">
-                <div class="painel" data-perm="financeiro.ver valores.ver">
+                <div class="painel" data-resumo data-perm="financeiro.ver valores.ver">
                     <div class="painel-head">
                         <div class="painel-titulo">Financeiro do mês</div>
                         <a class="ver-tudo" href="financeiro.html">Abrir fluxo de caixa →</a>
@@ -556,8 +557,11 @@
         }
 
         // ============ FINANCEIRO + ESTOQUE (equipe interna) ============
-        async function carregarInterno() {
-            if (Acesso.pode('financeiro.ver valores.ver')) api('/fluxo/resumo').then(r => {
+        // "Financeiro do mês" é um resumo (olho dos resumos): escondido, não busca /fluxo/resumo; busca ao mostrar
+        function carregarFinanceiroMes() {
+            if (!Acesso.pode('financeiro.ver valores.ver')) return;
+            if (OlhoResumos.adiar(carregarFinanceiroMes)) return;
+            api('/fluxo/resumo').then(r => {
                 $('f-recebido').textContent = moeda(r.recebido);
                 $('f-areceber').textContent = moeda(r.aReceber);
                 $('f-pago').textContent = moeda(r.pago);
@@ -565,6 +569,9 @@
                 $('f-atrasado').textContent = moeda(r.atrasado);
                 $('f-saldo').textContent = moeda(r.saldo);
             }).catch(() => { $('f-saldo').textContent = 'indisponível'; });
+        }
+        async function carregarInterno() {
+            carregarFinanceiroMes();
 
             if (!Acesso.pode('estoque.ver')) return;
             try {

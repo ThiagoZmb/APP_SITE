@@ -209,6 +209,10 @@ Cantos curtos e consistentes: **6px** (controles, botões, linhas de ranking), *
 - **Saldo / destaque:** mesmo cartão com borda âmbar a 50% e o número em âmbar. Não há cartão preenchido de âmbar.
 - **Painel:** Painel com filete, raio 8px, título 17px.
 
+### Olho dos resumos
+- Botão de olho (`.olho-resumos`, `olho_resumos.js` + bloco "OLHO DOS RESUMOS" do `tema.css`) que mostra ou esconde os blocos de números-resumo do topo da tela (cartões de indicador, faixas "Operação agora"/"Resultado do período"). **A tela sempre inicia com os resumos escondidos** (decisão do dono, 2026-11-11): a escolha não é guardada entre visitas. Escondido por CSS (`body:not(.resumos-on) [data-resumo]`), então não há flash e a lista principal sobe e ocupa o espaço.
+- Uso: `data-resumo` no bloco (junto de `data-perm`/`data-valor`, que continuam mandando; o botão some se nenhum resumo é permitido); `data-olho-destino` no elemento de filtros/título onde o botão entra (sem ele, uma barrinha acima do primeiro resumo). Botão: `aria-pressed`, `aria-label` "Mostrar resumos"/"Ocultar resumos", ícones SVG de olho aberto/fechado, alvo de 40px (44px em toque). Busca só para os resumos: `if (OlhoResumos.adiar(fn)) return;` (escondido, nada vai ao banco; roda ao mostrar). Resumo novo no topo de uma tela segue este padrão.
+
 ### Inputs / Fields
 - Fundo Grafite de Fundo (mais escuro que o painel), filete firme, raio 6px, altura mínima 42px; rótulo 12px/700 Tinta Média sem maiúsculas.
 - **Foco:** borda âmbar + anel de 3px. **Somente leitura:** número em âmbar. **Desabilitado:** `#181a1f`, borda tracejada, cursor bloqueado.

@@ -439,9 +439,10 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611171200">
+    <link rel="stylesheet" href="tema.css?v=202611181200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="fluxo_divisao.js?v=202611101300"></script>
+    <script src="olho_resumos.js?v=202611181200"></script>
 </head>
 <body>
     <div class="container">
@@ -469,7 +470,7 @@
             <h1 class="welcome-title">Fluxo de Caixa</h1>
             <p class="welcome-subtitle">Entradas e saídas, contas a pagar e a receber. Resumo do mês atual.</p>
 
-            <section class="cards compacto">
+            <section class="cards compacto" data-resumo>
                 <div class="card entrada clicavel" data-modo="recebido" title="Ver todos os recebidos">
                     <div class="card-header"><span class="card-title">Recebido</span><div class="card-icon">⬇️</div></div>
                     <div class="card-value" id="c-recebido">—</div><div class="card-sub">no mês</div>
@@ -760,6 +761,7 @@
 
         // ============ RESUMO (Carregar_Resumo_Mes) ============
         async function carregarResumo() {
+            if (OlhoResumos.adiar(carregarResumo)) return; // olho fechado: sem ida ao banco; a busca roda ao mostrar
             try {
                 const r = await api('/fluxo/resumo');
                 $('c-recebido').textContent = moeda(r.recebido);

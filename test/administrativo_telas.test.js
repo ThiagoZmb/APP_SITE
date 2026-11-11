@@ -14,7 +14,7 @@ test('layout.js: gráficos de pedidos e análise de cliente exigem a chave; pág
 
 test('estoque.html: cartões de resumo, gráfico do item e aba Análises só com a chave; resumo sem totais não quebra a tela; gráfico não chama o servidor sem a chave', () => {
   const h = ler('estoque.html');
-  assert.match(h, /<section class="cards" data-perm="administrativo\.ver">/);
+  assert.match(h, /<section class="cards" data-perm="administrativo\.ver" data-resumo>/);
   assert.match(h, /<div class="grafico-box" data-perm="administrativo\.ver">/);
   assert.match(h, /data-aba="analises" data-perm="administrativo\.ver"/);
   assert.match(h, /if \(r\.ativos !== undefined\) \{/);

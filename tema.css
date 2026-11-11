@@ -849,3 +849,26 @@ select option:disabled { color: #6b7280; }
   .dv-resumo > div { flex-direction: row; align-items: baseline; justify-content: space-between; padding: 10px 12px; }
   .dv-campos { grid-template-columns: 1fr; }
 }
+
+/* ===== OLHO DOS RESUMOS (olho_resumos.js) =====
+   Os blocos de números-resumo do topo (data-resumo) iniciam ESCONDIDOS em toda tela; o botão de olho os mostra.
+   Esconder por padrão aqui (e não no JS) evita o "flash" dos resumos antes do script rodar. Escondido = display:none,
+   então filtros, busca e a lista principal sobem e ocupam o espaço. */
+body:not(.resumos-on) [data-resumo] { display: none !important; }
+/* grade de dois painéis (Início) em que um deles é resumo: o que sobra ocupa a linha inteira em vez de deixar metade vazia */
+body:not(.resumos-on) .grade:has(> [data-resumo]) { grid-template-columns: minmax(0, 1fr) !important; }
+.olho-barra { display: flex; margin: 0 0 8px; }
+.olho-barra[hidden], .olho-resumos[hidden] { display: none !important; }
+body .olho-resumos {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; min-width: 40px; padding: 0 12px;
+    background: var(--surface-2); color: var(--text-mid); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
+    transition: border-color .12s, color .12s, background .12s;
+}
+body .olho-resumos:hover { border-color: var(--primary-color); color: var(--primary-color); background: var(--primary-light); }
+body .olho-resumos:focus-visible { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-ring); }
+body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-color: var(--primary-ring); background: var(--primary-light); }
+.olho-resumos .olho-ico { width: 20px; height: 20px; flex: 0 0 auto; }
+.olho-resumos[aria-pressed="true"] .olho-ico-off, .olho-resumos[aria-pressed="false"] .olho-ico-on { display: none; }
+@media (pointer: coarse) { body .olho-resumos { min-height: 44px; min-width: 44px; } }
+@media (prefers-reduced-motion: reduce) { body .olho-resumos { transition: none; } }

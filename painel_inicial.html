@@ -268,7 +268,7 @@
         #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611171200">
+    <link rel="stylesheet" href="tema.css?v=202611181200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
@@ -280,6 +280,7 @@
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
+    <script src="olho_resumos.js?v=202611181200"></script>
 </head>
 <body>
     <div class="container">
@@ -298,7 +299,7 @@
             </div>
 
             <!-- ===== FILTROS ===== -->
-            <section class="filtros">
+            <section class="filtros" data-olho-destino>
                 <label for="periodo">Período</label>
                 <select id="periodo">
                     <option value="mes">Este mês</option>
@@ -319,14 +320,14 @@
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
             <div id="conteudo" hidden>
                 <!-- ===== OPERAÇÃO AGORA ===== -->
-                <section class="painel so-geral" data-perm="indicadores.ver" style="margin-bottom:12px">
+                <section class="painel so-geral" data-resumo data-perm="indicadores.ver" style="margin-bottom:12px">
                     <div class="cab"><h3>Operação agora</h3><small>situação atual dos pedidos, independente do período</small></div>
                     <div class="operacao" id="operacao"></div>
                 </section>
 
                 <!-- ===== RESULTADO DO PERÍODO ===== -->
-                <div class="bloco-tit so-geral" data-perm="indicadores.ver">Resultado do período</div>
-                <section class="kpis so-geral" data-perm="indicadores.ver" id="kpis-periodo"></section>
+                <div class="bloco-tit so-geral" data-resumo data-perm="indicadores.ver">Resultado do período</div>
+                <section class="kpis so-geral" data-resumo data-perm="indicadores.ver" id="kpis-periodo"></section>
 
                 <!-- ===== LISTA ===== -->
                 <section class="painel" style="margin-bottom:18px">
@@ -498,6 +499,7 @@
         let seqIndicadores = 0;
         async function carregarIndicadores() {
             if (!Acesso.pode('indicadores.ver')) return; // sem a permissão nem se pede ao servidor
+            if (OlhoResumos.adiar(carregarIndicadores)) return; // olho fechado: nada de ida ao banco; a busca roda ao mostrar
             const meu = ++seqIndicadores;
             try {
                 const d = await api('/painel/indicadores?periodo=' + encodeURIComponent($('periodo').value) + (cliente ? '&cliente=' + encodeURIComponent(cliente) : ''));
