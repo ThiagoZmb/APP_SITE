@@ -118,6 +118,8 @@
         sep(); L.push({ titulo: 'Mudar situação para' });
         for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual }); }
       }
+      // histórico do pedido (web_auditoria): quem mudou a situação/data de pronto e quando; o servidor confere permissão e estados
+      sep(); add('pedidos.ver', '🕘', 'Histórico do pedido', () => window.HistoricoPedido.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
       if (x.entregaStatus && cfg.pode('entregas.ver')) {
         // com várias entregas abre a lista de TODAS as entregas do pedido (entregas.html?pedido=N)
         const andamento = andamentoEntregas(x);

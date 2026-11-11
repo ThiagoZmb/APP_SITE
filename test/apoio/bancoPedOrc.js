@@ -99,6 +99,11 @@ function bancoPedOrc() {
       const fica = estado.entregaEventos.filter(a => a.entrega_id !== id); estado.entregaEventos.splice(0, estado.entregaEventos.length, ...fica); return { affectedRows: 1 }; }],
     [/^DELETE FROM web_entregas WHERE id = \?$/, (sql, [id]) => {
       const fica = estado.entregas.filter(a => a.id !== id); estado.entregas.splice(0, estado.entregas.length, ...fica); return { affectedRows: 1 }; }],
+    // histórico do pedido (GET /ped_orc/Pedido/:n/historico): linhas de web_auditoria do alvo, ações da lista, mais novas primeiro
+    [/^SELECT id, DATE_FORMAT\(quando.*FROM web_auditoria WHERE alvo = \? AND acao IN \([?, ]+\) ORDER BY id DESC LIMIT \d+$/, (sql, params) => {
+      const [alvo, ...acoes] = params, limite = Number(sql.match(/LIMIT (\d+)$/)[1]);
+      return estado.auditoria.map((l, i) => ({ id: i + 1, quando: l.quando, quem: l.quem, acao: l.acao, alvo: l.alvo, detalhe: l.detalhe }))
+        .filter(l => l.alvo === alvo && acoes.includes(l.acao)).sort((a, b) => b.id - a.id).slice(0, limite); }],
     // cabeçalho
     // InnoDB (REPEATABLE READ): leitura comum vê a foto do início da transação; FOR UPDATE vê o que já foi gravado
     [/SELECT MAX\(NUMERO\) AS m FROM ped_orc WHERE TIPO = \?/, (sql, [t]) => {

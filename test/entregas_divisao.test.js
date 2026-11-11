@@ -340,7 +340,7 @@ test('motorista: lista e detalhe mostram SÓ os itens da própria entrega, com "
   assert.equal(entregas.length, 1);
   assert.deepEqual([entregas[0].qtdItens, entregas[0].ordemEntrega, entregas[0].qtdEntregasPedido], [1, 2, 2]);
   const d = await (await chamar(`/minhas_entregas/${nova.id}`)).json();
-  assert.deepEqual(d.itens, [{ descricao: 'Trilho', qtd: 1.5 }]);
+  assert.deepEqual(d.itens, [{ item: 2, descricao: 'Trilho', qtd: 1.5 }]);
   assert.equal(d.qtdItens, 1);
   assert.equal((await separar(chamar, nova.id, [{ numeroItem: 2, quantidade: 1 }])).status, 403);
 });
@@ -519,10 +519,10 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   assert.match(h, /id="sp-resumo"[^>]*aria-live="polite"/);
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
-  assert.match(h, /entregas_comum\.js\?v=202611101800/);
-  assert.match(h, /entregas\.js\?v=202611111700/);
-  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611101900/);
-  assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611101800/);
+  assert.match(h, /entregas_comum\.js\?v=202611112000/);
+  assert.match(h, /entregas\.js\?v=202611112000/);
+  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611112000/);
+  assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611112000/);
   const js = ler('entregas.js');
   assert.ok(js.includes("data-sobra=\"gerar\"") && js.includes('Gerar entrega do saldo') && js.includes('Encerrar saldo'));
   assert.ok(js.includes('/saldo/encerrar') && js.includes('/separar'));
@@ -564,7 +564,7 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
   assert.ok(ler('clientes.html').includes('${seloAndamento(p)}'));
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("err.dados.aviso === 'entregas_abertas'") && p.includes('confirmarEntregasAbertas: true'));
-  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611111200/, f);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611171200/, f);
 });
 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {
@@ -639,7 +639,7 @@ test('motorista: o detalhe da entrega mostra a observação de cada item (e a li
   Object.assign(banco.itens.find(i => i.ITEM === 1), { OBSERVACAO: 'conferir o gabarito' });
   const { chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: { codigo: 21, nome: 'Motorista Um' }, banco });
   const d = await (await chamar(`/minhas_entregas/${nova.id}`)).json();
-  assert.deepEqual(d.itens, [{ descricao: 'Porta', qtd: 1, observacao: 'levar com a ferragem separada' }, { descricao: 'Trilho', qtd: 1 }]);
+  assert.deepEqual(d.itens, [{ item: 1, descricao: 'Porta', qtd: 1, observacao: 'levar com a ferragem separada' }, { item: 2, descricao: 'Trilho', qtd: 1 }]);
   assert.ok(!JSON.stringify(d).includes('conferir'), 'a observação do orçamento não vai ao motorista');
 });
 

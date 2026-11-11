@@ -158,7 +158,7 @@ test('menu do calendário: cada item some sem a permissão correspondente', () =
   sem('corte.ver', 'Corte de perfil');
   sem('corte.ver', 'Corte de vidros');
   sem('orcamentos.criar', 'Abrir para editar');
-  assert.deepEqual(carregarMenu(new Set(['pedidos.ver'])).itensDoMenu(ped(7)), [], 'só pedidos.ver: menu vazio');
+  assert.deepEqual(rotulos(carregarMenu(new Set(['pedidos.ver'])).itensDoMenu(ped(7))), ['Histórico do pedido'], 'só pedidos.ver: só o histórico');
 });
 
 test('menu do calendário: pedido cancelado não tem data de pronto, situação nem cortes', () => {
@@ -204,7 +204,7 @@ for (const [html, js, ids] of [
     assert.ok(h.indexOf('tema.css') > h.indexOf('calendario.css'));
     // scripts do menu do botão direito + os da tela, todos com ?v= e defer, e na ordem em que dependem uns dos outros
     const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-    assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'calendario_comum.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js',
+    assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'calendario_comum.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
       'danfe_pedido.js', 'etiqueta_zebra.js', 'checklist_pedido.js', js]);
     assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
     assert.doesNotMatch(h, /\son[a-z]+=/i);

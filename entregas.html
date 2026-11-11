@@ -45,6 +45,11 @@
         .aba.ativo { color: var(--primary-color); border-bottom-color: var(--primary-color); }
         .contagem { display: inline-block; margin-left: 6px; font-size: 12px; background: var(--primary-light); color: var(--primary-color); padding: 1px 8px; border-radius: 20px; }
         .busca input { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; background: var(--secondary-color); margin-bottom: 14px; }
+        .busca-linha { display: flex; gap: 10px; align-items: flex-start; }
+        .busca-linha .busca { flex: 1; min-width: 0; }
+        #btn-atualizar { flex: none; }
+        #btn-atualizar:disabled { opacity: .65; cursor: progress; }
+        .ico-atualizar { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         .busca input:focus { outline: none; border-color: var(--primary-color); }
         .lista-wrap { max-height: 640px; overflow: auto; border-top: 1px solid var(--border-color); }
         table { width: 100%; border-collapse: collapse; }
@@ -188,10 +193,10 @@
         .sep-resumo strong { color: var(--text-dark); }
         .sep-resumo .aviso-divisao { margin: 8px 0 0; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611161500">
+    <link rel="stylesheet" href="tema.css?v=202611171200">
     <script src="layout.js?v=202611091200" defer></script>
-    <script src="entregas_comum.js?v=202611101800" defer></script>
-    <script src="entregas.js?v=202611111700" defer></script>
+    <script src="entregas_comum.js?v=202611112000" defer></script>
+    <script src="entregas.js?v=202611112000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -216,13 +221,16 @@
                 <section class="painel">
                     <div class="painel-head">
                         <div class="abas" role="tablist">
-                            <button type="button" class="aba ativo" role="tab" data-aba="fila">Fila<span class="contagem" hidden></span></button>
+                            <button type="button" class="aba ativo" role="tab" data-aba="fila">A programar<span class="contagem" hidden></span></button>
                             <button type="button" class="aba" role="tab" data-aba="agenda">Agenda</button>
                             <button type="button" class="aba" role="tab" data-aba="em_rota">Em rota</button>
                             <button type="button" class="aba" role="tab" data-aba="concluidas">Concluídas</button>
                             <button type="button" class="aba" role="tab" data-aba="ocorrencias">Ocorrências<span class="contagem" hidden></span></button>
                         </div>
-                        <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
+                        <div class="busca-linha">
+                            <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
+                            <button type="button" class="btn btn-secondary" id="btn-atualizar" title="Atualizar as listas e a fila" aria-label="Atualizar as listas de entregas"><svg class="ico-atualizar" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg><span class="rot">Atualizar</span></button>
+                        </div>
                     </div>
                     <div class="lista-wrap" id="lista"><p class="vazio">Carregando…</p></div>
                 </section>

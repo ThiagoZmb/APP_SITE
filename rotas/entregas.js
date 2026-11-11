@@ -221,8 +221,8 @@ async function encerrarEntregasDoPedido(conn, { situacao, quem, entregas }) {
 // itens do pedido para exibir na entrega (e na baixa): só descrição e quantidade, nunca preços
 async function itensDoPedido(conn, numero) {
   const [linhas] = await conn.execute(
-    "SELECT DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = ? ORDER BY ITEM", [numero]);
-  return linhas.map(l => ({ descricao: l.DESCRICAO || '', qtd: Number(l.QTD) || 0 }));
+    "SELECT ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = ? ORDER BY ITEM", [numero]);
+  return linhas.map(l => ({ item: l.ITEM !== null && l.ITEM !== undefined && Number.isFinite(Number(l.ITEM)) ? Number(l.ITEM) : null, descricao: l.DESCRICAO || '', qtd: Number(l.QTD) || 0 }));
 }
 
 // ---- Divisão da entrega (várias entregas por pedido, etapas 4 a 6) ----
@@ -483,10 +483,11 @@ function registrarEntregas({ rota, pool }) {
       const [[r]] = await pool.execute(
         `SELECT e.*, p.SITUACAO AS situacao_pedido, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
                 c.ENDERECO AS cli_endereco, c.NUMERO AS cli_numero, c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade,
-                c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone
+                c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone, mu.NOME AS motorista_nome
          FROM web_entregas e
          LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
+         LEFT JOIN cliente_usuarios mu ON mu.CODIGO = e.motorista_codigo
          WHERE e.id = ?${est.sql ? ` AND ${est.sql}` : ''}`, [id, ...(est.sql ? est.params : [])]);
       if (!r) return nao_encontrada(res);
       // histórico, comprovantes e divisão do pedido são independentes: saem juntos
@@ -510,7 +511,7 @@ function registrarEntregas({ rota, pool }) {
         divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
           podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && r.situacao_pedido === 'Pronto' && !d?.alterado && itensEntrega.length > 0,
           itensSemEntrega: d ? itensResumo(d.sobra) : [] },
-        entrega: { ...paraEntrega(r), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
+        entrega: { ...paraEntrega(r), motoristaNome: r.motorista_nome || null, statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
           canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
@@ -910,7 +911,7 @@ function registrarEntregas({ rota, pool }) {
         pool.execute('SELECT quando, tipo, motivo, entregue_a FROM web_entrega_eventos WHERE entrega_id = ? ORDER BY id', [id]),
         pool.execute('SELECT id, tipo, mime, criado_em FROM web_entrega_anexos WHERE entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?) ORDER BY id', [id, String(DONO(req))])]);
       const d = divisoes.get(Number(e.numero));
-      const itens = (d?.porEntrega.get(Number(id)) || []).map(i => ({ descricao: i.descricao, qtd: i.qtd, ...(i.observacao ? { observacao: i.observacao } : {}) }));
+      const itens = (d?.porEntrega.get(Number(id)) || []).map(i => ({ item: i.item, descricao: i.descricao, qtd: i.qtd, ...(i.observacao ? { observacao: i.observacao } : {}) }));
       const ordem = ordemNoPedido(d?.entregas || [], id);
       res.json({
         ...itemMotorista({ ...e, ...(ficha || {}), qtd_entregas_pedido: ordem.qtdEntregasPedido, ordem_entrega: ordem.ordemEntrega }, itens.length), itens, observacao: e.observacao ?? null,

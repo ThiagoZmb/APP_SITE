@@ -50,6 +50,8 @@
 
   // "Entrega n de N" (pedido dividido em várias entregas): a API só manda ordemEntrega/qtdEntregasPedido quando N > 1
   // e a entrega não está cancelada; nos outros casos o rótulo é vazio (pedido de uma entrega fica como sempre).
+  // "Item 3 · Descrição": o número é o ITEM do pedido (ped_orc_lista_itens.ITEM); sem número válido, só a descrição
+  const rotuloItem = i => (i && i.item !== null && i.item !== undefined && i.item !== '' && Number.isFinite(Number(i.item)) ? 'Item ' + i.item + ' · ' : '') + (i && i.descricao ? i.descricao : '');
   const rotuloSequencia = e => (e && Number(e.qtdEntregasPedido) > 1 && Number(e.ordemEntrega) > 0 ? `Entrega ${Number(e.ordemEntrega)} de ${Number(e.qtdEntregasPedido)}` : '');
 
   // maior lado limitado a `max`, sem ampliar
@@ -122,5 +124,5 @@
   }
 
   return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem,
-    rotuloSequencia };
+    rotuloSequencia, rotuloItem };
 });

@@ -7,6 +7,7 @@ const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcess
 const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const DescontoPedido = require('../calculo/desconto_pedido');
+const { ACOES_HISTORICO, LIMITE_HISTORICO, montarHistorico } = require('../calculo/historico_pedido');
 const express = require('express');
 const { validarPng } = require('../calculo/png');
 const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
@@ -794,6 +795,27 @@ function registrarPedOrc({ rota, pool }) {
       return { ok: true };
     });
     if (r) res.json({ ok: true, tipo: alvo.tipo, numero: alvo.numero, dataPronto: nova });
+  });
+
+  // Histórico do pedido (menu do botão direito): o que a web registrou em web_auditoria sobre o pedido (situação, data de pronto, cancelamento, desconto, aviso de preço),
+  // do mais novo para o mais antigo, até LIMITE_HISTORICO linhas. Somente leitura, SEM dinheiro (o texto é montado em calculo/historico_pedido.js). Mudanças feitas no VB não aparecem.
+  // Permissão pedidos.ver + estados do usuário (mesma checagem das rotas de documento).
+  rota('get', '/ped_orc/Pedido/:numero/historico', ['pedidos.ver'], async (req, res) => {
+    const numero = Number(req.params.numero);
+    if (!(Number.isInteger(numero) && numero > 0)) return res.status(400).json({ error: 'Documento inválido.' });
+    try {
+      const [[cab]] = await pool.execute('SELECT * FROM ped_orc WHERE NUMERO = ? AND TIPO = ?', [numero, 'Pedido']);
+      if (!cab) return res.status(404).json({ error: `Pedido nº ${numero} não encontrado.` });
+      await conferirEstadosDoCliente(pool, req, cab.RAZAO_SOCIAL);
+      const marcas = ACOES_HISTORICO.map(() => '?').join(', ');
+      const [linhas] = await pool.execute(`SELECT id, DATE_FORMAT(quando, '%Y-%m-%d %H:%i:%s') AS quando, quem, acao, detalhe FROM web_auditoria WHERE alvo = ? AND acao IN (${marcas}) ORDER BY id DESC LIMIT ${LIMITE_HISTORICO}`,
+        [`Pedido ${numero}`, ...ACOES_HISTORICO]);
+      res.json({ numero, eventos: montarHistorico(linhas) });
+    } catch (err) {
+      if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });
+      console.error('Erro GET /ped_orc/historico:', err.message);
+      res.status(500).json({ error: 'Erro de servidor' });
+    }
   });
 
   // valores atuais para a janela "Ajustar desconto adicional" (só leitura; uma consulta): subtotal, desconto, total e situações. Mesma permissão do ajuste.

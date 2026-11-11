@@ -828,6 +828,21 @@ select option:disabled { color: #6b7280; }
 .dv-dif.desce { border-color: var(--success-color); } .dv-dif.desce .dv-var { color: var(--success-color); }
 .dv-dif.sobe { border-color: var(--warning-color); } .dv-dif.sobe .dv-var { color: var(--warning-color); }
 .dv-erro { margin-top: 10px; font-size: 13px; line-height: 1.4; color: var(--danger-color); }
+
+/* janela "Histórico do pedido" (historico_pedido_tela.js): reaproveita os dp-*; tabela dentro de um quadro .rolagem (cabeçalho fixo, regra do dono) */
+.hp-caixa { max-width: 640px; }
+.hp-caixa .dp-sub { margin-bottom: 12px; }
+.hp-rolagem { max-height: min(55vh, 420px); border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg); }
+.hp-rolagem:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+.hp-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hp-tabela th, .hp-tabela td { padding: 8px 10px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.hp-tabela .hp-quando { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-mid); }
+.hp-msg { padding: 14px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-mid); line-height: 1.5; }
+.hp-msg.hp-erro { color: var(--danger-color); }
+@media (max-width: 560px) {
+    .hp-tabela th, .hp-tabela td { padding: 7px 8px; }
+    .hp-tabela .hp-quando { white-space: normal; }
+}
 .dv-erro:empty { display: none; }
 @media (max-width: 460px) {
   .dv-resumo { grid-template-columns: 1fr; }

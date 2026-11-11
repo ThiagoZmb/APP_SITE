@@ -268,12 +268,13 @@
         #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611161500">
+    <link rel="stylesheet" href="tema.css?v=202611171200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
     <script src="calculo/desconto_pedido.js?v=202611101600" defer></script>
     <script src="desconto_pedido_tela.js?v=202611161500" defer></script>
+    <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611041200" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
@@ -902,6 +903,8 @@
                 }
                 L.push({ icone: baixado ? '✔' : '', rotulo: 'Marcar como Baixado', fn: () => mudarSituacaoOrcamento(numero, 'Baixado'), desativado: baixado });
             }
+            // histórico do pedido (web_auditoria): quem mudou a situação/data de pronto e quando; o servidor confere permissão e estados
+            if (ehPedido) { sep(); add('pedidos.ver', '🕘', 'Histórico do pedido', () => window.HistoricoPedido.abrir({ numero, apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken })); }
             if (ehPedido && x.entregaStatus && Acesso.pode('entregas.ver')) {
                 sep();
                 // com várias entregas abre a lista de TODAS as entregas do pedido (entregas.html?pedido=N)

@@ -1,5 +1,5 @@
 // ==========================================================================
-// entregas.html — tela da EQUIPE do módulo Entregas (fila, agenda, em rota, concluídas, ocorrências).
+// entregas.html — tela da EQUIPE do módulo Entregas (A programar, agenda, em rota, concluídas, ocorrências).
 // Rotas: GET /entregas, GET /entregas/motoristas, GET /entregas/:id, POST /entregas/:id/{agendar,reagendar,cancelar,retirada,enviada,comprovante},
 // PUT /entregas/:id/anexo?tipo=foto (binário), GET /entregas/:id/anexo/:anexoId (binário, com Authorization -> blob URL).
 // Aqui ficam as funções puras (testadas no Node, test/entregas_tela.test.js) e, no fim, o desenho da tela (só no navegador).
@@ -27,7 +27,7 @@
     dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado',
     encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
   const ABAS = [
-    { id: 'fila', rotulo: 'Fila', status: ['a_programar'] },
+    { id: 'fila', rotulo: 'A programar', status: ['a_programar'] },
     { id: 'agenda', rotulo: 'Agenda', status: ['agendada'] },
     { id: 'em_rota', rotulo: 'Em rota', status: ['em_rota', 'enviada'] }, // enviada (outro estado) fica aqui: é onde se anexa o comprovante,
     { id: 'concluidas', rotulo: 'Concluídas', status: ['entregue', 'retirado', 'cancelada'] },
@@ -309,14 +309,25 @@
     const b = txt(busca).toLowerCase();
     return !b || String(s.numero).includes(b) || String(s.cliente || '').toLowerCase().includes(b) || String(s.clienteFinal || '').toLowerCase().includes(b);
   });
-  const textoItens = itens => (Array.isArray(itens) ? itens : []).map(i => `${i.descricao} × ${numeroBR(i.qtd)}`).join('; ');
+  // Nome do motorista: o que o servidor devolveu (motoristaNome/motorista) > lista de motoristas já carregada > "#id" só como último recurso
+  const nomeMotorista = (e, lista) => {
+    if (!e) return '';
+    const direto = String(e.motoristaNome || e.motorista || '').trim();
+    if (direto) return direto;
+    const achado = (Array.isArray(lista) ? lista : []).find(m => m.codigo === e.motoristaCodigo);
+    if (achado && achado.nome) return achado.nome;
+    return e.motoristaCodigo ? '#' + e.motoristaCodigo : '';
+  };
+  // "Item 3 · Descrição" (o número é o ITEM do pedido; sem número, só a descrição)
+  const rotuloItem = C.rotuloItem;
+  const textoItens = itens => (Array.isArray(itens) ? itens : []).map(i => `${rotuloItem(i)} × ${numeroBR(i.qtd)}`).join('; ');
 
   // ============ TELA (só no navegador) ============
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
     const estado = { lista: [], aba: 'fila', busca: '', det: null, motoristas: null, urls: [], anexoEnviado: null, reagendando: false, carregando: false, mes: null, diaAberto: null,
-      sobras: [], pedidoFiltro: '', sobraAlvo: null, separar: null };
+      atualizando: false, sobras: [], pedidoFiltro: '', sobraAlvo: null, separar: null };
 
     const { getAuth, chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
@@ -345,7 +356,7 @@
         const d = await chamar('/entregas');
         estado.lista = Array.isArray(d.entregas) ? d.entregas : [];
         estado.sobras = Array.isArray(d.sobras) ? d.sobras : [];
-      } catch (err) { toast(err.message, 'erro'); estado.lista = []; estado.sobras = []; }
+      } catch (err) { toast(err.message, 'erro'); } // falha: mantém o que já estava na tela
       if (pedidoDoLink) {
         estado.pedidoFiltro = pedidoDoLink;
         const alvo = entregaParaAbrir(entregasDoPedido(estado.lista, pedidoDoLink));
@@ -493,7 +504,9 @@
     }
 
     function desenharDetalhe() {
-      const { entrega: e, eventos, itens, anexos } = estado.det;
+      const { entrega: e, eventos, anexos } = estado.det;
+      // itensDetalhe traz o número do item do pedido ("Item 1 · ..."); `itens` (formato antigo) só como reserva
+      const itens = Array.isArray(estado.det.itensDetalhe) && estado.det.itensDetalhe.length ? estado.det.itensDetalhe : (estado.det.itens || []);
       const div = estado.det.divisao || {};
       mostrar('vista-detalhe');
       const seq = rotuloSequencia(div);
@@ -510,12 +523,12 @@
       $('d-itens-titulo').textContent = div.dividido ? 'Itens desta entrega' : 'Itens do pedido';
       $('d-info').innerHTML = linhaInfo('Cliente', e.cliente) + linhaInfo('Tipo', e.tipo ? rotuloTipo(e.tipo) : '') +
         linhaInfo('Data do pedido', dataBR(e.dataPedido)) + linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
-        linhaInfo('Motorista', (estado.motoristas || []).find(m => m.codigo === e.motoristaCodigo)?.nome || (e.motoristaCodigo ? '#' + e.motoristaCodigo : '')) +
+        linhaInfo('Motorista', nomeMotorista(e, estado.motoristas)) +
         linhaInfo('Endereço', enderecoTexto(e)) + linhaInfo('Contato no local', e.contatoLocal) + linhaInfo('Transportadora', e.transportadora) +
         linhaInfo('Rastreio', e.rastreio) + linhaInfo('Previsão', dataBR(e.previsao)) + linhaInfo('Observação', e.observacao);
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
-      $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(i.descricao)} <span class="cinza">× ${esc(i.qtd)}</span>${i.observacao ? `<div class="cinza">Obs.: ${esc(i.observacao)}</div>` : ''}</li>`).join('') : '<li class="cinza">Sem itens.</li>';
+      $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(rotuloItem(i))} <span class="cinza">× ${esc(i.qtd)}</span>${i.observacao ? `<div class="cinza">Obs.: ${esc(i.observacao)}</div>` : ''}</li>`).join('') : '<li class="cinza">Sem itens.</li>';
       $('d-eventos').innerHTML = eventos.map(v => { const x = eventoExibicao(v, e, eventos); return `<li><strong>${esc(x.rotulo)}</strong> <span class="cinza">${esc(dataHoraBR(v.quando))} · ${esc(v.usuario)}</span>` +
         (textoEvento({ ...v, motivo: x.motivo }) ? `<div>${esc(textoEvento({ ...v, motivo: x.motivo }))}</div>` : '') + '</li>'; }).join('');
       const caixa = $('d-anexos');
@@ -736,7 +749,7 @@
         try {
           await chamar(`/entregas/${encodeURIComponent(e.id)}/separar`, { metodo: 'POST', corpo: corpoSeparar(linhas, $('sp-obs').value) });
         } catch (err) { $('erro-separar').textContent = err.message; return; }
-        toast('Entrega separada: a nova está na fila, A programar.', 'ok');
+        toast('Entrega separada: a nova está em A programar.', 'ok');
         await recarregarTudo(e.id);
       });
     }
@@ -746,7 +759,7 @@
       if (!win.confirm(`Criar uma entrega nova (A programar) com os itens sem entrega do pedido ${numero}?`)) return;
       return ocupado(async () => {
         await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/saldo`, { metodo: 'POST', corpo: {} });
-        toast('Entrega do saldo criada na fila.', 'ok');
+        toast('Entrega do saldo criada em A programar.', 'ok');
         await carregar();
       });
     }
@@ -778,6 +791,25 @@
       });
     }
 
+    // Botão "Atualizar": só por clique (nenhum timer). GET /entregas já roda a varredura (sincronizarFila) antes de montar a lista,
+    // o mesmo caminho da abertura da tela. Aba e busca ficam; o detalhe aberto é relido (ou fechado se a entrega sumiu).
+    async function atualizar() {
+      if (estado.atualizando || estado.carregando) return;
+      estado.atualizando = true;
+      const btn = $('btn-atualizar'), rot = btn.querySelector('.rot');
+      btn.disabled = true; btn.setAttribute('aria-busy', 'true'); rot.textContent = 'Atualizando...';
+      try {
+        await carregar();
+        if (estado.det) {
+          const id = estado.det.entrega.id;
+          try { await abrirDetalhe(id); } catch (err) { estado.det = null; mostrar('vazio-painel'); desenharLista(); toast(err.message, 'erro'); }
+        }
+      } finally {
+        estado.atualizando = false;
+        btn.disabled = false; btn.removeAttribute('aria-busy'); rot.textContent = 'Atualizar';
+      }
+    }
+
     async function recarregarTudo(id) {
       await carregar();
       await abrirDetalhe(id);
@@ -793,6 +825,7 @@
     // ---------- eventos ----------
     function ligar() {
       doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); estado.pedidoFiltro = ''; desenharLista(); }));
+      $('btn-atualizar').addEventListener('click', atualizar);
       $('busca').addEventListener('input', ev => { estado.busca = ev.target.value.trim(); desenharLista(); });
       $('lista').addEventListener('click', ev => {
         if (ev.target.closest('[data-limpar-pedido]')) { estado.pedidoFiltro = ''; desenharLista(); return; }
@@ -866,5 +899,5 @@
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
-    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, iniciar };
+    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem, iniciar };
 });

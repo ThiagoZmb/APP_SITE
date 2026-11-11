@@ -250,11 +250,12 @@ function bancoEntregas() {
       if (sql.includes('c.ESTADO IN') && !(cli && estados.includes(cli.ESTADO))) return [];
       return [{ ...e, situacao_pedido: ped?.SITUACAO ?? null, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_PRONTO ?? null, data_pedido: ped?.DATA ?? null,
         cli_endereco: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null, cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null,
-        cli_estado: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null, cli_telefone: cli?.TELEFONE ?? null }];
+        cli_estado: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null, cli_telefone: cli?.TELEFONE ?? null,
+        motorista_nome: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME ?? null }];
     }],
     [/FROM web_entrega_eventos WHERE entrega_id = \? ORDER BY/, (sql, [id]) => eventos.filter(v => v.entrega_id === id)],
     [/FROM ped_orc_lista_itens/, (sql, [numero]) => estado.itens.filter(i => i.NUMERO === numero && i.TIPO === 'Pedido')
-      .sort((a, b) => a.ITEM - b.ITEM).map(i => ({ DESCRICAO: i.DESCRICAO, QTD: i.QTD }))], // itensDoPedido (só descrição e quantidade)
+      .sort((a, b) => a.ITEM - b.ITEM).map(i => ({ ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD }))], // itensDoPedido (item, descrição e quantidade)
     // motoristas: ativos, com entregas.baixar pelo perfil ou liberado, e não bloqueado
     [/FROM cliente_usuarios u JOIN web_usuario_acesso/, () => {
       const exc = (u, tipo) => estado.excecoes.some(x => x.usuario_codigo === u.CODIGO && x.permissao === 'entregas.baixar' && x.tipo === tipo);

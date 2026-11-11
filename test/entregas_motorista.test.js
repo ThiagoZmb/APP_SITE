@@ -80,7 +80,7 @@ test('detalhe: itens, eventos e anexos; entrega alheia, sem motorista, inexisten
   const r = await chamar('/minhas_entregas/1');
   assert.equal(r.status, 200);
   const j = await r.json();
-  assert.deepEqual(j.itens, [{ descricao: 'Porta pivotante', qtd: 2 }, { descricao: 'Puxador', qtd: 1 }]);
+  assert.deepEqual(j.itens, [{ item: 1, descricao: 'Porta pivotante', qtd: 2 }, { item: 2, descricao: 'Puxador', qtd: 1 }]);
   assert.equal(j.numero, 601);
   assert.equal(j.eventos[0].tipo, 'agendada');
   assert.deepEqual(j.anexos, []);

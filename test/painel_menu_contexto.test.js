@@ -49,7 +49,7 @@ test('menu do botão direito: quem só tem pedidos.pdf (perfil Representante) v�
   const orc = menuDoPainel(rep, 'Orçamento', { numero: 2, s: 'aberto', situacao: '' });
   assert.deepEqual(orc, ['Abrir PDF', 'Imprimir orçamento']);
   // sem pedidos.pdf, nada de PDF
-  assert.deepEqual(menuDoPainel(new Set(['pedidos.ver', 'valores.ver', 'clientes.ver']), 'Pedido', { numero: 1, s: 'pronto' }), []);
+  assert.deepEqual(menuDoPainel(new Set(['pedidos.ver', 'valores.ver', 'clientes.ver']), 'Pedido', { numero: 1, s: 'pronto' }), ['Histórico do pedido'], 'só o histórico (pedidos.ver); nada de PDF');
 });
 
 test('menu do botão direito: editar, cortes, situação, entrega, cancelar e excluir exigem a permissão certa', () => {
