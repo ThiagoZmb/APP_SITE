@@ -214,7 +214,10 @@
         .lista-topo .busca { margin: 0; min-width: 240px; }
         .chips-sit { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 22px 12px; }
         .chips-sit:empty { display: none; }
-        .tabela-wrap { max-height: 520px; }
+        .tabela-wrap { max-height: 520px; min-width: 0; overflow-x: hidden; }
+        #orders-table { width: 100%; table-layout: fixed; }
+        #orders-table th, #orders-table td { overflow: hidden; text-overflow: ellipsis; }
+        #orders-table .st { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
         #orders-tbody tr { cursor: pointer; }
         #orders-tbody tr.divisor-semana td { border-top: 2px solid var(--primary-color); }
         td.num, th.num { text-align: right; }
@@ -343,7 +346,8 @@
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
                     <div class="tabela-wrap">
-                        <table>
+                        <table id="orders-table">
+                            <colgroup><col style="width:10%"><col style="width:14%"><col style="width:13%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:8%"></colgroup>
                             <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num" data-valor>Valor</th><th>Observação</th><th>Situação</th><th data-valor>Financeiro</th><th>Entrega</th></tr></thead>
                             <tbody id="orders-tbody"></tbody>
                         </table>
