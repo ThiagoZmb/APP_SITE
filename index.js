@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento } = require('./seguranca/instalacao');
+const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
@@ -54,6 +54,7 @@ const { registrarTintas } = require('./rotas/tintas');
 const { registrarPesos } = require('./rotas/pesos');
 const { registrarDanfe } = require('./rotas/danfe');
 const { registrarChecklist } = require('./rotas/checklist');
+const { registrarEntregaChecklist } = require('./rotas/entrega_checklist');
 const { registrarFluxoVarios } = require('./rotas/fluxo_varios');
 const { registrarPerfilSecoes } = require('./rotas/perfil_secoes');
 const { registrarPesoItens } = require('./rotas/peso_itens');
@@ -1846,6 +1847,7 @@ registrarEstoqueMovimentos({ rota: registro.rota, pool });
 registrarEstoqueQr({ rota: registro.rota, pool });
 registrarPedOrc({ rota: registro.rota, pool });
 registrarEntregas({ rota: registro.rota, pool });
+registrarEntregaChecklist({ rota: registro.rota, pool });
 registrarCalendario({ rota: registro.rota, pool });
 registrarIndicadores({ rota: registro.rota, pool });
 registrarEtapasProducao({ rota: registro.rota, pool });
@@ -1914,6 +1916,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesPortal(pool)).feito) console.log('[permissões] portal.gerir acrescentada ao Administrador');
   if ((await acrescentarPermissoesIndicadores(pool)).feito) console.log('[permissões] indicadores.ver acrescentada ao Administrador');
   { const a = await acrescentarPermissoesAdministrativo(pool); if (a.feito) console.log(`[permissões] administrativo.ver concedida a ${a.perfis} perfil(is) e ${a.usuarios} usuário(s) por exceção; perfil Operador ${a.operadorCriado ? 'criado' : 'já existia'}`); }
+  { const c = await acrescentarPermissoesChecklistEntregas(pool); if (c.feito) console.log(`[permissões] entregas.checklist concedida a ${c.perfis} perfil(is) e ${c.usuarios} usuário(s) que já viam as entregas`); }
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
   if (process.env.NODE_ENV !== 'test') {

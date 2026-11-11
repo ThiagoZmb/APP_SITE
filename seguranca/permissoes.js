@@ -41,6 +41,7 @@ const CATALOGO = [
   { codigo: 'entregas.ver', nome: 'Ver entregas', area: 'Entregas' },
   { codigo: 'entregas.programar', nome: 'Programar entregas (agendar, reagendar, cancelar, endereço, comprovantes)', area: 'Entregas' },
   { codigo: 'entregas.baixar', nome: 'Dar baixa nas próprias entregas (motorista)', area: 'Entregas' },
+  { codigo: 'entregas.checklist', nome: 'Imprimir o checklist externo da entrega (PDF para conferência e assinatura do cliente); editar os campos também exige Programar entregas', area: 'Entregas' },
   { codigo: 'fornecedores.ver', nome: 'Ver fornecedores', area: 'Cadastros' },
   { codigo: 'fornecedores.editar', nome: 'Cadastrar e editar fornecedores', area: 'Cadastros' },
   { codigo: 'funcionarios.ver', nome: 'Ver funcionários (dados pessoais; salário e encargos também exigem Valores financeiros)', area: 'Cadastros' },
@@ -95,7 +96,7 @@ const PERFIS_INICIAIS = [
   // operador: faz saída de estoque, atualiza status e as etapas da produção; nada de gráficos, resumos, gestão nem dinheiro
   { nome: 'Operador', descricao: 'Operação do dia a dia (saída de estoque, status do pedido, etapas, entregas), sem informações administrativas',
     permissoes: ['estoque.ver', 'estoque.movimentar', 'pedidos.ver', 'pedidos.pdf', 'pedidos.situacao', 'etapas.ver', 'etapas.corte_perfil', 'etapas.corte_vidro',
-      'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'entregas.ver', 'corte.ver'] }
+      'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'entregas.ver', 'entregas.checklist', 'corte.ver'] }
 ];
 
 // perfil + exceções "liberar" − exceções "bloquear"; inativo = nada; códigos fora do catálogo são ignorados

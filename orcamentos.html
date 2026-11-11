@@ -1339,6 +1339,9 @@
         }
         // ============ CORES POR ACABAMENTO (filtro "metálic" / "sólid" do VB) ============
         const semAcento = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        // Compara nomes de acabamento sem depender de acentos, caixa ou espaços duplicados.
+        // O banco pode retornar a mesma descrição com diferenças de normalização Unicode.
+        const chaveAcabamento = t => semAcento(t).replace(/\s+/g, ' ').trim();
         function coresDoTipo(prefixo) {
             const chave = Object.keys(coresGrupos).find(k => semAcento(k).startsWith(prefixo));
             return chave ? coresGrupos[chave] : [];
@@ -1405,10 +1408,14 @@
             if (!pux) { sel.disabled = false; }
             else if (!alvo) { sel.value = ''; sel.disabled = false; msg = 'Escolha o acabamento do perfil: o puxador sempre usa o mesmo acabamento.'; }
             else {
-                if (![...sel.options].some(o => o.value === alvo)) {
+                const opcaoCorrespondente = [...sel.options].find(o => chaveAcabamento(o.value) === chaveAcabamento(alvo));
+                if (!opcaoCorrespondente) {
                     msg = `⚠️ O puxador "${pux}" não tem o acabamento "${alvo}" no cadastro. Ele segue o acabamento do perfil; confira se existe essa variante.`;
+                } else {
+                    // Mantém o valor canônico retornado pelo catálogo para preço e gravação.
+                    sel.value = opcaoCorrespondente.value;
                 }
-                selecionarComboPorTexto('f-acab-pux', alvo);
+                if (!opcaoCorrespondente) selecionarComboPorTexto('f-acab-pux', alvo);
                 sel.disabled = true;
                 sel.title = 'Sempre igual ao acabamento do perfil';
             }

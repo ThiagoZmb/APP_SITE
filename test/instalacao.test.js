@@ -27,11 +27,11 @@ function poolMigracao({ jaFeita = false, perfisExistentes = 0, falharEm = null }
 // instalação já com a chave única nova de web_entregas (várias entregas por pedido): nenhum ALTER de índice
 const JA_MIGRADO_ENTREGAS = [/information_schema\.STATISTICS/, [{ nome: 'uk_numero_seq' }]];
 
-test('cria as 47 tabelas web_', async () => {
+test('cria as 48 tabelas web_', async () => {
   const pool = criarPoolFalso([]);
   await instalarTabelas(pool);
   const creates = pool.chamadas.filter(c => /CREATE TABLE IF NOT EXISTS `web_/.test(c.sql)).map(c => c.sql.match(/`(web_\w+)`/)[1]);
-  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_checklist', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_danfe', 'web_danfe_vinculos', 'web_entrega_anexos', 'web_entrega_eventos', 'web_entrega_itens', 'web_entrega_sobras_encerradas', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
+  assert.deepEqual(creates.sort(), ['web_auditoria', 'web_checklist', 'web_corte_config', 'web_corte_planos', 'web_custo_componentes', 'web_custo_ligacoes', 'web_custo_material', 'web_custo_parametros', 'web_danfe', 'web_danfe_vinculos', 'web_entrega_anexos', 'web_entrega_checklist', 'web_entrega_eventos', 'web_entrega_itens', 'web_entrega_sobras_encerradas', 'web_entregas', 'web_estoque_ajustes', 'web_estoque_estornos', 'web_estoque_lancamentos', 'web_estoque_ligacoes', 'web_estoque_reposicao', 'web_gestao_metas', 'web_gestao_orcamento', 'web_item_desenhos', 'web_notas_fiscais',
     'web_perfil_permissoes', 'web_perfil_secoes', 'web_perfis', 'web_pesos', 'web_portal_auditoria', 'web_portal_convites', 'web_portal_empresas', 'web_portal_permissoes', 'web_portal_recuperacao', 'web_portal_sessoes', 'web_portal_usuarios', 'web_preco_encargos', 'web_preco_historico', 'web_preco_margens', 'web_producao_etapas', 'web_producao_etapas_eventos', 'web_retalhos', 'web_sessoes', 'web_usuario_acesso', 'web_usuario_excecoes', 'web_vidro_config', 'web_vidro_planos', 'web_vidro_retalhos']);
   const lig = pool.chamadas.find(c => /`web_estoque_ligacoes`/.test(c.sql)).sql;
   assert.match(lig, /UNIQUE KEY[^(]*\(fornecedor, cod_fabricante\)/);

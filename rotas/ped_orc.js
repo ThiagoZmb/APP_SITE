@@ -886,6 +886,7 @@ function registrarPedOrc({ rota, pool }) {
         for (const { id } of entregas) {
           await conn.execute('DELETE FROM web_entrega_anexos WHERE entrega_id = ?', [id]);
           await conn.execute('DELETE FROM web_entrega_itens WHERE entrega_id = ?', [id]); // itens da entrega (entrega parcial)
+          await conn.execute('DELETE FROM web_entrega_checklist WHERE entrega_id = ?', [id]); // edição do checklist externo da entrega
           await conn.execute('DELETE FROM web_entrega_eventos WHERE entrega_id = ?', [id]);
           await conn.execute('DELETE FROM web_entregas WHERE id = ?', [id]);
         }

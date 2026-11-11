@@ -426,6 +426,14 @@ const TABELAS = [
      detalhe JSON NULL,
      KEY idx_entrega (entrega_id, id)
    ) ${OPCOES}`,
+  // "Checklist externo – Entregas": a edição da equipe (campos da folha, JSON) por entrega; sem linha = a folha sai com os dados
+  // automáticos da entrega. Só da web; apagada junto com a entrega quando o pedido é excluído pela web.
+  `CREATE TABLE IF NOT EXISTS \`web_entrega_checklist\` (
+     entrega_id INT NOT NULL PRIMARY KEY,
+     dados TEXT NOT NULL,
+     atualizado_por VARCHAR(190) NOT NULL,
+     atualizado_em DATETIME NOT NULL
+   ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_entrega_anexos\` (
      id INT AUTO_INCREMENT PRIMARY KEY,
      entrega_id INT NOT NULL,
@@ -1191,4 +1199,28 @@ async function acrescentarPermissoesEtapas(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Checklist externo de entregas (entregas.checklist): vai para todo perfil que já tem entregas.ver e para quem tem entregas.ver
+// liberada por exceção (só acrescenta; INSERT IGNORE não troca um "bloquear" que já exista). Uma vez só (auditoria permissoes_checklist_entregas).
+async function acrescentarPermissoesChecklistEntregas(pool) {
+  const [feito] = await pool.execute("SELECT id FROM web_auditoria WHERE acao = 'permissoes_checklist_entregas' LIMIT 1");
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [perfis] = await conn.execute("SELECT DISTINCT perfil_id FROM web_perfil_permissoes WHERE permissao = 'entregas.ver' ORDER BY perfil_id");
+    for (const p of perfis) await conn.execute("INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, 'entregas.checklist')", [p.perfil_id]);
+    const [usuarios] = await conn.execute("SELECT DISTINCT usuario_codigo FROM web_usuario_excecoes WHERE permissao = 'entregas.ver' AND tipo = 'liberar' ORDER BY usuario_codigo");
+    for (const u of usuarios) await conn.execute("INSERT IGNORE INTO web_usuario_excecoes (usuario_codigo, permissao, tipo) VALUES (?, 'entregas.checklist', 'liberar')", [u.usuario_codigo]);
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', 'permissoes_checklist_entregas', '', JSON.stringify({ perfis: perfis.map(p => p.perfil_id), usuarios: usuarios.map(u => u.usuario_codigo) })]);
+    await conn.commit();
+    return { feito: true, perfis: perfis.length, usuarios: usuarios.length };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

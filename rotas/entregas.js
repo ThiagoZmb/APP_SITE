@@ -997,4 +997,4 @@ function registrarEntregas({ rota, pool }) {
   });
 }
 
-module.exports = { registrarEntregas, sincronizarFila, encerrarEntregasDoPedido, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos };
+module.exports = { registrarEntregas, sincronizarFila, encerrarEntregasDoPedido, itensDoPedido, motoristasValidos, guardarAnexo, lerAnexoIds, vincularAnexos, lerDivisoes };

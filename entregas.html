@@ -124,7 +124,8 @@
         .toast.erro { background: var(--danger-color); }
         .toast.info { background: var(--text-dark); }
 
-        @media (max-width: 1100px) { .workspace { grid-template-columns: 1fr; } .lista-wrap { max-height: 420px; } }
+        @media (max-width: 1100px) { .workspace { grid-template-columns: minmax(0, 1fr); } .lista-wrap { max-height: 420px; } }
+        .workspace > .painel { min-width: 0; } /* a tabela larga rola dentro do quadro, sem empurrar a página para o lado */
         @media (max-width: 360px) { .end-num-cep { grid-template-columns: minmax(0, 1fr); } }
         @media (max-width: 768px) {
             body { padding: 0; }
@@ -192,11 +193,103 @@
         .sep-resumo { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--surface-2); font-size: 13px; color: var(--text-mid); }
         .sep-resumo strong { color: var(--text-dark); }
         .sep-resumo .aviso-divisao { margin: 8px 0 0; }
+
+        /* ===== Painel de detalhe da entrega: seções separadas por um filete âmbar de 2px (pedido do dono) ===== */
+        .det-cab { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .det-cab-linha { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; }
+        #painel .det-cab h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+        .det-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+        #d-status .selo { font-size: 12.5px; padding: 4px 12px; }
+        .det-sub { margin: 0; font-size: 13.5px; color: var(--text-mid); overflow-wrap: anywhere; }
+        .det-secao { margin-top: 16px; padding-top: 14px; border-top: 2px solid var(--primary-color); min-width: 0; }
+        #painel .det-secao-titulo { margin: 0 0 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); }
+        /* dados: pares rótulo (tom suave, acima) + conteúdo (em destaque); curtos em duas colunas, longos em linha inteira */
+        #painel dl.info { margin-top: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+        .det-campo { min-width: 0; }
+        .det-campo.det-largo { grid-column: 1 / -1; }
+        #painel dl.info dt { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); }
+        #painel dl.info dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text-dark); min-width: 0; overflow-wrap: anywhere; }
+        .det-linha-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .det-mini { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+                    background: var(--surface-2); color: var(--text-mid); font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        .det-mini:hover { border-color: var(--primary-color); color: var(--primary-color); }
+        .det-mini:focus-visible, .det-acoes .btn:focus-visible, .ck-campo input:focus-visible, .ck-campo textarea:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: 2px; }
+        /* ações: principal no topo, depois as secundárias; a destrutiva fica isolada no fim, em contorno vermelho */
+        #painel .det-acoes .acoes { margin-top: 0; }
+        .det-acoes .acoes + .acoes { margin-top: 10px; }
+        .det-perigo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-strong); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+        #painel .det-perigo p { margin: 0; font-size: 12.5px; color: var(--text-light); flex: 1 1 180px; }
+        /* itens: chip "Item N" + descrição que quebra + quantidade */
+        #painel ul.det-itens { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+        #painel .det-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; margin: 0; padding: 8px 10px;
+                            border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--surface-2); }
+        .det-chip { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-strong); font-size: 11.5px; font-weight: 700; color: var(--text-mid); white-space: nowrap; font-family: var(--font-mono); }
+        .det-item-desc { font-size: 13.5px; line-height: 1.4; color: var(--text-dark); overflow-wrap: anywhere; min-width: 0; }
+        .det-item-qtd { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 700; color: var(--text-dark); white-space: nowrap; }
+        .det-item-obs { grid-column: 2 / -1; font-size: 12.5px; color: var(--selo-aviso-fg); overflow-wrap: anywhere; }
+        /* linha do tempo: marcador + rótulo; hora e usuário em tom suave */
+        #painel ol.det-tempo { list-style: none; padding: 0 0 0 18px; margin: 0; position: relative; }
+        #painel ol.det-tempo::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--border-strong); }
+        #painel .det-tempo li { position: relative; margin: 0 0 12px; font-size: 13.5px; }
+        #painel .det-tempo li:last-child { margin-bottom: 0; }
+        .det-tempo li::before { content: ""; position: absolute; left: -18px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--white); border: 2px solid var(--border-strong); box-sizing: border-box; }
+        .det-tempo li:last-child::before { border-color: var(--primary-color); background: var(--primary-color); }
+        .det-tempo-rot { font-weight: 700; color: var(--text-dark); }
+        .det-tempo-meta { display: block; font-size: 12px; color: var(--text-light); }
+        .det-tempo-txt { margin-top: 2px; color: var(--text-mid); overflow-wrap: anywhere; }
+        /* comprovantes: miniaturas que abrem a imagem inteira; estado vazio claro */
+        #d-anexos.det-anexos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        #d-anexos figure { margin: 0; min-width: 0; }
+        #d-anexos a { display: block; border-radius: var(--radius); }
+        #d-anexos img { width: 100%; height: 140px; max-height: none; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border-color); display: block; }
+        #d-anexos a:hover img { border-color: var(--primary-color); }
+        #painel .det-vazio { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); text-align: center; font-size: 13px; color: var(--text-light); }
+        .aviso-cancelar { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger-color); background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); font-size: 13px; line-height: 1.45; }
+        #btn-folha-branco { flex: none; }
+        @media (max-width: 480px) {
+            #painel { padding: 16px; }
+            .det-acoes .btn { flex: 1 1 100%; justify-content: center; }
+            .busca-linha { flex-wrap: wrap; }
+            .busca-linha .busca { flex-basis: 100%; }
+        }
+
+        /* ===== Janela "Checklist da entrega" ===== */
+        body.ck-aberta { overflow: hidden; }
+        .ck-fundo { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; background: rgba(8, 9, 11, .62); }
+        .ck-caixa { width: 100%; max-width: 720px; background: var(--white); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 20px; box-shadow: 0 24px 48px -12px rgba(0, 0, 0, .7); }
+        .ck-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .ck-topo h2 { font-size: 17px; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+        .ck-fechar { flex: none; width: 44px; height: 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-dark); font-size: 22px; line-height: 1; cursor: pointer; }
+        .ck-fechar:hover { border-color: var(--primary-color); color: var(--primary-color); }
+        .ck-nota { margin: 6px 0 0; font-size: 13px; color: var(--text-mid); }
+        .ck-info { margin: 6px 0 0; font-size: 12.5px; color: var(--text-light); }
+        .ck-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--primary-color); }
+        .ck-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .ck-campo.ck-largo { grid-column: 1 / -1; }
+        .ck-campo label { font-size: 12px; font-weight: 700; color: var(--text-mid); }
+        .ck-campo input, .ck-campo textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-dark); font-size: 14px; }
+        .ck-campo textarea { resize: vertical; min-height: 72px; }
+        .ck-campo input:focus, .ck-campo textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-ring); }
+        .ck-campo input[readonly], .ck-campo textarea[readonly] { border-style: dashed; color: var(--text-mid); }
+        #ck-gerar:disabled { opacity: .55; cursor: not-allowed; }
+        .ck-acoes { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        .ck-acoes .ck-sair { margin-left: auto; }
+        @media (max-width: 600px) {
+            .ck-fundo { padding: 0; }
+            .ck-caixa { min-height: 100%; border-radius: 0; border: none; padding: 16px; }
+            .ck-grade { grid-template-columns: minmax(0, 1fr); }
+            .ck-acoes .btn { flex: 1 1 100%; justify-content: center; }
+            .ck-acoes .ck-sair { margin-left: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .det-mini, .ck-fechar, #painel .btn { transition: none !important; }
+        }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611171200">
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202611112000" defer></script>
-    <script src="entregas.js?v=202611112000" defer></script>
+    <script src="entrega_checklist.js?v=202611121500" defer></script>
+    <script src="entregas.js?v=202611121200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -230,6 +323,7 @@
                         <div class="busca-linha">
                             <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
                             <button type="button" class="btn btn-secondary" id="btn-atualizar" title="Atualizar as listas e a fila" aria-label="Atualizar as listas de entregas"><svg class="ico-atualizar" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg><span class="rot">Atualizar</span></button>
+                            <button type="button" class="btn btn-secondary" id="btn-folha-branco" data-perm="entregas.checklist" title="Checklist de entrega em branco, para preencher à mão">Folha em branco</button>
                         </div>
                     </div>
                     <div class="lista-wrap" id="lista"><p class="vazio">Carregando…</p></div>
@@ -239,26 +333,49 @@
                     <p class="vazio" id="vazio-painel">Selecione uma entrega na lista.</p>
 
                     <div id="vista-detalhe" hidden>
-                        <h2 id="d-titulo"></h2>
-                        <span id="d-status"></span>
-                        <p class="aviso-divisao" id="d-aviso" role="status" hidden></p>
-                        <dl class="info" id="d-info"></dl>
-                        <div class="acoes">
-                            <button type="button" class="btn btn-primary" id="btn-agendar" data-perm="entregas.programar" hidden>Agendar</button>
-                            <button type="button" class="btn btn-primary" id="btn-reagendar" data-perm="entregas.programar" hidden>Reagendar</button>
-                            <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
-                            <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
-                            <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.programar" hidden>Anexar comprovante</button>
-                            <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.programar" hidden>Separar em outra entrega</button>
-                            <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.programar" hidden>Gerar entrega do restante</button>
-                            <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="entregas.programar" hidden>Cancelar entrega</button>
+                        <div class="det-cab">
+                            <div class="det-cab-linha">
+                                <h2 id="d-titulo"></h2>
+                                <span id="d-status"></span>
+                            </div>
+                            <p class="det-sub" id="d-sub" hidden></p>
                         </div>
-                        <h3 id="d-itens-titulo">Itens do pedido</h3>
-                        <ul id="d-itens"></ul>
-                        <h3>Linha do tempo</h3>
-                        <ol id="d-eventos"></ol>
-                        <h3>Comprovantes</h3>
-                        <div id="d-anexos"></div>
+                        <p class="aviso-divisao" id="d-aviso" role="status" hidden></p>
+                        <section class="det-secao" aria-labelledby="d-sec-dados">
+                            <h3 class="det-secao-titulo" id="d-sec-dados">Dados da entrega</h3>
+                            <dl class="info" id="d-info"></dl>
+                        </section>
+                        <section class="det-secao det-acoes" id="d-acoes" aria-labelledby="d-sec-acoes">
+                            <h3 class="det-secao-titulo" id="d-sec-acoes">Ações</h3>
+                            <div class="acoes" id="d-acoes-principais">
+                                <button type="button" class="btn btn-primary" id="btn-agendar" data-perm="entregas.programar" hidden>Agendar</button>
+                                <button type="button" class="btn btn-primary" id="btn-reagendar" data-perm="entregas.programar" hidden>Reagendar</button>
+                                <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
+                                <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
+                                <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.programar" hidden>Anexar comprovante</button>
+                            </div>
+                            <div class="acoes" id="d-acoes-secundarias">
+                                <button type="button" class="btn btn-secondary" id="btn-checklist" data-perm="entregas.checklist">Checklist de entrega</button>
+                                <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.programar" hidden>Separar em outra entrega</button>
+                                <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.programar" hidden>Gerar entrega do restante</button>
+                            </div>
+                            <div class="det-perigo" id="d-perigo" hidden>
+                                <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="entregas.programar" hidden>Cancelar entrega</button>
+                                <p>Cancela só esta entrega e pede o motivo antes de confirmar.</p>
+                            </div>
+                        </section>
+                        <section class="det-secao" aria-labelledby="d-itens-titulo">
+                            <h3 class="det-secao-titulo" id="d-itens-titulo">Itens do pedido</h3>
+                            <ul class="det-itens" id="d-itens"></ul>
+                        </section>
+                        <section class="det-secao" aria-labelledby="d-sec-tempo">
+                            <h3 class="det-secao-titulo" id="d-sec-tempo">Linha do tempo</h3>
+                            <ol class="det-tempo" id="d-eventos"></ol>
+                        </section>
+                        <section class="det-secao" aria-labelledby="d-sec-anexos">
+                            <h3 class="det-secao-titulo" id="d-sec-anexos">Comprovantes</h3>
+                            <div class="det-anexos" id="d-anexos"></div>
+                        </section>
                     </div>
 
                     <form id="vista-agendar" hidden>
@@ -302,7 +419,8 @@
                     </form>
 
                     <form id="vista-cancelar" hidden>
-                        <h2>Cancelar entrega</h2>
+                        <h2 id="c-titulo">Cancelar entrega</h2>
+                        <p class="aviso-cancelar" id="c-aviso" role="note"></p>
                         <div class="form-group"><label for="c-motivo">Motivo</label><textarea id="c-motivo" maxlength="500"></textarea></div>
                         <p class="erro-form erro-form-cancelar" id="erro-cancelar" role="alert"></p>
                         <div class="acoes">
@@ -377,6 +495,36 @@
                 </section>
             </div>
         </main>
+    </div>
+    <div class="ck-fundo" id="ck-janela" hidden>
+        <form class="ck-caixa" id="ck-form" role="dialog" aria-modal="true" aria-labelledby="ck-titulo" novalidate>
+            <div class="ck-topo">
+                <h2 id="ck-titulo">Checklist da entrega</h2>
+                <button type="button" class="ck-fechar" id="ck-fechar" aria-label="Fechar a janela do checklist">×</button>
+            </div>
+            <p class="ck-nota" id="ck-origem"></p>
+            <p class="ck-info" id="ck-info" hidden></p>
+            <p class="ck-nota" id="ck-somente-leitura" hidden>Você pode gerar o PDF; editar os campos exige a permissão "Programar entregas".</p>
+            <div class="ck-grade">
+                <div class="ck-campo"><label for="ck-dataEntrega">Data de entrega</label><input type="date" id="ck-dataEntrega"></div>
+                <div class="ck-campo"><label for="ck-pedido">Pedido</label><input id="ck-pedido" maxlength="40" autocomplete="off"></div>
+                <div class="ck-campo"><label for="ck-cliente">Cliente</label><input id="ck-cliente" maxlength="190" autocomplete="off"></div>
+                <div class="ck-campo"><label for="ck-clienteFinal">Cliente final</label><input id="ck-clienteFinal" maxlength="190" autocomplete="off"></div>
+                <div class="ck-campo ck-largo"><label for="ck-endereco">Endereço</label><textarea id="ck-endereco" maxlength="400" rows="2"></textarea></div>
+                <div class="ck-campo ck-largo"><label for="ck-observacoes">Observações de entrega</label><textarea id="ck-observacoes" maxlength="500" rows="3"></textarea></div>
+                <div class="ck-campo"><label for="ck-contato">Contato no local</label><input id="ck-contato" maxlength="190" autocomplete="off"></div>
+                <div class="ck-campo"><label for="ck-motorista">Motorista</label><input id="ck-motorista" maxlength="120" autocomplete="off"></div>
+                <div class="ck-campo ck-largo"><label for="ck-observacoesGerais">Observações gerais da entrega</label><textarea id="ck-observacoesGerais" maxlength="600" rows="3"></textarea></div>
+            </div>
+            <p class="aviso-divisao" id="ck-aviso-endereco" role="status" hidden></p>
+            <p class="erro-form" id="erro-ck" role="alert"></p>
+            <div class="ck-acoes">
+                <button type="submit" class="btn btn-primary" id="ck-gerar">Gerar PDF</button>
+                <button type="button" class="btn btn-secondary" id="ck-branco">Folha em branco</button>
+                <button type="button" class="btn btn-secondary" id="ck-automatico" data-perm="entregas.programar" hidden>Voltar ao automático</button>
+                <button type="button" class="btn btn-secondary ck-sair" id="ck-cancelar">Fechar</button>
+            </div>
+        </form>
     </div>
     <div id="toasts" aria-live="polite"></div>
 </body>

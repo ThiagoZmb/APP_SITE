@@ -208,6 +208,7 @@
         ${itens}
         ${ocHtml}
         ${botoes ? `<div class="acoes">${botoes}</div>` : ''}
+        <div class="acoes"><button type="button" class="btn btn-secondary" data-acao="checklist" data-perm="entregas.baixar">Checklist de entrega (PDF)</button></div>
       </article>`;
     }
 
@@ -433,6 +434,12 @@
         const cartao = ev.target.closest('[data-id]');
         if (!botao || !cartao) return;
         const id = Number(cartao.getAttribute('data-id'));
+        // folha do checklist externo desta entrega (somente leitura; o PDF vem do servidor e a aba abre já no clique)
+        if (botao.getAttribute('data-acao') === 'checklist') {
+          if (win.EntregaChecklist) win.EntregaChecklist.abrirPdf(win, { apiBase: C.API_BASE, loginUrl: C.LOGIN_URL, token: () => (getAuth() || {}).token || '' },
+            `/minhas_entregas/${encodeURIComponent(id)}/checklist.pdf`);
+          return;
+        }
         if (botao.getAttribute('data-acao') === 'iniciar') iniciarRota(id);
         else ocupado(() => abrirBaixa(id));
       });

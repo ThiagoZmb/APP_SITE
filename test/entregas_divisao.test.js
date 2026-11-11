@@ -520,8 +520,8 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611112000/);
-  assert.match(h, /entregas\.js\?v=202611112000/);
-  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611112000/);
+  assert.match(h, /entregas\.js\?v=202611121200/);
+  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611121200/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611112000/);
   const js = ler('entregas.js');
   assert.ok(js.includes("data-sobra=\"gerar\"") && js.includes('Gerar entrega do saldo') && js.includes('Encerrar saldo'));

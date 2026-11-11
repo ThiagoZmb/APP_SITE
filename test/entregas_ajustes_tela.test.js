@@ -62,7 +62,10 @@ test('rotuloItem: "Item N · descrição"; sem número válido, só a descriçã
   assert.equal(C.rotuloItem({ item: 'x', descricao: 'Porta' }), 'Porta');
   assert.equal(E.textoItens([{ item: 2, descricao: 'Trilho', qtd: 1.5 }]), 'Item 2 · Trilho × 1,5');
   const js = ler('entregas.js');
-  assert.match(js, /esc\(rotuloItem\(i\)\)/);
+  // o detalhe mostra o número do item num chip e a descrição escapada à parte (htmlItemDetalhe, 2026-11-12)
+  assert.match(js, /itens\.map\(htmlItemDetalhe\)/);
+  assert.equal(E.htmlItemDetalhe({ item: 3, descricao: '<b>Porta</b>', qtd: 2 }),
+    '<li class="det-item"><span class="det-chip">Item 3</span><span class="det-item-desc">&lt;b&gt;Porta&lt;/b&gt;</span><span class="det-item-qtd">× 2</span></li>');
 });
 
 test('detalhe da equipe: itensDetalhe traz o ITEM de cada item mesmo sem divisão (entrega do pedido inteiro)', async t => {
@@ -126,7 +129,7 @@ test('a varredura continua só por ação do usuário: GET /entregas varre, nada
 });
 
 test('versões ?v= dos scripts alterados subiram', () => {
-  assert.match(ler('entregas.html'), /entregas\.js\?v=202611112000/);
+  assert.match(ler('entregas.html'), /entregas\.js\?v=202611121200/);
   assert.match(ler('entregas.html'), /entregas_comum\.js\?v=202611112000/);
-  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611112000/);
+  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611121200/);
 });

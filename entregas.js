@@ -322,6 +322,44 @@
   const rotuloItem = C.rotuloItem;
   const textoItens = itens => (Array.isArray(itens) ? itens : []).map(i => `${rotuloItem(i)} × ${numeroBR(i.qtd)}`).join('; ');
 
+  // ---- Painel de detalhe (2026-11-12): dados com copiar/ligar, itens com chip, linha do tempo e aviso do cancelamento ----
+  // Telefone brasileiro dentro de um texto livre ("João (27) 99876-5432"): DDD de 11 a 99 + 8 ou 9 dígitos (celular começa
+  // com 9), com ou sem +55. Só um trecho que pareça telefone vale; nada é inventado. Devolve "tel:+55DDNNNNNNNNN" ou ''.
+  function linkLigar(texto) {
+    const s = String(texto ?? '');
+    const re = /(?:\+?55[\s.-]*)?\(?\s*([1-9][1-9])\s*\)?[\s.-]*(9?\d{4})[\s.-]?(\d{4})(?!\d)/g;
+    let m;
+    while ((m = re.exec(s))) {
+      const antes = s[m.index - 1];
+      if (antes && /\d/.test(antes)) continue; // pedaço de um número maior (CEP, documento)
+      const local = m[2] + m[3];
+      if (local.length === 9 && local[0] !== '9') continue;
+      if (local.length === 8 && /^[01]/.test(local)) continue;
+      return 'tel:+55' + m[1] + local;
+    }
+    return '';
+  }
+  // um item da entrega: chip "Item N", descrição (quebra) e quantidade; observação do item embaixo
+  function htmlItemDetalhe(i) {
+    const num = i && i.item !== null && i.item !== undefined && i.item !== '' && Number.isFinite(Number(i.item)) ? `<span class="det-chip">Item ${esc(i.item)}</span>` : '<span class="det-chip">—</span>';
+    return `<li class="det-item">${num}<span class="det-item-desc">${esc(i && i.descricao ? i.descricao : 'Sem descrição')}</span>` +
+      `<span class="det-item-qtd">× ${esc(numeroBR(i && i.qtd))}</span>${i && i.observacao ? `<span class="det-item-obs">Obs.: ${esc(i.observacao)}</span>` : ''}</li>`;
+  }
+  // um evento da linha do tempo: rótulo em destaque; hora e usuário em tom suave; texto do motivo/detalhe abaixo
+  const htmlEventoDetalhe = (rotulo, quando, usuario, texto) => `<li><span class="det-tempo-rot">${esc(rotulo)}</span>` +
+    `<span class="det-tempo-meta">${esc([dataHoraBR(quando), usuario].filter(Boolean).join(' · '))}</span>` +
+    (texto ? `<div class="det-tempo-txt">${esc(texto)}</div>` : '') + '</li>';
+  // texto da confirmação do cancelamento: o que acontece de verdade (a equipe não reabre uma entrega cancelada)
+  function avisoCancelamento(det) {
+    const e = (det && det.entrega) || {};
+    const div = (det && det.divisao) || {};
+    const seq = rotuloSequencia(div);
+    const base = `Cancelar a entrega do pedido ${e.numero ?? ''}${seq ? ' (' + seq + ')' : ''}? Ela sai da fila e da agenda e não pode ser reaberta por esta tela.`;
+    return div.dividido
+      ? `${base} Os itens desta entrega voltam para o "Saldo a entregar" do pedido.`
+      : `${base} O pedido continua com a situação atual e não volta sozinho para "A programar".`;
+  }
+
   // ============ TELA (só no navegador) ============
   function iniciar(win) {
     const doc = win.document;
@@ -486,7 +524,17 @@
       desenharLista();
     }
 
-    function linhaInfo(rot, val) { return val ? `<dt>${esc(rot)}</dt><dd>${esc(val)}</dd>` : ''; }
+    // `extra` = HTML já montado aqui (botões copiar/ligar); o valor sempre passa por esc()
+    // cada par fica num <div> (permitido dentro de <dl>): curtos em duas colunas, textos longos em linha inteira
+    const LARGOS = ['Cliente', 'Endereço', 'Contato no local', 'Observação', 'Transportadora'];
+    function linhaInfo(rot, val, extra = '') {
+      return val ? `<div class="det-campo${LARGOS.includes(rot) ? ' det-largo' : ''}"><dt>${esc(rot)}</dt><dd>${esc(val)}${extra}</dd></div>` : '';
+    }
+    const botaoCopiar = (campo, rotulo) => `<button type="button" class="det-mini" data-copiar="${campo}" aria-label="Copiar ${esc(rotulo)}">Copiar</button>`;
+    function acoesContato(texto) {
+      const tel = linkLigar(texto);
+      return `<span class="det-linha-acoes">${botaoCopiar('contato', 'o contato no local')}${tel ? `<a class="det-mini" href="${esc(tel)}" aria-label="Ligar para o contato no local">Ligar</a>` : ''}</span>`;
+    }
     function enderecoTexto(e) {
       const a = e.endereco || {};
       const l1 = [a.rua, a.numero].filter(Boolean).join(', ');
@@ -510,7 +558,11 @@
       const div = estado.det.divisao || {};
       mostrar('vista-detalhe');
       const seq = rotuloSequencia(div);
-      $('d-titulo').textContent = `Pedido ${e.numero}${seq ? ' · ' + seq : ''}`;
+      $('d-titulo').innerHTML = `Pedido <span class="det-num">${esc(e.numero)}</span>`;
+      $('d-titulo').setAttribute('aria-label', `Pedido ${e.numero}${seq ? ', ' + seq : ''}`);
+      const sub = [seq, e.cliente].filter(Boolean).join(' · ');
+      $('d-sub').textContent = sub;
+      $('d-sub').hidden = !sub;
       $('d-status').innerHTML = selo(e.statusExibicao || e.status);
       // pedido editado depois da divisão: aviso fixo; a divisão fica bloqueada e o pedido não fecha sozinho na última baixa
       const avisos = [];
@@ -521,19 +573,44 @@
       $('btn-separar').hidden = !div.podeSeparar;
       $('btn-restante').hidden = !podeGerarRestante(estado.det);
       $('d-itens-titulo').textContent = div.dividido ? 'Itens desta entrega' : 'Itens do pedido';
+      const endereco = enderecoTexto(e);
       $('d-info').innerHTML = linhaInfo('Cliente', e.cliente) + linhaInfo('Tipo', e.tipo ? rotuloTipo(e.tipo) : '') +
         linhaInfo('Data do pedido', dataBR(e.dataPedido)) + linhaInfo('Prometido', dataBR(e.dataPrometida)) + linhaInfo('Agendada', dataBR(e.dataAgendada)) +
         linhaInfo('Motorista', nomeMotorista(e, estado.motoristas)) +
-        linhaInfo('Endereço', enderecoTexto(e)) + linhaInfo('Contato no local', e.contatoLocal) + linhaInfo('Transportadora', e.transportadora) +
+        linhaInfo('Endereço', endereco, `<span class="det-linha-acoes">${botaoCopiar('endereco', 'o endereço')}</span>`) +
+        linhaInfo('Contato no local', e.contatoLocal, acoesContato(e.contatoLocal)) + linhaInfo('Transportadora', e.transportadora) +
         linhaInfo('Rastreio', e.rastreio) + linhaInfo('Previsão', dataBR(e.previsao)) + linhaInfo('Observação', e.observacao);
+      estado.copiar = { endereco, contato: txt(e.contatoLocal) };
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
-      $('d-itens').innerHTML = itens.length ? itens.map(i => `<li>${esc(rotuloItem(i))} <span class="cinza">× ${esc(i.qtd)}</span>${i.observacao ? `<div class="cinza">Obs.: ${esc(i.observacao)}</div>` : ''}</li>`).join('') : '<li class="cinza">Sem itens.</li>';
-      $('d-eventos').innerHTML = eventos.map(v => { const x = eventoExibicao(v, e, eventos); return `<li><strong>${esc(x.rotulo)}</strong> <span class="cinza">${esc(dataHoraBR(v.quando))} · ${esc(v.usuario)}</span>` +
-        (textoEvento({ ...v, motivo: x.motivo }) ? `<div>${esc(textoEvento({ ...v, motivo: x.motivo }))}</div>` : '') + '</li>'; }).join('');
+      // um primário por vez: com uma baixa disponível (retirada/enviada/comprovante), Reagendar vira secundário
+      const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a));
+      $('btn-reagendar').classList.toggle('btn-primary', !temBaixa);
+      $('btn-reagendar').classList.toggle('btn-secondary', temBaixa);
+      ajustarGruposDeAcao();
+      $('d-itens').innerHTML = itens.length ? itens.map(htmlItemDetalhe).join('') : '<li class="det-vazio">Sem itens.</li>';
+      $('d-eventos').innerHTML = eventos.map(v => { const x = eventoExibicao(v, e, eventos); return htmlEventoDetalhe(x.rotulo, v.quando, v.usuario, textoEvento({ ...v, motivo: x.motivo })); }).join('');
       const caixa = $('d-anexos');
-      caixa.innerHTML = anexos.length ? '' : '<p class="cinza">Nenhum comprovante.</p>';
+      caixa.innerHTML = anexos.length ? '' : '<p class="det-vazio">Nenhum comprovante anexado a esta entrega.</p>';
       anexos.forEach(a => carregarAnexo(e.id, a, caixa));
+    }
+
+    // esconde o grupo de ações que ficou sem nenhum botão visível (por estado ou por permissão: layout.js marca .acesso-oculto)
+    const visivel = b => !b.hidden && !b.classList.contains('acesso-oculto');
+    function ajustarGruposDeAcao() {
+      $('d-acoes-principais').hidden = ![...$('d-acoes-principais').children].some(visivel);
+      $('d-acoes-secundarias').hidden = ![...$('d-acoes-secundarias').children].some(visivel);
+      $('d-perigo').hidden = !visivel($('btn-cancelar'));
+      $('d-acoes').hidden = $('d-acoes-principais').hidden && $('d-acoes-secundarias').hidden && $('d-perigo').hidden;
+    }
+
+    async function copiar(campo) {
+      const texto = (estado.copiar || {})[campo] || '';
+      if (!texto) return;
+      try {
+        await win.navigator.clipboard.writeText(texto);
+        toast(campo === 'endereco' ? 'Endereço copiado.' : 'Contato copiado.', 'ok');
+      } catch { toast('Não foi possível copiar aqui. Selecione o texto e copie.', 'erro'); }
     }
 
     // o binário exige Authorization: busca com fetch e mostra por blob URL
@@ -547,9 +624,14 @@
         const blob = await chamar(`/entregas/${encodeURIComponent(entregaId)}/anexo/${encodeURIComponent(a.id)}`, { blob: true });
         const url = URL.createObjectURL(blob);
         estado.urls.push(url);
+        // miniatura; o clique abre a imagem inteira numa aba
+        const link = doc.createElement('a');
+        link.href = url; link.target = '_blank'; link.rel = 'noopener';
+        link.setAttribute('aria-label', 'Abrir ' + leg.textContent + ' em tamanho real');
         const img = doc.createElement('img');
-        img.src = url; img.alt = leg.textContent;
-        fig.insertBefore(img, leg);
+        img.src = url; img.alt = leg.textContent; img.loading = 'lazy';
+        link.appendChild(img);
+        fig.insertBefore(link, leg);
       } catch (err) { leg.textContent += ' — não foi possível carregar (' + err.message + ')'; }
     }
 
@@ -858,7 +940,20 @@
       });
       $('btn-agendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(false)));
       $('btn-reagendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(true)));
-      $('btn-cancelar').addEventListener('click', () => abrirForm('vista-cancelar', ['c-motivo']));
+      $('btn-cancelar').addEventListener('click', () => {
+        abrirForm('vista-cancelar', ['c-motivo']);
+        $('c-titulo').textContent = `Cancelar entrega — pedido ${estado.det.entrega.numero}`;
+        $('c-aviso').textContent = avisoCancelamento(estado.det);
+        $('c-motivo').focus();
+      });
+      $('d-info').addEventListener('click', ev => { const b = ev.target.closest('[data-copiar]'); if (b) copiar(b.getAttribute('data-copiar')); });
+      // Checklist externo de entrega (janela com os campos; o PDF é gerado no servidor)
+      const checklist = win.EntregaChecklist && win.EntregaChecklist.iniciarJanela(win, {
+        apiBase: C.API_BASE, loginUrl: C.LOGIN_URL, token: () => (getAuth() || {}).token || '', chamar, toast,
+        podeEditar: () => !!(win.Acesso && win.Acesso.pode('entregas.programar'))
+      });
+      $('btn-checklist').addEventListener('click', ev => { if (checklist && estado.det) checklist.abrir(estado.det.entrega.id, ev.currentTarget); });
+      $('btn-folha-branco').addEventListener('click', () => { if (checklist) checklist.abrirBranco(); });
       $('btn-retirada').addEventListener('click', () => abrirForm('vista-retirada', ['r-entregue', 'r-foto']));
       $('btn-enviada').addEventListener('click', () => {
         abrirForm('vista-enviada', ['e-transp', 'e-rastreio', 'e-previsao']);
@@ -899,5 +994,6 @@
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
-    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem, iniciar };
+    rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
+    linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };
 });
