@@ -174,7 +174,7 @@ function bancoEntregas() {
           || String(a.e.data_agendada).localeCompare(String(b.e.data_agendada)) || a.e.numero - b.e.numero)
         .map(({ e, ped, cli }) => ({
           id: e.id, numero: e.numero, status: e.status, tipo: e.tipo, data_agendada: e.data_agendada,
-          data_prometida: ped.DATA_PRONTO || null, data_pedido: ped.DATA || null, cliente: ped.RAZAO_SOCIAL,
+          data_prometida: ped.DATA_PRONTO || null, data_pedido: ped.DATA || null, cliente: ped.RAZAO_SOCIAL, situacao_pedido: ped.SITUACAO ?? null,
           cidade: e.endereco_cidade || cli?.CIDADE || null, uf: e.endereco_uf || cli?.ESTADO || null,
           motorista: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME || null,
           qtd_ocorrencias: String(eventos.filter(v => v.entrega_id === e.id && OCORRENCIAS.includes(v.tipo)).length),
@@ -223,7 +223,7 @@ function bancoEntregas() {
       entregas.filter(e => ['a_programar', 'agendada', 'ocorrencia'].includes(e.status)).filter(e => pedidoDe(e)?.SITUACAO === 'Cancelado').map(e => ({ id: e.id }))],
     // cancelamento: A programar cujo pedido deixou de estar Pronto
     [/SELECT e\.id FROM web_entregas e JOIN ped_orc p [\s\S]*e\.status = 'a_programar'/, () =>
-      entregas.filter(e => e.status === 'a_programar').filter(e => { const p = pedidoDe(e); return p && !ehPronto(p); }).map(e => ({ id: e.id }))],
+      entregas.filter(e => e.status === 'a_programar').filter(e => { const p = pedidoDe(e); return p && !ehPronto(p) && p.SITUACAO !== 'Em Produção'; }).map(e => ({ id: e.id }))],
     [/^UPDATE web_entregas SET status = 'cancelada', atualizado_em = \? WHERE id = \? AND status IN \(([^)]*)\)/, (sql, [atualizado_em, id]) => {
       const de = /status IN \(([^)]*)\)/.exec(sql)[1].split(',').map(x => x.trim().replace(/'/g, ''));
       const e = entregas.find(x => x.id === id && de.includes(x.status));

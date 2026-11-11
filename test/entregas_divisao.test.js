@@ -345,7 +345,7 @@ test('motorista: lista e detalhe mostram SÓ os itens da própria entrega, com "
   assert.equal((await separar(chamar, nova.id, [{ numeroItem: 2, quantidade: 1 }])).status, 403);
 });
 
-test('varredura com várias entregas: sai de Pronto cancela TODAS as A programar (Agendada fica); volta a Pronto reabre só as que ela cancelou; nada duplicado', async t => {
+test('varredura com várias entregas: sai de Pronto para outra situação que não Em Produção cancela TODAS as A programar (Agendada fica); volta a Pronto reabre só as que ela cancelou; nada duplicado', async t => {
   const { banco, chamar } = await prepararEntregas(t);
   const origem = cenario(banco);
   assert.equal((await separar(chamar, origem.id, [{ numeroItem: 1, quantidade: 1 }])).status, 201);
@@ -353,7 +353,7 @@ test('varredura com várias entregas: sai de Pronto cancela TODAS as A programar
   const [um, dois, tres] = [1, 2, 3].map(s => banco.entregas.find(e => e.sequencia === s));
   Object.assign(banco.entregas.find(e => e.id === tres.id), { status: 'agendada', tipo: 'retirada', data_agendada: '2026-11-20' });
   assert.equal((await chamar(`/entregas/${dois.id}/cancelar`, 'POST', { motivo: 'equipe cancelou' })).status, 200);
-  banco.pedidos[0].SITUACAO = 'Em Produção';
+  banco.pedidos[0].SITUACAO = 'Orçamento'; // (Em Produção não cancela mais: decisão do dono, 2026-11-11)
   await chamar('/entregas');
   const st = () => [um, dois, tres].map(x => banco.entregas.find(e => e.id === x.id).status);
   assert.deepEqual(st(), ['cancelada', 'cancelada', 'agendada']);

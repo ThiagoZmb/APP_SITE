@@ -85,7 +85,7 @@ test('dataPrometida vem de DATA_PRONTO, dataPedido de DATA e dataAgendada é tex
   banco.semear.evento({ entrega_id: 1, tipo: 'ausente' });
   banco.semear.evento({ entrega_id: 1, tipo: 'agendada' });
   const [e] = (await (await chamar('/entregas')).json()).entregas;
-  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'clienteFinal', 'dataAgendada', 'dataPedido', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'status', 'statusExibicao', 'tipo', 'uf'].sort());
+  assert.deepEqual(Object.keys(e).sort(), ['cidade', 'cliente', 'clienteFinal', 'dataAgendada', 'dataPedido', 'dataPrometida', 'id', 'motorista', 'numero', 'qtdOcorrencias', 'situacaoPedido', 'status', 'statusExibicao', 'tipo', 'uf'].sort());
   assert.equal(e.dataPrometida, '2026-11-10');
   assert.equal(e.dataPedido, '2026-10-20');
   assert.equal(e.dataAgendada, '2026-11-03');

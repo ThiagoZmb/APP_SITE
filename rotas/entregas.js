@@ -101,7 +101,8 @@ const lerImagem = (req, res, next) => rawImagem(req, res, err => {
 //    simultâneas não duplicam; pedido que já tem qualquer entrega, inclusive dividida, não ganha outra)
 //    e toda entrega sem nenhum evento ganha o evento 'criada';
 //  - registro A programar/Agendada/Ocorrência cujo pedido foi Cancelado vira cancelado ('Pedido cancelado'); Em rota nunca é cancelado aqui;
-//  - registro A programar cujo pedido deixou de estar Pronto vira cancelado ('Pedido saiu de Pronto');
+//  - registro A programar cujo pedido deixou de estar Pronto E não está Em Produção vira cancelado ('Pedido saiu de Pronto');
+//    (2026-11-11, decisão do dono) pedido Em Produção NÃO cancela a entrega A programar: a equipe pode criá-la à mão (POST /entregas/pedido/:numero/criar);
 //  - cancelada pela varredura por ter saído de Pronto, cujo pedido voltou a Pronto, reabre como A programar;
 //  - (2026-11-11) pedido Entregue/Retirado fora das Entregas (VB ou menu): A programar/Agendada/Ocorrência são ENCERRADAS como
 //    concluídas do mesmo tipo do pedido (evento 'encerrada', status anterior no detalhe); a cancelada pela própria varredura por
@@ -166,7 +167,7 @@ async function sincronizarFila(pool, res) {
     await cancelar(pedidoCancelado, MOTIVO_PEDIDO_CANCELADO, ['a_programar', 'agendada', 'ocorrencia']);
     const [fora] = await conn.execute(
       `SELECT e.id FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
-       WHERE e.status = 'a_programar' AND p.SITUACAO <> 'Pronto' ORDER BY e.id`);
+       WHERE e.status = 'a_programar' AND p.SITUACAO NOT IN ('Pronto', 'Em Produção') ORDER BY e.id`);
     await cancelar(fora, MOTIVO_SAIU_DE_PRONTO, ['a_programar']);
     // reabre só o que a própria varredura cancelou por "saiu de Pronto" (último evento); cancelamento da equipe ou do pedido fica
     const [voltaram] = await conn.execute(
@@ -452,7 +453,7 @@ function registrarEntregas({ rota, pool }) {
         dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
-        motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0,
+        motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0, situacaoPedido: l.situacao_pedido || null,
         ...camposOrdem(l)
       })), sobras });
     } catch (err) {
@@ -676,6 +677,10 @@ function registrarEntregas({ rota, pool }) {
   // Como o VB (Pedido_Entregue/Pedido_Retirado): grava SITUACAO e DATA_ENTREGA (data da entrega). Nunca sobrescreve pedido Cancelado.
   // Se o UPDATE não atingir linha, o SELECT distingue "já está no destino" (sucesso, p.ex. o VB já marcou) de cancelado/excluído (409 e rollback).
   const PEDIDO_CANCELADO = 'O pedido foi cancelado ou excluído no sistema; fale com a equipe.';
+  // baixa (Entregue/Retirado) só com o pedido Pronto: qualquer outra situação recusa, exceto Entregue/Retirado (já no destino
+  // e Cancelado seguem as regras de antes: baixarPedido/PEDIDO_CANCELADO)
+  const SITUACOES_COM_BAIXA = ['Pronto', 'Entregue', 'Retirado', 'Cancelado'];
+  const MSG_BAIXA_NAO_PRONTO = s => `O pedido ainda não está Pronto (situação atual: ${s || '—'}). A baixa só é possível depois que o pedido estiver Pronto.`;
   async function baixarPedido(c, numero, situacao) {
     const [up] = await c.execute(
       "UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = 'Pedido' AND SITUACAO <> 'Cancelado'", [situacao, hojeLocal(), numero]);
@@ -731,6 +736,8 @@ function registrarEntregas({ rota, pool }) {
     depois: async (c, { eventoId, status, pedido }) => {
       await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
       if (!pedidoPara(status)) return null;
+      // (2026-11-11) entrega de pedido Em Produção pode ser criada e agendada, mas só se baixa o que está Pronto
+      if (pedido && !SITUACOES_COM_BAIXA.includes(String(pedido.SITUACAO ?? '').trim())) throw new ErroUsuario(409, MSG_BAIXA_NAO_PRONTO(pedido.SITUACAO));
       const fim = await fechamento(c, atual, status);
       if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao); return null; }
       // baixa que não é a última: o pedido não muda, mas pedido Cancelado ou excluído continua recusando a baixa
@@ -857,6 +864,45 @@ function registrarEntregas({ rota, pool }) {
       return { ok: true, pedidoFechado: !!fim.fechar, situacao: fim.fechar ? fim.situacao : null };
     });
     if (r) res.json(r);
+  });
+
+  // ==== Criação manual de entrega (2026-11-11, decisão do dono): pedido Pronto OU Em Produção que ainda não tem nenhuma entrega ====
+  // A varredura só cria entrega para pedido Pronto; esta rota deixa a equipe criar (e depois agendar) a entrega de um pedido Em Produção.
+  // Nasce A programar, sequencia 1, sem data/motorista/tipo, com evento 'criada' e auditoria. A baixa continua exigindo pedido Pronto.
+  const SITUACOES_CRIAVEIS = ['Pronto', 'Em Produção'];
+  rota('post', '/entregas/pedido/:numero/criar', PROGRAMAR, async (req, res) => {
+    const numero = numeroDe(req);
+    if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/criar', async conn => {
+      // ordem de trava ped_orc -> web_entregas (a mesma da baixa e da divisão)
+      const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
+      if (!ped[0]) throw new ErroUsuario(404, 'Pedido não encontrado.');
+      const est = filtroEstados(req, 'c.ESTADO');
+      if (est.sql) {
+        const [ok] = await conn.execute(
+          `SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido' AND ${est.sql}`,
+          [numero, ...est.params]);
+        if (!ok.length) throw new ErroUsuario(404, 'Pedido não encontrado.');
+      }
+      const situacao = String(ped[0].SITUACAO ?? '').trim();
+      if (!SITUACOES_CRIAVEIS.includes(situacao)) {
+        throw new ErroUsuario(409, `Só pedido Pronto ou Em Produção pode ter entrega criada (situação atual: ${situacao || '—'}).`);
+      }
+      const [existentes] = await conn.execute('SELECT * FROM web_entregas WHERE numero = ? ORDER BY sequencia, id FOR UPDATE', [numero]);
+      if (existentes.length) {
+        throw new ErroUsuario(409, existentes.some(e => e.status !== 'cancelada')
+          ? 'Este pedido já tem entrega: use a tela de Entregas (pedido dividido: "Separar em outra entrega").'
+          : 'Este pedido já teve entrega (hoje cancelada). Se ela foi suspensa pela varredura, volta sozinha quando o pedido ficar Pronto.');
+      }
+      const agora = agoraLocal();
+      const [ins] = await conn.execute('INSERT INTO web_entregas (numero, sequencia, status, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?)',
+        [numero, 1, STATUS.A_PROGRAMAR, agora, agora]);
+      const motivo = situacao === 'Pronto' ? 'Criada manualmente pela equipe' : 'Criada manualmente pela equipe (pedido ainda Em Produção)';
+      await evento(conn, ins.insertId, agora, req.acesso.nome, 'criada', motivo, null);
+      await auditar(conn, agora, req.acesso.nome, 'entrega_criada_manual', numero, { entregaId: ins.insertId, situacaoPedido: situacao });
+      return { entrega: paraEntrega({ id: ins.insertId, numero, sequencia: 1, status: STATUS.A_PROGRAMAR, criado_em: agora, atualizado_em: agora }), situacaoPedido: situacao };
+    });
+    if (r) res.status(201).json(r);
   });
 
   // ==== Rotas do motorista (/minhas_entregas) ====

@@ -412,6 +412,8 @@
     };
     const local = e => [e.cidade, e.uf].filter(Boolean).join('/');
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
+    // pedido ainda Em Produção (entrega criada à mão): deixa claro que ainda não está pronto para sair
+    const seloProducao = sit => (String(sit || '') === 'Em Produção' ? ' <span class="selo info" title="O pedido ainda está em produção: só dá para dar baixa depois que ficar Pronto">Em produção</span>' : '');
     const botaoAcao = (acao, rotulo) => `<button type="button" class="btn btn-mini btn-secondary" data-acao="${acao}" data-perm="entregas.programar">${rotulo}</button>`;
 
     function desenharAbas() {
@@ -430,9 +432,9 @@
     function linha(e, aba) {
       const tdBase = `${celulaNumero(e)}${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
-      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')}</td>`;
+      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}${seloProducao(e.situacaoPedido)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
-      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.statusExibicao || e.status)}</td>` +
+      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.statusExibicao || e.status)}${seloProducao(e.situacaoPedido)}</td>` +
         (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
@@ -511,7 +513,7 @@
     }
 
     // ---------- painel ----------
-    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar'];
+    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar', 'vista-criar'];
     function mostrar(nome) { VISTAS.forEach(v => { $(v).hidden = v !== nome; }); }
     function limparUrls() { estado.urls.forEach(u => URL.revokeObjectURL(u)); estado.urls = []; }
 
@@ -563,9 +565,10 @@
       const sub = [seq, e.cliente].filter(Boolean).join(' · ');
       $('d-sub').textContent = sub;
       $('d-sub').hidden = !sub;
-      $('d-status').innerHTML = selo(e.statusExibicao || e.status);
+      $('d-status').innerHTML = selo(e.statusExibicao || e.status) + seloProducao(div.situacaoPedido);
       // pedido editado depois da divisão: aviso fixo; a divisão fica bloqueada e o pedido não fecha sozinho na última baixa
       const avisos = [];
+      if (div.situacaoPedido === 'Em Produção' && !['cancelada', 'entregue', 'retirado'].includes(e.status)) avisos.push('Pedido ainda em produção: a baixa só é possível depois que ele estiver Pronto.');
       if (div.alterado) avisos.push('O pedido foi alterado depois da divisão: confira os itens. Ele não vira Entregue sozinho na última baixa.');
       if (!div.alterado && Array.isArray(div.itensSemEntrega) && div.itensSemEntrega.length) avisos.push('Saldo a entregar: ' + textoItens(div.itensSemEntrega) + '.');
       $('d-aviso').textContent = avisos.join(' ');
@@ -704,6 +707,20 @@
         await chamar(`/entregas/${encodeURIComponent(e.id)}/${rota}`, { metodo: 'POST', corpo });
         toast(estado.reagendando ? 'Entrega reagendada.' : 'Entrega agendada.', 'ok');
         await recarregarTudo(e.id);
+      });
+    }
+
+    // ---------- Criar entrega (pedido Pronto ou Em Produção sem entrega) ----------
+    function enviarCriar() {
+      const numero = txt($('cr-numero').value);
+      if (!/^[0-9]{1,10}$/.test(numero) || Number(numero) < 1) { $('erro-criar').textContent = 'Informe o número do pedido (somente dígitos).'; return; }
+      $('erro-criar').textContent = '';
+      return ocupado(async () => {
+        let r;
+        try { r = await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/criar`, { metodo: 'POST', corpo: {} }); } catch (err) { $('erro-criar').textContent = err.message; return; }
+        toast(`Entrega criada para o pedido ${numero}.`, 'ok');
+        await carregar();
+        if (r && r.entrega) await abrirDetalhe(r.entrega.id); else mostrar('vazio-painel');
       });
     }
 
@@ -908,6 +925,7 @@
     function ligar() {
       doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); estado.pedidoFiltro = ''; desenharLista(); }));
       $('btn-atualizar').addEventListener('click', atualizar);
+      $('btn-criar-entrega').addEventListener('click', () => abrirForm('vista-criar', ['cr-numero']));
       $('busca').addEventListener('input', ev => { estado.busca = ev.target.value.trim(); desenharLista(); });
       $('lista').addEventListener('click', ev => {
         if (ev.target.closest('[data-limpar-pedido]')) { estado.pedidoFiltro = ''; desenharLista(); return; }
@@ -972,6 +990,7 @@
       const envio = (id, fn) => $(id).addEventListener('submit', ev => { ev.preventDefault(); fn(); });
       envio('vista-agendar', enviarAgendar);
       envio('vista-cancelar', enviarCancelar);
+      envio('vista-criar', enviarCriar);
       envio('vista-retirada', enviarRetirada);
       envio('vista-enviada', enviarEnviada);
       envio('vista-comprovante', enviarComprovante);

@@ -96,9 +96,9 @@ test('legado: cancelada pela varredura por "saiu de Pronto" de pedido Entregue v
   assert.equal(JSON.parse(banco.eventos.at(-1).detalhe).statusAnterior, 'cancelada');
 });
 
-test('pedido Em Produção: regra antiga intacta (A programar cancelada por "saiu de Pronto"; Agendada fica)', async t => {
+test('pedido em outra situação (nem Pronto nem Em Produção): A programar cancelada por "saiu de Pronto"; Agendada fica', async t => {
   const a = await prepararEntregas(t);
-  cenario(a.banco, 'Em Produção', [{ status: 'a_programar' }, { status: 'agendada', sequencia: 2 }]);
+  cenario(a.banco, 'Orçamento', [{ status: 'a_programar' }, { status: 'agendada', sequencia: 2 }]);
   await a.chamar('/entregas');
   assert.deepEqual(a.banco.entregas.map(e => e.status), ['cancelada', 'agendada']);
   assert.equal(a.banco.eventos.filter(v => v.tipo === 'encerrada').length, 0);
@@ -118,11 +118,15 @@ test('pedido volta de Retirado para Pronto: a encerrada com o pedido reabre no s
   assert.equal(banco.eventos.filter(v => v.tipo === 'reaberta').length, 1, 'idempotente');
 });
 
-test('pedido volta de Entregue para Em Produção: reabre A programar e, na mesma varredura, a regra "saiu de Pronto" a cancela', async t => {
+test('pedido volta de Entregue para Em Produção: reabre A programar e ela fica (Em Produção não cancela mais); em outra situação a regra "saiu de Pronto" a cancela', async t => {
   const { banco, chamar } = await prepararEntregas(t);
   cenario(banco, 'Entregue', [{ status: 'a_programar' }]);
   await chamar('/entregas');
   banco.pedidos[0].SITUACAO = 'Em Produção';
+  await chamar('/entregas');
+  assert.equal(banco.entregas[0].status, 'a_programar');
+  assert.deepEqual(banco.eventos.map(v => v.tipo), ['criada', 'encerrada', 'reaberta']);
+  banco.pedidos[0].SITUACAO = 'Orçamento';
   await chamar('/entregas');
   assert.equal(banco.entregas[0].status, 'cancelada');
   assert.deepEqual(banco.eventos.map(v => v.tipo), ['criada', 'encerrada', 'reaberta', 'cancelada']);

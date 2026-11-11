@@ -245,7 +245,7 @@
         #d-anexos a:hover img { border-color: var(--primary-color); }
         #painel .det-vazio { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); text-align: center; font-size: 13px; color: var(--text-light); }
         .aviso-cancelar { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger-color); background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); font-size: 13px; line-height: 1.45; }
-        #btn-folha-branco { flex: none; }
+        #btn-folha-branco, #btn-criar-entrega { flex: none; }
         @media (max-width: 480px) {
             #painel { padding: 16px; }
             .det-acoes .btn { flex: 1 1 100%; justify-content: center; }
@@ -323,6 +323,7 @@
                         <div class="busca-linha">
                             <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
                             <button type="button" class="btn btn-secondary" id="btn-atualizar" title="Atualizar as listas e a fila" aria-label="Atualizar as listas de entregas"><svg class="ico-atualizar" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg><span class="rot">Atualizar</span></button>
+                            <button type="button" class="btn btn-secondary" id="btn-criar-entrega" data-perm="entregas.programar" title="Criar a entrega de um pedido Pronto ou Em Produção que ainda não tem entrega">Criar entrega</button>
                             <button type="button" class="btn btn-secondary" id="btn-folha-branco" data-perm="entregas.checklist" title="Checklist de entrega em branco, para preencher à mão">Folha em branco</button>
                         </div>
                     </div>
@@ -414,6 +415,17 @@
                         <p class="erro-form" id="erro-agendar" role="alert"></p>
                         <div class="acoes">
                             <button type="submit" class="btn btn-primary" id="btn-salvar-agenda" data-perm="entregas.programar">Salvar</button>
+                            <button type="button" class="btn btn-secondary voltar">Voltar</button>
+                        </div>
+                    </form>
+
+                    <form id="vista-criar" hidden>
+                        <h2>Criar entrega</h2>
+                        <p class="aviso-divisao" role="note">Para pedido Pronto ou Em Produção que ainda não tem entrega. Depois de criada, ela aparece em A programar e pode ser agendada. A baixa (Entregue/Retirado) só é possível quando o pedido estiver Pronto.</p>
+                        <div class="form-group"><label for="cr-numero">Número do pedido</label><input id="cr-numero" inputmode="numeric" maxlength="10" autocomplete="off"></div>
+                        <p class="erro-form" id="erro-criar" role="alert"></p>
+                        <div class="acoes">
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-criar" data-perm="entregas.programar">Criar entrega</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
