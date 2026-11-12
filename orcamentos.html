@@ -1232,17 +1232,6 @@
             sel.value = 'Produto editável';
             sel.dispatchEvent(new Event('change'));
         }
-        function popularCores(id, grupos) {
-            const sel = document.getElementById(id);
-            if (!sel) return;
-            let html = '<option value="">— Selecione —</option>';
-            Object.keys(grupos || {}).sort().forEach(tipo => {
-                html += `<optgroup label="${escapeHtml(tipo)}">` +
-                    (grupos[tipo] || []).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
-                    '</optgroup>';
-            });
-            sel.innerHTML = html;
-        }
         async function catalogoFiltro(campo, chave) {
             if (!chave) return [];
             try {
@@ -1256,7 +1245,7 @@
                     fetchAutenticado(`${API_BASE}/cores_por_tipo`)
                 ]);
                 coresGrupos = cores || {};
-                popularCores('f-cor-serr', coresGrupos);
+                filtrarCores('f-cor-serr', val('f-acab-serr')); // Serralheria: cor só do tipo do acabamento (Sólida/Metálica)
                 popularLista('f-produto', cat.produtos_serr);
                 produtoPadraoSerr();
                 popularLista('f-sistema', cat.sistemas);
@@ -1463,10 +1452,12 @@
             if (!produto) {
                 popularLista('f-material', [], '— escolha o produto —');
                 popularLista('f-acab-serr', [], '— escolha o material —');
+                filtrarCores('f-cor-serr', '');
                 return;
             }
             popularLista('f-material', await catalogoFiltro('materiais', produto), '(nenhum material para este produto)');
             popularLista('f-acab-serr', [], '— escolha o material —');
+            filtrarCores('f-cor-serr', '');
         }
         async function carregarAcabSerr(material) {
             if (!material) {
@@ -1474,7 +1465,10 @@
                 return;
             }
             popularLista('f-acab-serr', await catalogoFiltro('acabamentos', material), '(nenhum acabamento para este material)');
+            filtrarCores('f-cor-serr', '');
         }
+        // Serralheria: a cor segue o acabamento (Pintura Sólida = cores Sólida; Pintura Metálica = cores Metálica), como nas portas
+        function aoMudarAcabSerr() { filtrarCores('f-cor-serr', val('f-acab-serr')); }
         // ============ ITENS AVULSOS (frmServicos + MotorFinanceiro.CalcularValorVendaAvulsa) ============
         // Perfil/Puxador/Trilhos = metro linear (tamanho); Revestimento = m² (altura × largura); Serviço = por unidade
         const AV_LINEAR = ['Perfil', 'Puxador', 'Trilhos'];
@@ -2655,7 +2649,9 @@
                 set('f-sistema', d.sistema); set('f-transpasse', d.transpasse);
                 largurasFolhas = Array.isArray(d.largurasFolhas) ? d.largurasFolhas.map(v => Math.round(parseFloat(v) || 0)) : [];
                 set('f-produto', d.produto); set('f-material', d.material);
-                set('f-acab-serr', d.acabSerr); set('f-cor-serr', d.corSerr);
+                set('f-acab-serr', d.acabSerr);
+                filtrarCores('f-cor-serr', val('f-acab-serr'));
+                selecionarComboPorTexto('f-cor-serr', d.corSerr); // cor gravada aparece mesmo fora da regra; escolha nova segue a lista filtrada
                 if (item.frente === 'Serralheria') limparMedidasSerr();
                 else {
                     set('f-profundidade', item.profundidade); set('f-soldas', item.soldas);
@@ -3221,7 +3217,8 @@
                 selecionarComboPorTexto('f-material', p.material);
                 await carregarAcabSerr(p.material);
                 selecionarComboPorTexto('f-acab-serr', p.acabSerr);
-                selecionarComboPorTexto('f-cor-serr', p.corSerr);
+                filtrarCores('f-cor-serr', p.acabSerr);
+                selecionarComboPorTexto('f-cor-serr', p.corSerr); // cor gravada fora da regra (TIPO vazio etc.) ainda aparece na edição
                 const set = (id, v) => { document.getElementById(id).value = v; };
                 set('f-altura-serr', p.altura || ''); set('f-largura-serr', p.largura || ''); set('f-profundidade', p.profundidade || '');
                 set('f-qtd-a', p.qtdAltura || 1); set('f-qtd-l', p.qtdLargura || 1); set('f-qtd-p', p.qtdProfundidade || 1); set('f-soldas', p.soldas || 0);
@@ -4250,6 +4247,7 @@
         document.getElementById('f-av-acab').addEventListener('change', aoMudarAcabAvulso);
         ['f-av-cor', 'f-av-alt', 'f-av-larg'].forEach(id => document.getElementById(id).addEventListener('change', calcularPrecoAutomatico));
         document.getElementById('f-material').addEventListener('change', e => carregarAcabSerr(e.target.value));
+        document.getElementById('f-acab-serr').addEventListener('change', aoMudarAcabSerr);
         ['f-produto', 'f-material', 'f-acab-serr', 'f-cor-serr'].forEach(id => {
             const combo = document.getElementById(id);
             combo.addEventListener('focus', () => expandirComboParaOpcoes(combo));

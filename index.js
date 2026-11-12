@@ -40,6 +40,7 @@ const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarEstoqueQr } = require('./rotas/estoque_qr');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
 const composicaoPedido = require('./calculo/composicao_pedido');
+const coresRegra = require('./calculo/cores');
 const { carregarComposicao } = require('./calculo/composicao_documentos');
 const { criarLeitor, lerCliente, calcularPrecoItem, precoComAcessorios, precificarAcessorios, precoSerralheria, ErroPreco, ErroCadastro, novoRastro, leitorRegistrado } = require('./calculo/precos');
 const { registrarPedOrc } = require('./rotas/ped_orc');
@@ -1055,14 +1056,16 @@ const TABELAS_CATALOGO = {
   materiais_serr: ['cadastro_de_produtos', 'MODELO', "WHERE SITUACAO = 'Ativo' AND CLASSE = 'Perfil AC'"],
   acabamentos:   ['acabamentos',          'ACABAMENTO', "WHERE SITUACAO = 'Ativo'"],
   produtos_serr: ['serralheria_produtos', 'nome_modelo', 'WHERE ativo = 1'],
-  cores:         ['cores', 'NOME_COR', '']
+  cores:         null // lista de cores: só TIPO Metálica/Sólida (calculo/cores.js), lida à parte
 };
 registro.rota('get', '/catalogos', ['orcamentos.criar'], async (req, res) => {
   // As leituras de cada catálogo são independentes: saem JUNTAS (eram ~13 idas ao banco em série, ~190 ms cada no Render = mais de 2 s).
   // A ordem das chaves da resposta é a de TABELAS_CATALOGO, como antes.
   const entradas = Object.entries(TABELAS_CATALOGO);
-  const listas = await Promise.all(entradas.map(async ([, [tabela, coluna, where]]) => {
+  const listas = await Promise.all(entradas.map(async ([, def]) => {
     try {
+      if (!def) return coresRegra.nomesCoresPermitidas(await coresRegra.lerLinhasCores(pool)); // chave 'cores'
+      const [tabela, coluna, where] = def;
       const [rows] = await pool.execute(
         `SELECT DISTINCT ${coluna} AS nome FROM ${tabela} ${where || ''} ORDER BY ${coluna}`);
       return rows.map(r => r.nome).filter(n => n);
@@ -1240,16 +1243,11 @@ registro.rota('get', '/dados_produto', ['orcamentos.criar'], async (req, res) =>
   }
 });
 
-// Cores agrupadas pela coluna TIPO (Sólida / Metálica)
+// Cores agrupadas pela coluna TIPO: somente Sólida e Metálica
 registro.rota('get', '/cores_por_tipo', ['orcamentos.criar'], async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT NOME_COR, TIPO FROM cores ORDER BY NOME_COR');
-    const grupos = {};
-    rows.forEach(r => {
-      const tipo = String(r.TIPO || '').trim() || 'Sem tipo';
-      (grupos[tipo] = grupos[tipo] || []).push(r.NOME_COR);
-    });
-    res.json(grupos);
+    // regra do dono (2026-11-12): só TIPO Metálica ou Sólida (calculo/cores.js); vazio/Eletrostática/outros nunca saem
+    res.json(await coresRegra.carregarCoresPermitidas(pool));
   } catch (err) {
     console.error('Erro /cores_por_tipo:', err.message);
     res.status(500).json({ error: 'Erro de servidor' });
