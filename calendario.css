@@ -83,6 +83,8 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .folha-dia h3 a:hover { text-decoration: underline; }
 .folha-dia.hoje h3 a { color: var(--primary-color); }
 .folha-dia ul { list-style: none; }
+/* linha dividindo as semanas (segunda a domingo), como na lista de Pedidos e Orçamentos */
+.folha-dia.divisor-semana, .dia-lista.divisor-semana { border-top: 2px solid var(--primary-color); }
 .folha-linha { padding: 3px 6px; border-radius: 4px; font-size: 14px; line-height: 1.5; cursor: context-menu; }
 .folha-linha:hover { background: var(--hover-linha); }
 .folha-linha:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }

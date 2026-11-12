@@ -143,11 +143,24 @@
     return `<div class="cal"><div class="cal-sem">${DIAS_SEMANA.map(d => `<span>${d}</span>`).join('')}</div>` +
       semanas.map(sem => `<div class="cal-linha">${sem.map(c => htmlCelula(c, situacao, busca)).join('')}</div>`).join('') + '</div>';
   }
+  // Segunda-feira da semana (segunda a domingo, como a lista de Pedidos e Orçamentos) de um dia 'AAAA-MM-DD'; vazio se inválido
+  function inicioSemana(dia) {
+    const d = new Date(String(dia) + 'T00:00:00Z');
+    if (Number.isNaN(d.getTime())) return '';
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  }
+  // classe 'divisor-semana' nos dias que abrem uma nova semana (linha dividindo as semanas); dias = células já filtradas e em ordem
+  function classesSemana(dias) {
+    let anterior = '';
+    return dias.map(c => { const sem = inicioSemana(c.dia); const nova = !!(sem && anterior && sem !== anterior); if (sem) anterior = sem; return nova ? ' divisor-semana' : ''; });
+  }
   // Celular: em vez da grade, uma lista só dos dias que têm pedido
   function htmlListaDias(semanas, situacao, busca) {
     const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
     if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
-    return dias.map(c => `<section class="dia-lista${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(DIAS_SEMANA[new Date(c.dia + 'T00:00:00Z').getUTCDay()])}, ${esc(dataBR(c.dia).slice(0, 5))}</a>` +
+    const sem = classesSemana(dias);
+    return dias.map((c, i) => `<section class="dia-lista${sem[i]}${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(DIAS_SEMANA[new Date(c.dia + 'T00:00:00Z').getUTCDay()])}, ${esc(dataBR(c.dia).slice(0, 5))}</a>` +
       `<span class="cinza">${c.qtdPedidos} pedido(s)${c.qtdAtrasados ? ` · ${c.qtdAtrasados} atrasado(s)` : ''}</span></h3>` +
       `<ul class="etqs">${c.pedidos.map(p => htmlEtiqueta(p, situacao, busca)).join('')}</ul></section>`).join('');
   }
@@ -163,7 +176,8 @@
   function htmlFolha(semanas, situacao, busca) {
     const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
     if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
-    return dias.map(c => `<section class="folha-dia${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
+    const sem = classesSemana(dias);
+    return dias.map((c, i) => `<section class="folha-dia${sem[i]}${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
       `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao, busca)).join('')}</ul></section>`).join('');
   }
   // alternador "Calendário | Lista" ao lado do título: só os botões (o contêiner #cal-visao é o .tipo-toggle do tema.css, o mesmo de Pedidos | Orçamentos no Início)
@@ -219,5 +233,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });
