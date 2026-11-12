@@ -17,8 +17,7 @@ const CAMPOS = [
   { chave: 'endereco', rotulo: 'Endereço', max: 400, multilinha: true },
   { chave: 'observacoes', rotulo: 'Observações de entrega', max: 500, multilinha: true },
   { chave: 'contato', rotulo: 'Contato no local', max: 190 },
-  { chave: 'motorista', rotulo: 'Motorista', max: 120 },
-  { chave: 'observacoesGerais', rotulo: 'Observações gerais da entrega', max: 600, multilinha: true }
+  { chave: 'motorista', rotulo: 'Motorista', max: 120 }
 ];
 const CHAVES = CAMPOS.map(c => c.chave);
 
@@ -72,7 +71,7 @@ function montarAutomatico({ entrega = {}, cliente = '', clienteFinal = '', motor
     cliente: t(cliente), clienteFinal: t(clienteFinal),
     endereco: end, enderecoOrigem: end ? 'entrega' : '',
     observacoes: t(e.observacao), contato: t(e.contato_local),
-    motorista: t(motoristaNome), observacoesGerais: '',
+    motorista: t(motoristaNome),
     itens: lista, qtdItensEsperada: lista.length ? r4(lista.reduce((s, i) => s + i.qtd, 0)) : null
   };
 }

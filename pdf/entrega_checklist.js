@@ -164,7 +164,6 @@ function desenharChecklistEntrega(doc, dados, { logo, geradoEm } = {}) {
   // ---- miolo variável: itens da entrega (só se couber) e a caixa de observações gerais (o que sobrar) ----
   const MIN_OBS = 58;
   const espaco = yRec - 10 - y;                       // entre as conferências e o recebimento
-  const obsGerais = campo('observacoesGerais', true);
   const itens = Array.isArray(d.itens) ? d.itens : [];
   let linhasItens = [];
   if (itens.length) {
@@ -193,11 +192,7 @@ function desenharChecklistEntrega(doc, dados, { logo, geradoEm } = {}) {
   y += 15;
   {
     const h = Math.max(30, yRec - 10 - y); // a caixa ocupa o que sobrar (o miolo de cima tem altura limitada: nunca passa daqui)
-    caixa(M, y, W, h);
-    if (obsGerais) {
-      const a = ajustarTexto(obsGerais, W - 2 * PAD, (s, tam) => medir(s, tam), { tamanhos: [10, 9, 8], maxLinhas: tam => (h - 2 * PAD) / (tam * 1.22) });
-      a.linhas.forEach((l, k) => escrever(l, M + PAD, y + PAD + k * a.tamanho * 1.22, { tam: a.tamanho }));
-    }
+    caixa(M, y, W, h); // caixa em branco para escrever à mão (não há campo na tela)
   }
 
   // recebimento (à mão)

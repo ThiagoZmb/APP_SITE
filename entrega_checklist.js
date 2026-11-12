@@ -23,8 +23,7 @@
     { chave: 'endereco', rotulo: 'Endereço', max: 400, multilinha: true },
     { chave: 'observacoes', rotulo: 'Observações de entrega', max: 500, multilinha: true },
     { chave: 'contato', rotulo: 'Contato no local', max: 190 },
-    { chave: 'motorista', rotulo: 'Motorista', max: 120 },
-    { chave: 'observacoesGerais', rotulo: 'Observações gerais da entrega', max: 600, multilinha: true }
+    { chave: 'motorista', rotulo: 'Motorista', max: 120 }
   ];
   const norm = v => String(v ?? '').replace(/\r\n?/g, '\n').trim();
 

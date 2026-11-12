@@ -69,7 +69,6 @@ test('montarAutomatico: dados da entrega, "Entrega n de N", quantidade esperada 
   assert.equal(a.motorista, 'Carlos');
   assert.equal(a.qtdItensEsperada, 3.5);
   assert.deepEqual(a.itens.map(i => i.item), [1, 3]);
-  assert.equal(a.observacoesGerais, '');
   // sem endereço na entrega: NUNCA o do cadastro do cliente (decisão do dono, 2026-11-12); a folha não pode ser gerada
   const b = K.montarAutomatico({ entrega: { numero: 5 }, enderecoCliente: { rua: 'Rua do Cliente', numero: '7', cidade: 'Serra', uf: 'ES' }, ordem: { ordemEntrega: 1, qtdEntregasPedido: 1 } });
   assert.equal(b.endereco, '');
@@ -93,10 +92,8 @@ test('validarEdicao: limpa, aceita vazio, recusa acima do limite (nunca corta), 
   assert.equal(ok.dados.cliente, 'Cliente X');
   assert.equal(ok.dados.endereco, 'Linha 1\nLinha 2\n\nLinha 3');
   assert.equal(ok.dados.motorista, '');
-  assert.equal(ok.dados.observacoesGerais, '');
   assert.deepEqual(Object.keys(ok.dados), K.CHAVES);
   assert.equal(K.validarEdicao({ cliente: 'x'.repeat(191) }).ok, false);
-  assert.match(K.validarEdicao({ observacoesGerais: 'x'.repeat(601) }).erro, /600/);
   assert.equal(K.validarEdicao({ dataEntrega: '2026-02-30' }).ok, false);
   assert.equal(K.validarEdicao({ cliente: { a: 1 } }).ok, false);
   assert.equal(K.validarEdicao(null).ok, false);
@@ -167,7 +164,7 @@ test('PDF: campos no limite, 60 itens e texto estranho continuam em UMA página;
     endereco_bairro: 'B'.repeat(120), endereco_cidade: 'C'.repeat(120), endereco_ref: 'R'.repeat(190), observacao: 'Obs '.repeat(125), contato_local: 'x'.repeat(190) },
     cliente: 'C'.repeat(190), clienteFinal: '😀 漢字 '.repeat(30), motoristaNome: 'M'.repeat(120),
     itens: Array.from({ length: 60 }, (_, i) => ({ item: i + 1, descricao: 'Descrição muito longa do item '.repeat(10), qtd: 1.25 })) });
-  const salvo = K.validarEdicao({ ...longo, endereco: 'E'.repeat(400), observacoes: 'linha\n'.repeat(80).slice(0, 500), observacoesGerais: 'g\n'.repeat(300) }).dados;
+  const salvo = K.validarEdicao({ ...longo, endereco: 'E'.repeat(400), observacoes: 'linha\n'.repeat(80).slice(0, 500) }).dados;
   for (const dados of [longo, K.mesclar(longo, salvo), K.folhaEmBranco(), K.montarAutomatico({}), {}]) {
     const { buf, textos } = await gerarPdf(dados);
     assert.equal(buf.subarray(0, 5).toString('latin1'), '%PDF-');
@@ -231,12 +228,12 @@ test('rotas: GET dos campos (automático), PUT salva com quem/quando e auditoria
   assert.equal(d.salvo, null);
   for (const k of nomesDeCampos(d)) assert.doesNotMatch(k, REGEX_VALOR, k);
 
-  r = await chamar('/entregas/1/checklist', 'PUT', { ...d.automatico, cliente: 'Cliente Editado', observacoesGerais: 'Levar escada' });
+  r = await chamar('/entregas/1/checklist', 'PUT', { ...d.automatico, cliente: 'Cliente Editado', motorista: 'Levar escada' });
   assert.equal(r.status, 200);
   const put = await r.json();
   assert.equal(put.salvo.cliente, 'Cliente Editado');
   assert.equal(put.salvoPor, 'Caio');
-  assert.equal(JSON.parse(banco.salvos.get(1).dados).observacoesGerais, 'Levar escada');
+  assert.equal(JSON.parse(banco.salvos.get(1).dados).motorista, 'Levar escada');
   assert.ok(banco.auditoria.some(a => a.acao === 'entrega_checklist_editado' && a.alvo === '100'));
 
   d = await (await chamar('/entregas/1/checklist')).json();
