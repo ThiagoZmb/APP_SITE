@@ -79,7 +79,7 @@ const montar = (linhas, hoje = '2026-11-05') => linhas.map(l => K.montarPedido(l
 
 test('montarPedido: classe, atraso, datas e valor numérico', () => {
   const p = K.montarPedido(linha(7, 'Em Produção', '2026-11-01 00:00:00', { data_entrega: '0001-01-01', cliente: ' Fulano  ' }), '2026-11-05');
-  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', comPerfil: false, comVidro: false, comSerralheria: false, comPintura: false, valor: 100.5 });   // linha sem composição = nenhum ícone
+  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', comPerfil: false, comVidro: false, comSerralheria: false, comPintura: false, itens: [], qtdItens: 0, valor: 100.5 });   // linha sem composição = nenhum ícone
 });
 
 test('agruparPorDia: abertos tira entregue/retirado/cancelado; todos mantém; ordem por data e número; contagens', () => {
@@ -100,4 +100,41 @@ test('virada de ano: pedido de 31/12 atrasa em 01/01 e o agrupamento mantém a d
   const ps = montar([linha(1, 'Em Produção', '2026-12-31')], '2027-01-01');
   assert.equal(ps[0].atrasado, true);
   assert.equal(K.agruparPorDia(ps)[0].data, '2026-12-31');
+});
+
+// ---------- itens do balão (ped_orc_lista_itens) ----------
+test('linhaItem: porta, porta de correr, serviço, revestimento e serralheria editável viram uma linha legível sem dinheiro', () => {
+  const porta = { TIPO_PRODUTO: 'Porta de giro', PRODUTO: 'Porta de giro', QTD: 2, DESCRICAO: 'Tipo de produto: Porta de giro\r\nTamanho: 1860x397 mm\r\nPerfil: 3345 (Pintura Metálica Alumínio) | Cor: Citrino\r\nPuxador: 1x Slim', UNITARIO: '999.00', TOTAL: '1998.00' };
+  assert.deepEqual(K.linhaItem(porta), { qtd: 2, texto: 'Porta de giro 1860 × 397 – Perfil 3345 (Pintura Metálica Alumínio)' });
+  assert.deepEqual(K.linhaItem({ TIPO_PRODUTO: 'Porta de correr', QTD: 1, DESCRICAO: 'Tam: 2250x580mm | Per: 3445 Anodizado Natural | Sist: Sem sistema' }), { qtd: 1, texto: 'Porta de correr 2250 × 580 – Perfil 3445 Anodizado Natural' });
+  assert.deepEqual(K.linhaItem({ TIPO_PRODUTO: 'Serviço', QTD: 27, DESCRICAO: 'Pinturas diversas' }), { qtd: 27, texto: 'Serviço: Pinturas diversas' });
+  assert.deepEqual(K.linhaItem({ TIPO_PRODUTO: 'Metalons', QTD: 1, DESCRICAO: 'Estrutura metálica editável', OBSERVACAO: 'estrutura cama  cor Ligth gold' }), { qtd: 1, texto: 'Metalons: estrutura cama cor Ligth gold' });
+  assert.deepEqual(K.linhaItem({ TIPO_PRODUTO: 'Metalons', QTD: 1, DESCRICAO: 'Estrutura metálica editável', OBSERVACAO: '' }), { qtd: 1, texto: 'Metalons: Estrutura metálica editável' });
+  assert.ok(!JSON.stringify(K.linhaItem(porta)).includes('999'), 'preço nunca entra');
+});
+
+test('linhaItem: saneia HTML/controle, corta texto longo, QTD inválida vira 1 e item sem texto some', () => {
+  const x = K.linhaItem({ TIPO_PRODUTO: 'Serviço', QTD: 0, DESCRICAO: '<img src=x onerror=1>' + 'a'.repeat(200) });
+  assert.equal(x.qtd, 1);
+  assert.ok(!/[<>]/.test(x.texto) && x.texto.length <= 90 && x.texto.endsWith('…'));
+  assert.equal(K.linhaItem({ TIPO_PRODUTO: '', DESCRICAO: '  ', PRODUTO: '' }), null);
+});
+
+test('agruparItens: por pedido, na ordem do ITEM, limita a MAX_ITENS_BALAO e guarda o total real; pedido sem itens fica fora', () => {
+  const linhas = [{ NUMERO: 5, ITEM: 2, TIPO_PRODUTO: 'Serviço', QTD: 1, DESCRICAO: 'B' }, { NUMERO: 5, ITEM: 1, TIPO_PRODUTO: 'Serviço', QTD: 1, DESCRICAO: 'A' }];
+  for (let i = 1; i <= 20; i++) linhas.push({ NUMERO: 6, ITEM: i, TIPO_PRODUTO: 'Serviço', QTD: i, DESCRICAO: 'S' + i });
+  const m = K.agruparItens(linhas);
+  assert.deepEqual(m.get(5).itens.map(i => i.texto), ['Serviço: A', 'Serviço: B']);
+  assert.equal(m.get(6).itens.length, K.MAX_ITENS_BALAO);
+  assert.equal(m.get(6).qtdItens, 20);
+  assert.equal(m.get(6).itens[0].texto, 'Serviço: S1');
+  assert.equal(m.has(7), false);
+  assert.equal(K.agruparItens(null).size, 0);
+});
+
+test('montarPedido: leva itens e qtdItens (padrão vazio)', () => {
+  const p = K.montarPedido({ numero: 1, situacao: 'Pronto', pronto_em: '2026-11-05', itens: [{ qtd: 1, texto: 'x' }], qtdItens: 3 }, '2026-11-05');
+  assert.deepEqual([p.itens, p.qtdItens], [[{ qtd: 1, texto: 'x' }], 3]);
+  const v = K.montarPedido({ numero: 2, situacao: 'Pronto', pronto_em: '2026-11-05' }, '2026-11-05');
+  assert.deepEqual([v.itens, v.qtdItens], [[], 0]);
 });

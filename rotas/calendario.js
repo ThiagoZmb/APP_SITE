@@ -2,20 +2,27 @@
 // Calendário de previsão de finalização dos pedidos (somente leitura).
 //   GET /calendario/pedidos?mes=AAAA-MM&situacao=abertos|todos   pedidos do mês agrupados por dia
 //   GET /calendario/dia?data=AAAA-MM-DD&situacao=abertos|todos   pedidos de um dia
-// A data é ped_orc.DATA_PRONTO (tipo Pedido). Uma consulta por chamada (sem N+1); "em aberto" e "atrasado" saem de calculo/calendario.js.
+// A data é ped_orc.DATA_PRONTO (tipo Pedido). Pedidos em 1 consulta + composição e itens (ped_orc_lista_itens, IN) em paralelo: sem N+1; "em aberto" e "atrasado" saem de calculo/calendario.js.
 // Permissão pedidos.ver (a mesma de /dados_lista); estados restritos do usuário filtram pelo cliente; valor só com valores.ver.
 // Regras: docs/regras/calendario-pedidos.md
 // ==========================================================================
 const { filtroEstados } = require('../seguranca/acesso');
 const { semValores } = require('../seguranca/valores');
 const { hojeLocal } = require('./transacao');
-const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia } = require('../calculo/calendario');
+const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia, agruparItens } = require('../calculo/calendario');
 const { carregarComposicao } = require('../calculo/composicao_documentos');
 const { SEM_COMPOSICAO } = require('../calculo/composicao_pedido');
 
 const VER = ['pedidos.ver'];
 
 function registrarCalendario({ rota, pool }) {
+  // itens dos pedidos do período em UMA consulta (IN); só texto, nunca UNITARIO/TOTAL
+  async function carregarItens(numeros) {
+    if (!numeros.length) return new Map();
+    const [linhas] = await pool.execute(
+      `SELECT NUMERO, ITEM, TIPO_PRODUTO, PRODUTO, QTD, DESCRICAO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${numeros.map(() => '?').join(',')}) ORDER BY NUMERO, ITEM`, numeros);
+    return agruparItens(linhas);
+  }
   // pedidos com DATA_PRONTO em [de, ate) ; a ordem final é a do agrupamento
   async function buscar(req, de, ate) {
     const est = filtroEstados(req, 'c.ESTADO');
@@ -28,6 +35,15 @@ function registrarCalendario({ rota, pool }) {
        ORDER BY p.DATA_PRONTO, p.NUMERO`, [de, ate, ...est.params]);
     return linhas;
   }
+  // composição (ícones) e itens do balão saem JUNTOS (ida e volta ao banco ~190 ms); falha em qualquer um só tira aquele enfeite, nunca a lista
+  async function enriquecer(linhas) {
+    const numeros = linhas.map(r => r.numero);
+    const [composicao, itens] = await Promise.all([
+      carregarComposicao(pool, 'Pedido', numeros).catch(err => { console.error('Erro composição do calendário:', err.message); return new Map(); }),
+      carregarItens(numeros).catch(err => { console.error('Erro itens do calendário:', err.message); return new Map(); })
+    ]);
+    return linhas.map(r => ({ ...r, ...(composicao.get(Number(r.numero)) || SEM_COMPOSICAO), ...(itens.get(Number(r.numero)) || {}) }));
+  }
   const resumo = dias => ({ qtdPedidos: dias.reduce((n, d) => n + d.qtdPedidos, 0), qtdAtrasados: dias.reduce((n, d) => n + d.qtdAtrasados, 0) });
 
   rota('get', '/calendario/pedidos', VER, async (req, res) => {
@@ -38,10 +54,7 @@ function registrarCalendario({ rota, pool }) {
     try {
       const hoje = hojeLocal();
       const linhas = await buscar(req, mes.inicio, mes.fim);
-      let composicao = new Map();
-      try { composicao = await carregarComposicao(pool, 'Pedido', linhas.map(r => r.numero)); }
-      catch (err) { console.error('Erro composição do calendário:', err.message); }
-      const dias = agruparPorDia(linhas.map(r => montarPedido({ ...r, ...(composicao.get(Number(r.numero)) || SEM_COMPOSICAO) }, hoje)), situacao);
+      const dias = agruparPorDia((await enriquecer(linhas)).map(r => montarPedido(r, hoje)), situacao);
       res.json(semValores(req, { mes: mes.chave, situacao, hoje, ...resumo(dias), dias }, ['valor']));
     } catch (err) {
       console.error('Erro GET /calendario/pedidos:', err.message);
@@ -57,10 +70,7 @@ function registrarCalendario({ rota, pool }) {
     try {
       const hoje = hojeLocal();
       const linhas = await buscar(req, data, somarDias(data, 1));
-      let composicao = new Map();
-      try { composicao = await carregarComposicao(pool, 'Pedido', linhas.map(r => r.numero)); }
-      catch (err) { console.error('Erro composição do calendário:', err.message); }
-      const dias = agruparPorDia(linhas.map(r => montarPedido({ ...r, ...(composicao.get(Number(r.numero)) || SEM_COMPOSICAO) }, hoje)), situacao);
+      const dias = agruparPorDia((await enriquecer(linhas)).map(r => montarPedido(r, hoje)), situacao);
       const pedidos = dias.length ? dias[0].pedidos : [];
       res.json(semValores(req, { data, situacao, hoje, ...resumo(dias), pedidos }, ['valor']));
     } catch (err) {

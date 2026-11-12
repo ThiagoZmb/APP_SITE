@@ -76,6 +76,53 @@ function dataISO(v) {
   return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
+// ---------- itens do pedido (ped_orc_lista_itens) para o balão ----------
+// Só texto legível, sem dinheiro (UNITARIO/TOTAL/PORCENTAGEM nem são lidos). O balão mostra no máximo MAX_ITENS_BALAO por pedido.
+const MAX_ITENS_BALAO = 15;
+const MAX_TEXTO_ITEM = 90;
+const limpar = s => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim();
+const cortar = (s, n = MAX_TEXTO_ITEM) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
+
+// Linha de ped_orc_lista_itens -> { qtd, texto } ou null (item sem nenhum texto).
+//  - Portas (DESCRICAO de várias linhas "Tamanho: 2425x670 mm / Perfil: 1036 (Anodizado Bronze)"): "Porta de giro 2425 × 670 – Perfil 1036 (Anodizado Bronze)"
+//  - Porta de correr (uma linha "Tam: ... | Per: ..."): idem
+//  - Demais (Serviço, Revestimento, Metalons, Perfil...): "Tipo: descrição" (a descrição é cortada em 90 caracteres)
+function linhaItem(r) {
+  const tipo = limpar(r.TIPO_PRODUTO ?? r.tipo_produto);
+  const bruta = String(r.DESCRICAO ?? r.descricao ?? '');
+  const qtd = Math.max(1, parseInt(r.QTD ?? r.qtd, 10) || 1);
+  let texto = '';
+  const tam = /(?:Tamanho|Tam):\s*(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)\s*mm/i.exec(bruta);
+  if (tam && /^porta|^frente/i.test(tipo)) {
+    const perfil = /(?:Perfil|Per):\s*([^\r\n|]+)/i.exec(bruta);
+    texto = `${tipo} ${tam[1]} × ${tam[2]}${perfil && limpar(perfil[1]) ? ' – Perfil ' + limpar(perfil[1]) : ''}`;
+  } else {
+    const desc = limpar(bruta.split(/\r?\n/)[0]);
+    const obs = limpar(r.OBSERVACAO ?? r.observacao);
+    // estrutura de serralheria "editável" só diz isso: a observação (ex.: "estrutura cama cor Ligth gold") é o que identifica o item
+    const base = (/edit[aá]vel/i.test(desc) && obs ? obs : desc) || limpar(r.PRODUTO ?? r.produto);
+    texto = !base ? tipo : !tipo || base.toLowerCase() === tipo.toLowerCase() ? base : `${tipo}: ${base}`;
+  }
+  texto = cortar(limpar(texto));
+  return texto ? { qtd, texto } : null;
+}
+
+// Linhas de ped_orc_lista_itens (qualquer ordem) -> Map numero -> { itens: [{ qtd, texto }] (até MAX_ITENS_BALAO, na ordem do ITEM), qtdItens (total real) }
+function agruparItens(linhas) {
+  const porPedido = new Map();
+  for (const r of Array.isArray(linhas) ? linhas : []) {
+    const numero = Number(r.NUMERO ?? r.numero);
+    if (!porPedido.has(numero)) porPedido.set(numero, []);
+    porPedido.get(numero).push(r);
+  }
+  const saida = new Map();
+  for (const [numero, lista] of porPedido) {
+    const itens = lista.sort((a, b) => (Number(a.ITEM ?? a.item) || 0) - (Number(b.ITEM ?? b.item) || 0)).map(linhaItem).filter(Boolean);
+    if (itens.length) saida.set(numero, { itens: itens.slice(0, MAX_ITENS_BALAO), qtdItens: itens.length });
+  }
+  return saida;
+}
+
 // Linha do banco -> pedido do calendário. `valor` só existe aqui; a rota o apaga de quem não tem valores.ver.
 function montarPedido(r, hoje) {
   const situacao = String(r.situacao ?? '').trim();
@@ -93,6 +140,8 @@ function montarPedido(r, hoje) {
     comVidro: !!r.comVidro,
     comSerralheria: !!r.comSerralheria,
     comPintura: !!r.comPintura,
+    itens: Array.isArray(r.itens) ? r.itens : [],
+    qtdItens: Number(r.qtdItens) || 0,
     valor: Number(r.valor) || 0
   };
 }
@@ -113,4 +162,4 @@ function agruparPorDia(pedidos, situacao = 'abertos') {
   });
 }
 
-module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia };
+module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens };

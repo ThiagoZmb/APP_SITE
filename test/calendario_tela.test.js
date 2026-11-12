@@ -469,3 +469,24 @@ test('calendario.js: mede a barra fixa (ResizeObserver, resize e antes de rolar)
   assert.match(js, /addEventListener\('resize', medirBarraFixa\)/);
   assert.match(js.slice(js.indexOf('function marcarAtual'), js.indexOf('function irParaAchado')), /medirBarraFixa\(\);\s*doc\.querySelectorAll/, 'mede antes de rolar');
 });
+
+// ---------- balão com os itens do pedido ----------
+test('balão: sem itens fica como antes; com itens vem "Itens:" e uma linha por item; passa de 15 e mostra "… e mais N itens"', () => {
+  const base = 'Pedido: 9\nCliente: Cliente 9\nCliente final: —\n▶ SITUAÇÃO: EM PRODUÇÃO';
+  assert.equal(K.rotuloPedido(ped(9)), base);
+  assert.equal(K.rotuloPedido(ped(9, { itens: [], qtdItens: 0 })), base);
+  const com = K.rotuloPedido(ped(9, { itens: [{ qtd: 2, texto: 'Porta de giro 2287 × 1395' }, { qtd: 1, texto: 'Serviço: Pintura' }], qtdItens: 2 }));
+  assert.equal(com, base + '\n\nItens:\n• 2× Porta de giro 2287 × 1395\n• 1× Serviço: Pintura');
+  const muitos = K.rotuloPedido(ped(9, { itens: [{ qtd: 1, texto: 'A' }], qtdItens: 3 }));
+  assert.ok(muitos.endsWith('\n… e mais 2 itens'));
+  assert.ok(K.rotuloPedido(ped(9, { itens: [{ qtd: 1, texto: 'A' }], qtdItens: 2 })).endsWith('\n… e mais 1 item'));
+});
+
+test('balão: o mesmo texto (escapado) na etiqueta, na linha da lista e na linha do dia', () => {
+  const p = ped(9, { itens: [{ qtd: 1, texto: '<b>x</b> & "y"' }], qtdItens: 1 });
+  const esperado = K.esc(K.rotuloPedido(p));
+  for (const h of [K.htmlEtiqueta(p, 'abertos', ''), K.htmlLinhaFolha(p, 'abertos', ''), K.htmlLinhaDia(p)]) {
+    assert.ok(h.includes(`title="${esperado}"`), h.slice(0, 200));
+    assert.ok(!h.includes('<b>x</b>'));
+  }
+});

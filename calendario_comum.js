@@ -114,7 +114,15 @@
   const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
   const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'grade' ? '&visao=grade' : ''}`;
-  const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}`;
+  // Balão (title) e rótulo de acessibilidade: o mesmo texto nas três visões e na página do dia. Itens do pedido (ped_orc_lista_itens) abaixo,
+  // até MAX_ITENS_BALAO (vem do servidor); "… e mais N itens" quando o pedido tem mais. Sem itens, a seção não aparece. Texto puro (esc() na hora de pôr no atributo).
+  const textoItens = p => {
+    const itens = Array.isArray(p.itens) ? p.itens.filter(i => i && i.texto) : [];
+    if (!itens.length) return '';
+    const mais = Math.max(0, (Number(p.qtdItens) || 0) - itens.length);
+    return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
+  };
+  const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}${textoItens(p)}`;
   const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
   const iconesItens = p => {
     const tem = ITENS_DOC.filter(([chave]) => p[chave]);
@@ -189,7 +197,7 @@
   // Linha do pedido na página do dia. `valor` só existe se a API o mandou (valores.ver).
   function htmlLinhaDia(p) {
     const temValor = Object.prototype.hasOwnProperty.call(p, 'valor');
-    return `<li class="linha-dia${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" aria-label="${esc(rotuloPedido(p))}">` +
+    return `<li class="linha-dia${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
       `<span class="ld-num">#${esc(p.numero)}</span>` +
       `<div class="ld-meio"><b>${esc(p.cliente || '—')}</b>${p.clienteFinal ? `<small>${esc(p.clienteFinal)}</small>` : ''}${iconesItens(p)}</div>` +
       `<div class="ld-sit">${seloSituacao(p)} ${seloAtraso(p)}</div>` +
@@ -233,5 +241,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, rotuloPedido, textoItens, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

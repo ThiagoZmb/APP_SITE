@@ -151,3 +151,45 @@ test('erro do banco: 500 sem vazar a mensagem', async t => {
   assert.equal(r.status, 500);
   assert.ok(!JSON.stringify(await r.json()).includes('segredo'));
 });
+
+test('itens do balão: UMA consulta IN a ped_orc_lista_itens por chamada (mês e dia), só Pedido, sem colunas de dinheiro, e vem sem valores.ver', async t => {
+  const { f, chamar } = await preparar(t);
+  const itens = [
+    { NUMERO: 10, ITEM: 2, TIPO_PRODUTO: 'Serviço', QTD: 3, DESCRICAO: 'Pinturas diversas', OBSERVACAO: '' },
+    { NUMERO: 10, ITEM: 1, TIPO_PRODUTO: 'Porta de giro', QTD: 2, DESCRICAO: 'Tipo de produto: Porta de giro\r\nTamanho: 2287x1395 mm\r\nPerfil: 1036 (Sottile)', OBSERVACAO: '' },
+    { NUMERO: 14, ITEM: 1, TIPO_PRODUTO: 'Revestimento', QTD: 1, DESCRICAO: 'Espelho 4mm', OBSERVACAO: '' }
+  ];
+  f.regras.unshift([/FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, itens]);
+  const sqlItens = () => f.chamadas.filter(c => /FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/.test(c.sql));
+  for (const id of [1, 2]) {
+    const antes = sqlItens().length;
+    const d = await (await chamar(id, '/calendario/pedidos?mes=2020-03')).json();
+    assert.equal(sqlItens().length - antes, 1, 'uma consulta só, nunca uma por pedido');
+    const q = sqlItens().pop();
+    assert.match(q.sql, /NUMERO IN \(\?,\?,\?,\?,\?\)/);
+    assert.doesNotMatch(q.sql, /UNITARIO|TOTAL|PORCENTAGEM/);
+    assert.deepEqual(q.params, [10, 11, 12, 13, 14]);
+    const p10 = d.dias[0].pedidos.find(p => p.numero === 10);
+    assert.deepEqual(p10.itens.map(i => [i.qtd, i.texto]), [[2, 'Porta de giro 2287 × 1395 – Perfil 1036 (Sottile)'], [3, 'Serviço: Pinturas diversas']]);
+    assert.equal(p10.qtdItens, 2);
+  }
+  const antes = sqlItens().length;
+  const dia = await (await chamar(2, '/calendario/dia?data=2020-03-10')).json();
+  assert.equal(sqlItens().length - antes, 1);
+  assert.equal(dia.pedidos.find(p => p.numero === 10).itens.length, 2);
+  assert.deepEqual(dia.pedidos.find(p => p.numero === 11).itens, [], 'pedido sem itens: lista vazia');
+});
+
+test('itens do balão: falha na leitura dos itens não derruba o calendário (balão sem a seção)', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift([/FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, () => { throw new Error('falha'); }]);
+  const r = await chamar(1, '/calendario/pedidos?mes=2020-03');
+  assert.equal(r.status, 200);
+  assert.deepEqual((await r.json()).dias[0].pedidos[0].itens, []);
+});
+
+test('itens do balão: mês sem pedidos não consulta itens', async t => {
+  const { f, chamar } = await preparar(t, []);
+  await chamar(1, '/calendario/pedidos?mes=2020-03');
+  assert.equal(f.chamadas.filter(c => /ped_orc_lista_itens/.test(c.sql)).length, 0);
+});
