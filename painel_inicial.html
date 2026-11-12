@@ -444,7 +444,7 @@
 
         // ================= CARGA =================
         // varrer = true só no clique em "Atualizar": o servidor acerta a fila de Entregas (mudanças do VB) antes de montar a lista
-        // Nesta tela, pedidos, orçamentos e análises carregam sempre, mesmo com o olho fechado.
+        // Olho fechado: só a lista exibida é buscada; análises (indicadores, gráficos, rankings) só ao abrir o olho.
         const carregado = { 'Pedido': false, 'Orçamento': false };
         const prep = x => ({ ...x, dt: deBR(x.data), v: parseFloat(x.valor) || 0, s: sit(x.situacao) });
         async function buscarTipo(tipo, varrer) {
@@ -469,10 +469,13 @@
             emCarga = carregarAgora(varrer);
             return emCarga;
         }
+        const OUTRO_TIPO = { 'Pedido': 'Orçamento', 'Orçamento': 'Pedido' };
+        // Parte de trabalho: só a lista da aba ativa (olho aberto: a outra junto). Análises ficam em renderAnalises.
         async function carregarAgora(varrer) {
             $('carregando').hidden = false; $('conteudo').hidden = true;
             try {
-                const tipos = ['Pedido', 'Orçamento'];
+                carregado['Pedido'] = false; carregado['Orçamento'] = false;
+                const tipos = [tipoLista, ...(OlhoResumos.visivel() ? [OUTRO_TIPO[tipoLista]] : [])];
                 await Promise.all(tipos.map(t => buscarTipo(t, varrer)));
                 atualizarNomes();
                 $('carregando').hidden = true; $('conteudo').hidden = false;
@@ -512,7 +515,7 @@
             renderDiario();
             renderRankings(j);
         }
-        const analises = { atualizar: renderAnalises };
+        const analises = OlhoResumos.carga(renderAnalises);
 
         // ================= RESUMO LOCAL (só para "Leitura rápida" e ranking de clientes) =================
         // Os blocos "Operação agora" e "Resultado do período" NÃO usam estas contas: os números deles vêm do servidor
@@ -1039,7 +1042,7 @@
             tipoLista = b.dataset.tipo; filtroSit = '';
             document.querySelectorAll('.toggle-btn').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
             if (carregado[tipoLista]) { renderLista(); return; }
-            // A outra lista normalmente já foi carregada junto com a tela; mantém este fluxo como fallback.
+            // A outra lista só é buscada agora (ou ao abrir o olho).
             $('orders-tbody').innerHTML = '<tr><td colspan="10" class="vazio">Carregando...</td></tr>';
             $('lista-qtd').textContent = '';
             const tipoPedido = tipoLista;
