@@ -116,10 +116,7 @@
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
-        .tag.minimo { background: var(--white); color: hsl(30, 78%, 72%); border: 1px solid #f0c08a; }
-        .tag.falta { background: var(--white); color: hsl(6, 78%, 72%); border: 1px solid #f5a08a; }
-        .tag.inativo { background: var(--white); color: var(--text-light); border: 1px solid #ced4da; }
+        .prod-nome .selo { margin-left: 6px; vertical-align: middle; }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
         .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
@@ -146,6 +143,8 @@
         .estoque-status { font-size: 13px; font-weight: 700; }
         .barra { height: 10px; border-radius: 6px; background: var(--border-color); position: relative; overflow: visible; }
         .barra-fill { height: 100%; border-radius: 6px; background: var(--success-color); transition: width .3s ease, background .3s ease; }
+        .barra-fill.neutro { background: var(--selo-neutro-fg); } .barra-fill.aviso { background: var(--selo-aviso-fg); }
+        .barra-fill.perigo { background: var(--selo-perigo-fg); } .barra-fill.ok { background: var(--selo-ok-fg); }
         .barra-min { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--text-dark); }
         .estoque-legenda { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-top: 8px; }
 
@@ -227,8 +226,9 @@
             .col-forn { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
@@ -524,7 +524,7 @@
                 const alerta = alertaDo(it);
                 return `<tr data-codigo="${escapeHtml(it.codigo)}" class="${alerta}${String(selecionado) === String(it.codigo) ? ' selecionado' : ''}">
                     <td class="cod">${escapeHtml(it.codigo)}</td>
-                    <td><div class="prod-nome">${escapeHtml(it.produto)}${alerta ? `<span class="tag ${alerta}">${ROTULO_ALERTA[alerta]}</span>` : ''}</div>
+                    <td><div class="prod-nome">${escapeHtml(it.produto)}${alerta ? Situacoes.selo('estoque_saldo', alerta, ROTULO_ALERTA[alerta]) : ''}</div>
                         <div class="prod-forn col-forn">${escapeHtml(it.prodFornecedor || '')}</div></td>
                     <td class="num"><b>${numero(it.qtd)}</b> <span class="cod">${escapeHtml(it.unidade || '')}</span></td>
                     <td class="num">${escapeHtml(it.aguardando || '—')}</td>
@@ -667,10 +667,10 @@
             fill.style.width = Math.max(0, Math.min(100, qtd / escala * 100)) + '%';
             $('v-min').style.left = Math.min(100, min / escala * 100) + '%';
             $('v-min').style.display = min > 0 ? '' : 'none';
-            if (alerta === 'inativo') { status.textContent = 'Inativo'; status.style.color = '#6c757d'; fill.style.background = '#adb5bd'; }
-            else if (alerta === 'falta') { status.textContent = '⛔ Em falta'; status.style.color = 'var(--danger-color)'; fill.style.background = 'var(--danger-color)'; }
-            else if (alerta === 'minimo') { status.textContent = '⚠️ No mínimo'; status.style.color = '#b8620b'; fill.style.background = 'var(--warning-color)'; }
-            else { status.textContent = '✅ Normal'; status.style.color = 'var(--success-color)'; fill.style.background = 'var(--success-color)'; }
+            const rotuloStatus = { inativo: 'Inativo', falta: 'Em falta', minimo: 'No mínimo' }[alerta] || 'Normal';
+            status.innerHTML = Situacoes.selo('estoque_saldo', alerta || 'normal', rotuloStatus);
+            fill.className = 'barra-fill ' + Situacoes.cor('estoque_saldo', alerta || 'normal');
+            fill.style.background = '';
             // mesma regra do Contar_Valor_Estoque, para o item aberto
             const ehRev = $('f-classe').value === 'Revestimento';
             $('v-valor-item').textContent = moeda(ehRev ? tam * valor * qtd : valor * qtd);

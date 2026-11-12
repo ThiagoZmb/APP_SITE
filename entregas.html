@@ -60,11 +60,6 @@
         tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(242, 163, 58,.12); }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); }
         .cinza { color: var(--text-light); font-size: 13px; }
-        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
-        .selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
-        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
 
         .dia { padding: 14px 18px; border-bottom: 1px solid var(--border-color); }
         .dia h3 { font-size: 16px; margin-bottom: 8px; }
@@ -148,9 +143,9 @@
         .cel.fora { opacity: .45; }
         .cel .num { font-size: 12px; font-weight: 600; align-self: center; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; }
         .cel.hoje .num { background: var(--primary-color); color: var(--on-primary); }
-        .etiqueta { border: none; border-radius: 4px; padding: 2px 6px; font-size: 11.5px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; color: #fff; background: #6b7280; }
-        .etiqueta.aviso { background: #d97706; } .etiqueta.info { background: #2563eb; } .etiqueta.perigo { background: #dc2626; }
-        .etiqueta.ok { background: #16a34a; } .etiqueta.neutro { background: #6b7280; }
+        .etiqueta { border: none; border-radius: 4px; padding: 2px 6px; font-size: 11.5px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
+        .etiqueta.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); } .etiqueta.info { background: var(--selo-info-bg); color: var(--selo-info-fg); } .etiqueta.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+        .etiqueta.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); } .etiqueta.neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
         .etiqueta:hover, .etiqueta:focus-visible { filter: brightness(1.15); outline: 2px solid var(--primary-color); outline-offset: 1px; }
         .mais { border: none; background: none; color: var(--primary-color); font-size: 11.5px; font-weight: 600; text-align: left; cursor: pointer; padding: 1px 4px; }
         /* várias entregas por pedido: "Entrega n de N", aviso de pedido alterado, saldo a entregar, filtro ?pedido=N e formulário de separar */
@@ -285,11 +280,12 @@
             .det-mini, .ck-fechar, #painel .btn { transition: none !important; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611112000" defer></script>
-    <script src="entrega_checklist.js?v=202611121840" defer></script>
-    <script src="entregas.js?v=202611121830" defer></script>
+    <script src="entrega_checklist.js?v=202611191400" defer></script>
+    <script src="entregas.js?v=202611191400" defer></script>
 </head>
 <body>
     <div class="container">

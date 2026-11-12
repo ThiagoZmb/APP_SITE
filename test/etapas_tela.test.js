@@ -108,7 +108,7 @@ test('etapas_producao.html: CSP igual à das páginas vizinhas, tema.css por úl
   assert.equal(css[css.length - 1], cal.match(/href="(tema\.css\?v=\d+)"/)[1]);
   assert.ok(css[0].startsWith('etapas_producao.css?v='));
   const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-  assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'etapas_producao.js']);
+  assert.deepEqual(scripts, ['layout.js', 'situacoes.js', 'entregas_comum.js', 'etapas_producao.js']);
   assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
   assert.doesNotMatch(h, /\son[a-z]+=/i);
   assert.doesNotMatch(h, /\sstyle=/i);

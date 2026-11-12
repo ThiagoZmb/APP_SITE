@@ -314,7 +314,7 @@
         return historico.find(r => r.id === selecionado) || historico[historico.length - 1];
     }
     const SELO = { pendente: ['aviso', 'Calculando'], aplicado: ['ok', 'Aplicado no campo'], simulado: ['info', 'Simulado (não aplicado)'], descartado: ['neutro', 'Descartado (resposta antiga)'], erro: ['perigo', 'Erro'] };
-    const selo = estado => { const [c, t] = SELO[estado] || ['neutro', estado]; return `<span class="aud-selo aud-selo-${c}">${esc(t)}</span>`; };
+    const selo = estado => { const [c0, t] = SELO[estado] || ['neutro', estado]; const c = raiz.Situacoes ? raiz.Situacoes.cor('calculo', estado) : c0; return `<span class="aud-selo aud-selo-${c}">${esc(t)}</span>`; };
     const mono = v => `<span class="aud-num">${esc(v)}</span>`;
 
     function htmlPassos(passos) {

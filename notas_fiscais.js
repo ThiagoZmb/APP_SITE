@@ -96,7 +96,7 @@
         estado.lista.map(n => `<tr data-id="${esc(n.id)}"${estado.atual && estado.atual.id === n.id ? ' class="selecionado"' : ''}>` +
           `<td><b>${esc(n.numero)}</b>/${esc(n.serie)}</td><td>${esc(dataBR(n.dataEmissao))}</td><td>${esc(n.contraparteNome)}</td>` +
           (mostrarValor ? `<td>${esc(moeda(n.valorTotal))}</td>` : '') +
-          `<td>${n.situacao === 'cancelada' ? '<span class="selo perigo">Cancelada</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
+          `<td>${n.situacao === 'cancelada' ? Situacoes.selo('nota', 'cancelada', 'Cancelada') : ''}</td></tr>`).join('') + '</tbody></table>';
     }
 
     // ---------- formulário ----------

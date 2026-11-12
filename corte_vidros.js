@@ -16,6 +16,11 @@
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const { esc, txt } = C;
+  const SIT = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
+  const ROT_RETALHO = { disponivel: 'Disponível', reservado: 'Reservado', usado: 'Usado', descartado: 'Descartado' };
+  const ROT_PLANO = { gerado: 'Gerado', conferido: 'Conferido', desatualizado: 'Desatualizado', cancelado: 'Cancelado' };
+  const seloRetalho = s => SIT.selo('retalho', s, ROT_RETALHO[s] || s);
+  const htmlSeloPlano = s => (s ? SIT.selo('plano', s, ROT_PLANO[s] || s) : '');
 
   // ---------- lista de pedidos para escolher ----------
   const semAcento = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -82,7 +87,7 @@
     const feitas = (c.pecas || []).filter((p, k) => cortadas.has(chaveCortada(g.chave, i, k))).length;
     const completa = (c.pecas || []).length > 0 && feitas === c.pecas.length;
     return `<div class="chapa${retalho ? ' retalho' : ''}${completa ? ' completa' : ''}" role="group" aria-label="${titulo}"><div class="chapa-titulo"><b>${titulo}</b>` +
-      `${completa ? '<span class="selo-completa">✓ Completa</span>' : ''}<span class="cinza">aproveitamento ${esc(pctTxt(c.aproveitamentoPct))}</span></div>` +
+      `${completa ? '<span class="selo ok">✓ Completa</span>' : ''}<span class="cinza">aproveitamento ${esc(pctTxt(c.aproveitamentoPct))}</span></div>` +
       `<div class="chapa-caixa" style="aspect-ratio:${esc(c.largura)} / ${esc(c.altura)};height:${alturaPx}px">${pecas}${sobras}</div>` +
       `<details class="lista-cortes"><summary>Lista de cortes (${(c.pecas || []).length})</summary><ul>${cortes}</ul></details>` +
       `${opcoes.conferindo ? htmlConferencia(g.chave, c, i) : ''}</div>`;
@@ -242,7 +247,7 @@
   function htmlRetalhos(lista, podeParametros, podePlanejar = false) {
     if (!lista.length) return '<p class="vazio" role="status">Nenhum retalho nesta situação.</p>';
     const linhas = lista.map(r => `<tr><td>${esc(r.produtoNome ?? ('Produto ' + r.produtoCodigo))}</td><td class="num">${esc(medida(r.altura, r.largura))}</td>` +
-      `<td>${esc(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
+      `<td>${seloRetalho(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
       `<td>${podePlanejar && r.situacao === 'reservado' && r.planoReserva ? `<button type="button" class="btn btn-secondary" data-acao="cancelar-plano" data-plano="${esc(r.planoReserva)}">Cancelar plano ${esc(r.planoReserva)}</button>` : ''}${podeParametros && r.situacao === 'disponivel' ? `<button type="button" class="btn btn-secondary" data-acao="editar" data-id="${esc(r.id)}">Ajustar</button> <button type="button" class="btn btn-secondary" data-acao="descartar" data-id="${esc(r.id)}">Descartar</button>` : ''}</td></tr>`);
     return '<table><thead><tr><th>Vidro</th><th>Altura × largura</th><th>Situação</th><th>Origem</th><th>Ações</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>';
   }
@@ -347,6 +352,7 @@
       $('plano-titulo').textContent = `Pedido nº ${previa.pedido.numero} — ${previa.pedido.cliente}`;
       $('btn-excluir-dados').hidden = !(pode('corte.planejar') && previa.qtdPlanosGravados > 0);
       const situacao = modo === 'salvo' ? salvo.situacao : null;
+      $('plano-selo').innerHTML = htmlSeloPlano(situacao);
       $('plano-status').textContent = textoStatusPlano({ modo, salvo, total: contarPecas(fonte.plano), cortadas: estado.cortadas.size, planoSalvoConferido: !!(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido') });
       const editavel = modo === 'salvo' && ABERTO(situacao) && pode('corte.planejar');
       const opcoes = { cortadas: estado.cortadas, clicavel: editavel && !estado.conferindo, conferindo: editavel && estado.conferindo };

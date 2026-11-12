@@ -69,9 +69,6 @@
         .clients-table tbody tr[data-razao] { cursor: pointer; }
         .clients-table tbody tr[data-razao]:hover { background: var(--primary-light); }
         .client-code { font-weight: 600; color: var(--primary-color); }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .status-ativo { background: rgba(40,167,69,.1); color: var(--success-color); }
-        .status-inativo { background: rgba(220,53,69,.1); color: var(--danger-color); }
         .loading-overlay {
             position: absolute; inset: 0; background: rgba(255,255,255,.85);
             display: flex; align-items: center; justify-content: center; border-radius: 20px; z-index: 100;
@@ -108,9 +105,10 @@
         .cf-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 12px; }
         .cf-chip { border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .cf-chip:hover { background: rgba(255,255,255,.2); }
-        .cf-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
-        .cf-chip.ok .dot { background: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,.25); }
-        .cf-chip.nao .dot { background: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,.25); }
+        .cf-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--selo-neutro-fg); }
+        .cf-chip.ok .dot { background: var(--selo-ok-fg); box-shadow: 0 0 0 3px var(--selo-ok-bg); }
+        .cf-chip.neutro .dot { background: var(--selo-neutro-fg); box-shadow: 0 0 0 3px var(--selo-neutro-bg); }
+        .cf-chip.perigo .dot { background: var(--selo-perigo-fg); box-shadow: 0 0 0 3px var(--selo-perigo-bg); }
         .cf-chip.info { cursor: default; }
         .cf-abas { display: flex; gap: 4px; margin-top: 4px; }
         .cf-aba { border: none; background: transparent; color: rgba(255,255,255,.75); padding: 10px 16px; font-size: 14px; font-weight: 700; border-radius: 10px 10px 0 0; cursor: pointer; }
@@ -153,20 +151,16 @@
         .cf-res { border-radius: 14px; padding: 14px 16px; background: var(--white); border: 1px solid var(--border-color); }
         .cf-res span { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
         .cf-res b { display: block; font-size: 22px; font-weight: 800; margin-top: 4px; letter-spacing: -.02em; }
-        .cf-res.alerta { background: hsla(37, 100%, 55%, .14); border-color: #f2c47a; }
-        .cf-res.alerta b { color: hsl(35, 78%, 72%); }
+        .cf-res.alerta { background: var(--selo-aviso-bg); border-color: var(--selo-aviso-fg); }
+        .cf-res.alerta b { color: var(--selo-aviso-fg); }
         .cf-res.saldo { background: #18151d; border-color: #18151d; }
         .cf-res.saldo span { color: rgba(255,255,255,.7); }
         .cf-res.saldo b { color: #fff; }
         .cf tbody tr { cursor: pointer; }
         .cf .chk { width: 16px; height: 16px; }
         .cf .td-valor { text-align: right; font-weight: 700; }
-        .cf .pill { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: var(--white); }
-        .cf .pill.alerta { color: hsl(6, 78%, 72%); border-color: #f5a08a; background: hsla(10, 100%, 55%, .14); }
-        .cf .pill.aberto { color: hsl(47, 78%, 72%); border-color: #f0d98a; }
-        .cf .pill.entrega { color: hsl(262, 78%, 72%); border-color: #cdbfe6; background: hsla(264, 71%, 55%, .14); margin-left: 4px; }
-        .cf .aviso-entregas { font-size: 12.5px; color: hsl(262, 78%, 72%); margin-left: 10px; }
-        .cf .pill.ok { color: hsl(134, 78%, 72%); border-color: #a3d9b1; }
+        .cf .aviso-entregas { font-size: 12.5px; color: var(--selo-aviso-fg); margin-left: 10px; }
+        .cf .selo + .selo { margin-left: 4px; }
         /* histórico */
         .cf-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
         .cf-hist-graf { background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; height: 300px; }
@@ -204,7 +198,8 @@
             .cf { border-radius: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
     <script src="fluxo_divisao.js?v=202611101500"></script>
@@ -482,7 +477,7 @@
                             <td>${escapeHtml(c.telefone || '-')}</td>
                             <td>${escapeHtml(c.email || '-')}</td>
                             <td>${escapeHtml(c.cidade || '-')} / ${escapeHtml(c.estado || '-')}</td>
-                            <td><span class="status-badge ${String(c.situacao || '').toLowerCase().includes('ativo') ? 'status-ativo' : 'status-inativo'}">${escapeHtml(c.situacao || '-')}</span></td>
+                            <td>${c.situacao ? Situacoes.selo('cadastro', c.situacao) : '-'}</td>
                         </tr>`).join('');
                 adicionarEventosClique();
                 document.getElementById('table-loading').style.display = 'none';
@@ -678,13 +673,13 @@
         // ---------- chips do topo ----------
         function mostrarSituacao() {
             const chip = $('cf-situacao');
-            chip.className = 'cf-chip ' + (situacao === 'Ativo' ? 'ok' : 'nao');
+            chip.className = 'cf-chip ' + Situacoes.cor('cadastro', situacao);
             chip.lastElementChild.textContent = situacao;
         }
         function mostrarPermissao(p) {
             const chip = $('cf-permissao');
             chip.hidden = !fichaAtual;
-            chip.className = 'cf-chip ' + (p === 'Bloqueado' ? 'nao' : 'ok');
+            chip.className = 'cf-chip ' + Situacoes.cor('cadastro', p === 'Bloqueado' ? 'bloqueado' : 'liberado');
             chip.lastElementChild.textContent = p === 'Bloqueado' ? 'Bloqueado no sistema' : 'Liberado no sistema';
         }
         function mostrarCredito(v) {
@@ -827,14 +822,11 @@
 
         // ---------- financeiro ----------
         const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
-        const seloEntrega = st => st ? `<span class="pill entrega">Entrega: ${escapeHtml(ROT_ENTREGA[st] || st)}</span>` : '';
+        const seloEntrega = st => st ? Situacoes.selo('entrega', st, 'Entrega: ' + (ROT_ENTREGA[st] || st)) : '';
         // pedido com várias entregas (entrega parcial): selo "1 de 2 entregues"; com uma entrega só, nada muda
         const andamentoEntregas = p => (Number(p.qtdEntregas) > 1 ? `${Number(p.qtdEntregasConcluidas) || 0} de ${Number(p.qtdEntregas)} entregues` : '');
-        const seloAndamento = p => andamentoEntregas(p) ? `<span class="pill entrega">${escapeHtml(andamentoEntregas(p))}</span>` : '';
-        function pillFin(s) {
-            const n = String(s || '').toLowerCase();
-            return n.includes('atrasad') || n.includes('protest') ? 'alerta' : n.includes('receber') ? 'aberto' : n.includes('recebid') ? 'ok' : '';
-        }
+        // "X de Y entregues": ok quando todas concluídas, neutro enquanto houver entrega aberta
+        const seloAndamento = p => andamentoEntregas(p) ? Situacoes.selo('entrega', (Number(p.qtdEntregasConcluidas) || 0) >= Number(p.qtdEntregas) ? 'concluida' : 'encerrada', andamentoEntregas(p)) : '';
         async function carregarFinanceiro() {
             if (!fichaAtual) return;
             $('cf-pedidos').innerHTML = $('cf-fluxo').innerHTML = '<tr><td colspan="9" class="vazio">Carregando...</td></tr>';
@@ -849,14 +841,14 @@
                     <td><input type="checkbox" class="chk" data-num="${p.numero}" aria-label="Selecionar pedido"></td>
                     <td><b style="color:var(--primary-color)">${escapeHtml(p.numero)}</b></td><td>${escapeHtml(p.clienteFinal || '-')}</td>
                     <td>${dataBR(p.data)}</td><td>${escapeHtml(p.entrega || '-')}</td><td class="td-valor">${moeda(p.valor)}</td>
-                    <td>${escapeHtml(p.observacao || '-')}</td><td>${escapeHtml(p.situacao)}${seloEntrega(p.entregaStatus)}${seloAndamento(p)}</td>
-                    <td><span class="pill ${pillFin(p.financeiro)}">${escapeHtml(p.financeiro || '-')}</span></td>
+                    <td>${escapeHtml(p.observacao || '-')}</td><td>${p.situacao ? Situacoes.selo('pedido', p.situacao) : '-'} ${seloEntrega(p.entregaStatus)}${seloAndamento(p)}</td>
+                    <td>${p.financeiro ? Situacoes.selo('financeiro', p.financeiro) : '-'}</td>
                 </tr>`).join('') || '<tr><td colspan="9" class="vazio">Nenhum pedido em aberto</td></tr>';
             $('cf-fluxo').innerHTML = fluxo.map(f => `
                 <tr data-id="${f.id}">
                     <td>${escapeHtml(f.id)}</td><td>${dataBR(f.data)}</td><td>${escapeHtml(f.pedido || '-')}</td><td>${escapeHtml(f.notaFiscal || '-')}</td>
                     <td class="td-valor">${moeda(f.valor)}</td><td>${escapeHtml(f.observacao || '-')}</td>
-                    <td><span class="pill ${pillFin(f.situacao)}">${escapeHtml(f.situacao)}</span></td>
+                    <td>${f.situacao ? Situacoes.selo('financeiro', f.situacao) : '-'}</td>
                 </tr>`).join('') || '<tr><td colspan="7" class="vazio">Nenhum lançamento em aberto</td></tr>';
             $('cf-rec-pedidos').textContent = moeda(resumo.receberPedidos);
             $('cf-rec-fluxo').textContent = moeda(resumo.receberFluxo);

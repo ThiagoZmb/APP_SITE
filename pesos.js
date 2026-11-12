@@ -28,7 +28,7 @@
 
   // selo da origem: o valor estimado pelo desenho aparece como "estimado" (com a confiança); os demais pelo nome
   function seloOrigem(origem, confianca) {
-    if (origem === 'estimado_desenho') return { texto: 'estimado' + (ROTULO_CONFIANCA[confianca] ? ' (' + ROTULO_CONFIANCA[confianca] + ')' : ''), classe: 'estimado' };
+    if (origem === 'estimado_desenho') return { texto: 'estimado' + (ROTULO_CONFIANCA[confianca] ? ' (' + ROTULO_CONFIANCA[confianca] + ')' : ''), classe: 'aviso' };
     if (origem === 'pesado') return { texto: 'pesado', classe: 'ok' };
     if (origem === 'fornecedor') return { texto: 'fornecedor', classe: 'info' };
     return { texto: 'manual', classe: 'neutro' };

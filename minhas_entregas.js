@@ -13,11 +13,11 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  const Sit = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
   const { esc, txt, dataBR, rotuloSequencia, rotuloItem } = C;
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', cancelada: 'Cancelada' };
-  const COR_STATUS = { agendada: 'info', em_rota: 'info', ocorrencia: 'perigo', entregue: 'ok', cancelada: 'neutro' };
   const RESULTADOS = [
     { id: 'entregue', rotulo: 'Entregue' },
     { id: 'parcial', rotulo: 'Entrega parcial' },
@@ -29,7 +29,7 @@
   const ORDEM_STATUS = { em_rota: 0, agendada: 1, ocorrencia: 2 };
 
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
-  const corStatus = s => COR_STATUS[s] || 'neutro';
+  const corStatus = s => Sit.cor('entrega', s);
   const rotuloResultado = id => (RESULTADOS.find(r => r.id === id) || {}).rotulo || String(id ?? '');
 
   // O cadastro pode trazer mais de um número ("2222-3333 / 99999-8888"): separa por / ; , | ou " e " e usa o primeiro trecho com 8+ dígitos.

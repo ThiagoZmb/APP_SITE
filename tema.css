@@ -510,6 +510,19 @@ body .status-badge::before, body .financial-badge::before, body .pill::before {
     content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8;
 }
 
+/* ===== SELO ÚNICO DE SITUAÇÃO (DESIGN.md "Cores das situações"; mapa situação -> cor em situacoes.js) ===== */
+body .selo {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px !important; border-radius: 999px !important;
+    font-size: 11.5px !important; font-weight: 700 !important; letter-spacing: .01em; white-space: nowrap;
+    background: var(--selo-neutro-bg) !important; color: var(--selo-neutro-fg) !important;
+}
+body .selo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8; flex: none; }
+body .selo.aviso { background: var(--selo-aviso-bg) !important; color: var(--selo-aviso-fg) !important; }
+body .selo.info { background: var(--selo-info-bg) !important; color: var(--selo-info-fg) !important; }
+body .selo.ok { background: var(--selo-ok-bg) !important; color: var(--selo-ok-fg) !important; }
+body .selo.perigo { background: var(--selo-perigo-bg) !important; color: var(--selo-perigo-fg) !important; }
+body .selo.neutro { background: var(--selo-neutro-bg) !important; color: var(--selo-neutro-fg) !important; }
+
 /* ===== LISTAS (início) ===== */
 body .lista li:hover { background: var(--surface-2); }
 body .ver-tudo { color: var(--primary-color) !important; font-weight: 700 !important; }

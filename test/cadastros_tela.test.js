@@ -176,7 +176,7 @@ test('funcionários (tela): abrir quem NÃO recebe insalubridade (0, "0", "0.0",
 
 test('funcionários (tela): o ?v= do funcionarios.js mudou junto com a lógica (senão o navegador usa o JS antigo em cache)', () => {
   const f = fs.readFileSync(path.join(__dirname, '..', 'funcionarios.html'), 'utf8');
-  assert.match(f, /funcionarios\.js\?v=202611051200/);
+  assert.match(f, /funcionarios\.js\?v=202611191400/);
 });
 
 test('funcionários (tela): sem salário mínimo cadastrado, quem recebe insalubridade fica com pendência visível (campo vazio, aviso, custo parcial)', async () => {

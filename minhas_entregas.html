@@ -17,7 +17,7 @@
         /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
         [hidden] { display: none !important; }
         /* mobile primeiro: sem moldura, uma coluna */
-        body { background: hsla(216, 60%, 55%, .14); color: var(--text-dark); min-height: 100vh; }
+        body { background: var(--selo-info-bg); color: var(--text-dark); min-height: 100vh; }
         .container { display: grid; grid-template-columns: 1fr; grid-template-areas: "header" "main"; min-height: 100vh; background: var(--white); }
         header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; min-height: 60px; box-shadow: var(--shadow-medium); }
         .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
@@ -43,17 +43,14 @@
         .cartao p { font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
         .endereco { font-size: 16px; }
         .endereco.sem { color: var(--danger-color); font-weight: 600; }
-        .aviso { background: hsla(46, 100%, 55%, .14); color: hsl(46, 78%, 72%); border-radius: 10px; padding: 8px 10px; font-size: 13px !important; }
+        .aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border-radius: 10px; padding: 8px 10px; font-size: 13px !important; }
         .itens { list-style: none; font-size: 15px; }
         .itens li { padding: 6px 0; border-bottom: 1px dashed var(--border-color); overflow-wrap: anywhere; }
-        .ocorrencia { background: hsla(355, 70%, 55%, .14); color: hsl(354, 78%, 72%); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+        .ocorrencia { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
         .cinza { color: var(--text-light); font-size: 13px; }
         .obs-item { margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--selo-aviso-fg); }
         .vazio { text-align: center; padding: 40px 10px; color: var(--text-light); }
-        .selo { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); white-space: nowrap; }
-        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+        .selo { font-size: 13px; padding: 4px 12px; white-space: nowrap; }
 
         .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
         .acoes > :only-child { grid-column: 1 / -1; }
@@ -100,11 +97,12 @@
             #toasts { left: auto; right: 24px; max-width: 380px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611121715">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611112000" defer></script>
-    <script src="entrega_checklist.js?v=202611121500" defer></script>
-    <script src="minhas_entregas.js?v=202611121200" defer></script>
+    <script src="entrega_checklist.js?v=202611191400" defer></script>
+    <script src="minhas_entregas.js?v=202611191400" defer></script>
 </head>
 <body>
     <div class="container">

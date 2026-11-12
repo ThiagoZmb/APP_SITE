@@ -12,10 +12,9 @@
   const C = raiz.EntregasComum;
 
   const ROTULO_SITUACAO_PORTAL = { nao_liberada: 'Não liberada', ativa: 'Ativa', suspensa: 'Suspensa' };
-  const CLASSE_SITUACAO_PORTAL = { nao_liberada: '', ativa: 'ok', suspensa: 'perigo' };
+  const cor = v => raiz.Situacoes.cor('cadastro', v);
   const ROTULO_PAPEL = { admin_geral: 'Administrador geral' };
   const ROTULO_SITUACAO_USUARIO = { convidado: 'Convidado', ativo: 'Ativo', inativo: 'Inativo' };
-  const CLASSE_SITUACAO_USUARIO = { convidado: 'aviso', ativo: 'ok', inativo: 'perigo' };
   const MSG_DESATIVAR = 'A pessoa perde o acesso e as sessões abertas caem. Continuar?';
   const MSG_REMOVER = 'Remover apaga este convite e o cadastro da pessoa no portal; só vale para quem ainda não aceitou o convite (e-mail digitado errado). Continuar?';
   const MSG_SUSPENDER = 'Suspender derruba todas as sessões desta empresa. Continuar?';
@@ -109,7 +108,7 @@
         return [
           c.codigo,
           c.razaoSocial,
-          selo(ROTULO_SITUACAO_PORTAL[c.situacaoPortal] || c.situacaoPortal, CLASSE_SITUACAO_PORTAL[c.situacaoPortal]),
+          selo(ROTULO_SITUACAO_PORTAL[c.situacaoPortal] || c.situacaoPortal, cor(c.situacaoPortal)),
           acao
         ];
       });
@@ -151,7 +150,7 @@
         else acoes.appendChild(botao('Suspender', 'btn-perigo', () => suspender(e)));
         return [
           e.razaoSocial || ('Cliente ' + e.clienteCodigo),
-          selo(ROTULO_SITUACAO_PORTAL[e.situacao] || e.situacao, CLASSE_SITUACAO_PORTAL[e.situacao]),
+          selo(ROTULO_SITUACAO_PORTAL[e.situacao] || e.situacao, cor(e.situacao)),
           e.qtdUsuarios,
           acoes
         ];
@@ -214,7 +213,7 @@
         return [
           u.email,
           ROTULO_PAPEL[u.papel] || u.papel,
-          selo(ROTULO_SITUACAO_USUARIO[u.situacao] || u.situacao, CLASSE_SITUACAO_USUARIO[u.situacao]),
+          selo(ROTULO_SITUACAO_USUARIO[u.situacao] || u.situacao, cor(u.situacao)),
           acoes
         ];
       });

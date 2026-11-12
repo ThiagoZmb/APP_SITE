@@ -47,15 +47,9 @@
         .erro-estado { text-align: center; padding: 20px; color: var(--danger-color); font-weight: 600; }
         .cinza { color: var(--text-light); font-size: 13px; margin-top: 2px; }
         .fonte { color: var(--text-light); font-size: 12px; margin-top: 8px; }
-        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
-        .selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
-        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
-        .selo.neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
         .alertas { list-style: none; }
         .alertas li { padding: 12px 4px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        .aviso-periodo { background: hsla(46, 100%, 55%, .14); color: hsl(47, 78%, 72%); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+        .aviso-periodo { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
         .barra-mes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
         .barra-mes input[type="month"] { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; min-height: 44px; }
         .barra-mes h2 { font-size: 20px; text-transform: capitalize; margin-left: 8px; }
@@ -104,10 +98,11 @@
             .linha2, .linha3 { grid-template-columns: 1fr; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="gestao.js?v=202611191200" defer></script>
+    <script src="gestao.js?v=202611191400" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>

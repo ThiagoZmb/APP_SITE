@@ -62,10 +62,6 @@
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
-        .tag.minimo { background: var(--white); color: hsl(30, 78%, 72%); border: 1px solid #f0c08a; }
-        .tag.falta { background: var(--white); color: hsl(6, 78%, 72%); border: 1px solid #f5a08a; }
-        .tag.inativo { background: var(--white); color: var(--text-light); border: 1px solid #ced4da; }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
         .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
@@ -217,24 +213,11 @@
         .tabela-wrap { max-height: 520px; min-width: 0; overflow-x: hidden; }
         #orders-table { width: 100%; table-layout: fixed; }
         #orders-table th, #orders-table td { overflow: hidden; text-overflow: ellipsis; }
-        #orders-table .st { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+        #orders-table .selo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+        #orders-table .selo + .selo { margin-left: 4px; }
         #orders-tbody tr { cursor: pointer; }
         #orders-tbody tr.divisor-semana td { border-top: 2px solid var(--primary-color); }
         td.num, th.num { text-align: right; }
-        .st { display: inline-flex; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border-color); background: var(--white); white-space: nowrap; }
-        .st.producao { color: hsl(217, 78%, 72%); border-color: #b6cdf4; background: hsla(220, 86%, 55%, .14); }
-        .st.pronto { color: hsl(39, 78%, 72%); border-color: #f2d48a; background: hsla(40, 100%, 55%, .14); }
-        .st.entregue { color: hsl(146, 78%, 72%); border-color: #a3d9b1; background: hsla(133, 60%, 55%, .14); }
-        .st.retirado { color: hsl(180, 78%, 72%); border-color: #9fdcdc; background: hsla(180, 60%, 55%, .14); }
-        .st.entrega { color: hsl(262, 78%, 72%); border-color: #cdbfe6; background: hsla(264, 71%, 55%, .14); margin-left: 4px; }
-        .st.cancelado { color: hsl(353, 78%, 72%); border-color: #f5a08a; background: hsla(10, 100%, 55%, .14); }
-        .st.fechado { color: hsl(214, 78%, 72%); border-color: #a9c8f2; background: hsla(214, 100%, 55%, .14); }
-        .st.baixado { color: var(--text-mid); border-color: #cfd3d8; background: var(--surface-2); }
-        /* orçamento Fechado: a linha toda em azul bem claro (antes da regra .ctx, que continua valendo no clique direito) */
-        #orders-tbody tr.linha-fechada { background: hsla(214, 100%, 55%, .14); }
-        .st.fin-aberto { color: hsl(39, 78%, 72%); border-color: #f2d48a; }
-        .st.fin-atraso { color: hsl(353, 78%, 72%); border-color: #f5a08a; background: hsla(10, 100%, 55%, .14); }
-        .st.fin-ok { color: hsl(146, 78%, 72%); border-color: #a3d9b1; }
         .rodape-l { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 22px 14px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-light); font-weight: 600; }
         .rodape-l b { color: var(--text-dark); }
         #carregando { padding: 60px 0; text-align: center; color: var(--text-light); font-weight: 600; }
@@ -272,7 +255,8 @@
         #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
@@ -427,7 +411,6 @@
         const sit = s => { const n = norm(s);
             return n.includes('cancel') ? 'cancelado' : n.includes('produ') ? 'producao' : (n.includes('pronto') || n.includes('finaliz') || n.includes('conclu') || n === 'ok') ? 'pronto'
                 : n.includes('entreg') ? 'entregue' : n.includes('retir') ? 'retirado' : n === 'fechado' ? 'fechado' : n === 'baixado' ? 'baixado' : 'outro'; };
-        const finClasse = f => { const n = norm(f); return n.includes('atras') || n.includes('protest') ? 'fin-atraso' : n.includes('receber') ? 'fin-aberto' : n.includes('recebid') ? 'fin-ok' : ''; };
 
         // ================= ESTADO =================
         let pedidos = [], orcamentos = [];
@@ -694,7 +677,10 @@
         }
 
         // ================= SITUAÇÃO E MOVIMENTO DIÁRIO =================
-        const COR_SIT = { producao: COR.azul, pronto: COR.ambar, entregue: COR.verde, retirado: COR.turquesa, cancelado: COR.vermelho, outro: COR.cinza };
+        // cores da rosca = as do selo da situação (mapa único em situacoes.js), lidas das variáveis do tema
+        const corTema = cor => getComputedStyle(document.documentElement).getPropertyValue('--selo-' + cor + '-fg').trim() || '#888';
+        const VALOR_SIT = { producao: 'em_producao', pronto: 'pronto', entregue: 'entregue', retirado: 'retirado', cancelado: 'cancelado' };
+        const corSit = k => corTema(Situacoes.cor('pedido', VALOR_SIT[k] || ''));
         const NOME_SIT = { producao: 'Em produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado', cancelado: 'Cancelado', outro: 'Outros' };
         function renderStatus(j) {
             const cont = {};
@@ -704,7 +690,7 @@
             graficos.status?.destroy();
             graficos.status = new Chart($('g-status'), {
                 type: 'doughnut',
-                data: { labels: chaves.map(k => NOME_SIT[k]), datasets: [{ data: chaves.map(k => cont[k]), backgroundColor: chaves.map(k => COR_SIT[k]), borderColor: '#fff', borderWidth: 2 }] },
+                data: { labels: chaves.map(k => NOME_SIT[k]), datasets: [{ data: chaves.map(k => cont[k]), backgroundColor: chaves.map(corSit), borderColor: getComputedStyle(document.body).backgroundColor, borderWidth: 2 }] },
                 options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } },
                     tooltip: { callbacks: { label: c => { const t = c.dataset.data.reduce((a, b) => a + b, 0); return `${c.label}: ${c.raw} (${pct(c.raw / t)})`; } } } } }
             });
@@ -792,15 +778,14 @@
             let semanaAnterior = null;
             $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => {
                 const semana = semanaDaData(x.data);
-                const classes = [tipoLista === 'Orçamento' && x.s === 'fechado' ? 'linha-fechada' : '',
-                    semana && semanaAnterior && semana !== semanaAnterior ? 'divisor-semana' : ''].filter(Boolean).join(' ');
+                const classes = [semana && semanaAnterior && semana !== semanaAnterior ? 'divisor-semana' : ''].filter(Boolean).join(' ');
                 if (semana) semanaAnterior = semana;
                 return `
                 <tr data-numero="${esc(x.numero)}" tabindex="0"${classes ? ` class="${classes}"` : ''}>
                     <td class="order-number">${esc(x.numero)}${iconesItens(x)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
                     <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
-                    <td>${esc(x.observacao || '-')}</td><td><span class="st ${x.s}">${esc(x.situacao || '-')}</span></td>
-                    <td data-valor><span class="st ${finClasse(x.financeiro)}">${esc(x.financeiro || '-')}</span></td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}</td>
+                    <td>${esc(x.observacao || '-')}</td><td>${Situacoes.selo(tipoLista === 'Pedido' ? 'pedido' : 'orcamento', tipoLista === 'Pedido' ? (VALOR_SIT[x.s] || x.situacao) : x.situacao, x.situacao || '-')}</td>
+                    <td data-valor>${x.financeiro ? Situacoes.selo('financeiro', x.financeiro) : '-'}</td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}</td>
                 </tr>`;
             }).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
@@ -816,10 +801,11 @@
         }
         // status interno da entrega (web_entregas) -> rótulo; só pedidos com registro de entrega têm selo
         const ROT_ENTREGA = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue', retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
-        const seloEntrega = st => st ? `<span class="st entrega">${esc(ROT_ENTREGA[st] || st)}</span>` : '';
+        const seloEntrega = st => st ? Situacoes.selo('entrega', st, ROT_ENTREGA[st] || st) : '';
         // pedido com várias entregas (entrega parcial): selo "1 de 2 entregues"; com uma entrega só, nada muda
         const andamentoEntregas = x => (Number(x && x.qtdEntregas) > 1 ? `${Number(x.qtdEntregasConcluidas) || 0} de ${Number(x.qtdEntregas)} entregues` : '');
-        const seloAndamento = x => andamentoEntregas(x) ? `<span class="st entrega">${esc(andamentoEntregas(x))}</span>` : '';
+        // "X de Y entregues": ok quando todas concluídas, neutro enquanto houver entrega aberta
+        const seloAndamento = x => andamentoEntregas(x) ? Situacoes.selo('entrega', (Number(x.qtdEntregasConcluidas) || 0) >= Number(x.qtdEntregas) ? 'concluida' : 'encerrada', andamentoEntregas(x)) : '';
         // cancelar / excluir: sempre pergunta antes; o servidor confere a permissão e registra quem fez
         async function acaoNoDocumento(acao, numero) {
             const x = (tipoLista === 'Pedido' ? pedidos : orcamentos).find(d => String(d.numero) === String(numero));

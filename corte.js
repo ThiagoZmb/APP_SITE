@@ -14,6 +14,11 @@
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const { esc, txt } = C;
+  const SIT = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
+  const ROT_RETALHO = { disponivel: 'Disponível', reservado: 'Reservado', usado: 'Usado', descartado: 'Descartado' };
+  const ROT_PLANO = { gerado: 'Gerado', conferido: 'Conferido', desatualizado: 'Desatualizado', cancelado: 'Cancelado' };
+  const seloRetalho = s => SIT.selo('retalho', s, ROT_RETALHO[s] || s);
+  const htmlSeloPlano = s => (s ? SIT.selo('plano', s, ROT_PLANO[s] || s) : '');
 
   // ---------- lista de pedidos para escolher ----------
   const semAcento = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -70,7 +75,7 @@
     const destino = b.sobra > 0 ? ` — sobra de ${esc(mm(b.sobra))}: ${b.destinoSobra === 'guardar' ? 'guardar como retalho' : 'descartar (abaixo da sobra mínima)'}` : ' — sem sobra';
     const feitas = (b.pecas || []).filter((p, k) => cortadas.has(chaveCortada(chave, i, k))).length;
     const completa = (b.pecas || []).length > 0 && feitas === b.pecas.length;
-    const selo = completa ? `<span class="selo-completa">✓ ${b.tipo === 'retalho' ? 'Retalho completo' : 'Vara completa'}</span>` : '';
+    const selo = completa ? `<span class="selo ok">✓ ${b.tipo === 'retalho' ? 'Retalho completo' : 'Vara completa'}</span>` : '';
     return `<div class="barra${completa ? ' completa' : ''}" role="group" aria-label="${titulo}"><div class="barra-titulo"><b>${titulo}</b>${selo}<span class="cinza">${destino}</span></div>` +
       `<div class="faixa">${pecas}${sobra}</div>${opcoes.conferindo ? htmlConferencia(chave, b, i) : ''}</div>`;
   }
@@ -171,7 +176,7 @@
   function htmlRetalhos(lista, podeParametros, podePlanejar = false) {
     if (!lista.length) return '<p class="vazio" role="status">Nenhum retalho nesta situação.</p>';
     const linhas = lista.map(r => `<tr><td>${esc(r.perfil)}</td><td>${esc(semAcab(r.acabamento))}</td><td>${esc(semCor(r.cor))}</td><td class="num">${esc(mm(r.comprimento))}</td>` +
-      `<td>${esc(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
+      `<td>${seloRetalho(r.situacao)}${r.planoReserva ? ` (plano ${esc(r.planoReserva)})` : ''}</td><td>${r.planoOrigem ? `plano ${esc(r.planoOrigem)}` : 'manual'}</td>` +
       `<td>${podePlanejar && r.situacao === 'reservado' && r.planoReserva ? `<button type="button" class="btn btn-secondary" data-acao="cancelar-plano" data-plano="${esc(r.planoReserva)}">Cancelar plano ${esc(r.planoReserva)}</button>` : ''}${podeParametros && r.situacao === 'disponivel' ? `<button type="button" class="btn btn-secondary" data-acao="editar" data-id="${esc(r.id)}">Ajustar</button> <button type="button" class="btn btn-secondary" data-acao="descartar" data-id="${esc(r.id)}">Descartar</button>` : ''}</td></tr>`);
     return '<table><thead><tr><th>Perfil</th><th>Acabamento</th><th>Cor</th><th>Comprimento</th><th>Situação</th><th>Origem</th><th>Ações</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>';
   }
@@ -281,8 +286,9 @@
       const fonte = modo === 'salvo' ? salvo : previa;
       $('plano-titulo').textContent = `Pedido nº ${previa.pedido.numero} — ${previa.pedido.cliente}`;
       $('btn-excluir-dados').hidden = !(pode('corte.planejar') && previa.qtdPlanosGravados > 0);
-      if (previa.vazio) { mensagem('plano-area', previa.mensagem); ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano'].forEach(id => { $(id).hidden = true; }); $('plano-status').textContent = ''; return; }
+      if (previa.vazio) { mensagem('plano-area', previa.mensagem); ['btn-salvar', 'btn-refazer', 'btn-conferir', 'btn-confirmar', 'btn-cancelar-plano'].forEach(id => { $(id).hidden = true; }); $('plano-status').textContent = ''; $('plano-selo').innerHTML = ''; return; }
       const situacao = modo === 'salvo' ? salvo.situacao : null;
+      $('plano-selo').innerHTML = htmlSeloPlano(situacao);
       $('plano-status').textContent = textoStatusPlano({ modo, salvo, total: contarPecas(fonte.plano), cortadas: estado.cortadas.size, planoSalvoConferido: !!(previa.planoSalvo && previa.planoSalvo.situacao === 'conferido') });
       const editavel = modo === 'salvo' && ABERTO(situacao) && pode('corte.planejar');
       const opcoes = { cortadas: estado.cortadas, clicavel: editavel && !estado.conferindo, conferindo: editavel && estado.conferindo };

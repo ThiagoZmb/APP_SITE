@@ -78,10 +78,10 @@
 .aud-linha-alerta td { color: var(--warning-color); }
 .aud-selo { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .aud-selo::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.aud-selo-ok { background: var(--selo-ok-bg); color: var(--success-color); }
-.aud-selo-aviso { background: var(--selo-aviso-bg); color: var(--warning-color); }
-.aud-selo-perigo { background: var(--selo-perigo-bg); color: var(--danger-color); }
-.aud-selo-neutro { background: var(--selo-neutro-bg); color: var(--text-mid); }
+.aud-selo-ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
+.aud-selo-aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+.aud-selo-perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+.aud-selo-neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
 /* aviso na própria tela (fora da gaveta): valor recalculado diferente do salvo, cálculo pendente */
 .aviso-recalculo { margin-top: 6px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--selo-aviso-bg); color: var(--text-dark); font-size: 12.5px; font-weight: 600; }
 .aviso-recalculo:empty { display: none; }
@@ -95,4 +95,4 @@
 @media (prefers-reduced-motion: reduce) {
     .aud-gaveta, .aud-gaveta.aberta, .aud-abrir { transition: none; }
 }
-.aud-selo-info { background: var(--selo-info-bg); color: var(--info-color); }
+.aud-selo-info { background: var(--selo-info-bg); color: var(--selo-info-fg); }

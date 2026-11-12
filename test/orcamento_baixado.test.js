@@ -123,7 +123,8 @@ test('menu: quem tem orcamentos.salvar vê Fechado, Aguardando e Baixado; sem ne
 
 test('lista: selo "baixado" e confirmação ao mudar a situação', () => {
   assert.match(h, /n === 'baixado' \? 'baixado'/);
-  assert.match(h, /\.st\.baixado \{/);
+  assert.match(h, /Situacoes\.selo\(tipoLista === 'Pedido' \? 'pedido' : 'orcamento'/);
+  assert.equal(require('../situacoes.js').cor('orcamento', 'Baixado'), 'neutro');
   assert.match(h, /mudarSituacaoOrcamento\(numero, 'Baixado'\)/);
   assert.match(h, /if \(!confirm\(`Mudar a situação do orçamento/);
 });

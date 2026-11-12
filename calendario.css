@@ -27,11 +27,7 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
 .cinza { color: var(--text-light); font-size: 13px; }
 .vazio { text-align: center; padding: 40px; color: var(--text-light); list-style: none; }
-.selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
-.selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
-.selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-.selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-.selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
+/* .selo: único estilo no tema.css (cores pelo mapa situacoes.js) */
 
 /* barra FIXA do topo (.cal-fixo = navegação + resumo + filtros + pesquisa): gruda no topo da janela logo abaixo do cabeçalho de 24px do tema.css enquanto a lista/grade rola (a janela rola, o main do tema é overflow:visible).
    --cal-fixo-altura é medida pelo calendario.js (ResizeObserver) e alimenta o scroll-margin do resultado da pesquisa; o valor daqui é só reserva. z-index 20 < cabeçalho (30) < menu do botão direito (1000). */
@@ -61,6 +57,8 @@ main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
 .etq.info { background: var(--selo-info-bg); color: var(--selo-info-fg); border-left-color: var(--info-color); }
 .etq.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); border-left-color: var(--success-color); }
 .etq.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border-left-color: var(--warning-color); }
+.etq.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); border-left-color: var(--danger-color); }
+.etq.neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); border-left-color: var(--text-light); }
 .etq.atraso { border-left-color: var(--danger-color); }
 .etq-num { font-family: var(--font-mono); font-weight: 600; }
 .etq-sit { font-size: 10.5px; opacity: .85; }

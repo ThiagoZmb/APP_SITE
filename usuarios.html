@@ -7,11 +7,6 @@
     <title>Elegance Dashboard - Usuários e permissões</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        :root {
-            --ok: #1f9d55;
-            --erro: #d22f42;
-            --aviso: #b26a00;
-        }
         body { min-height: 100vh; padding: 20px; }
         .container {
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
@@ -40,18 +35,13 @@
         .btn { border: none; border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
         .btn-primario { background: var(--gradient-primary); color: var(--on-primary); }
         .btn-secundario { background: var(--white); color: var(--text-dark); border: 1px solid var(--border-color); }
-        .btn-perigo { color: var(--erro); border-color: rgba(210,47,66,.35); }
+        .btn-perigo { color: var(--danger-color); border-color: var(--danger-color); }
         .tabela { width: 100%; border-collapse: collapse; }
         .tabela th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 9px 10px; border-bottom: 2px solid var(--border-color); }
         .tabela td { padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; vertical-align: middle; }
         .tabela tbody tr[data-codigo] { cursor: pointer; }
         .tabela tbody tr[data-codigo]:hover { background: var(--primary-light); }
         .vazio { text-align: center; color: var(--text-light); padding: 30px 0; }
-        .selo { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-        .selo.ok { background: rgba(31,157,85,.12); color: var(--ok); }
-        .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
-        .selo.aviso { background: rgba(178,106,0,.12); color: var(--aviso); }
-        .selo.neutro { background: hsla(240, 60%, 55%, .14); color: var(--text-light); }
         .rolagem { overflow-x: auto; }
 
         /* ===== toasts ===== */
@@ -92,14 +82,14 @@
         #grade-permissoes tr.critica td:first-child b { color: var(--primary-color); }
         #grade-permissoes td.do-perfil { text-align: center; color: var(--text-light); width: 70px; }
         #grade-permissoes td.resultado { font-weight: 800; width: 80px; text-align: center; }
-        #grade-permissoes td.resultado.sim { color: var(--ok); }
-        #grade-permissoes td.resultado.nao { color: var(--erro); }
+        #grade-permissoes td.resultado.sim { color: var(--success-color); }
+        #grade-permissoes td.resultado.nao { color: var(--danger-color); }
         .tri { display: inline-flex; border: 1px solid var(--border-color); border-radius: 9px; overflow: hidden; }
         .tri button { border: none; background: var(--white); padding: 5px 9px; font-size: 12px; font-weight: 700; color: var(--text-light); cursor: pointer; }
         .tri button + button { border-left: 1px solid var(--border-color); }
         .tri button.on[data-estado="herdar"] { background: hsla(250, 60%, 55%, .14); color: var(--text-dark); }
-        .tri button.on[data-estado="liberar"] { background: var(--ok); color: #fff; }
-        .tri button.on[data-estado="bloquear"] { background: var(--erro); color: #fff; }
+        .tri button.on[data-estado="liberar"] { background: var(--success-color); color: var(--on-primary); }
+        .tri button.on[data-estado="bloquear"] { background: var(--danger-color); color: var(--on-primary); }
         .legenda { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
 
         /* ===== perfis ===== */
@@ -137,7 +127,8 @@
             .tabela { min-width: 640px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
 </head>
 <body>
@@ -324,10 +315,10 @@
         // ===================== LISTA DE USUÁRIOS =====================
         let usuarios = [];
         function situacaoDe(u) {
-            if (String(u.situacaoVB || '').toUpperCase() === 'INATIVO') return ['Inativo no VB', 'erro'];
-            if (!u.perfil && !u.ativoWeb) return ['Sem acesso à web', 'neutro'];
-            if (!u.ativoWeb) return ['Inativo na web', 'erro'];
-            return ['Ativo', 'ok'];
+            if (String(u.situacaoVB || '').toUpperCase() === 'INATIVO') return Situacoes.selo('cadastro', 'inativo_no_vb', 'Inativo no VB');
+            if (!u.perfil && !u.ativoWeb) return Situacoes.selo('cadastro', 'sem_acesso', 'Sem acesso à web');
+            if (!u.ativoWeb) return Situacoes.selo('cadastro', 'inativo_na_web', 'Inativo na web');
+            return Situacoes.selo('cadastro', 'ativo', 'Ativo');
         }
         function renderUsuarios() {
             const termo = semAcento($('busca').value.trim());
@@ -335,20 +326,19 @@
             const tbody = $('lista-usuarios').querySelector('tbody');
             if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="vazio">${usuarios.length ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}</td></tr>`; return; }
             tbody.innerHTML = lista.map(u => {
-                const [sit, cls] = situacaoDe(u);
                 return `<tr data-codigo="${u.codigo}">
                     <td><b>${esc(u.nome)}</b></td>
                     <td>${esc(u.cargo || '—')}</td>
                     <td>${esc(u.perfil?.nome || '—')}</td>
                     <td>${seloClasse(u.classe)}</td>
                     <td>${u.estados.length ? esc(u.estados.join(', ')) : 'Todos'}</td>
-                    <td><span class="selo ${cls}">${sit}</span></td>
+                    <td>${situacaoDe(u)}</td>
                     <td>${u.qtdExcecoes ? `<span class="selo aviso">${u.qtdExcecoes} ${u.qtdExcecoes === 1 ? 'exceção' : 'exceções'}</span>` : ''}</td>
                 </tr>`;
             }).join('');
         }
         // classe calculada pelo servidor: administrativo (tem a chave), só valores (preço, sem gráficos nem gestão) ou operador
-        const CLASSES = { administrativo: ['Administrativo', 'ok'], so_valores: ['Só valores', 'aviso'], operador: ['Operador', ''] };
+        const CLASSES = { administrativo: ['Administrativo', 'ok'], so_valores: ['Só valores', 'aviso'], operador: ['Operador', 'neutro'] };
         const seloClasse = c => (CLASSES[c] ? `<span class="selo ${CLASSES[c][1]}">${CLASSES[c][0]}</span>` : '—');
         async function carregarUsuarios() {
             try { usuarios = await api('/admin/usuarios'); renderUsuarios(); }
@@ -594,7 +584,7 @@
                         <div class="rodape">
                             <span class="selo neutro">${p.qtdUsuarios} ${p.qtdUsuarios === 1 ? 'usuário' : 'usuários'}</span>
                             <span class="selo ${p.permissoes.includes('valores.ver') ? 'aviso' : 'neutro'}">${p.permissoes.length} de ${total} permissões</span>
-                            ${p.ativo ? '' : '<span class="selo erro">Desativado</span>'}
+                            ${p.ativo ? '' : '<span class="selo neutro">Desativado</span>'}
                         </div>
                     </div>`).join('') : '<p class="vazio">Nenhum perfil cadastrado</p>';
             } catch (e) { $('lista-perfis').innerHTML = `<p class="vazio">${esc(e.message)}</p>`; }

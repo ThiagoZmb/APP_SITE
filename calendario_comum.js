@@ -13,13 +13,16 @@
   // esc, dataBR, dataValida, criarApi e criarToast vêm de entregas_comum.js (carregado antes no navegador)
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   const { esc, dataBR, dataValida } = C;
+  // mapa único situação -> cor (situacoes.js, carregado antes no navegador)
+  const S = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
 
   const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const DIAS_EXTENSO = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
   const SITUACOES = [{ id: 'abertos', rotulo: 'Em aberto' }, { id: 'todos', rotulo: 'Todos' }];
-  // classe do pedido (calculo/calendario.js) -> cor do selo (selo-*-bg/fg do tema.css) e texto curto
-  const COR_CLASSE = { producao: 'info', pronto: 'ok', entregue: 'ok', retirado: 'ok', cancelado: 'neutro', outro: 'aviso' };
+  // classe do pedido (calculo/calendario.js) -> cor do selo, SEMPRE pelo mapa único (situação desconhecida = neutro); atrasado = perigo
+  const COR_CLASSE = { producao: S.cor('pedido', 'em_producao'), pronto: S.cor('pedido', 'pronto'), entregue: S.cor('pedido', 'entregue'), retirado: S.cor('pedido', 'retirado'), cancelado: S.cor('pedido', 'cancelado'), outro: 'neutro' };
+  const corPedido = p => (p.atrasado ? S.cor('pedido', 'atrasado') : COR_CLASSE[p.classe] || 'neutro');
   const SIGLA_CLASSE = { producao: 'Produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado', cancelado: 'Cancelado', outro: '' };
   const MAX_ETIQUETAS = 8;   // etiquetas por dia na grade; o resto vira "+N mais" (a célula cresce na vertical)
   const VISOES = [{ id: 'grade', rotulo: 'Calendário' }, { id: 'lista', rotulo: 'Lista' }];
@@ -122,7 +125,7 @@
   function htmlEtiqueta(p, situacao, busca) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="etq-sit">${esc(SIGLA_CLASSE[p.classe])}</span>` : '';
     const rot = rotuloPedido(p) + rotuloAchou(p, busca);
-    return `<li class="etq ${COR_CLASSE[p.classe] || 'aviso'}${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
+    return `<li class="etq ${corPedido(p)}${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
       `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${iconesItens(p)}${sit}` +
       (p.atrasado ? ' <span class="etq-atraso">Atrasado</span>' : '') + '</li>';
   }
@@ -167,8 +170,8 @@
   function htmlVisao(visao) {
     return VISOES.map(s => `<button type="button" class="toggle-btn${s.id === visao ? ' active' : ''}" data-visao="${s.id}" aria-pressed="${s.id === visao}">${s.rotulo}</button>`).join('');
   }
-  const seloSituacao = p => `<span class="selo ${COR_CLASSE[p.classe] || 'aviso'}">${esc(p.situacao || '—')}</span>`;
-  const seloAtraso = p => (p.atrasado ? '<span class="selo perigo">Atrasado</span>' : '');
+  const seloSituacao = p => `<span class="selo ${COR_CLASSE[p.classe] || 'neutro'}">${esc(p.situacao || '—')}</span>`;
+  const seloAtraso = p => (p.atrasado ? S.selo('pedido', 'atrasado', 'Atrasado') : '');
   // Linha do pedido na página do dia. `valor` só existe se a API o mandou (valores.ver).
   function htmlLinhaDia(p) {
     const temValor = Object.prototype.hasOwnProperty.call(p, 'valor');

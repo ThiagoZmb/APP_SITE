@@ -12,6 +12,7 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  const SIT = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
   const { esc, txt, consultarCep } = C;
 
   const CLASSES = ['Matéria prima', 'Insumos', 'Serviços', 'Geral'];
@@ -33,7 +34,7 @@
     if (codigo) b.codigo = codigo;
     return b;
   }
-  const seloStatus = s => `<span class="selo ${s === 'Inativo' ? 'neutro' : 'ok'}">${esc(s || 'Ativo')}</span>`;
+  const seloStatus = s => SIT.selo('cadastro', s || 'Ativo');
 
   // ============ TELA (só no navegador) ============
   function iniciar(win) {

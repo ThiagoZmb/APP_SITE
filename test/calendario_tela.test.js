@@ -72,7 +72,7 @@ test('lerConsulta: mês e data da URL, inválidos caem no padrão', () => {
 test('etiqueta: número, cliente abreviado, selo de atraso e escape de HTML; situação visível só em "todos"', () => {
   const p = ped(7, { cliente: '<img src=x onerror=alert(1)> Cliente com nome muito comprido', atrasado: true });
   const h = K.htmlEtiqueta(p, 'abertos');
-  assert.match(h, /<li class="etq info atraso" data-numero="7" tabindex="0"/);
+  assert.match(h, /<li class="etq perigo atraso" data-numero="7" tabindex="0"/);
   assert.match(h, /#7/);
   assert.match(h, /Atrasado/);
   assert.ok(!h.includes('<img'), 'cliente escapado');
@@ -204,7 +204,7 @@ for (const [html, js, ids] of [
     assert.ok(h.indexOf('tema.css') > h.indexOf('calendario.css'));
     // scripts do menu do botão direito + os da tela, todos com ?v= e defer, e na ordem em que dependem uns dos outros
     const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-    assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'calendario_comum.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
+    assert.deepEqual(scripts, ['situacoes.js', 'layout.js', 'entregas_comum.js', 'calendario_comum.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
       'danfe_pedido.js', 'etiqueta_zebra.js', 'checklist_pedido.js', js]);
     assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
     assert.doesNotMatch(h, /\son[a-z]+=/i);

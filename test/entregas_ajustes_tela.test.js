@@ -129,7 +129,7 @@ test('a varredura continua só por ação do usuário: GET /entregas varre, nada
 });
 
 test('versões ?v= dos scripts alterados subiram', () => {
-  assert.match(ler('entregas.html'), /entregas\.js\?v=202611121200/);
+  assert.match(ler('entregas.html'), /entregas\.js\?v=202611191400/);
   assert.match(ler('entregas.html'), /entregas_comum\.js\?v=202611112000/);
-  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611121200/);
+  assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611191400/);
 });

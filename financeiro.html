@@ -115,10 +115,6 @@
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
-        .tag.minimo { background: var(--white); color: hsl(30, 78%, 72%); border: 1px solid #f0c08a; }
-        .tag.falta { background: var(--white); color: hsl(6, 78%, 72%); border: 1px solid #f5a08a; }
-        .tag.inativo { background: var(--white); color: var(--text-light); border: 1px solid #ced4da; }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); cursor: default; }
         .legenda { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 24px; font-size: 12px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .legenda span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
@@ -265,11 +261,6 @@
         .mov.s { background: var(--danger-color); color: white; }
         .nome-mov { display: flex; align-items: center; font-weight: 600; }
         .obs-linha { font-size: 12px; color: var(--text-light); margin-top: 3px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--white); border: 1px solid var(--border-color); }
-        .pill.recebido, .pill.pago { color: hsl(134, 78%, 72%); border-color: #a3d9b1; }
-        .pill.a-receber, .pill.a-pagar { color: hsl(47, 78%, 72%); border-color: #f0d98a; }
-        .pill.atrasado, .pill.protestado { color: hsl(6, 78%, 72%); border-color: #f5a08a; background: hsla(10, 100%, 55%, .14); }
-        .pill.faturado { color: hsl(188, 78%, 72%); border-color: #9fd4dc; }
         .vencido { display: block; font-size: 11px; color: var(--danger-color); font-weight: 700; margin-top: 3px; }
         td.valor { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
         td.valor.e { color: hsl(134, 78%, 72%); }
@@ -349,7 +340,9 @@
         .ctx-sep { height: 1px; background: var(--border-color); margin: 5px 6px; }
         .ctx-sub { left: calc(100% + 4px); top: -7px; min-width: 210px; position: absolute; }
         .ctx-sub.esquerda { left: auto; right: calc(100% + 4px); }
-        .ctx-sit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .ctx-sit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--selo-neutro-fg); }
+        .ctx-sit-dot.ok { background: var(--selo-ok-fg); } .ctx-sit-dot.info { background: var(--selo-info-fg); }
+        .ctx-sit-dot.aviso { background: var(--selo-aviso-fg); } .ctx-sit-dot.perigo { background: var(--selo-perigo-fg); }
         .ctx-item .marca-atual { margin-left: auto; color: var(--primary-color); font-weight: 800; }
         .ctx-grupo-tit { padding: 6px 10px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-light); }
         tbody tr.ctx-alvo { box-shadow: inset 3px 0 0 var(--primary-color) !important; background: rgba(242, 163, 58, .08) !important; }
@@ -439,8 +432,9 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
     <script src="layout.js?v=202611091200" defer></script>
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="fluxo_divisao.js?v=202611101300"></script>
     <script src="olho_resumos.js?v=202611191200"></script>
 </head>
@@ -883,7 +877,7 @@
                         <td class="col-opc">${escapeHtml(it.notaFiscal)}</td>
                         <td class="col-opc">${escapeHtml(it.formaPgto)}</td>
                         <td class="col-opc">${escapeHtml(it.banco)}</td>
-                        <td><span class="pill ${slug(it.situacao)}">${escapeHtml(it.situacao || '—')}</span>${vencido ? '<span class="vencido">vencido</span>' : ''}</td>
+                        <td>${Situacoes.selo('financeiro', it.situacao, it.situacao || '—')}${vencido ? '<span class="vencido">vencido</span>' : ''}</td>
                         <td class="valor ${e ? 'e' : 's'}">${e ? '' : '− '}${moeda(it.valor)}</td>
                     </tr>`;
                 }).join('');
@@ -969,8 +963,6 @@
         $('sel-excel').addEventListener('click', () => enviarParaExcel([...marcados]));
 
         // ============ MENU DO BOTÃO DIREITO (ContextMenuStrip1 do VB) ============
-        const COR_SITUACAO = { 'A Receber': '#d98a00', 'Recebido': '#12a150', 'A Pagar': '#d98a00', 'Pago': '#12a150',
-                               'Faturado': '#2b7fd9', 'Protestado': '#e0384b', 'Atrasado': '#e0384b' };
         const menu = $('ctx-menu');
         let ctxIds = [];
         function fecharMenu() {
@@ -995,7 +987,7 @@
             const grupos = [['Recebimentos', ['A Receber', 'Recebido']], ['Pagamentos', ['A Pagar', 'Pago']], ['Outras', ['Faturado', 'Protestado', 'Atrasado']]];
             const sub = grupos.map(([tit, lista]) => `<div class="ctx-grupo-tit">${tit}</div>` + lista.map(sit => `
                 <button class="ctx-item" role="menuitem" data-acao="situacao" data-sit="${sit}">
-                    <span class="ctx-sit-dot" style="background:${COR_SITUACAO[sit]}"></span>${sit}
+                    <span class="ctx-sit-dot ${Situacoes.cor('financeiro', sit)}"></span>${sit}
                     ${situacoesAtuais.size === 1 && situacoesAtuais.has(sit.toLowerCase()) ? '<span class="marca-atual">✓</span>' : ''}
                 </button>`).join('')).join('');
             const pessoa = um ? (ehEntrada(um) ? um.cliente : um.fornecedor) : '';

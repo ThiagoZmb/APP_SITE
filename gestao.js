@@ -12,6 +12,7 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  const SIT = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
   const { esc, txt } = C;
 
   // ---------- formatação ----------
@@ -51,13 +52,13 @@
   }
   // risco: sempre texto + símbolo além da cor
   const RISCO = {
-    estourado: { texto: 'Estourado', simbolo: '✖', classe: 'perigo' },
-    alerta: { texto: 'Alerta', simbolo: '▲', classe: 'perigo' },
-    risco_ritmo: { texto: 'Risco pelo ritmo', simbolo: '▲', classe: 'aviso' },
-    atencao: { texto: 'Atenção', simbolo: '●', classe: 'aviso' },
-    ok: { texto: 'Dentro do orçado', simbolo: '✔', classe: 'ok' },
-    sem_orcamento: { texto: 'Sem orçamento', simbolo: '–', classe: 'neutro' },
-    nao_calculavel: { texto: 'Não calculável', simbolo: '?', classe: 'neutro' }
+    estourado: { texto: 'Estourado', simbolo: '✖', classe: SIT.cor('gestao', 'estourado') },
+    alerta: { texto: 'Alerta', simbolo: '▲', classe: SIT.cor('gestao', 'alerta') },
+    risco_ritmo: { texto: 'Risco pelo ritmo', simbolo: '▲', classe: SIT.cor('gestao', 'risco_ritmo') },
+    atencao: { texto: 'Atenção', simbolo: '●', classe: SIT.cor('gestao', 'atencao') },
+    ok: { texto: 'Dentro do orçado', simbolo: '✔', classe: SIT.cor('gestao', 'ok') },
+    sem_orcamento: { texto: 'Sem orçamento', simbolo: '–', classe: SIT.cor('gestao', 'sem_orcamento') },
+    nao_calculavel: { texto: 'Não calculável', simbolo: '?', classe: SIT.cor('gestao', 'nao_calculavel') }
   };
   const riscoDe = r => RISCO[r] || RISCO.nao_calculavel;
   // largura da barra de consumo, limitada a 0-100 (o excedente aparece no texto)
@@ -117,10 +118,9 @@
   }
   function htmlAlertas(alertas) {
     if (!alertas || !alertas.length) return '<p class="vazio">Nenhum alerta para este mês. Os alertas são calculados na hora a partir dos dados do VB e das metas; eles só informam, não bloqueiam nada.</p>';
-    const classe = { critico: 'perigo', atencao: 'aviso', info: 'info' };
     const nome = { critico: 'Crítico', atencao: 'Atenção', info: 'Informação' };
     return '<ul class="alertas">' + alertas.map(a =>
-      `<li><span class="selo ${classe[a.gravidade] || 'neutro'}">${esc(nome[a.gravidade] || a.gravidade)}</span> <b>${esc(a.titulo)}</b>` +
+      `<li><span class="selo ${SIT.cor('gestao', a.gravidade)}">${esc(nome[a.gravidade] || a.gravidade)}</span> <b>${esc(a.titulo)}</b>` +
       `<br><span>${esc(a.motivo)}</span><br><span class="fonte">Período: ${esc(a.periodo)} · Fonte: ${esc(a.fonte)}</span></li>`).join('') + '</ul>';
   }
   function htmlOrcamento(o) {
@@ -141,7 +141,7 @@
     const sc = o.semCategoria;
     if (sc && sc.qtdLancamentos > 0) {
       linhas.push(`<tr class="sem-cat"><td><b>${esc(sc.rotulo)}</b><br><span class="cinza">${esc(String(sc.qtdLancamentos))} lançamento(s) sem categoria válida: limitação de qualidade dos dados</span></td>` +
-        `<td class="num">—</td><td class="num">${esc(moeda(sc.realizadoPago))}</td><td class="num">${esc(moeda(sc.aPagar))}</td><td class="num">—</td><td>—</td><td>—</td><td><span class="selo neutro">– Sem orçamento</span></td></tr>`);
+        `<td class="num">—</td><td class="num">${esc(moeda(sc.realizadoPago))}</td><td class="num">${esc(moeda(sc.aPagar))}</td><td class="num">—</td><td>—</td><td>—</td><td><span class="selo ${SIT.cor('gestao', 'sem_orcamento')}">– Sem orçamento</span></td></tr>`);
     }
     return '<table><thead><tr><th>Categoria</th><th>Orçado</th><th>Pago</th><th>A pagar</th><th>Saldo</th><th>Consumo</th><th>Projeção no ritmo</th><th>Situação</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>';
   }

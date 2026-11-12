@@ -47,12 +47,6 @@
         .erro-estado { text-align: center; padding: 20px; color: var(--danger-color); font-weight: 600; }
         .cinza { color: var(--text-light); font-size: 13px; margin-top: 2px; }
         .fonte { color: var(--text-light); font-size: 12px; margin-top: 8px; }
-        .selo { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
-        .selo.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
-        .selo.info { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-        .selo.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-        .selo.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
-        .selo.neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
         .alertas { list-style: none; }
         .alertas li { padding: 12px 4px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         .aviso-periodo { background: hsla(46, 100%, 55%, .14); color: hsl(47, 78%, 72%); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
@@ -164,12 +158,11 @@
         .nome-perfil { background: var(--g-solido, #444); color: var(--on-primary); font-size: 20px; font-weight: 800; letter-spacing: .3px; padding: 4px 14px; border-radius: 10px; line-height: 1.3; }
         .chip { background: var(--white); color: var(--g-solido, var(--text-mid)); border: 1px solid var(--g-borda, #999); font-size: 12.5px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
         .progresso-grupo { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--g-solido, var(--text-mid)); }
-        .selo-completa { display: inline-flex; align-items: center; background: #2e7d32; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
         .barra { margin-bottom: 14px; }
         .barra-titulo { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px; }
         .barra-titulo .cinza { margin: 0 0 0 auto; }
         .faixa { display: flex; height: 56px; border: 2px solid var(--text-dark); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
-        .barra.completa .faixa { border-color: #2e7d32; }
+        .barra.completa .faixa { border-color: var(--success-color); }
         .peca { border: 0; border-right: 1px solid var(--text-dark); background: var(--g-peca, hsla(215, 100%, 55%, .14)); color: var(--text-dark); font-weight: 800; font-size: 13px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; min-width: 0; padding: 0 2px; transition: filter .12s ease; }
         .peca small { font-weight: 500; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .peca[disabled] { cursor: default; }
@@ -211,10 +204,11 @@
         }
         @media (prefers-reduced-motion: reduce) { .peca { transition: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <script src="entregas_comum.js?v=202610271400" defer></script>
-    <script src="corte.js?v=202611061600" defer></script>
+    <script src="corte.js?v=202611191400" defer></script>
 </head>
 <body>
     <div class="container">
@@ -253,6 +247,7 @@
                     </div>
                     <div class="cab-plano">
                         <h2 id="plano-titulo"></h2>
+                        <span id="plano-selo"></span>
                         <span class="sync" id="sync-estado" role="status" aria-live="polite" hidden></span>
                     </div>
                     <p class="dica" id="plano-status" role="status"></p>

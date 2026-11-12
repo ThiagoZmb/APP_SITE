@@ -10,7 +10,7 @@ const F = { tipo: 'perfil', produto: '3345', unidadePeso: 'kg_m', kgPorUnidade: 
 const ESTIMADO = { id: 1, tipo: 'perfil', produto: '3345', unidadePeso: 'kg_m', kgPorUnidade: 0.412, origem: 'estimado_desenho', confianca: 'alta' };
 
 test('pesos: seloOrigem — estimado ganha selo com a confiança; os demais pelo nome', () => {
-  assert.deepEqual(P.seloOrigem('estimado_desenho', 'media'), { texto: 'estimado (média)', classe: 'estimado' });
+  assert.deepEqual(P.seloOrigem('estimado_desenho', 'media'), { texto: 'estimado (média)', classe: 'aviso' });
   assert.equal(P.seloOrigem('estimado_desenho', '').texto, 'estimado');
   assert.equal(P.seloOrigem('pesado').texto, 'pesado');
   assert.equal(P.seloOrigem('fornecedor').texto, 'fornecedor');

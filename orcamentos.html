@@ -113,12 +113,8 @@
         /* peso no extremo esquerdo da barra (o HTML continua com o peso por último: order só muda a posição visual) */
         .totais #grupo-peso-doc { order: -1; margin-right: auto; text-align: left; }
         .badge-frente { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .bf-abrir { background: var(--selo-info-bg); color: var(--selo-info-fg); }
-        .bf-correr { background: var(--selo-ok-bg); color: var(--selo-ok-fg); }
-        .bf-serralheria { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
-        .bf-basculante { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
-        .bf-gaveta { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
-        .bf-avulso { background: var(--selo-info-bg); color: var(--selo-info-fg); }
+        /* tipo de produto não é situação (DESIGN.md "Cores das situações"): todos neutros */
+        .bf-abrir, .bf-correr, .bf-serralheria, .bf-basculante, .bf-gaveta, .bf-avulso { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
         /* ===== FURAÇÕES (pnlFuracoes do VB) ===== */
         #pnl-furacoes { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 6px; }
         .linha-furo { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -371,8 +367,8 @@
         .ped-pedido-grid input, .ped-pedido-grid select { width: 100%; box-sizing: border-box; }
         #ped-obs { width: 100%; box-sizing: border-box; resize: vertical; }
         .msg-salvar { margin-top: 10px; font-size: 14px; }
-        .msg-salvar.erro { color: hsl(0, 78%, 72%); }
-        .msg-salvar.ok { color: hsl(142, 78%, 72%); font-weight: 600; }
+        .msg-salvar.erro { color: var(--selo-perigo-fg); }
+        .msg-salvar.ok { color: var(--selo-ok-fg); font-weight: 600; }
         #itens-tbody tr.preco-mudou td { background: rgba(255, 107, 122, .10); }
         #itens-tbody tr.preco-mudou td:first-child { box-shadow: inset 1px 0 0 var(--danger-color); }
         .dlg-salvar { margin: auto; border: none; border-radius: 12px; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
@@ -402,11 +398,11 @@
         body.so-leitura #btn-importar { display: none !important; }
         .dlg-importar { margin: auto; width: min(680px, calc(100vw - 32px)); }
         .imp-status { font-size: 13px; color: var(--text-light); }
-        .imp-status.erro { color: hsl(0, 78%, 72%); font-weight: 600; }
+        .imp-status.erro { color: var(--selo-perigo-fg); font-weight: 600; }
         .imp-sec h4 { margin: 0 0 6px; font-size: 13.5px; }
-        .imp-sec.ok h4 { color: hsl(142, 78%, 72%); }
-        .imp-sec.fora h4 { color: hsl(0, 78%, 72%); }
-        .imp-sec.aviso h4 { color: hsl(36, 78%, 72%); }
+        .imp-sec.ok h4 { color: var(--selo-ok-fg); }
+        .imp-sec.fora h4 { color: var(--selo-perigo-fg); }
+        .imp-sec.aviso h4 { color: var(--selo-aviso-fg); }
         .imp-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
         .imp-lista > li { background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
         .imp-lista ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-light); font-size: 12.5px; }
@@ -420,28 +416,25 @@
         .lp-item > header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border-color); }
         .lp-item > header b { font-size: 14px; }
         .lp-item > header .lp-legenda { flex: 1 1 240px; font-size: 12px; color: var(--text-light); overflow-wrap: anywhere; }
-        .lp-chip { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: hsla(213, 60%, 55%, .14); color: hsl(215, 78%, 72%); white-space: nowrap; }
-        .lp-chip.ok { background: hsla(140, 60%, 55%, .14); color: hsl(143, 78%, 72%); } .lp-chip.pendente { background: hsla(39, 100%, 55%, .14); color: hsl(36, 78%, 72%); }
-        .lp-chip.bloqueado { background: hsla(0, 81%, 55%, .14); color: hsl(0, 78%, 72%); } .lp-chip.fora { background: hsla(213, 60%, 55%, .14); color: hsl(215, 78%, 72%); }
         .lp-linhas { list-style: none; margin: 0; padding: 0; }
         .lp-linha { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(140px, 1.3fr) auto; gap: 4px 10px; align-items: start; padding: 7px 12px; border-top: 1px solid var(--border-color); font-size: 13px; }
         .lp-linha:first-child { border-top: none; }
-        .lp-linha.inferido { background: hsla(40, 100%, 55%, .14); } .lp-linha.conflitante { background: hsla(356, 100%, 55%, .14); } .lp-linha.ausente.obrig { background: hsla(356, 100%, 55%, .14); }
+        .lp-linha.inferido { background: var(--selo-aviso-bg); } .lp-linha.conflitante { background: var(--selo-perigo-bg); } .lp-linha.ausente.obrig { background: var(--selo-perigo-bg); }
         .lp-linha .lp-rot { font-weight: 600; } .lp-linha .lp-rot small { display: block; font-weight: 400; color: var(--text-light); }
         .lp-linha .lp-val { overflow-wrap: anywhere; } .lp-linha .lp-val small { display: block; color: var(--text-light); font-size: 11.5px; }
         .lp-linha .lp-acoes { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
         .lp-linha .lp-acoes button { font-size: 12px; padding: 3px 8px; }
-        .lp-linha .lp-decisao { grid-column: 1 / -1; font-size: 12.5px; color: hsl(217, 78%, 72%); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .lp-linha .lp-decisao { grid-column: 1 / -1; font-size: 12.5px; color: var(--selo-info-fg); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .lp-linha .lp-form { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
         .lp-linha .lp-form input { flex: 1 1 160px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; }
-        .lp-linha .lp-erro { grid-column: 1 / -1; color: hsl(0, 78%, 72%); font-size: 12px; }
+        .lp-linha .lp-erro { grid-column: 1 / -1; color: var(--selo-perigo-fg); font-size: 12px; }
         .lp-pend { margin: 0; padding: 8px 12px 8px 28px; font-size: 12.5px; border-top: 1px solid var(--border-color); }
-        .lp-pend li.bloq { color: hsl(0, 78%, 72%); }
+        .lp-pend li.bloq { color: var(--selo-perigo-fg); }
         .lp-ausentes summary { padding: 7px 12px; cursor: pointer; font-size: 12.5px; color: var(--text-light); border-top: 1px solid var(--border-color); }
         .lp-item-acoes { padding: 6px 12px; border-top: 1px solid var(--border-color); display: flex; gap: 6px; flex-wrap: wrap; }
         @media (max-width: 640px) { .lp-linha { grid-template-columns: 1fr; } .lp-linha .lp-acoes { justify-content: flex-start; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
     <style>
         /* ===== MODO COMPACTO (vem depois do tema.css): mais campos por tela, menos rolagem ===== */
         html body .container > main { padding: 18px 24px 28px !important; }
@@ -997,6 +990,7 @@
             <button type="button" class="btn btn-primary" id="avl-ok">OK</button>
         </div>
     </aside>
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="importar_itens.js?v=202610261800"></script>
     <script src="desenhos.js?v=202610272200"></script>
     <script src="calculo/perfil_secoes.js?v=202611051800"></script>
@@ -1004,7 +998,7 @@
     <script src="alteracao_valor.js?v=202611041200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
-    <script src="auditoria_calculo.js?v=202611111800"></script>
+    <script src="auditoria_calculo.js?v=202611191400"></script>
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
@@ -3937,7 +3931,7 @@
             const d = LeituraPdf.descreverLinha(l);
             const li = elImp('li', `lp-linha ${l.estado}${l.obrigatorio ? ' obrig' : ''}`);
             const rot = elImp('div', 'lp-rot', l.rotulo + (l.obrigatorio ? ' *' : ''));
-            rot.append(elImp('small', '', d.estado));
+            { const sm = elImp('small'); sm.append(elImp('span', `selo ${Situacoes.cor('leitura', l.estado)}`, d.estado)); rot.append(sm); }
             const val = elImp('div', 'lp-val', d.valor);
             val.append(elImp('small', '', d.detalhes));
             if (d.trecho) val.append(elImp('small', '', `Origem: “${d.trecho}”`));
@@ -3985,7 +3979,7 @@
             const sec = elImp('section', 'lp-item');
             const cab = elImp('header');
             const s = LeituraPdf.situacaoItem(item);
-            cab.append(elImp('b', '', `${item.idItem} · ${item.categoria}`), elImp('span', 'lp-legenda', item.legenda), elImp('span', `lp-chip ${s.classe}`, s.texto));
+            cab.append(elImp('b', '', `${item.idItem} · ${item.categoria}`), elImp('span', 'lp-legenda', item.legenda), elImp('span', `selo ${Situacoes.cor('leitura', s.classe)}`, s.texto));
             sec.append(cab);
             const g = LeituraPdf.gruposDoItem(item);
             const ul = elImp('ul', 'lp-linhas');

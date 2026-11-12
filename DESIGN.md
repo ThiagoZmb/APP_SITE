@@ -145,6 +145,12 @@ Neutros frios em grafite com um acento quente. O contraste entre eles é a ident
 ### Selos de status
 Pares `-bg` (tom translúcido) e `-fg` (texto claro da mesma cor) em `tema.css`: `--selo-neutro-*`, `--selo-aviso-*`, `--selo-info-*`, `--selo-ok-*`, `--selo-perigo-*`.
 
+### Cores das situações
+Padrão único (aprovado em `docs/padrao-cores-situacoes.md`): cada situação tem **uma** cor em todas as telas, definida em `situacoes.js` (`Situacoes.selo(grupo, valor)` / `Situacoes.cor`) e desenhada pelo único `.selo` do `tema.css`. Nada de hsl/hex, variáveis locais (`--ok`, `--erro`...) nem `.selo` copiado na página.
+- **ok** (verde): concluído, pago, ativo, conferido. **info** (azul): em andamento ou combinado. **aviso** (âmbar): falta ação ou conferência. **perigo** (vermelho): atrasado, falhou, bloqueado. **neutro** (cinza): inativo, N/A, encerrado, cancelado por decisão normal.
+- Pedido: Em Produção info · Pronto aviso · Entregue/Retirado ok · Cancelado neutro · Atrasado perigo. Entrega: A programar aviso · Agendada/Em rota/Enviada info · Ocorrência perigo · Entregue/Retirado ok · Cancelada/Encerrada neutro.
+- "Inativo" é sempre neutro; vermelho só para o que exige reação (Bloqueado, Suspensa). Tipo (de entrega, de produto) não tem cor de situação. Situação nova: acrescentar em `situacoes.js` e no teste `test/situacoes.test.js`.
+
 ### Sidebar
 - **Grafite Fundo** (`#101215`) com filete à direita; texto `#9aa1ad`, rótulos de grupo `#6b7280`; item ativo em Âmbar Fundo com texto âmbar.
 

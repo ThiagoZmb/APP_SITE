@@ -7,11 +7,6 @@
     <title>Elegance Dashboard - Movimentação de estoque</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        :root {
-            --ok: #1f9d55;
-            --erro: #d22f42;
-            --aviso: #b26a00;
-        }
         body { min-height: 100vh; padding: 20px; }
         .container {
             display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr;
@@ -58,10 +53,9 @@
         .an-cartao { display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer; font: inherit; padding: 14px 16px; }
         .an-cartao small { color: var(--text-light); font-weight: 700; font-size: 12.5px; }
         .an-cartao b { font-size: 26px; color: var(--text-dark); }
-        .an-cartao.erro b { color: var(--erro); } .an-cartao.aviso b { color: var(--aviso); }
+        .an-cartao.erro b { color: var(--selo-perigo-fg); } .an-cartao.aviso b { color: var(--selo-aviso-fg); }
         .an-cartao.on { outline: 2px solid var(--primary-color); }
         div.an-cartao { cursor: default; }
-        .selo.erro { background: rgba(210,47,66,.12); color: var(--erro); }
         /* listas longas (estoque grande) rolam dentro do bloco; o cabeçalho da tabela fica fixo */
         #an-previsao .rolagem { max-height: 480px; overflow: auto; }
         #an-previsao thead th { position: sticky; top: 0; background: var(--white); z-index: 1; }
@@ -77,18 +71,15 @@
         .an-lista li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         .an-subiram, .an-cairam { margin-bottom: 10px; }
         .an-bloco h4 { font-size: 13px; color: var(--text-light); margin: 4px 0; }
-        b.sobe { color: var(--ok); } b.cai { color: var(--erro); }
-        .bloco-erro { color: var(--erro); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+        b.sobe { color: var(--selo-ok-fg); } b.cai { color: var(--selo-perigo-fg); }
+        .bloco-erro { color: var(--selo-perigo-fg); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
         .bloco-hist { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-color); }
         .bloco-hist .rolagem { max-height: 420px; overflow: auto; }
         .bloco-hist thead th { position: sticky; top: 0; background: var(--white); z-index: 1; }
         .bloco-hist h3 { font-size: 16px; margin-bottom: 10px; color: var(--text-dark); }
         .rodape-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 14px; }
-        .aviso { padding: 10px 14px; border-radius: 12px; background: rgba(178,106,0,.1); color: var(--aviso); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
-        .selo { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: hsla(240, 60%, 55%, .14); color: var(--text-light); }
+        .aviso { padding: 10px 14px; border-radius: 12px; background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); font-weight: 700; font-size: 14px; margin-bottom: 12px; }
         .selo[title] { cursor: help; } /* selo com explicação ao passar o mouse */
-        .selo.ok { background: rgba(31,157,85,.12); color: var(--ok); }
-        .selo.aviso { background: rgba(178,106,0,.12); color: var(--aviso); }
         tr.excede td, tr.pendente td { background: rgba(210,47,66,.06); }
         tr.pendente td { background: rgba(178,106,0,.08); }
         /* a célula do produto quebra linha (o tema corta texto com "…" nas tabelas) */
@@ -102,13 +93,13 @@
         #painel-entrada > .painel + .painel { margin-top: 18px; }
         #e-historico { margin-top: 0; padding-top: 0; border-top: 0; }
         /* aviso de preço diferente do cadastro: grande e vermelho, explicação ao passar o mouse */
-        .e-preco { color: var(--erro); font-size: 20px; font-weight: 800; line-height: 1; vertical-align: middle; margin-left: 4px; cursor: help; }
+        .e-preco { color: var(--selo-perigo-fg); font-size: 20px; font-weight: 800; line-height: 1; vertical-align: middle; margin-left: 4px; cursor: help; }
         .e-antes { display: block; font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
         .e-cod { display: block; margin-top: 3px; }
-        .e-codigo-novo { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 4px; }
+        .e-codigo-novo { display: block; font-size: 12px; color: var(--selo-aviso-fg); font-weight: 700; margin-top: 4px; }
         .e-acoes-linha { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-        .pendencia { display: block; font-size: 12px; color: var(--aviso); font-weight: 700; margin-top: 3px; }
-        tr.excede .s-atual { color: var(--erro); font-weight: 800; }
+        .pendencia { display: block; font-size: 12px; color: var(--selo-aviso-fg); font-weight: 700; margin-top: 3px; }
+        tr.excede .s-atual { color: var(--selo-perigo-fg); font-weight: 800; }
 
         /* ===== busca de produto ===== */
         .busca { position: relative; }
@@ -121,8 +112,8 @@
         /* ===== avisos (acima do modal, que é z-index 70) ===== */
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 90; max-width: calc(100vw - 48px); }
         .toast { padding: 12px 18px; border-radius: 12px; color: #fff; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-heavy); max-width: 420px; }
-        .toast.ok { background: var(--ok); }
-        .toast.erro { background: var(--erro); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
         .toast.info { background: var(--text-dark); }
 
         /* ===== modal ===== */
@@ -139,7 +130,8 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="tema.css?v=202611191200">
+    <link rel="stylesheet" href="tema.css?v=202611191400">
+    <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611091200" defer></script>
     <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
     <script src="notas_compra.js?v=202610301200" defer></script>
@@ -895,7 +887,7 @@
             if (propria) alvo.add(propria);
             alvo.forEach(l => l.recarregar());
         }
-        const TIPO_NOME = { entrada: ['Entrada', 'ok'], saida: ['Saída', 'aviso'], ajuste: ['Ajuste', ''], estorno: ['Estorno', ''] };
+        const TIPO_NOME = { entrada: 'Entrada', saida: 'Saída', ajuste: 'Ajuste', estorno: 'Estorno' };
         // 'AAAA-MM-DD HH:MM:SS' → 'dd/mm/aaaa hh:mm' (entrada do VB só tem a data)
         const dataHora = q => { const m = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/.exec(String(q || '')); if (!m) return esc(q);
             return `${m[3]}/${m[2]}/${m[1]}` + (m[4] && !(m[4] === '00' && m[5] === '00') ? ` ${m[4]}:${m[5]}` : ''); };
@@ -928,7 +920,7 @@
             return historico.length ? historico.map((g, i) => `
                 <tr data-i="${i}" style="cursor:pointer">
                     <td style="white-space:nowrap">${dataHora(g.quando)}</td>
-                    <td><span class="selo ${TIPO_NOME[g.tipo]?.[1] || ''}">${TIPO_NOME[g.tipo]?.[0] || esc(g.tipo)}</span></td>
+                    <td>${Situacoes.selo('estoque_movimento', g.tipo, TIPO_NOME[g.tipo] || g.tipo)}</td>
                     <td>${esc(g.referencia)}${g.motivo ? `<small class="pendencia" style="color:var(--text-light)">Motivo: ${esc(g.motivo)}</small>` : ''}</td>
                     <td class="num">${g.itens.length}</td>
                     <td>${esc(g.quem) || '—'}</td>
@@ -1031,7 +1023,7 @@
         });
 
         // ----- previsão de falta -----
-        const ALERTA = { falta: ['Em falta', 'erro'], comprar: ['Comprar', 'aviso'], atencao: ['Atenção', 'aviso'], ok: ['OK', 'ok'], sem_consumo: ['Sem consumo', ''], poucos_dados: ['Poucos dados', ''] };
+        const ALERTA = { falta: 'Em falta', comprar: 'Comprar', atencao: 'Atenção', ok: 'OK', sem_consumo: 'Sem consumo', poucos_dados: 'Poucos dados' };
         const dataBR = d => d ? d.split('-').reverse().join('/') : '—';
         const pct = t => t === null || t === undefined ? '—' : `${t >= 0 ? '▲' : '▼'} ${num(Math.round(Math.abs(t) * 100))}%`;
         let redesenhandoPrevisao = false; // o campo de prazo que some no redesenho dispara "blur": não pode gravar
@@ -1040,7 +1032,7 @@
             const itens = !filtroAnalise ? a.itens : a.itens.filter(i => filtroAnalise === 'parados' ? i.parado : i.alerta === filtroAnalise);
             redesenhandoPrevisao = true;
             try { $('an-previsao').querySelector('tbody').innerHTML = itens.length ? itens.map(i => {
-                const [texto, cor] = ALERTA[i.alerta] || [i.alerta, ''];
+                const texto = ALERTA[i.alerta] || i.alerta;
                 return `<tr data-codigo="${i.codigo}">
                     <td>${esc(i.produto)}<small class="pendencia" style="color:var(--text-light)">${esc(i.classe)} · ABC ${esc(i.abc)}</small></td>
                     <td class="num">${num(i.qtd)} <small>${esc(i.unidade)}</small></td>
@@ -1048,7 +1040,7 @@
                     <td class="num">${i.diasCobertura === null ? '—' : num(i.diasCobertura)}</td>
                     <td>${dataBR(i.dataFalta)}</td>
                     <td class="num">${editar ? `<button type="button" class="btn btn-secundario btn-mini an-prazo" title="Prazo de reposição em dias (clique para alterar)">${i.prazoDias}</button>` : i.prazoDias}</td>
-                    <td><span class="selo ${cor}">${texto}${i.alerta === 'poucos_dados' ? ` (${a.diasDados} dias)` : ''}</span></td>
+                    <td>${Situacoes.selo('estoque_previsao', i.alerta, texto + (i.alerta === 'poucos_dados' ? ` (${a.diasDados} dias)` : ''))}</td>
                     <td class="num">${pct(i.tendencia)}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="8" class="vazio">Nenhum item</td></tr>'; } finally { redesenhandoPrevisao = false; }

@@ -14,6 +14,7 @@
   'use strict';
   // helpers compartilhados com a tela do motorista (entregas_comum.js, carregado antes no navegador)
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  const Sit = typeof module === 'object' && module.exports ? require('./situacoes.js') : raiz.Situacoes;
   const { esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, rotuloSequencia } = C;
 
   // ============ LÓGICA PURA ============
@@ -38,7 +39,7 @@
   const abaDoStatus = s => (ABAS.find(a => a.status.includes(s)) || {}).id || null;
 
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
-  const corStatus = s => COR_STATUS[s] || 'neutro';
+  const corStatus = s => Sit.cor('entrega', s);
   const rotuloTipo = t => ROTULO_TIPO[t] || '—';
   const rotuloEvento = t => ROTULO_EVENTO[t] || String(t ?? '');
   // Linha do tempo: o cancelamento automático por "saiu de Pronto" acompanha o selo (Encerrada/Suspensa), e não "Cancelada".
