@@ -505,7 +505,7 @@
       if (!estado.mes) { const h = new win.Date(); estado.mes = { ano: h.getFullYear(), mes: h.getMonth() }; }
       const { ano, mes } = estado.mes;
       const semanas = montarMes(estado.lista.filter(casa), ano, mes, hojeISO());
-      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(statusDaEntrega(e))}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(statusDaEntrega(e))}) · Responsável: ${e.motorista || (e.tipo === 'retirada' ? 'Retirada agendada' : rotuloTipo(e.tipo))}`)}">` +
+      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(statusDaEntrega(e))}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(statusDaEntrega(e))}) · Responsável: ${e.motorista || (e.tipo === 'retirada' ? 'Retirada agendada' : rotuloTipo(e.tipo))}${C.textoItens(e)}`)}">` +
         `<strong>${esc(e.numero)}</strong> ${esc(e.cliente || '')}</button>`;
       const celula = c => {
         const aberto = estado.diaAberto === c.dia;

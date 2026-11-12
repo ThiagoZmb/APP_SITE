@@ -10,6 +10,7 @@ const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, fecham
   STATUS_ENCERRAVEIS, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusDeReabertura, motivoEncerrada, validarEdicao, aplicarEdicao } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
+const { carregarItensPedidos } = require('./pedido_itens');
 
 const VER = ['entregas.ver'];
 const PROGRAMAR = ['entregas.programar'];
@@ -432,7 +433,7 @@ function registrarEntregas({ rota, pool }) {
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) { where.push(est.sql); params.push(...est.params); }
       // a lista e as sobras dos pedidos divididos são independentes: saem juntas (uma ida ao banco a menos de espera)
-      const [[linhas], sobras] = await Promise.all([pool.execute(
+      const [[linhas, itensPedidos], sobras] = await Promise.all([pool.execute(
         `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
                 p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
                 u.NOME AS motorista, p.SITUACAO AS situacao_pedido,
@@ -445,7 +446,9 @@ function registrarEntregas({ rota, pool }) {
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
          LEFT JOIN cliente_usuarios u ON u.CODIGO = e.motorista_codigo
          WHERE ${where.join(' AND ')}
-         ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero, e.sequencia`, params),
+         ORDER BY e.data_agendada IS NULL, e.data_agendada, e.numero, e.sequencia`, params)
+        // itens do pedido (balão do calendário): UMA consulta IN com todos os pedidos da lista, andando junto com as sobras; falha só omite os itens
+        .then(async ([ls]) => [ls, await carregarItensPedidos(pool, ls.map(l => l.numero)).catch(err => { console.error('Erro GET /entregas (itens do balão):', err.message); return new Map(); })]),
       sobrasDosPedidos(req).catch(err => { console.error('Erro GET /entregas (sobras):', err.message); return []; })]);
       res.json({ entregas: linhas.map(l => ({
         id: l.id, numero: l.numero, status: l.status, tipo: l.tipo || null,
@@ -454,7 +457,7 @@ function registrarEntregas({ rota, pool }) {
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
         dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
         motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0, situacaoPedido: l.situacao_pedido || null,
-        ...camposOrdem(l)
+        ...camposOrdem(l), ...(itensPedidos.get(Number(l.numero)) || {})
       })), sobras });
     } catch (err) {
       console.error('Erro GET /entregas:', err.message);

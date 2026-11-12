@@ -114,14 +114,8 @@
   const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
   const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'grade' ? '&visao=grade' : ''}`;
-  // Balão (title) e rótulo de acessibilidade: o mesmo texto nas três visões e na página do dia. Itens do pedido (ped_orc_lista_itens) abaixo,
-  // até MAX_ITENS_BALAO (vem do servidor); "… e mais N itens" quando o pedido tem mais. Sem itens, a seção não aparece. Texto puro (esc() na hora de pôr no atributo).
-  const textoItens = p => {
-    const itens = Array.isArray(p.itens) ? p.itens.filter(i => i && i.texto) : [];
-    if (!itens.length) return '';
-    const mais = Math.max(0, (Number(p.qtdItens) || 0) - itens.length);
-    return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
-  };
+  // Balão (title) e rótulo de acessibilidade: o mesmo texto nas três visões e na página do dia. Os itens do pedido vêm de textoItens (entregas_comum.js).
+  const { textoItens } = C;
   const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}${textoItens(p)}`;
   const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
   const iconesItens = p => {

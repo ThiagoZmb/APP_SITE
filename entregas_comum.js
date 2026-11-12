@@ -123,6 +123,15 @@
     throw new Error('A foto continua grande demais. Tente outra.');
   }
 
+  // Balão (title): itens do pedido (calculo/calendario.js agruparItens) abaixo do texto, até 15 (vem do servidor); "… e mais N itens" quando há mais.
+  // Sem itens a seção não aparece. Texto puro (esc() na hora de pôr no atributo). Compartilhado pelo Calendário de pedidos e pelo calendário de Entregas.
+  const textoItens = p => {
+    const itens = Array.isArray(p && p.itens) ? p.itens.filter(i => i && i.texto) : [];
+    if (!itens.length) return '';
+    const mais = Math.max(0, (Number(p.qtdItens) || 0) - itens.length);
+    return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
+  };
+
   return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem,
-    rotuloSequencia, rotuloItem };
+    rotuloSequencia, rotuloItem, textoItens };
 });

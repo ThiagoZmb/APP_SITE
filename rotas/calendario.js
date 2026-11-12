@@ -9,20 +9,15 @@
 const { filtroEstados } = require('../seguranca/acesso');
 const { semValores } = require('../seguranca/valores');
 const { hojeLocal } = require('./transacao');
-const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia, agruparItens } = require('../calculo/calendario');
+const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia } = require('../calculo/calendario');
+const { carregarItensPedidos } = require('./pedido_itens');
 const { carregarComposicao } = require('../calculo/composicao_documentos');
 const { SEM_COMPOSICAO } = require('../calculo/composicao_pedido');
 
 const VER = ['pedidos.ver'];
 
 function registrarCalendario({ rota, pool }) {
-  // itens dos pedidos do período em UMA consulta (IN); só texto, nunca UNITARIO/TOTAL
-  async function carregarItens(numeros) {
-    if (!numeros.length) return new Map();
-    const [linhas] = await pool.execute(
-      `SELECT NUMERO, ITEM, TIPO_PRODUTO, PRODUTO, QTD, DESCRICAO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN (${numeros.map(() => '?').join(',')}) ORDER BY NUMERO, ITEM`, numeros);
-    return agruparItens(linhas);
-  }
+  const carregarItens = numeros => carregarItensPedidos(pool, numeros); // itens dos pedidos do período em UMA consulta (IN); só texto, nunca UNITARIO/TOTAL
   // pedidos com DATA_PRONTO em [de, ate) ; a ordem final é a do agrupamento
   async function buscar(req, de, ate) {
     const est = filtroEstados(req, 'c.ESTADO');

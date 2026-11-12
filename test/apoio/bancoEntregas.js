@@ -88,6 +88,10 @@ function bancoEntregas() {
     [/^SELECT NUMERO, ITEM, DESCRICAO, QTD, PRODUTO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, nums) =>
       estado.itens.filter(i => i.TIPO === 'Pedido' && nums.includes(i.NUMERO)).sort((a, b) => (a.NUMERO - b.NUMERO) || (a.ITEM - b.ITEM))
         .map(i => ({ NUMERO: i.NUMERO, ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD, PRODUTO: i.PRODUTO ?? null, OBSERVACAO: i.OBSERVACAO ?? null }))],
+    // balão do calendário (rotas/pedido_itens.js): itens de todos os pedidos da lista, só texto
+    [/^SELECT NUMERO, ITEM, TIPO_PRODUTO, PRODUTO, QTD, DESCRICAO, OBSERVACAO FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, (sql, nums) =>
+      estado.itens.filter(i => i.TIPO === 'Pedido' && nums.includes(i.NUMERO)).sort((a, b) => (a.NUMERO - b.NUMERO) || (a.ITEM - b.ITEM))
+        .map(i => ({ NUMERO: i.NUMERO, ITEM: i.ITEM, TIPO_PRODUTO: i.TIPO_PRODUTO ?? null, PRODUTO: i.PRODUTO ?? null, QTD: i.QTD, DESCRICAO: i.DESCRICAO, OBSERVACAO: i.OBSERVACAO ?? null }))],
     [/^SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c/, (sql, [numero, ...estados]) => {
       const cli = clienteDe(pedidos.find(p => p.NUMERO === numero && p.TIPO === 'Pedido'));
       return cli && estados.includes(cli.ESTADO) ? [{ ok: 1 }] : [];
