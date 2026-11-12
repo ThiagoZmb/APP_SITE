@@ -36,7 +36,12 @@
         .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
         .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
 
-        .workspace { display: grid; grid-template-columns: minmax(0, 3.6fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+        .workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 12px; align-items: start; }
+        /* lista sem barra horizontal: células compactas e textos longos cortados com reticências (o completo está no detalhe) */
+        .lista-wrap table { table-layout: auto; }
+        .lista-wrap thead th, .lista-wrap tbody td { padding-left: 8px; padding-right: 8px; }
+        .lista-wrap tbody td:not(.acao) { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lista-wrap tbody td:first-child { max-width: none; }
         .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; }
         .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
         .painel-head { padding: 22px 22px 0; }
@@ -139,7 +144,7 @@
         .cal { padding: 0 8px 14px; min-width: 640px; }
         .cal-sem, .cal-linha { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
         .cal-sem span { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-light); padding: 6px 0; }
-        .cel { min-height: 96px; border: 1px solid var(--border-color); margin: -1px 0 0 -1px; padding: 4px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .cel { min-height: 230px; border: 1px solid var(--border-color); margin: -1px 0 0 -1px; padding: 4px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .cel.fora { opacity: .45; }
         .cel .num { font-size: 12px; font-weight: 600; align-self: center; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; }
         .cel.hoje .num { background: var(--primary-color); color: var(--on-primary); }

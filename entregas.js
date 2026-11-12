@@ -451,7 +451,7 @@
     };
 
     // Agenda em calendário mensal: cada entrega é uma etiqueta colorida pelo status; clicar abre o detalhe
-    const MAX_ETIQUETAS = 3;
+    const MAX_ETIQUETAS = 8; // células altas (min-height em entregas.html): cabem bem mais pedidos antes do "+N mais"
     function hojeISO() {
       const d = new win.Date();
       return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
