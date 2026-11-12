@@ -1,6 +1,6 @@
 // Imprime as etiquetas de um Pedido na Zebra. Fluxo: confere o serviço local do PC (127.0.0.1:3917, local/zebra.js) ->
-// busca os itens e as sugestões no servidor (GET /etiquetas/pedido/:n/itens) -> abre a janela de ajustes (volumes, medidas,
-// estado de destino) -> o servidor monta o ZPL com esses ajustes (POST /etiquetas/pedido/:n) -> o serviço local o envia RAW
+// busca os itens e as sugestões no servidor (GET /etiquetas/pedido/:n/itens) -> abre a janela de ajustes (volumes = nº de etiquetas
+// por item, medidas, estado de destino geral) -> o servidor monta o ZPL com esses ajustes (POST /etiquetas/pedido/:n) -> o serviço local o envia RAW
 // à impressora. Os ajustes valem só para esta impressão: nada é gravado. O texto digitado vai ao servidor, que valida e
 // monta o ZPL; a tela nunca manda texto para a impressora. Sem o serviço local não há plano B pelo navegador.
 // EtiquetaZebra.imprimir(numero, { apiBase, loginUrl, token })
@@ -10,6 +10,7 @@
   const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
   const QTD_MAX = 999;
   const MEDIDAS_MAX = 30;
+const MAX_ETIQUETAS = 200; // mesmo teto do servidor (calculo/etiqueta_edicao.js)
 
   async function servicoLocalAtivo() {
     const ctl = new AbortController();
@@ -24,6 +25,13 @@
   }
 
   const el = (tag, classe, texto) => { const e = document.createElement(tag); if (classe) e.className = classe; if (texto !== undefined) e.textContent = texto; return e; };
+
+  // total de etiquetas = soma dos volumes; campo vazio/inválido não entra na soma
+  function totalEtiquetas(valores) {
+    let t = 0;
+    for (const v of valores) { const s = String(v ?? '').trim(); if (/^\d{1,3}$/.test(s)) t += Number(s); }
+    return t;
+  }
 
   function selectUf(id, vazioTexto, valor) {
     const s = el('select'); s.id = id;
@@ -49,7 +57,8 @@
       caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-labelledby', 'ez-titulo');
       const titulo = el('div', 'dp-titulo', 'Imprimir etiquetas (Zebra)'); titulo.id = 'ez-titulo';
       const itens = dados.itens || [];
-      const sub = el('div', 'dp-sub', `Pedido nº ${numero} · ${itens.length} etiqueta(s). Os ajustes valem só para esta impressão; nada é gravado.`);
+      const sub = el('div', 'dp-sub');
+      const resumo = () => { sub.textContent = `Pedido nº ${numero} · ${totalEtiquetas(fichas.map(f => f.qtd.value))} etiqueta(s) vão sair (limite ${MAX_ETIQUETAS}). Os ajustes valem só para esta impressão; nada é gravado.`; };
 
       const geral = el('div', 'ez-geral');
       const ufGeral = selectUf('ez-uf-geral', 'Sem estado de destino', dados.ufSugerida);
@@ -67,15 +76,17 @@
         const ligaRotulo = el('label', 'ez-liga'); ligaRotulo.htmlFor = liga.id;
         ligaRotulo.append(liga, el('span', '', 'Incluir medidas na etiqueta'));
         liga.addEventListener('change', () => { med.disabled = !liga.checked; });
-        const ufItem = selectUf(`ez-uf-${it.item}`, 'Igual ao geral', '');
         const cMed = el('div', 'ez-campo');
         const lMed = el('label', '', 'Medidas do item'); lMed.htmlFor = med.id;
         cMed.append(lMed, med, ligaRotulo);
         const campos = el('div', 'ez-campos');
-        campos.append(campo('Qtd de volumes', qtd), cMed, campo('Estado deste item', ufItem));
+        const cQtd = campo('Qtd de etiquetas (volumes)', qtd);
+        cQtd.append(el('small', 'ez-ajuda', 'N etiquetas: VOL 1/N … VOL N/N'));
+        qtd.addEventListener('input', resumo);
+        campos.append(cQtd, cMed);
         ficha.append(t, campos);
         lista.append(ficha);
-        return { item: it.item, qtd, med, liga, ufItem };
+        return { item: it.item, qtd, med, liga };
       });
 
       const erro = el('div', 'ez-erro'); erro.setAttribute('role', 'alert'); erro.hidden = true;
@@ -93,13 +104,15 @@
         for (const f of fichas) {
           const n = Number(f.qtd.value);
           if (!/^\d{1,3}$/.test(String(f.qtd.value).trim()) || !Number.isInteger(n) || n < 1 || n > QTD_MAX) {
-            return mostrarErro(`Item ${f.item}: a quantidade de volumes deve ser um número inteiro de 1 a ${QTD_MAX}.`, f.qtd);
+            return mostrarErro(`Item ${f.item}: a quantidade de etiquetas (volumes) deve ser um número inteiro de 1 a ${QTD_MAX}.`, f.qtd);
           }
         }
+        const total = totalEtiquetas(fichas.map(f => f.qtd.value));
+        if (total > MAX_ETIQUETAS) return mostrarErro(`Total de ${total} etiquetas passa do limite de ${MAX_ETIQUETAS} por impressão: reduza a quantidade de volumes.`, fichas[0] ? fichas[0].qtd : null);
         mostrarErro('');
         const escolha = {
           uf: ufGeral.value,
-          itens: fichas.map(f => ({ item: f.item, qtd: Number(f.qtd.value), incluirMedidas: !!f.liga.checked, medidas: f.liga.checked ? f.med.value : '', uf: f.ufItem.value }))
+          itens: fichas.map(f => ({ item: f.item, qtd: Number(f.qtd.value), incluirMedidas: !!f.liga.checked, medidas: f.liga.checked ? f.med.value : '' }))
         };
         enviando = true; bImprimir.disabled = true; bImprimir.textContent = 'Enviando...';
         let msg;
@@ -108,7 +121,7 @@
         if (msg) mostrarErro(msg); else fecha();
       }
 
-      const focaveis = () => [ufGeral, ...fichas.flatMap(f => [f.qtd, f.liga, f.med, f.ufItem]), bCancelar, bImprimir].filter(x => !x.disabled);
+      const focaveis = () => [ufGeral, ...fichas.flatMap(f => [f.qtd, f.liga, f.med]), bCancelar, bImprimir].filter(x => !x.disabled);
       const teclas = e => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!enviando) fecha(); }
         else if (e.key === 'Enter' && e.target && String(e.target.tagName || e.target.tag).toLowerCase() === 'input' && e.target.type !== 'checkbox') { e.preventDefault(); imprimir(); }
@@ -121,6 +134,7 @@
       bCancelar.addEventListener('click', () => { if (!enviando) fecha(); });
       fundo.addEventListener('mousedown', e => { if (e.target === fundo && !enviando) fecha(); });
       document.addEventListener('keydown', teclas, true);
+      resumo();
       caixa.append(titulo, sub, geral, lista, erro, acoes);
       fundo.append(caixa);
       document.body.append(fundo);

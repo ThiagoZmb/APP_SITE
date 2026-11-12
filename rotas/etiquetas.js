@@ -1,8 +1,8 @@
-// Etiquetas de pedido/produção (Zebra): devolve o ZPL de um Pedido, uma etiqueta por item. Só leitura, só Pedido, sem dinheiro.
+// Etiquetas de pedido/produção (Zebra): devolve o ZPL de um Pedido, 1 a N etiquetas por item (N = volumes). Só leitura, só Pedido, sem dinheiro.
 // O envio à impressora é do serviço local do PC da empresa (local/zebra.js); aqui só se monta o ZPL (calculo/etiqueta_zpl.js).
-// GET  /etiquetas/pedido/:numero         ZPL padrão (qtd do item, sem medidas, sem destino)
+// GET  /etiquetas/pedido/:numero         ZPL padrão (1 etiqueta por item, "VOL 1/1", sem medidas, sem destino)
 // GET  /etiquetas/pedido/:numero/itens   dados para a janela de edição (itens, medidas sugeridas, UF sugerida do cliente)
-// POST /etiquetas/pedido/:numero         ZPL com os ajustes da janela ({ itens: [{ item, qtd, medidas, incluirMedidas, uf }], uf }); nada é gravado
+// POST /etiquetas/pedido/:numero         ZPL com os ajustes da janela ({ itens: [{ item, qtd (= volumes = nº de etiquetas do item), medidas, incluirMedidas }], uf }); N etiquetas por item, total até 200; nada é gravado
 const { montarEtiquetas } = require('../calculo/etiqueta_zpl');
 const { validarEdicao, normalizarUf, sugerirMedidas } = require('../calculo/etiqueta_edicao');
 const { textoVB } = require('../pdf/ped_orc');
@@ -40,7 +40,7 @@ function registrarEtiquetas({ rota, pool, foraDosEstados }) {
       numero, cliente: cab.RAZAO_SOCIAL, clienteFinal: cab.CLIENTE_FINAL, uf: edicao.uf,
       itens: itens.map(it => {
         const e = edicao.porItem.get(String(it.ITEM));
-        return { ITEM: it.ITEM, QTD: e?.qtd !== undefined ? String(e.qtd) : textoVB(it.QTD), MEDIDAS: e?.medidas, UF: e?.uf };
+        return { ITEM: it.ITEM, QTD: textoVB(it.QTD), MEDIDAS: e?.medidas, VOLUMES: e?.qtd ?? 1 };
       })
     });
     res.json({ zpl, quantidade });

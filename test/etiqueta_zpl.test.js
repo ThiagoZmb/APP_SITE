@@ -16,7 +16,7 @@ test('sanearZpl remove ^ ~ \\ e troca controle por espaço', () => {
   assert.equal(sanearZpl(null), '');
 });
 
-test('uma etiqueta por item, em 800x480 dots (203 dpi) com UTF-8', () => {
+test('sem VOLUMES: uma etiqueta por item (VOL 1/1), em 800x480 dots (203 dpi) com UTF-8', () => {
   const { zpl, quantidade } = montarEtiquetas(PEDIDO([ITEM(1), ITEM(2), ITEM(3)]));
   assert.equal(quantidade, 3);
   assert.equal((zpl.match(/\^XA/g) || []).length, 3);
@@ -26,7 +26,7 @@ test('uma etiqueta por item, em 800x480 dots (203 dpi) com UTF-8', () => {
 
 test('layout: Pedido, Nome (razão social), Cliente (cliente final) e Qtd do item', () => {
   const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { QTD: '4' })]));
-  assert.deepEqual(unicos(zpl), ['Pedido: 23254', 'Nome: ITAPLAN COMERCIO', 'Cliente: ALEX FABIANO', 'Qtd: 4']);
+  assert.deepEqual(unicos(zpl), ['Pedido: 23254', 'Nome: ITAPLAN COMERCIO', 'Cliente: ALEX FABIANO', 'Qtd: 4', 'VOL 1/1']);
   assert.ok(!zpl.includes('Item '), 'não imprime mais "Item n"');
 });
 
@@ -131,8 +131,8 @@ test('rótulos Nome, Cliente, Qtd e Destino ganham filete ^GB (espessura 3) logo
   }
 });
 
-test('Pedido não tem filete; sem medidas nem destino há exatamente 3 filetes (Nome, Cliente, Qtd)', () => {
-  assert.equal(filetes(montarEtiquetas(PEDIDO([ITEM(1)])).zpl).length, 3);
+test('Pedido não tem filete; sem medidas nem destino há exatamente 4 filetes (Nome, Cliente, Qtd, VOL)', () => {
+  assert.equal(filetes(montarEtiquetas(PEDIDO([ITEM(1)])).zpl).length, 4);
 });
 
 test('medidas ligadas viram "Medidas: ..." entre Cliente e Qtd; vazias não imprimem linha nem rótulo', () => {
@@ -141,18 +141,18 @@ test('medidas ligadas viram "Medidas: ..." entre Cliente e Qtd; vazias não impr
   const y = rotulo => ts.find(t => t.texto.startsWith(rotulo)).y;
   assert.equal(ts.filter(t => t.texto === 'Medidas: 2287 × 706').length, 2);
   assert.ok(y('Cliente:') < y('Medidas:') && y('Medidas:') < y('Qtd:'));
-  assert.equal(filetes(com).length, 4);
+  assert.equal(filetes(com).length, 5);
   for (const MEDIDAS of [undefined, '', '   ']) {
     const sem = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS })])).zpl;
     assert.ok(!sem.includes('Medidas'));
-    assert.equal(filetes(sem).length, 3);
+    assert.equal(filetes(sem).length, 4);
   }
 });
 
-test('destino: "Destino: ES" embaixo à esquerda; UF do item vale mais que a geral; sem UF não imprime nada', () => {
+test('destino: "Destino: ES" embaixo à esquerda em todas as etiquetas; UF por item não existe mais; sem UF não imprime nada', () => {
   const geral = montarEtiquetas(PEDIDO([ITEM(1), ITEM(2, { UF: 'RJ' })], { uf: 'ES' })).zpl;
   assert.ok(blocos(geral)[0].includes('^FDDestino: ES^FS'));
-  assert.ok(blocos(geral)[1].includes('^FDDestino: RJ^FS') && !blocos(geral)[1].includes('Destino: ES'));
+  assert.ok(blocos(geral)[1].includes('^FDDestino: ES^FS') && !geral.includes('Destino: RJ'), 'a UF do item é ignorada');
   const d = todosTextos(blocos(geral)[0]).find(t => t.texto.startsWith('Destino:'));
   assert.equal(d.x, 20);
   assert.ok(d.y + d.h + 5 <= 480, 'filete incluído, cabe na etiqueta');
@@ -160,7 +160,7 @@ test('destino: "Destino: ES" embaixo à esquerda; UF do item vale mais que a ger
 });
 
 test('texto digitado (medidas/UF) também é saneado: nada de ^ ~ \ no ZPL', () => {
-  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS: '12^XZ~DG\\34', UF: 'E^S' })]));
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS: '12^XZ~DG\\34' })], { uf: 'E^S' }));
   assert.ok(zpl.includes('Medidas: 12XZDG34'));
   assert.equal((zpl.match(/\^XZ/g) || []).length, 1);
   assert.ok(!zpl.includes('~DG'));
@@ -193,4 +193,55 @@ test('Qtd longo é truncado e nunca fica vazio', () => {
 test('sem dinheiro', () => {
   const { zpl } = montarEtiquetas(PEDIDO([ITEM(1)]));
   assert.ok(!zpl.includes('R$'));
+});
+
+// ---------- volumes: N etiquetas por item, "VOL i/N" ----------
+const vols = b => textos(b).map(t => t.texto).filter(t => t.startsWith('VOL '));
+
+test('N = 1: uma etiqueta com "VOL 1/1" (padrão único, também sem VOLUMES)', () => {
+  for (const it of [ITEM(1), ITEM(1, { VOLUMES: 1 }), ITEM(1, { VOLUMES: 0 }), ITEM(1, { VOLUMES: 'x' })]) {
+    const { zpl, quantidade } = montarEtiquetas(PEDIDO([it]));
+    assert.equal(quantidade, 1);
+    assert.deepEqual([...new Set(vols(zpl))], ['VOL 1/1']);
+  }
+});
+
+test('N = 3: três etiquetas do mesmo item, VOL 1/3, 2/3 e 3/3 nesta ordem; Qtd = quantidade do item, independente de N', () => {
+  const { zpl, quantidade } = montarEtiquetas(PEDIDO([ITEM(1, { QTD: '5', VOLUMES: 3 })]));
+  assert.equal(quantidade, 3);
+  const bs = blocos(zpl);
+  assert.equal(bs.length, 3);
+  bs.forEach((b, i) => {
+    assert.deepEqual([...new Set(vols(b))], [`VOL ${i + 1}/3`]);
+    assert.ok(b.includes('^FDQtd: 5^FS'), 'Qtd é a do item, não o nº de volumes');
+    assert.ok(!b.includes('Qtd: 3'));
+    assert.ok(b.includes('^FD23254^FS'), 'cada etiqueta tem o código de barras');
+  });
+});
+
+test('vários itens: total = soma dos volumes e a ordem é item a item', () => {
+  const { zpl, quantidade } = montarEtiquetas(PEDIDO([ITEM(1, { QTD: '2', VOLUMES: 2 }), ITEM(2, { QTD: '7' }), ITEM(3, { QTD: '1', VOLUMES: 3 })]));
+  assert.equal(quantidade, 6);
+  const bs = blocos(zpl);
+  assert.deepEqual(bs.map(b => [...new Set(vols(b))][0]), ['VOL 1/2', 'VOL 2/2', 'VOL 1/1', 'VOL 1/3', 'VOL 2/3', 'VOL 3/3']);
+  assert.deepEqual(bs.map(b => /\^FDQtd: (\d+)\^FS/.exec(b)[1]), ['2', '2', '7', '1', '1', '1']);
+});
+
+test('"VOL i/N": negrito (duas passadas), rótulo "VOL" sublinhado, acima do código de barras e sem tocar em Qtd/Medidas', () => {
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS: '2287 × 706', VOLUMES: 999 })], { uf: 'ES' }));
+  const b = blocos(zpl)[998];
+  const v = todosTextos(b).filter(t => t.texto === 'VOL 999/999');
+  assert.equal(v.length, 2);
+  assert.equal(v[1].x - v[0].x, 2);
+  const { x, y, h, texto } = v[0];
+  assert.ok(h >= 36, 'fonte grande');
+  assert.ok(x + texto.length * 0.6 * h <= 780, 'cabe na largura');
+  const f = filetes(b).find(q => q.x === x && q.y === y + h + 2);
+  assert.ok(f && f.w < texto.length * 0.6 * h, 'filete só sob "VOL"');
+  const barra = /\^FO(\d+),(\d+)\^BY/.exec(b);
+  assert.ok(f.y + 3 <= +barra[2], 'filete termina antes do código de barras');
+  const med = todosTextos(b).find(t => t.texto.startsWith('Medidas:'));
+  assert.ok(y >= med.y + med.h, 'abaixo de Medidas');
+  const qtd = todosTextos(b).find(t => t.texto.startsWith('Qtd:'));
+  assert.ok(qtd.x + qtd.texto.length * 0.6 * qtd.h <= x, 'não toca em Qtd');
 });

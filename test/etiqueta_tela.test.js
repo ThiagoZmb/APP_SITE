@@ -99,7 +99,7 @@ test('404 da API mostra a mensagem do servidor e não abre a janela', async () =
   assert.equal(t.document.body.filhos.length, 0);
 });
 
-test('abre a janela acessível com um cartão por item: volumes = QTD do item, medidas desligadas com a sugestão pronta, UF geral = a do cliente', async () => {
+test('abre a janela acessível com um cartão por item: etiquetas (volumes) = QTD do item, medidas desligadas com a sugestão pronta, UF geral = a do cliente, sem estado por item', async () => {
   const t = cenario();
   const fim = t.imprimir();
   const j = await t.esperarJanela();
@@ -120,7 +120,11 @@ test('abre a janela acessível com um cartão por item: volumes = QTD do item, m
   assert.equal(t.porId('ez-med-1').value, '2287 × 706');
   assert.equal(t.porId('ez-med-1').disabled, true);
   assert.equal(t.porId('ez-med-2').value, '', 'sem sugestão: vazio, nada inventado');
-  assert.equal(t.porId('ez-uf-1').value, '');
+  assert.equal(t.porId('ez-uf-1'), null, 'não há mais estado por item');
+  const rotulos = []; achar(t.janela(), n => { if (n.tag === 'label') rotulos.push(n.textContent); return false; });
+  assert.ok(rotulos.includes('Qtd de etiquetas (volumes)') && !rotulos.some(x => /Estado deste item|Qtd de volumes/.test(x)));
+  assert.ok(achar(t.janela(), n => n.className === 'ez-ajuda' && n.textContent === 'N etiquetas: VOL 1/N … VOL N/N'));
+  assert.match(t.janela().children[0].children[1].textContent, /Pedido nº 23425 · 4 etiqueta\(s\) vão sair/, 'resumo = 2 + 2');
   assert.equal(t.document.activeElement, t.porId('ez-qtd-1'), 'foco no primeiro campo');
   assert.ok(!t.chamadas.some(c => c.metodo === 'POST'), 'nada foi enviado ainda');
   t.tecla('Escape');
@@ -161,17 +165,18 @@ test('ligar "Incluir medidas" habilita o campo; Imprimir envia ao servidor os aj
   await t.esperarJanela();
   t.porId('ez-uf-geral').value = 'RJ';
   t.porId('ez-qtd-1').value = '5';
+  t.emitir(t.porId('ez-qtd-1'), 'input');
+  assert.match(t.janela().children[0].children[1].textContent, /7 etiqueta\(s\) vão sair/, 'resumo atualiza ao digitar (5 + 2)');
   const liga = t.porId('ez-inc-1'); liga.checked = true; t.emitir(liga, 'change');
   assert.equal(t.porId('ez-med-1').disabled, false);
   t.porId('ez-med-1').value = '2287 x 700';
-  t.porId('ez-uf-2').value = 'SP';
   t.emitir(t.botao('Imprimir'), 'click');
   await fim;
   const post = t.chamadas.find(c => c.metodo === 'POST' && c.url === 'https://api/etiquetas/pedido/23425');
   assert.equal(post.auth, 'Bearer tk');
   assert.deepEqual(JSON.parse(post.corpo), { uf: 'RJ', itens: [
-    { item: '1', qtd: 5, incluirMedidas: true, medidas: '2287 x 700', uf: '' },
-    { item: '2', qtd: 2, incluirMedidas: false, medidas: '', uf: 'SP' }] });
+    { item: '1', qtd: 5, incluirMedidas: true, medidas: '2287 x 700' },
+    { item: '2', qtd: 2, incluirMedidas: false, medidas: '' }] });
   const envio = t.chamadas.find(c => c.url === 'http://127.0.0.1:3917/etiqueta');
   assert.deepEqual(JSON.parse(envio.corpo), { zpl: '^XA^XZ' }, 'o serviço local só recebe o ZPL montado pelo servidor');
   assert.ok(t.chamadas.indexOf(post) < t.chamadas.indexOf(envio));
@@ -212,7 +217,7 @@ test('quantidade fora de 1 a 999 (ou não inteira) bloqueia o envio e mostra o e
     t.emitir(t.botao('Imprimir'), 'click');
     const erro = achar(t.janela(), n => n.className === 'ez-erro');
     assert.equal(erro.hidden, false, ruim);
-    assert.match(erro.textContent, /Item 2: a quantidade de volumes deve ser um número inteiro de 1 a 999/);
+    assert.match(erro.textContent, /Item 2: a quantidade de etiquetas \(volumes\) deve ser um número inteiro de 1 a 999/);
     assert.equal(t.document.activeElement, t.porId('ez-qtd-2'));
   }
   assert.ok(!t.chamadas.some(c => c.metodo === 'POST'));
@@ -250,11 +255,34 @@ test('erro do serviço local na impressão é mostrado dentro da janela', async 
 test('visual: janela sem estilo inline nem innerHTML, reaproveita dp-* e os ez-* existem no tema.css (versão do tema igual em todas as páginas)', () => {
   assert.ok(!/\.style\b|style=|innerHTML|#[0-9a-fA-F]{3,6}\b|rgba?\(/.test(modulo), 'sem estilo nem cor solta no JS');
   const css = ler('tema.css');
-  for (const cls of ['dp-fundo', 'dp-caixa', 'ez-caixa', 'ez-lista', 'ez-item', 'ez-campos', 'ez-campo', 'ez-liga', 'ez-erro', 'ez-geral']) assert.match(css, new RegExp('\\.' + cls + '\\b'), cls);
+  for (const cls of ['dp-fundo', 'dp-caixa', 'ez-caixa', 'ez-lista', 'ez-item', 'ez-campos', 'ez-campo', 'ez-liga', 'ez-erro', 'ez-geral', 'ez-ajuda']) assert.match(css, new RegExp('\\.' + cls + '\\b'), cls);
   const bloco = css.slice(css.indexOf('janela "Imprimir etiquetas (Zebra)"'));
   assert.ok(!/#[0-9a-fA-F]{3,6}\b|rgba?\(/.test(bloco), 'só variáveis do tema');
   const htmls = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html'));
   const temas = new Set(htmls.flatMap(f => [...ler(f).matchAll(/tema\.css\?v=(\d+)/g)].map(m => m[1])));
   assert.equal(temas.size, 1);
-  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202611201200/, f);
+  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202611201300/, f);
+});
+
+test('total acima de 200 etiquetas bloqueia o envio na própria janela, dizendo o total e o limite', async () => {
+  const t = cenario();
+  const fim = t.imprimir();
+  await t.esperarJanela();
+  t.porId('ez-qtd-1').value = '150'; t.emitir(t.porId('ez-qtd-1'), 'input');
+  t.porId('ez-qtd-2').value = '51'; t.emitir(t.porId('ez-qtd-2'), 'input');
+  assert.match(t.janela().children[0].children[1].textContent, /201 etiqueta\(s\) vão sair \(limite 200\)/);
+  t.emitir(t.botao('Imprimir'), 'click');
+  assert.match(achar(t.janela(), n => n.className === 'ez-erro').textContent, /Total de 201 etiquetas passa do limite de 200/);
+  assert.ok(!t.chamadas.some(c => c.metodo === 'POST'));
+  t.tecla('Escape');
+  await fim;
+});
+
+test('o alerta de sucesso diz o total de etiquetas enviadas', async () => {
+  const t = cenario({ post: { status: 200, corpo: { zpl: '^XA^XZ', quantidade: 3 } } });
+  const fim = t.imprimir();
+  await t.esperarJanela();
+  t.emitir(t.botao('Imprimir'), 'click');
+  await fim;
+  assert.match(t.avisos[0], /^3 etiqueta\(s\) enviada\(s\) para ZDesigner ZD220 \(porta USB001\)\.$/);
 });

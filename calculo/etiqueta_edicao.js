@@ -1,4 +1,4 @@
-// Edição de última hora das etiquetas da Zebra (volumes, medidas e estado de destino). Funções puras, sem banco.
+// Edição de última hora das etiquetas da Zebra (volumes = nº de etiquetas por item, medidas e estado de destino geral). Funções puras, sem banco.
 // Os ajustes valem só para a impressão em curso: nada disso é gravado. O servidor valida aqui e monta o ZPL em
 // calculo/etiqueta_zpl.js; o texto digitado na tela nunca vai direto para a impressora.
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
@@ -6,6 +6,7 @@ const QTD_MIN = 1;
 const QTD_MAX = 999;
 const MEDIDAS_MAX = 30;
 const MAX_ITENS = 500;
+const MAX_ETIQUETAS = 200; // teto de segurança: total de etiquetas (soma dos volumes de todos os itens) por impressão
 
 const ehObjeto = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const vazio = v => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -37,10 +38,11 @@ function normalizarMedidas(v) {
   return t;
 }
 
-// corpo = { itens: [{ item, qtd, medidas, incluirMedidas, uf }], uf }; itensDoPedido = ['1','2',...]
-// -> { ok: true, uf, porItem: Map(item -> { qtd?, medidas, uf }) } | { ok: false, erro }
+// corpo = { itens: [{ item, qtd (volumes), medidas, incluirMedidas }], uf (estado de destino geral) }; itensDoPedido = ['1','2',...]
+// Item sem qtd = 1 volume. Um "uf" por item (formato antigo) é ignorado em silêncio: só vale o estado geral.
+// -> { ok: true, uf, porItem: Map(item -> { qtd?, medidas }), total } | { ok: false, erro }   (total = nº de etiquetas)
 function validarEdicao(corpo, itensDoPedido) {
-  if (corpo === undefined || corpo === null) return { ok: true, uf: '', porItem: new Map() };
+  if (corpo === undefined || corpo === null) return { ok: true, uf: '', porItem: new Map(), total: (itensDoPedido || []).length };
   if (!ehObjeto(corpo)) return { ok: false, erro: 'Corpo inválido: envie um objeto com "itens" e "uf".' };
   const uf = normalizarUf(corpo.uf);
   if (uf === null) return { ok: false, erro: 'Estado de destino inválido: use a sigla de uma das 27 UFs (ex.: ES, RJ, SP).' };
@@ -54,9 +56,7 @@ function validarEdicao(corpo, itensDoPedido) {
     if (!id || !validos.has(id)) return { ok: false, erro: `O item ${id || '(vazio)'} não existe neste pedido.` };
     if (porItem.has(id)) return { ok: false, erro: `O item ${id} veio repetido.` };
     const qtd = normalizarQtd(e.qtd);
-    if (qtd === null) return { ok: false, erro: `Qtd de volumes do item ${id} inválida: informe um número inteiro de ${QTD_MIN} a ${QTD_MAX}.` };
-    const itemUf = normalizarUf(e.uf);
-    if (itemUf === null) return { ok: false, erro: `Estado de destino do item ${id} inválido: use a sigla de uma das 27 UFs.` };
+    if (qtd === null) return { ok: false, erro: `Qtd de etiquetas (volumes) do item ${id} inválida: informe um número inteiro de ${QTD_MIN} a ${QTD_MAX}.` };
     if (e.incluirMedidas !== undefined && typeof e.incluirMedidas !== 'boolean') return { ok: false, erro: `"incluirMedidas" do item ${id} deve ser verdadeiro ou falso.` };
     let medidas = '';
     if (e.incluirMedidas === true) {
@@ -64,9 +64,12 @@ function validarEdicao(corpo, itensDoPedido) {
       if (m === null) return { ok: false, erro: `Medidas do item ${id} inválidas: até ${MEDIDAS_MAX} caracteres, só números, x, ×, ponto, vírgula, espaço, hífen e mm.` };
       medidas = m;
     }
-    porItem.set(id, { qtd, medidas, uf: itemUf });
+    porItem.set(id, { qtd, medidas });
   }
-  return { ok: true, uf, porItem };
+  let total = 0;
+  for (const id of validos) total += porItem.get(id)?.qtd ?? 1;
+  if (total > MAX_ETIQUETAS) return { ok: false, erro: `Total de ${total} etiquetas passa do limite de ${MAX_ETIQUETAS} por impressão: reduza a quantidade de volumes dos itens.` };
+  return { ok: true, uf, porItem, total };
 }
 
 // medida legível: número positivo de até 5 dígitos inteiros, com no máximo 2 decimais (vírgula ou ponto); o resto não é sugerido
@@ -89,4 +92,4 @@ function sugerirMedidas(linhas) {
   return distintas.size === 1 ? [...distintas][0] : '';
 }
 
-module.exports = { UFS, QTD_MIN, QTD_MAX, MEDIDAS_MAX, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, sugerirMedidas };
+module.exports = { UFS, QTD_MIN, QTD_MAX, MAX_ETIQUETAS, MEDIDAS_MAX, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, sugerirMedidas };

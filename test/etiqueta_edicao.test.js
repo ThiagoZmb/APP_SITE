@@ -1,7 +1,7 @@
 // Validação PURA dos ajustes da janela de etiquetas (calculo/etiqueta_edicao.js). Sem banco.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { UFS, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, sugerirMedidas } = require('../calculo/etiqueta_edicao');
+const { UFS, MAX_ETIQUETAS, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, sugerirMedidas } = require('../calculo/etiqueta_edicao');
 
 const ITENS = ['1', '2'];
 const erro = corpo => { const v = validarEdicao(corpo, ITENS); assert.equal(v.ok, false, JSON.stringify(corpo)); return v.erro; };
@@ -36,13 +36,15 @@ test('medidas: só dígitos, x, X, ×, ponto, vírgula, espaço, hífen e mm; at
   assert.equal(normalizarMedidas('1'.repeat(30)), '1'.repeat(30));
 });
 
-test('validarEdicao: sem corpo = padrões; devolve UF geral e ajustes por item', () => {
+test('validarEdicao: sem corpo = padrões; devolve UF geral, ajustes por item e o total de etiquetas', () => {
   for (const c of [undefined, null]) { const v = validarEdicao(c, ITENS); assert.ok(v.ok); assert.equal(v.uf, ''); assert.equal(v.porItem.size, 0); }
+  assert.equal(validarEdicao(undefined, ITENS).total, 2);
   const v = validarEdicao({ uf: 'es', itens: [{ item: 1, qtd: '3', incluirMedidas: true, medidas: '2287 × 706', uf: 'rj' }, { item: '2' }] }, ITENS);
+  assert.equal(v.total, 4, '3 volumes + 1 (padrão)');
   assert.ok(v.ok);
   assert.equal(v.uf, 'ES');
-  assert.deepEqual(v.porItem.get('1'), { qtd: 3, medidas: '2287 × 706', uf: 'RJ' });
-  assert.deepEqual(v.porItem.get('2'), { qtd: undefined, medidas: '', uf: '' });
+  assert.deepEqual(v.porItem.get('1'), { qtd: 3, medidas: '2287 × 706' });
+  assert.deepEqual(v.porItem.get('2'), { qtd: undefined, medidas: '' });
 });
 
 test('validarEdicao: medidas só valem com "incluirMedidas: true" (desligadas são ignoradas, mesmo com texto)', () => {
@@ -64,8 +66,7 @@ test('validarEdicao: mensagens claras de 400', () => {
   assert.match(erro({ itens: [{ item: '7' }] }), /item 7 não existe/);
   assert.match(erro({ itens: [{}] }), /não existe/);
   assert.match(erro({ itens: [{ item: '1' }, { item: 1 }] }), /repetido/);
-  assert.match(erro({ itens: [{ item: '1', qtd: 1000 }] }), /Qtd de volumes do item 1.*1 a 999/);
-  assert.match(erro({ itens: [{ item: '1', uf: 'ZZ' }] }), /Estado de destino do item 1/);
+  assert.match(erro({ itens: [{ item: '1', qtd: 1000 }] }), /Qtd de etiquetas \(volumes\) do item 1.*1 a 999/);
   assert.match(erro({ itens: [{ item: '1', incluirMedidas: 'sim' }] }), /incluirMedidas/);
   assert.match(erro({ itens: [{ item: '2', incluirMedidas: true, medidas: '^XZ' }] }), /Medidas do item 2.*30 caracteres/);
   assert.match(erro({ itens: Array.from({ length: 501 }, (_, i) => ({ item: String(i) })) }), /até 500/);
@@ -79,4 +80,20 @@ test('sugerirMedidas: ALTURA × LARGURA quando legível e igual em todas as folh
   for (const linhas of [undefined, [], [{ ALTURA: '', LARGURA: '706' }], [{ ALTURA: null, LARGURA: null }], [{ ALTURA: '0', LARGURA: '5' }], [{ ALTURA: 'abc', LARGURA: '5' }], [{ ALTURA: '2287', LARGURA: '7x' }]]) assert.equal(sugerirMedidas(linhas), '');
   // a sugestão sempre passa na própria validação
   assert.equal(normalizarMedidas(sugerirMedidas([{ ALTURA: '2287', LARGURA: '706' }])), '2287 × 706');
+});
+
+test('UF por item (formato antigo) é ignorada sem erro, mesmo inválida; só vale a UF geral', () => {
+  const v = validarEdicao({ uf: 'ES', itens: [{ item: '1', uf: 'ZZ' }] }, ITENS);
+  assert.ok(v.ok);
+  assert.equal(v.uf, 'ES');
+  assert.ok(!('uf' in v.porItem.get('1')));
+});
+
+test('teto de etiquetas: soma dos volumes de todos os itens até 200; acima disso é recusado com mensagem clara', () => {
+  assert.equal(MAX_ETIQUETAS, 200);
+  const ok = validarEdicao({ itens: [{ item: '1', qtd: 199 }] }, ITENS); // 199 + 1 (item 2, padrão) = 200
+  assert.ok(ok.ok);
+  assert.equal(ok.total, 200);
+  assert.match(erro({ itens: [{ item: '1', qtd: 100 }, { item: '2', qtd: 101 }] }), /Total de 201 etiquetas passa do limite de 200/);
+  assert.match(erro({ itens: [{ item: '1', qtd: 999 }] }), /limite de 200/);
 });

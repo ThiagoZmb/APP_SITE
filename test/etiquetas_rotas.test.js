@@ -13,8 +13,8 @@ aceitarSidDeTeste(sessoes);
 
 const PERFIS = { 'Produção': ['pedidos.pdf'], 'Sem acesso': ['pedidos.ver'] };
 
-function banco({ existe = true, itens = 2, estadoCliente = 'SP' } = {}) {
-  const lista = Array.from({ length: itens }, (_, i) => ({ ITEM: String(i + 1), QTD: '1', TIPO_PRODUTO: 'Porta de giro', DESCRICAO: 'Porta ' + (i + 1), UNITARIO: '100', TOTAL: '100' }));
+function banco({ existe = true, itens = 2, estadoCliente = 'SP', qtdItem = '1' } = {}) {
+  const lista = Array.from({ length: itens }, (_, i) => ({ ITEM: String(i + 1), QTD: qtdItem, TIPO_PRODUTO: 'Porta de giro', DESCRICAO: 'Porta ' + (i + 1), UNITARIO: '100', TOTAL: '100' }));
   const regras = [
     [/FROM ped_orc_lista_itens/, () => lista],
     [/FROM ped_orc_itens_v4/, () => lista.map(l => ({ ITEM_PEDIDO: l.ITEM, ALTURA: '2100', LARGURA: '900', PERFIL: 'Perfil 30' }))],
@@ -87,10 +87,10 @@ test('etiquetas: número não numérico é 400', async t => {
 // ---------- janela de ajustes: GET .../itens e POST ----------
 const textosZpl = zpl => [...new Set([...zpl.matchAll(/\^FD([^^]*)\^FS/g)].map(m => m[1]))];
 
-test('etiquetas: GET padrão não muda (sem Medidas, sem Destino, Qtd do item)', async t => {
+test('etiquetas: GET padrão: 1 etiqueta por item, sem Medidas nem Destino, Qtd do item e VOL 1/1', async t => {
   const { chamar } = await preparar(t, { itens: 1 });
   const j = await (await chamar('/etiquetas/pedido/23425')).json();
-  assert.deepEqual(textosZpl(j.zpl).filter(x => !/^[0-9A-F]{40,}/.test(x)), ['Pedido: 23425', 'Nome: Fulano Ação Ltda', 'Cliente: Beltrano', 'Qtd: 1', '23425']);
+  assert.deepEqual(textosZpl(j.zpl).filter(x => !/^[0-9A-F]{40,}/.test(x)), ['Pedido: 23425', 'Nome: Fulano Ação Ltda', 'Cliente: Beltrano', 'Qtd: 1', 'VOL 1/1', '23425']);
   assert.ok(!j.zpl.includes('Medidas') && !j.zpl.includes('Destino'));
 });
 
@@ -109,36 +109,66 @@ test('etiquetas: UF do cadastro que não é sigla de UF não vira sugestão', as
   assert.equal((await (await chamar('/etiquetas/pedido/23425/itens')).json()).ufSugerida, '');
 });
 
-test('etiquetas: POST aplica volumes, medidas ligadas, UF geral e UF do item', async t => {
+const blocosZpl = zpl => zpl.split('^XZ').filter(b => b.includes('^XA'));
+const volDe = b => /\^FDVOL (\d+\/\d+)\^FS/.exec(b)[1];
+
+test('etiquetas: POST gera N etiquetas por item (qtd = volumes), medidas ligadas e UF geral; Qtd = quantidade do item; UF por item é ignorada', async t => {
   const { postar } = await preparar(t, { itens: 2 });
   const r = await postar('/etiquetas/pedido/23425', { uf: 'ES', itens: [
     { item: '1', qtd: 5, incluirMedidas: true, medidas: '2287 × 706' },
     { item: 2, qtd: '12', incluirMedidas: false, medidas: '999 x 999', uf: 'rj' }] });
   assert.equal(r.status, 200);
   const j = await r.json();
-  assert.equal(j.quantidade, 2);
-  const [e1, e2] = j.zpl.split('^XZ').filter(b => b.includes('^XA'));
-  assert.deepEqual(textosZpl(e1).filter(x => /^(Qtd|Medidas|Destino)/.test(x)), ['Medidas: 2287 × 706', 'Qtd: 5', 'Destino: ES']);
-  assert.deepEqual(textosZpl(e2).filter(x => /^(Qtd|Medidas|Destino)/.test(x)), ['Qtd: 12', 'Destino: RJ']);
+  assert.equal(j.quantidade, 17);
+  const bs = blocosZpl(j.zpl);
+  assert.equal(bs.length, 17);
+  assert.deepEqual(bs.slice(0, 5).map(volDe), ['1/5', '2/5', '3/5', '4/5', '5/5']);
+  assert.deepEqual(bs.slice(5).map(volDe), Array.from({ length: 12 }, (_, i) => `${i + 1}/12`));
+  for (const b of bs.slice(0, 5)) assert.deepEqual(textosZpl(b).filter(x => /^(Qtd|Medidas|Destino)/.test(x)), ['Medidas: 2287 × 706', 'Qtd: 1', 'Destino: ES']);
+  for (const b of bs.slice(5)) assert.deepEqual(textosZpl(b).filter(x => /^(Qtd|Medidas|Destino)/.test(x)), ['Qtd: 1', 'Destino: ES']);
   assert.ok(!j.zpl.includes('999 x 999'), 'medidas desligadas não saem');
+  assert.ok(!j.zpl.includes('Destino: RJ'), 'a UF por item não vale mais');
 });
 
-test('etiquetas: POST sem corpo usa os padrões; itens não listados usam o padrão', async t => {
+test('etiquetas: "Qtd:" mostra a quantidade do item do pedido, não o nº de volumes', async t => {
+  const { postar } = await preparar(t, { itens: 1, qtdItem: '4' });
+  const j = await (await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', qtd: 3 }] })).json();
+  assert.equal(j.quantidade, 3);
+  for (const [i, b] of blocosZpl(j.zpl).entries()) {
+    assert.ok(textosZpl(b).includes('Qtd: 4'));
+    assert.equal(volDe(b), `${i + 1}/3`);
+  }
+});
+
+test('etiquetas: POST sem corpo = 1 etiqueta por item (VOL 1/1); item não listado também; N=1 explícito idem', async t => {
   const { postar } = await preparar(t, { itens: 2 });
   const j = await (await postar('/etiquetas/pedido/23425', {})).json();
   assert.equal(j.quantidade, 2);
   assert.ok(!j.zpl.includes('Destino') && !j.zpl.includes('Medidas'));
+  assert.deepEqual(blocosZpl(j.zpl).map(volDe), ['1/1', '1/1']);
   const k = await (await postar('/etiquetas/pedido/23425', { itens: [{ item: '2', qtd: 9 }] })).json();
-  const [e1, e2] = k.zpl.split('^XZ').filter(b => b.includes('^XA'));
-  assert.ok(e1.includes('Qtd: 1') && e2.includes('Qtd: 9'));
+  assert.equal(k.quantidade, 10);
+  assert.deepEqual(blocosZpl(k.zpl).map(volDe), ['1/1', ...Array.from({ length: 9 }, (_, i) => `${i + 1}/9`)]);
+  const u = await (await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', qtd: 1 }] })).json();
+  assert.equal(u.quantidade, 2);
+});
+
+test('etiquetas: teto de 200 etiquetas por requisição (soma dos itens): 200 passa, 201 é 400 com mensagem clara', async t => {
+  const { postar } = await preparar(t, { itens: 2 });
+  const ok = await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', qtd: 100 }, { item: '2', qtd: 100 }] });
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).quantidade, 200);
+  const r = await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', qtd: 100 }, { item: '2', qtd: 101 }] });
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /Total de 201 etiquetas passa do limite de 200/);
 });
 
 test('etiquetas: POST recusa com 400 e mensagem clara: qtd, UF, medidas, item e tipos', async t => {
   const { postar } = await preparar(t, { itens: 1 });
   const casos = [
-    [{ itens: [{ item: '1', qtd: 0 }] }, /Qtd de volumes/], [{ itens: [{ item: '1', qtd: 1000 }] }, /Qtd de volumes/],
-    [{ itens: [{ item: '1', qtd: 1.5 }] }, /Qtd de volumes/], [{ itens: [{ item: '1', qtd: 'abc' }] }, /Qtd de volumes/],
-    [{ uf: 'XX' }, /Estado de destino/], [{ uf: 'Espírito' }, /Estado de destino/], [{ itens: [{ item: '1', uf: 'ZZ' }] }, /Estado de destino do item 1/],
+    [{ itens: [{ item: '1', qtd: 0 }] }, /Qtd de etiquetas \(volumes\)/], [{ itens: [{ item: '1', qtd: 1000 }] }, /Qtd de etiquetas \(volumes\)/],
+    [{ itens: [{ item: '1', qtd: 1.5 }] }, /Qtd de etiquetas \(volumes\)/], [{ itens: [{ item: '1', qtd: 'abc' }] }, /Qtd de etiquetas \(volumes\)/],
+    [{ uf: 'XX' }, /Estado de destino/], [{ uf: 'Espírito' }, /Estado de destino/],
     [{ itens: [{ item: '1', incluirMedidas: true, medidas: '10; DROP' }] }, /Medidas do item 1/],
     [{ itens: [{ item: '1', incluirMedidas: true, medidas: '^FO10 x 20' }] }, /Medidas do item 1/],
     [{ itens: [{ item: '1', incluirMedidas: true, medidas: '1'.repeat(31) }] }, /Medidas do item 1/],

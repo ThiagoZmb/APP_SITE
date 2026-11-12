@@ -911,6 +911,7 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .ez-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ez-campo > label, .ez-campo > .ez-rotulo { font-size: 12px; font-weight: 700; color: var(--text-mid); }
 .ez-campo input[type="number"], .ez-campo input[type="text"], .ez-campo select { width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font: inherit; color-scheme: dark; }
+.ez-ajuda { font-size: 12px; line-height: 1.3; color: var(--text-light); }
 .ez-campo input:focus-visible, .ez-campo select:focus-visible, .ez-liga input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
 .ez-campo input:disabled { opacity: .5; cursor: not-allowed; }
 .ez-liga { display: flex; align-items: center; gap: 8px; min-height: 24px; font-size: 12.5px; color: var(--text-mid); cursor: pointer; }

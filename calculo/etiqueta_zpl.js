@@ -1,8 +1,8 @@
 // Etiqueta de pedido/produção para a Zebra (ZPL), 100 x 60 mm a 203 dpi (8 dots/mm = 800 x 480 dots). Função pura, sem banco.
-// Uma etiqueta por item do Pedido. Nenhum campo de dinheiro. Todo texto do banco ou digitado passa por sanearZpl: ^, ~ e \ são
+// N etiquetas por item do Pedido (N = volumes, 1 a 999), cada uma com "VOL i/N" (sempre, também "VOL 1/1"). Nenhum campo de dinheiro. Todo texto do banco ou digitado passa por sanearZpl: ^, ~ e \ são
 // caracteres de comando do ZPL, então o conteúdo do pedido nunca pode chegar à impressora com eles.
-// Layout (2026-11-12): logo + "Pedido: N", "Nome: razão social", "Cliente: cliente final", [Medidas: ...], "Qtd: n", [Destino: UF]
-// e o código de barras do nº do pedido. Nome, Cliente e Medidas SEMPRE numa linha só (fonte menor até 36; depois trunca com "...").
+// Layout (2026-11-12): logo + "Pedido: N", "Nome: razão social", "Cliente: cliente final", [Medidas: ...], "Qtd: n" (QTD do item),
+// [Destino: UF], "VOL i/N" (x 520, y 324, acima do código de barras) e o código de barras do nº do pedido. Nome, Cliente e Medidas SEMPRE numa linha só (fonte menor até 36; depois trunca com "...").
 // Os rótulos "Nome:", "Cliente:", "Qtd:", "Medidas:" e "Destino:" saem sublinhados (ZPL não tem sublinhado de fonte: um filete ^GB
 // logo abaixo do rótulo). Campos vazios (medidas, destino) não imprimem linha nem rótulo.
 const LOGO = require('./etiqueta_logo'); // bitmap 1-bit gerado por calculo/gerar_logo_zpl.js
@@ -13,7 +13,9 @@ const MARGEM = 20;
 const AVANCO = 0.6;        // largura média de um caractere da fonte 0 em negrito = AVANCO x altura (estimativa conservadora)
 const AVANCO_ROTULO = 0.55; // idem para o comprimento do filete do rótulo (um pouco menor, para não passar muito do ":")
 const MIN_FONTE = 36;      // menor altura de Nome/Cliente/Medidas; abaixo disso trunca com "..."
-const Y = { nome: 120, cliente: 200, medidas: 278, qtd: 348, destino: 424 };
+const Y = { nome: 120, cliente: 200, medidas: 278, qtd: 348, destino: 424, vol: 324 };
+const MAX_VOLUMES = 999;
+const X_VOL = 520; // "VOL i/N": à direita de Qtd (até x 350), abaixo de Medidas (y 278 + 44) e acima do código de barras (y 368)
 
 // remove ^ ~ \ e troca caracteres de controle por espaço
 function sanearZpl(texto) {
@@ -65,9 +67,14 @@ const logo = () => [
   `^FO22,20^GFA,${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha},${LOGO.hex}^FS`
 ].join('\n');
 
+// volumes válidos: inteiro 1 a 999; qualquer outra coisa = 1
+const volumesDe = v => { const n = Number(v); return Number.isInteger(n) && n >= 1 && n <= MAX_VOLUMES ? n : 1; };
+
 // dados = { numero, cliente (razão social), clienteFinal, uf (destino geral, opcional),
-//           itens: [{ ITEM, QTD, MEDIDAS (opcional), UF (opcional, vale mais que a geral) }] }  →  { zpl, quantidade }
-// QTD, MEDIDAS e UF já vêm validados pela rota (calculo/etiqueta_edicao.js); mesmo assim tudo passa por sanearZpl.
+//           itens: [{ ITEM, QTD (quantidade do item, impressa em "Qtd:"), MEDIDAS (opcional), VOLUMES (N etiquetas; padrão 1) }] }
+//   →  { zpl, quantidade } (quantidade = TOTAL de etiquetas = soma dos volumes)
+// Cada item gera VOLUMES blocos ^XA...^XZ, com "VOL 1/N" ... "VOL N/N". MEDIDAS e VOLUMES já vêm validados pela rota
+// (calculo/etiqueta_edicao.js); mesmo assim tudo passa por sanearZpl.
 function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
   const lista = itens || [];
   const num = String(numero ?? '').replace(/\D/g, '');
@@ -75,11 +82,13 @@ function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
   const final = limpar(clienteFinal).slice(0, MAX_TEXTO) || '—';
   const util = LARGURA - 2 * MARGEM;
   const ALTURAS_NOME = [60, 52, 44, MIN_FONTE];
-  const blocos = lista.map(it => {
+  const destino = limpar(uf).slice(0, 2).toUpperCase();
+  const blocos = [];
+  for (const it of lista) {
     const qtd = limpar(it.QTD).slice(0, MAX_QTD) || '1';
     const medidas = limpar(it.MEDIDAS).slice(0, 30);
-    const destino = limpar(it.UF || uf).slice(0, 2).toUpperCase();
-    return [
+    const n = volumesDe(it.VOLUMES);
+    for (let i = 1; i <= n; i++) blocos.push([
       '^XA^CI28^PW800^LL480',
       logo(),
       linha(272, 30, '', `Pedido: ${num}`, LARGURA - 272 - MARGEM, [64, 56, 48, 40, 32]),
@@ -88,11 +97,12 @@ function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
       medidas ? linha(MARGEM, Y.medidas, 'Medidas:', medidas, util, [44, 40, MIN_FONTE]) : '',
       linha(MARGEM, Y.qtd, 'Qtd:', qtd, 330, [56, 48, 40, 32]),
       destino ? linha(MARGEM, Y.destino, 'Destino:', destino, 330, [40]) : '',
+      linha(X_VOL, Y.vol, 'VOL', `${i}/${n}`, LARGURA - X_VOL - MARGEM, [38]),
       codigoDeBarras(num),
       '^XZ'
-    ].filter(Boolean).join('\n');
-  });
-  return { zpl: blocos.join('\n'), quantidade: lista.length };
+    ].filter(Boolean).join('\n'));
+  }
+  return { zpl: blocos.join('\n'), quantidade: blocos.length };
 }
 
 module.exports = { sanearZpl, montarEtiquetas };
