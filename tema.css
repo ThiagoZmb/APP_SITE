@@ -897,3 +897,24 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
    Quando um atalho (chip) filtra uma lista, a lista mostra esta faixa com o que está valendo e o botão "Limpar filtro". */
 .filtro-ativo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 8px 12px; border: 1px solid var(--primary-ring); background: var(--primary-light); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--text-dark); }
 .filtro-ativo[hidden] { display: none; }
+
+/* janela "Imprimir etiquetas (Zebra)" (etiqueta_zebra.js): reaproveita dp-fundo/dp-caixa/dp-titulo/dp-sub/dp-acoes/dp-btn; só o que é próprio dela.
+   Uma ficha por item (volumes, medidas, estado); lista com rolagem própria, só os botões ficam sempre à vista. Nada é gravado: vale só para esta impressão. */
+.ez-caixa { max-width: 640px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.ez-geral { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+.ez-geral .ez-campo { flex: 0 1 260px; }
+.ez-lista { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px 4px 2px 0; }
+.ez-item { padding: 12px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius); }
+.ez-item-titulo { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--text-dark); overflow-wrap: anywhere; }
+.ez-item-titulo small { display: block; margin-top: 2px; font-weight: 500; color: var(--text-light); }
+.ez-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.ez-campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ez-campo > label, .ez-campo > .ez-rotulo { font-size: 12px; font-weight: 700; color: var(--text-mid); }
+.ez-campo input[type="number"], .ez-campo input[type="text"], .ez-campo select { width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font: inherit; color-scheme: dark; }
+.ez-campo input:focus-visible, .ez-campo select:focus-visible, .ez-liga input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
+.ez-campo input:disabled { opacity: .5; cursor: not-allowed; }
+.ez-liga { display: flex; align-items: center; gap: 8px; min-height: 24px; font-size: 12.5px; color: var(--text-mid); cursor: pointer; }
+.ez-liga input { flex: none; accent-color: var(--primary-color); }
+.ez-erro { margin: 10px 0 0; font-size: 13px; line-height: 1.4; color: var(--danger-color); }
+.ez-erro[hidden] { display: none; }
+@media (max-width: 520px) { .ez-campos { grid-template-columns: 1fr; } .ez-geral .ez-campo { flex-basis: 100%; } }

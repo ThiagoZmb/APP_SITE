@@ -87,20 +87,93 @@ test('cliente final vazio ou ausente vira —', () => {
   }
 });
 
-test('nome curto cabe numa linha; nome longo quebra em até 2 linhas menores; enorme é truncado com …', () => {
-  const curto = textos(montarEtiquetas(PEDIDO([ITEM(1)])).zpl).filter(t => t.texto.startsWith('Nome'));
+const linhaDe = (zpl, prefixo) => textos(zpl).filter(t => t.texto.startsWith(prefixo));
+const todosTextos = zpl => [...zpl.matchAll(/\^FO(\d+),(\d+)\^A0N,(\d+),\d+\^FD([^^]*)\^FS/g)].map(m => ({ x: +m[1], y: +m[2], h: +m[3], texto: m[4] }));
+const filetes = zpl => [...zpl.matchAll(/\^FO(\d+),(\d+)\^GB(\d+),3,3\^FS/g)].map(m => ({ x: +m[1], y: +m[2], w: +m[3] }));
+const ENORME = 'CONSTRUTORA E INCORPORADORA HORIZONTE NOVO LTDA COMERCIO DE ESQUADRIAS E SERRALHERIA DO ESPIRITO SANTO';
+
+test('Nome e Cliente: SEMPRE uma linha só (nunca quebra); fonte cai até 36 e, se ainda não couber, trunca com "..."', () => {
+  const curto = linhaDe(montarEtiquetas(PEDIDO([ITEM(1)])).zpl, 'Nome:');
   assert.equal(new Set(curto.map(t => t.texto)).size, 1);
+  assert.equal(curto[0].altura, 52);
 
-  const longo = 'CONSTRUTORA E INCORPORADORA HORIZONTE NOVO LTDA';
-  const l = textos(montarEtiquetas(PEDIDO([ITEM(1)], { cliente: longo })).zpl).filter(t => t.altura <= 52 && t.altura >= 36 && /^(Nome|CONSTRUTORA|HORIZONTE|[A-Z ]+$)/.test(t.texto));
-  const linhas = [...new Set(l.map(t => t.texto))].filter(t => !t.startsWith('Cliente') && !t.startsWith('Pedido') && !t.startsWith('Qtd'));
-  assert.equal(linhas.length, 2, linhas.join(' / '));
-  assert.equal(linhas.join(' ').replace(/\s+/g, ' '), 'Nome: ' + longo);
+  // médio: cabe numa fonte menor, sem reticências
+  const medio = 'CONSTRUTORA HORIZONTE LTDA';
+  const m = linhaDe(montarEtiquetas(PEDIDO([ITEM(1)], { cliente: medio })).zpl, 'Nome:');
+  assert.deepEqual([...new Set(m.map(t => t.texto))], ['Nome: ' + medio]);
+  assert.ok(m[0].altura >= 36 && m[0].altura < 52);
 
-  const enorme = montarEtiquetas(PEDIDO([ITEM(1)], { cliente: 'PALAVRA '.repeat(40) })).zpl;
-  const texto = unicos(enorme).filter(t => !/^(Pedido|Cliente|Qtd)/.test(t));
-  assert.ok(texto.length <= 2);
-  assert.ok(texto[texto.length - 1].endsWith('…'));
+  // gigante: uma única linha (duas passadas do negrito), altura 36, termina em "..." (três pontos, não "…")
+  for (const campo of ['cliente', 'clienteFinal']) {
+    const z = montarEtiquetas(PEDIDO([ITEM(1)], { [campo]: ENORME })).zpl;
+    const rotulo = campo === 'cliente' ? 'Nome:' : 'Cliente:';
+    const l = linhaDe(z, rotulo);
+    assert.equal(l.length, 2, 'duas passadas do negrito = uma linha');
+    assert.equal(new Set(l.map(t => t.texto)).size, 1);
+    assert.equal(l[0].altura, 36);
+    assert.ok(l[0].texto.endsWith('...') && !l[0].texto.includes('…'));
+    assert.ok(l[0].texto.startsWith(rotulo + ' CONSTRUTORA'));
+    assert.ok(l[0].texto.length * 0.6 * 36 <= 760);
+    assert.ok(!unicos(z).some(t => t.includes('SERRALHERIA')), 'o resto do nome não vira outra linha');
+  }
+});
+
+test('rótulos Nome, Cliente, Qtd e Destino ganham filete ^GB (espessura 3) logo abaixo da palavra, só no rótulo', () => {
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { QTD: '4' })], { uf: 'ES' }));
+  const fs_ = filetes(zpl), ts = todosTextos(zpl);
+  for (const rotulo of ['Nome:', 'Cliente:', 'Qtd:', 'Destino:']) {
+    const t = ts.find(x => x.texto.startsWith(rotulo));
+    assert.ok(t, rotulo);
+    const f = fs_.find(x => x.x === t.x && x.y === t.y + t.h + 2);
+    assert.ok(f, 'filete logo abaixo de ' + rotulo);
+    assert.ok(f.w >= rotulo.length * 0.5 * t.h && f.w <= rotulo.length * 0.6 * t.h + 4, 'largura ~ a do rótulo: ' + f.w);
+    assert.ok(f.w < t.texto.length * 0.6 * t.h, 'não cobre o valor');
+  }
+});
+
+test('Pedido não tem filete; sem medidas nem destino há exatamente 3 filetes (Nome, Cliente, Qtd)', () => {
+  assert.equal(filetes(montarEtiquetas(PEDIDO([ITEM(1)])).zpl).length, 3);
+});
+
+test('medidas ligadas viram "Medidas: ..." entre Cliente e Qtd; vazias não imprimem linha nem rótulo', () => {
+  const com = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS: '2287 × 706' })])).zpl;
+  const ts = todosTextos(com);
+  const y = rotulo => ts.find(t => t.texto.startsWith(rotulo)).y;
+  assert.equal(ts.filter(t => t.texto === 'Medidas: 2287 × 706').length, 2);
+  assert.ok(y('Cliente:') < y('Medidas:') && y('Medidas:') < y('Qtd:'));
+  assert.equal(filetes(com).length, 4);
+  for (const MEDIDAS of [undefined, '', '   ']) {
+    const sem = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS })])).zpl;
+    assert.ok(!sem.includes('Medidas'));
+    assert.equal(filetes(sem).length, 3);
+  }
+});
+
+test('destino: "Destino: ES" embaixo à esquerda; UF do item vale mais que a geral; sem UF não imprime nada', () => {
+  const geral = montarEtiquetas(PEDIDO([ITEM(1), ITEM(2, { UF: 'RJ' })], { uf: 'ES' })).zpl;
+  assert.ok(blocos(geral)[0].includes('^FDDestino: ES^FS'));
+  assert.ok(blocos(geral)[1].includes('^FDDestino: RJ^FS') && !blocos(geral)[1].includes('Destino: ES'));
+  const d = todosTextos(blocos(geral)[0]).find(t => t.texto.startsWith('Destino:'));
+  assert.equal(d.x, 20);
+  assert.ok(d.y + d.h + 5 <= 480, 'filete incluído, cabe na etiqueta');
+  assert.ok(!montarEtiquetas(PEDIDO([ITEM(1)])).zpl.includes('Destino'));
+});
+
+test('texto digitado (medidas/UF) também é saneado: nada de ^ ~ \ no ZPL', () => {
+  const { zpl } = montarEtiquetas(PEDIDO([ITEM(1, { MEDIDAS: '12^XZ~DG\\34', UF: 'E^S' })]));
+  assert.ok(zpl.includes('Medidas: 12XZDG34'));
+  assert.equal((zpl.match(/\^XZ/g) || []).length, 1);
+  assert.ok(!zpl.includes('~DG'));
+});
+
+test('nenhum texto passa de 780 dots e nada invade o código de barras (x >= 500) nas linhas de baixo', () => {
+  const z = montarEtiquetas(PEDIDO([ITEM(1, { QTD: '999', MEDIDAS: '9999,99 x 9999,99 mm - 99999 x 1' })], { cliente: ENORME, clienteFinal: ENORME, uf: 'MG', numero: '1234567890' })).zpl;
+  for (const { x, y, h, texto } of todosTextos(z)) {
+    if (texto.startsWith('Pedido')) continue;
+    const fim = x + texto.length * 0.6 * h;
+    assert.ok(fim <= 780, texto);
+    if (y + h > 368) assert.ok(fim <= 490, 'não invade o código de barras: ' + texto);
+  }
 });
 
 test('nenhum texto passa da largura estimada de 760 dots', () => {

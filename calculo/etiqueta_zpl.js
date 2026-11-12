@@ -1,14 +1,19 @@
 // Etiqueta de pedido/produção para a Zebra (ZPL), 100 x 60 mm a 203 dpi (8 dots/mm = 800 x 480 dots). Função pura, sem banco.
-// Uma etiqueta por item do Pedido. Nenhum campo de dinheiro. Todo texto do banco passa por sanearZpl: ^, ~ e \ são
+// Uma etiqueta por item do Pedido. Nenhum campo de dinheiro. Todo texto do banco ou digitado passa por sanearZpl: ^, ~ e \ são
 // caracteres de comando do ZPL, então o conteúdo do pedido nunca pode chegar à impressora com eles.
-// Layout (2026-11-12, copiado da etiqueta de referência do dono): logo + "Pedido: N", "Nome: razão social",
-// "Cliente: cliente final", "Qtd: n" e o código de barras do nº do pedido. Textos em negrito grande, sem endereço da empresa.
+// Layout (2026-11-12): logo + "Pedido: N", "Nome: razão social", "Cliente: cliente final", [Medidas: ...], "Qtd: n", [Destino: UF]
+// e o código de barras do nº do pedido. Nome, Cliente e Medidas SEMPRE numa linha só (fonte menor até 36; depois trunca com "...").
+// Os rótulos "Nome:", "Cliente:", "Qtd:", "Medidas:" e "Destino:" saem sublinhados (ZPL não tem sublinhado de fonte: um filete ^GB
+// logo abaixo do rótulo). Campos vazios (medidas, destino) não imprimem linha nem rótulo.
 const LOGO = require('./etiqueta_logo'); // bitmap 1-bit gerado por calculo/gerar_logo_zpl.js
-const MAX_TEXTO = 60;      // razão social / cliente final (depois do rótulo "Nome: " / "Cliente: ")
+const MAX_TEXTO = 200;     // teto de entrada (razão social / cliente final); o que não couber na linha é truncado com "..."
 const MAX_QTD = 12;
 const LARGURA = 800;
 const MARGEM = 20;
 const AVANCO = 0.6;        // largura média de um caractere da fonte 0 em negrito = AVANCO x altura (estimativa conservadora)
+const AVANCO_ROTULO = 0.55; // idem para o comprimento do filete do rótulo (um pouco menor, para não passar muito do ":")
+const MIN_FONTE = 36;      // menor altura de Nome/Cliente/Medidas; abaixo disso trunca com "..."
+const Y = { nome: 120, cliente: 200, medidas: 278, qtd: 348, destino: 424 };
 
 // remove ^ ~ \ e troca caracteres de controle por espaço
 function sanearZpl(texto) {
@@ -18,50 +23,27 @@ function sanearZpl(texto) {
 const limpar = texto => sanearZpl(texto).replace(/\s+/g, ' ').trim();
 const larguraEstimada = (texto, altura) => Math.ceil(texto.length * AVANCO * altura);
 
-// quebra em palavras (palavra maior que a linha é partida); devolve as linhas
-function quebrar(texto, caracteresPorLinha) {
-  const linhas = []; let atual = '';
-  for (let palavra of texto.split(' ')) {
-    while (palavra.length > caracteresPorLinha) {
-      if (atual) { linhas.push(atual); atual = ''; }
-      linhas.push(palavra.slice(0, caracteresPorLinha)); palavra = palavra.slice(caracteresPorLinha);
-    }
-    if (!atual) atual = palavra;
-    else if (atual.length + 1 + palavra.length <= caracteresPorLinha) atual += ' ' + palavra;
-    else { linhas.push(atual); atual = palavra; }
-  }
-  if (atual) linhas.push(atual);
-  return linhas;
-}
-
-// Escolhe tamanho e linhas para caber em larguraMax: uma linha no maior tamanho possível; senão até maxLinhas
-// menores; se ainda não couber, trunca com "…" (nunca corta sem aviso).
-function ajustar(texto, larguraMax, { uma = [60, 52], varias = [52, 44, 36], maxLinhas = 2 } = {}) {
-  for (const h of uma) if (larguraEstimada(texto, h) <= larguraMax) return { altura: h, linhas: [texto] };
-  if (maxLinhas > 1) {
-    for (const h of varias) {
-      const cap = Math.floor(larguraMax / (AVANCO * h));
-      const linhas = quebrar(texto, cap);
-      if (linhas.length <= maxLinhas) return { altura: h, linhas };
-    }
-  }
-  const h = maxLinhas > 1 ? varias[varias.length - 1] : uma[uma.length - 1];
-  const cap = Math.floor(larguraMax / (AVANCO * h));
-  const linhas = quebrar(texto, cap);
-  if (linhas.length <= maxLinhas) return { altura: h, linhas };
-  const corte = linhas.slice(0, maxLinhas);
-  const ultima = corte[maxLinhas - 1];
-  corte[maxLinhas - 1] = (ultima.length >= cap ? ultima.slice(0, cap - 1) : ultima) + '…';
-  return { altura: h, linhas: corte };
+// Uma linha só: usa a maior altura de `alturas` em que "rótulo valor" cabe em larguraMax; se nem na menor couber, trunca
+// o VALOR (nunca o rótulo) e termina com "...". Devolve { altura, texto }.
+function linhaUnica(rotulo, valor, larguraMax, alturas) {
+  const prefixo = rotulo ? rotulo + ' ' : '';
+  for (const h of alturas) if (larguraEstimada(prefixo + valor, h) <= larguraMax) return { altura: h, texto: prefixo + valor };
+  const h = alturas[alturas.length - 1];
+  const cabem = Math.floor(larguraMax / (AVANCO * h)) - prefixo.length; // caracteres do valor
+  const manter = cabem - 3;
+  return { altura: h, texto: prefixo + (manter > 0 ? valor.slice(0, manter).trimEnd() + '...' : '...') };
 }
 
 // negrito simulado: a mesma linha impressa duas vezes, 2 dots deslocada
 const negrito = (x, y, altura, texto) =>
   [0, 2].map(d => `^FO${x + d},${y}^A0N,${altura},${altura}^FD${texto}^FS`).join('\n');
 
-function blocoTexto(x, y, texto, larguraMax, opcoes) {
-  const { altura, linhas } = ajustar(texto, larguraMax, opcoes);
-  return linhas.map((l, i) => negrito(x, y + i * altura, altura, l)).join('\n');
+// linha única; se tem rótulo, desenha o filete (sublinhado) logo abaixo dele
+function linha(x, y, rotulo, valor, larguraMax, alturas) {
+  const { altura, texto } = linhaUnica(rotulo, valor, larguraMax, alturas);
+  const partes = [negrito(x, y, altura, texto)];
+  if (rotulo) partes.push(`^FO${x},${y + altura + 2}^GB${Math.ceil(rotulo.length * AVANCO_ROTULO * altura) + 2},3,3^FS`);
+  return partes.join('\n');
 }
 
 // módulos (barras) de um Code 128 só de dígitos no modo automático (^BC...,A): start + dados (Code C) + troca/dígito solto + check + stop
@@ -83,25 +65,32 @@ const logo = () => [
   `^FO22,20^GFA,${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha},${LOGO.hex}^FS`
 ].join('\n');
 
-// dados = { numero, cliente (razão social), clienteFinal, itens: [{ ITEM, QTD }] }  →  { zpl, quantidade }
-function montarEtiquetas({ numero, cliente, clienteFinal, itens }) {
+// dados = { numero, cliente (razão social), clienteFinal, uf (destino geral, opcional),
+//           itens: [{ ITEM, QTD, MEDIDAS (opcional), UF (opcional, vale mais que a geral) }] }  →  { zpl, quantidade }
+// QTD, MEDIDAS e UF já vêm validados pela rota (calculo/etiqueta_edicao.js); mesmo assim tudo passa por sanearZpl.
+function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
   const lista = itens || [];
   const num = String(numero ?? '').replace(/\D/g, '');
   const nome = limpar(cliente).slice(0, MAX_TEXTO) || '—';
   const final = limpar(clienteFinal).slice(0, MAX_TEXTO) || '—';
   const util = LARGURA - 2 * MARGEM;
+  const ALTURAS_NOME = [60, 52, 44, MIN_FONTE];
   const blocos = lista.map(it => {
     const qtd = limpar(it.QTD).slice(0, MAX_QTD) || '1';
+    const medidas = limpar(it.MEDIDAS).slice(0, 30);
+    const destino = limpar(it.UF || uf).slice(0, 2).toUpperCase();
     return [
       '^XA^CI28^PW800^LL480',
       logo(),
-      blocoTexto(272, 30, `Pedido: ${num}`, LARGURA - 272 - MARGEM, { uma: [64, 56, 48, 40, 32], maxLinhas: 1 }),
-      blocoTexto(MARGEM, 120, `Nome: ${nome}`, util),
-      blocoTexto(MARGEM, 240, `Cliente: ${final}`, util),
-      blocoTexto(MARGEM, 368, `Qtd: ${qtd}`, 330, { uma: [64, 56, 48, 40, 32], maxLinhas: 1 }),
+      linha(272, 30, '', `Pedido: ${num}`, LARGURA - 272 - MARGEM, [64, 56, 48, 40, 32]),
+      linha(MARGEM, Y.nome, 'Nome:', nome, util, ALTURAS_NOME),
+      linha(MARGEM, Y.cliente, 'Cliente:', final, util, ALTURAS_NOME),
+      medidas ? linha(MARGEM, Y.medidas, 'Medidas:', medidas, util, [44, 40, MIN_FONTE]) : '',
+      linha(MARGEM, Y.qtd, 'Qtd:', qtd, 330, [56, 48, 40, 32]),
+      destino ? linha(MARGEM, Y.destino, 'Destino:', destino, 330, [40]) : '',
       codigoDeBarras(num),
       '^XZ'
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   });
   return { zpl: blocos.join('\n'), quantidade: lista.length };
 }
