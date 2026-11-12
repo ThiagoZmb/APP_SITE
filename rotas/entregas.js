@@ -7,7 +7,7 @@ const express = require('express');
 const { filtroEstados } = require('../seguranca/acesso');
 const { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, fechamentoDoPedido,
   STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens,
-  STATUS_ENCERRAVEIS, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusDeReabertura, motivoEncerrada } = require('../calculo/entregas');
+  STATUS_ENCERRAVEIS, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusDeReabertura, motivoEncerrada, validarEdicao, aplicarEdicao } = require('../calculo/entregas');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { validarData, txt } = require('./estoque_movimentos');
 
@@ -484,7 +484,7 @@ function registrarEntregas({ rota, pool }) {
       const [[r]] = await pool.execute(
         `SELECT e.*, p.SITUACAO AS situacao_pedido, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
                 c.ENDERECO AS cli_endereco, c.NUMERO AS cli_numero, c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade,
-                c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone, mu.NOME AS motorista_nome
+                c.CODIGO AS cli_codigo, c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone, mu.NOME AS motorista_nome
          FROM web_entregas e
          LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
          LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
@@ -518,6 +518,7 @@ function registrarEntregas({ rota, pool }) {
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
         itens,
         anexos: anexos.map(a => ({ id: a.id, tipo: a.tipo, mime: a.mime, criadoEm: a.criado_em })), // só metadados; o binário vem de /anexo/:anexoId
+        clienteCodigo: r.cli_codigo ?? null,
         clienteEndereco: { rua: r.cli_endereco || '', numero: r.cli_numero || '', bairro: r.cli_bairro || '', cidade: r.cli_cidade || '',
           uf: r.cli_estado || '', cep: r.cli_cep || '', telefone: r.cli_telefone || '' }
       });
@@ -533,7 +534,7 @@ function registrarEntregas({ rota, pool }) {
   // excluir pedido). O número vem de uma leitura comum FORA da transação: assim as primeiras leituras da transação são as travas
   // e as leituras comuns seguintes já enxergam tudo o que foi gravado antes de o pedido ser travado (duas baixas do mesmo pedido
   // ficam em fila no pedido e a segunda vê a primeira concluída).
-  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false, travarPedido = false } = {}) {
+  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false, travarPedido = false, finalDe = 'o endereço' } = {}) {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const est = filtroEstados(req, 'c.ESTADO');
@@ -568,7 +569,7 @@ function registrarEntregas({ rota, pool }) {
         if (!p) throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e não pode ser ${participio(acao)}.`);
         status = p.status; tipoEvento = p.evento;
       } else if (FINAIS.includes(atual.status)) {
-        throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e o endereço não pode mais ser alterado.`);
+        throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e ${finalDe} não pode mais ser alterado.`);
       }
       const { cols, motivo = null, detalhe = null, entregueA = null, depois = null } = await montar(conn, atual);
       const agora = agoraLocal();
@@ -619,6 +620,21 @@ function registrarEntregas({ rota, pool }) {
     const b = req.body || {};
     const cols = lerOu400(res, () => ({ ...colunasEndereco(b), ...(Object.hasOwn(b, 'contatoLocal') ? { contato_local: txt(b.contatoLocal, 190) || null } : {}) }));
     if (cols) await gravar(req, res, 'PUT /entregas/:id/endereco', null, 'endereco', async () => ({ cols, detalhe: { endereco: cols } }));
+  });
+
+  // Editar entrega (2026-11-12): tipo, data, motorista, endereço, contato no local e observação de UMA entrega, sem mexer no status
+  // (a máquina `proximo` segue sendo a única que o muda), no pedido, nos itens nem na situação. Só entrega aberta (não concluída
+  // nem cancelada); em rota/enviada o tipo, a data e o motorista ficam travados. Evento 'editada' + auditoria com antes/depois.
+  // Só web_entregas, web_entrega_eventos e web_auditoria; não roda a varredura (sincronizarFila só por ação do usuário na lista).
+  rota('put', '/entregas/:id', PROGRAMAR, async (req, res) => {
+    const v = validarEdicao(req.body);
+    if (v.erro) return res.status(400).json({ error: v.erro });
+    await gravar(req, res, 'PUT /entregas/:id', null, 'editada', async (conn, atual) => {
+      const motoristas = ['tipo', 'motoristaCodigo'].some(k => Object.hasOwn(v.edicao, k)) ? (await motoristasValidos(conn)).map(m => m.codigo) : [];
+      const r = aplicarEdicao(atual, v.edicao, motoristas);
+      if (r.erro) throw new ErroUsuario(r.erro.status, r.erro.msg);
+      return { cols: r.cols, detalhe: { antes: r.antes, depois: r.depois } };
+    }, { finalDe: 'a entrega' });
   });
 
   // ---- anexos (foto/assinatura) ----

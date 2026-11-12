@@ -172,6 +172,8 @@
     const salvo = lerFiltros(win);
     const estado = { pedidos: [], etapas: ETAPAS_PADRAO, podeMarcar: [], versao: '', atualizadoEm: null, consulta: 0, salvando: new Set(), menuAberto: false, janela: false,
       pendenteDesenho: false, filtros: { busca: '', falta: typeof salvo.falta === 'string' ? salvo.falta : '', minha: salvo.minha === true, abertos: salvo.abertos === true } };
+    // ?busca=N (link "Ver etapas de produção" do menu da tela de Entregas): já abre filtrado pelo pedido
+    try { const b = (new win.URLSearchParams(win.location.search).get('busca') || '').trim(); if (/^d{1,10}$/.test(b)) { estado.filtros.busca = b; $('etp-busca').value = b; } } catch { /* sem query */ }
     const link = pode('pedidos.pdf') ? 'pdf' : pode('orcamentos.criar') && pode('valores.ver') ? 'editar' : null;
     const podeEtapa = c => estado.podeMarcar.includes(c);
     const doNumero = n => estado.pedidos.find(p => String(p.numero) === String(n));

@@ -277,6 +277,115 @@ function validarAnexo(buffer, mime) {
   return { ok: true, tipo };
 }
 
-module.exports = { STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, entregaPrincipal, resumoEntregas, fechamentoDoPedido,
+// ---- Editar entrega (PUT /entregas/:id): só a entrega, nunca pedido, itens, status nem situação ----
+// Edição não muda o status: a máquina de status (`proximo`) continua sendo a única que move a entrega.
+const STATUS_EDITAVEIS = Object.freeze(['a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada']);
+const STATUS_AGENDA_TRAVADA = Object.freeze(['em_rota', 'enviada']); // tipo, data e motorista só mudam por Reagendar/fluxo próprio
+const CAMPOS_EDICAO = ['tipo', 'dataAgendada', 'motoristaCodigo', 'endereco', 'contatoLocal', 'observacao'];
+const CAMPOS_ENDERECO_EDICAO = [['rua', 190], ['numero', 30], ['bairro', 120], ['cidade', 120], ['uf', 2], ['cep', 12], ['ref', 190]];
+const LIMITES_EDICAO = { contatoLocal: 190, observacao: 500 };
+
+const dataIsoValida = t => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(t ?? ''));
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+};
+const aparar = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+const diaDe = v => (v ? String(v).slice(0, 10) : null);
+
+// Valida e normaliza o corpo. Devolve { erro } (400) ou { edicao } só com as chaves que vieram.
+function validarEdicao(corpo) {
+  if (!corpo || typeof corpo !== 'object' || Array.isArray(corpo)) return { erro: 'Corpo inválido.' };
+  const estranho = Object.keys(corpo).find(k => !CAMPOS_EDICAO.includes(k));
+  if (estranho) return { erro: `Campo não editável: ${estranho}.` };
+  if (!Object.keys(corpo).length) return { erro: 'Informe ao menos um campo para editar.' };
+  const e = {};
+  if (Object.hasOwn(corpo, 'tipo')) {
+    if (!Object.values(TIPOS).includes(corpo.tipo)) return { erro: 'Tipo de entrega inválido.' };
+    e.tipo = corpo.tipo;
+  }
+  if (Object.hasOwn(corpo, 'dataAgendada')) {
+    const t = corpo.dataAgendada === null ? '' : String(corpo.dataAgendada).trim();
+    if (t && !dataIsoValida(t)) return { erro: 'Data inválida: use AAAA-MM-DD.' };
+    e.dataAgendada = t || null;
+  }
+  if (Object.hasOwn(corpo, 'motoristaCodigo')) {
+    const c = corpo.motoristaCodigo;
+    if (c === null || c === '') e.motoristaCodigo = null;
+    else if (/^\d+$/.test(String(c)) && Number(c) >= 1) e.motoristaCodigo = Number(c);
+    else return { erro: 'Escolha um motorista válido.' };
+  }
+  if (Object.hasOwn(corpo, 'endereco')) {
+    const a = corpo.endereco;
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return { erro: 'Endereço inválido.' };
+    const estranhoEnd = Object.keys(a).find(k => !CAMPOS_ENDERECO_EDICAO.some(([c]) => c === k));
+    if (estranhoEnd) return { erro: `Campo de endereço desconhecido: ${estranhoEnd}.` };
+    const end = {};
+    for (const [campo, max] of CAMPOS_ENDERECO_EDICAO) {
+      const v = campo === 'uf' ? String(a.uf ?? '').trim().toUpperCase() : aparar(a[campo], max);
+      if (campo === 'uf' && v && !/^[A-Z]{2}$/.test(v)) return { erro: 'UF inválida: use 2 letras.' };
+      end[campo] = v || null;
+    }
+    e.endereco = end;
+  }
+  for (const campo of ['contatoLocal', 'observacao']) {
+    if (!Object.hasOwn(corpo, campo)) continue;
+    if (corpo[campo] !== null && typeof corpo[campo] !== 'string') return { erro: `Campo inválido: ${campo}.` };
+    const bruto = String(corpo[campo] ?? '').trim();
+    if (bruto.length > LIMITES_EDICAO[campo]) return { erro: `${campo === 'observacao' ? 'Observação' : 'Contato no local'} passa de ${LIMITES_EDICAO[campo]} caracteres.` };
+    e[campo] = aparar(bruto, LIMITES_EDICAO[campo]) || null;
+  }
+  return { edicao: e };
+}
+
+// Aplica a edição (já validada) sobre a linha atual de web_entregas. `motoristas` = códigos de motoristas válidos.
+// Devolve { erro: { status, msg } } ou { cols, antes, depois } com SÓ o que mudou (colunas do banco em `cols`).
+function aplicarEdicao(atual, edicao, motoristas = []) {
+  const falha = (status, msg) => ({ erro: { status, msg } });
+  if (!atual || !STATUS_EDITAVEIS.includes(atual.status)) return falha(409, 'Esta entrega já foi concluída ou cancelada e não pode mais ser editada.');
+  const mexeAgenda = ['tipo', 'dataAgendada', 'motoristaCodigo'].some(k => Object.hasOwn(edicao, k));
+  if (mexeAgenda && STATUS_AGENDA_TRAVADA.includes(atual.status)) {
+    return falha(409, 'Com a entrega em rota ou enviada, tipo, data e motorista não mudam aqui. Use Reagendar (em rota) ou o fluxo da própria entrega.');
+  }
+  const cols = {}, antes = {}, depois = {};
+  const mudou = (campo, coluna, velho, novo) => {
+    if ((velho ?? null) === (novo ?? null)) return;
+    cols[coluna] = novo ?? null; antes[campo] = velho ?? null; depois[campo] = novo ?? null;
+  };
+  const tipoNovo = Object.hasOwn(edicao, 'tipo') ? edicao.tipo : (atual.tipo || null);
+  if (Object.hasOwn(edicao, 'dataAgendada')) {
+    if (!edicao.dataAgendada && atual.status !== 'a_programar') return falha(400, 'Esta entrega já está programada: informe a data (use Cancelar para desfazer a programação).');
+    mudou('dataAgendada', 'data_agendada', diaDe(atual.data_agendada), edicao.dataAgendada);
+  }
+  if (Object.hasOwn(edicao, 'motoristaCodigo') && edicao.motoristaCodigo !== null && tipoNovo !== TIPOS.MOTORISTA) {
+    return falha(400, 'Motorista só vale para o tipo "Entrega".');
+  }
+  if (Object.hasOwn(edicao, 'tipo') || Object.hasOwn(edicao, 'motoristaCodigo')) {
+    let codigo = null;
+    if (tipoNovo === TIPOS.MOTORISTA) {
+      codigo = Object.hasOwn(edicao, 'motoristaCodigo') ? edicao.motoristaCodigo : (atual.motorista_codigo ?? null);
+      if (!motoristas.includes(Number(codigo))) return falha(400, 'Escolha um motorista válido.');
+      codigo = Number(codigo);
+    }
+    mudou('tipo', 'tipo', atual.tipo || null, tipoNovo);
+    mudou('motoristaCodigo', 'motorista_codigo', atual.motorista_codigo ?? null, codigo);
+  }
+  if (Object.hasOwn(edicao, 'endereco')) {
+    const e = edicao.endereco;
+    const mapa = { rua: 'endereco_rua', numero: 'endereco_numero', bairro: 'endereco_bairro', cidade: 'endereco_cidade', uf: 'endereco_uf', cep: 'endereco_cep', ref: 'endereco_ref' };
+    const novoEnd = {}, velhoEnd = {};
+    for (const [campo, coluna] of Object.entries(mapa)) {
+      if ((atual[coluna] ?? null) !== (e[campo] ?? null)) { cols[coluna] = e[campo] ?? null; velhoEnd[campo] = atual[coluna] ?? null; novoEnd[campo] = e[campo] ?? null; }
+    }
+    if (Object.keys(novoEnd).length) { antes.endereco = velhoEnd; depois.endereco = novoEnd; }
+  }
+  if (Object.hasOwn(edicao, 'contatoLocal')) mudou('contatoLocal', 'contato_local', atual.contato_local, edicao.contatoLocal);
+  if (Object.hasOwn(edicao, 'observacao')) mudou('observacao', 'observacao', atual.observacao, edicao.observacao);
+  if (!Object.keys(cols).length) return falha(400, 'Nenhuma alteração para gravar.');
+  return { cols, antes, depois };
+}
+
+module.exports = { STATUS_EDITAVEIS, STATUS_AGENDA_TRAVADA, validarEdicao, aplicarEdicao, STATUS, TIPOS, proximo, pedidoPara, statusExibicao, validarAnexo, entregaPrincipal, resumoEntregas, fechamentoDoPedido,
   STATUS_DIVISIVEIS, hashItensPedido, situacaoDivisao, ordemNoPedido, lerSeparacao, separarItens,
   STATUS_ENCERRAVEIS, STATUS_EM_CURSO, EVENTO_ENCERRADA, EVENTO_REABERTA, statusConcluidoPara, statusNaLista, statusDeReabertura, motivoEncerrada };

@@ -27,7 +27,7 @@
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
     ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial',
     dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado',
-    encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
+    editada: 'Entrega editada', encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
   const ABAS = [
     { id: 'fila', rotulo: 'A programar', status: ['a_programar'] },
     { id: 'agenda', rotulo: 'Agenda', status: ['agendada'] },
@@ -128,6 +128,50 @@
     if (e.status === 'enviada' && e.tipo === 'outro_estado') r.push('comprovante');
     if (['a_programar', 'agendada', 'ocorrencia', 'em_rota'].includes(e.status)) r.push('cancelar');
     return r;
+  }
+
+  // Editar entrega: só entrega aberta (espelha STATUS_EDITAVEIS de calculo/entregas.js; o servidor continua decidindo)
+  const STATUS_EDITAVEIS = ['a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada'];
+  const podeEditarEntrega = e => !!(e && STATUS_EDITAVEIS.includes(e.status));
+
+  // ---- Menu do botão direito (consulta e fiscalização; NADA que altere pedido ou entrega) ----
+  // Cada opção só aparece com a permissão da rota que ela usa (perm = códigos separados por espaço: todos são exigidos, como Acesso.pode).
+  // `rota` documenta a chamada que a opção faz (conferida em teste contra as rotas registradas); dinheiro só com valores.ver.
+  const MENU_ENTREGA = [
+    { id: 'detalhe', icone: '📋', rotulo: 'Abrir detalhes da entrega', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
+    { id: 'linha_tempo', icone: '🕘', rotulo: 'Ver linha do tempo da entrega', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
+    { sep: true },
+    { id: 'pdf_pedido', icone: '📄', rotulo: 'Abrir PDF do pedido', perm: 'pedidos.pdf', rota: 'GET /dados_pdf' },
+    { id: 'pdf_producao', icone: '🏭', rotulo: 'Guia de produção (PDF)', perm: 'pedidos.pdf', rota: 'GET /dados_pdf' },
+    { id: 'pdf_vidros', icone: '🪟', rotulo: 'Vidros (PDF)', perm: 'pedidos.pdf', rota: 'GET /dados_pdf_vidros' },
+    { id: 'danfe', icone: '🧾', rotulo: 'Abrir nota fiscal (DANFE)', perm: 'danfe.ver', rota: 'GET /danfe/pedido/:numero' },
+    { id: 'checklist', icone: '✅', rotulo: 'Checklist de entrega (PDF)', perm: 'entregas.ver entregas.checklist', rota: 'GET /entregas/:id/checklist.pdf' },
+    { sep: true },
+    { id: 'historico_pedido', icone: '🕘', rotulo: 'Histórico do pedido', perm: 'pedidos.ver', rota: 'GET /ped_orc/Pedido/:numero/historico' },
+    { id: 'etapas', icone: '🧩', rotulo: 'Ver etapas de produção', perm: 'etapas.ver', rota: 'GET /etapas/fila' },
+    { id: 'financeiro_cliente', icone: '💰', rotulo: 'Ver financeiro do cliente', perm: 'clientes.receber valores.ver', rota: 'GET /clientes/financeiro/:codigo' },
+    { sep: true },
+    { id: 'copiar_endereco', icone: '📍', rotulo: 'Copiar endereço', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
+    { id: 'copiar_contato', icone: '📋', rotulo: 'Copiar contato no local', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
+    { id: 'ligar', icone: '📞', rotulo: 'Ligar para o contato', perm: 'entregas.ver', rota: 'GET /entregas/:id' }
+  ];
+  function itensMenuEntrega(e, pode) {
+    if (!e || typeof pode !== 'function') return [];
+    const L = [];
+    for (const it of MENU_ENTREGA) {
+      if (it.sep) { if (L.length && !L[L.length - 1].sep) L.push({ sep: true }); continue; }
+      if (pode(it.perm)) L.push({ ...it });
+    }
+    while (L.length && L[L.length - 1].sep) L.pop();
+    return L;
+  }
+  // texto da linha do tempo para o evento 'editada' (detalhe = { antes, depois } só do que mudou)
+  const ROTULO_CAMPO_EDICAO = { tipo: 'Tipo', dataAgendada: 'Data', motoristaCodigo: 'Motorista', endereco: 'Endereço', contatoLocal: 'Contato no local', observacao: 'Observação' };
+  function resumoEdicao(detalhe) {
+    const depois = detalhe && typeof detalhe.depois === 'object' && detalhe.depois ? detalhe.depois : null;
+    if (!depois) return '';
+    const val = (k, v) => (v === null || v === undefined || v === '' ? 'vazio' : k === 'tipo' ? rotuloTipo(v) : k === 'dataAgendada' ? dataBR(v) : typeof v === 'object' ? 'alterado' : String(v));
+    return Object.keys(depois).map(k => `${ROTULO_CAMPO_EDICAO[k] || k}: ${val(k, (detalhe.antes || {})[k])} → ${val(k, depois[k])}`).join('; ');
   }
 
   const CAMPOS_ENDERECO = ['rua', 'numero', 'bairro', 'cidade', 'uf', 'cep', 'ref'];
@@ -440,14 +484,15 @@
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
       else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td>` +
         (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
+      const mais = `<td class="mais"><button type="button" class="ent-mais" data-mais="${esc(e.id)}" aria-haspopup="menu" aria-label="Consultar a entrega do pedido ${esc(e.numero)}" title="Consultar (PDFs, nota fiscal, histórico...)">⋯</button></td>`;
       const classes = [estado.det && estado.det.entrega.id === e.id ? 'selecionado' : '', statusDaEntrega(e) === 'retirada_agendada' ? 'linha-retirada' : ''].filter(Boolean).join(' ');
-      return `<tr data-id="${esc(e.id)}"${classes ? ` class="${classes}"` : ''}>${tdBase}${resto}</tr>`;
+      return `<tr data-id="${esc(e.id)}"${classes ? ` class="${classes}"` : ''}>${tdBase}${resto}${mais}</tr>`;
     }
     const CABECALHO = {
-      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', ''],
-      ocorrencias: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
-      outras: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
-      em_rota: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
+      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', '', ''],
+      ocorrencias: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', '', ''],
+      outras: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', ''],
+      em_rota: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '', '']
     };
 
     // Agenda em calendário mensal: cada entrega é uma etiqueta colorida pelo status; clicar abre o detalhe
@@ -552,6 +597,7 @@
       const partes = [];
       if (v.motivo) partes.push(v.motivo);
       if (v.entregueA) partes.push('Recebido por ' + v.entregueA);
+      if (v.tipo === 'editada' && v.detalhe) partes.push(resumoEdicao(v.detalhe));
       const itens = v.detalhe && Array.isArray(v.detalhe.itensEntregues) ? v.detalhe.itensEntregues : [];
       if (itens.length) partes.push('Entregue: ' + itens.map(i => `${i.descricao} × ${i.qtd}`).join('; '));
       if (v.detalhe && v.detalhe.transportadora) partes.push('Transportadora: ' + v.detalhe.transportadora + (v.detalhe.rastreio ? ' (rastreio ' + v.detalhe.rastreio + ')' : ''));
@@ -591,6 +637,7 @@
       estado.copiar = { endereco, contato: txt(e.contatoLocal) };
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
+      $('btn-editar').hidden = !podeEditarEntrega(e); // concluída/cancelada não edita; o servidor também recusa
       $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
       // um primário por vez: com uma baixa disponível (retirada/enviada/comprovante), Reagendar vira secundário
       const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a));
@@ -736,6 +783,108 @@
         await carregar();
         if (r && r.entrega) await abrirDetalhe(r.entrega.id); else mostrar('vazio-painel');
       });
+    }
+
+    // ---------- Editar entrega ----------
+    function abrirEditar() {
+      const det = estado.det;
+      if (!det || !podeEditarEntrega(det.entrega) || !win.EntregaEditar) return;
+      const e = det.entrega, id = e.id;
+      win.EntregaEditar.abrir(win, {
+        entrega: { ...e, rotuloSequencia: rotuloSequencia(det.divisao) }, motoristas: estado.motoristas || [], motoristaNome: nomeMotorista(e, estado.motoristas),
+        salvar: async corpo => {
+          await chamar(`/entregas/${encodeURIComponent(id)}`, { metodo: 'PUT', corpo });
+          toast('Entrega atualizada.', 'ok');
+          await recarregarTudo(id);
+        }
+      });
+    }
+
+    // ---------- Menu do botão direito / Shift+F10 / "⋯" (só consulta e fiscalização: nada altera pedido ou entrega) ----------
+    const pode = c => !!(win.Acesso && win.Acesso.pode(c));
+    const tokenAtual = () => (getAuth() || {}).token || '';
+    let menu = null, origemMenu = null;
+    function fecharMenu(devolverFoco) {
+      if (menu) { menu.remove(); menu = null; }
+      doc.querySelectorAll('tr.ctx').forEach(r => r.classList.remove('ctx'));
+      if (devolverFoco && origemMenu && origemMenu.isConnected) origemMenu.focus({ preventScroll: true });
+      origemMenu = null;
+    }
+    const entregaDoId = id => estado.lista.find(x => String(x.id) === String(id)) || (estado.det && String(estado.det.entrega.id) === String(id) ? estado.det.entrega : null);
+    // detalhe da entrega (endereço, contato, código do cliente): o que já está aberto ou uma leitura nova
+    async function detalheDe(id) {
+      if (estado.det && String(estado.det.entrega.id) === String(id)) return estado.det;
+      return chamar(`/entregas/${encodeURIComponent(id)}`);
+    }
+    async function copiarTexto(texto, vazio, ok) {
+      if (!txt(texto)) { toast(vazio, 'info'); return; }
+      try { await win.navigator.clipboard.writeText(texto); toast(ok, 'ok'); } catch { toast('Não foi possível copiar aqui. Selecione o texto e copie.', 'erro'); }
+    }
+    async function executarMenu(it, e, origem) {
+      const n = e.numero, enc = encodeURIComponent, api = C.API_BASE;
+      const pdf = url => win.abrirPdfAutenticado(url);
+      switch (it.id) {
+        case 'detalhe': return ocupado(() => abrirDetalhe(e.id));
+        case 'linha_tempo': return ocupado(async () => { await abrirDetalhe(e.id); const el = $('d-eventos'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); });
+        case 'pdf_pedido': return pdf(`${api}/dados_pdf?numero=${enc(n)}&tipo=Pedido`);
+        case 'pdf_producao': return pdf(`${api}/dados_pdf?numero=${enc(n)}&tipo=Pedido&producao=1`);
+        case 'pdf_vidros': return pdf(`${api}/dados_pdf_vidros?numero=${enc(n)}`);
+        case 'danfe': return win.DanfePedido && win.DanfePedido.abrir(n, { apiBase: api, loginUrl: C.LOGIN_URL, token: tokenAtual, pode });
+        case 'checklist': return estado.checklist && estado.checklist.abrir(e.id, origem);
+        case 'historico_pedido': return win.HistoricoPedido && win.HistoricoPedido.abrir({ numero: n, apiBase: api, loginUrl: C.LOGIN_URL, token: tokenAtual });
+        case 'etapas': win.location.href = `etapas_producao.html?busca=${enc(n)}`; return undefined;
+        case 'financeiro_cliente': return ocupado(async () => {
+          const d = await detalheDe(e.id);
+          if (!d.clienteCodigo) { toast('Não encontrei o cadastro deste cliente.', 'info'); return; }
+          win.location.href = `clientes.html?abrir=${enc(d.clienteCodigo)}&aba=financeiro`;
+        });
+        case 'copiar_endereco': return ocupado(async () => { const d = await detalheDe(e.id); await copiarTexto(enderecoTexto(d.entrega), 'Esta entrega não tem endereço.', 'Endereço copiado.'); });
+        case 'copiar_contato': return ocupado(async () => { const d = await detalheDe(e.id); await copiarTexto(d.entrega.contatoLocal, 'Esta entrega não tem contato no local.', 'Contato copiado.'); });
+        case 'ligar': return ocupado(async () => {
+          const d = await detalheDe(e.id);
+          const tel = linkLigar(d.entrega.contatoLocal) || linkLigar((d.clienteEndereco || {}).telefone);
+          if (!tel) { toast('Não há telefone nesta entrega nem no cadastro do cliente.', 'info'); return; }
+          win.location.href = tel;
+        });
+        default: return undefined;
+      }
+    }
+    function abrirMenu(el, x, y) {
+      const id = el.getAttribute('data-id') || el.getAttribute('data-mais') || (estado.det && estado.det.entrega.id);
+      const e = entregaDoId(id);
+      if (!e) return;
+      const itens = itensMenuEntrega(e, pode);
+      if (!itens.length) return;
+      fecharMenu();
+      const m = doc.createElement('div');
+      m.id = 'ent-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', `Consultar a entrega do pedido ${e.numero}`);
+      m.innerHTML = `<div class="mc-cab">Pedido nº ${esc(e.numero)}${e.cliente ? ' · ' + esc(e.cliente) : ''}${rotuloSequencia(e) ? ' · ' + esc(rotuloSequencia(e)) : ''}</div>` + itens.map((it, i) => it.sep
+        ? '<div class="mc-sep" role="separator"></div>'
+        : `<button type="button" role="menuitem" data-i="${i}"><span class="mc-ic">${esc(it.icone)}</span>${esc(it.rotulo)}</button>`).join('');
+      m.addEventListener('click', ev => {
+        const b = ev.target.closest('button[data-i]'); if (!b) return;
+        const it = itens[Number(b.dataset.i)], origem = origemMenu;
+        fecharMenu(false);
+        if (it) Promise.resolve(executarMenu(it, e, origem)).catch(err => toast(err.message, 'erro'));
+      });
+      m.addEventListener('keydown', ev => {
+        const bs = [...m.querySelectorAll('button')], i = bs.indexOf(doc.activeElement);
+        if (ev.key === 'Escape') { ev.preventDefault(); fecharMenu(true); }
+        else if (ev.key === 'ArrowDown') { ev.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+        else if (ev.key === 'ArrowUp') { ev.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+        else if (ev.key === 'Home') { ev.preventDefault(); bs[0].focus(); }
+        else if (ev.key === 'End') { ev.preventDefault(); bs[bs.length - 1].focus(); }
+        else if (ev.key === 'Tab') { ev.preventDefault(); fecharMenu(true); }
+      });
+      doc.body.appendChild(m);
+      menu = m; origemMenu = el;
+      const linha = el.closest('tr'); if (linha) linha.classList.add('ctx');
+      const r = el.getBoundingClientRect();
+      const px = x ?? r.left, py = y ?? r.bottom;
+      m.style.left = Math.max(8, Math.min(px, win.innerWidth - m.offsetWidth - 8)) + 'px';
+      m.style.top = Math.max(8, Math.min(py, win.innerHeight - m.offsetHeight - 8)) + 'px';
+      const primeiro = m.querySelector('button');
+      if (primeiro) primeiro.focus({ preventScroll: true });
     }
 
     // ---------- Cancelar ----------
@@ -949,6 +1098,8 @@
           if (sobra.getAttribute('data-sobra') === 'gerar') gerarSobra(numero); else abrirEncerrar(numero);
           return;
         }
+        const maisBtn = ev.target.closest('[data-mais]');
+        if (maisBtn) { abrirMenu(maisBtn); return; }
         const nav = ev.target.closest('[data-mes]');
         if (nav) {
           const h = new win.Date(), m = estado.mes || { ano: h.getFullYear(), mes: h.getMonth() };
@@ -976,6 +1127,19 @@
       $('btn-agendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(false)));
       $('btn-agendar-retirada').addEventListener('click', () => ocupado(() => abrirFormAgendar(false, 'retirada')));
       $('btn-reagendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(true)));
+      $('btn-editar').addEventListener('click', () => ocupado(async () => { await garantirMotoristas(); abrirEditar(); }));
+      $('btn-mais').addEventListener('click', ev => abrirMenu(ev.currentTarget));
+      // botão direito (e Shift+F10 / tecla de menu, que disparam "contextmenu" no item focado) nas linhas e nos cartões do calendário
+      $('lista').addEventListener('contextmenu', ev => {
+        const alvo = ev.target.closest('[data-mais], tr[data-id], .etiqueta[data-id]');
+        if (!alvo) return;
+        ev.preventDefault();
+        const teclado = ev.clientX === 0 && ev.clientY === 0;
+        abrirMenu(alvo, teclado ? undefined : ev.clientX, teclado ? undefined : ev.clientY);
+      });
+      doc.addEventListener('mousedown', ev => { if (menu && !menu.contains(ev.target)) fecharMenu(false); });
+      win.addEventListener('resize', () => fecharMenu(false));
+      win.addEventListener('scroll', ev => { if (menu && !(ev.target && ev.target.nodeType === 1 && menu.contains(ev.target))) fecharMenu(false); }, true);
       $('btn-cancelar').addEventListener('click', () => {
         abrirForm('vista-cancelar', ['c-motivo']);
         $('c-titulo').textContent = `Cancelar entrega — pedido ${estado.det.entrega.numero}`;
@@ -984,7 +1148,7 @@
       });
       $('d-info').addEventListener('click', ev => { const b = ev.target.closest('[data-copiar]'); if (b) copiar(b.getAttribute('data-copiar')); });
       // Checklist externo de entrega (janela com os campos; o PDF é gerado no servidor)
-      const checklist = win.EntregaChecklist && win.EntregaChecklist.iniciarJanela(win, {
+      const checklist = estado.checklist = win.EntregaChecklist && win.EntregaChecklist.iniciarJanela(win, {
         apiBase: C.API_BASE, loginUrl: C.LOGIN_URL, token: () => (getAuth() || {}).token || '', chamar, toast,
         podeEditar: () => !!(win.Acesso && win.Acesso.pode('entregas.programar'))
       });
@@ -1041,7 +1205,7 @@
     });
   }
 
-  return { statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
     rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
     linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };
