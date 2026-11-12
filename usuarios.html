@@ -97,7 +97,14 @@
         .legenda { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
 
         /* ===== perfis ===== */
-        #lista-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        #lista-perfis { display: block; }
+        .grupo-classe { margin-bottom: 22px; }
+        .grupo-classe > h3 { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+        .grupo-classe > .dica-classe { font-size: 12.5px; color: var(--text-light); margin: 0 0 10px; }
+        .grade-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .cartao .horario { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 12.5px; color: var(--text-light); }
+        .cartao .horario button { margin-left: auto; font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--primary-color); cursor: pointer; }
+        .cartao .horario button:hover { border-color: var(--primary-color); }
         .cartao { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; cursor: pointer; background: var(--white); transition: border-color .15s ease, box-shadow .15s ease; }
         .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(242, 163, 58,.45); }
         .cartao.desativado { opacity: .65; }
@@ -590,7 +597,31 @@
                 if (!catalogo) catalogo = await api('/admin/permissoes');
                 perfisCache = await api('/admin/perfis');
                 const total = catalogo.length;
-                $('lista-perfis').innerHTML = perfisCache.length ? perfisCache.map(p => `
+                const classeDoPerfil = p => p.permissoes.includes('administrativo.ver') ? 'administrativo' : (p.permissoes.includes('valores.ver') ? 'so_valores' : 'operador');
+                const DESC_CLASSE = {
+                    administrativo: 'Veem gráficos, indicadores, resumos, telas de gestão e dinheiro.',
+                    so_valores: 'Veem preços e valores, mas não a parte administrativa (vendedor, representante).',
+                    operador: 'Só trabalham na rotina (estoque, status, etapas, entregas), sem informação administrativa.'
+                };
+                const SIGLA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                const resumoHorario = p => {
+                    const itens = [];
+                    if (p.bloqueioManual) itens.push('<span class="selo perigo">Bloqueado agora</span>');
+                    const dias = p.horario && p.horario.dias ? p.horario.dias : null;
+                    if (dias) {
+                        const grupos = [];
+                        for (let d = 0; d < 7; d++) {
+                            const j = dias[String(d)]; if (!j) continue;
+                            const ult = grupos[grupos.length - 1];
+                            if (ult && ult.fim === d - 1 && ult.i === j.inicio && ult.f === j.fim) ult.fim = d;
+                            else grupos.push({ ini: d, fim: d, i: j.inicio, f: j.fim });
+                        }
+                        itens.push(grupos.length ? grupos.map(g => `<span class="selo neutro">${g.ini === g.fim ? SIGLA[g.ini] : SIGLA[g.ini] + ' a ' + SIGLA[g.fim]} ${esc(g.i)}–${esc(g.f)}</span>`).join('') : '<span class="selo perigo">Nenhum dia liberado</span>');
+                    } else itens.push('<span class="selo neutro">Sem limite de horário</span>');
+                    itens.push(p.inatividadeMin ? `<span class="selo neutro">Sai após ${p.inatividadeMin} min parado</span>` : '<span class="selo neutro">Sem limite de inatividade</span>');
+                    return itens.join('');
+                };
+                const cartao = p => `
                     <div class="cartao${p.ativo ? '' : ' desativado'}" data-id="${p.id}">
                         <b>${esc(p.nome)}</b>
                         <p>${esc(p.descricao || '')}</p>
@@ -599,7 +630,13 @@
                             <span class="selo ${p.permissoes.includes('valores.ver') ? 'aviso' : 'neutro'}">${p.permissoes.length} de ${total} permissões</span>
                             ${p.ativo ? '' : '<span class="selo neutro">Desativado</span>'}
                         </div>
-                    </div>`).join('') : '<p class="vazio">Nenhum perfil cadastrado</p>';
+                        <div class="horario">${resumoHorario(p)}<button type="button" data-horario="1" title="Configurar bloqueio, horário e inatividade deste perfil">Horário</button></div>
+                    </div>`;
+                $('lista-perfis').innerHTML = perfisCache.length ? ['administrativo', 'so_valores', 'operador'].map(c => {
+                    const lista = perfisCache.filter(p => classeDoPerfil(p) === c);
+                    if (!lista.length) return '';
+                    return `<section class="grupo-classe"><h3>Classe: ${seloClasse(c)}</h3><p class="dica-classe">${DESC_CLASSE[c]} A classe vem das permissões do perfil.</p><div class="grade-perfis">${lista.map(cartao).join('')}</div></section>`;
+                }).join('') : '<p class="vazio">Nenhum perfil cadastrado</p>';
             } catch (e) { $('lista-perfis').innerHTML = `<p class="vazio">${esc(e.message)}</p>`; }
         }
         carregadores.perfis = carregarPerfis;
@@ -680,7 +717,11 @@
             try { if (!catalogo) catalogo = await api('/admin/permissoes'); } catch (e) { return toast(e.message, 'erro'); }
             abrirPerfil(id);
         }
-        $('lista-perfis').addEventListener('click', e => { const c = e.target.closest('[data-id]'); if (c) abrirPerfilComCatalogo(Number(c.dataset.id)); });
+        $('lista-perfis').addEventListener('click', async e => {
+            const c = e.target.closest('[data-id]'); if (!c) return;
+            await abrirPerfilComCatalogo(Number(c.dataset.id));
+            if (e.target.closest('[data-horario]')) $('p-bloco-horario').scrollIntoView({ block: 'start', behavior: 'smooth' });
+        });
         $('btn-novo-perfil').addEventListener('click', () => abrirPerfilComCatalogo(null));
         umPorVez($('p-salvar'), salvarPerfil);
         $('p-fechar').addEventListener('click', fecharPerfil);
