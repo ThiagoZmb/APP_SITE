@@ -346,6 +346,7 @@
                             <h3 class="det-secao-titulo" id="d-sec-acoes">Ações</h3>
                             <div class="acoes" id="d-acoes-principais">
                                 <button type="button" class="btn btn-primary" id="btn-agendar" data-perm="entregas.programar" hidden>Agendar</button>
+                                <button type="button" class="btn btn-secondary" id="btn-agendar-retirada" data-perm="entregas.programar" hidden>Agendar retirada</button>
                                 <button type="button" class="btn btn-primary" id="btn-reagendar" data-perm="entregas.programar" hidden>Reagendar</button>
                                 <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
                                 <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
@@ -379,7 +380,7 @@
                         <h2 id="ag-titulo">Agendar</h2>
                         <div class="form-group"><label for="f-tipo">Tipo</label>
                             <select id="f-tipo"><option value="">Escolha…</option><option value="motorista">Entrega</option><option value="retirada">Retirado pelo cliente</option><option value="outro_estado">Entrega em outro estado</option></select></div>
-                        <div class="form-group"><label for="f-data">Data</label><input type="date" id="f-data"></div>
+                        <div class="form-group"><label for="f-data" id="rot-data">Data</label><input type="date" id="f-data"></div>
                         <div class="form-group" id="w-motorista" hidden><label for="f-motorista">Motorista</label><select id="f-motorista"></select></div>
                         <fieldset id="w-endereco" hidden>
                             <legend>Endereço de entrega</legend>

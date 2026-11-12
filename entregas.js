@@ -19,7 +19,8 @@
 
   // ============ LÓGICA PURA ============
   const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
-    retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada', encerrada: 'Encerrada', suspensa: 'Suspensa' };
+    retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada', encerrada: 'Encerrada', suspensa: 'Suspensa',
+    retirada_agendada: 'Retirada agendada' }; // só exibição: no banco continua status 'agendada' + tipo 'retirada'
   const COR_STATUS = { a_programar: 'aviso', agendada: 'info', em_rota: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok', enviada: 'info', cancelada: 'neutro', encerrada: 'neutro', suspensa: 'aviso' };
   const ROTULO_TIPO = { motorista: 'Entrega', retirada: 'Retirado pelo cliente', outro_estado: 'Entrega em outro estado' };
   const ROTULO_EVENTO = { criada: 'Entrou na fila', agendada: 'Agendada', reagendada: 'Reagendada', saiu: 'Saiu para a entrega', entregue: 'Entregue',
@@ -39,7 +40,9 @@
   const abaDoStatus = s => (ABAS.find(a => a.status.includes(s)) || {}).id || null;
 
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
-  const corStatus = s => Sit.cor('entrega', s);
+  const corStatus = s => (s === 'retirada_agendada' ? 'info' : Sit.cor('entrega', s));
+  // status mostrado nos selos: Agendada de tipo "Retirado pelo cliente" vira "Retirada agendada" (a data é a que o cliente marcou)
+  const statusDaEntrega = e => { const s = e.statusExibicao || e.status; return s === 'agendada' && e.tipo === 'retirada' ? 'retirada_agendada' : s; };
   const rotuloTipo = t => ROTULO_TIPO[t] || '—';
   const rotuloEvento = t => ROTULO_EVENTO[t] || String(t ?? '');
   // Linha do tempo: o cancelamento automático por "saiu de Pronto" acompanha o selo (Encerrada/Suspensa), e não "Cancelada".
@@ -433,9 +436,9 @@
     function linha(e, aba) {
       const tdBase = `${celulaNumero(e)}${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
-      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(e.statusExibicao || e.status)}${seloProducao(e.situacaoPedido)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')}</td>`;
+      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')} ${botaoAcao('agendar-retirada', 'Agendar retirada')}</td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
-      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(e.statusExibicao || e.status)}${seloProducao(e.situacaoPedido)}</td>` +
+      else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td>` +
         (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
       return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
     }
@@ -456,7 +459,7 @@
       if (!estado.mes) { const h = new win.Date(); estado.mes = { ano: h.getFullYear(), mes: h.getMonth() }; }
       const { ano, mes } = estado.mes;
       const semanas = montarMes(estado.lista.filter(casa), ano, mes, hojeISO());
-      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(e.status)}) · Responsável: ${e.motorista || rotuloTipo(e.tipo)}`)}">` +
+      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(statusDaEntrega(e))}) · Responsável: ${e.motorista || rotuloTipo(e.tipo)}`)}">` +
         `<strong>${esc(e.numero)}</strong> ${esc(e.cliente || '')}</button>`;
       const celula = c => {
         const aberto = estado.diaAberto === c.dia;
@@ -566,7 +569,7 @@
       const sub = [seq, e.cliente].filter(Boolean).join(' · ');
       $('d-sub').textContent = sub;
       $('d-sub').hidden = !sub;
-      $('d-status').innerHTML = selo(e.statusExibicao || e.status) + seloProducao(div.situacaoPedido);
+      $('d-status').innerHTML = selo(statusDaEntrega(e)) +seloProducao(div.situacaoPedido);
       // pedido editado depois da divisão: aviso fixo; a divisão fica bloqueada e o pedido não fecha sozinho na última baixa
       const avisos = [];
       if (div.situacaoPedido === 'Em Produção' && !['cancelada', 'entregue', 'retirado'].includes(e.status)) avisos.push('Pedido ainda em produção: a baixa só é possível depois que ele estiver Pronto.');
@@ -587,6 +590,7 @@
       estado.copiar = { endereco, contato: txt(e.contatoLocal) };
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
+      $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
       // um primário por vez: com uma baixa disponível (retirada/enviada/comprovante), Reagendar vira secundário
       const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a));
       $('btn-reagendar').classList.toggle('btn-primary', !temBaixa);
@@ -654,14 +658,16 @@
       $('w-motorista').hidden = t !== 'motorista';
       $('w-endereco').hidden = t === 'retirada';
       $('w-outro').hidden = t !== 'outro_estado';
+      $('rot-data').textContent = t === 'retirada' ? 'Data da retirada (marcada pelo cliente)' : 'Data';
     }
-    async function abrirFormAgendar(reagendar) {
+    // tipoInicial = 'retirada' abre o formulário já como "Agendar retirada" (o cliente marcou o dia para vir buscar)
+    async function abrirFormAgendar(reagendar, tipoInicial) {
       await garantirMotoristas();
       const e = estado.det.entrega;
       estado.reagendando = reagendar;
-      $('ag-titulo').textContent = (reagendar ? 'Reagendar' : 'Agendar') + ` — pedido ${e.numero}`;
+      $('ag-titulo').textContent = (reagendar ? 'Reagendar' : tipoInicial === 'retirada' ? 'Agendar retirada' : 'Agendar') + ` — pedido ${e.numero}`;
       $('f-motorista').innerHTML = '<option value="">' + (estado.motoristas.length ? 'Escolha…' : 'Nenhum motorista com permissão de baixa') + '</option>' + estado.motoristas.map(m => `<option value="${esc(m.codigo)}">${esc(m.nome)}</option>`).join('');
-      $('f-tipo').value = e.tipo || '';
+      $('f-tipo').value = (!reagendar && tipoInicial) || e.tipo || '';
       $('f-data').value = e.dataAgendada || '';
       $('f-motorista').value = e.motoristaCodigo ? String(e.motoristaCodigo) : '';
       const a = e.endereco || {};
@@ -960,10 +966,14 @@
         const id = alvo.getAttribute('data-id');
         ocupado(async () => {
           await abrirDetalhe(id);
-          if (botao) await abrirFormAgendar(botao.getAttribute('data-acao') === 'reagendar');
+          if (botao) {
+            const acao = botao.getAttribute('data-acao');
+            await abrirFormAgendar(acao === 'reagendar', acao === 'agendar-retirada' ? 'retirada' : undefined);
+          }
         });
       });
       $('btn-agendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(false)));
+      $('btn-agendar-retirada').addEventListener('click', () => ocupado(() => abrirFormAgendar(false, 'retirada')));
       $('btn-reagendar').addEventListener('click', () => ocupado(() => abrirFormAgendar(true)));
       $('btn-cancelar').addEventListener('click', () => {
         abrirForm('vista-cancelar', ['c-motivo']);
@@ -1030,7 +1040,7 @@
     });
   }
 
-  return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
     rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
     linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };
