@@ -156,7 +156,7 @@
                     </div>
                     <div class="rolagem">
                         <table class="tabela" id="lista-usuarios">
-                            <thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th>Classe</th><th>Estados</th><th>Situação</th><th></th></tr></thead>
+                            <thead><tr><th>Nome</th><th>Cargo</th><th>Perfil</th><th title="Calculado pelas permissões finais do usuário (perfil + exceções): Administrativo vê gráficos, indicadores e dinheiro; Só valores vê preços; Operador só trabalha na rotina">Tipo de acesso</th><th>Estados</th><th>Situação</th><th></th></tr></thead>
                             <tbody><tr><td colspan="6" class="vazio">Carregando...</td></tr></tbody>
                         </table>
                     </div>
@@ -439,7 +439,8 @@
                     ativo: !!u.ativoWeb, cargo: u.cargo || '', excecoes: new Map((u.excecoes || []).map(e => [e.permissao, e.tipo]))
                 };
                 $('f-titulo').textContent = u.nome;
-                $('f-sub').textContent = u.perfil ? `Perfil ${u.perfil.nome}` : 'Sem acesso à web';
+                const classeDoUsuario = (usuarios.find(x => x.codigo === u.codigo) || {}).classe;
+                $('f-sub').textContent = u.perfil ? `Perfil ${u.perfil.nome}${CLASSES[classeDoUsuario] ? ' · Tipo de acesso: ' + CLASSES[classeDoUsuario][0] : ''}` : 'Sem acesso à web';
                 $('f-nome').value = u.nome; $('f-nome').readOnly = true;
                 $('campo-senha').hidden = true; $('f-senha').value = '';
                 preencherSelects(u.cargo, u.empresa);

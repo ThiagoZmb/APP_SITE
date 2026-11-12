@@ -39,7 +39,7 @@ test('painel_inicial.html e clientes.html: gráficos e rankings só com a chave,
 
 test('usuarios.html: coluna Classe com Administrativo, Só valores e Operador (calculada pelo servidor)', () => {
   const h = ler('usuarios.html');
-  assert.match(h, /<th>Perfil<\/th><th>Classe<\/th><th>Estados<\/th>/);
+  assert.match(h, /<th>Perfil<\/th><th title="[^"]*">Tipo de acesso<\/th><th>Estados<\/th>/);
   assert.match(h, /administrativo: \['Administrativo'/);
   assert.match(h, /so_valores: \['Só valores'/);
   assert.match(h, /operador: \['Operador'/);
