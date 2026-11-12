@@ -17,9 +17,9 @@ test('orçamentos: só volta para páginas do próprio sistema e só quando o sa
   const re = new RegExp(m.match(/test\(v\)/) ? m.match(/return (\/.*\/i)\.test\(v\)/)[1].slice(1, -2) : '', 'i');
   for (const ok of ['painel_inicial.html', 'painel_inicial.html?cliente=ACME']) assert.ok(re.test(ok), ok);
   for (const ruim of ['https://outro.site/x', '//outro.site', 'javascript:alert(1)', '../x.html', 'a.html#x']) assert.ok(!re.test(ruim), ruim);
-  // com aviso de preço divergente (decisão do dono, 2026-11-11) também fica na tela para o usuário ler
-  assert.match(h, /if \(paginaDeRetorno && !falhasDesenho && !avisosPreco\.length && !divergentes\.length\)/);
-  assert.match(h, /paginaDeRetorno = ''; \/\/ documento novo/);
+  // decisão do dono (2026-11-12): salvar/atualizar NUNCA sai da página, nem quando veio da lista
+  assert.ok(!/window\.location\.href = paginaDeRetorno/.test(h), 'salvar não redireciona');
+  assert.ok(!h.includes('Voltando para a lista'));
 });
 
 test('lista de pedidos/orçamentos: botões Pedidos/Orçamentos ficam no canto esquerdo (antes do título)', () => {

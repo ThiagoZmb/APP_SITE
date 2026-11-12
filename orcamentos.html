@@ -3605,16 +3605,11 @@
                     const env = await Desenhos.enviarDesenhos(chamarDesenho, json.tipo, json.numero, itensSalvos);
                     falhasDesenho = env.falhas; resumoDesenho = Desenhos.resumoEnvio(env);
                 } catch { falhasDesenho = 0; }
-                // aberto pela lista ("Abrir para editar"): salvou sem pendências, volta para a mesma página da lista
+                // decisão do dono (2026-11-12): depois de salvar/atualizar continua nesta página (não volta para a lista)
                 const avisosPreco = (json.avisos && json.avisos.precoMudou) || [];
                 // valor da tela diferente do preço que o servidor calcula hoje para o item gravado: gravou o da tela, mas avisa
                 const divergentes = (json.avisos && json.avisos.precoDivergente) || [];
                 const textoDivergentes = textoPrecoDivergente(divergentes);
-                if (paginaDeRetorno && !falhasDesenho && !avisosPreco.length && !divergentes.length) {
-                    mostrarMsgSalvar(`${json.tipo} nº ${json.numero} salvo. Voltando para a lista…`, 'ok');
-                    setTimeout(() => { window.location.href = paginaDeRetorno; }, 700);
-                    return;
-                }
                 // reabre do servidor: renova itens, origem e impressão digital (a numeração dos itens pode ter mudado)
                 const reaberto = await abrirDocumento(json.tipo, json.numero, { confirmar: false, silencioso: true });
                 if (!reaberto) { docAberto = { tipo: json.tipo, numero: json.numero, impressao: null, data: '', podeEditar: true }; mostrarNumero(); renderItens(); }
