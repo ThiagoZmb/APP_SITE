@@ -2691,8 +2691,8 @@
             set('f-obs', item.obs);
             limparAcessorios();
             acessoriosItem = (item.acessorios || []).filter(a => a.origem !== ORIGEM_SIS).map(a => ({ ...a }));
-            // trilhos já reduzidos no item salvo: o recálculo do sistema reaplica (limitado ao máximo da tabela)
-            (item.acessorios || []).filter(ehTrilhoSis).forEach(a => { trilhosReduzidos[a.nome] = a.qtd; });
+            // quantidades de linhas do sistema já editadas no item salvo: o recálculo do sistema reaplica
+            (item.acessorios || []).filter(a => a.origem === ORIGEM_SIS).forEach(a => { trilhosReduzidos[a.nome] = a.qtd; });
             complementosSerr = (item.complementos || []).map(c => ({ ...c }));
             renderComplementos();
             renderPecas();
@@ -3372,7 +3372,7 @@
             document.querySelector('#quadro-acessorios tbody').innerHTML = acessoriosItem.map((a, i) => `
                 <tr data-nome="${escapeHtml(a.nome)}" data-origem="${escapeHtml(a.origem)}">
                     <td>${escapeHtml(a.nome)}</td>
-                    <td><input type="number" class="ac-qtd" min="1" step="1" value="${a.qtd}" data-i="${i}" ${ehTrilhoSis(a) ? `max="${a.qtdMax || a.qtd}" title="Trilho: de 1 até ${a.qtdMax || a.qtd} (definido pela tabela do sistema)"` : a.origem === ORIGEM_SIS ? 'readonly title="Quantidade definida pelo sistema"' : ''}></td>
+                    <td><input type="number" class="ac-qtd" min="1" max="9999" step="1" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? `title="Quantidade do sistema: ${a.qtdMax || a.qtd}; pode ser alterada"` : ''}></td>
                     <td>${a.tamanho || 0}</td>
                     <td data-valor>${a.valorUnitario != null ? formatCurrency(a.valorUnitario) : '—'}</td>
                     <td data-valor>${a.valorTotal != null ? formatCurrency(a.valorTotal) : '—'}</td>
@@ -3428,8 +3428,8 @@
                 acessoriosItem = [...r.acessorios.map(a => {
                     const x = { nome: a.nome, classe: a.classe, qtd: a.qtd, qtdMax: a.qtd, tamanho: a.tamanho, origem: ORIGEM_SIS,
                         valorUnitario: a.valorUnitario, valorTotal: a.valorTotal };
-                    const red = ehTrilhoSis(x) ? parseInt(trilhosReduzidos[x.nome]) : 0;
-                    if (red >= 1 && red < x.qtd) {
+                    const red = parseInt(trilhosReduzidos[x.nome]);
+                    if (red >= 1 && red !== x.qtd) {
                         x.qtd = red;
                         x.valorTotal = x.valorUnitario != null ? Math.round(x.valorUnitario * red * 100) / 100 : null;
                     }
@@ -3458,8 +3458,8 @@
             if (!inp || inp.readOnly) return;
             const a = acessoriosItem[Number(inp.dataset.i)];
             if (!a) return;
-            a.qtd = Math.min(ehTrilhoSis(a) ? (a.qtdMax || a.qtd) : 9999, Math.max(1, parseInt(inp.value) || 1));
-            if (ehTrilhoSis(a)) trilhosReduzidos[a.nome] = a.qtd;
+            a.qtd = Math.min(9999, Math.max(1, parseInt(inp.value) || 1));
+            if (a.origem === ORIGEM_SIS) trilhosReduzidos[a.nome] = a.qtd; // quantidade editada de linha do sistema (nome histórico "trilhosReduzidos")
             a.valorTotal = a.valorUnitario != null ? Math.round(a.valorUnitario * a.qtd * 100) / 100 : null; // o motor confirma em seguida
             renderAcessorios();
             calcularPrecoAutomatico();

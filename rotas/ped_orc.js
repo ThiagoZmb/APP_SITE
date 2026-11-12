@@ -258,15 +258,15 @@ async function prepararItem(db, leitor, cliente, item, n) {
       descontoAlturaSistema = sis.descontoAltura;
       const larguraVao = larguraRealDoVao(item, folhasDoItem(item, { descontoAlturaSistema: sis.descontoAltura }));
       const doSistema = acessoriosDoSistema(sis.itens, sis.config, { larguraVao, folhas: n0, incluirDesempenador: !!d.desempenador });
-      // trilhos: o usuário pode reduzir a quantidade (1 até o que a tabela do sistema dá para este nº de portas), nunca aumentar
-      const reduzidos = new Map();
+      // quantidade editada pelo usuário em QUALQUER linha do sistema (decisão do dono, 2026-11-12): vale a enviada (inteiro 1 a 9999);
+      // sem quantidade válida, vale a da tabela do sistema. Só a quantidade muda: preço unitário, tamanho e desconto são os de sempre.
+      const editadas = new Map();
       for (const a of Array.isArray(item.acessorios) ? item.acessorios : []) {
-        if (a && a.origem === 'SISTEMA DE CORRER' && !reduzidos.has(a.nome)) reduzidos.set(a.nome, parseInt(a.qtd));
+        if (a && a.origem === 'SISTEMA DE CORRER' && !editadas.has(a.nome)) editadas.set(a.nome, Number(a.qtd));
       }
       acessorios = [...doSistema.map(a => {
-        const pedida = reduzidos.get(a.nome);
-        const ehTrilho = /TRILHO/i.test(`${a.classe || ''} ${a.nome}`);
-        const qtd = ehTrilho && pedida >= 1 ? Math.min(a.qtd, pedida) : a.qtd;
+        const pedida = editadas.get(a.nome);
+        const qtd = Number.isInteger(pedida) && pedida >= 1 && pedida <= 9999 ? pedida : a.qtd;
         return { nome: a.nome, qtd, tamanho: a.tamanho, origem: 'SISTEMA DE CORRER' };
       }), ...acessorios];
     }
