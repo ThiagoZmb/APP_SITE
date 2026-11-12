@@ -307,7 +307,7 @@
             // linha acima do título de seção: só se já houve seção antes e a seção imediatamente anterior ficou visível
             let secoesVistas = 0, secaoAnteriorVisivel = false;
             nav.innerHTML =
-                `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
+                `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}" aria-label="Ir para a tela principal"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map((m, i) => {
                     const oculto = visivel[i] ? '' : ' hidden';
                     if (m.secao) {

@@ -919,3 +919,5 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .ez-erro { margin: 10px 0 0; font-size: 13px; line-height: 1.4; color: var(--danger-color); }
 .ez-erro[hidden] { display: none; }
 @media (max-width: 520px) { .ez-campos { grid-template-columns: 1fr; } .ez-geral .ez-campo { flex-basis: 100%; } }
+.sb-marca:hover b { color: var(--primary-color); }
+.sb-marca:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: -3px; border-radius: 12px; }
