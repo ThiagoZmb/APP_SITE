@@ -114,7 +114,7 @@
   const moeda = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const urlDia = (data, situacao) => `calendario_dia.html?data=${encodeURIComponent(data)}&situacao=${encodeURIComponent(situacao)}`;
   const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'grade' ? '&visao=grade' : ''}`;
-  const rotuloPedido = p => `Pedido ${p.numero}, ${p.cliente || 'sem cliente'}, ${p.situacao || 'sem situação'}${p.atrasado ? ', atrasado' : ''}`;
+  const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}`;
   const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
   const iconesItens = p => {
     const tem = ITENS_DOC.filter(([chave]) => p[chave]);
