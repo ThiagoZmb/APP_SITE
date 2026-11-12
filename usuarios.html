@@ -80,6 +80,10 @@
         #grade-permissoes td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 13.5px; vertical-align: middle; }
         #grade-permissoes tr.area td { background: hsla(255, 60%, 55%, .14); font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); }
         #grade-permissoes tr.critica td:first-child b { color: var(--primary-color); }
+        .h-dias { display: grid; gap: 6px; margin-top: 8px; }
+        .h-dia { display: grid; grid-template-columns: 110px 1fr auto 1fr; gap: 8px; align-items: center; font-size: 13px; }
+        .h-dia input[type="time"] { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--white); color: var(--text-dark); }
+        .h-dia input[type="time"]:disabled { opacity: .4; }
         #grade-permissoes td.do-perfil { text-align: center; color: var(--text-light); width: 70px; }
         #grade-permissoes td.resultado { font-weight: 800; width: 80px; text-align: center; }
         #grade-permissoes td.resultado.sim { color: var(--success-color); }
@@ -244,6 +248,14 @@
                     <div class="campo form-group"><label for="p-descricao">Descrição</label><input id="p-descricao" maxlength="255" autocomplete="off"></div>
                     <div class="campo"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="p-ativo"> Perfil ativo</label></div>
                 </div>
+            </div>
+            <div class="bloco" id="p-bloco-horario">
+                <h4>Acesso por horário e inatividade</h4>
+                <p class="dica">Vale na hora para todos os usuários deste perfil (quem está logado é desconectado). Perfil que administra usuários não pode ter restrição. Hora de Brasília.</p>
+                <div class="campo"><label class="chk"><input type="checkbox" id="h-manual"> Bloquear o acesso deste perfil agora</label></div>
+                <div class="campo form-group"><label for="h-inativ">Voltar ao login após ficar sem usar (minutos)</label><input type="number" id="h-inativ" min="1" max="480" step="1" placeholder="Sem limite"></div>
+                <div class="campo"><label class="chk"><input type="checkbox" id="h-usar"> Limitar por dia e horário</label></div>
+                <div id="h-dias" class="h-dias" hidden></div>
             </div>
             <div class="bloco">
                 <h4>Permissões do perfil</h4>
@@ -609,8 +621,34 @@
             for (const c of catalogo) { let a = areas.find(x => x.nome === c.area); if (!a) areas.push(a = { nome: c.area, itens: [] }); a.itens.push(c); }
             $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(c =>
                 `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> ${esc(c.nome)}</label>`).join('')}</fieldset>`).join('');
+            // horário de acesso: só para perfil já criado (a restrição precisa do id)
+            $('p-bloco-horario').hidden = !p;
+            const NOMES_DIA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'], PADRAO = ['07:00', '18:00'];
+            const h = p && p.horario ? p.horario.dias : null;
+            $('h-manual').checked = !!(p && p.bloqueioManual);
+            $('h-inativ').value = p && p.inatividadeMin ? p.inatividadeMin : '';
+            $('h-usar').checked = !!h;
+            $('h-dias').hidden = !h;
+            $('h-dias').innerHTML = NOMES_DIA.map((n, d) => {
+                const j = h ? h[String(d)] : (d >= 1 && d <= 5 ? { inicio: PADRAO[0], fim: PADRAO[1] } : null);
+                return `<div class="h-dia" data-dia="${d}"><label class="chk"><input type="checkbox" class="h-lib"${j ? ' checked' : ''}> ${n}</label>` +
+                    `<input type="time" class="h-ini" value="${j ? j.inicio : PADRAO[0]}"${j ? '' : ' disabled'} aria-label="${n}: início"><span>até</span>` +
+                    `<input type="time" class="h-fim" value="${j ? j.fim : PADRAO[1]}"${j ? '' : ' disabled'} aria-label="${n}: fim"></div>`;
+            }).join('');
             mostrarFichaPerfil(true);
             $('p-nome').focus();
+        }
+        $('h-usar').addEventListener('change', () => { $('h-dias').hidden = !$('h-usar').checked; });
+        $('h-dias').addEventListener('change', e => {
+            const lib = e.target.closest('.h-lib'); if (!lib) return;
+            lib.closest('.h-dia').querySelectorAll('input[type="time"]').forEach(i => { i.disabled = !lib.checked; });
+        });
+        function lerHorarioDaTela() {
+            const dias = {};
+            document.querySelectorAll('#h-dias .h-dia').forEach(l => {
+                dias[l.dataset.dia] = l.querySelector('.h-lib').checked ? { inicio: l.querySelector('.h-ini').value, fim: l.querySelector('.h-fim').value } : null;
+            });
+            return { dias };
         }
         function fecharPerfil() { mostrarFichaPerfil(false); perfilAtual = null; }
         async function salvarPerfil() {
@@ -626,6 +664,9 @@
             try {
                 if (perfilAtual.id) {
                     await api('/admin/perfis/' + perfilAtual.id, { method: 'PUT', body: JSON.stringify({ nome, descricao: $('p-descricao').value.trim(), ativo, permissoes }) });
+                    await api('/admin/perfis/' + perfilAtual.id + '/horario', { method: 'PUT', body: JSON.stringify({
+                        bloqueioManual: $('h-manual').checked, inatividadeMin: $('h-inativ').value.trim() === '' ? null : Number($('h-inativ').value),
+                        horario: $('h-usar').checked ? lerHorarioDaTela() : null }) });
                     toast(`Perfil ${nome} atualizado. Vale na hora para os usuários dele.`, 'ok');
                 } else {
                     await api('/admin/perfis', { method: 'POST', body: JSON.stringify({ nome, descricao: $('p-descricao').value.trim(), permissoes }) });

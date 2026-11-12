@@ -168,7 +168,7 @@ function gerarToken(usuario, sid) {
     { expiresIn: '8h', issuer: 'elegance-api' }
   );
 }
-const resumoAcesso = a => ({ perfil: a.perfil, permissoes: [...a.permissoes], estados: a.estados });
+const resumoAcesso = a => ({ perfil: a.perfil, permissoes: [...a.permissoes], estados: a.estados, inatividadeMin: a.inatividadeMin || null, restrito: !!a.restricao });
 
 async function autenticar(req, res, next) {
   const header = req.headers.authorization || '';
@@ -194,6 +194,7 @@ async function autenticar(req, res, next) {
     console.error('Erro ao carregar acesso:', err.code || 'sem código');
     return res.status(500).json({ error: 'Erro de servidor' });
   }
+  if (req.acesso && req.acesso.bloqueio) return res.status(401).json({ error: req.acesso.bloqueio.mensagem, bloqueio: req.acesso.bloqueio.motivo });
   if (!req.acesso || !req.acesso.ativo) return res.status(401).json({ error: 'Sessão encerrada. Faça login novamente.' });
   req.user = { id: payload.id, nome: req.acesso.nome, cargo: req.acesso.cargo };
   next();
@@ -320,7 +321,7 @@ registro.publica('post', '/login', loginLimiter, async (req, res) => {
     const a = await acesso.carregar(user.CODIGO);
     if (!a || !a.ativo) {
       await auditarLogin('login_negado', user, req.ip, username);
-      return res.status(403).json({ success: false, message: 'Acesso à web não liberado. Fale com o administrador.' });
+      return res.status(403).json({ success: false, message: a && a.bloqueio ? a.bloqueio.mensagem : 'Acesso à web não liberado. Fale com o administrador.' });
     }
     const sid = await sessoes.criar(user.CODIGO, req.ip);
     await auditarLogin('login_ok', user, req.ip, username);

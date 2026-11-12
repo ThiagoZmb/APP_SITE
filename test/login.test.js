@@ -37,7 +37,7 @@ test('login ok devolve acesso.permissoes como array e token com v:2', async t =>
   const d = await r.json();
   assert.equal(d.success, true);
   assert.deepEqual(d.user, { nome: 'Caio', empresa: 'ELEGANCE', cargo: 'Produção' });
-  assert.deepEqual(d.acesso, { perfil: { id: 4, nome: 'Estoquista' }, permissoes: ['estoque.ver'], estados: [] });
+  assert.deepEqual(d.acesso, { perfil: { id: 4, nome: 'Estoquista' }, permissoes: ['estoque.ver'], estados: [], inatividadeMin: null, restrito: false });
   const claims = jwt.decode(d.token);
   assert.equal(claims.v, 2);
   assert.equal(claims.id, 7);
@@ -73,5 +73,5 @@ test('/auth/verify devolve permissões atuais', async t => {
   const r = await fetch(s.url + '/auth/verify', { headers: { Authorization: 'Bearer ' + tokenV2() } });
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { valid: true, user: { nome: 'Caio', cargo: 'Produção' },
-    acesso: { perfil: { id: 4, nome: 'Estoquista' }, permissoes: ['estoque.ver', 'valores.ver'], estados: [] } });
+    acesso: { perfil: { id: 4, nome: 'Estoquista' }, permissoes: ['estoque.ver', 'valores.ver'], estados: [], inatividadeMin: null, restrito: false } });
 });

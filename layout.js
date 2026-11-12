@@ -126,6 +126,36 @@
             fetch(API + '/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, keepalive: true }).catch(() => {});
         } catch { /* sem rede ou sem fetch: a saída segue */ }
     }
+    // Perfis com limite de inatividade (acesso.inatividadeMin, definido por perfil em Usuários > Perfis): sem uso do mouse, teclado ou
+    // toque por esse tempo, a sessão é encerrada e volta ao login. A última atividade fica no localStorage para valer entre abas.
+    // Perfis com horário/bloqueio (acesso.restrito) conferem o servidor a cada minuto para sair na hora em que o acesso fecha.
+    let vigia = null;
+    function armarVigia() {
+        const ac = auth()?.acesso || {};
+        const min = Number(ac.inatividadeMin) || 0, restrito = !!ac.restrito;
+        const chave = min + '|' + restrito;
+        if (vigia && vigia.chave === chave) return;
+        if (vigia) { vigia.parar(); vigia = null; }
+        if (!min && !restrito) return;
+        const CH = 'atividade-ts';
+        const marcar = () => { try { localStorage.setItem(CH, String(Date.now())); } catch { /* sem armazenamento: só esta aba conta */ } };
+        let local = Date.now(), ultimoMarcado = 0;
+        const ativ = () => { local = Date.now(); if (local - ultimoMarcado > 2000) { ultimoMarcado = local; marcar(); } };
+        const eventos = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'];
+        if (min) eventos.forEach(e => window.addEventListener(e, ativ, { passive: true, capture: true }));
+        const sair = () => { encerrarSessao(); try { localStorage.removeItem('auth'); } catch { /* segue */ } location.href = LOGIN_URL; };
+        const tique = setInterval(() => {
+            if (!min) return;
+            let outra = 0; try { outra = Number(localStorage.getItem(CH)) || 0; } catch { /* ignora */ }
+            if (Date.now() - Math.max(local, outra) >= min * 60000) sair();
+        }, 5000);
+        const conferir = restrito ? setInterval(async () => {
+            const a = auth(); if (!a?.token) return;
+            try { const r = await fetch(API + '/auth/verify', { headers: { Authorization: 'Bearer ' + a.token } }); if (r.status === 401) { try { localStorage.removeItem('auth'); } catch { /* segue */ } location.href = LOGIN_URL; } } catch { /* sem rede: tenta no próximo minuto */ }
+        }, 60000) : null;
+        vigia = { chave, parar: () => { clearInterval(tique); if (conferir) clearInterval(conferir); eventos.forEach(e => window.removeEventListener(e, ativ, { capture: true })); } };
+        marcar();
+    }
     const arquivoAtual = () => (location.pathname.split('/').pop() || 'inicio.html').toLowerCase();
     // pode('a') ou pode('a b'): todos os códigos exigidos
     const pode = codigos => {
@@ -238,6 +268,7 @@
             fundo.className = 'sb-fundo';
             fundo.addEventListener('click', () => document.body.classList.remove('menu-aberto'));
             container.appendChild(fundo);
+            armarVigia();
             atualizarAcesso(nav, atual);
         }
         montarTopo(container, header, a);
@@ -313,6 +344,7 @@
             const mudou = chave(novo.acesso) !== chave(d.acesso);
             novo.acesso = d.acesso;
             localStorage.setItem('auth', JSON.stringify(novo));
+            armarVigia();
             // a página já se montou com o acesso antigo: recarrega uma vez para refletir o novo
             if (mudou) { location.reload(); return; }
             desenharMenu(nav, atual);

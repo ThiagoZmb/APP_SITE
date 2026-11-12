@@ -6,6 +6,7 @@
 const { CATALOGO, CODIGOS, permissoesFinais, classeDoAcesso } = require('../seguranca/permissoes');
 const { parseEstados } = require('../seguranca/acesso');
 const { CUSTO_BCRYPT } = require('../seguranca/login_limite');
+const { validarHorario, lerHorario } = require('../calculo/horario_acesso');
 
 const ADMIN = ['admin.usuarios'];
 const MSG_PROPRIO = 'Você não pode remover o seu próprio acesso de administrador.';
@@ -277,11 +278,45 @@ function registrarAdmin({ rota, pool, acesso, bcrypt, sessoes }) {
                 (SELECT COUNT(*) FROM web_usuario_acesso a WHERE a.perfil_id = p.id) AS qtd_usuarios
          FROM web_perfis p ORDER BY p.nome`);
       const [pp] = await pool.execute('SELECT perfil_id, permissao FROM web_perfil_permissoes');
-      res.json(perfis.map(p => ({
-        id: p.id, nome: p.nome, descricao: p.descricao || '', ativo: Number(p.ativo) === 1, qtdUsuarios: Number(p.qtd_usuarios) || 0,
-        permissoes: pp.filter(x => x.perfil_id === p.id).map(x => x.permissao)
-      })));
+      let hs = [];
+      try { [hs] = await pool.execute('SELECT perfil_id, bloqueio_manual, horario, inatividade_min FROM web_perfil_horario'); } catch { hs = []; } // sem a tabela: tudo liberado
+      res.json(perfis.map(p => {
+        const h = hs.find(x => x.perfil_id === p.id);
+        return {
+          id: p.id, nome: p.nome, descricao: p.descricao || '', ativo: Number(p.ativo) === 1, qtdUsuarios: Number(p.qtd_usuarios) || 0,
+          permissoes: pp.filter(x => x.perfil_id === p.id).map(x => x.permissao),
+          bloqueioManual: !!h && Number(h.bloqueio_manual) === 1, horario: h ? lerHorario(h.horario) : null,
+          inatividadeMin: h && Number(h.inatividade_min) > 0 ? Number(h.inatividade_min) : null
+        };
+      }));
     } catch (err) { falha(res, '/admin/perfis', err); }
+  });
+
+  // Horário de acesso do perfil: { bloqueioManual: bool, horario: { dias: {0..6: null | {inicio, fim}} } | null }.
+  // Perfil que administra usuários não pode ter restrição (não se tranca o sistema para fora).
+  rota('put', '/admin/perfis/:id/horario', ADMIN, async (req, res) => {
+    const id = parseInt(req.params.id, 10) || 0;
+    const b = req.body || {};
+    const v = validarHorario(b.horario);
+    if (v.erro) return erro(res, 400, v.erro);
+    const manual = b.bloqueioManual === true;
+    const inat = b.inatividadeMin === null || b.inatividadeMin === undefined || b.inatividadeMin === '' ? null : Number(b.inatividadeMin);
+    if (inat !== null && (!Number.isInteger(inat) || inat < 1 || inat > 480)) return erro(res, 400, 'Tempo de inatividade: informe de 1 a 480 minutos (ou deixe vazio para não limitar).');
+    try {
+      const [[perfil]] = await pool.execute('SELECT id, nome FROM web_perfis WHERE id = ? LIMIT 1', [id]);
+      if (!perfil) return erro(res, 404, 'Perfil não encontrado.');
+      if (manual || v.horario || inat !== null) {
+        const [adm] = await pool.execute('SELECT 1 AS x FROM web_perfil_permissoes WHERE perfil_id = ? AND permissao = ? LIMIT 1', [id, 'admin.usuarios']);
+        if (adm.length) return erro(res, 409, 'Este perfil administra usuários e não pode ter bloqueio nem horário limite.');
+      }
+      await pool.execute(
+        `INSERT INTO web_perfil_horario (perfil_id, bloqueio_manual, horario, inatividade_min, atualizado_por, atualizado_em) VALUES (?, ?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE bloqueio_manual = VALUES(bloqueio_manual), horario = VALUES(horario), inatividade_min = VALUES(inatividade_min), atualizado_por = VALUES(atualizado_por), atualizado_em = NOW()`,
+        [id, manual ? 1 : 0, v.horario ? JSON.stringify(v.horario) : null, inat, req.user.nome]);
+      await auditar(pool, { quem: req.user.nome, acao: 'perfil_horario', alvo: 'perfil:' + perfil.nome, detalhe: { bloqueioManual: manual, horario: v.horario, inatividadeMin: inat } });
+      acesso.limpar(); // vale na próxima ação de cada usuário do perfil (quem está logado é barrado na hora)
+      res.json({ ok: true });
+    } catch (err) { falha(res, 'PUT /admin/perfis/:id/horario', err); }
   });
 
   rota('post', '/admin/perfis', ADMIN, async (req, res) => {

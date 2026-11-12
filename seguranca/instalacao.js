@@ -434,6 +434,15 @@ const TABELAS = [
      atualizado_por VARCHAR(190) NOT NULL,
      atualizado_em DATETIME NOT NULL
    ) ${OPCOES}`,
+  // Horário de acesso por PERFIL (2026-11-12): janela por dia da semana (JSON) e bloqueio manual. Sem linha = sem restrição.
+  `CREATE TABLE IF NOT EXISTS \`web_perfil_horario\` (
+     perfil_id INT NOT NULL PRIMARY KEY,
+     bloqueio_manual TINYINT(1) NOT NULL DEFAULT 0,
+     horario TEXT NULL,
+     inatividade_min INT NULL,
+     atualizado_por VARCHAR(190) NOT NULL,
+     atualizado_em DATETIME NOT NULL
+   ) ${OPCOES}`,
   `CREATE TABLE IF NOT EXISTS \`web_entrega_anexos\` (
      id INT AUTO_INCREMENT PRIMARY KEY,
      entrega_id INT NOT NULL,
