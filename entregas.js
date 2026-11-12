@@ -717,7 +717,13 @@
       $('erro-criar').textContent = '';
       return ocupado(async () => {
         let r;
-        try { r = await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/criar`, { metodo: 'POST', corpo: {} }); } catch (err) { $('erro-criar').textContent = err.message; return; }
+        try { r = await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/criar`, { metodo: 'POST', corpo: {} }); } catch (err) {
+          // pedido que já tem entrega: abre a existente em vez de só avisar
+          await carregar();
+          const alvo = entregaParaAbrir(entregasDoPedido(estado.lista, numero));
+          if (alvo && /já tem entrega/.test(err.message || '')) { toast(`O pedido ${numero} já tem entrega: aberta ao lado.`, 'ok'); await abrirDetalhe(alvo.id); return; }
+          $('erro-criar').textContent = err.message; return;
+        }
         toast(`Entrega criada para o pedido ${numero}.`, 'ok');
         await carregar();
         if (r && r.entrega) await abrirDetalhe(r.entrega.id); else mostrar('vazio-painel');
@@ -1015,7 +1021,12 @@
     } catch { /* sem query */ }
     // não esconde o formulário de criar que acabou de abrir (vindo do menu "Programar entrega")
     if (!abriuCriar) mostrar('vazio-painel');
-    carregar();
+    carregar().then(async () => {
+      // se o pedido do menu já tem entrega, abre ela em vez de oferecer criar outra
+      if (!abriuCriar) return;
+      const alvo = entregaParaAbrir(entregasDoPedido(estado.lista, $('cr-numero').value));
+      if (alvo) { try { await abrirDetalhe(alvo.id); } catch { /* fica no formulário */ } }
+    });
   }
 
   return { ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
