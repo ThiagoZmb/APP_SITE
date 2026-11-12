@@ -85,10 +85,10 @@ test('etiquetas: número não numérico é 400', async t => {
 });
 
 // ---------- janela de ajustes: GET .../itens e POST ----------
-const textosZpl = zpl => [...new Set([...zpl.matchAll(/^FD([^^]*)^FS/g)].map(m => m[1]))];
+const textosZpl = zpl => [...new Set([...zpl.matchAll(/\^FD([^^]*)\^FS/g)].map(m => m[1]))];
 
-test('etiquetas: GET padrão não muda (sem Medidas, sem Destino, Qtd do item) e não consulta medidas nem estado', async t => {
-  const { chamar, f } = await preparar(t, { itens: 1 });
+test('etiquetas: GET padrão não muda (sem Medidas, sem Destino, Qtd do item)', async t => {
+  const { chamar } = await preparar(t, { itens: 1 });
   const j = await (await chamar('/etiquetas/pedido/23425')).json();
   assert.deepEqual(textosZpl(j.zpl).filter(x => !/^[0-9A-F]{40,}/.test(x)), ['Pedido: 23425', 'Nome: Fulano Ação Ltda', 'Cliente: Beltrano', 'Qtd: 1', '23425']);
   assert.ok(!j.zpl.includes('Medidas') && !j.zpl.includes('Destino'));
@@ -164,7 +164,7 @@ test('etiquetas: POST e GET /itens sem pedidos.pdf são 403; restrito a outros e
   assert.equal((await chamar('/etiquetas/pedido/abc/itens')).status, 400);
 });
 
-test('etiquetas: texto digitado com ^ ~ \ nunca chega ao ZPL como comando (medidas recusadas antes; UF só siglas)', async t => {
+test('etiquetas: texto digitado com ^ ~ nunca chega ao ZPL como comando (medidas recusadas antes; UF só siglas)', async t => {
   const { postar } = await preparar(t, { itens: 1 });
   assert.equal((await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', incluirMedidas: true, medidas: '1^XZ' }] })).status, 400);
   assert.equal((await postar('/etiquetas/pedido/23425', { uf: '~D' })).status, 400);

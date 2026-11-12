@@ -21,6 +21,7 @@ function normalizarUf(v) {
 // inteiro 1 a 999 (número ou texto só de dígitos); vazio -> undefined (usa o padrão); inválido -> null
 function normalizarQtd(v) {
   if (vazio(v)) return undefined;
+  if (typeof v !== 'number' && typeof v !== 'string') return null;
   const n = typeof v === 'number' ? v : (/^\d{1,4}$/.test(String(v).trim()) ? Number(String(v).trim()) : NaN);
   return Number.isInteger(n) && n >= QTD_MIN && n <= QTD_MAX ? n : null;
 }
