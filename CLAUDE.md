@@ -233,7 +233,7 @@ Chapas do estoque por Pedido (guilhotina com rotação) e retalhos; quantidades 
 > Regras completas: `docs/regras/corte-vidros.md` (ler antes de mexer neste módulo).
 
 ### Etiquetas na Zebra (uma por item do Pedido, ZPL 100 × 60 mm)
-Servidor monta o ZPL (`GET /etiquetas/pedido/:numero`, `pedidos.pdf`); o serviço local envia RAW ao spooler; texto do banco saneado (`^ ~ \`); medida ausente = "—"; sem dinheiro; impressora só do `zebra.config.json` ou detectada, nunca da requisição. **Ainda não testado em Zebra real.**
+Servidor monta o ZPL (`GET /etiquetas/pedido/:numero`, `pedidos.pdf`); o serviço local envia RAW ao spooler; texto do banco saneado (`^ ~ \`); medida ausente = "—"; sem dinheiro; impressora só do `zebra.config.json` ou detectada, nunca da requisição. **Desde 2026-11-12 a detecção ignora impressoras de arquivo/virtuais (porta `FILE:`, causa do `.prn` em Documentos), prefere a Zebra USB pronta, recusa ambiguidade (pede para fixar em `zebra.config.json`) e tem diagnóstico em `GET 127.0.0.1:3917/impressoras`; o serviço do PC precisa ser reinstalado.** **Ainda não testado em Zebra real.**
 > Regras completas: `docs/regras/etiqueta-zebra.md` (ler antes de mexer neste módulo).
 
 ### Checklist de produção (PDF no banco)

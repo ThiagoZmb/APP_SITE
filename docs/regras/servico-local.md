@@ -7,3 +7,8 @@ local/                   salvador_pdf.js (+ iniciar_salvador_pdf.bat): serviço 
 ## Etiquetas na Zebra (zebra.js)
 
 `local/zebra.js` (carregado por `salvador_pdf.js`, como o `sefaz.js`): `POST /etiqueta` com `{ zpl }` grava o ZPL RAW no spooler do Windows por PowerShell (`winspool.drv`), sem dependências. A impressora vem só de `zebra.config.json` (exemplo `zebra.config.exemplo.json`) ou da primeira com "zebra"/"zdesigner" no nome; `/ping` informa `zebra`. O instalador copia `zebra.js` e o exemplo e preserva o `zebra.config.json`. Regras completas: `docs/regras/etiqueta-zebra.md`. Teste: `test/zebra_local.test.js`.
+
+### Impressora errada, diagnóstico e atualização do serviço (2026-11-12)
+- `zebra.js` agora ignora impressoras de arquivo/virtuais (porta `FILE:` etc.), prefere a Zebra em porta USB pronta, recusa-se a adivinhar entre várias e recusa nome fixado em porta de arquivo. Detalhe em `docs/regras/etiqueta-zebra.md`.
+- **Diagnóstico:** `GET http://127.0.0.1:3917/impressoras` (abrir no navegador do PC) mostra as impressoras instaladas (nome, porta, driver) e quais são candidatas; só lê.
+- **Atualizar o serviço no PC** (ele roda copiado em `C:\Programa Elegance\Servico`, então só `git pull` não basta): atualizar o repositório e dar duplo clique em `local\instalar_salvador_pdf.bat`. Ele recopia `salvador_pdf.js`, `zebra.js` etc., preserva `zebra.config.json` e reinicia o serviço. Conferir depois: `http://127.0.0.1:3917/ping` e `/impressoras`.

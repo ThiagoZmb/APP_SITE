@@ -25,7 +25,7 @@
       const p = await fetch(LOCAL + '/etiqueta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zpl: d.zpl }) });
       const resp = await p.json().catch(() => ({}));
       if (!p.ok) throw new Error(resp.error || `Erro ${p.status} no serviço local.`);
-      alert(`${d.quantidade} etiqueta(s) enviada(s) para ${resp.impressora}.`);
+      alert(`${d.quantidade} etiqueta(s) enviada(s) para ${resp.impressora}${resp.porta ? ' (porta ' + resp.porta + ')' : ''}.`);
     } catch (err) { alert('Não foi possível imprimir as etiquetas: ' + err.message); }
   }
 

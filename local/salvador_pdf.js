@@ -65,6 +65,10 @@ const servidor = http.createServer(async (req, res) => {
       return await sefaz.tratar(req, res, url, { origemPermitida: !!origem && ORIGENS.has(origem) });
     }
     if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra });
+    if (req.method === 'GET' && url.pathname === '/impressoras') {
+      if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
+      try { return responder(res, 200, await zebra.diagnostico()); } catch (e) { return responder(res, 500, { error: 'Não foi possível listar as impressoras do Windows: ' + e.message }); }
+    }
     if (req.method === 'POST' && url.pathname === '/etiqueta') {
       if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await zebra.tratar(req, res);

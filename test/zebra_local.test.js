@@ -17,7 +17,10 @@ test.before(async () => { await new Promise(ok => servidor.listen(0, '127.0.0.1'
 test.after(() => { servidor.close(); fs.rmSync(raiz, { recursive: true, force: true }); });
 
 const post = (corpo, headers = {}) => fetch(base + '/etiqueta', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(corpo) });
-function falsos({ nomes = ['HP LaserJet', 'ZDesigner ZD220'], config = {}, falha } = {}) {
+const imp = (nome, porta, extra = {}) => ({ nome, porta, driver: extra.driver || nome, status: 'Normal', offline: false, ...extra });
+const USB = imp('ZDesigner ZD220', 'USB001');
+const ARQUIVO = imp('ZDesigner for Developers - Generic Printer 600dpi', 'FILE:');
+function falsos({ nomes = [imp('HP LaserJet', 'IP_10.0.0.5'), USB], config = {}, falha } = {}) {
   const envios = [];
   zebra.listar = async () => nomes;
   zebra.config = config;
@@ -30,11 +33,70 @@ test('validarZpl aceita ^XA…^XZ e recusa o resto', () => {
   for (const ruim of ['texto', '^XAsem fim', 'sem inicio^XZ', 42, null, '^XA' + 'x'.repeat(1024 * 1024) + '^XZ']) assert.equal(validarZpl(ruim).ok, false);
 });
 
-test('escolherImpressora: config manda; sem config acha Zebra/ZDesigner; sem nada é null', () => {
-  assert.equal(escolherImpressora(['HP LaserJet', 'ZDesigner ZD220'], {}), 'ZDesigner ZD220');
-  assert.equal(escolherImpressora(['HP LaserJet', 'Zebra ZD421'], {}), 'Zebra ZD421');
-  assert.equal(escolherImpressora(['HP LaserJet', 'ZDesigner ZD220'], { impressora: 'HP LaserJet' }), 'HP LaserJet');
-  assert.equal(escolherImpressora(['HP LaserJet'], {}), null);
+test('escolherImpressora: config manda; sem config acha Zebra/ZDesigner (nomes puros ainda valem); sem nada é erro', () => {
+  assert.equal(escolherImpressora(['HP LaserJet', 'ZDesigner ZD220'], {}).impressora.nome, 'ZDesigner ZD220');
+  assert.equal(escolherImpressora(['HP LaserJet', 'Zebra ZD421'], {}).impressora.nome, 'Zebra ZD421');
+  assert.equal(escolherImpressora(['HP LaserJet', 'ZDesigner ZD220'], { impressora: 'hp laserjet' }).impressora.nome, 'HP LaserJet');
+  assert.match(escolherImpressora(['HP LaserJet'], {}).erro, /Nenhuma impressora Zebra USB encontrada; instaladas: "HP LaserJet"/);
+  assert.match(escolherImpressora(['HP LaserJet'], { impressora: 'Outra' }).erro, /não está instalada/);
+});
+
+test('ignora impressora de arquivo (FILE:) e virtual, mesmo com nome Zebra/ZDesigner', () => {
+  const r = escolherImpressora([ARQUIVO, imp('Zebra Virtual', 'PORTPROMPT:'), imp('ZDesigner X', 'C:\\x\\saida.prn'), USB], {});
+  assert.equal(r.impressora.nome, 'ZDesigner ZD220');
+  assert.equal(r.impressora.porta, 'USB001');
+  const so = escolherImpressora([ARQUIVO, imp('Microsoft Print to PDF', 'PORTPROMPT:')], {});
+  assert.match(so.erro, /Nenhuma impressora Zebra USB encontrada/);
+  assert.match(so.erro, /FILE:/);
+});
+
+test('prefere a Zebra em USB pronta; USB offline não é escolhida', () => {
+  const rede = imp('Zebra ZT230', 'IP_10.0.0.9');
+  assert.equal(escolherImpressora([rede, USB], {}).impressora.nome, 'ZDesigner ZD220');
+  const off = imp('ZDesigner ZD220', 'USB001', { offline: true });
+  assert.equal(escolherImpressora([off, rede], {}).impressora.nome, 'Zebra ZT230');
+  assert.match(escolherImpressora([off], {}).erro, /Nenhuma impressora Zebra USB/);
+});
+
+test('várias candidatas: não adivinha, lista nomes e portas e manda fixar em zebra.config.json', () => {
+  const r = escolherImpressora([USB, imp('Zebra ZD421', 'USB002')], {});
+  assert.equal(r.impressora, undefined);
+  assert.match(r.erro, /ZDesigner ZD220.*USB001.*Zebra ZD421.*USB002.*zebra\.config\.json/);
+});
+
+test('nome fixado em porta FILE: ou virtual é recusado; fixado em Zebra real vale', () => {
+  assert.match(escolherImpressora([ARQUIVO, USB], { impressora: ARQUIVO.nome }).erro, /imprime em arquivo/);
+  assert.match(escolherImpressora([imp('Microsoft Print to PDF', 'PORTPROMPT:')], { impressora: 'Microsoft Print to PDF' }).erro, /virtual/);
+  assert.equal(escolherImpressora([ARQUIVO, USB], { impressora: 'ZDesigner ZD220' }).impressora.porta, 'USB001');
+});
+
+test('POST /etiqueta: com o driver de arquivo instalado não imprime nele; resposta traz nome e porta', async () => {
+  let envios = falsos({ nomes: [ARQUIVO, USB] });
+  let r = await post({ zpl: ZPL });
+  assert.deepEqual(await r.json(), { ok: true, impressora: 'ZDesigner ZD220', porta: 'USB001' });
+  assert.equal(envios[0].impressora, 'ZDesigner ZD220');
+  envios = falsos({ nomes: [ARQUIVO] });
+  r = await post({ zpl: ZPL });
+  assert.equal(r.status, 500);
+  assert.equal(envios.length, 0);
+  envios = falsos({ nomes: [ARQUIVO, USB], config: { impressora: ARQUIVO.nome } });
+  r = await post({ zpl: ZPL });
+  assert.equal(r.status, 500);
+  assert.match((await r.json()).error, /arquivo/);
+  assert.equal(envios.length, 0);
+});
+
+test('GET /impressoras lista nome, porta, driver e candidatas; some só leitura e respeita a origem', async () => {
+  falsos({ nomes: [ARQUIVO, USB, imp('HP LaserJet', 'IP_1')] });
+  const d = await (await fetch(base + '/impressoras')).json();
+  assert.equal(d.impressoras.length, 3);
+  assert.equal(d.impressoras[0].virtual, true);
+  assert.equal(d.impressoras[0].candidata, false);
+  assert.equal(d.impressoras[1].candidata, true);
+  assert.equal(d.impressoras[1].usb, true);
+  assert.deepEqual(d.escolhida, { nome: 'ZDesigner ZD220', porta: 'USB001' });
+  assert.equal((await fetch(base + '/impressoras', { headers: { Origin: 'https://site-estranho.com' } })).status, 403);
+  assert.equal((await fetch(base + '/impressoras', { method: 'POST' })).status, 404);
 });
 
 test('POST /etiqueta envia uma vez à impressora escolhida', async () => {
@@ -59,10 +121,10 @@ test('ZPL inválido é 400 e não envia', async () => {
 });
 
 test('sem impressora é 500 com a lista; falha no envio é 500 e o serviço segue vivo', async () => {
-  falsos({ nomes: ['HP LaserJet'] });
+  falsos({ nomes: [imp('HP LaserJet', 'IP_1')] });
   let r = await post({ zpl: ZPL });
   assert.equal(r.status, 500);
-  assert.deepEqual((await r.json()).impressoras, ['HP LaserJet']);
+  assert.deepEqual((await r.json()).impressoras, [{ nome: 'HP LaserJet', porta: 'IP_1' }]);
   falsos({ falha: 'spooler parado' });
   r = await post({ zpl: ZPL });
   assert.equal(r.status, 500);
