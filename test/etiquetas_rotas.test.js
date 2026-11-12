@@ -19,7 +19,7 @@ function banco({ existe = true, itens = 2, estadoCliente = 'SP' } = {}) {
     [/FROM ped_orc_lista_itens/, () => lista],
     [/FROM ped_orc_itens_v4/, () => lista.map(l => ({ ITEM_PEDIDO: l.ITEM, ALTURA: '2100', LARGURA: '900', PERFIL: 'Perfil 30' }))],
     [/FROM cadastro_clientes/, () => [{ ESTADO: estadoCliente }]],
-    [/FROM ped_orc /, () => (existe ? [{ RAZAO_SOCIAL: 'Fulano Ação Ltda', DATA_PRONTO: '2026-11-10' }] : [])]
+    [/FROM ped_orc /, () => (existe ? [{ RAZAO_SOCIAL: 'Fulano Ação Ltda', CLIENTE_FINAL: 'Beltrano' }] : [])]
   ];
   return criarPoolFalso(regras);
 }
@@ -50,8 +50,8 @@ test('etiquetas: pedido com 2 itens devolve ZPL com 2 etiquetas, sem dinheiro', 
   const j = await r.json();
   assert.equal(j.quantidade, 2);
   assert.equal((j.zpl.match(/\^XA/g) || []).length, 2);
-  assert.ok(j.zpl.includes('2100x900'));
-  assert.ok(j.zpl.includes('10/11/2026'));
+  assert.ok(j.zpl.includes('Nome: Fulano Ação Ltda'));
+  assert.ok(j.zpl.includes('Cliente: Beltrano'));
   assert.ok(!j.zpl.includes('R$'));
   for (const n of nomes(j)) assert.ok(!REGEX_VALOR.test(n), n);
 });
