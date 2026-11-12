@@ -40,7 +40,7 @@
   const abaDoStatus = s => (ABAS.find(a => a.status.includes(s)) || {}).id || null;
 
   const rotuloStatus = s => ROTULO_STATUS[s] || String(s ?? '');
-  const corStatus = s => (s === 'retirada_agendada' ? 'info' : Sit.cor('entrega', s));
+  const corStatus = s => (s === 'retirada_agendada' ? 'retirada' : Sit.cor('entrega', s));
   // status mostrado nos selos: Agendada de tipo "Retirado pelo cliente" vira "Retirada agendada" (a data é a que o cliente marcou)
   const statusDaEntrega = e => { const s = e.statusExibicao || e.status; return s === 'agendada' && e.tipo === 'retirada' ? 'retirada_agendada' : s; };
   const rotuloTipo = t => ROTULO_TIPO[t] || '—';
@@ -436,11 +436,12 @@
     function linha(e, aba) {
       const tdBase = `${celulaNumero(e)}${aba === 'fila' ? `<td>${esc(dataBR(e.dataPedido))}</td>` : ''}<td>${esc(e.cliente)}</td><td>${esc(e.clienteFinal || '-')}</td><td>${esc(local(e))}</td>`;
       let resto;
-      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td><td class="acao">${botaoAcao('agendar', 'Agendar')} ${botaoAcao('agendar-retirada', 'Agendar retirada')}</td>`;
+      if (aba === 'fila') resto = `<td>${esc(dataBR(e.dataPrometida))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td><td class="acao"><div class="acao-pilha">${botaoAcao('agendar', 'Agendar')}${botaoAcao('agendar-retirada', 'Agendar retirada')}</div></td>`;
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
       else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td>` +
         (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
-      return `<tr data-id="${esc(e.id)}"${estado.det && estado.det.entrega.id === e.id ? ' class="selecionado"' : ''}>${tdBase}${resto}</tr>`;
+      const classes = [estado.det && estado.det.entrega.id === e.id ? 'selecionado' : '', statusDaEntrega(e) === 'retirada_agendada' ? 'linha-retirada' : ''].filter(Boolean).join(' ');
+      return `<tr data-id="${esc(e.id)}"${classes ? ` class="${classes}"` : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {
       fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', ''],
@@ -459,7 +460,7 @@
       if (!estado.mes) { const h = new win.Date(); estado.mes = { ano: h.getFullYear(), mes: h.getMonth() }; }
       const { ano, mes } = estado.mes;
       const semanas = montarMes(estado.lista.filter(casa), ano, mes, hojeISO());
-      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(e.status)}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(statusDaEntrega(e))}) · Responsável: ${e.motorista || rotuloTipo(e.tipo)}`)}">` +
+      const etiqueta = e => `<button type="button" class="etiqueta ${corStatus(statusDaEntrega(e))}" data-id="${esc(e.id)}" title="${esc(`${e.numero}${rotuloSequencia(e) ? ' · ' + rotuloSequencia(e) : ''} — ${e.cliente || ''} (${rotuloStatus(statusDaEntrega(e))}) · Responsável: ${e.motorista || rotuloTipo(e.tipo)}`)}">` +
         `<strong>${esc(e.numero)}</strong> ${esc(e.cliente || '')}</button>`;
       const celula = c => {
         const aberto = estado.diaAberto === c.dia;
