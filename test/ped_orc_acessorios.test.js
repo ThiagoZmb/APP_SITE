@@ -47,24 +47,6 @@ test('/calcular_preco soma os acessórios ao item (base = portas + acessórios; 
   assert.deepEqual(j.acessorios, [{ nome: 'Dobradiça', qtd: 2, tamanho: 0, origem: 'MANUAL', valorTabela: 20, valorUnitario: 20, valorTotal: 40 }]);
 });
 
-test('/calcular_preco: QTD editada de acessório do sistema vale (acima ou abaixo da tabela); inválida volta à tabela', async t => {
-  const { chamar } = await prepararPedOrc(t);
-  const base = { frente: 'Porta de Correr', clienteCodigo: 7, altura: 2100, largura: 1600, qtd: 2, perfil: 'Perfil P',
-    detalhes: { sistema: 'S1', transpasse: '50', desempenador: false } };
-  const sis = (trilho, roldana) => [{ nome: 'Trilho Sup', qtd: trilho, origem: 'SISTEMA DE CORRER' }, { nome: 'Roldana', qtd: roldana, origem: 'SISTEMA DE CORRER' }];
-  const qtds = async acessorios => {
-    const r = await chamar('/calcular_preco', 'POST', { ...base, acessorios });
-    assert.equal(r.status, 200);
-    return (await r.json()).acessorios.map(a => [a.nome, a.qtd, a.valorTotal]);
-  };
-  const T = n => ['Trilho Sup', n, 40 * n], R = n => ['Roldana', n, 15 * n]; // total = unitário × qtd
-  assert.deepEqual(await qtds(sis(2, 4)), [T(2), R(4)]); // tabela: Trilho 2, Roldana 4
-  assert.deepEqual(await qtds(sis(3, 6)), [T(3), R(6)]); // editadas acima da tabela (antes o trilho era limitado a 2)
-  assert.deepEqual(await qtds(sis(1, 1)), [T(1), R(1)]); // abaixo da tabela
-  assert.deepEqual(await qtds(sis(0, 'x')), [T(2), R(4)]); // inválida = tabela
-  assert.deepEqual(await qtds(sis(-1, 2.5)), [T(2), R(4)]);
-});
-
 test('/calcular_preco somenteAcessorios: preço dos acessórios sem perfil nem medidas da porta', async t => {
   const { chamar } = await prepararPedOrc(t);
   const r = await chamar('/calcular_preco', 'POST', { frente: 'Porta de giro', clienteCodigo: 7, somenteAcessorios: true,

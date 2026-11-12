@@ -297,3 +297,18 @@ test('orcamentos.html: abrir documento escolhe a opção sem diferenciar caixa e
   const abrir = /async function abrirDocumento[\s\S]*?return true;/.exec(h)[0];
   assert.match(abrir, /sincronizarTipoToggle\(\)/);
 });
+
+// QTD editada de linha do sistema (decisão do dono, 2026-11-12): vale a enviada (inteiro 1 a 9999), acima ou abaixo da tabela
+// (tabela: Trilho Sup 2, Roldana 4); inválida = tabela; preço unitário e tamanho continuam os do cadastro
+test('porta de correr: QTD editada de acessório do sistema é gravada; inválida volta à tabela', async t => {
+  const sis = (trilho, roldana) => [{ nome: 'Trilho Sup', qtd: trilho, origem: 'SISTEMA DE CORRER' }, { nome: 'Roldana', qtd: roldana, origem: 'SISTEMA DE CORRER' }];
+  const gravado = async acessorios => {
+    const { banco, chamar } = await prepararPedOrc(t);
+    assert.equal((await salvar(chamar, corpo({ itens: [correr({ acessorios })] }))).status, 200);
+    return banco.complementos.map(c => [c.COMPLEMENTO, c.QTD, c.TAMANHO, c.UNITARIO]);
+  };
+  assert.deepEqual(await gravado(sis(2, 4)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
+  assert.deepEqual(await gravado(sis(3, 6)), [['Trilho Sup', 3, 1600, 40], ['Roldana', 6, 0, 15]]);
+  assert.deepEqual(await gravado(sis(1, 1)), [['Trilho Sup', 1, 1600, 40], ['Roldana', 1, 0, 15]]);
+  assert.deepEqual(await gravado(sis(0, 2.5)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
+});
