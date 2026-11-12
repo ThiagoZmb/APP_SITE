@@ -26,7 +26,7 @@ test('layout.js compila e o wrapper do fetch deixa as chamadas normais passarem'
 test('menu lateral: sem o item "Início" nem o título "Visão geral"; o logo continua levando à primeira página liberada', () => {
   assert.ok(!fonte.includes("texto: 'Início'") && !fonte.includes("{ secao: 'Visão geral' }"));
   assert.ok(fonte.includes("'inicio.html': ['paineis.ver']"), 'a página Início continua existindo e protegida pela permissão');
-  assert.ok(fonte.includes("<a class=\"sb-marca\" href=\"${window.Acesso.primeiraPagina() || 'inicio.html'}\" aria-label=\"Ir para a tela principal\">"), 'o logo é o atalho para a tela principal');
+  assert.ok(fonte.includes("<a class=\"sb-marca\" href=\"${window.Acesso.paginaDaMarca() || 'inicio.html'}\" aria-label=\"${window.Acesso.paginaDaMarca() === 'inicio.html' ? 'Ir para o Início' : 'Ir para a tela principal'}\">"), 'o logo é o atalho para a tela principal');
 });
 
 test('indicador de carregamento: porta de correr em miniatura (trilho, duas folhas, sombra, texto), keyframes presentes e o giro dos botões preservado', () => {

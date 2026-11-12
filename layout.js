@@ -173,6 +173,9 @@
     const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html')) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
         && !(atendAtivoPara(acesso) && atendBloqueia(p))
         && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
+    // Destino da logo do menu: o Início, se este acesso pode vê-lo (permissão da página e modo atendimento); senão a primeira página de sempre
+    const INICIO = 'inicio.html';
+    const paginaDaMarcaDe = acesso => PAGINAS[INICIO].every(item => atendeItem(item, acesso?.permissoes || [])) && !(atendAtivoPara(acesso) && atendBloqueia(INICIO)) ? INICIO : primeiraPaginaDe(acesso);
     const podePagina = arquivo => {
         const exige = PAGINAS[String(arquivo || '').toLowerCase()];
         if (atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivo)) return false;
@@ -185,6 +188,8 @@
         podePagina,
         primeiraPagina: () => primeiraPaginaDe(auth()?.acesso),
         primeiraPaginaDe,
+        paginaDaMarca: () => paginaDaMarcaDe(auth()?.acesso),
+        paginaDaMarcaDe,
         paginaLiberada: () => podePagina(arquivoAtual()),
         aplicar
     };
@@ -307,7 +312,7 @@
             // linha acima do título de seção: só se já houve seção antes e a seção imediatamente anterior ficou visível
             let secoesVistas = 0, secaoAnteriorVisivel = false;
             nav.innerHTML =
-                `<a class="sb-marca" href="${window.Acesso.primeiraPagina() || 'inicio.html'}" aria-label="Ir para a tela principal"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
+                `<a class="sb-marca" href="${window.Acesso.paginaDaMarca() || 'inicio.html'}" aria-label="${window.Acesso.paginaDaMarca() === 'inicio.html' ? 'Ir para o Início' : 'Ir para a tela principal'}"><img class="sb-logo" src="imagens/icone_elegance.png" alt="Elegance"><span><b>Elegance</b><small>Sistema de gestão</small></span></a>` +
                 MENU.map((m, i) => {
                     const oculto = visivel[i] ? '' : ' hidden';
                     if (m.secao) {

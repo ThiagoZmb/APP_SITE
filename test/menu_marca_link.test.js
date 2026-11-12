@@ -1,4 +1,4 @@
-// Logo "Elegance" do menu lateral (layout.js): é um link para a tela principal (mesma regra do login).
+// Logo "Elegance" do menu lateral (layout.js): link para o Início (ou, sem acesso a ele, a primeira página do login).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -50,24 +50,35 @@ function linkDaMarca(html) {
   return m[0];
 }
 
-test('logo do menu: link para a tela principal, com rótulo acessível e caminho relativo', () => {
+const href = a => a.match(/href="([^"]*)"/)[1];
+
+test('logo do menu: Administrador vai para o Início, com rótulo acessível e caminho relativo', () => {
   const { html } = montarMenu({ permissoes: ['pedidos.ver', 'paineis.ver', 'estoque.ver'] });
   const a = linkDaMarca(html);
+  assert.ok(a.includes('aria-label="Ir para o Início"'), a);
+  assert.equal(href(a), 'inicio.html');
+  assert.ok(!/^(\/|https?:)/.test(href(a)), 'caminho relativo (o site roda em /APP_SITE/)');
+});
+
+test('logo do menu: sem acesso ao Início cai na primeira página dele', () => {
+  const p = ['pedidos.ver', 'estoque.ver'];
+  const { html, window } = montarMenu({ permissoes: p });
+  const a = linkDaMarca(html);
+  assert.equal(href(a), 'painel_inicial.html');
+  assert.equal(href(a), window.Acesso.primeiraPaginaDe({ permissoes: p }));
   assert.ok(a.includes('aria-label="Ir para a tela principal"'), a);
-  const href = a.match(/href="([^"]*)"/)[1];
-  assert.equal(href, 'painel_inicial.html', 'quem tem pedidos.ver cai em Pedidos e Orçamentos (primeira página do mapa)');
-  assert.ok(!/^(\/|https?:)/.test(href), 'caminho relativo (o site roda em /APP_SITE/)');
 });
 
-test('logo do menu: o destino é o mesmo que o login usa (Acesso.primeiraPaginaDe)', () => {
-  const acesso = { permissoes: ['paineis.ver', 'estoque.ver'] };
-  const { html, window } = montarMenu({ permissoes: acesso.permissoes });
-  const href = linkDaMarca(html).match(/href="([^"]*)"/)[1];
-  assert.equal(href, window.Acesso.primeiraPaginaDe(acesso));
-  assert.equal(href, 'inicio.html', 'sem pedidos.ver a tela principal é o Início');
+test('logo do menu: com modo atendimento ligado o Início (escondido) é pulado; sem o modo volta', () => {
+  const { html, window } = montarMenu({ permissoes: ['paineis.ver', 'pedidos.ver', 'atendimento.modo'] });
+  assert.equal(href(linkDaMarca(html)), 'painel_inicial.html');
+  assert.equal(window.Acesso.paginaDaMarcaDe({ permissoes: ['paineis.ver', 'pedidos.ver'] }), 'inicio.html');
 });
 
-test('logo do menu: com modo atendimento ligado o destino pula o Início (tela escondida)', () => {
-  const { html } = montarMenu({ permissoes: ['paineis.ver', 'pedidos.ver', 'atendimento.modo'] });
-  assert.equal(linkDaMarca(html).match(/href="([^"]*)"/)[1], 'painel_inicial.html');
+test('o destino do login não mudou (primeiraPaginaDe segue a ordem de PAGINAS)', () => {
+  const { window } = montarMenu({ permissoes: [] });
+  const p = ['paineis.ver', 'pedidos.ver', 'estoque.ver'];
+  assert.equal(window.Acesso.primeiraPaginaDe({ permissoes: p }), 'painel_inicial.html');
+  assert.equal(window.Acesso.paginaDaMarcaDe({ permissoes: p }), 'inicio.html');
+  assert.equal(window.Acesso.primeiraPaginaDe({ permissoes: ['paineis.ver', 'estoque.ver'] }), 'inicio.html');
 });
