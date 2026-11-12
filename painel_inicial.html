@@ -215,6 +215,15 @@
         #orders-table th, #orders-table td { overflow: hidden; text-overflow: ellipsis; }
         #orders-table .selo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
         #orders-table .selo + .selo { margin-left: 4px; }
+        /* Celular: 10 colunas não cabem em ~360 px (tudo virava "..."). Colunas pelo conteúdo e rolagem lateral na tabela. */
+        @media (max-width: 768px) {
+            .tabela-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            #orders-table { table-layout: auto; width: max-content; min-width: 100%; }
+            #orders-table col { width: auto !important; }
+            #orders-table th, #orders-table td { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+            #orders-table td:nth-child(2), #orders-table td:nth-child(3), #orders-table td:nth-child(7) { max-width: 180px; }
+            #orders-table .selo { max-width: none; }
+        }
         #orders-tbody tr { cursor: pointer; }
         #orders-tbody tr.divisor-semana td { border-top: 2px solid var(--primary-color); }
         td.num, th.num { text-align: right; }
