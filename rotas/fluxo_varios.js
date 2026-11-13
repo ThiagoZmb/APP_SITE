@@ -3,10 +3,11 @@
 //   (precisa de clientes.receber, a mesma permissão do /clientes/receber).
 // POST /fluxo/dividir (financeiro.lancar + valores.ver): divide um movimento JÁ EXISTENTE (Editar movimento), Entrada ou Saída: a 1ª parcela atualiza o
 //   registro, as demais viram registros novos; tudo ou nada.
+// POST /fluxo/salvar_datas (financeiro.lancar + valores.ver): Novo movimento (Entrada ou Saída) repetido em 2 a 24 datas, mesmos dados; tudo ou nada.
 // GET  /fluxo/pedido_resumo?numero= (financeiro.ver + valores.ver): total do pedido, já recebido e quanto falta (só leitura).
 // Nenhuma linha é sobrescrita: o ID novo vem de MAX(ID)+1 travado na transação e o INSERT é simples (colisão = erro, nunca overwrite).
 const { ErroUsuario, emTransacao } = require('./transacao');
-const { validarDivisao, validarDivisaoEdicao, numeroUnicoDoPedido, saldoDoPedido } = require('../calculo/fluxo_varios');
+const { validarVariasDatas, validarDivisao, validarDivisaoEdicao, numeroUnicoDoPedido, saldoDoPedido } = require('../calculo/fluxo_varios');
 
 const ESCREVER = ['financeiro.lancar', 'valores.ver'];
 const LER = ['financeiro.ver', 'valores.ver'];
@@ -55,6 +56,18 @@ function registrarFluxoVarios({ rota, pool }) {
       ids.push(id);
     }
   }
+
+  // mesmo movimento em 2 a 24 datas (ex.: 3 boletos): validação e INSERT são os de sempre (validarLinhas / inserirLinhas), numa transação só
+  rota('post', '/fluxo/salvar_datas', ESCREVER, async (req, res) => {
+    const v = validarVariasDatas(req.body);
+    if (!v.ok) return res.status(400).json({ error: v.erro });
+    const r = await emTransacao(pool, res, 'POST /fluxo/salvar_datas', async conn => {
+      const ids = [];
+      await inserirLinhas(conn, ids, v.comum, v.linhas, v.movimento);
+      return { ok: true, ids, mensagem: `${ids.length} lançamentos salvos com sucesso!` };
+    });
+    if (r) res.json(r);
+  });
 
   rota('post', '/fluxo/dividir', ESCREVER, async (req, res) => {
     const v = validarDivisaoEdicao(req.body);

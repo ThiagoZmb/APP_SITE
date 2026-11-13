@@ -87,10 +87,28 @@ function validarDivisaoEdicao(b) {
   return { ok: true, id, movimento: b.movimento, comum: dadosComuns(b, classificacao), linhas: v.linhas, soma: arredondar(v.linhas.reduce((s, l) => s + l.valor, 0)) };
 }
 
+// Lançar o MESMO movimento em várias datas (Novo movimento, Entrada ou Saída): forma, banco, valor, situação e demais dados iguais,
+// só a data muda (ex.: 3 boletos). Datas repetidas são permitidas. Devolve { ok: true, movimento, comum, linhas, soma } ou { ok: false, erro }.
+const MIN_DATAS = 2;
+const MAX_DATAS = 24;
+function validarVariasDatas(b) {
+  b = b || {};
+  if (b.movimento !== 'Entrada' && b.movimento !== 'Saída') return { ok: false, erro: 'Tipo de movimento inválido.' };
+  const datas = Array.isArray(b.datas) ? b.datas : [];
+  if (datas.length < MIN_DATAS) return { ok: false, erro: `Informe pelo menos ${MIN_DATAS} datas.` };
+  if (datas.length > MAX_DATAS) return { ok: false, erro: `No máximo ${MAX_DATAS} datas por vez.` };
+  const classificacao = parseInt(b.codClassificacao, 10);
+  if (!(classificacao > 0)) return { ok: false, erro: 'Favor escolher uma categoria!' };
+  const brutas = datas.map(data => ({ formaPgto: b.formaPgto, banco: b.banco, valor: b.valor, situacao: b.situacao, data }));
+  const v = validarLinhas(brutas, SITUACOES_POR_MOVIMENTO[b.movimento]);
+  if (v.erro) return { ok: false, erro: v.erro.replace(/^Linha (\d+): /, 'Data $1: ') };
+  return { ok: true, movimento: b.movimento, comum: dadosComuns(b, classificacao), linhas: v.linhas, soma: arredondar(v.linhas.reduce((s, l) => s + l.valor, 0)) };
+}
+
 // total do pedido x o que já entrou como Recebido (soma das linhas já gravadas + as que estão sendo lançadas agora)
 function saldoDoPedido(total, recebidoAntes, lancandoAgora = 0) {
   const t = arredondar(Number(total) || 0), r = arredondar((Number(recebidoAntes) || 0) + (Number(lancandoAgora) || 0));
   return { total: t, recebido: r, falta: arredondar(Math.max(0, t - r)), cobreTotal: t > 0 && r >= t };
 }
 
-module.exports = { MAX_LINHAS, SITUACOES_ENTRADA, SITUACOES_SAIDA, SEM_FORMA, numero, numeroUnicoDoPedido, validarDivisao, validarDivisaoEdicao, saldoDoPedido };
+module.exports = { MIN_DATAS, MAX_DATAS, validarVariasDatas, MAX_LINHAS, SITUACOES_ENTRADA, SITUACOES_SAIDA, SEM_FORMA, numero, numeroUnicoDoPedido, validarDivisao, validarDivisaoEdicao, saldoDoPedido };

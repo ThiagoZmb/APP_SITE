@@ -407,6 +407,10 @@
         .categoria .grid-form { gap: 10px; }
         /* recebimento dividido em várias formas (fluxo_divisao.js) */
         #bloco-divisao[hidden], #div-resumo[hidden], #div-quitar-rotulo[hidden], #info-total[hidden], #rest-caixa[hidden], #btn-dividir-valor[hidden] { display: none; }
+        #bloco-datas[hidden], #dt-corpo[hidden] { display: none; }
+        #dt-corpo { margin-top: 12px; }
+        .dt-qtd { max-width: 220px; margin-bottom: 12px; }
+        #dt-lista { margin-bottom: 4px; }
         .btn-dividir-valor { margin-left: auto; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
         .tipo-mov button:disabled { opacity: .4; cursor: not-allowed; }
         .info-total { font-size: 13px; line-height: 1.5; font-weight: 600; padding: 10px 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
@@ -436,6 +440,7 @@
     <script src="layout.js?v=202611211000" defer></script>
     <script src="situacoes.js?v=202611191300"></script>
     <script src="fluxo_divisao.js?v=202611101300"></script>
+    <script src="fluxo_datas.js?v=202611221000"></script>
     <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
@@ -630,6 +635,18 @@
                     <label class="div-quitar" id="div-quitar-rotulo" hidden><input type="checkbox" id="div-quitar"> Pedido quitado: marcar como Recebido</label>
                 </div>
             </section>
+            <section class="bloco" id="bloco-datas" hidden>
+                <div class="bloco-cab"><span class="ico">📅</span><h3>Lançar em várias datas</h3></div>
+                <div class="bloco-corpo">
+                    <label class="div-quitar" for="dt-ligar"><input type="checkbox" id="dt-ligar"> Repetir este lançamento em várias datas (mesmos dados, só a data muda)</label>
+                    <div id="dt-corpo" hidden>
+                        <p class="div-dica">A Data 1 é o campo Data lá em cima; as demais são sugeridas no mesmo dia dos meses seguintes e podem ser editadas. Forma, banco, valor, situação, pedido, documentos, categoria e observação são iguais em todos.</p>
+                        <div class="form-group dt-qtd"><label for="dt-qtd">Quantidade de lançamentos (2 a 24)</label><input type="number" id="dt-qtd" min="2" max="24" step="1" value="3"></div>
+                        <div class="grid-form" id="dt-lista"></div>
+                        <div class="div-resumo" id="dt-resumo" aria-live="polite"></div>
+                    </div>
+                </div>
+            </section>
             <section class="bloco">
                 <div class="bloco-cab"><span class="ico">🏷️</span><h3>Categoria</h3></div>
                 <div class="bloco-corpo categoria form-group">
@@ -742,6 +759,7 @@
         let movimento = '';
         let alterado = false;
         let Divisao = null;   // recebimento dividido em várias formas (fluxo_divisao.js); criado antes do INIT
+        let Datas = null;     // mesmo movimento em várias datas (fluxo_datas.js); criado depois do Divisao
         let grafico = null;
         let graficoGastos = null;
         let agruparGastos = 'fornecedor';
@@ -1235,6 +1253,7 @@
                 $('f-situacao').value = atual;
             }
             if (Divisao) Divisao.atualizarVisibilidade();
+            if (Datas) Datas.atualizarVisibilidade();
         }
         document.querySelectorAll('.tipo-mov button').forEach(b => b.addEventListener('click', () => {
             if ($('f-id').value) return;   // movimento já gravado: o tipo (Entrada/Saída) não muda, evita erro de lançamento
@@ -1275,6 +1294,7 @@
             $('f-valor').value = moeda(0);
             movimento = '';
             if (Divisao) { Divisao.reiniciar(); Divisao.atualizarVisibilidade(); }
+            if (Datas) { Datas.reiniciar(); Datas.atualizarVisibilidade(); }
             travarTipo(null);
             document.querySelectorAll('.tipo-mov button').forEach(b => b.classList.remove('on'));
             $('f-situacao').innerHTML = '<option value="">— escolha o tipo —</option>';
@@ -1309,6 +1329,7 @@
             // "Dividir este valor": o registro atual vira a parcela 1 e as demais são criadas
             Divisao.reiniciar();
             Divisao.definirEdicao({ id: it.id, valorOriginal: it.valor });
+            if (Datas) { Datas.reiniciar(); Datas.atualizarVisibilidade(); }   // várias datas só no Novo movimento: some ao editar
             marcarAlterado(false);
             abrirGaveta();
         }
@@ -1328,7 +1349,7 @@
                 campo.placeholder = '';
             });
         });
-        $('link-hoje').addEventListener('click', () => { $('f-data').value = hojeISO(); marcarAlterado(); });
+        $('link-hoje').addEventListener('click', () => { $('f-data').value = hojeISO(); $('f-data').dispatchEvent(new Event('input', { bubbles: true })); marcarAlterado(); });
 
         // KeyPress do VB: valor [0-9,], pedido/PDV [0-9/,]
         document.querySelectorAll('input.dec').forEach(inp => {
@@ -1357,6 +1378,8 @@
             if (!d.codClassificacao) return falha('Favor escolher uma categoria!', 'cat-tipo');
             const dividido = !!(Divisao && Divisao.ativo());
             if (dividido) { const p = Divisao.conferir(); if (p) return falha(p); }
+            const emDatas = !dividido && !!(Datas && Datas.ativo());   // mesmo movimento em várias datas (Novo movimento)
+            if (Datas && Datas.ativo()) { const p = Datas.conferir(); if (p) return falha(p); }
             const comRestante = dividido && Divisao.temRestante();   // sobrou valor: vira linha "A Receber" e os pedidos passam a Recebido
             const btn = $('btn-salvar');
             btn.disabled = true;
@@ -1364,8 +1387,11 @@
             try {
                 const r = dividido
                     ? await api(Divisao.caminho(), { method: 'POST', body: JSON.stringify(Divisao.montarEnvio(d)) })
-                    : await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
+                    : emDatas
+                        ? await api(Datas.caminho(), { method: 'POST', body: JSON.stringify(Datas.montarEnvio(d)) })
+                        : await api('/fluxo/salvar', { method: 'POST', body: JSON.stringify(d) });
                 if (Divisao) Divisao.reiniciar();
+                if (Datas) Datas.reiniciar();
                 toast(r.mensagem, 'ok');
                 avisarPai('salvo', r.mensagem, { restante: comRestante });
                 fecharGaveta(true);
@@ -1381,6 +1407,7 @@
                 btn.disabled = false;
                 btn.textContent = $('f-id').value ? '💾 Atualizar' : '💾 Salvar';
                 if (Divisao) Divisao.recalcular();   // refaz o rótulo "Salvar N recebimentos" quando há formas extras
+                if (Datas) Datas.recalcular();       // idem para "Salvar N lançamentos" (várias datas)
             }
         }
         $('btn-salvar').addEventListener('click', salvarMovimento);
@@ -1445,6 +1472,7 @@
         }
 
         Divisao = FluxoDivisao.iniciar({ $, api, lerNumero, moeda, escapeHtml, hojeISO, pode: c => Acesso.pode(c), getMovimento: () => movimento });
+        Datas = FluxoDatas.iniciar({ $, lerNumero, moeda, hojeISO, pode: c => Acesso.pode(c), getMovimento: () => movimento, divisaoAtiva: () => !!Divisao.ativo() });
 
         // ============ INIT ============
         document.addEventListener('DOMContentLoaded', () => {
