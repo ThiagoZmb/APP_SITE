@@ -107,8 +107,39 @@ function linhaItem(r) {
   return texto ? { qtd, texto } : null;
 }
 
-// Linhas de ped_orc_lista_itens (qualquer ordem) -> Map numero -> { itens: [{ qtd, texto }] (até MAX_ITENS_BALAO, na ordem do ITEM), qtdItens (total real) }
-function agruparItens(linhas) {
+// ---------- cores dos itens (só as colunas COR_*; nada é inventado) ----------
+// ped_orc_itens_v4 (uma linha por folha/peça, ligada ao item da lista por ITEM_PEDIDO = ped_orc_lista_itens.ITEM): COR_PERFIL, COR_PUXADOR, COR_DIVISOR, COR_REVESTIMENTO.
+// ped_orc_serralheria (ITEM_PEDIDO): COR. Cor vazia = a parte não aparece; sem nenhuma cor o item não ganha a linha "Cores".
+const CAMPOS_COR = [['COR_PERFIL', 'perfil'], ['COR_PUXADOR', 'puxador'], ['COR_DIVISOR', 'divisor'], ['COR_REVESTIMENTO', 'revestimento']];
+const MAX_TEXTO_CORES = 120;
+const corValida = s => /[\p{L}\p{N}]/u.test(s);
+
+// v4 e serralheria (linhas do banco, qualquer ordem) -> Map 'numero|item' -> 'perfil Branco; puxador Preto' (valores repetidos entre folhas aparecem uma vez)
+function agruparCores(v4, serralheria) {
+  const porItem = new Map(); // chave -> Map rótulo -> Set de cores (ordem de chegada)
+  const somar = (r, rotulo, valor) => {
+    const cor = limpar(valor);
+    if (!cor || !corValida(cor)) return;
+    const chave = `${Number(r.NUMERO ?? r.numero)}|${Number(r.ITEM_PEDIDO ?? r.item_pedido)}`;
+    if (!porItem.has(chave)) porItem.set(chave, new Map());
+    const rotulos = porItem.get(chave);
+    if (!rotulos.has(rotulo)) rotulos.set(rotulo, new Map());
+    if (!rotulos.get(rotulo).has(norm(cor))) rotulos.get(rotulo).set(norm(cor), cor); // repetida (outra folha): fica a primeira grafia
+  };
+  for (const r of Array.isArray(v4) ? v4 : []) for (const [campo, rotulo] of CAMPOS_COR) somar(r, rotulo, r[campo]);
+  for (const r of Array.isArray(serralheria) ? serralheria : []) somar(r, 'serralheria', r.COR);
+  const saida = new Map();
+  for (const [chave, rotulos] of porItem) {
+    const ordem = [...CAMPOS_COR.map(c => c[1]), 'serralheria'];
+    const partes = ordem.filter(r => rotulos.has(r)).map(r => `${r} ${[...rotulos.get(r).values()].join(' / ')}`);
+    if (partes.length) saida.set(chave, cortar(partes.join('; '), MAX_TEXTO_CORES));
+  }
+  return saida;
+}
+
+// Linhas de ped_orc_lista_itens (qualquer ordem) -> Map numero -> { itens: [{ qtd, texto, cores? }] (até MAX_ITENS_BALAO, na ordem do ITEM), qtdItens (total real) }
+// `cores` (opcional) = Map de agruparCores; o item só ganha `cores` quando há cor cadastrada.
+function agruparItens(linhas, cores) {
   const porPedido = new Map();
   for (const r of Array.isArray(linhas) ? linhas : []) {
     const numero = Number(r.NUMERO ?? r.numero);
@@ -117,33 +148,67 @@ function agruparItens(linhas) {
   }
   const saida = new Map();
   for (const [numero, lista] of porPedido) {
-    const itens = lista.sort((a, b) => (Number(a.ITEM ?? a.item) || 0) - (Number(b.ITEM ?? b.item) || 0)).map(linhaItem).filter(Boolean);
+    const itens = lista.sort((a, b) => (Number(a.ITEM ?? a.item) || 0) - (Number(b.ITEM ?? b.item) || 0)).map(r => {
+      const linha = linhaItem(r);
+      const c = linha && cores instanceof Map ? cores.get(`${numero}|${Number(r.ITEM ?? r.item)}`) : '';
+      return c ? { ...linha, cores: c } : linha;
+    }).filter(Boolean);
     if (itens.length) saida.set(numero, { itens: itens.slice(0, MAX_ITENS_BALAO), qtdItens: itens.length });
   }
   return saida;
+}
+
+// ---------- entrega do pedido na linha do calendário ----------
+// `entregas` = linhas de web_entregas do pedido ({ id, status, tipo, data_agendada }); `classe` = classificarSituacao do pedido.
+// Só pedido em aberto (produção, pronto, situação desconhecida) tem resumo; Entregue/Retirado/Cancelado -> null (a linha não mostra nada).
+//  - estado 'marcada'   : há entrega ativa (nem concluída nem cancelada) COM data; `data` = a da principal (a mais cedo), `qtdMais` = outras ativas
+//  - estado 'a_agendar' : há entrega ativa mas sem data (ainda na fila)
+//  - estado 'concluida' : sem ativa, mas já houve entrega concluída (entregue/retirado)
+//  - estado 'nenhuma'   : nenhuma entrega, ou só canceladas
+const STATUS_FIM = ['entregue', 'retirado', 'cancelada'];
+function resumoEntregaCalendario(entregas, classe) {
+  if (!['producao', 'pronto', 'outro'].includes(classe)) return null;
+  const lista = (Array.isArray(entregas) ? entregas : []).filter(e => e && e.status !== 'cancelada');
+  const ativas = lista.filter(e => !STATUS_FIM.includes(e.status));
+  if (ativas.length) {
+    const dataDe = e => dataISO(e.data_agendada);
+    const [p] = [...ativas].sort((a, b) => {
+      const da = dataDe(a), db = dataDe(b);
+      if (!da !== !db) return da ? -1 : 1;
+      if (da !== db) return da < db ? -1 : 1;
+      return Number(a.id) - Number(b.id);
+    });
+    const data = dataDe(p);
+    return { estado: data ? 'marcada' : 'a_agendar', tipo: String(p.tipo ?? ''), data, qtdMais: ativas.length - 1 };
+  }
+  if (lista.length) return { estado: 'concluida', tipo: '', data: '', qtdMais: 0 };
+  return { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 };
 }
 
 // Linha do banco -> pedido do calendário. `valor` só existe aqui; a rota o apaga de quem não tem valores.ver.
 function montarPedido(r, hoje) {
   const situacao = String(r.situacao ?? '').trim();
   const prontoEm = dataISO(r.pronto_em);
-  return {
+  const classe = classificarSituacao(situacao);
+  const base = {
     numero: r.numero,
     cliente: String(r.cliente ?? '').trim(),
     clienteFinal: String(r.cliente_final ?? '').trim(),
     situacao,
-    classe: classificarSituacao(situacao),
+    classe,
     atrasado: atrasado(situacao, prontoEm, hoje),
     prontoEm,
     dataEntrega: dataISO(r.data_entrega),
-    comPerfil: !!r.comPerfil,
-    comVidro: !!r.comVidro,
-    comSerralheria: !!r.comSerralheria,
-    comPintura: !!r.comPintura,
     itens: Array.isArray(r.itens) ? r.itens : [],
     qtdItens: Number(r.qtdItens) || 0,
     valor: Number(r.valor) || 0
   };
+  // `entregas` só existe quando o usuário pode ver entregas (a rota não consulta nem devolve nada sem a permissão)
+  if (Array.isArray(r.entregas)) {
+    const entrega = resumoEntregaCalendario(r.entregas, classe);
+    if (entrega) base.entrega = entrega;
+  }
+  return base;
 }
 
 // Pedidos já montados -> [{ data, qtdPedidos, qtdAtrasados, pedidos }] em ordem de data; dentro do dia, por número.
@@ -162,4 +227,4 @@ function agruparPorDia(pedidos, situacao = 'abertos') {
   });
 }
 
-module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens };
+module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens, agruparCores, resumoEntregaCalendario };

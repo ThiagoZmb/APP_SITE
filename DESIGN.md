@@ -274,7 +274,7 @@ Cantos curtos e consistentes: **6px** (controles, botões, linhas de ranking), *
 
 ### Tables
 - Cabeçalho em Painel Elevado, 11px/700 maiúsculas Tinta Suave. Células 13.5px, divisória `#21262e`, hover sutil.
-- Linhas semânticas por tom de fundo (entrada verde 5%, saída vermelho 4,5%, falta vermelho 9%, mínimo amarelo-dourado 9%, selecionada cobre 12%); sem faixa lateral.
+- Linhas semânticas por tom de fundo (falta vermelho 9%, mínimo amarelo-dourado 9%, selecionada cobre 12%); sem faixa lateral. Movimentos do Fluxo de Caixa não têm fundo por tipo (entrada/saída): a cor fica no valor; só a linha da data de hoje ganha verde suave (`--success-bg`, classe `.linha-hoje`).
 - **Selos:** pílula 11.5px/700 com bolinha de 6px, usando os pares `--selo-*`.
 
 ### Navigation

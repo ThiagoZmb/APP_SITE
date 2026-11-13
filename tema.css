@@ -505,11 +505,8 @@ body :where(.tabela-wrap, .lista-wrap, .rolagem, .etp-rolagem) thead th {
     color: var(--text-dark) !important; border-bottom: 2px solid var(--primary-color) !important;
     box-shadow: 0 8px 10px -8px rgba(0, 0, 0, .75);
 }
-/* cores de linha herdadas do VB, em tons suaves com marcador lateral */
-body tbody tr.entrada { background: rgba(84, 193, 139, .05) !important; }
-body tbody tr.saida { background: rgba(239, 111, 123, .045) !important; }
-body tbody tr.entrada.hoje { background: rgba(84, 193, 139, .12) !important; }
-body tbody tr.saida.hoje { background: rgba(239, 111, 123, .11) !important; }
+/* linha do dia de hoje (Fluxo de Caixa): verde suave do tema; movimentos de entrada/saída não têm fundo por tipo (a cor fica no valor) */
+body tbody tr.linha-hoje { background: var(--success-bg) !important; }
 body tbody tr.falta { background: rgba(239, 111, 123, .09) !important; }
 body tbody tr.minimo { background: rgba(227, 176, 75, .09) !important; }
 body tbody tr.inativo { background: rgba(255, 255, 255, .025) !important; color: var(--text-disabled) !important; }

@@ -79,7 +79,7 @@ const montar = (linhas, hoje = '2026-11-05') => linhas.map(l => K.montarPedido(l
 
 test('montarPedido: classe, atraso, datas e valor numérico', () => {
   const p = K.montarPedido(linha(7, 'Em Produção', '2026-11-01 00:00:00', { data_entrega: '0001-01-01', cliente: ' Fulano  ' }), '2026-11-05');
-  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', comPerfil: false, comVidro: false, comSerralheria: false, comPintura: false, itens: [], qtdItens: 0, valor: 100.5 });   // linha sem composição = nenhum ícone
+  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', itens: [], qtdItens: 0, valor: 100.5 });   // sem ícones de composição; sem `entregas` na linha (usuário sem entregas.ver) = sem a chave `entrega`
 });
 
 test('agruparPorDia: abertos tira entregue/retirado/cancelado; todos mantém; ordem por data e número; contagens', () => {
@@ -137,4 +137,46 @@ test('montarPedido: leva itens e qtdItens (padrão vazio)', () => {
   assert.deepEqual([p.itens, p.qtdItens], [[{ qtd: 1, texto: 'x' }], 3]);
   const v = K.montarPedido({ numero: 2, situacao: 'Pronto', pronto_em: '2026-11-05' }, '2026-11-05');
   assert.deepEqual([v.itens, v.qtdItens], [[], 0]);
+});
+
+// ---------- cores dos itens (balão) e entrega na linha ----------
+test('agruparCores: só COR_* (perfil, puxador, divisor, revestimento) e COR da serralheria; vazio/"-" não aparece; repetido entre folhas vira um', () => {
+  const v4 = [
+    { NUMERO: 5, ITEM_PEDIDO: 1, COR_PERFIL: 'Branco', COR_PUXADOR: 'Preto', COR_DIVISOR: '', COR_REVESTIMENTO: 'Fumê' },
+    { NUMERO: 5, ITEM_PEDIDO: 1, COR_PERFIL: 'branco ', COR_PUXADOR: 'Preto', COR_DIVISOR: '-', COR_REVESTIMENTO: null },
+    { NUMERO: 5, ITEM_PEDIDO: 2, COR_PERFIL: '', COR_PUXADOR: '  ', COR_DIVISOR: null, COR_REVESTIMENTO: '' }
+  ];
+  const m = K.agruparCores(v4, [{ NUMERO: 5, ITEM_PEDIDO: 3, COR: 'Light gold' }, { NUMERO: 5, ITEM_PEDIDO: 4, COR: '' }]);
+  assert.equal(m.get('5|1'), 'perfil Branco; puxador Preto; revestimento Fumê');
+  assert.equal(m.has('5|2'), false, 'sem cor cadastrada: nada inventado');
+  assert.equal(m.get('5|3'), 'serralheria Light gold');
+  assert.equal(m.has('5|4'), false);
+  assert.equal(K.agruparCores(null, undefined).size, 0);
+  assert.equal(K.agruparCores([{ NUMERO: 1, ITEM_PEDIDO: 1, COR_PERFIL: 'A' }, { NUMERO: 1, ITEM_PEDIDO: 1, COR_PERFIL: 'B' }], []).get('1|1'), 'perfil A / B');
+});
+
+test('agruparItens com cores: o item ganha `cores` só quando há cor; sem o mapa, o formato antigo não muda', () => {
+  const linhas = [{ NUMERO: 5, ITEM: 1, TIPO_PRODUTO: 'Porta de giro', QTD: 2, DESCRICAO: 'Tamanho: 2000x800 mm\nPerfil: 1036 (Sottile)' }, { NUMERO: 5, ITEM: 2, TIPO_PRODUTO: 'Serviço', QTD: 1, DESCRICAO: 'Frete' }];
+  const m = K.agruparItens(linhas, new Map([['5|1', 'perfil Branco']]));
+  assert.deepEqual(m.get(5).itens, [{ qtd: 2, texto: 'Porta de giro 2000 × 800 – Perfil 1036 (Sottile)', cores: 'perfil Branco' }, { qtd: 1, texto: 'Serviço: Frete' }]);
+  assert.deepEqual(K.agruparItens(linhas).get(5).itens.map(i => Object.keys(i)), [['qtd', 'texto'], ['qtd', 'texto']]);
+});
+
+test('resumoEntregaCalendario: marcada (principal = data mais cedo, +N), a agendar, concluída, nenhuma; cancelada não conta; pedido fechado = null', () => {
+  const R = K.resumoEntregaCalendario;
+  assert.deepEqual(R([{ id: 1, status: 'agendada', tipo: 'motorista', data_agendada: '2026-11-14' }], 'producao'), { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 });
+  const varias = [{ id: 2, status: 'agendada', tipo: 'retirada', data_agendada: '2026-11-20' }, { id: 3, status: 'agendada', tipo: 'motorista', data_agendada: '2026-11-14' }, { id: 4, status: 'a_programar', tipo: null, data_agendada: null }, { id: 5, status: 'cancelada', data_agendada: '2026-11-01' }, { id: 6, status: 'entregue', data_agendada: '2026-11-02' }];
+  assert.deepEqual(R(varias, 'pronto'), { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 2 });
+  assert.deepEqual(R([{ id: 1, status: 'a_programar', tipo: null, data_agendada: null }], 'pronto'), { estado: 'a_agendar', tipo: '', data: '', qtdMais: 0 });
+  assert.equal(R([{ id: 1, status: 'retirado', data_agendada: '2026-11-02' }], 'pronto').estado, 'concluida');
+  assert.equal(R([], 'producao').estado, 'nenhuma');
+  assert.equal(R([{ id: 1, status: 'cancelada' }], 'pronto').estado, 'nenhuma', 'só cancelada = sem entrega');
+  for (const c of ['entregue', 'retirado', 'cancelado']) assert.equal(R([{ id: 1, status: 'agendada', data_agendada: '2026-11-14' }], c), null, c);
+});
+
+test('montarPedido: `entrega` só existe quando a linha traz `entregas` (permissão); pedido fechado não ganha a chave', () => {
+  const base = { numero: 1, situacao: 'Pronto', pronto_em: '2026-11-05' };
+  assert.equal('entrega' in K.montarPedido(base, '2026-11-05'), false);
+  assert.equal(K.montarPedido({ ...base, entregas: [] }, '2026-11-05').entrega.estado, 'nenhuma');
+  assert.equal('entrega' in K.montarPedido({ ...base, situacao: 'Entregue', entregas: [] }, '2026-11-05'), false);
 });

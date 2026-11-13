@@ -490,3 +490,29 @@ test('balão: o mesmo texto (escapado) na etiqueta, na linha da lista e na linha
     assert.ok(!h.includes('<b>x</b>'));
   }
 });
+
+// ---------- sem ícones; selo de entrega na linha; cores no balão ----------
+test('a linha não tem mais ícones de perfil/vidro/serralheria/pintura (nenhuma das três visões)', () => {
+  const p = ped(9, { comPerfil: true, comVidro: true, comSerralheria: true, comPintura: true });
+  for (const h of [K.htmlEtiqueta(p, 'abertos', ''), K.htmlLinhaFolha(p, 'abertos', ''), K.htmlLinhaDia(p)]) assert.doesNotMatch(h, /itens-doc|item-doc/);
+  assert.doesNotMatch(ler('calendario.css') + ler('calendario_comum.js'), /itens-doc|item-doc/);
+});
+
+test('selo de entrega: marcada (data e +N), retirada, a agendar, concluída, sem entrega (pronto = aviso, produção = neutro); sem `entrega` nada aparece', () => {
+  const com = (classe, entrega) => ped(1, { classe, entrega });
+  assert.match(K.htmlLinhaFolha(com('producao', { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 }), 'abertos', ''), /<span class="selo info selo-ent"[^>]*>Entrega 14\/11<\/span>/);
+  assert.match(K.htmlLinhaFolha(com('pronto', { estado: 'marcada', tipo: 'retirada', data: '2026-11-14', qtdMais: 2 }), 'abertos', ''), />Retirada 14\/11 \+2<\/span>/);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'a_agendar', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*>Entrega a agendar</);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'concluida', tipo: '', data: '', qtdMais: 0 })), /selo ok selo-ent[^>]*>Entrega concluída</);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*>Sem entrega</);
+  assert.match(K.htmlLinhaDia(com('producao', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo neutro selo-ent[^>]*>Sem entrega</);
+  assert.match(K.htmlEtiqueta(com('producao', { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 }), 'abertos', ''), /<span class="etq-ent"[^>]*>Ent\. 14\/11<\/span>/);
+  for (const h of [K.htmlEtiqueta(ped(2), 'abertos', ''), K.htmlLinhaFolha(ped(2), 'abertos', ''), K.htmlLinhaDia(ped(2))]) assert.doesNotMatch(h, /selo-ent|etq-ent|Sem entrega/);
+});
+
+test('balão: a entrega fica fora do balão e as cores entram na linha de cada item', () => {
+  const p = ped(3, { itens: [{ qtd: 2, texto: 'Porta de giro 2000 × 800', cores: 'perfil Branco; puxador Preto' }, { qtd: 1, texto: 'Serviço: Frete' }], qtdItens: 2, entrega: { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 } });
+  const r = K.rotuloPedido(p);
+  assert.match(r, /• 2× Porta de giro 2000 × 800\n {4}Cores: perfil Branco; puxador Preto\n• 1× Serviço: Frete$/);
+  assert.doesNotMatch(r, /Entrega|14\/11/);
+});

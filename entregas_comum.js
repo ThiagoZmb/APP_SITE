@@ -129,7 +129,8 @@
     const itens = Array.isArray(p && p.itens) ? p.itens.filter(i => i && i.texto) : [];
     if (!itens.length) return '';
     const mais = Math.max(0, (Number(p.qtdItens) || 0) - itens.length);
-    return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
+    // item com cor cadastrada (só o Calendário de pedidos manda `cores`) ganha uma segunda linha recuada: "Cores: perfil Branco; puxador Preto"
+    return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}${i.cores ? `\n    Cores: ${i.cores}` : ''}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
   };
 
   return { API_BASE, LOGIN_URL, LIMITE_IMAGEM, SEM_CONEXAO, esc, txt, dataValida, dataBR, dataHoraBR, escalaImagem, enderecoDoViaCep, cepLimpo, consultarCep, criarApi, criarToast, reduzirImagem,

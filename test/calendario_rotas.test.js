@@ -15,7 +15,8 @@ const USUARIOS = {
   1: { nome: 'Admin', permissoes: new Set(['pedidos.ver', 'valores.ver']), estados: [] },
   2: { nome: 'Sem valores', permissoes: new Set(['pedidos.ver']), estados: [] },
   3: { nome: 'Sem pedidos', permissoes: new Set(['estoque.ver', 'valores.ver']), estados: [] },
-  4: { nome: 'Regional', permissoes: new Set(['pedidos.ver', 'valores.ver']), estados: ['RJ', 'ES'] }
+  4: { nome: 'Regional', permissoes: new Set(['pedidos.ver', 'valores.ver']), estados: ['RJ', 'ES'] },
+  5: { nome: 'Com entregas', permissoes: new Set(['pedidos.ver', 'entregas.ver']), estados: [] }
 };
 const token = id => jwt.sign({ id, nome: USUARIOS[id].nome, v: 2, tipo: 'funcionario', sid: SID_TESTE }, 'teste', { issuer: 'elegance-api', expiresIn: '1h' });
 
@@ -192,4 +193,90 @@ test('itens do balão: mês sem pedidos não consulta itens', async t => {
   const { f, chamar } = await preparar(t, []);
   await chamar(1, '/calendario/pedidos?mes=2020-03');
   assert.equal(f.chamadas.filter(c => /ped_orc_lista_itens/.test(c.sql)).length, 0);
+});
+
+// ---------- cores no balão, sem ícones de composição e entrega na linha ----------
+const SQL_LISTA = /FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/;
+const SQL_V4 = /FROM ped_orc_itens_v4 WHERE TIPO = 'Pedido' AND NUMERO IN/;
+const SQL_SERR = /FROM ped_orc_serralheria WHERE TIPO = 'Pedido' AND NUMERO IN/;
+const SQL_ENTREGAS = /FROM web_entregas WHERE numero IN/;
+const de = (f, re) => f.chamadas.filter(c => re.test(c.sql));
+
+test('cores: uma consulta IN por tabela (lista, v4, serralheria), só COR_*, texto sem dinheiro; item sem cor não ganha linha; sem ícones de composição', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift(
+    [SQL_LISTA, [{ NUMERO: 10, ITEM: 1, TIPO_PRODUTO: 'Porta de giro', QTD: 2, DESCRICAO: 'Tamanho: 2287x1395 mm\nPerfil: 1036 (Sottile)', OBSERVACAO: '' },
+      { NUMERO: 10, ITEM: 2, TIPO_PRODUTO: 'Serviço', QTD: 3, DESCRICAO: 'Pinturas diversas', OBSERVACAO: '' },
+      { NUMERO: 14, ITEM: 1, TIPO_PRODUTO: 'Metalons', QTD: 1, DESCRICAO: 'Estrutura metálica editável', OBSERVACAO: 'estrutura cama' }]],
+    [SQL_V4, [{ NUMERO: 10, ITEM_PEDIDO: 1, COR_PERFIL: 'Branco', COR_PUXADOR: 'Preto', COR_DIVISOR: '', COR_REVESTIMENTO: 'Fumê' }, { NUMERO: 10, ITEM_PEDIDO: 2, COR_PERFIL: '', COR_PUXADOR: '', COR_DIVISOR: '', COR_REVESTIMENTO: '' }]],
+    [SQL_SERR, [{ NUMERO: 14, ITEM_PEDIDO: 1, COR: 'Light gold' }]]);
+  for (const id of [1, 2]) {
+    f.chamadas.length = 0;
+    const d = await (await chamar(id, '/calendario/pedidos?mes=2020-03')).json();
+    for (const re of [SQL_LISTA, SQL_V4, SQL_SERR]) {
+      assert.equal(de(f, re).length, 1, String(re));
+      assert.match(de(f, re)[0].sql, /NUMERO IN \(\?,\?,\?,\?,\?\)/);
+      assert.doesNotMatch(de(f, re)[0].sql, /UNITARIO|TOTAL|PORCENTAGEM|VALOR/);
+    }
+    assert.doesNotMatch(f.chamadas.map(c => c.sql).join('\n'), /ped_orc_itens_v4 WHERE TIPO = \?|FROM vidros/, 'a composição (ícones) não é mais lida pelo calendário');
+    const [p10, p14] = [d.dias[0].pedidos.find(p => p.numero === 10), d.dias[1].pedidos.find(p => p.numero === 14)];
+    assert.deepEqual(p10.itens.map(i => i.cores), ['perfil Branco; puxador Preto; revestimento Fumê', undefined]);
+    assert.equal(p14.itens[0].cores, 'serralheria Light gold');
+    const json = JSON.stringify(d);
+    assert.ok(!/comPerfil|comVidro|comSerralheria|comPintura/.test(json));
+    assert.ok(id === 1 || !/valor|250/i.test(json.replace(/qtd\w+/g, '')), 'sem valores.ver: nenhum dinheiro');
+  }
+});
+
+test('cores: falha na leitura das cores só tira as cores (itens continuam, 200)', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift([SQL_LISTA, [{ NUMERO: 10, ITEM: 1, TIPO_PRODUTO: 'Serviço', QTD: 1, DESCRICAO: 'Frete', OBSERVACAO: '' }]], [SQL_V4, () => { throw new Error('falha'); }], [SQL_SERR, () => { throw new Error('falha'); }]);
+  const r = await chamar(1, '/calendario/pedidos?mes=2020-03');
+  assert.equal(r.status, 200);
+  const p = (await r.json()).dias[0].pedidos[0];
+  assert.deepEqual(p.itens, [{ qtd: 1, texto: 'Serviço: Frete' }]);
+});
+
+test('entrega: sem entregas.ver não consulta web_entregas e nenhuma chave de entrega vem na resposta (mês e dia)', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift([SQL_ENTREGAS, [{ id: 1, numero: 10, status: 'agendada', tipo: 'motorista', data_agendada: '2099-01-05' }]]);
+  for (const caminho of ['/calendario/pedidos?mes=2020-03&situacao=todos', '/calendario/dia?data=2020-03-10&situacao=todos']) {
+    const j = JSON.stringify(await (await chamar(1, caminho)).json());
+    assert.ok(!/entrega"|2099-01-05/.test(j), j);
+  }
+  assert.equal(de(f, SQL_ENTREGAS).length, 0);
+});
+
+test('entrega: com entregas.ver, UMA consulta IN por chamada; principal (data mais cedo) + qtdMais, a agendar, sem entrega; pedido fechado sem chave; cancelada não conta', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift([SQL_ENTREGAS, [
+    { id: 1, numero: 10, status: 'agendada', tipo: 'retirada', data_agendada: '2020-03-20' },
+    { id: 2, numero: 10, status: 'agendada', tipo: 'motorista', data_agendada: '2020-03-12' },
+    { id: 3, numero: 10, status: 'cancelada', tipo: 'motorista', data_agendada: '2020-03-01' },
+    { id: 4, numero: 11, status: 'a_programar', tipo: null, data_agendada: null },
+    { id: 5, numero: 14, status: 'cancelada', tipo: 'motorista', data_agendada: '2099-03-01' },
+    { id: 6, numero: 12, status: 'agendada', tipo: 'motorista', data_agendada: '2020-03-12' }
+  ]]);
+  const d = await (await chamar(5, '/calendario/pedidos?mes=2020-03&situacao=todos')).json();
+  assert.equal(de(f, SQL_ENTREGAS).length, 1, 'uma consulta só, nunca uma por pedido');
+  assert.match(de(f, SQL_ENTREGAS)[0].sql, /numero IN \(\?,\?,\?,\?,\?\)/);
+  assert.deepEqual(de(f, SQL_ENTREGAS)[0].params, [10, 11, 12, 13, 14]);
+  const por = n => d.dias.flatMap(x => x.pedidos).find(p => p.numero === n);
+  assert.deepEqual(por(10).entrega, { estado: 'marcada', tipo: 'motorista', data: '2020-03-12', qtdMais: 1 });
+  assert.equal(por(11).entrega.estado, 'a_agendar');
+  assert.equal(por(14).entrega.estado, 'nenhuma', 'só cancelada = sem entrega');
+  assert.equal('entrega' in por(12), false, 'pedido Entregue não mostra entrega');
+  assert.equal('entrega' in por(13), false, 'pedido Cancelado não mostra entrega');
+  assert.doesNotMatch(JSON.stringify(d), /"valor"/, 'entregas.ver sozinha não libera valor (5 não tem valores.ver)');
+  const dia = await (await chamar(5, '/calendario/dia?data=2020-03-10')).json();
+  assert.equal(de(f, SQL_ENTREGAS).length, 2, 'uma consulta também no dia');
+  assert.equal(dia.pedidos.find(p => p.numero === 10).entrega.estado, 'marcada');
+});
+
+test('entrega: falha ao ler web_entregas só tira o selo (200, sem chave de entrega)', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift([SQL_ENTREGAS, () => { throw new Error('falha'); }]);
+  const r = await chamar(5, '/calendario/pedidos?mes=2020-03');
+  assert.equal(r.status, 200);
+  assert.ok(!JSON.stringify(await r.json()).includes('"entrega"'));
 });

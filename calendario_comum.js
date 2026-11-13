@@ -117,18 +117,33 @@
   // Balão (title) e rótulo de acessibilidade: o mesmo texto nas três visões e na página do dia. Os itens do pedido vêm de textoItens (entregas_comum.js).
   const { textoItens } = C;
   const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}${textoItens(p)}`;
-  const ITENS_DOC = [['comPerfil', '📏', 'Perfil'], ['comVidro', '🔷', 'Vidro'], ['comSerralheria', '🔩', 'Serralheria'], ['comPintura', '🎨', 'Pintura']];
-  const iconesItens = p => {
-    const tem = ITENS_DOC.filter(([chave]) => p[chave]);
-    return tem.length ? ` <span class="itens-doc" role="img" aria-label="Contém: ${tem.map(t => t[2]).join(', ')}">${tem.map(([, icone, nome]) => `<span class="item-doc" title="${nome}">${icone}</span>`).join('')}</span>` : '';
-  };
+  // Entrega do pedido (só vem na API para quem tem entregas.ver; sem `p.entrega` nada aparece). Cores só do mapa único (situacoes.js, grupo entrega).
+  // marcada = "Entrega 14/11" (Retirada / Envio conforme o tipo; "+N" quando há outras entregas ativas); a_agendar = "Entrega a agendar";
+  // concluida = "Entrega concluída"; nenhuma = "Sem entrega" (aviso se o pedido está Pronto, neutro se ainda em produção). Pedido fechado não manda `entrega`.
+  const NOME_ENTREGA = { retirada: 'Retirada', outro_estado: 'Envio' };
+  function infoEntrega(p) {
+    const e = p && p.entrega;
+    if (!e || !e.estado) return null;
+    const nome = NOME_ENTREGA[e.tipo] || 'Entrega';
+    const mais = Number(e.qtdMais) > 0 ? ` +${Number(e.qtdMais)}` : '';
+    if (e.estado === 'marcada' && dataValida(e.data)) {
+      return { cor: S.cor('entrega', 'agendada'), curto: `${nome === 'Entrega' ? 'Ent.' : nome} ${dataBR(e.data).slice(0, 5)}${mais}`, texto: `${nome} ${dataBR(e.data).slice(0, 5)}${mais}`,
+        dica: `${nome} marcada para ${dataBR(e.data)}${mais ? `; mais ${Number(e.qtdMais)} entrega(s) do pedido` : ''}` };
+    }
+    if (e.estado === 'marcada' || e.estado === 'a_agendar') return { cor: S.cor('entrega', 'a_programar'), curto: `${nome === 'Entrega' ? 'Ent.' : nome} a agendar${mais}`, texto: `${nome} a agendar${mais}`, dica: `${nome} na fila, ainda sem data${mais ? `; mais ${Number(e.qtdMais)} entrega(s)` : ''}` };
+    if (e.estado === 'concluida') return { cor: S.cor('entrega', 'concluida'), curto: 'Entrega feita', texto: 'Entrega concluída', dica: 'As entregas deste pedido já foram concluídas' };
+    if (e.estado === 'nenhuma') return { cor: p.classe === 'pronto' ? S.cor('entrega', 'a_programar') : 'neutro', curto: 'Sem entrega', texto: 'Sem entrega', dica: 'Este pedido ainda não tem entrega marcada' };
+    return null;
+  }
+  const seloEntrega = p => { const i = infoEntrega(p); return i ? `<span class="selo ${i.cor} selo-ent" title="${esc(i.dica)}">${esc(i.texto)}</span>` : ''; };
+  const etqEntrega = p => { const i = infoEntrega(p); return i ? ` <span class="etq-ent" title="${esc(i.dica)}">${esc(i.curto)}</span>` : ''; };
 
   // Etiqueta do pedido no calendário (classe etq: "chip" já é do tema.css). É um <li data-numero> focável: o InicioMenu abre o menu pelo botão direito, pela tecla de menu e por Shift+F10.
   function htmlEtiqueta(p, situacao, busca) {
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="etq-sit">${esc(SIGLA_CLASSE[p.classe])}</span>` : '';
     const rot = rotuloPedido(p) + rotuloAchou(p, busca);
     return `<li class="etq ${corPedido(p)}${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
-      `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${iconesItens(p)}${sit}` +
+      `<span class="etq-num">#${esc(p.numero)}</span> <span class="etq-cli">${esc(abreviar(p.cliente))}</span>${sit}${etqEntrega(p)}` +
       (p.atrasado ? ' <span class="etq-atraso">Atrasado</span>' : '') + '</li>';
   }
   function htmlCelula(c, situacao, busca) {
@@ -172,7 +187,7 @@
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
     const rot = rotuloPedido(p) + rotuloAchou(p, busca);
     return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
-      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${iconesItens(p)}${sit} ${seloSituacao(p)}` +
+      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit} ${seloSituacao(p)}${seloEntrega(p) ? ' ' + seloEntrega(p) : ''}` +
       (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
   }
   function htmlFolha(semanas, situacao, busca) {
@@ -193,8 +208,8 @@
     const temValor = Object.prototype.hasOwnProperty.call(p, 'valor');
     return `<li class="linha-dia${p.atrasado ? ' atraso' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rotuloPedido(p))}" aria-label="${esc(rotuloPedido(p))}">` +
       `<span class="ld-num">#${esc(p.numero)}</span>` +
-      `<div class="ld-meio"><b>${esc(p.cliente || '—')}</b>${p.clienteFinal ? `<small>${esc(p.clienteFinal)}</small>` : ''}${iconesItens(p)}</div>` +
-      `<div class="ld-sit">${seloSituacao(p)} ${seloAtraso(p)}</div>` +
+      `<div class="ld-meio"><b>${esc(p.cliente || '—')}</b>${p.clienteFinal ? `<small>${esc(p.clienteFinal)}</small>` : ''}</div>` +
+      `<div class="ld-sit">${seloSituacao(p)} ${seloEntrega(p)} ${seloAtraso(p)}</div>` +
       (temValor ? `<span class="ld-valor" data-valor>${esc(moeda(p.valor))}</span>` : '') +
       `<button type="button" class="btn btn-mini btn-secondary ld-acoes" aria-haspopup="menu" aria-label="Ações do pedido ${esc(p.numero)}">Ações</button></li>`;
   }
@@ -235,5 +250,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, rotuloPedido, textoItens, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, rotuloPedido, textoItens, infoEntrega, seloEntrega, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

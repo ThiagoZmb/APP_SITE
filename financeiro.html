@@ -251,10 +251,6 @@
         th.ordenavel::after { content: " ↓"; color: var(--primary-color); }
         th.ordenavel.asc::after { content: " ↑"; }
         td.nowrap, th.nowrap { white-space: nowrap; }
-        tbody tr.entrada { background: rgba(84,193,139,.05); }
-        tbody tr.saida { background: rgba(239,111,123,.045); }
-        tbody tr.entrada.hoje { background: rgba(84,193,139,.12); }
-        tbody tr.saida.hoje { background: rgba(239,111,123,.11); }
         tbody tr.marcado { box-shadow: inset 4px 0 0 var(--primary-color); filter: brightness(.94); }
         .mov { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
         .mov.e { background: var(--success-color); color: white; }
@@ -436,7 +432,7 @@
             .col-opc { display: none; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211500">
+    <link rel="stylesheet" href="tema.css?v=202611221100">
     <script src="layout.js?v=202611211000" defer></script>
     <script src="situacoes.js?v=202611191300"></script>
     <script src="fluxo_divisao.js?v=202611101300"></script>
@@ -881,11 +877,11 @@
             if (!lista.length) {
                 $('tbody').innerHTML = '<tr><td colspan="11" class="vazio">Nenhum movimento encontrado</td></tr>';
             } else {
-                // Marcar_Linhas: verde = entrada, vermelho = saída; tom mais forte quando a data é hoje
+                // Sem fundo por tipo: a cor fica no valor (verde entrada, vermelho saída); só a linha de hoje ganha fundo verde suave (.linha-hoje)
                 $('tbody').innerHTML = lista.map(it => {
                     const e = ehEntrada(it);
                     const vencido = ehAberto(it.situacao) && it.data < hoje;
-                    return `<tr data-id="${it.id}" class="${e ? 'entrada' : 'saida'}${it.data === hoje ? ' hoje' : ''}${marcados.has(it.id) ? ' marcado' : ''}">
+                    return `<tr data-id="${it.id}" class="${e ? 'entrada' : 'saida'}${it.data === hoje ? ' linha-hoje' : ''}${marcados.has(it.id) ? ' marcado' : ''}">
                         <td class="sel"><input type="checkbox" class="chk" ${marcados.has(it.id) ? 'checked' : ''} aria-label="Selecionar"></td>
                         <td class="nowrap">${dataBR(it.data)}</td>
                         <td><div class="nome-mov"><span class="mov ${e ? 'e' : 's'}">${e ? '↓' : '↑'}</span><span class="nm">${escapeHtml(e ? it.cliente : it.fornecedor)}</span></div>
