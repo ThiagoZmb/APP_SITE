@@ -7,7 +7,7 @@
 // Texto vindo do banco é cortado em 40 caracteres; a tela mostra tudo por textContent (nunca como HTML).
 
 const ACOES_HISTORICO = ['pedido_situacao', 'pedido_situacao_entregas_abertas', 'pedido_cancelado', 'data_pronto_alterada',
-  'desconto_adicional_alterado', 'preco_divergente'];
+  'desconto_adicional_alterado', 'preco_divergente', 'orcamento_virou_pedido'];
 const LIMITE_HISTORICO = 200;
 
 const texto = v => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(/[\u0000-\u001f]+/g, ' ').trim().slice(0, 40) : '');
@@ -61,6 +61,10 @@ function resumoDoEvento(acao, detalhe, quando) {
     case 'preco_divergente': {
       const n = Array.isArray(d.itens) ? d.itens.length : 0;
       return n ? `Aviso de preço divergente na gravação (${plural(n, 'item', 'itens')})` : 'Aviso de preço divergente na gravação';
+    }
+    case 'orcamento_virou_pedido': {
+      const o = Number(d.orcamento);
+      return Number.isInteger(o) && o > 0 ? `Criado a partir do orçamento nº ${o}` : null;
     }
     default:
       return null;

@@ -884,6 +884,7 @@
                         <button type="button" class="btn btn-secondary" id="btn-novo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/></svg><span>Novo</span></button>
                         <button type="button" class="btn btn-secondary" id="btn-abrir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Abrir</span></button>
                         <button type="button" class="btn btn-primary" id="btn-salvar" data-perm="orcamentos.salvar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg><span>Salvar</span></button>
+                        <button type="button" class="btn btn-secondary" id="btn-virar-pedido" data-perm="pedidos.criar" style="display:none" title="Cria um pedido a partir deste orçamento gravado (o orçamento continua como está)"><span>Transformar em pedido</span></button>
                         <button type="button" class="btn btn-secondary" id="btn-pdf" data-perm="pedidos.pdf" title="Abre o PDF do documento salvo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg><span>PDF</span></button>
                     </div>
                     <div class="acoes-grupo acoes-risco">
@@ -996,6 +997,7 @@
     <script src="calculo/perfil_secoes.js?v=202611051800"></script>
     <script src="desenho3d.js?v=202611051800"></script>
     <script src="alteracao_valor.js?v=202611041200"></script>
+    <script src="virar_pedido.js?v=202611131200"></script>
     <script src="peso_tela.js?v=202610290900"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script src="auditoria_calculo.js?v=202611191400"></script>
@@ -3510,6 +3512,17 @@
             $s('ped-numero').value = docAberto ? String(docAberto.numero) : '';
             const podeVirarPedido = !!docAberto && docAberto.tipo === 'Orçamento' && docAberto.podeEditar && !!$s('ped-tipo').querySelector('option[value="Pedido"]');
             $s('ped-tipo').disabled = !!docAberto && !podeVirarPedido;
+            // botão "Transformar em pedido": só com um orçamento gravado aberto (o servidor cria o pedido a partir do que está gravado)
+            $s('btn-virar-pedido').style.display = podeVirarPedido ? '' : 'none';
+        }
+        async function transformarEmPedido() {
+            if (!docAberto || docAberto.tipo !== 'Orçamento') return;
+            if (!confirm('O pedido será criado a partir do orçamento GRAVADO: alterações ainda não salvas na tela ficam de fora. Continuar?')) return;
+            const sel = $s('sel-cliente');
+            await window.VirarPedido.executar({ numero: docAberto.numero, cliente: sel.options[sel.selectedIndex]?.text || '', dataPronto: $s('ped-entrega').value,
+                apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken,
+                aoEditar: n => abrirDocumento('Pedido', n, { confirmar: false }),
+                aoEnviar: n => mostrarMsgSalvar(`Pedido nº ${n} criado a partir do orçamento nº ${docAberto.numero}.`, 'ok') });
         }
         function aplicarModoLeitura(soLeitura) {
             document.body.classList.toggle('so-leitura', soLeitura);
@@ -4146,6 +4159,7 @@
         document.getElementById('btn-dlg-cancelar').addEventListener('click', () => document.getElementById('dlg-salvar').close());
         document.getElementById('btn-novo').addEventListener('click', novoDocumento);
         document.getElementById('btn-abrir').addEventListener('click', abrirJanelaAbrir);
+        document.getElementById('btn-virar-pedido').addEventListener('click', transformarEmPedido);
         document.getElementById('btn-abrir-fechar').addEventListener('click', () => document.getElementById('dlg-abrir').close());
         document.getElementById('abrir-tipo').addEventListener('change', buscarParaAbrir);
         document.getElementById('abrir-busca').addEventListener('input', () => { clearTimeout(timerBuscaAbrir); timerBuscaAbrir = setTimeout(buscarParaAbrir, 300); });

@@ -269,6 +269,7 @@
     <script src="layout.js?v=202611221200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
+    <script src="virar_pedido.js?v=202611131200" defer></script>
     <script src="calculo/desconto_pedido.js?v=202611101600" defer></script>
     <script src="desconto_pedido_tela.js?v=202611161500" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
@@ -942,6 +943,12 @@
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });
+            // orçamento → pedido: janela com data de pronto, financeiro (A Receber) e produção (Em Produção); "Editar pedido" abre o novo pedido, "Enviar do jeito que está" só cria
+            if (!ehPedido && Acesso.pode('orcamentos.criar valores.ver') && !Acesso.pode('orcamentos.salvar pedidos.criar')) L.push({ icone: '📦', rotulo: 'Transformar em pedido (sem permissão)', fn: null, desativado: true });
+            if (!ehPedido) add('orcamentos.criar orcamentos.salvar pedidos.criar valores.ver', '📦', 'Transformar em pedido', () => window.VirarPedido.executar({ numero, cliente: x.cliente, prontoEm: x.prontoEm,
+                apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken,
+                aoEditar: n => { location.href = `orcamentos.html?abrir=Pedido/${encodeURIComponent(n)}` + '&voltar=' + voltarParaEstaPagina(); },
+                aoEnviar: n => { alert(`Pedido nº ${n} criado a partir do orçamento nº ${numero}.`); carregar(); } }));
             if (ehPedido && !cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero, apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, recarregar: () => carregar() }));
             if (!cancelado && Acesso.pode(ehPedido ? 'pedidos.situacao' : 'orcamentos.salvar')) {
                 sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(numero));

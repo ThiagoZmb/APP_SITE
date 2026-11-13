@@ -29,6 +29,10 @@
         main { grid-area: main; padding: 16px 14px 40px; min-width: 0; }
         .welcome-title { font-size: 24px; margin-bottom: 4px; font-weight: 700; }
         .welcome-subtitle { font-size: 14px; color: var(--text-light); margin-bottom: 14px; }
+        .cabecalho-lista { background: var(--white); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: var(--shadow-light); padding: 16px; margin-bottom: 18px; }
+        .cabecalho-lista .welcome-subtitle { margin-bottom: 12px; }
+        .cabecalho-lista .escopo { margin-bottom: 12px; }
+        .cabecalho-lista .nav-dia { margin-bottom: 0; }
 
         .nav-dia { display: grid; grid-template-columns: 56px 1fr 56px; gap: 8px; align-items: center; margin-bottom: 14px; }
         .nav-dia .rotulo { text-align: center; font-weight: 700; font-size: 16px; }
@@ -126,18 +130,20 @@
         <main>
             <!-- lista do dia -->
             <section id="vista-lista">
-                <h1 class="welcome-title">Minhas entregas</h1>
-                <p class="welcome-subtitle" id="subtitulo">Suas entregas agendadas: inicie a rota e dê baixa no local.</p>
-                <!-- só o administrativo: todas as entregas de todos os motoristas (padrão) ou só as dele -->
-                <div class="escopo" id="filtro-escopo" data-perm="administrativo.ver entregas.ver" hidden>
-                    <button type="button" class="btn btn-primary" data-escopo="todos" aria-pressed="true">Todos</button>
-                    <button type="button" class="btn btn-secondary" data-escopo="minhas" aria-pressed="false">Só as minhas</button>
-                </div>
-                <div class="nav-dia">
-                    <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-ant" aria-label="Dia anterior">‹</button>
-                    <div class="rotulo" id="dia-rotulo" aria-live="polite"></div>
-                    <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-prox" aria-label="Próximo dia">›</button>
-                    <button type="button" class="btn btn-secondary hoje" id="btn-dia-hoje">Hoje</button>
+                <div class="cabecalho-lista">
+                    <h1 class="welcome-title">Minhas entregas</h1>
+                    <p class="welcome-subtitle" id="subtitulo">Suas entregas agendadas: inicie a rota e dê baixa no local.</p>
+                    <!-- só o administrativo: todas as entregas de todos os motoristas (padrão) ou só as dele -->
+                    <div class="escopo" id="filtro-escopo" data-perm="administrativo.ver entregas.ver" hidden>
+                        <button type="button" class="btn btn-primary" data-escopo="todos" aria-pressed="true">Todos</button>
+                        <button type="button" class="btn btn-secondary" data-escopo="minhas" aria-pressed="false">Só as minhas</button>
+                    </div>
+                    <div class="nav-dia">
+                        <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-ant" aria-label="Dia anterior">‹</button>
+                        <div class="rotulo" id="dia-rotulo" aria-live="polite"></div>
+                        <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-prox" aria-label="Próximo dia">›</button>
+                        <button type="button" class="btn btn-secondary hoje" id="btn-dia-hoje">Hoje</button>
+                    </div>
                 </div>
                 <div id="cartoes" aria-live="polite"><p class="vazio">Carregando…</p></div>
             </section>

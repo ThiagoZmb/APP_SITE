@@ -99,6 +99,9 @@ function bancoPedOrc() {
       const fica = estado.entregaEventos.filter(a => a.entrega_id !== id); estado.entregaEventos.splice(0, estado.entregaEventos.length, ...fica); return { affectedRows: 1 }; }],
     [/^DELETE FROM web_entregas WHERE id = \?$/, (sql, [id]) => {
       const fica = estado.entregas.filter(a => a.id !== id); estado.entregas.splice(0, estado.entregas.length, ...fica); return { affectedRows: 1 }; }],
+    // "transformar em pedido": já houve conversão deste orçamento? (última linha de web_auditoria do alvo com a ação)
+    [/^SELECT detalhe FROM web_auditoria WHERE alvo = \? AND acao = \? ORDER BY id DESC LIMIT 1$/, (sql, [alvo, acao]) =>
+      estado.auditoria.filter(l => l.alvo === alvo && l.acao === acao).slice(-1).map(l => ({ detalhe: l.detalhe }))],
     // histórico do pedido (GET /ped_orc/Pedido/:n/historico): linhas de web_auditoria do alvo, ações da lista, mais novas primeiro
     [/^SELECT id, DATE_FORMAT\(quando.*FROM web_auditoria WHERE alvo = \? AND acao IN \([?, ]+\) ORDER BY id DESC LIMIT \d+$/, (sql, params) => {
       const [alvo, ...acoes] = params, limite = Number(sql.match(/LIMIT (\d+)$/)[1]);

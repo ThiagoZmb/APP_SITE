@@ -7,6 +7,7 @@ const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcess
 const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
 const DescontoPedido = require('../calculo/desconto_pedido');
+const OrcamentoPedido = require('../calculo/orcamento_pedido');
 const { ACOES_HISTORICO, LIMITE_HISTORICO, montarHistorico } = require('../calculo/historico_pedido');
 const express = require('express');
 const { validarPng } = require('../calculo/png');
@@ -21,6 +22,8 @@ const { STATUS_ENCERRAVEIS, STATUS_EM_CURSO } = require('../calculo/entregas'); 
 const TIPOS = ['Orçamento', 'Pedido'];
 const SITUACOES_PEDIDO = ['Em Produção', 'Entregue', 'Cancelado', 'Retirado'];
 const FINANCEIROS = ['Recebido', 'A Receber', 'Atrasado', 'Sem custo'];
+// "Transformar em pedido": pedido novo nasce Em Produção (Entregue/Retirado exigem DATA_ENTREGA e a baixa das entregas; Cancelado não faz sentido; Pronto passa pelo menu de situação)
+const SITUACOES_VIRAR_PEDIDO = ['Em Produção'];
 const FRENTES_PORTA = ['Porta de giro', 'Porta basculante', 'Frente de gaveta', 'Porta de Correr'];
 // o banco/VB pode guardar "A receber", "em produção" ou com espaço sobrando: acha o valor canônico da lista sem diferenciar caixa
 const canonico = (lista, v) => { const t = String(v ?? '').trim().toLowerCase(); return lista.find(x => x.toLowerCase() === t); };
@@ -432,6 +435,20 @@ async function lerSistemaCorrer(db, nome, folhas) {
   };
 }
 
+// Documento lido do banco → formato da tela (cabeçalho + itens), com o cliente (CODIGO, ESTADO). Usado por GET /ped_orc/:tipo/:numero e por virar_pedido.
+// Cliente, componentes da serralheria e sistemas de correr são independentes entre si: saem JUNTOS (cada ida ao banco custa ~190 ms).
+async function traduzirDoBanco(db, leitor, linhas) {
+  const produtosSerr = [...new Set(linhas.serralheria.map(s => s.PRODUTO))];
+  const [[cli], componentes, sistemas] = await Promise.all([
+    db.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]),
+    Promise.all(produtosSerr.map(p => leitor.componentesSerralheria(p))),
+    sistemasDoDocumento(db, linhas)
+  ]);
+  const componentesSerr = {};
+  produtosSerr.forEach((p, i) => { componentesSerr[p] = componentes[i]; });
+  return { cli: cli[0], ...traduzirDocumento(linhas, { sistemas, componentesSerr }) };
+}
+
 function registrarPedOrc({ rota, pool }) {
   const leitor = criarLeitor(pool);
 
@@ -510,19 +527,10 @@ function registrarPedOrc({ rota, pool }) {
     try {
       const linhas = await lerDocumento(pool, tipo, numero);
       if (!linhas) return res.status(404).json({ error: `${tipo} nº ${numero} não encontrado.` });
-      // cliente, componentes da serralheria e sistemas de correr são independentes entre si: saem JUNTOS (cada ida ao banco custa ~190 ms)
-      const produtosSerr = [...new Set(linhas.serralheria.map(s => s.PRODUTO))];
-      const [[cli], componentes, sistemas] = await Promise.all([
-        pool.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]),
-        Promise.all(produtosSerr.map(p => leitor.componentesSerralheria(p))),
-        sistemasDoDocumento(pool, linhas)
-      ]);
-      if (foraDosEstados(req, cli[0]?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
-      const componentesSerr = {};
-      produtosSerr.forEach((p, i) => { componentesSerr[p] = componentes[i]; });
-      const { cabecalho, itens } = traduzirDocumento(linhas, { sistemas, componentesSerr });
+      const { cli, cabecalho, itens } = await traduzirDoBanco(pool, leitor, linhas);
+      if (foraDosEstados(req, cli?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
       const p = req.acesso.permissoes;
-      res.json({ cabecalho: { ...cabecalho, clienteCodigo: cli[0]?.CODIGO ?? null }, itens, impressao: impressaoDigital(linhas, tipo),
+      res.json({ cabecalho: { ...cabecalho, clienteCodigo: cli?.CODIGO ?? null }, itens, impressao: impressaoDigital(linhas, tipo),
         podeEditar: p.has('orcamentos.salvar') && (tipo === 'Orçamento' || p.has('pedidos.criar')) });
     } catch (err) {
       console.error('Erro GET /ped_orc/:tipo/:numero:', err.message);
@@ -565,8 +573,8 @@ function registrarPedOrc({ rota, pool }) {
     });
 
   // Salvar_Ped_Orc_Blindado: novo número ou atualizar, tudo numa transação
-  rota('post', '/ped_orc/salvar', ['orcamentos.criar', 'orcamentos.salvar', 'valores.ver'], async (req, res) => {
-    const b = req.body || {};
+  // `aoGravar(conn, numero, tipo)` (opcional): roda DENTRO da mesma transação, depois de tudo gravado (ex.: auditoria de "orçamento virou pedido")
+  async function gravarDocumento(req, res, b, { aoGravar } = {}) {
     if (b.tipo === 'Pedido' && !req.acesso.permissoes.has('pedidos.criar'))
       return res.status(403).json({ error: 'Sem permissão para salvar como pedido.', faltando: ['pedidos.criar'] });
     if (b.tipo === 'Pedido') { b.situacao = canonico(SITUACOES_PEDIDO, b.situacao) ?? b.situacao; b.financeiro = canonico(FINANCEIROS, b.financeiro) ?? b.financeiro; }
@@ -677,10 +685,49 @@ function registrarPedOrc({ rota, pool }) {
         }
       }
       if (divergentes.length) await auditarDoc(conn, req, 'preco_divergente', tipo, numero, { itens: divergentes });
+      if (aoGravar) await aoGravar(conn, numero, tipo);
       return { numero };
     });
     const avisos = { ...(mudaram.length ? { precoMudou: mudaram } : {}), ...(divergentes.length ? { precoDivergente: divergentes } : {}) };
     if (resultado) res.json({ ok: true, tipo, numero: resultado.numero, ...(Object.keys(avisos).length ? { avisos } : {}) });
+  }
+  rota('post', '/ped_orc/salvar', ['orcamentos.criar', 'orcamentos.salvar', 'valores.ver'], (req, res) => gravarDocumento(req, res, req.body || {}));
+
+  // ---- transformar ORÇAMENTO em PEDIDO (menu do botão direito / botão da tela de orçamentos) ----
+  // Mesmo caminho do "trocar o tipo para Pedido e salvar" da tela (converte: itens gerados do zero, valor da tela = valor gravado do orçamento,
+  // vidros e perfis do pedido gerados pela engenharia, número novo com a trava de sempre), só que o servidor monta o corpo a partir do orçamento
+  // gravado. O orçamento NÃO muda. Corpo: { dataPronto, financeiro?, situacao?, confirmarDuplicado? } (padrões: 'A Receber' e 'Em Produção').
+  // Orçamento já transformado antes (web_auditoria) = 409 { aviso: 'ja_convertido', pedido } até vir confirmarDuplicado: true.
+  rota('post', '/ped_orc/orcamentos/:numero/virar_pedido', ['orcamentos.criar', 'orcamentos.salvar', 'pedidos.criar', 'valores.ver'], async (req, res) => {
+    const numero = Number(req.params.numero);
+    if (!(Number.isInteger(numero) && numero > 0)) return res.status(400).json({ error: 'Documento inválido.' });
+    const p = OrcamentoPedido.validarPedido(req.body || {}, { canonico, SITUACOES: SITUACOES_VIRAR_PEDIDO, FINANCEIROS, validarData });
+    if (!p.ok) return res.status(400).json({ error: p.erro });
+    try {
+      const linhas = await lerDocumento(pool, 'Orçamento', numero);
+      if (!linhas) return res.status(404).json({ error: `Orçamento nº ${numero} não encontrado.` });
+      const { cli, cabecalho, itens } = await traduzirDoBanco(pool, leitor, linhas);
+      if (foraDosEstados(req, cli?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
+      const corpo = OrcamentoPedido.montarCorpo({ cabecalho, itens, clienteCodigo: cli?.CODIGO ?? null, ...p.valores });
+      if (!corpo.ok) return res.status(422).json({ error: corpo.erro });
+      if (!(req.body || {}).confirmarDuplicado) {
+        const [antes] = await pool.execute('SELECT detalhe FROM web_auditoria WHERE alvo = ? AND acao = ? ORDER BY id DESC LIMIT 1', [`Orçamento ${numero}`, 'orcamento_virou_pedido']);
+        if (antes.length) {
+          let pedido = null; try { pedido = JSON.parse(antes[0].detalhe).pedido ?? null; } catch { /* detalhe ilegível: avisa mesmo assim */ }
+          return res.status(409).json({ error: `O orçamento nº ${numero} já foi transformado em pedido${pedido ? ` (nº ${pedido})` : ''}. Transformar de novo cria outro pedido.`, aviso: 'ja_convertido', pedido });
+        }
+      }
+      const detalhe = { cliente: cabecalho.razaoSocial, dataPronto: p.valores.dataPronto, financeiro: p.valores.financeiro, situacao: p.valores.situacao };
+      await gravarDocumento(req, res, corpo.corpo, { aoGravar: async (conn, novo) => {
+        await auditarDoc(conn, req, 'orcamento_virou_pedido', 'Pedido', novo, { orcamento: numero, ...detalhe });
+        await auditarDoc(conn, req, 'orcamento_virou_pedido', 'Orçamento', numero, { pedido: novo, ...detalhe });
+      } });
+    } catch (err) {
+      if (err instanceof ErroItem) return res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
+      if (err instanceof ErroCadastro) return res.status(503).json({ error: 'Não foi possível transformar: erro ao ler o cadastro. Nada foi gravado; tente de novo.', codigo: 'erro_cadastro' });
+      console.error('Erro POST /ped_orc/orcamentos/virar_pedido:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
+    }
   });
 
   // ---- cancelar / excluir (a tela sempre pergunta antes; aqui só o servidor decide e registra) ----
