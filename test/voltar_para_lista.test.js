@@ -31,9 +31,10 @@ test('lista de pedidos/orçamentos: imprimir PDF direto (iframe com blob, sem ab
   const h = ler('painel_inicial.html');
   const csp = h.match(/Content-Security-Policy" content="([^"]+)"/)[1];
   assert.ok(/frame-src blob:/.test(csp) && /object-src 'self' blob:/.test(csp), 'o iframe de blob precisa de frame-src e object-src');
-  assert.ok(h.includes('async function imprimirPdf(url) {'));
-  assert.ok(h.includes('quadro.contentWindow.print()') && h.includes("document.createElement('iframe')"));
-  assert.ok(!/imprimirPdf[\s\S]{0,1500}window\.open/.test(h), 'imprimir não abre aba nova');
+  assert.ok(h.includes('const imprimirPdf = url => window.ImpressaoPdf.imprimirComAviso(url,'));
+  const imp = ler('impressao_pdf.js');
+  assert.ok(imp.includes('quadro.contentWindow.print()') && imp.includes("document.createElement('iframe')"));
+  assert.ok(!/window\.open/.test(imp), 'imprimir não abre aba nova');
   for (const rotulo of ["'Imprimir guia de produção'", "'Imprimir vidros'", "'Imprimir orçamento'"]) assert.ok(h.includes(rotulo), rotulo);
   assert.ok(h.includes('imprimirPdf(urlPdf(numero, true))') && h.includes('imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero='));
 });

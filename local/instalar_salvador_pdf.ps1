@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 $destino = 'C:\Programa Elegance\Servico'
 $porta   = 3917
-$arquivos = @('salvador_pdf.js', 'sefaz.js', 'zebra.js', 'package.json', 'package-lock.json', 'sefaz.config.exemplo.json', 'zebra.config.exemplo.json')
+$arquivos = @('salvador_pdf.js', 'sefaz.js', 'zebra.js', 'impressao.js', 'package.json', 'package-lock.json', 'sefaz.config.exemplo.json', 'zebra.config.exemplo.json', 'impressao.config.exemplo.json')
 
 function Achar-Node {
   $c = Get-Command node -ErrorAction SilentlyContinue

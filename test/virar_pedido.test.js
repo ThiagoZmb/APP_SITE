@@ -169,7 +169,7 @@ test('janela: sem erro de sintaxe, padrões Financeiro "A Receber" / Produção 
 });
 
 test('telas: item do menu de Orçamentos atrás das permissões e botão em orcamentos.html; script carregado', () => {
-  assert.match(ler('painel_inicial.html'), /if \(!ehPedido\) add\('orcamentos\.criar orcamentos\.salvar pedidos\.criar valores\.ver', '[^']+', 'Transformar em pedido'/);
+  assert.match(ler('painel_inicial.html'), /if \(!ehPedido\) add\('orcamentos\.criar orcamentos\.salvar pedidos\.criar valores\.ver', '[^']+', 'Gerar pedido'/);
   assert.ok(ler('painel_inicial.html').includes('<script src="virar_pedido.js'));
   const o = ler('orcamentos.html');
   assert.ok(o.includes('<script src="virar_pedido.js'));
@@ -178,11 +178,11 @@ test('telas: item do menu de Orçamentos atrás das permissões e botão em orca
   assert.match(o, /getElementById\('btn-virar-pedido'\)\.addEventListener\('click', transformarEmPedido\)/);
 });
 
-test('lista Pedidos e Orçamentos: "Enviar do jeito que está" cria direto, avisa com o nº do pedido e recarrega a lista; sem permissão o item aparece desativado', () => {
+test('lista Pedidos e Orçamentos: "Enviar do jeito que está" cria direto, recarrega a lista e oferece a impressão; sem permissão o item aparece desativado', () => {
   const p = ler('painel_inicial.html');
-  assert.match(p, /aoEnviar: n => \{ alert\(`Pedido nº \$\{n\} criado a partir do orçamento nº \$\{numero\}\.`\); carregar\(\); \}/);
-  assert.match(p, /Transformar em pedido \(sem permissão\)[^\n]*desativado: true/);
-  assert.ok(ler('virar_pedido.js').includes("aoEnviar(d.numero)"));
+  assert.ok(p.includes('aoEnviar: async n => { carregar(); await opcoesImpressao(n, x.cliente); }'));
+  assert.match(p, /Gerar pedido \(sem permissão\)[^\n]*desativado: true/);
+  assert.ok(ler('virar_pedido.js').includes("aoEnviar(numeroNovo)"));
 });
 
 test('histórico do pedido mostra "Criado a partir do orçamento nº N" sem dinheiro', () => {

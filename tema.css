@@ -944,3 +944,18 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 @media (max-width: 520px) { .ez-campos { grid-template-columns: 1fr; } .ez-geral .ez-campo { flex-basis: 100%; } }
 .sb-marca:hover b { color: var(--primary-color); }
 .sb-marca:focus-visible { outline: 3px solid var(--primary-ring); outline-offset: -3px; border-radius: 12px; }
+
+/* janela "Imprimir documentos" (impressao_pdf.js): reaproveita dp-fundo/dp-caixa/dp-titulo/dp-sub/dp-acoes/dp-btn.
+   Uma linha por documento (caixa de seleção, nome, resultado); o iframe de impressão do navegador fica fora da vista. */
+.ip-caixa { max-width: 460px; }
+.ip-modo { margin-bottom: 10px; font-size: 13px; }
+.ip-lista { display: flex; flex-direction: column; gap: 6px; }
+.ip-linha { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 10px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; }
+.ip-linha input { grid-row: 1 / span 2; accent-color: var(--primary-color); }
+.ip-nome { font-weight: 700; color: var(--text-dark); }
+.ip-estado { grid-column: 2; font-size: 12.5px; line-height: 1.35; color: var(--text-mid); overflow-wrap: anywhere; }
+.ip-estado:empty { display: none; }
+.ip-estado.ip-ok { color: var(--success-color); }
+.ip-estado.ip-erro { color: var(--danger-color); }
+.ip-estado.ip-neutro { color: var(--text-light); }
+.ip-oculto { position: fixed; right: 0; bottom: 0; width: 1px; height: 1px; border: 0; opacity: 0; pointer-events: none; }

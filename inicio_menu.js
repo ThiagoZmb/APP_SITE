@@ -26,29 +26,8 @@
     const urlPdf = (n, producao) => `${cfg.apiBase}/dados_pdf?numero=${enc(n)}&tipo=Pedido${producao ? '&producao=1' : ''}`;
     const urlVidros = n => `${cfg.apiBase}/dados_pdf_vidros?numero=${enc(n)}`;
 
-    // baixa o PDF com o token, põe num iframe escondido (blob) e chama a impressão do navegador, sem abrir outra aba/página
-    async function imprimirPdf(url) {
-      let link = null, quadro = null;
-      const limpar = () => { if (quadro) quadro.remove(); if (link) URL.revokeObjectURL(link); };
-      try {
-        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + cfg.token() } });
-        if (r.status === 401) { localStorage.removeItem('auth'); location.href = cfg.loginUrl; return; }
-        if (!r.ok) {
-          let msg = ''; try { msg = (await r.json()).error || ''; } catch { /* sem corpo JSON */ }
-          throw new Error(r.status === 404 ? (msg || 'Documento não encontrado.') : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
-        }
-        link = URL.createObjectURL(await r.blob());
-        quadro = document.createElement('iframe');
-        quadro.setAttribute('aria-hidden', 'true');
-        quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-        quadro.addEventListener('load', () => {
-          setTimeout(() => { try { quadro.contentWindow.focus(); quadro.contentWindow.print(); } catch { alert('Não foi possível abrir a impressão. Use "Abrir PDF" e imprima por lá.'); } }, 400);
-        });
-        quadro.src = link;
-        document.body.appendChild(quadro);
-        setTimeout(limpar, 5 * 60 * 1000);
-      } catch (err) { limpar(); alert('Não foi possível imprimir: ' + err.message); }
-    }
+    // impressão direta (impressao_pdf.js): serviço do PC sem diálogo, ou iframe oculto + print() do navegador; nunca abre outra aba
+    const imprimirPdf = url => window.ImpressaoPdf.imprimirComAviso(url, cfg);
 
     async function mudarSituacao(x, nome) {
       let manterData = false, usarDataPronto = false, dataEscolhida = '';
@@ -105,7 +84,7 @@
       add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)));
       add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(urlVidros(n)));
       add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
-      add('pedidos.checklist', '✅', 'Imprimir checklist', () => window.ChecklistPedido.abrir({ apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
+      add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${cfg.apiBase}/checklist/pdf`));
       sep();
       add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
       if (!cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, recarregar: cfg.recarregar }));

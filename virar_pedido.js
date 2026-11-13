@@ -1,9 +1,9 @@
-// Janela "Transformar em pedido" (menu do botão direito de Orçamentos e botão da tela de orçamentos).
+// Janela "Gerar pedido" (menu do botão direito de Orçamentos e botão da tela de orçamentos).
 // Escolhe data de pronto, Financeiro (já "A Receber") e Produção (já "Em Produção") e tem duas saídas:
 //   "Editar pedido" = cria o pedido e abre para edição; "Enviar do jeito que está" = cria o pedido direto.
 // perguntar({ numero, cliente, dataPronto }) devolve { acao: 'editar'|'enviar', dataPronto, financeiro, situacao } ou null (cancelou).
 // executar({ numero, cliente, dataPronto, apiBase, loginUrl, token, aoEditar(n), aoEnviar(n) }) pergunta, chama
-// POST /ped_orc/orcamentos/:numero/virar_pedido (com a confirmação de orçamento já transformado) e chama o callback certo com o nº do pedido.
+// POST /ped_orc/orcamentos/:numero/virar_pedido (com a confirmação de orçamento já transformado) e chama (e espera) o callback certo com o nº do pedido.
 (function () {
   'use strict';
   const FINANCEIROS = ['Recebido', 'A Receber', 'Atrasado', 'Sem custo'];
@@ -25,8 +25,8 @@
     return new Promise(resolver => {
       const fundo = document.createElement('div'); fundo.className = 'dp-fundo';
       const caixa = document.createElement('div'); caixa.className = 'dp-caixa vp-caixa';
-      caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-label', 'Transformar em pedido');
-      const t = document.createElement('div'); t.className = 'dp-titulo'; t.textContent = 'Transformar em pedido';
+      caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-label', 'Gerar pedido');
+      const t = document.createElement('div'); t.className = 'dp-titulo'; t.textContent = 'Gerar pedido';
       const sub = document.createElement('div'); sub.className = 'dp-sub'; sub.textContent = `Orçamento nº ${numero}${cliente ? ' · ' + cliente : ''}`;
       const campo = (id, texto, el) => { const l = document.createElement('label'); l.className = 'dp-rotulo vp-rotulo'; l.htmlFor = id; l.textContent = texto; el.id = id; return [l, el]; };
       const data = document.createElement('input'); data.type = 'date'; data.className = 'dp-data'; data.value = dataSugerida(dataPronto);
@@ -68,6 +68,7 @@
     const url = `${apiBase}/ped_orc/orcamentos/${encodeURIComponent(numero)}/virar_pedido`;
     const enviar = confirmarDuplicado => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
       body: JSON.stringify({ dataPronto: e.dataPronto, financeiro: e.financeiro, situacao: e.situacao, ...(confirmarDuplicado ? { confirmarDuplicado: true } : {}) }) });
+    let numeroNovo;
     try {
       let r = await enviar(false);
       if (r.status === 401) { localStorage.removeItem('auth'); location.href = loginUrl; return; }
@@ -79,8 +80,10 @@
         d = await r.json().catch(() => ({}));
       }
       if (!r.ok || !d.ok) throw new Error(d.error || `Erro HTTP: ${r.status}`);
-      if (e.acao === 'editar') aoEditar(d.numero); else aoEnviar(d.numero);
-    } catch (err) { alert('Não foi possível transformar em pedido: ' + err.message); }
+      numeroNovo = d.numero;
+    } catch (err) { alert('Não foi possível transformar em pedido: ' + err.message); return; }
+    // fora do try: um erro da tela (ex.: janela de impressão) não pode aparecer como falha da criação do pedido
+    if (e.acao === 'editar') await aoEditar(numeroNovo); else await aoEnviar(numeroNovo);
   }
 
   window.VirarPedido = { perguntar, executar, paraISO, dataSugerida, FINANCEIROS, SITUACOES, PADRAO };

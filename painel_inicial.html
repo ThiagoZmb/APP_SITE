@@ -264,18 +264,19 @@
         #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611221100">
+    <link rel="stylesheet" href="tema.css?v=202611221300">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611221200" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
-    <script src="virar_pedido.js?v=202611131200" defer></script>
+    <script src="virar_pedido.js?v=202611221300" defer></script>
     <script src="calculo/desconto_pedido.js?v=202611101600" defer></script>
     <script src="desconto_pedido_tela.js?v=202611161500" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611201300" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
+    <script src="impressao_pdf.js?v=202611221300" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
@@ -879,29 +880,9 @@
         // Imprimir sem sair da tela: baixa o PDF com o token, põe num iframe escondido (blob) e chama a impressão do navegador.
         // O navegador sempre mostra a janela de impressão (nenhum site imprime em silêncio); com o Chrome aberto por um atalho com
         // --kiosk-printing ela sai direto na impressora padrão.
-        async function imprimirPdf(url) {
-            let link = null, quadro = null;
-            const limpar = () => { if (quadro) quadro.remove(); if (link) URL.revokeObjectURL(link); };
-            try {
-                const r = await fetch(url, { headers: { Authorization: 'Bearer ' + getToken() } });
-                if (r.status === 401) { localStorage.removeItem('auth'); location.href = LOGIN_URL; return; }
-                if (!r.ok) {
-                    let msg = ''; try { msg = (await r.json()).error || ''; } catch { /* sem corpo JSON */ }
-                    throw new Error(r.status === 404 ? (msg || 'Documento não encontrado.') : r.status === 403 ? 'Acesso restrito.' : `Erro ${r.status} no servidor.`);
-                }
-                link = URL.createObjectURL(await r.blob());
-                quadro = document.createElement('iframe');
-                quadro.setAttribute('aria-hidden', 'true');
-                quadro.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-                quadro.addEventListener('load', () => {
-                    // o visualizador de PDF do navegador precisa de um instante depois do load
-                    setTimeout(() => { try { quadro.contentWindow.focus(); quadro.contentWindow.print(); } catch { alert('Não foi possível abrir a impressão. Use "Abrir PDF" e imprima por lá.'); } }, 400);
-                });
-                quadro.src = link;
-                document.body.appendChild(quadro);
-                setTimeout(limpar, 5 * 60 * 1000);
-            } catch (err) { limpar(); alert('Não foi possível imprimir: ' + err.message); }
-        }
+        const imprimirPdf = url => window.ImpressaoPdf.imprimirComAviso(url, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken });
+        // janela com as 4 opções de impressão do pedido recém-criado (cada uma só com a permissão; impressão direta, sem abrir PDF)
+        const opcoesImpressao = (n, cliente) => window.ImpressaoPdf.painel({ numero: n, cliente, titulo: 'Pedido ' + n + ' criado', apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) });
         // alterar a data de pronto (só ela: não muda situação nem data de entrega); vale para Pedido e Orçamento
         async function alterarDataPronto(numero) {
             const x = docDe(numero);
@@ -937,18 +918,19 @@
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
             if (ehPedido) add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }));
-            if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => window.ChecklistPedido.abrir({ apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }));
+            if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${API_BASE}/checklist/pdf`));
             sep();
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
             add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });
             // orçamento → pedido: janela com data de pronto, financeiro (A Receber) e produção (Em Produção); "Editar pedido" abre o novo pedido, "Enviar do jeito que está" só cria
-            if (!ehPedido && Acesso.pode('orcamentos.criar valores.ver') && !Acesso.pode('orcamentos.salvar pedidos.criar')) L.push({ icone: '📦', rotulo: 'Transformar em pedido (sem permissão)', fn: null, desativado: true });
-            if (!ehPedido) add('orcamentos.criar orcamentos.salvar pedidos.criar valores.ver', '📦', 'Transformar em pedido', () => window.VirarPedido.executar({ numero, cliente: x.cliente, prontoEm: x.prontoEm,
+            if (!ehPedido && Acesso.pode('orcamentos.criar valores.ver') && !Acesso.pode('orcamentos.salvar pedidos.criar')) L.push({ icone: '📦', rotulo: 'Gerar pedido (sem permissão)', fn: null, desativado: true });
+            if (!ehPedido) add('orcamentos.criar orcamentos.salvar pedidos.criar valores.ver', '📦', 'Gerar pedido', () => window.VirarPedido.executar({ numero, cliente: x.cliente, prontoEm: x.prontoEm,
                 apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken,
-                aoEditar: n => { location.href = `orcamentos.html?abrir=Pedido/${encodeURIComponent(n)}` + '&voltar=' + voltarParaEstaPagina(); },
-                aoEnviar: n => { alert(`Pedido nº ${n} criado a partir do orçamento nº ${numero}.`); carregar(); } }));
+                // pedido criado: oferece as opções de impressão (pedido, guia, vidros, checklist) e só depois segue (editar = abre o pedido; enviar = fica na lista)
+                aoEditar: async n => { await opcoesImpressao(n, x.cliente); location.href = `orcamentos.html?abrir=Pedido/${encodeURIComponent(n)}` + '&voltar=' + voltarParaEstaPagina(); },
+                aoEnviar: async n => { carregar(); await opcoesImpressao(n, x.cliente); } }));
             if (ehPedido && !cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero, apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, recarregar: () => carregar() }));
             if (!cancelado && Acesso.pode(ehPedido ? 'pedidos.situacao' : 'orcamentos.salvar')) {
                 sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(numero));

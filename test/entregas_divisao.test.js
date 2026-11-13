@@ -564,7 +564,7 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
   assert.ok(ler('clientes.html').includes('${seloAndamento(p)}'));
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("err.dados.aviso === 'entregas_abertas'") && p.includes('confirmarEntregasAbertas: true'));
-  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611171200/, f);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611221300/, f);
 });
 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {

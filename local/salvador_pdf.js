@@ -22,6 +22,10 @@ try { sefaz = require('./sefaz').criarSefaz({ raiz: RAIZ }); } catch { sefaz = n
 let zebra = null;
 try { zebra = require('./zebra').criarZebra(); } catch { zebra = null; }
 
+// Impressão automática de PDF (local/impressao.js, rota POST /imprimir). Só vale com impressao.config.json; sem ele /imprimir responde 503.
+let impressao = null;
+try { impressao = require('./impressao').criarImpressao(); } catch { impressao = null; }
+
 function nomeValido(nome) {
   return typeof nome === 'string' && nome.length > 4 && nome.length <= 200 && /\.pdf$/i.test(nome)
     && !/[\\/:*?"<>|\x00-\x1f]/.test(nome) && nome !== '.' && !nome.startsWith('..');
@@ -64,7 +68,7 @@ const servidor = http.createServer(async (req, res) => {
       if (!sefaz) return responder(res, 503, { error: 'O módulo da SEFAZ não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await sefaz.tratar(req, res, url, { origemPermitida: !!origem && ORIGENS.has(origem) });
     }
-    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra });
+    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra, imprimir: !!impressao && impressao.configurada() });
     if (req.method === 'GET' && url.pathname === '/impressoras') {
       if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       try { return responder(res, 200, await zebra.diagnostico()); } catch (e) { return responder(res, 500, { error: 'Não foi possível listar as impressoras do Windows: ' + e.message }); }
@@ -72,6 +76,11 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/etiqueta') {
       if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await zebra.tratar(req, res);
+    }
+    if (req.method === 'POST' && url.pathname === '/imprimir') {
+      if (!impressao) return responder(res, 503, { error: 'O módulo de impressão não está instalado neste PC. Rode de novo o instalador do serviço local.', configurada: false });
+      const r = await impressao.imprimir(await lerCorpo(req));
+      return responder(res, r.status, r.corpo);
     }
     if (req.method === 'PUT' && url.pathname === '/pdf') {
       const pasta = url.searchParams.get('pasta'), nome = url.searchParams.get('nome');
@@ -96,4 +105,4 @@ if (require.main === module) {
   servidor.listen(PORTA, '127.0.0.1', () => console.log(`Salvador de PDF ativo em http://127.0.0.1:${PORTA} → ${RAIZ}`));
 }
 
-module.exports = { servidor, nomeValido, PASTAS, RAIZ, sefaz, zebra };
+module.exports = { servidor, nomeValido, PASTAS, RAIZ, sefaz, zebra, impressao };
