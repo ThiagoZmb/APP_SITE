@@ -50,6 +50,7 @@ Regras: um estado tem **uma** cor em **todas** as telas; o rótulo pode variar, 
 | Status | Cor |
 |---|---|
 | A programar | aviso |
+| Entrega a agendar (estado derivado exibido no calendário) | info |
 | Agendada | info |
 | Em rota | info |
 | Enviada (outro estado) | info |

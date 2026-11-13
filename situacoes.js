@@ -24,7 +24,7 @@
     // ped_orc.FINANCEIRO e fluxo_de_caixa.SITUACAO (entrada e saída)
     financeiro: { recebido: 'ok', pago: 'ok', a_receber: 'aviso', a_pagar: 'aviso', faturado: 'info', atrasado: 'perigo', protestado: 'perigo', sem_custo: 'neutro' },
     // web_entregas.status (+ estados só de exibição). Tipo de entrega não tem cor.
-    entrega: { a_programar: 'aviso', agendada: 'info', em_rota: 'info', enviada: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok',
+    entrega: { a_programar: 'aviso', a_agendar: 'info', agendada: 'info', em_rota: 'info', enviada: 'info', ocorrencia: 'perigo', entregue: 'ok', retirado: 'ok',
       concluida: 'ok', cancelada: 'neutro', encerrada: 'neutro', suspensa: 'aviso' },
     // web_producao_etapas.estado; "ok_corte" = OK vindo do corte (mantém a distinção azul)
     etapa: { ok: 'ok', ok_corte: 'info', pendente: 'neutro', na: 'neutro' },

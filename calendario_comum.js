@@ -130,7 +130,7 @@
       return { cor: S.cor('entrega', 'agendada'), curto: `${nome === 'Entrega' ? 'Ent.' : nome} ${dataBR(e.data).slice(0, 5)}${mais}`, texto: `${nome} ${dataBR(e.data).slice(0, 5)}${mais}`,
         dica: `${nome} marcada para ${dataBR(e.data)}${mais ? `; mais ${Number(e.qtdMais)} entrega(s) do pedido` : ''}` };
     }
-    if (e.estado === 'marcada' || e.estado === 'a_agendar') return { cor: S.cor('entrega', 'a_programar'), curto: `${nome === 'Entrega' ? 'Ent.' : nome} a agendar${mais}`, texto: `${nome} a agendar${mais}`, dica: `${nome} na fila, ainda sem data${mais ? `; mais ${Number(e.qtdMais)} entrega(s)` : ''}` };
+    if (e.estado === 'marcada' || e.estado === 'a_agendar') return { cor: S.cor('entrega', 'a_agendar'), curto: `${nome === 'Entrega' ? 'Ent.' : nome} a agendar${mais}`, texto: `${nome} a agendar${mais}`, dica: `${nome} na fila, ainda sem data${mais ? `; mais ${Number(e.qtdMais)} entrega(s)` : ''}` };
     if (e.estado === 'concluida') return { cor: S.cor('entrega', 'concluida'), curto: 'Entrega feita', texto: 'Entrega concluída', dica: 'As entregas deste pedido já foram concluídas' };
     if (e.estado === 'nenhuma') return { cor: p.classe === 'pronto' ? S.cor('entrega', 'a_programar') : 'neutro', curto: 'Sem entrega', texto: 'Sem entrega', dica: 'Este pedido ainda não tem entrega marcada' };
     return null;
