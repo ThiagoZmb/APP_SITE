@@ -12,7 +12,7 @@
     const meta = (nome, conteudo) => { const e = document.createElement('meta'); e.name = nome; e.content = conteudo; return e; };
 
     garantir('link[rel="manifest"]', () => link('manifest', url('manifest.webmanifest')));
-    garantir('meta[name="theme-color"]', () => meta('theme-color', '#14161a'));
+    garantir('meta[name="theme-color"]', () => meta('theme-color', '#12151a'));
     garantir('link[rel="apple-touch-icon"]', () => link('apple-touch-icon', url('icones/apple-touch-icon.png')));
     garantir('meta[name="apple-mobile-web-app-capable"]', () => meta('apple-mobile-web-app-capable', 'yes'));
     garantir('meta[name="mobile-web-app-capable"]', () => meta('mobile-web-app-capable', 'yes'));

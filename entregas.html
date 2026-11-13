@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#14161a">
+    <meta name="theme-color" content="#12151a">
     <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -62,7 +62,7 @@
         tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         tbody tr { cursor: pointer; }
         tbody tr:hover { background: var(--primary-light); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(242, 163, 58,.12); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(232, 137, 90,.12); }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); }
         .cinza { color: var(--text-light); font-size: 13px; }
 
@@ -172,7 +172,7 @@
         .etiqueta.aviso { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); } .etiqueta.info { background: var(--selo-info-bg); color: var(--selo-info-fg); } .etiqueta.perigo { background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); }
         .etiqueta.ok { background: var(--selo-ok-bg); color: var(--selo-ok-fg); } .etiqueta.neutro { background: var(--selo-neutro-bg); color: var(--selo-neutro-fg); }
         /* Retirada agendada (cliente vem buscar): violeta, para não se confundir com a entrega agendada (azul) */
-        :root { --retirada-bg: rgba(177, 140, 255, .18); --retirada-fg: #c9aaff; --retirada-borda: #b18cff; }
+        :root { --retirada-bg: var(--surface-3); --retirada-fg: var(--text-mid); --retirada-borda: var(--border-control); }
         body .selo.retirada { background: var(--retirada-bg) !important; color: var(--retirada-fg) !important; }
         .etiqueta.retirada { background: var(--retirada-bg); color: var(--retirada-fg); box-shadow: inset 3px 0 0 var(--retirada-borda); }
         tbody tr.linha-retirada td:first-child { box-shadow: inset 3px 0 0 var(--retirada-borda); }
@@ -283,7 +283,7 @@
 
         /* ===== Janela "Checklist da entrega" ===== */
         body.ck-aberta { overflow: hidden; }
-        .ck-fundo { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; background: rgba(8, 9, 11, .62); }
+        .ck-fundo { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; background: var(--fundo-modal); }
         .ck-caixa { width: 100%; max-width: 720px; background: var(--white); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 20px; box-shadow: 0 24px 48px -12px rgba(0, 0, 0, .7); }
         .ck-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
         .ck-topo h2 { font-size: 17px; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
@@ -313,7 +313,7 @@
             .det-mini, .ck-fechar, #painel .btn { transition: none !important; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="layout.js?v=202611211000" defer></script>
     <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>

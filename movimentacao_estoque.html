@@ -64,7 +64,7 @@
         .an-rank-pos { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-light); color: var(--primary-color); font-size: 12px; font-weight: 800; display: grid; place-items: center; }
         .an-rank-nome { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .an-rank-val { font-size: 13px; color: var(--text-light); white-space: nowrap; }
-        .an-rank-barra { grid-column: 2 / -1; height: 6px; background: hsla(240, 60%, 55%, .14); border-radius: 4px; overflow: hidden; }
+        .an-rank-barra { grid-column: 2 / -1; height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
         .an-rank-barra span { display: block; height: 100%; background: var(--primary-color); border-radius: 4px; }
         .an-alternar { display: flex; gap: 6px; margin-bottom: 8px; }
         .an-lista { list-style: none; }
@@ -117,7 +117,7 @@
         .toast.info { background: var(--text-dark); }
 
         /* ===== modal ===== */
-        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: rgba(21,17,26,.45); }
+        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: var(--fundo-modal); }
         .modal-fundo.aberto { display: flex; }
         .modal { background: var(--white); border-radius: 18px; padding: 20px 22px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .modal h3 { font-size: 18px; }
@@ -130,7 +130,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
     <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
@@ -1048,7 +1048,7 @@
         desenhosAnalise.push(desenharPrevisao);
         // ----- gráficos e listas -----
         const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-        const COR = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', cinza: '#c7cbd4', ambar: '#f2a516' };
+        const COR = { vinho: '#e8895a', azul: '#6fa8dc', verde: '#54c18b', cinza: '#8e99a8', ambar: '#e3b04b' }; // valores do tema.css (canvas não aceita var())
         const graficos = {};
         function desenharGrafico(id, config) {
             graficos[id]?.destroy();

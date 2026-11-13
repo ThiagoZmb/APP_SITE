@@ -8,10 +8,10 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
-            /* cores do Grifar_Estoque do VB */
-            --row-inativo: #e2e3e5;
-            --row-minimo: #ffe4c4;
-            --row-falta: #ffb59a;
+            /* tons de linha (derivados das semânticas do tema.css) */
+            --row-inativo: rgba(255, 255, 255, .025);
+            --row-minimo: rgba(227, 176, 75, .09);
+            --row-falta: rgba(239, 111, 123, .09);
         }
         body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
         .container {
@@ -80,7 +80,7 @@
             width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
             font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
         }
-        .busca input:focus { outline: none; border-color: var(--primary-color); background: hsla(50, 100%, 55%, .14); }
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: var(--warning-bg); }
         .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
         .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
         .chip {
@@ -104,7 +104,7 @@
         tbody tr.inativo { background: var(--row-inativo); color: var(--text-light); }
         tbody tr.minimo { background: var(--row-minimo); }
         tbody tr.falta { background: var(--row-falta); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(242, 163, 58,.14); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(232, 137, 90,.14); }
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
@@ -154,7 +154,7 @@
         .form-group textarea { resize: vertical; min-height: 90px; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
         .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
-        .form-group input[readonly] { background: hsla(210, 60%, 55%, .14); color: var(--text-light); }
+        .form-group input[readonly] { background: var(--info-bg); color: var(--text-light); }
         .form-group.full { grid-column: 1 / -1; }
         .campo-com-botao { display: flex; gap: 8px; }
         .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
@@ -173,7 +173,7 @@
             display: inline-flex; align-items: center; gap: 8px;
         }
         .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(242, 163, 58,.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(232, 137, 90,.3); }
         .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
@@ -230,12 +230,12 @@
         .grupo-classe.aberto .grupo-itens { display: block; }
         .prod-linha {
             display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 44px; cursor: pointer; font-size: 14px;
-            border-top: 1px solid hsla(220, 55%, 55%, .4); transition: background .15s ease;
+            border-top: 1px solid var(--border-color); transition: background .15s ease;
         }
         .prod-linha:hover { background: var(--primary-light); }
-        .prod-linha.selecionado { background: rgba(242, 163, 58,.14); box-shadow: inset 4px 0 0 var(--primary-color); }
+        .prod-linha.selecionado { background: rgba(232, 137, 90,.14); box-shadow: inset 4px 0 0 var(--primary-color); }
         .prod-linha .cod { min-width: 44px; font-variant-numeric: tabular-nums; }
-        .prod-linha.inativo { color: #9aa0a6; }
+        .prod-linha.inativo { color: var(--text-disabled); }
         .prod-linha .selo { margin-left: 8px; }
 
         /* ===== FOTO ===== */
@@ -258,8 +258,8 @@
 
         /* ===== CAMPOS QUE A CLASSE DESLIGA ===== */
         .form-group.desligado label { opacity: .5; }
-        .form-group select:disabled, .form-group input:disabled { background: hsla(210, 60%, 55%, .14); color: #adb5bd; cursor: not-allowed; }
-        .regra-classe { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13px; background: rgba(23,162,184,.08); border: 1px solid rgba(23,162,184,.25); color: hsl(188, 78%, 72%); display: none; }
+        .form-group select:disabled, .form-group input:disabled { background: var(--white); color: var(--text-disabled); cursor: not-allowed; }
+        .regra-classe { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13px; background: rgba(23,162,184,.08); border: 1px solid rgba(23,162,184,.25); color: var(--info-fg); display: none; }
         .regra-classe.visivel { display: block; }
 
         /* ===== PERMISSÕES ===== */
@@ -268,7 +268,7 @@
         .perm-grupo h5 span { color: var(--primary-color); background: var(--primary-light); border-radius: 10px; padding: 1px 8px; }
         .perm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
         .perm-chips span { font-size: 13px; padding: 5px 10px; border-radius: 8px; background: var(--secondary-color); border: 1px solid var(--border-color); }
-        .perm-vazio { font-size: 13px; color: #adb5bd; }
+        .perm-vazio { font-size: 13px; color: var(--text-light); }
         #modal-texto { white-space: pre-line; max-height: 50vh; overflow: auto; }
         /* Editor de dependências do perfil (produtos_dependencias_tela.js) */
         .dep-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
@@ -409,7 +409,7 @@
         .pe-raiz-btn:disabled, #pe-raiz .btn:disabled { opacity: .5; cursor: not-allowed; }
         @media (prefers-reduced-motion: reduce) { .pe-palco canvas { transition: none; } }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="layout.js?v=202611211000" defer></script>
     <script src="situacoes.js?v=202611191300"></script>
     <script src="olho_resumos.js?v=202611191200"></script>

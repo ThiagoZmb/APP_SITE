@@ -9,10 +9,10 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         :root {
-            /* cores do Grifar_Estoque do VB */
-            --row-inativo: #e2e3e5;
-            --row-minimo: #ffe4c4;
-            --row-falta: #ffb59a;
+            /* tons de linha (derivados das semânticas do tema.css) */
+            --row-inativo: rgba(255, 255, 255, .025);
+            --row-minimo: rgba(227, 176, 75, .09);
+            --row-falta: rgba(239, 111, 123, .09);
         }
         body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
         .container {
@@ -81,7 +81,7 @@
             width: 100%; padding: 13px 15px 13px 42px; border: 1px solid var(--border-color); border-radius: 12px;
             font-size: 14px; background: var(--secondary-color); transition: all .2s ease;
         }
-        .busca input:focus { outline: none; border-color: var(--primary-color); background: hsla(50, 100%, 55%, .14); }
+        .busca input:focus { outline: none; border-color: var(--primary-color); background: var(--warning-bg); }
         .busca::before { content: "🔍"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); }
         .chips { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
         .chip {
@@ -105,7 +105,7 @@
         tbody tr.inativo { background: var(--row-inativo); color: var(--text-light); }
         tbody tr.minimo { background: var(--row-minimo); }
         tbody tr.falta { background: var(--row-falta); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(242, 163, 58,.14); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(232, 137, 90,.14); }
         .prod-nome { font-weight: 600; }
         .prod-forn { font-size: 12px; color: var(--text-light); margin-top: 2px; }
         .cod { color: var(--text-light); font-size: 13px; }
@@ -155,7 +155,7 @@
         .form-group textarea { resize: vertical; min-height: 90px; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
         .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
-        .form-group input[readonly] { background: hsla(210, 60%, 55%, .14); color: var(--text-light); }
+        .form-group input[readonly] { background: var(--info-bg); color: var(--text-light); }
         .form-group.full { grid-column: 1 / -1; }
         .campo-com-botao { display: flex; gap: 8px; }
         .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
@@ -174,7 +174,7 @@
             display: inline-flex; align-items: center; gap: 8px;
         }
         .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(242, 163, 58,.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(232, 137, 90,.3); }
         .btn-primary:disabled { opacity: .6; transform: none; box-shadow: none; cursor: wait; }
         .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
@@ -221,12 +221,12 @@
         .voltar:hover { color: var(--primary-color); }
         .hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 250px; gap: 22px; padding: 22px 24px; margin-bottom: 18px; align-items: center; }
         .hero-id { display: flex; gap: 16px; align-items: center; min-width: 0; }
-        .hero-avatar { width: 60px; height: 60px; border-radius: 18px; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; flex-shrink: 0; box-shadow: 0 10px 22px -10px rgba(242, 163, 58,.7); }
+        .hero-avatar { width: 60px; height: 60px; border-radius: 18px; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; flex-shrink: 0; box-shadow: 0 10px 22px -10px rgba(232, 137, 90,.7); }
         .hero-nome { min-width: 0; }
         .hero-nome h1 { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
         .hero-nome .sub { font-size: 13px; color: var(--text-light); font-weight: 600; margin-top: 3px; }
         .chips-h { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-        .chip-h { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2, hsla(240, 60%, 55%, .14)); border: 1px solid var(--border-color); color: var(--text-mid, var(--text-mid)); }
+        .chip-h { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--surface-2, var(--surface-2)); border: 1px solid var(--border-color); color: var(--text-mid, var(--text-mid)); }
         .hero-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; font-size: 13px; }
         .hero-meta span { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-light); }
         .hero-meta b { font-weight: 700; color: var(--text-dark); }
@@ -249,12 +249,12 @@
         .graf.baixo { height: 200px; }
 
         .insights { list-style: none; padding: 6px 22px 18px; display: flex; flex-direction: column; gap: 8px; }
-        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, hsla(240, 60%, 55%, .14)); border: 1px solid var(--border-color); }
+        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, var(--surface-2)); border: 1px solid var(--border-color); }
         .insights li .ic { width: 24px; height: 24px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; }
-        .insights li.pos .ic { background: #1f9d55; }
-        .insights li.alerta .ic { background: #e59a0b; }
-        .insights li.risco .ic { background: #d22f42; }
-        .insights li.info .ic { background: #2f6fdb; }
+        .insights li.pos .ic { background: var(--success-solid); }
+        .insights li.alerta .ic { background: var(--warning-color); color: var(--on-primary); }
+        .insights li.risco .ic { background: var(--danger-solid); }
+        .insights li.info .ic { background: var(--info-color); color: var(--on-primary); }
         .insights li b { font-weight: 800; }
         .acoes-sug li .ic { background: var(--primary-color) !important; }
 
@@ -263,7 +263,7 @@
         .kpi > span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
         .kpi b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .kpi small { font-size: 12px; color: var(--text-light); font-weight: 600; }
-        .up { color: #1f9d55 !important; font-weight: 800; }
+        .up { color: var(--success-fg) !important; font-weight: 800; }
         .down { color: var(--selo-perigo-fg) !important; font-weight: 800; }
         .neutro { color: var(--text-light); font-weight: 800; }
 
@@ -284,7 +284,7 @@
             .hero-meta { grid-template-columns: 1fr 1fr; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
@@ -317,10 +317,10 @@
                     <div class="hero-meta" id="h-meta"></div>
                     <div class="score" data-resumo>
                         <svg viewBox="0 0 100 100" aria-hidden="true">
-                            <circle cx="50" cy="50" r="42" fill="none" stroke="#ececf2" stroke-width="10"/>
-                            <circle id="score-arco" cx="50" cy="50" r="42" fill="none" stroke="#1f9d55" stroke-width="10" stroke-linecap="round"
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="#2a303a" stroke-width="10"/>
+                            <circle id="score-arco" cx="50" cy="50" r="42" fill="none" stroke="#54c18b" stroke-width="10" stroke-linecap="round"
                                     stroke-dasharray="0 264" transform="rotate(-90 50 50)"/>
-                            <text id="score-num" x="50" y="56" text-anchor="middle" font-size="24" font-weight="800" fill="#18151d">—</text>
+                            <text id="score-num" x="50" y="56" text-anchor="middle" font-size="24" font-weight="800" fill="#e7eaef">—</text>
                         </svg>
                         <div class="lbl"><small>Saúde do cliente</small><b id="score-rotulo">—</b><em id="score-desc">—</em></div>
                     </div>
@@ -399,7 +399,8 @@
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
         const $ = id => document.getElementById(id);
-        const CORES = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', ambar: '#f2a516', roxo: '#7b4fd6', turquesa: '#14a3a3', rosa: '#e0527e', cinza: '#94a3b8' };
+        // valores do tema.css (canvas não aceita var()): vinho = acento, verde/ambar = semânticas, resto = séries
+        const CORES = { vinho: '#e8895a', azul: '#6fa8dc', verde: '#54c18b', ambar: '#e3b04b', roxo: '#9a8cd9', turquesa: '#5db8a8', rosa: '#d98aa8', cinza: '#8e99a8' };
 
         function getAuth() {
             try {
@@ -538,7 +539,7 @@
             if (r.canc12.length >= 3) tira(5, `${r.canc12.length} pedidos cancelados`);
             s = Math.max(0, Math.min(100, Math.round(s)));
             const [rotulo, cor, desc] = s >= 80 ? ['Saudável', CORES.verde, 'relacionamento em dia'] : s >= 60 ? ['Atenção', CORES.ambar, 'acompanhar de perto']
-                : s >= 40 ? ['Em risco', '#e8711a', 'agir nas próximas semanas'] : ['Crítico', '#d22f42', 'ação imediata'];
+                : s >= 40 ? ['Em risco', '#e3b04b', 'agir nas próximas semanas'] : ['Crítico', '#ef6f7b', 'ação imediata'];
             return { s, rotulo, cor, desc, fatores };
         }
 
@@ -678,7 +679,7 @@
             novoGrafico('g-mensal', {
                 data: { labels: r.meses.map(m => m.rotulo), datasets: [
                     { type: 'bar', label: 'Pedidos', data: r.meses.map(m => m.ped), backgroundColor: CORES.vinho, borderRadius: 4, order: 2 },
-                    { type: 'bar', label: 'Orçamentos', data: r.meses.map(m => m.orc), backgroundColor: 'rgba(47,111,219,.35)', borderRadius: 4, order: 3 },
+                    { type: 'bar', label: 'Orçamentos', data: r.meses.map(m => m.orc), backgroundColor: 'rgba(111,168,220,.35)', borderRadius: 4, order: 3 },
                     { type: 'line', label: 'Média móvel 3m (pedidos)', data: r.meses.map(m => m.media), borderColor: CORES.verde, borderWidth: 2.5, pointRadius: 0, tension: .35, order: 1 }
                 ] },
                 options: baseOpts({ plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, padding: 12 } },
@@ -697,13 +698,13 @@
             $('aging-sub').textContent = `${moeda(r.aberto)} em aberto no fluxo de caixa`;
             novoGrafico('g-aging', {
                 type: 'bar',
-                data: { labels: r.aging.map(a => a[0]), datasets: [{ data: r.aging.map(a => a[1]), backgroundColor: [CORES.verde, CORES.ambar, '#e8711a', '#d22f42', '#8b0f22'], borderRadius: 6, maxBarThickness: 40 }] },
+                data: { labels: r.aging.map(a => a[0]), datasets: [{ data: r.aging.map(a => a[1]), backgroundColor: [CORES.verde, CORES.ambar, '#d98a52', '#ef6f7b', '#b04a58'], borderRadius: 6, maxBarThickness: 40 }] },
                 options: baseOpts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => moeda(x.raw) } } },
                     scales: { y: { beginAtZero: true, ticks: { callback: v => moedaK(v) } }, x: { grid: { display: false } } } })
             });
             // situação dos pedidos
             // cores da rosca = as do selo da situação (mapa único em situacoes.js), lidas das variáveis do tema
-            const corTema = cor => getComputedStyle(document.documentElement).getPropertyValue('--selo-' + cor + '-fg').trim() || '#888';
+            const corTema = cor => getComputedStyle(document.documentElement).getPropertyValue('--selo-' + cor + '-fg').trim() || '#8d97a5';
             const corSt = s => corTema(Situacoes.cor('pedido', s));
             novoGrafico('g-status', {
                 type: 'doughnut',
@@ -714,7 +715,7 @@
             const prazoMes = r.meses.slice(-12).map(m => mediana(r.prazos.filter(x => ISO(x.dt).slice(0, 7) === m.k).map(x => x.dias)));
             novoGrafico('g-prazo', {
                 type: 'line',
-                data: { labels: r.meses.slice(-12).map(m => m.rotulo), datasets: [{ label: 'Dias', data: prazoMes, borderColor: CORES.roxo, backgroundColor: 'rgba(123,79,214,.12)', fill: true, tension: .3, spanGaps: true, pointRadius: 3 }] },
+                data: { labels: r.meses.slice(-12).map(m => m.rotulo), datasets: [{ label: 'Dias', data: prazoMes, borderColor: CORES.roxo, backgroundColor: 'rgba(154,140,217,.12)', fill: true, tension: .3, spanGaps: true, pointRadius: 3 }] },
                 options: baseOpts({ plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + 'd' } }, x: { grid: { display: false } } } })
             });
 

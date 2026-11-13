@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com https://viacep.com.br http://127.0.0.1:3917; object-src 'self' blob:; frame-src blob:; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#14161a">
+    <meta name="theme-color" content="#12151a">
     <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,9 +17,9 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         /* os tokens de cor, sombra e gradiente vêm do tema.css (carregado depois); aqui ficam só as cores de linha do VB */
         :root {
-            --row-inativo: #e2e3e5;
-            --row-minimo: #ffe4c4;
-            --row-falta: #ffb59a;
+            --row-inativo: rgba(255, 255, 255, .025);
+            --row-minimo: rgba(227, 176, 75, .09);
+            --row-falta: rgba(239, 111, 123, .09);
         }
         body { color: var(--text-dark); }
         /* cabeçalho, casca e menu lateral: tema.css */
@@ -108,7 +108,7 @@
         .form-group textarea { resize: vertical; min-height: 90px; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary-color); }
         .form-group input.num { text-align: right; font-variant-numeric: tabular-nums; }
-        .form-group input[readonly] { background: hsla(210, 60%, 55%, .14); color: var(--text-light); }
+        .form-group input[readonly] { background: var(--info-bg); color: var(--text-light); }
         .form-group.full { grid-column: 1 / -1; }
         .campo-com-botao { display: flex; gap: 8px; }
         .campo-com-botao input { flex: 1; min-width: 0; font-family: 'Consolas', monospace; letter-spacing: 1px; }
@@ -157,7 +157,7 @@
         /* ===== PEDIDOS E ORÇAMENTOS ===== */
         .filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; padding: 12px 14px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-light); }
         .filtros label { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
-        .filtros select, .filtros input { padding: 9px 12px; border: 1px solid var(--border-strong, #d9d9e3); border-radius: 10px; font-size: 14px; background: var(--white); min-height: 40px; }
+        .filtros select, .filtros input { padding: 9px 12px; border: 1px solid var(--border-control); border-radius: 10px; font-size: 14px; background: var(--white); min-height: 40px; }
         .filtros input { min-width: 260px; }
         .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
@@ -186,7 +186,7 @@
         .graf.baixo { height: 220px; }
 
         .insights { list-style: none; padding: 6px 22px 18px; display: flex; flex-direction: column; gap: 8px; }
-        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 12px; background: var(--surface-2, hsla(240, 60%, 55%, .14)); border: 1px solid var(--border-color); }
+        .insights li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 12px; background: var(--surface-2, var(--surface-2)); border: 1px solid var(--border-color); }
         .insights li .ic { width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: var(--on-primary); }
         .insights li.pos .ic { background: var(--success-color); }
         .insights li.alerta .ic { background: var(--warning-color); }
@@ -261,10 +261,10 @@
         #menu-ctx button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
         #menu-ctx button:hover:not(:disabled), #menu-ctx button:focus-visible { background: var(--primary-light); outline: none; }
         #menu-ctx button:disabled { opacity: .55; cursor: default; font-weight: 700; }
-        #menu-ctx button.mc-perigo { color: hsl(4, 78%, 72%); }
+        #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
@@ -383,7 +383,8 @@
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
         const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
         const $ = id => document.getElementById(id);
-        const COR = { vinho: '#a3213a', azul: '#2f6fdb', verde: '#1f9d55', ambar: '#f2a516', roxo: '#7b4fd6', turquesa: '#14a3a3', rosa: '#e0527e', cinza: '#94a3b8', vermelho: '#d22f42' };
+        // valores do tema.css (canvas não aceita var()): vinho = acento, azul/verde/ambar/vermelho = semânticas, resto = séries
+        const COR = { vinho: '#e8895a', azul: '#6fa8dc', verde: '#54c18b', ambar: '#e3b04b', roxo: '#9a8cd9', turquesa: '#5db8a8', rosa: '#d98aa8', cinza: '#8e99a8', vermelho: '#ef6f7b' };
 
         function getAuth() {
             try { const a = JSON.parse(localStorage.getItem('auth') || 'null'); return a && a.token && a.user && Date.now() <= (a.exp || 0) ? a : null; }
@@ -690,7 +691,7 @@
 
         // ================= SITUAÇÃO E MOVIMENTO DIÁRIO =================
         // cores da rosca = as do selo da situação (mapa único em situacoes.js), lidas das variáveis do tema
-        const corTema = cor => getComputedStyle(document.documentElement).getPropertyValue('--selo-' + cor + '-fg').trim() || '#888';
+        const corTema = cor => getComputedStyle(document.documentElement).getPropertyValue('--selo-' + cor + '-fg').trim() || '#8d97a5';
         const VALOR_SIT = { producao: 'em_producao', pronto: 'pronto', entregue: 'entregue', retirado: 'retirado', cancelado: 'cancelado' };
         const corSit = k => corTema(Situacoes.cor('pedido', VALOR_SIT[k] || ''));
         const NOME_SIT = { producao: 'Em produção', pronto: 'Pronto', entregue: 'Entregue', retirado: 'Retirado', cancelado: 'Cancelado', outro: 'Outros' };

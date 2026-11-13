@@ -9,7 +9,7 @@ pelas variáveis `--selo-*` do `tema.css` (classe `.selo` + `neutro | aviso | in
 |---|---|---|
 | **ok** (verde) | Concluído, positivo, regular | Pago, Recebido, Entregue, Ativo, Conferido |
 | **info** (azul) | Em andamento, já combinado, em curso | Em Produção, Agendada, Em rota, Gerado |
-| **aviso** (âmbar) | Falta ação ou conferência; atenção | Pronto (aguarda entrega), A programar, A Receber, No mínimo |
+| **aviso** (amarelo-dourado) | Falta ação ou conferência; atenção | Pronto (aguarda entrega), A programar, A Receber, No mínimo |
 | **perigo** (vermelho) | Atrasado, falhou, bloqueado, cancelado com impacto | Atrasado, Ocorrência, Em falta, Cancelada, Bloqueado |
 | **neutro** (cinza) | Sem estado ativo: inativo, não se aplica, encerrado, desconhecido | Inativo, N/A, Baixado, Encerrada, Sem consumo |
 
@@ -157,7 +157,7 @@ Tipo não é situação: fica **neutro** em todos (sem verde/vermelho). Se preci
 
 ## 3. Pontos para o dono decidir
 
-1. **Pronto = aviso (âmbar)** ou ok (verde)? A proposta usa âmbar porque ainda falta entregar; verde ficaria só para Entregue/Retirado.
+1. **Pronto = aviso (amarelo-dourado)** ou ok (verde)? A proposta usa amarelo-dourado porque ainda falta entregar; verde ficaria só para Entregue/Retirado.
 2. **Cancelado = neutro** nos pedidos e perigo nas entregas: aceita a diferença?
 3. **Inativo sempre neutro**, inclusive usuário e cliente (hoje vermelho em vários lugares).
 4. Ajuste de estoque em **info** para diferenciar de Estorno (neutro).

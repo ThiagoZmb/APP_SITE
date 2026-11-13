@@ -74,7 +74,7 @@
             display: flex; align-items: center; justify-content: center; border-radius: 20px; z-index: 100;
         }
         .loading-spinner {
-            width: 50px; height: 50px; border: 5px solid rgba(242, 163, 58,.2);
+            width: 50px; height: 50px; border: 5px solid rgba(232, 137, 90,.2);
             border-top: 5px solid var(--primary-color); border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -87,7 +87,7 @@
         }
 
         /* ===== FICHA DO CLIENTE (frm_Clientes) ===== */
-        .cf-fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
+        .cf-fundo { position: fixed; inset: 0; background: var(--fundo-modal); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
         .cf-fundo.aberta { opacity: 1; pointer-events: auto; }
         .cf {
             position: fixed; top: 0; right: 0; bottom: 0; width: min(1080px, 100vw); background: var(--bg); z-index: 41;
@@ -113,12 +113,12 @@
         .cf-abas { display: flex; gap: 4px; margin-top: 4px; }
         .cf-aba { border: none; background: transparent; color: rgba(255,255,255,.75); padding: 10px 16px; font-size: 14px; font-weight: 700; border-radius: 10px 10px 0 0; cursor: pointer; }
         .cf-aba:hover { color: #fff; background: rgba(255,255,255,.08); }
-        .cf-aba.ativa { background: hsla(240, 60%, 55%, .14); color: var(--primary-color); }
+        .cf-aba.ativa { background: var(--surface-2); color: var(--primary-color); }
         .cf-corpo { flex: 1; overflow-y: auto; padding: 18px 24px 24px; }
         .cf-pag { display: none; }
         .cf-pag.ativa { display: block; }
         .cf-acoes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 24px; background: var(--white); border-top: 1px solid var(--border-color); }
-        .cf-acoes .alteracoes { font-size: 12px; color: #d98a00; font-weight: 700; margin-left: auto; display: none; }
+        .cf-acoes .alteracoes { font-size: 12px; color: var(--warning-fg); font-weight: 700; margin-left: auto; display: none; }
         .cf-acoes .alteracoes.visivel { display: block; }
         .cf-bloco { background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px 6px; margin-bottom: 14px; }
         .cf-bloco h4 { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--primary-color); margin-bottom: 12px; }
@@ -134,7 +134,7 @@
         .cf .campo-btn { display: flex; gap: 6px; }
         .cf .campo-btn input { flex: 1; min-width: 0; }
         .cf .campo-btn button { flex-shrink: 0; }
-        .cf .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: hsla(240, 60%, 55%, .14); }
+        .cf .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-2); }
         .cf .seg button { border: none; background: transparent; padding: 8px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--text-light); cursor: pointer; }
         .cf .seg button.on { background: var(--white); color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08); }
         /* financeiro do cliente */
@@ -153,7 +153,7 @@
         .cf-res b { display: block; font-size: 22px; font-weight: 800; margin-top: 4px; letter-spacing: -.02em; }
         .cf-res.alerta { background: var(--selo-aviso-bg); border-color: var(--selo-aviso-fg); }
         .cf-res.alerta b { color: var(--selo-aviso-fg); }
-        .cf-res.saldo { background: #18151d; border-color: #18151d; }
+        .cf-res.saldo { background: var(--surface-2); border-color: var(--primary-borda); }
         .cf-res.saldo span { color: rgba(255,255,255,.7); }
         .cf-res.saldo b { color: #fff; }
         .cf tbody tr { cursor: pointer; }
@@ -167,7 +167,7 @@
         /* modal de valor */
         .modal input.valor-modal { width: 100%; height: 46px; font-size: 20px; font-weight: 700; padding: 0 14px; margin-bottom: 18px; border: 1px solid var(--border-color); border-radius: 12px; }
         .btn-novo-cliente { white-space: nowrap; }
-        .clients-table tbody tr.sel-linha { background: rgba(242, 163, 58,.08) !important; box-shadow: inset 3px 0 0 var(--primary-color); }
+        .clients-table tbody tr.sel-linha { background: rgba(232, 137, 90,.08) !important; box-shadow: inset 3px 0 0 var(--primary-color); }
         .ctx-menu {
             position: fixed; z-index: 75; min-width: 260px; padding: 6px; border-radius: 14px; background: var(--surface-2);
             border: 1px solid var(--border-color); box-shadow: 0 18px 40px -12px rgba(20,16,28,.28), 0 4px 12px -4px rgba(20,16,28,.12);
@@ -178,7 +178,7 @@
         .ctx-cab b { display: block; font-size: 13px; font-weight: 800; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ctx-cab small { font-size: 12px; color: var(--text-light); font-weight: 600; }
         .ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--text-dark); cursor: pointer; text-align: left; }
-        .ctx-item:hover, .ctx-item:focus-visible { background: rgba(242, 163, 58,.08); color: var(--primary-color); outline: none; }
+        .ctx-item:hover, .ctx-item:focus-visible { background: rgba(232, 137, 90,.08); color: var(--primary-color); outline: none; }
         .ctx-item .ic { width: 18px; text-align: center; flex-shrink: 0; }
         .ctx-item .atalho { margin-left: auto; font-size: 11.5px; color: var(--text-light); font-weight: 600; }
         .ctx-item.destaque { color: var(--primary-color); font-weight: 800; }
@@ -198,7 +198,7 @@
             .cf { border-radius: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
     <script src="ranking.js?v=202611051300" defer></script>
@@ -485,7 +485,7 @@
                 console.error('Erro ao carregar clientes:', err);
                 document.getElementById('table-loading').style.display = 'none';
                 document.getElementById('clients-tbody').innerHTML =
-                    `<tr><td colspan="8" style="text-align:center;padding:30px;color:#dc3545">Erro ao carregar: ${escapeHtml(err.message || 'Verifique a conexão')}</td></tr>`;
+                    `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--danger-fg)">Erro ao carregar: ${escapeHtml(err.message || 'Verifique a conexão')}</td></tr>`;
             }
         }
 
@@ -946,7 +946,7 @@
                 graficoHist = new Chart($('cf-grafico'), {
                     type: 'bar',
                     data: { labels: meses.map(m => { const [a, mm] = m.mes.split('-'); return new Date(a, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }); }),
-                            datasets: [{ label: 'Pedidos', data: meses.map(m => m.total), backgroundColor: '#1f9d55', borderRadius: 6, maxBarThickness: 54 }] },
+                            datasets: [{ label: 'Pedidos', data: meses.map(m => m.total), backgroundColor: '#54c18b', borderRadius: 6, maxBarThickness: 54 }] },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${moeda(c.raw)} · ${meses[c.dataIndex].qtd} pedido(s)` } } },
                                scales: { y: { beginAtZero: true, ticks: { callback: v => moeda(v).replace(',00', '') } }, x: { grid: { display: false } } } }
                 });

@@ -50,7 +50,7 @@
       fundo.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
       const caixa = doc.createElement('div');
       caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-label', titulo);
-      caixa.style.cssText = 'background:#1b1e24;border:1px solid #2c313a;border-radius:10px;padding:20px;max-width:440px;width:100%;box-shadow:0 24px 48px rgba(0,0,0,.6);font:14px "Public Sans","Segoe UI",sans-serif;color:#e8eaee';
+      caixa.style.cssText = 'background:#181c22;border:1px solid #2a303a;border-radius:10px;padding:20px;max-width:440px;width:100%;box-shadow:0 24px 48px rgba(0,0,0,.6);font:14px "Public Sans","Segoe UI",sans-serif;color:#e7eaef';
       const h = doc.createElement('h3'); h.textContent = titulo; h.style.cssText = 'font-size:17px;margin-bottom:8px';
       caixa.appendChild(h);
       if (texto) { const p = doc.createElement('p'); p.textContent = texto; p.style.cssText = 'margin-bottom:12px;line-height:1.4'; caixa.appendChild(p); }
@@ -58,7 +58,7 @@
       function aoTeclar(e) { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } }
       for (const b of botoes) {
         const el = doc.createElement('button'); el.type = 'button'; el.textContent = b.rotulo;
-        el.style.cssText = 'display:block;width:100%;text-align:left;margin-top:8px;padding:11px 12px;border:1px solid #2c313a;border-radius:6px;background:' + (b.principal ? '#f2a33a;color:#14161a' : '#20242b;color:#e8eaee') + ';font:inherit;cursor:pointer;min-height:44px';
+        el.style.cssText = 'display:block;width:100%;text-align:left;margin-top:8px;padding:11px 12px;border:1px solid #2a303a;border-radius:6px;background:' + (b.principal ? '#e8895a;color:#12151a' : '#1f242c;color:#e7eaef') + ';font:inherit;cursor:pointer;min-height:44px';
         el.addEventListener('click', () => { fechar(); b.fn(); });
         caixa.appendChild(el);
       }

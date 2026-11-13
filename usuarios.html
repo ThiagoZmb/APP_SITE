@@ -24,7 +24,7 @@
         /* ===== sem acesso ===== */
 
         /* ===== abas ===== */
-        .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: hsla(240, 60%, 55%, .14); margin-bottom: 18px; flex-wrap: wrap; }
+        .abas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-2); margin-bottom: 18px; flex-wrap: wrap; }
         .aba { border: none; background: transparent; padding: 8px 16px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--text-light); cursor: pointer; }
         .aba.on { background: var(--white); color: var(--primary-color); box-shadow: 0 1px 2px rgba(20,16,28,.08), 0 2px 8px -2px rgba(20,16,28,.1); }
 
@@ -49,7 +49,7 @@
         .toast { color: #fff; padding: 12px 16px; border-radius: 12px; font-size: 14px; }
 
         /* ===== ficha lateral (padrão da ficha de clientes) ===== */
-        .fundo { position: fixed; inset: 0; background: rgba(21,17,26,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
+        .fundo { position: fixed; inset: 0; background: var(--fundo-modal); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40; }
         .fundo.aberta { opacity: 1; pointer-events: auto; }
         .gaveta { position: fixed; top: 0; right: 0; bottom: 0; width: min(920px, 100vw); background: var(--bg); z-index: 41;
             transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column;
@@ -78,7 +78,7 @@
         #grade-permissoes table { width: 100%; border-collapse: collapse; }
         #grade-permissoes th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-light); padding: 6px 8px; border-bottom: 2px solid var(--border-color); }
         #grade-permissoes td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 13.5px; vertical-align: middle; }
-        #grade-permissoes tr.area td { background: hsla(255, 60%, 55%, .14); font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); }
+        #grade-permissoes tr.area td { background: var(--surface-2); font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); }
         #grade-permissoes tr.critica td:first-child b { color: var(--primary-color); }
         .h-dias { display: grid; gap: 6px; margin-top: 8px; }
         .h-dia { display: grid; grid-template-columns: 110px 1fr auto 1fr; gap: 8px; align-items: center; font-size: 13px; }
@@ -91,7 +91,7 @@
         .tri { display: inline-flex; border: 1px solid var(--border-color); border-radius: 9px; overflow: hidden; }
         .tri button { border: none; background: var(--white); padding: 5px 9px; font-size: 12px; font-weight: 700; color: var(--text-light); cursor: pointer; }
         .tri button + button { border-left: 1px solid var(--border-color); }
-        .tri button.on[data-estado="herdar"] { background: hsla(250, 60%, 55%, .14); color: var(--text-dark); }
+        .tri button.on[data-estado="herdar"] { background: var(--surface-2); color: var(--text-dark); }
         .tri button.on[data-estado="liberar"] { background: var(--success-color); color: var(--on-primary); }
         .tri button.on[data-estado="bloquear"] { background: var(--danger-color); color: var(--on-primary); }
         .legenda { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
@@ -106,13 +106,13 @@
         .cartao .horario button { margin-left: auto; font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--primary-color); cursor: pointer; }
         .cartao .horario button:hover { border-color: var(--primary-color); }
         .cartao { border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; cursor: pointer; background: var(--white); transition: border-color .15s ease, box-shadow .15s ease; }
-        .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(242, 163, 58,.45); }
+        .cartao:hover { border-color: var(--primary-color); box-shadow: 0 6px 18px -10px rgba(232, 137, 90,.45); }
         .cartao.desativado { opacity: .65; }
         .cartao b { font-size: 15px; display: block; }
         .cartao p { font-size: 13px; color: var(--text-light); margin: 4px 0 10px; min-height: 18px; }
         .cartao .rodape { display: flex; gap: 6px; flex-wrap: wrap; }
         #p-permissoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px 14px; }
-        #p-permissoes fieldset { border: 1px solid var(--border-color); border-radius: 14px; background: hsla(240, 60%, 55%, .14); box-shadow: var(--shadow-light); padding: 0 14px 12px; min-width: 0; }
+        #p-permissoes fieldset { border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-2); box-shadow: var(--shadow-light); padding: 0 14px 12px; min-width: 0; }
         #p-permissoes legend { float: left; width: 100%; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); padding: 12px 0 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border-color); }
         #p-permissoes legend + label { clear: left; }
         #p-permissoes label { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; padding: 3px 0; cursor: pointer; }
@@ -124,7 +124,7 @@
         }
 
         /* ===== modal ===== */
-        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: rgba(21,17,26,.45); }
+        .modal-fundo { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; padding: 16px; background: var(--fundo-modal); }
         .modal-fundo.aberto { display: flex; }
         .modal { background: var(--white); border-radius: 18px; padding: 20px 22px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px; }
         .modal h3 { font-size: 18px; }
@@ -138,7 +138,7 @@
             .tabela { min-width: 640px; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
 </head>

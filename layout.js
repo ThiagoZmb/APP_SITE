@@ -219,14 +219,14 @@
         const css = document.createElement('style');
         css.textContent = `.${OCULTO} { display: none !important; }
             body.modo-atendimento .so-geral { display: none !important; }
-            .btn-atendimento { margin-left: auto; margin-right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border-strong, #3a404b); background: var(--surface-2, #20242b); color: var(--danger-color, #ff6b7a); font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+            .btn-atendimento { margin-left: auto; margin-right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border-strong, #3a424e); background: var(--surface-2, #1f242c); color: var(--danger-color, #ef6f7b); font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
             .btn-atendimento svg { width: 18px; height: 18px; }
-            .btn-atendimento.ligado { color: var(--success-color, #3ddc97); }
-            .btn-atendimento.flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 60; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,.5); border-color: var(--border-strong, #3a404b); }
+            .btn-atendimento.ligado { color: var(--success-color, #54c18b); }
+            .btn-atendimento.flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 60; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,.5); border-color: var(--border-strong, #3a424e); }
             @media (max-width: 768px) { .btn-atendimento span { display: none; } .btn-atendimento { margin-right: 8px; } }
             #sem-acesso-pagina { text-align: center; padding: 80px 20px; color: var(--text-light, #666); }
             #sem-acesso-pagina h2 { color: var(--text-dark, #222); margin-bottom: 8px; }
-            #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #f2a33a); font-weight: 700; }`;
+            #sem-acesso-pagina a { display: inline-block; margin-top: 18px; color: var(--primary-color, #e8895a); font-weight: 700; }`;
         document.head.appendChild(css);
         aplicar();
         new MutationObserver(lista => {
@@ -458,16 +458,16 @@
         let el = document.getElementById('aviso-pdf');
         if (!el) {
             el = document.createElement('div'); el.id = 'aviso-pdf';
-            el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:10000;max-width:360px;padding:12px 14px;border-radius:12px;font:13px/1.45 sans-serif;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center';
+            el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:10000;max-width:360px;padding:12px 14px;border-radius:12px;font:13px/1.45 sans-serif;color:var(--text-dark);box-shadow:var(--shadow-heavy);display:flex;gap:10px;align-items:center';
             document.body.appendChild(el);
         }
-        el.style.background = tipo === 'erro' ? '#a52a2a' : '#1c2230';
+        el.style.background = tipo === 'erro' ? 'var(--danger-solid)' : 'var(--surface-3)';
         el.textContent = '';
         const t = document.createElement('span'); t.textContent = texto; el.appendChild(t);
         const fechar = () => { el.remove(); };
         if (botao) {
             const b = document.createElement('button'); b.type = 'button'; b.textContent = botao;
-            b.style.cssText = 'flex:none;padding:6px 10px;border:none;border-radius:8px;background:#fff;color:#1c2230;font-weight:700;cursor:pointer';
+            b.style.cssText = 'flex:none;padding:6px 10px;border:none;border-radius:8px;background:var(--primary-color);color:var(--on-primary);font-weight:700;cursor:pointer';
             b.addEventListener('click', async () => { try { await aoClicar(); } finally { fechar(); } });
             el.appendChild(b);
         } else setTimeout(fechar, 7000);
@@ -535,19 +535,19 @@
             /* uma PORTA DE CORRER em miniatura (a cara da fábrica): duas folhas de vidro deslizam no trilho, um brilho passa pelo vidro,
                a sombra no chão acompanha e o "Carregando" ganha pontinhos. Cartão no centro da tela, sem bloquear cliques. */
             #carregando-global .cg-porta { position: absolute; top: 50%; left: 50%; width: 84px; height: 62px; margin: -46px 0 0 -42px; }
-            #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #4a515e, #3a404b); }
-            #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #6b7280; border-radius: 3px;
+            #carregando-global .cg-trilho { position: absolute; top: 0; left: -4px; right: -4px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #667180, #3a424e); }
+            #carregando-global .cg-folha { position: absolute; top: 8px; width: 42px; height: 52px; box-sizing: border-box; border: 3px solid #6b7685; border-radius: 3px;
                 background: linear-gradient(115deg, rgba(255,255,255,0) 38%, rgba(255,255,255,.28) 50%, rgba(255,255,255,0) 62%) 130% 0 / 260% 100% no-repeat, linear-gradient(180deg, #2c3a48, #212c37);
                 box-shadow: 0 2px 6px rgba(0,0,0,.4); }
-            #carregando-global .cg-folha::after { content: ''; position: absolute; top: 12px; width: 3px; height: 20px; border-radius: 2px; background: var(--primary-color, #f2a33a); }
+            #carregando-global .cg-folha::after { content: ''; position: absolute; top: 12px; width: 3px; height: 20px; border-radius: 2px; background: var(--primary-color, #e8895a); }
             #carregando-global .cg-f1 { left: 0; z-index: 1; animation: cg-brilho 2.6s ease-in-out infinite; }
             #carregando-global .cg-f1::after { right: 2px; }
             #carregando-global .cg-f2 { left: 42px; z-index: 2; animation: cg-desliza 2.6s ease-in-out infinite, cg-brilho 2.6s ease-in-out .18s infinite; }
             #carregando-global .cg-f2::after { left: 2px; }
             #carregando-global .cg-sombra { position: absolute; left: 50%; bottom: -8px; width: 72px; height: 7px; margin-left: -36px; border-radius: 50%; background: rgba(0,0,0,.35); animation: cg-sombra 2.6s ease-in-out infinite; }
             #carregando-global .cg-texto { position: absolute; top: 50%; left: 50%; width: 148px; margin: 33px 0 0 -74px; text-align: center; font: 700 10.5px/1 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
-                letter-spacing: .14em; text-transform: uppercase; color: #8b93a1; }
-            #carregando-global .cg-texto b { display: inline-block; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--primary-color, #f2a33a); opacity: .25; animation: cg-ponto 1.2s ease-in-out infinite; }
+                letter-spacing: .14em; text-transform: uppercase; color: #8d97a5; }
+            #carregando-global .cg-texto b { display: inline-block; width: 3px; height: 3px; margin-left: 3px; border-radius: 50%; background: var(--primary-color, #e8895a); opacity: .25; animation: cg-ponto 1.2s ease-in-out infinite; }
             #carregando-global .cg-texto b:nth-child(2) { animation-delay: .2s; }
             #carregando-global .cg-texto b:nth-child(3) { animation-delay: .4s; }
             @keyframes carregando-entrada { from { opacity: 0; } to { opacity: 1; } }
@@ -562,8 +562,8 @@
                 border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: carregando-giro .7s linear infinite; }
             tr.processando td { opacity: .6; }
             @keyframes carregando-giro { to { transform: rotate(360deg); } }
-            #aviso-servidor { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9998; background: #2c3e50; color: #fff;
-                padding: 12px 18px; border-radius: 12px; font: 600 14px 'Segoe UI', sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.25); max-width: calc(100vw - 32px); }`;
+            #aviso-servidor { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9998; background: var(--surface-3); color: var(--text-dark); border: 1px solid var(--border-strong);
+                padding: 12px 18px; border-radius: 12px; font: 600 14px 'Segoe UI', sans-serif; box-shadow: var(--shadow-heavy); max-width: calc(100vw - 32px); }`;
         document.head.appendChild(css);
         const barra = document.createElement('div');
         barra.id = 'carregando-global';

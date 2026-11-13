@@ -363,7 +363,7 @@
     function corFundo() {
       let cor = '';
       try { cor = getComputedStyle(container).backgroundColor; } catch (_) { /* usa o fallback */ }
-      return cor && cor !== 'rgba(0, 0, 0, 0)' ? cor : '#20242b';
+      return cor && cor !== 'rgba(0, 0, 0, 0)' ? cor : '#1f242c';
     }
 
     function limparCena() {

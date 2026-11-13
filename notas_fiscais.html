@@ -45,7 +45,7 @@
         tbody td { padding: 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         tbody tr { cursor: pointer; }
         tbody tr:hover { background: var(--primary-light); }
-        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(242, 163, 58,.12); }
+        tbody tr.selecionado { box-shadow: inset 4px 0 0 var(--primary-color); background: rgba(232, 137, 90,.12); }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); }
         .cinza { color: var(--text-light); font-size: 13px; }
 
@@ -118,14 +118,14 @@
         .cep-grupo { display: flex; gap: 6px; } .cep-grupo input { flex: 1; min-width: 0; } .cep-grupo button { flex: none; }
         #form h2 { font-size: 22px; margin-bottom: 14px; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <style>
         /* aba ativa preenchida e com cor própria: verde = entrada, azul = saída */
         .aba { border-radius: 10px 10px 0 0; }
-        body .aba.ativo[data-tipo="entrada"] { background: #1b6b30 !important; color: #fff !important; border-bottom-color: #1b6b30 !important; }
-        body .aba.ativo[data-tipo="saida"] { background: #1e40af !important; color: #fff !important; border-bottom-color: #1e40af !important; }
+        body .aba.ativo[data-tipo="entrada"] { background: var(--success-bg) !important; color: var(--success-fg) !important; border-bottom-color: var(--success-color) !important; }
+        body .aba.ativo[data-tipo="saida"] { background: var(--info-bg) !important; color: var(--info-fg) !important; border-bottom-color: var(--info-color) !important; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611211000">
+    <link rel="stylesheet" href="tema.css?v=202611211500">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611211000" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>

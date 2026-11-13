@@ -48,7 +48,7 @@ test('páginas-chave referenciam manifesto, ícone da Apple, theme-color ', () =
         const h = ler(p + '.html');
         assert.match(h, /<link rel="manifest" href="manifest\.webmanifest">/, p);
         assert.match(h, /<link rel="apple-touch-icon" href="icones\/apple-touch-icon\.png">/, p);
-        assert.match(h, /<meta name="theme-color" content="#14161a">/, p);
+        assert.match(h, /<meta name="theme-color" content="#12151a">/, p);
         assert.match(h, /apple-mobile-web-app-capable/, p);
     }
 });
