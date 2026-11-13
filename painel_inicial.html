@@ -215,8 +215,8 @@
         #orders-table th, #orders-table td { overflow: hidden; text-overflow: ellipsis; }
         #orders-table .selo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
         #orders-table .selo + .selo { margin-left: 4px; }
-        /* Celular: 10 colunas não cabem em ~360 px (tudo virava "..."). Colunas pelo conteúdo e rolagem lateral na tabela. */
-        @media (max-width: 768px) {
+        /* Celular e tablet (até 1100 px): 10 colunas não cabem (tudo virava "..."). Colunas pelo conteúdo e rolagem lateral na tabela. */
+        @media (max-width: 1100px) {
             .tabela-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             #orders-table { table-layout: auto; width: max-content; min-width: 100%; }
             #orders-table col { width: auto !important; }
