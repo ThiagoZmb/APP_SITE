@@ -16,7 +16,11 @@ const PERFIS = {
   'Programador': ['entregas.ver', 'entregas.programar'],
   'Motorista': ['entregas.baixar'],
   'Motorista com valores': ['entregas.baixar', 'valores.ver'],
-  'Somente ver': ['entregas.ver']
+  'Somente ver': ['entregas.ver'],
+  // administrativo (2026-11-13): a chave administrativo.ver; "com baixa" também é motorista; "sem ver" não tem entregas.ver
+  'Administrativo': ['entregas.ver', 'administrativo.ver', 'valores.ver'],
+  'Administrativo com baixa': ['entregas.ver', 'administrativo.ver', 'valores.ver', 'entregas.baixar'],
+  'Administrativo sem ver': ['administrativo.ver', 'valores.ver']
 };
 const OCORRENCIAS = ['ausente', 'endereco_errado', 'recusa', 'parcial'];
 
@@ -139,6 +143,17 @@ function bancoEntregas() {
       estado.entregaItens.filter(i => ids.includes(i.entrega_id)).map(i => ({ entrega_id: i.entrega_id, numero_item: i.numero_item, quantidade: String(i.quantidade) }))],
     [/^SELECT ITEM, DESCRICAO, QTD FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO = \?/, (sql, [numero]) => itensDoPedidoFalso(numero)
       .map(i => ({ ITEM: i.ITEM, DESCRICAO: i.DESCRICAO, QTD: i.QTD }))],
+
+    // ---- administrativo (2026-11-13): lista de TODOS os motoristas (tipo motorista), nome do motorista e filtro de estados depois da data ----
+    [/AS motorista_nome,[\s\S]*AS qtd_itens/, (sql, [data, ...estados]) => entregas
+      .filter(e => e.tipo === 'motorista' && ['agendada', 'em_rota', 'ocorrencia'].includes(e.status) && e.data_agendada
+        && (sql.includes('<= ?') ? e.data_agendada <= data : e.data_agendada === data)
+        && (!sql.includes('c.ESTADO IN') || estados.includes(clienteDe(pedidoDe(e))?.ESTADO)))
+      .sort((a, b) => String(a.data_agendada).localeCompare(String(b.data_agendada)) || a.numero - b.numero)
+      .map(e => ({ ...e, ...fichaDe(e), ...ordemDe(e), motorista_nome: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME ?? null,
+        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
+    [/^SELECT \* FROM web_entregas WHERE id = \? AND tipo = 'motorista'/, (sql, [id]) => entregas.filter(e => e.id === id && e.tipo === 'motorista').map(e => ({ ...e }))],
+    [/^SELECT NOME FROM cliente_usuarios WHERE CODIGO = \?$/, (sql, [codigo]) => usuarios.filter(u => u.CODIGO === codigo).map(u => ({ NOME: u.NOME }))],
 
     // ---- rotas do motorista (T6): o dono é sempre motorista_codigo ----
     [/AS qtd_itens/, (sql, [uid, data]) => entregas

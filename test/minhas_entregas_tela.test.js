@@ -219,7 +219,7 @@ function carregarLayout() {
 test('layout.js: Minhas entregas no menu e em PAGINAS (por último)', () => {
   const l = ler('layout.js');
   assert.match(l, /\{ href: 'minhas_entregas\.html', texto: 'Minhas entregas', icone: 'entregas', sub: true \}/); // subitem de Entregas
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]/);
   const { ACESSO_PAGINAS } = carregarLayout();
   assert.equal(Object.keys(ACESSO_PAGINAS).pop(), 'minhas_entregas.html');
   // dentro da seção Comercial (antes de "Gestão")

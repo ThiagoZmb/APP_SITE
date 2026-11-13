@@ -14,6 +14,8 @@ const TRANSICOES = {
   reagendar: { de: ['ocorrencia', 'agendada', 'em_rota'], tipo: null, para: 'agendada', evento: 'reagendada' },
   saiu: { de: ['agendada'], tipo: 'motorista', para: 'em_rota', evento: 'saiu' },
   entregue: { de: ['em_rota'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
+  // baixa dada pelo administrativo (2026-11-13): vale também para a entrega ainda Agendada (a rota grava antes o evento 'saiu' para a história ficar completa)
+  baixa_administrativa: { de: ['agendada', 'em_rota'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
   retirada: { de: ['agendada'], tipo: 'retirada', para: 'retirado', evento: 'retirada' },
   enviada: { de: ['agendada'], tipo: 'outro_estado', para: 'enviada', evento: 'enviada' },
   comprovante: { de: ['enviada'], tipo: 'outro_estado', para: 'entregue', evento: 'comprovante' },

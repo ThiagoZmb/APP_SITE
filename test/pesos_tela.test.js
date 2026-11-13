@@ -62,5 +62,5 @@ test('layout.js: Pesos no menu (subitem de Produtos, logo depois dele) e em PAGI
   assert.match(l, /'pesos\.html': \['pesos\.ver'\]/);
   assert.ok(l.indexOf("href: 'pesos.html'") > l.indexOf("href: 'produtos.html'") && l.indexOf("href: 'pesos.html'") < l.indexOf("href: 'fornecedores.html'"));
   assert.match(l, /href: 'pesos\.html'.*sub: true/);
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });

@@ -314,14 +314,14 @@
         }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611221100">
-    <script src="layout.js?v=202611211000" defer></script>
+    <script src="layout.js?v=202611221200" defer></script>
     <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
     <script src="entrega_checklist.js?v=202611191400" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="entrega_editar.js?v=202611191800" defer></script>
-    <script src="entregas.js?v=202611201000" defer></script>
+    <script src="entregas.js?v=202611221200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -389,6 +389,7 @@
                                 <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
                                 <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
                                 <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.programar" hidden>Anexar comprovante</button>
+                                <button type="button" class="btn btn-primary" id="btn-baixa-adm" data-perm="administrativo.ver" hidden>Dar baixa da entrega</button>
                             </div>
                             <div class="acoes" id="d-acoes-secundarias">
                                 <button type="button" class="btn btn-secondary" id="btn-checklist" data-perm="entregas.checklist">Checklist de entrega</button>
@@ -483,6 +484,18 @@
                         <p class="erro-form" id="erro-retirada" role="alert"></p>
                         <div class="acoes">
                             <button type="submit" class="btn btn-primary" id="btn-confirmar-retirada" data-perm="entregas.programar">Dar baixa</button>
+                            <button type="button" class="btn btn-secondary voltar">Voltar</button>
+                        </div>
+                    </form>
+
+                    <form id="vista-baixa-adm" hidden>
+                        <h2>Baixa da entrega</h2>
+                        <p class="aviso-divisao" id="ba-aviso" role="status" hidden></p>
+                        <div class="form-group"><label for="ba-quem">Quem recebeu</label><input id="ba-quem" maxlength="190" autocomplete="off"></div>
+                        <div class="form-group"><label for="ba-foto">Foto do canhoto (opcional)</label><input type="file" id="ba-foto" accept="image/*"></div>
+                        <p class="erro-form" id="erro-baixa-adm" role="alert"></p>
+                        <div class="acoes">
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-baixa-adm" data-perm="administrativo.ver">Dar baixa</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>

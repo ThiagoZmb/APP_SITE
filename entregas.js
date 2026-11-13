@@ -130,6 +130,16 @@
     return r;
   }
 
+  // Baixa dada pela administração (administrativo.ver; POST /minhas_entregas/:id/baixa): entrega do tipo Entrega, Agendada ou Em rota.
+  // Separada de acoesDisponiveis porque depende de uma permissão (data-perm no botão) e não de programar; o servidor continua decidindo.
+  const podeBaixaAdministrativa = e => !!e && e.tipo === 'motorista' && ['agendada', 'em_rota'].includes(e.status);
+  function avisoBaixaAdministrativa(e, nomeDoMotorista) {
+    const p = [];
+    if (e && e.status === 'agendada') p.push('Esta entrega ainda não saiu: a saída será registrada junto com a baixa.');
+    p.push(`A baixa será registrada em nome do motorista ${txt(nomeDoMotorista) || '(sem nome)'}, com o seu usuário como autor.`);
+    return p.join(' ');
+  }
+
   // Editar entrega: só entrega aberta (espelha STATUS_EDITAVEIS de calculo/entregas.js; o servidor continua decidindo)
   const STATUS_EDITAVEIS = ['a_programar', 'agendada', 'em_rota', 'ocorrencia', 'enviada'];
   const podeEditarEntrega = e => !!(e && STATUS_EDITAVEIS.includes(e.status));
@@ -563,7 +573,7 @@
     }
 
     // ---------- painel ----------
-    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar', 'vista-criar'];
+    const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-baixa-adm', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar', 'vista-criar'];
     function mostrar(nome) { VISTAS.forEach(v => { $(v).hidden = v !== nome; }); }
     function limparUrls() { estado.urls.forEach(u => URL.revokeObjectURL(u)); estado.urls = []; }
 
@@ -638,9 +648,10 @@
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
       $('btn-editar').hidden = !podeEditarEntrega(e); // concluída/cancelada não edita; o servidor também recusa
+      $('btn-baixa-adm').hidden = !podeBaixaAdministrativa(e); // só aparece com administrativo.ver (data-perm); o servidor confere
       $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
       // um primário por vez: com uma baixa disponível (retirada/enviada/comprovante), Reagendar vira secundário
-      const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a));
+      const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a)) || (podeBaixaAdministrativa(e) && !$('btn-baixa-adm').classList.contains('acesso-oculto'));
       $('btn-reagendar').classList.toggle('btn-primary', !temBaixa);
       $('btn-reagendar').classList.toggle('btn-secondary', temBaixa);
       ajustarGruposDeAcao();
@@ -904,10 +915,11 @@
     // ---------- foto (reduzida para ≤ 1 MB) ----------
     const reduzirImagem = arquivo => C.reduzirImagem(win, arquivo);
     // envia a foto uma única vez por arquivo escolhido (um novo clique após erro na baixa não duplica o anexo)
-    async function enviarFoto(entregaId, arquivo) {
+    // `base` = '/minhas_entregas' na baixa da administração (a rota de anexo dela vale para o administrativo em qualquer motorista)
+    async function enviarFoto(entregaId, arquivo, base = '/entregas') {
       if (estado.anexoEnviado && estado.anexoEnviado.arquivo === arquivo) return estado.anexoEnviado.id;
       const blob = await reduzirImagem(arquivo);
-      const r = await chamar(`/entregas/${encodeURIComponent(entregaId)}/anexo?tipo=foto`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
+      const r = await chamar(`${base}/${encodeURIComponent(entregaId)}/anexo?tipo=foto`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
       estado.anexoEnviado = { arquivo, id: r.anexoId };
       return r.anexoId;
     }
@@ -922,6 +934,20 @@
         const corpo = { entregueA: txt($('r-entregue').value), anexoIds: arq ? [await enviarFoto(e.id, arq)] : [] };
         await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo });
         toast('Retirada registrada.', 'ok');
+        await recarregarTudo(e.id);
+      });
+    }
+    // baixa da administração: mesma rota/regra da baixa do motorista (POST /minhas_entregas/:id/baixa); o servidor grava a autoria "em nome do motorista"
+    function enviarBaixaAdm() {
+      const quem = txt($('ba-quem').value);
+      const erro = quem ? (quem.length > 190 ? 'Nome de quem recebeu muito longo (máximo 190 caracteres).' : null) : 'Informe quem recebeu.';
+      $('erro-baixa-adm').textContent = erro || '';
+      if (erro) return;
+      const e = estado.det.entrega, arq = $('ba-foto').files[0];
+      return ocupado(async () => {
+        const corpo = { entregueA: quem, anexoIds: arq ? [await enviarFoto(e.id, arq, '/minhas_entregas')] : [] };
+        await chamar(`/minhas_entregas/${encodeURIComponent(e.id)}/baixa`, { metodo: 'POST', corpo });
+        toast('Baixa registrada.', 'ok');
         await recarregarTudo(e.id);
       });
     }
@@ -1155,6 +1181,12 @@
       $('btn-checklist').addEventListener('click', ev => { if (checklist && estado.det) checklist.abrir(estado.det.entrega.id, ev.currentTarget); });
       $('btn-folha-branco').addEventListener('click', () => { if (checklist) checklist.abrirBranco(); });
       $('btn-retirada').addEventListener('click', () => abrirForm('vista-retirada', ['r-entregue', 'r-foto']));
+      $('btn-baixa-adm').addEventListener('click', () => {
+        abrirForm('vista-baixa-adm', ['ba-quem', 'ba-foto']);
+        const e = estado.det.entrega;
+        $('ba-aviso').textContent = avisoBaixaAdministrativa(e, nomeMotorista(e, estado.motoristas));
+        $('ba-aviso').hidden = false;
+      });
       $('btn-enviada').addEventListener('click', () => {
         abrirForm('vista-enviada', ['e-transp', 'e-rastreio', 'e-previsao']);
         $('e-transp').value = estado.det.entrega.transportadora || '';
@@ -1174,6 +1206,7 @@
       envio('vista-cancelar', enviarCancelar);
       envio('vista-criar', enviarCriar);
       envio('vista-retirada', enviarRetirada);
+      envio('vista-baixa-adm', enviarBaixaAdm);
       envio('vista-enviada', enviarEnviada);
       envio('vista-comprovante', enviarComprovante);
       envio('vista-separar', enviarSeparar);
@@ -1205,7 +1238,7 @@
     });
   }
 
-  return { MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, podeBaixaAdministrativa, avisoBaixaAdministrativa, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
     rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
     linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };

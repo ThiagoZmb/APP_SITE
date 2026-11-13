@@ -78,7 +78,7 @@ test('layout.js: Fornecedores e Funcionários no menu (Gestão) e em PAGINAS com
   assert.match(l, /'fornecedores\.html': \['fornecedores\.ver'\]/);
   assert.match(l, /'funcionarios\.html': \['funcionarios\.ver'\]/);
   assert.ok(l.indexOf("href: 'fornecedores.html'") > l.indexOf("secao: 'Gestão'"));
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });
 
 test('nomes de campo da API de funcionários e fornecedores não casam com REGEX_VALOR (exceto o dinheiro, que é filtrado por semValores)', () => {

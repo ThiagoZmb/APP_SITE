@@ -111,7 +111,7 @@
         'usuarios.html': ['admin.usuarios'],
         'portal_admin.html': ['portal.gerir'],
         'etapas_producao.html': ['etapas.ver'],   // antes de minhas_entregas: quem só tem as etapas (chão de fábrica) cai aqui depois do login
-        'minhas_entregas.html': ['entregas.baixar']   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre
+        'minhas_entregas.html': [{ algum: ['entregas.baixar', 'administrativo.ver'] }]   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre; o administrativo (+ entregas.ver, o servidor confere) vê todas as entregas e dá a baixa
     };
     window.ACESSO_PAGINAS = PAGINAS;
 

@@ -57,7 +57,7 @@ test('layout.js: Tintas no menu (subitem do Estoque) e em PAGINAS com tintas.ver
   assert.match(l, /href: 'tintas\.html', texto: 'Tintas'/);
   assert.match(l, /'tintas\.html': \['tintas\.ver'\]/);
   assert.ok(l.indexOf("href: 'tintas.html'") > l.indexOf("href: 'estoque.html'") && l.indexOf("href: 'tintas.html'") < l.indexOf("href: 'produtos.html'"));
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });
 
 test('tintas: corValida (cor antiga fora do formato conta como não escolhida), paraTela com vírgula e milhar recusado', () => {

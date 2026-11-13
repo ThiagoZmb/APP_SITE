@@ -34,6 +34,10 @@
         .nav-dia .rotulo { text-align: center; font-weight: 700; font-size: 16px; }
         .nav-dia .hoje { grid-column: 1 / -1; }
 
+        .escopo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+        .escopo .btn { min-height: 44px; font-size: 15px; }
+        .cartao .motorista { margin-bottom: 4px; }
+        #b-aviso { margin-bottom: 12px; }
         .dia h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-color); margin: 18px 0 10px; }
         .cartao { background: var(--white); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: var(--shadow-light); padding: 16px; margin-bottom: 14px; position: relative; overflow: hidden; }
         .cartao::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
@@ -98,11 +102,11 @@
         }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611221100">
-    <script src="layout.js?v=202611211000" defer></script>
+    <script src="layout.js?v=202611221200" defer></script>
     <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
     <script src="entrega_checklist.js?v=202611191400" defer></script>
-    <script src="minhas_entregas.js?v=202611191400" defer></script>
+    <script src="minhas_entregas.js?v=202611221200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -123,7 +127,12 @@
             <!-- lista do dia -->
             <section id="vista-lista">
                 <h1 class="welcome-title">Minhas entregas</h1>
-                <p class="welcome-subtitle">Suas entregas agendadas: inicie a rota e dê baixa no local.</p>
+                <p class="welcome-subtitle" id="subtitulo">Suas entregas agendadas: inicie a rota e dê baixa no local.</p>
+                <!-- só o administrativo: todas as entregas de todos os motoristas (padrão) ou só as dele -->
+                <div class="escopo" id="filtro-escopo" data-perm="administrativo.ver entregas.ver" hidden>
+                    <button type="button" class="btn btn-primary" data-escopo="todos" aria-pressed="true">Todos</button>
+                    <button type="button" class="btn btn-secondary" data-escopo="minhas" aria-pressed="false">Só as minhas</button>
+                </div>
                 <div class="nav-dia">
                     <button type="button" class="btn btn-secondary btn-nav" id="btn-dia-ant" aria-label="Dia anterior">‹</button>
                     <div class="rotulo" id="dia-rotulo" aria-live="polite"></div>
@@ -137,6 +146,7 @@
             <section id="vista-baixa" class="folha" hidden>
                 <h2 id="b-titulo"></h2>
                 <p class="sub" id="b-cliente"></p>
+                <p class="aviso" id="b-aviso" role="status" hidden></p>
 
                 <div id="b-escolha">
                     <div class="pilha">
@@ -181,7 +191,7 @@
 
                     <p class="erro-form" id="b-erro" role="alert"></p>
                     <div class="pilha">
-                        <button type="submit" class="btn btn-primary" id="btn-confirmar" data-perm="entregas.baixar">Confirmar</button>
+                        <button type="submit" class="btn btn-primary" id="btn-confirmar">Confirmar</button>
                         <button type="button" class="btn btn-secondary" id="btn-voltar-escolha">Voltar</button>
                     </div>
                 </form>

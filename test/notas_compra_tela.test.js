@@ -162,7 +162,7 @@ test('layout.js: item no menu (subitem do Estoque) e página no mapa com compras
   assert.match(l, /'notas_compra\.html': \['compras_nfe\.ver'\]/);
   const pos = h => l.indexOf("href: '" + h + "'");
   assert.ok(pos('notas_compra.html') > pos('estoque.html') && pos('notas_compra.html') < pos('produtos.html'));
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });
 
 test('permissões compras_nfe.*: catálogo (Estoque), perfis iniciais e migração única para Administrador e Interno completo', async () => {

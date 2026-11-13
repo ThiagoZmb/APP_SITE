@@ -433,7 +433,7 @@ test('entregas.html: botão "Checklist de entrega" no detalhe, "Folha em branco"
   for (const id of ['ck-janela', 'ck-form', 'ck-gerar', 'ck-branco', 'ck-automatico', 'ck-fechar', 'ck-cancelar', 'ck-origem', 'ck-info', 'ck-somente-leitura', 'erro-ck']) assert.match(h, new RegExp(`id="${id}"`), id);
   assert.match(h, /id="ck-automatico" data-perm="entregas\.programar"/);
   assert.match(h, /role="dialog" aria-modal="true"/);
-  assert.match(h, /<script src="entrega_checklist\.js\?v=202611191400" defer><\/script>[\s\S]*<script src="entregas\.js\?v=202611201000" defer>/);
+  assert.match(h, /<script src="entrega_checklist\.js\?v=202611191400" defer><\/script>[\s\S]*<script src="entregas\.js\?v=202611221200" defer>/);
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(ler('minhas_entregas.html'), /<script src="entrega_checklist\.js\?v=202611191400" defer><\/script>/);

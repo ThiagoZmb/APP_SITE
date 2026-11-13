@@ -59,7 +59,7 @@ test('layout.js: Notas fiscais no menu como subitem do Financeiro (logo abaixo d
   assert.ok(pos('notas_fiscais.html') > pos('financeiro.html') && pos('notas_fiscais.html') < pos('usuarios.html'));
   assert.match(l, /href: 'notas_fiscais\.html'[^\n]*sub: true/);
   assert.ok(pos('notas_fiscais.html') > pos('funcionarios.html'), 'não pode ficar sob Fornecedores');
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });
 
 test('página: aba ativa tem cor própria (entrada verde, saída azul)', () => {

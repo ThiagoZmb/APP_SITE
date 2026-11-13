@@ -124,5 +124,5 @@ test('layout.js: Central de Gestão no menu (subitem do Financeiro) e em PAGINAS
   assert.match(l, /href: 'gestao\.html', texto: 'Central de Gestão'/);
   assert.match(l, /'gestao\.html': \['gestao\.ver', 'valores\.ver'\]/);
   assert.ok(l.indexOf("href: 'gestao.html'") > l.indexOf("href: 'financeiro.html'") && l.indexOf("href: 'gestao.html'") < l.indexOf("href: 'usuarios.html'"));
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });

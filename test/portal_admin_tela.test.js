@@ -36,7 +36,7 @@ test('layout.js: Portal do cliente no menu (depois de Usuários) e em PAGINAS co
   assert.equal(contar(l, /'portal_admin\.html': \['portal\.gerir'\]/g), 1);
   assert.ok(l.indexOf("href: 'portal_admin.html'") > l.indexOf("href: 'usuarios.html'"));
   assert.match(l, /href: 'portal_admin\.html'[^}]*sub: true/);
-  assert.match(l, /'minhas_entregas\.html': \['entregas\.baixar'\]\s*\/\/ por último/);
+  assert.match(l, /'minhas_entregas\.html': \[\{ algum: \['entregas\.baixar', 'administrativo\.ver'\] \}\]\s*\/\/ por último/);
 });
 
 test('portal_admin.js: compila e só usa textContent/value para dados do servidor', () => {

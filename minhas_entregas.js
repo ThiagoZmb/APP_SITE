@@ -71,11 +71,29 @@
   };
 
   // ações que o servidor aceita para o motorista em cada estado (o servidor continua decidindo)
-  function acoesMotorista(e) {
+  // administrativo (2026-11-13): dá a baixa em qualquer entrega Agendada ou Em rota (o servidor grava a saída junto quando ainda Agendada);
+  // "Iniciar rota" só nas dele (e.minha !== false)
+  function acoesMotorista(e, administrativo = false) {
     if (!e) return [];
+    if (administrativo) {
+      const r = [];
+      if (e.status === 'agendada' && e.minha !== false) r.push('iniciar');
+      if (e.status === 'agendada' || e.status === 'em_rota') r.push('baixar');
+      return r;
+    }
     if (e.status === 'agendada') return ['iniciar'];
     if (e.status === 'em_rota') return ['baixar'];
     return [];
+  }
+  // só o resultado "Entregue" para o administrativo dando baixa em entrega de outro motorista (ocorrência é do motorista)
+  const baixaSoEntregue = (e, administrativo, ehMotorista) => !!administrativo && !(e && e.minha !== false && ehMotorista);
+  // texto do aviso na tela de baixa do administrativo
+  function avisoBaixaAdministrativa(e) {
+    if (!e) return '';
+    const partes = [];
+    if (e.status === 'agendada') partes.push('Esta entrega ainda não saiu: a saída será registrada junto com a baixa.');
+    if (e.minha === false) partes.push(`A baixa será registrada em nome do motorista ${txt(e.motorista) || '(sem nome)'}, com o seu usuário como autor.`);
+    return partes.join(' ');
   }
 
   // última ocorrência registrada (motivo mostrado no cartão da entrega em ocorrência)
@@ -151,7 +169,7 @@
     const { getAuth, chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
     const estado = {
-      dia: null, lista: [], detalhes: new Map(), carregando: false, baixa: null, urlFoto: null,
+      dia: null, escopo: 'todos', lista: [], detalhes: new Map(), carregando: false, baixa: null, urlFoto: null,
       traco: { tem: false, versao: 0 }
     };
 
@@ -176,7 +194,12 @@
     }
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
 
+    // administrativo (administrativo.ver + entregas.ver): vê as entregas de todos os motoristas e dá a baixa; "Só as minhas" volta ao padrão do motorista
+    const souAdministrativo = () => !!(win.Acesso && win.Acesso.pode('administrativo.ver entregas.ver'));
+    const souMotorista = () => !!(win.Acesso && win.Acesso.pode('entregas.baixar'));
+
     function htmlCartao(e) {
+      const adm = souAdministrativo();
       const det = estado.detalhes.get(e.id);
       const end = enderecoDe(e);
       const mapa = urlMapa(e), tel = urlLigar(e.telefone);
@@ -195,12 +218,17 @@
       const oc = e.status === 'ocorrencia' && det ? motivoOcorrencia(det.eventos) : null;
       const ocHtml = e.status === 'ocorrencia'
         ? `<div class="ocorrencia"><strong>${esc(oc ? oc.rotulo : 'Ocorrência')}</strong>${oc && oc.motivo ? `<p>${esc(oc.motivo)}</p>` : ''}<p class="cinza">A equipe vai reagendar.</p></div>` : '';
-      const acoes = acoesMotorista(e);
+      const acoes = acoesMotorista(e, adm);
       const botoes = (acoes.includes('iniciar') ? '<button type="button" class="btn btn-primary btn-grande" data-acao="iniciar" data-perm="entregas.baixar">Iniciar rota</button>' : '') +
-        (acoes.includes('baixar') ? '<button type="button" class="btn btn-primary btn-grande" data-acao="baixar" data-perm="entregas.baixar">Dar baixa</button>' : '');
+        (acoes.includes('baixar') ? `<button type="button" class="btn btn-primary btn-grande" data-acao="baixar" data-perm="${adm ? 'administrativo.ver' : 'entregas.baixar'}">Dar baixa</button>` : '');
+      // o checklist do motorista é só da própria entrega (rota própria); com o filtro "Todos" some das dos outros
+      const botaoChecklist = e.minha === false ? '' : '<div class="acoes"><button type="button" class="btn btn-secondary" data-acao="checklist" data-perm="entregas.baixar">Checklist de entrega (PDF)</button></div>';
+      const motoristaHtml = e.motorista !== undefined
+        ? `<p class="motorista"><span class="cinza">Motorista:</span> <strong>${esc(txt(e.motorista) || 'sem nome')}</strong>${e.minha ? ' <span class="cinza">(você)</span>' : ''}</p>` : '';
       return `<article class="cartao" data-id="${esc(e.id)}">
         <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}${rotuloSequencia(e) ? ` · ${esc(rotuloSequencia(e))}` : ''}</strong>${selo(e.status)}</div>
         <h3>${esc(e.cliente)}</h3>
+        ${motoristaHtml}
         ${htmlTelefone(e.telefone)}
         ${enderecoHtml}
         ${e.contatoLocal ? `<p><span class="cinza">Contato no local:</span> ${esc(e.contatoLocal)}</p>` : ''}
@@ -208,12 +236,21 @@
         ${itens}
         ${ocHtml}
         ${botoes ? `<div class="acoes">${botoes}</div>` : ''}
-        <div class="acoes"><button type="button" class="btn btn-secondary" data-acao="checklist" data-perm="entregas.baixar">Checklist de entrega (PDF)</button></div>
+        ${botaoChecklist}
       </article>`;
     }
 
     function desenharLista() {
       $('dia-rotulo').textContent = rotuloDia();
+      const adm = souAdministrativo();
+      $('filtro-escopo').hidden = !adm;
+      $('subtitulo').textContent = adm ? 'Entregas de todos os motoristas: dê a baixa no local ou em nome do motorista.' : 'Suas entregas agendadas: inicie a rota e dê baixa no local.';
+      doc.querySelectorAll('[data-escopo]').forEach(b => {
+        const ativo = b.getAttribute('data-escopo') === estado.escopo;
+        b.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+        b.classList.toggle('btn-primary', ativo);
+        b.classList.toggle('btn-secondary', !ativo);
+      });
       const alvo = $('cartoes');
       if (!estado.lista.length) { alvo.innerHTML = '<p class="vazio">Nenhuma entrega para este dia.</p>'; return; }
       const h = hoje();
@@ -224,7 +261,10 @@
     async function carregar() {
       let ok = true;
       try {
-        const d = await chamar('/minhas_entregas' + (estado.dia ? '?dia=' + encodeURIComponent(estado.dia) : ''));
+        const q = [];
+        if (estado.dia) q.push('dia=' + encodeURIComponent(estado.dia));
+        if (souAdministrativo() && estado.escopo === 'minhas') q.push('escopo=minhas');
+        const d = await chamar('/minhas_entregas' + (q.length ? '?' + q.join('&') : ''));
         estado.lista = Array.isArray(d.entregas) ? d.entregas : [];
       } catch (err) { toast(err.message, 'erro'); estado.lista = []; ok = false; }
       estado.detalhes.clear();
@@ -265,13 +305,19 @@
       if (!e) return;
       let det = estado.detalhes.get(id);
       if (!det) { det = await chamar(`/minhas_entregas/${encodeURIComponent(id)}`); estado.detalhes.set(id, det); }
-      estado.baixa = { entrega: e, det, resultado: null, foto: null, assinatura: null };
+      const adm = souAdministrativo();
+      const soEntregue = baixaSoEntregue(e, adm, souMotorista());
+      estado.baixa = { entrega: e, det, resultado: null, foto: null, assinatura: null, soEntregue };
       $('b-titulo').textContent = `Pedido ${e.numero}`;
       $('b-cliente').textContent = e.cliente;
       $('b-erro').textContent = '';
+      const aviso = adm ? avisoBaixaAdministrativa(e) : '';
+      $('b-aviso').textContent = aviso;
+      $('b-aviso').hidden = !aviso;
       $('b-escolha').hidden = false;
       $('b-form').hidden = true;
       mostrar('vista-baixa');
+      if (soEntregue) escolherResultado('entregue'); // administrativo: vai direto ao formulário da entrega concluída
       win.scrollTo(0, 0);
     }
 
@@ -300,6 +346,7 @@
     }
 
     function voltarEscolha() {
+      if (estado.baixa.soEntregue) { fecharBaixa(); return; } // não há escolha de resultado para o administrativo
       estado.baixa.resultado = null;
       $('b-erro').textContent = '';
       $('b-escolha').hidden = false;
@@ -307,6 +354,7 @@
     }
     function fecharBaixa() {
       estado.baixa = null;
+      $('b-aviso').hidden = true;
       limparFoto();
       mostrar('vista-lista');
     }
@@ -449,6 +497,13 @@
       $('btn-dia-hoje').addEventListener('click', () => ir(null));
       doc.querySelectorAll('[data-resultado]').forEach(b => b.addEventListener('click', () => escolherResultado(b.getAttribute('data-resultado'))));
       $('btn-voltar-lista').addEventListener('click', fecharBaixa);
+      doc.querySelectorAll('[data-escopo]').forEach(b => b.addEventListener('click', () => {
+        const novo = b.getAttribute('data-escopo');
+        if (novo === estado.escopo) return;
+        estado.escopo = novo;
+        $('cartoes').innerHTML = '<p class="vazio">Carregando…</p>';
+        carregar();
+      }));
       $('btn-voltar-escolha').addEventListener('click', voltarEscolha);
       $('b-form').addEventListener('submit', ev => { ev.preventDefault(); enviarBaixa(); });
       $('b-foto').addEventListener('change', () => {
@@ -472,6 +527,6 @@
     carregar();
   }
 
-  return { esc, RESULTADOS, rotuloStatus, corStatus, rotuloResultado, telefoneLimpo, htmlTelefone, urlLigar, enderecoTexto, enderecoDe, urlMapa, acoesMotorista,
+  return { esc, baixaSoEntregue, avisoBaixaAdministrativa, RESULTADOS, rotuloStatus, corStatus, rotuloResultado, telefoneLimpo, htmlTelefone, urlLigar, enderecoTexto, enderecoDe, urlMapa, acoesMotorista,
     motivoOcorrencia, hojeISO, deslocarDia, agruparCartoes, maxInteiro, validarBaixa, corpoBaixa, corpoOcorrencia, iniciar };
 });

@@ -17,7 +17,7 @@ const PROGRAMAR = ['entregas.programar'];
 const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
   retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
 const PARTICIPIO = { agendar: 'agendada', reagendar: 'reagendada', cancelar: 'cancelada', retirada: 'registrada como retirada', enviada: 'marcada como enviada',
-  comprovante: 'confirmada', saiu: 'iniciada', entregue: 'baixada' };
+  comprovante: 'confirmada', saiu: 'iniciada', entregue: 'baixada', baixa_administrativa: 'baixada' };
 const participio = acao => (String(acao).startsWith('ocorrencia:') ? 'registrada como ocorrência' : PARTICIPIO[acao] || 'alterada');
 const FINAIS = ['entregue', 'retirado', 'cancelada']; // endereço não muda mais
 // campo do corpo -> coluna e tamanho máximo (endereço de entrega)
@@ -355,6 +355,25 @@ async function buscarDoMotorista(conn, id, usuarioId, { travar = false } = {}) {
   return e;
 }
 
+// Administrativo (2026-11-13): quem tem `administrativo.ver` + `entregas.ver` enxerga e dá a baixa nas entregas de TODOS os motoristas
+// (só tipo motorista), respeitando o filtro de estados. Motorista comum (só entregas.baixar) continua preso às próprias.
+const ehAdministrativo = req => !!req.acesso?.permissoes?.has('administrativo.ver') && req.acesso.permissoes.has('entregas.ver');
+async function buscarComoAdministrativo(db, req, id, { travar = false } = {}) {
+  if (!Number.isInteger(id)) return undefined;
+  const [[e]] = await db.execute(`SELECT * FROM web_entregas WHERE id = ? AND tipo = 'motorista'${travar ? ' FOR UPDATE' : ''}`, [id]);
+  if (!e) return undefined;
+  const est = filtroEstados(req, 'c.ESTADO');
+  if (est.sql) {
+    const [ok] = await db.execute(
+      `SELECT 1 AS ok FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
+       JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE e.id = ? AND ${est.sql}`, [id, ...est.params]);
+    if (!ok.length) return undefined;
+  }
+  return e;
+}
+// porta única das rotas /minhas_entregas que só leem ou anexam: administrativo = qualquer motorista; senão só o dono
+const buscarMinha = (db, req, id, opcoes) => (ehAdministrativo(req) ? buscarComoAdministrativo(db, req, id, opcoes) : buscarDoMotorista(db, id, Number(req.user.id), opcoes));
+
 const idDe = req => (/^\d+$/.test(String(req.params.id)) ? Number(req.params.id) : null);
 const bad = msg => new ErroUsuario(400, msg);
 
@@ -537,7 +556,7 @@ function registrarEntregas({ rota, pool }) {
   // excluir pedido). O número vem de uma leitura comum FORA da transação: assim as primeiras leituras da transação são as travas
   // e as leituras comuns seguintes já enxergam tudo o que foi gravado antes de o pedido ser travado (duas baixas do mesmo pedido
   // ficam em fila no pedido e a segunda vê a primeira concluída).
-  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false, travarPedido = false, finalDe = 'o endereço' } = {}) {
+  async function gravar(req, res, nomeRota, acao, evento, montar, { motorista = false, administrativo = false, travarPedido = false, finalDe = 'o endereço' } = {}) {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const est = filtroEstados(req, 'c.ESTADO');
@@ -555,7 +574,7 @@ function registrarEntregas({ rota, pool }) {
         pedido = ped[0] || null;
       }
       // motorista: só a própria entrega (buscarDoMotorista); equipe: qualquer uma, respeitando o filtro de estados
-      const atual = motorista ? await buscarDoMotorista(conn, id, req.user.id, { travar: true })
+      const atual = motorista ? await (administrativo ? buscarComoAdministrativo(conn, req, id, { travar: true }) : buscarDoMotorista(conn, id, req.user.id, { travar: true }))
         : (await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [id]))[0][0];
       if (!atual) throw new ErroUsuario(404, 'Entrega não encontrada.');
       // o número de uma entrega nunca muda; se não bate, o pedido travado não é o dela: refaz do zero
@@ -928,6 +947,10 @@ function registrarEntregas({ rota, pool }) {
   // Isolamento: toda rota passa por buscarDoMotorista (motorista_codigo = req.user.id). Nada daqui devolve dinheiro,
   // nem para quem tem valores.ver: só se leem colunas de endereço, contato, itens (descrição/quantidade) e histórico.
   const BAIXAR = ['entregas.baixar'];
+  // listar, abrir, anexar e dar a baixa: o motorista (entregas.baixar) nas próprias; o administrativo (administrativo.ver + entregas.ver) em todas
+  const MINHAS = [{ algum: ['entregas.baixar', 'administrativo.ver'] }];
+  const guardaMinhas = (req, res, next) => (req.acesso.permissoes.has('entregas.baixar') || ehAdministrativo(req) ? next()
+    : res.status(403).json({ error: 'Sem permissão para esta ação.' }));
   const FICHA_SQL = `p.RAZAO_SOCIAL AS cliente, c.TELEFONE AS cli_telefone, c.ENDERECO AS cli_rua, c.NUMERO AS cli_numero,
     c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade, c.ESTADO AS cli_uf, c.CEP AS cli_cep`;
   const DONO = req => Number(req.user.id);
@@ -943,31 +966,36 @@ function registrarEntregas({ rota, pool }) {
     return item;
   }
 
-  rota('get', '/minhas_entregas', BAIXAR, async (req, res) => {
+  rota('get', '/minhas_entregas', MINHAS, guardaMinhas, async (req, res) => {
     const diaPedido = req.query.dia === undefined ? null : String(req.query.dia);
     if (diaPedido !== null && !validarData(diaPedido)) return res.status(400).json({ error: 'Data inválida: use AAAA-MM-DD.' });
+    // administrativo: padrão = entregas de todos os motoristas (?escopo=minhas = só as dele); o filtro de estados vale
+    const todos = ehAdministrativo(req) && req.query.escopo !== 'minhas';
+    const est = todos ? filtroEstados(req, 'c.ESTADO') : { sql: '', params: [] };
     try {
       const [linhas] = await pool.execute(
         // qtd_itens = itens DESTA entrega (a lista dela); sem lista = os itens do pedido inteiro (como antes da divisão)
-        `SELECT e.*, ${FICHA_SQL},
+        `SELECT e.*, ${FICHA_SQL},${todos ? ' mu.NOME AS motorista_nome,' : ''}
                 COALESCE(NULLIF((SELECT COUNT(*) FROM web_entrega_itens ei WHERE ei.entrega_id = e.id), 0),
                          (SELECT COUNT(*) FROM ped_orc_lista_itens i WHERE i.TIPO = 'Pedido' AND i.NUMERO = e.numero)) AS qtd_itens,
                 ${SQL_ORDEM}
          FROM web_entregas e
          LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
-         LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL
-         WHERE e.motorista_codigo = ? AND e.tipo = 'motorista' AND e.status IN ('agendada', 'em_rota', 'ocorrencia')
-           AND e.data_agendada ${diaPedido ? '=' : '<='} ?
-         ORDER BY e.data_agendada, e.numero`, [DONO(req), diaPedido || hojeLocal()]);
-      res.json({ entregas: linhas.map(l => itemMotorista(l, l.qtd_itens)) });
+         LEFT JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL${todos ? `
+         LEFT JOIN cliente_usuarios mu ON mu.CODIGO = e.motorista_codigo` : ''}
+         WHERE ${todos ? '' : 'e.motorista_codigo = ? AND '}e.tipo = 'motorista' AND e.status IN ('agendada', 'em_rota', 'ocorrencia')
+           AND e.data_agendada ${diaPedido ? '=' : '<='} ?${est.sql ? ` AND ${est.sql}` : ''}
+         ORDER BY e.data_agendada, e.numero`, [...(todos ? [] : [DONO(req)]), diaPedido || hojeLocal(), ...est.params]);
+      res.json({ entregas: linhas.map(l => ({ ...itemMotorista(l, l.qtd_itens),
+        ...(todos ? { motorista: l.motorista_nome || null, motoristaCodigo: l.motorista_codigo ?? null, minha: Number(l.motorista_codigo) === DONO(req) } : {}) })) });
     } catch (err) { falha(res, 'GET /minhas_entregas', err); }
   });
 
-  rota('get', '/minhas_entregas/:id', BAIXAR, async (req, res) => {
+  rota('get', '/minhas_entregas/:id', MINHAS, guardaMinhas, async (req, res) => {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     try {
-      const e = await buscarDoMotorista(pool, id, DONO(req));
+      const e = await buscarMinha(pool, req, id);
       if (!e) return nao_encontrada(res);
       // ficha, divisão (itens só DESTA entrega), histórico e anexos são independentes: saem juntos
       const [[[ficha]], divisoes, [eventos], [anexos]] = await Promise.all([
@@ -986,16 +1014,24 @@ function registrarEntregas({ rota, pool }) {
     } catch (err) { falha(res, 'GET /minhas_entregas/:id', err); }
   });
 
-  rota('put', '/minhas_entregas/:id/anexo', BAIXAR, lerImagem, async (req, res) => {
+  rota('put', '/minhas_entregas/:id/anexo', MINHAS, guardaMinhas, lerImagem, async (req, res) => {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const tipo = String(req.query.tipo || '');
     if (!TIPOS_ANEXO.includes(tipo)) return res.status(400).json({ error: 'Tipo de anexo inválido: use foto ou assinatura.' });
     if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
     const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const adm = ehAdministrativo(req);
     try {
+      // administrativo: estados e tipo conferidos antes; a decisão final (status) continua dentro da trava de guardarAnexo
+      if (adm && !(await buscarComoAdministrativo(pool, req, id))) return nao_encontrada(res);
       // dono, tipo e status são decididos dentro da trava de guardarAnexo (sem janela de corrida)
       res.status(201).json(await guardarAnexo(pool, id, tipo, req.body, mime, DONO(req), linha => {
+        if (adm) {
+          if (linha.tipo !== TIPOS.MOTORISTA) throw new ErroUsuario(404, 'Entrega não encontrada.');
+          if (![STATUS.EM_ROTA, STATUS.AGENDADA].includes(linha.status)) throw new ErroUsuario(409, 'Só é possível anexar em entrega agendada ou em rota.');
+          return;
+        }
         if (Number(linha.motorista_codigo) !== DONO(req) || linha.tipo !== TIPOS.MOTORISTA) throw new ErroUsuario(404, 'Entrega não encontrada.');
         if (linha.status !== STATUS.EM_ROTA) throw new ErroUsuario(409, 'Só é possível anexar depois de sair para a entrega.');
       }));
@@ -1005,11 +1041,11 @@ function registrarEntregas({ rota, pool }) {
     }
   });
 
-  rota('get', '/minhas_entregas/:id/anexo/:anexoId', BAIXAR, async (req, res) => {
+  rota('get', '/minhas_entregas/:id/anexo/:anexoId', MINHAS, guardaMinhas, async (req, res) => {
     const id = idDe(req);
     if (id === null || !/^\d+$/.test(String(req.params.anexoId))) return nao_encontrada(res);
     try {
-      if (!(await buscarDoMotorista(pool, id, DONO(req)))) return nao_encontrada(res);
+      if (!(await buscarMinha(pool, req, id))) return nao_encontrada(res);
       const [[a]] = await pool.execute(
         'SELECT mime, dados FROM web_entrega_anexos WHERE id = ? AND entrega_id = ? AND (evento_id IS NOT NULL OR criado_por = ?)',
         [Number(req.params.anexoId), id, String(DONO(req))]);
@@ -1024,7 +1060,27 @@ function registrarEntregas({ rota, pool }) {
     await gravar(req, res, 'POST /minhas_entregas/:id/saiu', 'saiu', null, async () => ({ cols: {} }), MOTORISTA);
   });
 
-  rota('post', '/minhas_entregas/:id/baixa', BAIXAR, async (req, res) => {
+  // Autoria da baixa dada pela administração (2026-11-13): o evento e a auditoria mostram QUEM deu a baixa (usuário do evento = o
+  // administrativo) e, quando a entrega é de outro motorista, "em nome do motorista X". Entrega ainda Agendada: grava antes o evento
+  // 'saiu' (a máquina `proximo` só conhece Agendada -> Em rota -> Entregue), com a mesma autoria, na mesma transação.
+  async function autoriaAdministrativa(conn, req, atual, r) {
+    const dele = Number(atual.motorista_codigo) === DONO(req);
+    let nome = null;
+    if (!dele) {
+      const [[m]] = await conn.execute('SELECT NOME FROM cliente_usuarios WHERE CODIGO = ?', [atual.motorista_codigo]);
+      nome = m?.NOME || `#${atual.motorista_codigo}`;
+    }
+    const saiuJunto = atual.status === STATUS.AGENDADA;
+    const emNome = dele ? {} : { porAdministrativo: true, emNomeDe: { codigo: Number(atual.motorista_codigo), nome } };
+    if (saiuJunto) {
+      await evento(conn, atual.id, agoraLocal(), req.acesso.nome, 'saiu',
+        dele ? 'Saída registrada junto com a baixa' : `Saída registrada junto com a baixa, em nome do motorista ${nome}`, { saiuJuntoComABaixa: true, ...emNome });
+    }
+    return { ...r, motivo: dele ? (r.motivo ?? null) : `Baixa dada pela administração em nome do motorista ${nome}`,
+      detalhe: { ...(r.detalhe || {}), ...emNome, ...(saiuJunto ? { saiuJuntoComABaixa: true } : {}) } };
+  }
+
+  rota('post', '/minhas_entregas/:id/baixa', MINHAS, guardaMinhas, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => {
       const entregueA = lerEntregueA(b.entregueA, { obrigatorio: true });
@@ -1034,7 +1090,10 @@ function registrarEntregas({ rota, pool }) {
     if (!lido) return;
     const usuario = DONO(req);
     const montarBaixa = baixa({ ...lido, usuario });
-    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', 'entregue', null, async (conn, atual) => montarBaixa(conn, atual), { ...MOTORISTA, ...BAIXA });
+    const adm = ehAdministrativo(req); // administrativo: qualquer motorista, entrega Agendada ou Em rota (calculo/entregas.js, baixa_administrativa)
+    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', adm ? 'baixa_administrativa' : 'entregue', null,
+      async (conn, atual) => (adm ? autoriaAdministrativa(conn, req, atual, await montarBaixa(conn, atual)) : montarBaixa(conn, atual)),
+      { ...MOTORISTA, administrativo: adm, ...BAIXA });
   });
 
   // ocorrência: tipo, motivo (3-500) e, no parcial, o que foi entregue
