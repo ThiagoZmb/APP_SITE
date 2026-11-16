@@ -321,7 +321,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="entrega_editar.js?v=202611191800" defer></script>
-    <script src="entregas.js?v=202611221200" defer></script>
+    <script src="entregas.js?v=202611221300" defer></script>
 </head>
 <body>
     <div class="container">
@@ -393,6 +393,8 @@
                             </div>
                             <div class="acoes" id="d-acoes-secundarias">
                                 <button type="button" class="btn btn-secondary" id="btn-checklist" data-perm="entregas.checklist">Checklist de entrega</button>
+                                <button type="button" class="btn btn-secondary" id="btn-foto-checklist" data-perm="entregas.programar" title="Fotografa a folha do checklist assinada pelo cliente">Foto do checklist assinado</button>
+                                <input type="file" id="d-foto-checklist" accept="image/*" capture="environment" hidden>
                                 <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.programar" hidden>Separar em outra entrega</button>
                                 <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.programar" hidden>Gerar entrega do restante</button>
                             </div>

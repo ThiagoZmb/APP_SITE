@@ -33,6 +33,12 @@ const MOTIVO_SAIU_DE_CONCLUIDO = 'Pedido deixou de estar Entregue/Retirado';
 const TIPOS_ANEXO = ['foto', 'assinatura'];
 const MAX_ANEXOS_PENDENTES = 10; // por entrega e por usuário (anexos enviados e ainda não vinculados a uma baixa)
 const MAX_ANEXOS_POR_BAIXA = 3;
+// Foto da folha do "Checklist externo" assinada pelo cliente (2026-11-16): o anexo já nasce vinculado a um evento 'checklist_assinado'
+// (nunca "solto"), então não entra na contagem de pendentes nem na baixa; várias fotos por entrega (frente e verso, folha cortada etc.).
+const TIPO_CHECKLIST = 'checklist';
+const EVENTO_CHECKLIST = 'checklist_assinado';
+const MAX_CHECKLIST_FOTOS = 6;
+const STATUS_CHECKLIST_MOTORISTA = ['agendada', 'em_rota', 'ocorrencia', 'entregue']; // antes ou depois da baixa; a baixa nunca depende dela
 const ANEXO_INVALIDO = 'Anexo inválido.';
 
 // Guarda uma foto/assinatura solta (evento_id NULL) da entrega `entrega` (id); a baixa a vincula depois (vincularAnexos).
@@ -126,7 +132,7 @@ async function sincronizarFila(pool, res) {
     // encerrada com o pedido, mas o pedido não está mais Entregue/Retirado: volta ao status de antes (antes das regras de cancelamento)
     const [desfazer] = await conn.execute(
       `SELECT e.id, e.status, v.detalhe FROM web_entregas e JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
-       JOIN web_entrega_eventos v ON v.entrega_id = e.id AND v.id = (SELECT MAX(v2.id) FROM web_entrega_eventos v2 WHERE v2.entrega_id = e.id)
+       JOIN web_entrega_eventos v ON v.entrega_id = e.id AND v.id = (SELECT MAX(v2.id) FROM web_entrega_eventos v2 WHERE v2.entrega_id = e.id AND v2.tipo <> '${EVENTO_CHECKLIST}')
        WHERE e.status IN ('entregue', 'retirado') AND v.tipo = '${EVENTO_ENCERRADA}' AND COALESCE(p.SITUACAO, '') NOT IN ('Entregue', 'Retirado')
        ORDER BY e.id`);
     for (const { id, status, detalhe } of desfazer) {
@@ -302,6 +308,33 @@ const evento = (conn, id, agora, usuario, tipo, motivo, detalhe) => conn.execute
 const auditar = (conn, agora, quem, acao, numero, detalhe) => conn.execute(
   'INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (?, ?, ?, ?, ?)', [agora, quem, acao, String(numero), JSON.stringify(detalhe)]);
 const itensResumo = itens => itens.map(i => ({ item: i.item, descricao: i.descricao, qtd: i.qtd }));
+
+// Grava UMA foto do checklist assinado: evento 'checklist_assinado' + anexo já vinculado a ele + auditoria, numa transação só, com a
+// entrega travada (contagem e INSERT não furam o limite). `buscar(conn)` devolve a linha travada (undefined = 404) e `conferir(linha)`
+// lança ErroUsuario para recusar. `emNomeDe(conn, linha)` (opcional) devolve { motivo, detalhe } quando a administração envia em nome do
+// motorista. A imagem é validada pelos bytes ANTES de abrir a transação (mesma regra do canhoto: JPEG/PNG, até 1 MB).
+async function anexarChecklistAssinado(pool, req, res, nomeRota, id, corpo, mime, { buscar, conferir, emNomeDe }) {
+  const v = validarAnexo(corpo, mime);
+  if (!v.ok) return res.status(400).json({ error: v.motivo });
+  const r = await emTransacao(pool, res, nomeRota, async conn => {
+    const linha = await buscar(conn);
+    if (!linha) throw new ErroUsuario(404, 'Entrega não encontrada.');
+    conferir(linha);
+    const [[c]] = await conn.execute('SELECT COUNT(*) AS qtd_fotos FROM web_entrega_anexos WHERE entrega_id = ? AND tipo = ?', [id, TIPO_CHECKLIST]);
+    const antes = Number(c?.qtd_fotos) || 0;
+    if (antes >= MAX_CHECKLIST_FOTOS) throw new ErroUsuario(409, `Esta entrega já tem ${MAX_CHECKLIST_FOTOS} fotos do checklist assinado.`);
+    const agora = agoraLocal();
+    const nome = req.acesso.nome;
+    const em = emNomeDe ? await emNomeDe(conn, linha) : { motivo: null, detalhe: {} };
+    const [ev] = await evento(conn, id, agora, nome, EVENTO_CHECKLIST, em.motivo, { foto: antes + 1, ...em.detalhe });
+    const [ins] = await conn.execute(
+      'INSERT INTO web_entrega_anexos (entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, ev.insertId, TIPO_CHECKLIST, mime, corpo, String(req.user.id), agora]);
+    await auditar(conn, agora, nome, `entrega_${EVENTO_CHECKLIST}`, linha.numero, { entregaId: id, anexoId: ins.insertId, foto: antes + 1, ...em.detalhe });
+    return { anexoId: ins.insertId, qtdChecklistAssinado: antes + 1 };
+  });
+  if (r) res.status(201).json(r);
+}
 
 // Cria uma entrega nova do pedido dividido: sequencia = MAX + 1 (as entregas do número já estão travadas), "A programar",
 // SEM data, SEM motorista e SEM tipo (quem agenda escolhe; nada herda status, tipo nem motorista da origem). O endereço de
@@ -708,6 +741,21 @@ function registrarEntregas({ rota, pool }) {
     } catch (err) { falha(res, 'GET /entregas/:id/anexo/:anexoId', err); }
   });
 
+  // Foto do checklist assinado (equipe): qualquer status menos Cancelada (antes ou depois da baixa); não mexe em status, pedido nem itens.
+  rota('put', '/entregas/:id/checklist_assinado', PROGRAMAR, lerImagem, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
+    const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    try {
+      if (!(await entregaVisivel(req, id))) return nao_encontrada(res);
+      await anexarChecklistAssinado(pool, req, res, 'PUT /entregas/:id/checklist_assinado', id, req.body, mime, {
+        buscar: async conn => (await conn.execute('SELECT * FROM web_entregas WHERE id = ? FOR UPDATE', [id]))[0][0],
+        conferir: linha => { if (linha.status === 'cancelada') throw new ErroUsuario(409, 'Esta entrega está cancelada e não aceita mais anexos.'); }
+      });
+    } catch (err) { falha(res, 'PUT /entregas/:id/checklist_assinado', err); }
+  });
+
   // ---- baixa pela equipe ----
   const lerEntregueA = (v, { obrigatorio }) => {
     const t = String(v ?? '').trim();
@@ -965,7 +1013,8 @@ function registrarEntregas({ rota, pool }) {
       uf: r.endereco_uf ?? null, cep: r.endereco_cep ?? null, ref: r.endereco_ref ?? null };
     const vazio = Object.values(end).every(v => !v);
     const item = { id: r.id, numero: r.numero, status: r.status, dataAgendada: dia(r.data_agendada), cliente: r.cliente || '', telefone: r.cli_telefone || '',
-      endereco: vazio ? null : end, contatoLocal: r.contato_local ?? null, qtdItens: Number(qtdItens) || 0, ...camposOrdem(r) };
+      endereco: vazio ? null : end, contatoLocal: r.contato_local ?? null, qtdItens: Number(qtdItens) || 0, ...camposOrdem(r),
+      ...(Number(r.qtd_checklist) > 0 ? { checklistAssinado: true, qtdChecklistAssinado: Number(r.qtd_checklist) } : {}) };
     if (vazio) item.enderecoCliente = { rua: r.cli_rua || '', numero: r.cli_numero || '', bairro: r.cli_bairro || '', cidade: r.cli_cidade || '', uf: r.cli_uf || '', cep: r.cli_cep || '' };
     return item;
   }
@@ -982,6 +1031,7 @@ function registrarEntregas({ rota, pool }) {
         `SELECT e.*, ${FICHA_SQL},${todos ? ' mu.NOME AS motorista_nome,' : ''}
                 COALESCE(NULLIF((SELECT COUNT(*) FROM web_entrega_itens ei WHERE ei.entrega_id = e.id), 0),
                          (SELECT COUNT(*) FROM ped_orc_lista_itens i WHERE i.TIPO = 'Pedido' AND i.NUMERO = e.numero)) AS qtd_itens,
+                (SELECT COUNT(*) FROM web_entrega_anexos ck WHERE ck.entrega_id = e.id AND ck.tipo = 'checklist') AS qtd_checklist,
                 ${SQL_ORDEM}
          FROM web_entregas e
          LEFT JOIN ped_orc p ON p.NUMERO = e.numero AND p.TIPO = 'Pedido'
@@ -1056,6 +1106,28 @@ function registrarEntregas({ rota, pool }) {
       if (!a) return res.status(404).json({ error: 'Anexo não encontrado.' });
       res.set('Content-Type', a.mime).set('Content-Disposition', 'inline').set('Cache-Control', 'no-store').send(a.dados);
     } catch (err) { falha(res, 'GET /minhas_entregas/:id/anexo/:anexoId', err); }
+  });
+
+  // Foto do checklist assinado (motorista): só a própria entrega; a administração envia em nome do motorista (como a baixa). Não bloqueia a baixa.
+  rota('put', '/minhas_entregas/:id/checklist_assinado', MINHAS, guardaMinhas, lerImagem, async (req, res) => {
+    const id = idDe(req);
+    if (id === null) return nao_encontrada(res);
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
+    const mime = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    try {
+      await anexarChecklistAssinado(pool, req, res, 'PUT /minhas_entregas/:id/checklist_assinado', id, req.body, mime, {
+        buscar: conn => buscarMinha(conn, req, id, { travar: true }),
+        conferir: linha => {
+          if (!STATUS_CHECKLIST_MOTORISTA.includes(linha.status)) throw new ErroUsuario(409, 'Esta entrega não aceita mais anexos.');
+        },
+        emNomeDe: async (conn, linha) => {
+          if (Number(linha.motorista_codigo) === DONO(req)) return { motivo: null, detalhe: {} };
+          const [[m]] = await conn.execute('SELECT NOME FROM cliente_usuarios WHERE CODIGO = ?', [linha.motorista_codigo]);
+          const nome = m?.NOME || `#${linha.motorista_codigo}`;
+          return { motivo: `Foto enviada pela administração em nome do motorista ${nome}`, detalhe: { porAdministrativo: true, emNomeDe: { codigo: Number(linha.motorista_codigo), nome } } };
+        }
+      });
+    } catch (err) { falha(res, 'PUT /minhas_entregas/:id/checklist_assinado', err); }
   });
 
   const MOTORISTA = { motorista: true };

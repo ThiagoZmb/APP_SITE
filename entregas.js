@@ -27,7 +27,7 @@
     retirada: 'Retirada pelo cliente', enviada: 'Enviada', comprovante: 'Comprovante confirmado', cancelada: 'Cancelada', endereco: 'Endereço alterado',
     ausente: 'Ocorrência: cliente ausente', endereco_errado: 'Ocorrência: endereço errado', recusa: 'Ocorrência: recusa', parcial: 'Ocorrência: entrega parcial',
     dividida: 'Itens separados em outra entrega', sobra_encerrada: 'Saldo encerrado',
-    editada: 'Entrega editada', encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
+    editada: 'Entrega editada', checklist_assinado: 'Checklist assinado anexado', encerrada: 'Encerrada com o pedido', reaberta: 'Reaberta' }; // encerrada/reaberta: pedido Entregue/Retirado fora das Entregas (motivo diz como)
   const ABAS = [
     { id: 'fila', rotulo: 'A programar', status: ['a_programar'] },
     { id: 'agenda', rotulo: 'Agenda', status: ['agendada'] },
@@ -472,6 +472,9 @@
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
     // pedido ainda Em Produção (entrega criada à mão): deixa claro que ainda não está pronto para sair
     const seloProducao = sit => (String(sit || '') === 'Em Produção' ? ' <span class="selo info" title="O pedido ainda está em produção: só dá para dar baixa depois que ficar Pronto">Em produção</span>' : '');
+    // folha do checklist assinada e fotografada (anexo tipo 'checklist'); só aparece quando há foto
+    const fotosChecklist = anexos => (Array.isArray(anexos) ? anexos : []).filter(a => a.tipo === 'checklist');
+    const seloChecklist = anexos => (fotosChecklist(anexos).length ? ' <span class="selo ok" title="Há foto da folha do checklist assinada pelo cliente">Checklist assinado ✓</span>' : '');
     const botaoAcao = (acao, rotulo) => `<button type="button" class="btn btn-mini btn-secondary" data-acao="${acao}" data-perm="entregas.programar">${rotulo}</button>`;
 
     function desenharAbas() {
@@ -626,7 +629,7 @@
       const sub = [seq, e.cliente].filter(Boolean).join(' · ');
       $('d-sub').textContent = sub;
       $('d-sub').hidden = !sub;
-      $('d-status').innerHTML = selo(statusDaEntrega(e)) +seloProducao(div.situacaoPedido);
+      $('d-status').innerHTML = selo(statusDaEntrega(e)) +seloProducao(div.situacaoPedido) + seloChecklist(anexos);
       // pedido editado depois da divisão: aviso fixo; a divisão fica bloqueada e o pedido não fecha sozinho na última baixa
       const avisos = [];
       if (div.situacaoPedido === 'Em Produção' && !['cancelada', 'entregue', 'retirado'].includes(e.status)) avisos.push('Pedido ainda em produção: a baixa só é possível depois que ele estiver Pronto.');
@@ -647,6 +650,7 @@
       estado.copiar = { endereco, contato: txt(e.contatoLocal) };
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
+      $('btn-foto-checklist').hidden = e.status === 'cancelada'; // antes ou depois da baixa; o servidor também recusa cancelada
       $('btn-editar').hidden = !podeEditarEntrega(e); // concluída/cancelada não edita; o servidor também recusa
       $('btn-baixa-adm').hidden = !podeBaixaAdministrativa(e); // só aparece com administrativo.ver (data-perm); o servidor confere
       $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
@@ -684,7 +688,7 @@
     async function carregarAnexo(entregaId, a, caixa) {
       const fig = doc.createElement('figure');
       const leg = doc.createElement('figcaption');
-      leg.textContent = `${a.tipo === 'assinatura' ? 'Assinatura' : 'Foto'} · ${dataHoraBR(a.criadoEm)}`;
+      leg.textContent = `${a.tipo === 'assinatura' ? 'Assinatura' : a.tipo === 'checklist' ? 'Checklist assinado' : 'Foto'} · ${dataHoraBR(a.criadoEm)}`;
       fig.appendChild(leg);
       caixa.appendChild(fig);
       try {
@@ -922,6 +926,20 @@
       const r = await chamar(`${base}/${encodeURIComponent(entregaId)}/anexo?tipo=foto`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
       estado.anexoEnviado = { arquivo, id: r.anexoId };
       return r.anexoId;
+    }
+
+    // ---------- foto do checklist assinado (câmera do celular; reduzida como o canhoto; não mexe em status nem na baixa) ----------
+    async function enviarChecklistAssinado() {
+      const campo = $('d-foto-checklist'), arq = campo.files[0];
+      campo.value = '';
+      if (!arq || !estado.det) return;
+      const e = estado.det.entrega;
+      return ocupado(async () => {
+        const blob = await reduzirImagem(arq);
+        await chamar(`/entregas/${encodeURIComponent(e.id)}/checklist_assinado`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
+        toast('Foto do checklist assinado enviada.', 'ok');
+        await recarregarTudo(e.id);
+      });
     }
 
     // ---------- baixas: retirada / enviada / comprovante ----------
@@ -1180,6 +1198,8 @@
       });
       $('btn-checklist').addEventListener('click', ev => { if (checklist && estado.det) checklist.abrir(estado.det.entrega.id, ev.currentTarget); });
       $('btn-folha-branco').addEventListener('click', () => { if (checklist) checklist.abrirBranco(); });
+      $('btn-foto-checklist').addEventListener('click', () => $('d-foto-checklist').click());
+      $('d-foto-checklist').addEventListener('change', enviarChecklistAssinado);
       $('btn-retirada').addEventListener('click', () => abrirForm('vista-retirada', ['r-entregue', 'r-foto']));
       $('btn-baixa-adm').addEventListener('click', () => {
         abrirForm('vista-baixa-adm', ['ba-quem', 'ba-foto']);

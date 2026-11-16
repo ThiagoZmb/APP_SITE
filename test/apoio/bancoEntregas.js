@@ -151,7 +151,8 @@ function bancoEntregas() {
         && (!sql.includes('c.ESTADO IN') || estados.includes(clienteDe(pedidoDe(e))?.ESTADO)))
       .sort((a, b) => String(a.data_agendada).localeCompare(String(b.data_agendada)) || a.numero - b.numero)
       .map(e => ({ ...e, ...fichaDe(e), ...ordemDe(e), motorista_nome: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME ?? null,
-        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
+        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length),
+        qtd_checklist: String(estado.anexos.filter(a => a.entrega_id === e.id && a.tipo === 'checklist').length) }))],
     [/^SELECT \* FROM web_entregas WHERE id = \? AND tipo = 'motorista'/, (sql, [id]) => entregas.filter(e => e.id === id && e.tipo === 'motorista').map(e => ({ ...e }))],
     [/^SELECT NOME FROM cliente_usuarios WHERE CODIGO = \?$/, (sql, [codigo]) => usuarios.filter(u => u.CODIGO === codigo).map(u => ({ NOME: u.NOME }))],
 
@@ -162,7 +163,8 @@ function bancoEntregas() {
       .sort((a, b) => String(a.data_agendada).localeCompare(String(b.data_agendada)) || a.numero - b.numero)
       .map(e => ({ ...e, ...fichaDe(e), ...ordemDe(e),
         // itens DESTA entrega (lista dela); sem lista = itens do pedido inteiro
-        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length) }))],
+        qtd_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length || estado.itens.filter(i => i.NUMERO === e.numero && i.TIPO === 'Pedido').length),
+        qtd_checklist: String(estado.anexos.filter(a => a.entrega_id === e.id && a.tipo === 'checklist').length) }))],
     [/FROM web_entregas WHERE id = \? AND motorista_codigo = \?/, (sql, [id, uid]) =>
       entregas.filter(e => e.id === id && e.motorista_codigo === uid && e.tipo === 'motorista').map(e => ({ ...e }))],
     [/^SELECT p\.RAZAO_SOCIAL AS cliente, c\.TELEFONE AS cli_telefone/, (sql, [numero]) => {
@@ -307,6 +309,14 @@ function bancoEntregas() {
 
     // ---- anexos e baixa (T5) ----
     [/^SELECT id, status FROM web_entregas WHERE id = \?$/, (sql, [id]) => entregas.filter(e => e.id === id).map(e => ({ id: e.id, status: e.status }))],
+    // foto do checklist assinado: o anexo já nasce vinculado ao evento
+    [/^SELECT COUNT\(\*\) AS qtd_fotos FROM web_entrega_anexos WHERE entrega_id = \? AND tipo = \?/, (sql, [entrega_id, tipo]) =>
+      [{ qtd_fotos: String(estado.anexos.filter(a => a.entrega_id === entrega_id && a.tipo === tipo).length) }]],
+    [/^INSERT INTO web_entrega_anexos \(entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em\)/, (sql, [entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em]) => {
+      const id = estado.anexos.length + 1;
+      estado.anexos.push({ id, entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em });
+      return { affectedRows: 1, insertId: id };
+    }],
     [/^SELECT COUNT\(\*\) AS n FROM web_entrega_anexos/, (sql, [entrega_id, criado_por]) =>
       [{ n: String(estado.anexos.filter(a => a.entrega_id === entrega_id && a.criado_por === criado_por && a.evento_id == null).length) }]],
     [/^INSERT INTO web_entrega_anexos \(entrega_id, tipo, mime, dados, criado_por, criado_em\)/, (sql, [entrega_id, tipo, mime, dados, criado_por, criado_em]) => {

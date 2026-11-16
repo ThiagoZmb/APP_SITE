@@ -193,6 +193,7 @@
       return (estado.dia === hoje() ? 'Hoje · ' : '') + dataBR(estado.dia);
     }
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
+    const seloChecklist = e => (e.checklistAssinado ? ' <span class="selo ok" title="Há foto da folha do checklist assinada pelo cliente">Checklist assinado ✓</span>' : '');
 
     // administrativo (administrativo.ver + entregas.ver): vê as entregas de todos os motoristas e dá a baixa; "Só as minhas" volta ao padrão do motorista
     const souAdministrativo = () => !!(win.Acesso && win.Acesso.pode('administrativo.ver entregas.ver'));
@@ -223,10 +224,12 @@
         (acoes.includes('baixar') ? `<button type="button" class="btn btn-primary btn-grande" data-acao="baixar" data-perm="${adm ? 'administrativo.ver' : 'entregas.baixar'}">Dar baixa</button>` : '');
       // o checklist do motorista é só da própria entrega (rota própria); com o filtro "Todos" some das dos outros
       const botaoChecklist = e.minha === false ? '' : '<div class="acoes"><button type="button" class="btn btn-secondary" data-acao="checklist" data-perm="entregas.baixar">Checklist de entrega (PDF)</button></div>';
+      // foto da folha do checklist assinada pelo cliente: a própria entrega, ou qualquer uma para a administração (em nome do motorista); antes ou depois da baixa
+      const botaoFotoChecklist = `<div class="acoes"><button type="button" class="btn btn-secondary btn-grande" data-acao="foto_checklist" data-perm="${adm ? 'administrativo.ver' : 'entregas.baixar'}">Foto do checklist assinado</button></div>`;
       const motoristaHtml = e.motorista !== undefined
         ? `<p class="motorista"><span class="cinza">Motorista:</span> <strong>${esc(txt(e.motorista) || 'sem nome')}</strong>${e.minha ? ' <span class="cinza">(você)</span>' : ''}</p>` : '';
       return `<article class="cartao" data-id="${esc(e.id)}">
-        <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}${rotuloSequencia(e) ? ` · ${esc(rotuloSequencia(e))}` : ''}</strong>${selo(e.status)}</div>
+        <div class="cartao-topo"><strong>Pedido ${esc(e.numero)}${rotuloSequencia(e) ? ` · ${esc(rotuloSequencia(e))}` : ''}</strong><span>${selo(e.status)}${seloChecklist(e)}</span></div>
         <h3>${esc(e.cliente)}</h3>
         ${motoristaHtml}
         ${htmlTelefone(e.telefone)}
@@ -237,6 +240,7 @@
         ${ocHtml}
         ${botoes ? `<div class="acoes">${botoes}</div>` : ''}
         ${botaoChecklist}
+        ${botaoFotoChecklist}
       </article>`;
     }
 
@@ -475,8 +479,23 @@
       });
     }
 
+    // ---------- foto do checklist assinado (câmera; reduzida como o canhoto; não bloqueia nem depende da baixa) ----------
+    async function enviarChecklistAssinado() {
+      const campo = $('m-foto-checklist'), arq = campo.files[0], id = estado.fotoChecklistId;
+      campo.value = '';
+      if (!arq || !id) return;
+      return ocupado(async () => {
+        const blob = await C.reduzirImagem(win, arq);
+        await chamar(`/minhas_entregas/${encodeURIComponent(id)}/checklist_assinado`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
+        toast('Foto do checklist assinado enviada.', 'ok');
+        estado.detalhes.delete(id);
+        await carregar();
+      });
+    }
+
     // ---------- eventos ----------
     function ligar() {
+      $('m-foto-checklist').addEventListener('change', enviarChecklistAssinado);
       $('cartoes').addEventListener('click', ev => {
         const botao = ev.target.closest('button[data-acao]');
         const cartao = ev.target.closest('[data-id]');
@@ -488,6 +507,7 @@
             `/minhas_entregas/${encodeURIComponent(id)}/checklist.pdf`);
           return;
         }
+        if (botao.getAttribute('data-acao') === 'foto_checklist') { estado.fotoChecklistId = id; $('m-foto-checklist').click(); return; }
         if (botao.getAttribute('data-acao') === 'iniciar') iniciarRota(id);
         else ocupado(() => abrirBaixa(id));
       });
