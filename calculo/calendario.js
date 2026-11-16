@@ -185,6 +185,17 @@ function resumoEntregaCalendario(entregas, classe) {
   return { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 };
 }
 
+// ---------- busca sem limite de mês (GET /calendario/pedidos?busca=...) ----------
+const MAX_BUSCA = 60;            // caracteres do termo
+const MAX_PEDIDOS_BUSCA = 200;   // pedidos devolvidos (os de data mais recente)
+// Termo cru -> { texto, like } ou null (vazio). "#123" e "P 123" valem como "123" (igual à tela); % _ \ do termo são literais no LIKE.
+function validarBusca(v) {
+  if (v === undefined || v === null || Array.isArray(v) || typeof v === 'object') return null;
+  const texto = limpar(v).slice(0, MAX_BUSCA).replace(/^(p ?|#)(?=\d)/i, '').trim();
+  if (!texto) return null;
+  return { texto, like: '%' + texto.replace(/[\\%_]/g, c => '\\' + c) + '%' };
+}
+
 // Linha do banco -> pedido do calendário. `valor` só existe aqui; a rota o apaga de quem não tem valores.ver.
 function montarPedido(r, hoje) {
   const situacao = String(r.situacao ?? '').trim();
@@ -227,4 +238,4 @@ function agruparPorDia(pedidos, situacao = 'abertos') {
   });
 }
 
-module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens, agruparCores, resumoEntregaCalendario };
+module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens, agruparCores, resumoEntregaCalendario, validarBusca, MAX_BUSCA, MAX_PEDIDOS_BUSCA };

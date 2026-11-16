@@ -95,6 +95,13 @@
     if (!achou.qtdPedidos) return `Nenhum pedido encontrado no mês exibido${situacao === 'abertos' ? ' (mostrando só os em aberto; use "Todos" para incluir os finalizados)' : ''}.`;
     return `${achou.qtdPedidos} pedido(s) encontrado(s) em ${achou.qtdDias} dia(s).`;
   }
+  // Pesquisa no servidor (sem limite de mês): a API devolve `dias` de vários meses; viram "células" de um único bloco (uma "semana") para as mesmas funções html*.
+  const celulasDeBusca = (dias, hoje) => [(Array.isArray(dias) ? dias : []).map(d => ({ dia: d.data, num: Number(String(d.data).slice(8, 10)), doMes: true, hoje: d.data === hoje,
+    qtdPedidos: d.qtdPedidos, qtdAtrasados: d.qtdAtrasados, pedidos: d.pedidos || [] }))];
+  function textoBuscaServidor(achou, situacao, limitado, limite) {
+    if (!achou.qtdPedidos) return `Nenhum pedido encontrado em nenhuma data${situacao === 'abertos' ? ' (mostrando só os em aberto; use "Todos" para incluir os finalizados)' : ''}.`;
+    return `${achou.qtdPedidos} pedido(s) encontrado(s) em ${achou.qtdDias} dia(s), em qualquer data.${limitado ? ` Mostrando os ${limite} de data mais recente; refine a pesquisa.` : ''}`;
+  }
   // Rolagem automática depois da digitação: só quando o termo (normalizado) é novo em relação ao último já levado à tela e há destaque visível.
   const deveRolarBusca = (termoRolado, termo, qtdVisiveis) => {
     const t = normalizarBusca(termo);
@@ -250,5 +257,5 @@
   }
 
   return { MESES, DIAS_SEMANA, SITUACOES, VISOES, COR_CLASSE, MAX_ETIQUETAS, esc, dataBR, dataValida, situacaoValida, visaoValida, htmlFolha, htmlLinhaFolha, htmlVisao, mesValido, mesDe, somarMeses, somarDias, nomeMes, dataExtenso, hojeISO,
-    normalizarBusca, pedidoCasa, localizar, textoBusca, deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, rotuloPedido, textoItens, infoEntrega, seloEntrega, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
+    normalizarBusca, pedidoCasa, localizar, textoBusca, celulasDeBusca, textoBuscaServidor,deveRolarBusca, comportamentoRolagem, alturaBarraFixa, montarGrade, inicioSemana, abreviar, moeda, urlDia, urlMes, htmlEtiqueta, htmlCelula, rotuloPedido, textoItens, infoEntrega, seloEntrega, htmlGrade, htmlListaDias, htmlLinhaDia, htmlSituacao, ligarMenu, abrirMenuDaLinha, iniciarComum, C };
 });

@@ -207,10 +207,13 @@ test('separar: quantidades e itens inválidos; marcar tudo não é divisão; ped
   assert.equal(banco.entregas.length, 1);
   assert.equal(banco.entregaItens.length, 0);
   assert.equal((await separar(chamar, 99, [{ numeroItem: 1, quantidade: 1 }])).status, 404);
-  banco.pedidos[0].SITUACAO = 'Em Produção';
+  banco.pedidos[0].SITUACAO = 'Entregue';
   const r = await separar(chamar, e.id, [{ numeroItem: 1, quantidade: 1 }]);
   assert.equal(r.status, 409);
-  assert.match((await r.json()).error, /Só pedido Pronto/);
+  assert.match((await r.json()).error, /Só pedido Pronto ou Em Produção/);
+  // Em Produção também pode ser dividido (decisão do dono, 2026-11-13)
+  banco.pedidos[0].SITUACAO = 'Em Produção';
+  assert.equal((await separar(chamar, e.id, [{ numeroItem: 1, quantidade: 1 }])).status, 201);
 });
 
 test('permissões: sem entregas.programar = 403 (Somente ver e Motorista) em separar, gerar saldo e encerrar saldo', async t => {

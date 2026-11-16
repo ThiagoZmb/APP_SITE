@@ -231,6 +231,10 @@ async function itensDoPedido(conn, numero) {
 const marcas = arr => arr.map(() => '?').join(', ');
 const MSG_ALTERADO = 'O pedido foi alterado depois da divisão: confira os itens. Nada foi dividido nem gerado.';
 const MSG_NAO_PRONTO = s => `Só pedido Pronto tem a entrega dividida (situação atual: ${s || '—'}).`;
+// Separar a entrega por itens e gerar a entrega do saldo valem também com o pedido Em Produção (decisão do dono, 2026-11-13);
+// a baixa e o encerramento do saldo continuam exigindo Pronto.
+const SITUACOES_DIVIDEM = ['Pronto', 'Em Produção'];
+const MSG_NAO_DIVIDE = s => `Só pedido Pronto ou Em Produção pode ter a entrega dividida (situação atual: ${s || '—'}).`;
 
 // Lê tudo o que a divisão precisa de um ou mais pedidos (as leituras independentes saem juntas): entregas, listas de itens,
 // sobras encerradas e itens do pedido (ped_orc_lista_itens). `entregasLidas` (opcional) = linhas de web_entregas já lidas
@@ -532,7 +536,7 @@ function registrarEntregas({ rota, pool }) {
           ...(doPedido.get(i.item)?.produto ? { produto: doPedido.get(i.item).produto } : {}),
           ...(doPedido.get(i.item)?.obsPedido ? { obsPedido: doPedido.get(i.item).obsPedido } : {}) })),
         divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
-          podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && r.situacao_pedido === 'Pronto' && !d?.alterado && itensEntrega.length > 0,
+          podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && SITUACOES_DIVIDEM.includes(r.situacao_pedido) && !d?.alterado && itensEntrega.length > 0,
           itensSemEntrega: d ? itensResumo(d.sobra) : [] },
         entrega: { ...paraEntrega(r), motoristaNome: r.motorista_nome || null, statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
           canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
@@ -834,7 +838,7 @@ function registrarEntregas({ rota, pool }) {
       if (!STATUS_DIVISIVEIS.includes(origem.status)) {
         throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[origem.status] || origem.status}' e não pode ser dividida: só A programar, Agendada ou Ocorrência.`);
       }
-      if (d.situacao !== 'Pronto') throw new ErroUsuario(409, MSG_NAO_PRONTO(d.situacao));
+      if (!SITUACOES_DIVIDEM.includes(d.situacao)) throw new ErroUsuario(409, MSG_NAO_DIVIDE(d.situacao));
       if (d.alterado) throw new ErroUsuario(409, MSG_ALTERADO);
       const s = separarItens(d.porEntrega.get(id) || [], pedidoSep.itens);
       if (s.erro) throw new ErroUsuario(s.erro.status, s.erro.msg);
@@ -863,7 +867,7 @@ function registrarEntregas({ rota, pool }) {
     if (observacao.length > 500) return res.status(400).json({ error: 'Observação muito longa (máximo 500 caracteres).' });
     const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/saldo', async conn => {
       const d = await travarPedidoDividido(conn, req, numero);
-      if (d.situacao !== 'Pronto') throw new ErroUsuario(409, MSG_NAO_PRONTO(d.situacao));
+      if (!SITUACOES_DIVIDEM.includes(d.situacao)) throw new ErroUsuario(409, MSG_NAO_DIVIDE(d.situacao));
       if (d.alterado) throw new ErroUsuario(409, MSG_ALTERADO);
       if (!d.sobra.length) throw new ErroUsuario(409, 'Este pedido não tem itens sem entrega.');
       const nova = await criarEntregaDividida(conn, req, { numero, entregas: d.entregas, itens: d.sobra, hash: d.hashAtual, observacao: observacao || null,

@@ -2,6 +2,7 @@
 // Calendário de previsão de finalização dos pedidos (somente leitura).
 //   GET /calendario/pedidos?mes=AAAA-MM&situacao=abertos|todos   pedidos do mês agrupados por dia
 //   GET /calendario/dia?data=AAAA-MM-DD&situacao=abertos|todos   pedidos de um dia
+//   GET /calendario/pedidos?busca=TEXTO&situacao=...  pesquisa em TODAS as datas (nº, cliente, cliente final; até 200 pedidos)
 // A data é ped_orc.DATA_PRONTO (tipo Pedido). Pedidos em 1 consulta + itens/cores (ped_orc_lista_itens, ped_orc_itens_v4, ped_orc_serralheria) e entregas (web_entregas, só com entregas.ver), todas com IN e em paralelo: sem N+1; "em aberto" e "atrasado" saem de calculo/calendario.js.
 // Permissão pedidos.ver (a mesma de /dados_lista); estados restritos do usuário filtram pelo cliente; valor só com valores.ver.
 // Regras: docs/regras/calendario-pedidos.md
@@ -9,7 +10,7 @@
 const { filtroEstados } = require('../seguranca/acesso');
 const { semValores } = require('../seguranca/valores');
 const { hojeLocal } = require('./transacao');
-const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia } = require('../calculo/calendario');
+const { validarData, validarMes, validarSituacao, somarDias, montarPedido, agruparPorDia, validarBusca, dataISO, emAberto, MAX_PEDIDOS_BUSCA } = require('../calculo/calendario');
 const { carregarItensPedidos } = require('./pedido_itens');
 
 const VER = ['pedidos.ver'];
@@ -50,7 +51,38 @@ function registrarCalendario({ rota, pool }) {
   }
   const resumo = dias => ({ qtdPedidos: dias.reduce((n, d) => n + d.qtdPedidos, 0), qtdAtrasados: dias.reduce((n, d) => n + d.qtdAtrasados, 0) });
 
+  // pesquisa sem limite de data: número, cliente ou cliente final contêm o termo (LIKE parametrizado); só pedidos com data de pronto
+  async function buscarPorTexto(req, like) {
+    const est = filtroEstados(req, 'c.ESTADO');
+    const [linhas] = await pool.execute(
+      `SELECT p.NUMERO AS numero, p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, p.SITUACAO AS situacao, p.TOTAL AS valor,
+              CAST(p.DATA_PRONTO AS CHAR) AS pronto_em, CAST(p.DATA_ENTREGA AS CHAR) AS data_entrega
+       FROM ped_orc p
+       ${est.sql ? 'INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL' : ''}
+       WHERE p.TIPO = 'Pedido' AND p.DATA_PRONTO >= '2000-01-01'
+         AND (CAST(p.NUMERO AS CHAR) LIKE ? OR p.RAZAO_SOCIAL LIKE ? OR p.CLIENTE_FINAL LIKE ?) ${est.sql ? 'AND ' + est.sql : ''}
+       ORDER BY p.DATA_PRONTO DESC, p.NUMERO DESC LIMIT ${MAX_PEDIDOS_BUSCA * 5}`, [like, like, like, ...est.params]);
+    return linhas;
+  }
+
   rota('get', '/calendario/pedidos', VER, async (req, res) => {
+    const busca = validarBusca(req.query.busca);
+    if (busca) {
+      const situacao = validarSituacao(req.query.situacao);
+      if (!situacao) return res.status(400).json({ error: 'Situação inválida. Use abertos ou todos.' });
+      try {
+        const hoje = hojeLocal();
+        // o filtro "em aberto" é em JS (acentos); só depois o teto de pedidos, para o teto valer para o que será mostrado
+        const todas = (await buscarPorTexto(req, busca.like)).filter(r => dataISO(r.pronto_em) && (situacao === 'todos' || emAberto(r.situacao)));
+        const linhas = todas.slice(0, MAX_PEDIDOS_BUSCA);
+        const dias = agruparPorDia((await enriquecer(req, linhas)).map(r => montarPedido(r, hoje)), situacao);
+        res.json(semValores(req, { busca: busca.texto, situacao, hoje, limitado: todas.length > MAX_PEDIDOS_BUSCA, limite: MAX_PEDIDOS_BUSCA, ...resumo(dias), dias }, ['valor']));
+      } catch (err) {
+        console.error('Erro GET /calendario/pedidos (busca):', err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
+      }
+      return;
+    }
     const mes = validarMes(req.query.mes);
     if (!mes) return res.status(400).json({ error: 'Mês inválido. Use o formato AAAA-MM.' });
     const situacao = validarSituacao(req.query.situacao);

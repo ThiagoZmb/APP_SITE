@@ -400,11 +400,11 @@ test('calendario.js: a digitação rola até o 1º destaque visível sem mover o
   assert.match(js, /scrollIntoView\(\{ block: 'center', behavior: K\.comportamentoRolagem\(reduzirMovimento\(\)\) \}\)/);
   assert.match(js, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/);
   assert.match(js, /\.filter\(el => el\.offsetParent !== null\)/, 'só elemento visível (a visão escondida não conta)');
-  const rolar = js.slice(js.indexOf('function rolarSeTermoNovo'), js.indexOf('function redesenharBusca'));
+  const rolar = js.slice(js.indexOf('function rolarSeTermoNovo'), js.indexOf('async function executarBusca'));
   assert.match(rolar, /K\.deveRolarBusca\(estado\.termoRolado, estado\.busca, lista\.length\)/);
   assert.match(rolar, /achados\(\)/);
   assert.doesNotMatch(rolar, /\.focus\(/, 'a digitação não rouba o foco do campo');
-  assert.match(js, /redesenharBusca\(true\); \}, 200\)/, 'só o fim da digitação (debounce) rola');
+  assert.match(js, /executarBusca\(true\); \}, 300\)/, 'só o fim da digitação (debounce) rola');
   assert.doesNotMatch(js.slice(js.indexOf('function desenhar'), js.indexOf('// Pesquisa:')), /rolarSeTermoNovo|scrollIntoView/, 'recarregar/trocar visão não rola');
   assert.match(js.slice(js.indexOf('function irParaAchado'), js.indexOf('function rolarSeTermoNovo')), /marcarAtual\(el\);\s*el\.focus\(\{ preventScroll: true \}\)/);
   assert.match(js, /function limparBusca\(\) \{[^}]*estado\.termoRolado = ''/);
@@ -515,4 +515,27 @@ test('balão: a entrega fica fora do balão e as cores entram na linha de cada i
   const r = K.rotuloPedido(p);
   assert.match(r, /• 2× Porta de giro 2000 × 800\n {4}Cores: perfil Branco; puxador Preto\n• 1× Serviço: Frete$/);
   assert.doesNotMatch(r, /Entrega|14\/11/);
+});
+
+// ---------- pesquisa no servidor (todas as datas) ----------
+test('celulasDeBusca: dias de vários meses viram um bloco único; a lista mostra a data completa com ano; textoBuscaServidor', () => {
+  const dias = [dia('2020-03-10', [ped(1, { prontoEm: '2020-03-10' })]), dia('2021-07-01', [ped(2, { prontoEm: '2021-07-01' })])];
+  const semanas = K.celulasDeBusca(dias, '2026-11-16');
+  assert.equal(semanas.length, 1);
+  assert.deepEqual(semanas[0].map(c => c.dia), ['2020-03-10', '2021-07-01']);
+  assert.ok(semanas[0].every(c => c.doMes));
+  const h = K.htmlFolha(semanas, 'abertos', '1');
+  assert.match(h, /10\/03\/2020/);
+  assert.match(h, /01\/07\/2021/);
+  assert.equal(K.localizar(semanas.flat(), 'cliente 2').qtdPedidos, 1);
+  assert.match(K.textoBuscaServidor({ qtdPedidos: 2, qtdDias: 2 }, 'abertos', true, 200), /2 pedido\(s\).*em qualquer data.*200/);
+  assert.match(K.textoBuscaServidor({ qtdPedidos: 0, qtdDias: 0 }, 'abertos', false, 200), /Nenhum pedido encontrado em nenhuma data.*Todos/);
+  assert.deepEqual(K.celulasDeBusca(null, 'x'), [[]]);
+});
+
+test('calendario.js: a pesquisa consulta o servidor com busca= (espera de 300 ms, respostas antigas descartadas) e não manda mes', () => {
+  const js = ler('calendario.js');
+  assert.match(js, /\/calendario\/pedidos\?busca=\$\{encodeURIComponent/);
+  assert.match(js, /setTimeout\(\(\) => \{ executarBusca\(true\); \}, 300\)/);
+  assert.match(js, /minha !== estado\.seqBusca/);
 });

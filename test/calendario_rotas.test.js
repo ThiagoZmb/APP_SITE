@@ -280,3 +280,66 @@ test('entrega: falha ao ler web_entregas só tira o selo (200, sem chave de entr
   assert.equal(r.status, 200);
   assert.ok(!JSON.stringify(await r.json()).includes('"entrega"'));
 });
+
+// ---------- pesquisa sem limite de mês (GET /calendario/pedidos?busca=...) ----------
+test('busca: ignora o mês (mes não é exigido), LIKE parametrizado nos três campos, só Pedido, teto no SQL; "#123" vale 123 e % _ são literais', async t => {
+  const { f, chamar } = await preparar(t);
+  const r = await chamar(1, '/calendario/pedidos?busca=' + encodeURIComponent('#10'));
+  assert.equal(r.status, 200);
+  const q = consultas(f)[0];
+  assert.match(q.sql, /p\.TIPO = 'Pedido'/);
+  assert.match(q.sql, /CAST\(p\.NUMERO AS CHAR\) LIKE \? OR p\.RAZAO_SOCIAL LIKE \? OR p\.CLIENTE_FINAL LIKE \?/);
+  assert.doesNotMatch(q.sql, /DATA_PRONTO < \?/);
+  assert.deepEqual(q.params, ['%10%', '%10%', '%10%']);
+  assert.ok(!q.sql.includes('10%'), 'termo nunca entra no SQL');
+  await chamar(1, '/calendario/pedidos?busca=' + encodeURIComponent("50%_a\' OR 1=1"));
+  assert.deepEqual(consultas(f)[1].params[0], '%50\\%\\_a\' OR 1=1%');
+});
+
+test('busca: devolve pedidos de vários meses agrupados por dia, respeita abertos/todos e inclui o termo e o teto na resposta', async t => {
+  const linhas = [L(10, 'Em Produção', '2020-03-10'), L(11, 'Entregue', '2020-03-10'), L(12, 'Em Produção', '2021-07-01'), L(13, 'Em Produção', '0001-01-01')];
+  const { chamar } = await preparar(t, linhas);
+  let d = await (await chamar(1, '/calendario/pedidos?busca=cliente')).json();
+  assert.equal(d.busca, 'cliente');
+  assert.equal(d.situacao, 'abertos');
+  assert.deepEqual(d.dias.map(x => x.data), ['2020-03-10', '2021-07-01']);
+  assert.deepEqual(d.dias.flatMap(x => x.pedidos.map(p => p.numero)), [10, 12]);
+  assert.equal(d.qtdPedidos, 2);
+  assert.equal(d.limitado, false);
+  d = await (await chamar(1, '/calendario/pedidos?busca=cliente&situacao=todos')).json();
+  assert.deepEqual(d.dias.flatMap(x => x.pedidos.map(p => p.numero)), [10, 11, 12]);
+});
+
+test('busca: teto de 200 pedidos (os de data mais recente) com aviso `limitado`', async t => {
+  const muitas = Array.from({ length: 230 }, (_, i) => L(1000 + i, 'Em Produção', '2020-03-10'));
+  const { chamar } = await preparar(t, muitas);
+  const d = await (await chamar(1, '/calendario/pedidos?busca=cliente')).json();
+  assert.equal(d.qtdPedidos, 200);
+  assert.equal(d.limitado, true);
+  assert.equal(d.limite, 200);
+});
+
+test('busca: sem valores.ver não há dinheiro; com restrição de estados junta o cliente; termo em branco cai na regra do mês (400 sem mes); situação inválida 400', async t => {
+  const { f, chamar } = await preparar(t);
+  const sem = await (await chamar(2, '/calendario/pedidos?busca=cliente')).json();
+  assert.ok(!JSON.stringify(sem).includes('valor'));
+  const com = await (await chamar(1, '/calendario/pedidos?busca=cliente')).json();
+  assert.equal(com.dias[0].pedidos[0].valor, 250);
+  await chamar(4, '/calendario/pedidos?busca=cliente');
+  const q = consultas(f).pop();
+  assert.match(q.sql, /INNER JOIN cadastro_clientes c/);
+  assert.match(q.sql, /ESTADO IN/);
+  const antes = consultas(f).length;
+  assert.equal((await chamar(1, '/calendario/pedidos?busca=%20%20')).status, 400);
+  assert.equal((await chamar(1, '/calendario/pedidos?busca=x&situacao=nada')).status, 400);
+  assert.equal(consultas(f).length, antes);
+});
+
+test('busca: erro do banco = 500 sem vazar a mensagem', async t => {
+  const { f, chamar } = await preparar(t);
+  f.execute = null;
+  pool.execute = async () => { throw new Error('segredo do banco'); };
+  const r = await chamar(1, '/calendario/pedidos?busca=abc');
+  assert.equal(r.status, 500);
+  assert.ok(!JSON.stringify(await r.json()).includes('segredo'));
+});
