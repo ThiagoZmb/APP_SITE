@@ -313,27 +313,38 @@ const itensResumo = itens => itens.map(i => ({ item: i.item, descricao: i.descri
 // entrega travada (contagem e INSERT não furam o limite). `buscar(conn)` devolve a linha travada (undefined = 404) e `conferir(linha)`
 // lança ErroUsuario para recusar. `emNomeDe(conn, linha)` (opcional) devolve { motivo, detalhe } quando a administração envia em nome do
 // motorista. A imagem é validada pelos bytes ANTES de abrir a transação (mesma regra do canhoto: JPEG/PNG, até 1 MB).
+// `?chave=` (opcional, 8 a 64 letras/números/hífen, gerada pela tela por foto) torna o reenvio idempotente: se a foto já chegou (a resposta se
+// perdeu na rede), o servidor devolve 200 com o mesmo anexo em vez de gravar outra (a chave fica no detalhe do evento). Sem chave = como antes.
+const REGEX_CHAVE_FOTO = /^[A-Za-z0-9-]{8,64}$/;
 async function anexarChecklistAssinado(pool, req, res, nomeRota, id, corpo, mime, { buscar, conferir, emNomeDe }) {
   const v = validarAnexo(corpo, mime);
   if (!v.ok) return res.status(400).json({ error: v.motivo });
+  const chave = req.query && req.query.chave !== undefined ? String(req.query.chave) : null;
+  if (chave !== null && !REGEX_CHAVE_FOTO.test(chave)) return res.status(400).json({ error: 'Chave da foto inválida.' });
   const r = await emTransacao(pool, res, nomeRota, async conn => {
     const linha = await buscar(conn);
     if (!linha) throw new ErroUsuario(404, 'Entrega não encontrada.');
     conferir(linha);
     const [[c]] = await conn.execute('SELECT COUNT(*) AS qtd_fotos FROM web_entrega_anexos WHERE entrega_id = ? AND tipo = ?', [id, TIPO_CHECKLIST]);
     const antes = Number(c?.qtd_fotos) || 0;
+    if (chave) {
+      const [[ja]] = await conn.execute(
+        'SELECT a.id AS anexo_id FROM web_entrega_eventos v JOIN web_entrega_anexos a ON a.evento_id = v.id WHERE v.entrega_id = ? AND v.tipo = ? AND v.detalhe LIKE ? LIMIT 1',
+        [id, EVENTO_CHECKLIST, `%"chave":"${chave}"%`]);
+      if (ja) return { anexoId: Number(ja.anexo_id), qtdChecklistAssinado: antes, repetido: true };
+    }
     if (antes >= MAX_CHECKLIST_FOTOS) throw new ErroUsuario(409, `Esta entrega já tem ${MAX_CHECKLIST_FOTOS} fotos do checklist assinado.`);
     const agora = agoraLocal();
     const nome = req.acesso.nome;
     const em = emNomeDe ? await emNomeDe(conn, linha) : { motivo: null, detalhe: {} };
-    const [ev] = await evento(conn, id, agora, nome, EVENTO_CHECKLIST, em.motivo, { foto: antes + 1, ...em.detalhe });
+    const [ev] = await evento(conn, id, agora, nome, EVENTO_CHECKLIST, em.motivo, { foto: antes + 1, ...(chave ? { chave } : {}), ...em.detalhe });
     const [ins] = await conn.execute(
       'INSERT INTO web_entrega_anexos (entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, ev.insertId, TIPO_CHECKLIST, mime, corpo, String(req.user.id), agora]);
     await auditar(conn, agora, nome, `entrega_${EVENTO_CHECKLIST}`, linha.numero, { entregaId: id, anexoId: ins.insertId, foto: antes + 1, ...em.detalhe });
     return { anexoId: ins.insertId, qtdChecklistAssinado: antes + 1 };
   });
-  if (r) res.status(201).json(r);
+  if (r) res.status(r.repetido ? 200 : 201).json(r);
 }
 
 // Cria uma entrega nova do pedido dividido: sequencia = MAX + 1 (as entregas do número já estão travadas), "A programar",

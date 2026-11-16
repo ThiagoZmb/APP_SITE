@@ -193,7 +193,7 @@
       return (estado.dia === hoje() ? 'Hoje · ' : '') + dataBR(estado.dia);
     }
     const selo = s => `<span class="selo ${corStatus(s)}">${esc(rotuloStatus(s))}</span>`;
-    const seloChecklist = e => (e.checklistAssinado ? ' <span class="selo ok" title="Há foto da folha do checklist assinada pelo cliente">Checklist assinado ✓</span>' : '');
+    const seloChecklist = e => (e.checklistAssinado ? ` <span class="selo ok" title="Há foto da folha do checklist assinada pelo cliente">Checklist assinado ✓${Number(e.qtdChecklistAssinado) > 1 ? ` (${Number(e.qtdChecklistAssinado)})` : ''}</span>` : '');
 
     // administrativo (administrativo.ver + entregas.ver): vê as entregas de todos os motoristas e dá a baixa; "Só as minhas" volta ao padrão do motorista
     const souAdministrativo = () => !!(win.Acesso && win.Acesso.pode('administrativo.ver entregas.ver'));
@@ -479,23 +479,25 @@
       });
     }
 
-    // ---------- foto do checklist assinado (câmera; reduzida como o canhoto; não bloqueia nem depende da baixa) ----------
-    async function enviarChecklistAssinado() {
-      const campo = $('m-foto-checklist'), arq = campo.files[0], id = estado.fotoChecklistId;
-      campo.value = '';
-      if (!arq || !id) return;
-      return ocupado(async () => {
-        const blob = await C.reduzirImagem(win, arq);
-        await chamar(`/minhas_entregas/${encodeURIComponent(id)}/checklist_assinado`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
-        toast('Foto do checklist assinado enviada.', 'ok');
-        estado.detalhes.delete(id);
-        await carregar();
+    // ---------- foto do checklist assinado: câmera ao vivo (camera_captura.js), enviada na hora; não bloqueia nem depende da baixa ----------
+    // a chave de idempotência (por foto) vai na URL: reenviar depois de falha de rede nunca grava a mesma foto duas vezes
+    function fotografarChecklist(id) {
+      const cartao = estado.lista.find(x => x.id === id) || {};
+      return win.CameraCaptura.capturar(win, {
+        titulo: `Checklist assinado · Pedido ${cartao.numero ?? ''}`.trim(),
+        enviar: (blob, chave) => chamar(`/minhas_entregas/${encodeURIComponent(id)}/checklist_assinado?chave=${encodeURIComponent(chave)}`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' }),
+        aoRegistrar: r => {
+          // selo e contagem do cartão mudam na hora, sem recarregar a página
+          const e = estado.lista.find(x => x.id === id);
+          if (e) { e.checklistAssinado = true; e.qtdChecklistAssinado = Number(r && r.qtdChecklistAssinado) || (Number(e.qtdChecklistAssinado) || 0) + 1; }
+          if (!estado.baixa) desenharLista();
+        },
+        aoFechar: qtd => { if (qtd) { estado.detalhes.delete(id); toast('Foto do checklist assinado registrada.', 'ok'); } }
       });
     }
 
     // ---------- eventos ----------
     function ligar() {
-      $('m-foto-checklist').addEventListener('change', enviarChecklistAssinado);
       $('cartoes').addEventListener('click', ev => {
         const botao = ev.target.closest('button[data-acao]');
         const cartao = ev.target.closest('[data-id]');
@@ -507,7 +509,7 @@
             `/minhas_entregas/${encodeURIComponent(id)}/checklist.pdf`);
           return;
         }
-        if (botao.getAttribute('data-acao') === 'foto_checklist') { estado.fotoChecklistId = id; $('m-foto-checklist').click(); return; }
+        if (botao.getAttribute('data-acao') === 'foto_checklist') { if (win.CameraCaptura) fotografarChecklist(id); else toast('Câmera indisponível. Recarregue a página.', 'erro'); return; }
         if (botao.getAttribute('data-acao') === 'iniciar') iniciarRota(id);
         else ocupado(() => abrirBaixa(id));
       });

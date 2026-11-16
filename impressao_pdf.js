@@ -4,8 +4,12 @@
 //                       (só se o dono instalou o SumatraPDF e criou impressao.config.json; /ping informa imprimir:true);
 //     via 'navegador' = fallback sempre disponível: o PDF vai para um iframe oculto e print() abre a caixa de impressão do sistema
 //                       (o navegador não permite impressão 100% silenciosa; "ok" quer dizer que a caixa foi aberta).
+//   ImpressaoPdf.preparar(url, cfg, {local})  como imprimir, mas SEM abrir a caixa do navegador: com o serviço do PC envia; sem ele devolve
+//     { ok, via:'navegador', manual:true, blob } para o chamador imprimir num clique do usuário (ImpressaoPdf.imprimirBlob(blob)).
 //   ImpressaoPdf.painel({ numero, cliente, titulo?, apiBase, loginUrl, token, pode })  janela com as opções (pedido, guia de produção,
 //     vidros, checklist; cada uma só com a permissão), "Imprimir selecionados", resultado de cada uma e "Concluir"; resolve ao fechar.
+//     Com o serviço do PC: envio em sequência, sem diálogo. Sem ele: o navegador só mostra UMA caixa de impressão por vez (print()
+//     concorrente é ignorado), então "Imprimir selecionados" prepara os PDFs e cada documento ganha o seu botão "Imprimir" (um clique = uma caixa).
 // cfg = { apiBase, loginUrl, token: () => string }. Nada aqui grava no banco nem navega para outra página.
 (function () {
   'use strict';
@@ -91,6 +95,26 @@
     return n.ok ? { ok: true, via: 'navegador' } : { ok: false, erro: n.erro };
   }
 
+  // Prepara um documento para o lote do painel: o serviço do PC envia na hora; sem ele (ou se falhar) NÃO abre nada e
+  // devolve o PDF para o botão "Imprimir" do documento (o navegador só aceita uma caixa de impressão por vez).
+  async function preparar(url, cfg, { local } = {}) {
+    const b = await baixar(url, cfg);
+    if (!b.blob) return { ok: false, erro: b.erro, semDocumento: !!b.semDocumento };
+    const usarLocal = local === undefined ? await localPronto() : local;
+    if (usarLocal) {
+      const l = await imprimirNoLocal(b.blob);
+      if (l.ok) return { ok: true, via: 'local' };
+      return { ok: true, via: 'navegador', manual: true, blob: b.blob, aviso: l.erro };
+    }
+    return { ok: true, via: 'navegador', manual: true, blob: b.blob };
+  }
+
+  // Abre a caixa de impressão de um PDF já baixado (chamar dentro do clique do usuário, um documento por vez).
+  async function imprimirBlob(blob) {
+    const n = await imprimirNoNavegador(blob);
+    return n.ok ? { ok: true, via: 'navegador' } : { ok: false, erro: n.erro };
+  }
+
   // item do menu do botão direito: imprime e só avisa se algo deu errado
   async function imprimirComAviso(url, cfg) {
     const r = await imprimir(url, cfg);
@@ -99,7 +123,9 @@
   }
 
   const textoResultado = r => !r.ok ? (r.semDocumento ? 'Nada a imprimir: ' + r.erro : 'Erro: ' + r.erro)
-    : r.via === 'local' ? 'Enviado à impressora' : 'Caixa de impressão aberta' + (r.aviso ? ` (impressão automática falhou: ${r.aviso})` : '');
+    : r.via === 'local' ? 'Enviado à impressora'
+    : r.manual ? 'Pronto: clique em Imprimir' + (r.aviso ? ` (impressão automática falhou: ${r.aviso})` : '')
+    : 'Caixa de impressão aberta' + (r.aviso ? ` (impressão automática falhou: ${r.aviso})` : '');
 
   function painel(cfg) {
     const opcoes = opcoesDisponiveis(cfg.pode);
@@ -118,30 +144,60 @@
         const c = document.createElement('input'); c.type = 'checkbox'; c.id = 'ip-' + o.id; c.checked = true;
         const n = document.createElement('span'); n.className = 'ip-nome'; n.textContent = o.rotulo;
         const s = document.createElement('span'); s.className = 'ip-estado'; s.setAttribute('role', 'status');
-        l.append(c, n, s); lista.append(l); linhas[o.id] = { c, s };
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'dp-btn ip-botao'; b.textContent = 'Imprimir'; b.hidden = true;
+        l.append(c, n, s, b); lista.append(l); linhas[o.id] = { c, s, b, blob: null };
       }
       const acoes = document.createElement('div'); acoes.className = 'dp-acoes';
       const bConcluir = document.createElement('button'); bConcluir.type = 'button'; bConcluir.className = 'dp-btn'; bConcluir.textContent = 'Concluir';
       const bImprimir = document.createElement('button'); bImprimir.type = 'button'; bImprimir.className = 'dp-btn dp-btn-ok'; bImprimir.textContent = 'Imprimir selecionados';
-      let ocupado = false, local;
+      let ocupado = false, abrindo = false, local;
       const marcados = () => opcoes.filter(o => linhas[o.id].c.checked);
-      const atualizar = () => { bImprimir.disabled = ocupado || !marcados().length; bConcluir.disabled = ocupado; for (const o of opcoes) linhas[o.id].c.disabled = ocupado; };
+      const pendentes = () => opcoes.filter(o => linhas[o.id].blob);
+      const atualizar = () => {
+        bImprimir.disabled = ocupado || abrindo || !marcados().length; bConcluir.disabled = ocupado || abrindo;
+        for (const o of opcoes) { linhas[o.id].c.disabled = ocupado; linhas[o.id].b.disabled = ocupado || abrindo; }
+      };
       const teclas = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecha(); } };
-      const fecha = () => { if (ocupado) return; document.removeEventListener('keydown', teclas, true); fundo.remove(); resolver(); };
+      const fecha = () => {
+        if (ocupado || abrindo) return;
+        if (pendentes().length && !confirm('Há documentos que ainda não foram impressos. Fechar mesmo assim?')) return;
+        document.removeEventListener('keydown', teclas, true); fundo.remove(); resolver();
+      };
       lista.addEventListener('change', atualizar);
       bConcluir.addEventListener('click', fecha);
+      const mostrar = (id, r) => {
+        const L = linhas[id];
+        L.s.textContent = textoResultado(r);
+        L.s.className = 'ip-estado ' + (r.ok && !r.manual ? 'ip-ok' : r.ok || r.semDocumento ? 'ip-neutro' : 'ip-erro');
+        L.blob = r.manual ? r.blob : null; L.b.hidden = !r.manual;
+      };
+      for (const o of opcoes) {
+        linhas[o.id].b.addEventListener('click', async e => {
+          e.preventDefault(); e.stopPropagation();   // o botão está dentro do label: não pode marcar/desmarcar a caixa
+          const L = linhas[o.id]; if (!L.blob || abrindo || ocupado) return;
+          abrindo = true; atualizar(); L.s.textContent = 'Abrindo a caixa de impressão…'; L.s.className = 'ip-estado';
+          let r;
+          try { r = await imprimirBlob(L.blob); } catch (er) { r = { ok: false, erro: er.message }; }
+          // print() foi chamado; o navegador não diz se o usuário confirmou, então o texto só afirma que a caixa abriu
+          L.s.textContent = r.ok ? 'Caixa de impressão aberta. Para imprimir de novo, clique em Imprimir.' : 'Erro: ' + r.erro;
+          L.s.className = 'ip-estado ' + (r.ok ? 'ip-ok' : 'ip-erro');
+          abrindo = false; atualizar();
+        });
+      }
       bImprimir.addEventListener('click', async () => {
         const escolhidos = marcados();
         ocupado = true; atualizar();
-        for (const o of escolhidos) { linhas[o.id].s.className = 'ip-estado'; linhas[o.id].s.textContent = 'Na fila'; }
+        for (const o of opcoes) if (!escolhidos.includes(o)) { linhas[o.id].blob = null; linhas[o.id].b.hidden = true; linhas[o.id].s.textContent = ''; linhas[o.id].s.className = 'ip-estado'; }
+        for (const o of escolhidos) { const L = linhas[o.id]; L.blob = null; L.b.hidden = true; L.s.className = 'ip-estado'; L.s.textContent = 'Aguardando'; }
         for (const o of escolhidos) {
-          const s = linhas[o.id].s; s.textContent = 'Enviando…';
+          linhas[o.id].s.textContent = 'Preparando…';
           let r;
-          try { r = await imprimir(urlDaOpcao(o.id, cfg.numero, cfg.apiBase), cfg, { local }); } catch (e) { r = { ok: false, erro: e.message }; }
-          s.textContent = textoResultado(r);
-          s.className = 'ip-estado ' + (r.ok ? 'ip-ok' : r.semDocumento ? 'ip-neutro' : 'ip-erro');
+          try { r = await preparar(urlDaOpcao(o.id, cfg.numero, cfg.apiBase), cfg, { local }); } catch (e) { r = { ok: false, erro: e.message }; }
+          mostrar(o.id, r);
         }
-        ocupado = false; atualizar(); bConcluir.focus();
+        ocupado = false; atualizar();
+        const prim = escolhidos.find(o => linhas[o.id].blob);
+        (prim ? linhas[prim.id].b : bConcluir).focus();
       });
       fundo.addEventListener('mousedown', e => { if (e.target === fundo) fecha(); });
       document.addEventListener('keydown', teclas, true);
@@ -152,10 +208,10 @@
       localPronto().then(ok => {
         local = ok;
         modo.textContent = ok ? 'Impressão automática pelo PC: os documentos vão direto para a impressora.'
-          : 'Neste computador o navegador mostrará a caixa de impressão de cada documento.';
+          : 'Neste computador o navegador abre uma caixa de impressão por vez: depois de preparar, use o botão Imprimir de cada documento.';
       });
     });
   }
 
-  window.ImpressaoPdf = { imprimir, imprimirComAviso, painel, opcoesDisponiveis, urlDaOpcao, textoResultado, OPCOES };
+  window.ImpressaoPdf = { imprimir, preparar, imprimirBlob, imprimirComAviso, painel, opcoesDisponiveis, urlDaOpcao, textoResultado, OPCOES };
 })();

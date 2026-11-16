@@ -184,7 +184,7 @@ test('minhas_entregas.html: viewport, CSP, permissão, scripts e sem handlers in
   assert.match(h, /data-perm="entregas\.baixar"/);
   assert.match(h, /type="file"[^>]*accept="image\/\*"/);
   assert.doesNotMatch(h.match(/<input[^>]*id="b-foto"[^>]*>/)[0], /capture=/); // canhoto: galeria liberada, a foto é opcional
-  assert.match(h, /<input[^>]*id="m-foto-checklist"[^>]*capture="environment"/); // folha do checklist assinado: abre a câmera
+  assert.match(h, /<script src="camera_captura\.js\?v=\d+" defer>/); // folha do checklist assinado: câmera ao vivo (o input capture é criado pelo módulo, só no fallback)
   assert.match(h, /<canvas[^>]*id="assinatura"/);
   assert.doesNotMatch(h, /\son[a-z]+=/i);
   assert.doesNotMatch(h, /R\$|valor|preço/i);

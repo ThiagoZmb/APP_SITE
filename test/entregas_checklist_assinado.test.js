@@ -182,22 +182,68 @@ test('instalacao: nenhuma tabela nem coluna nova (tipo VARCHAR(20) comporta "che
   assert.match(inst, /web_entrega_eventos[\s\S]*tipo VARCHAR\(30\)/);
 });
 
-test('tela da equipe: botao com camera, input capture, selo e rotulo do evento; limite de tamanho igual ao do canhoto', () => {
-  const h = ler('entregas.html'), js = ler('entregas.js');
-  assert.match(h, /id="btn-foto-checklist"[^>]*data-perm="entregas\.programar"/);
-  assert.match(h, /id="d-foto-checklist" accept="image\/\*" capture="environment"/);
-  assert.match(js, /checklist_assinado: 'Checklist assinado anexado'/);
-  assert.match(js, /Checklist assinado ✓/);
-  assert.match(js, /\/checklist_assinado`, \{ metodo: 'PUT', binario: blob, mime: 'image\/jpeg' \}/);
-  assert.match(js, /reduzirImagem\(arq\)/); // mesma reducao do canhoto (<= 1 MB)
+// ---- camera ao vivo + registro em tempo real (2026-11-16): chave de idempotencia por foto ----
+const CHAVE = 'a1b2c3d4-e5f6-4711-8899-aabbccddeeff';
+const comChave = (chamar, rota, id, chave, corpo = JPEG) => chamar(`${rota}/${id}/checklist_assinado?chave=${chave}`, 'PUT', corpo, CT);
+
+test('idempotencia: reenviar a MESMA chave devolve 200 com o mesmo anexo e nao duplica (equipe e motorista)', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  cenario(banco);
+  const a = await comChave(chamar, '/entregas', 1, CHAVE);
+  assert.equal(a.status, 201);
+  const ja = await a.json();
+  const b = await comChave(chamar, '/entregas', 1, CHAVE); // a resposta se perdeu na rede e a tela reenviou
+  assert.equal(b.status, 200);
+  const rb = await b.json();
+  assert.equal(rb.anexoId, ja.anexoId);
+  assert.equal(rb.qtdChecklistAssinado, 1);
+  assert.equal(banco.anexos.filter(x => x.tipo === 'checklist').length, 1);
+  assert.equal(banco.eventos.filter(v => v.tipo === 'checklist_assinado').length, 1);
+  assert.equal(banco.auditoria.filter(x => x.acao === 'entrega_checklist_assinado').length, 1);
+  assert.equal(JSON.parse(banco.eventos.find(v => v.tipo === 'checklist_assinado').detalhe).chave, CHAVE);
+  // outra chave = outra foto; sem chave continua como antes
+  assert.equal((await comChave(chamar, '/entregas', 1, 'outra-chave-0001')).status, 201);
+  assert.equal((await enviarEquipe(chamar, 1)).status, 201);
+  assert.equal(banco.anexos.filter(x => x.tipo === 'checklist').length, 3);
+  // a mesma chave em OUTRA entrega e uma foto nova dela
+  assert.equal((await comChave(chamar, '/entregas', 3, CHAVE)).status, 201);
 });
 
-test('tela do motorista: botao no cartao (perm do motorista ou administrativo), input capture e selo', () => {
+test('idempotencia: chave invalida 400; o motorista tambem reenvia sem duplicar; limite de fotos nao bloqueia o reenvio de uma ja gravada', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  for (const ruim of ['curta', 'tem espaco 123456', 'ac%C3%A7ao-123456', 'x'.repeat(65)])
+    assert.equal((await comChave(chamar, '/minhas_entregas', 1, ruim)).status, 400, ruim);
+  assert.equal(banco.anexos.length, 0);
+  assert.equal((await comChave(chamar, '/minhas_entregas', 1, CHAVE)).status, 201);
+  assert.equal((await comChave(chamar, '/minhas_entregas', 1, CHAVE)).status, 200);
+  for (let i = 0; i < 5; i++) assert.equal((await comChave(chamar, '/minhas_entregas', 1, `chave-numero-${i}0`)).status, 201);
+  assert.equal(banco.anexos.length, 6);
+  assert.equal((await comChave(chamar, '/minhas_entregas', 1, 'chave-numero-novo')).status, 409); // 7a foto
+  assert.equal((await comChave(chamar, '/minhas_entregas', 1, CHAVE)).status, 200); // reenvio da 1a: reconhecido, nao e 409
+});
+
+test('tela da equipe: botao abre a camera ao vivo (camera_captura.js), sem input de arquivo; selo, miniatura e rotulo do evento', () => {
+  const h = ler('entregas.html'), js = ler('entregas.js');
+  assert.match(h, /id="btn-foto-checklist"[^>]*data-perm="entregas\.programar"/);
+  assert.doesNotMatch(h, /id="d-foto-checklist"/);
+  assert.match(h, /<link rel="stylesheet" href="camera_captura\.css\?v=\d+">/);
+  assert.match(h, /<script src="camera_captura\.js\?v=\d+" defer><\/script>[\s\S]*<script src="entregas\.js\?v=/);
+  assert.match(js, /checklist_assinado: 'Checklist assinado anexado'/);
+  assert.match(js, /Checklist assinado ✓/);
+  assert.match(js, /win\.CameraCaptura\.capturar\(win,/);
+  assert.match(js, /\/checklist_assinado\?chave=\$\{encodeURIComponent\(chave\)\}`, \{ metodo: 'PUT', binario: blob, mime: 'image\/jpeg' \}/);
+  assert.match(js, /estado\.det\.anexos\.push\(a\);[\s\S]*carregarAnexo\(e\.id, a, caixa\)/); // detalhe aberto reflete a foto na hora
+});
+
+test('tela do motorista: botao no cartao (perm do motorista ou administrativo), camera ao vivo, selo com contagem', () => {
   const h = ler('minhas_entregas.html'), js = ler('minhas_entregas.js');
-  assert.match(h, /id="m-foto-checklist" accept="image\/\*" capture="environment"/);
+  assert.doesNotMatch(h, /id="m-foto-checklist"/);
+  assert.match(h, /<script src="camera_captura\.js\?v=\d+" defer><\/script>[\s\S]*<script src="minhas_entregas\.js\?v=/);
   assert.match(js, /data-acao=\\?"foto_checklist\\?"/);
   assert.match(js, /'administrativo\.ver' : 'entregas\.baixar'/);
-  assert.match(js, /C\.reduzirImagem\(win, arq\)/);
+  assert.match(js, /win\.CameraCaptura\.capturar\(win,/);
+  assert.match(js, /e\.checklistAssinado = true; e\.qtdChecklistAssinado = /); // selo e contagem do cartao na hora
   // o selo aparece so com foto
   const e = { id: 1, numero: 601, status: 'agendada', checklistAssinado: true };
   assert.equal(typeof M.corStatus, 'function');

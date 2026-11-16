@@ -928,17 +928,26 @@
       return r.anexoId;
     }
 
-    // ---------- foto do checklist assinado (câmera do celular; reduzida como o canhoto; não mexe em status nem na baixa) ----------
-    async function enviarChecklistAssinado() {
-      const campo = $('d-foto-checklist'), arq = campo.files[0];
-      campo.value = '';
-      if (!arq || !estado.det) return;
+    // ---------- foto do checklist assinado: câmera ao vivo (camera_captura.js), enviada na hora; não mexe em status nem na baixa ----------
+    // a chave de idempotência (por foto) vai na URL: reenviar depois de falha de rede nunca grava a mesma foto duas vezes
+    function fotografarChecklist() {
+      if (!estado.det) return;
+      if (!win.CameraCaptura) { toast('Câmera indisponível. Recarregue a página.', 'erro'); return; }
       const e = estado.det.entrega;
-      return ocupado(async () => {
-        const blob = await reduzirImagem(arq);
-        await chamar(`/entregas/${encodeURIComponent(e.id)}/checklist_assinado`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
-        toast('Foto do checklist assinado enviada.', 'ok');
-        await recarregarTudo(e.id);
+      return win.CameraCaptura.capturar(win, {
+        titulo: `Checklist assinado · Pedido ${e.numero}`,
+        enviar: (blob, chave) => chamar(`/entregas/${encodeURIComponent(e.id)}/checklist_assinado?chave=${encodeURIComponent(chave)}`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' }),
+        aoRegistrar: r => {
+          // o detalhe aberto ganha a miniatura e o selo na hora (se ainda é a mesma entrega), sem recarregar
+          if (!estado.det || estado.det.entrega.id !== e.id) return;
+          const a = { id: r.anexoId, tipo: 'checklist', mime: 'image/jpeg', criadoEm: win.CameraCaptura.agoraTexto() };
+          estado.det.anexos.push(a);
+          const caixa = $('d-anexos');
+          caixa.querySelectorAll('.det-vazio').forEach(x => x.remove());
+          carregarAnexo(e.id, a, caixa);
+          $('d-status').innerHTML = selo(statusDaEntrega(e)) + seloProducao((estado.det.divisao || {}).situacaoPedido) + seloChecklist(estado.det.anexos);
+        },
+        aoFechar: async qtd => { if (qtd) { toast('Foto do checklist assinado registrada.', 'ok'); if (!estado.carregando) await recarregarTudo(e.id); } }
       });
     }
 
@@ -1198,8 +1207,7 @@
       });
       $('btn-checklist').addEventListener('click', ev => { if (checklist && estado.det) checklist.abrir(estado.det.entrega.id, ev.currentTarget); });
       $('btn-folha-branco').addEventListener('click', () => { if (checklist) checklist.abrirBranco(); });
-      $('btn-foto-checklist').addEventListener('click', () => $('d-foto-checklist').click());
-      $('d-foto-checklist').addEventListener('change', enviarChecklistAssinado);
+      $('btn-foto-checklist').addEventListener('click', fotografarChecklist);
       $('btn-retirada').addEventListener('click', () => abrirForm('vista-retirada', ['r-entregue', 'r-foto']));
       $('btn-baixa-adm').addEventListener('click', () => {
         abrirForm('vista-baixa-adm', ['ba-quem', 'ba-foto']);

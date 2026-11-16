@@ -312,6 +312,12 @@ function bancoEntregas() {
     // foto do checklist assinado: o anexo já nasce vinculado ao evento
     [/^SELECT COUNT\(\*\) AS qtd_fotos FROM web_entrega_anexos WHERE entrega_id = \? AND tipo = \?/, (sql, [entrega_id, tipo]) =>
       [{ qtd_fotos: String(estado.anexos.filter(a => a.entrega_id === entrega_id && a.tipo === tipo).length) }]],
+    [/^SELECT a\.id AS anexo_id FROM web_entrega_eventos v JOIN web_entrega_anexos a/, (sql, [entrega_id, tipo, like]) => {
+      const trecho = String(like).replace(/^%|%$/g, '');
+      const v = eventos.find(x => x.entrega_id === entrega_id && x.tipo === tipo && String(x.detalhe || '').includes(trecho));
+      const a = v && estado.anexos.find(x => x.evento_id === v.id);
+      return a ? [{ anexo_id: a.id }] : [];
+    }],
     [/^INSERT INTO web_entrega_anexos \(entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em\)/, (sql, [entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em]) => {
       const id = estado.anexos.length + 1;
       estado.anexos.push({ id, entrega_id, evento_id, tipo, mime, dados, criado_por, criado_em });

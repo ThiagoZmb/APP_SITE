@@ -127,6 +127,44 @@ test('imprimir: com o serviço do PC pronto envia a ele (sem iframe nem diálogo
   assert.equal(r.via, 'navegador'); assert.equal(r.aviso, 'Sem papel'); assert.equal(c.criados.join(), 'print');
 });
 
+test('lote do painel: sem o serviço do PC "preparar" NÃO abre nenhuma caixa (o navegador só mostra uma por vez); cada documento imprime no seu clique', async () => {
+  const pdf = resp(200, '%PDF-1.4 x');
+  const c = carregar({ respostas: { 'https://api.teste/dados_pdf': pdf, 'https://api.teste/checklist/pdf': pdf, 'http://127.0.0.1:3917/ping': resp(200, '', { imprimir: false }) } });
+  const urls = ['https://api.teste/dados_pdf?numero=1&tipo=Pedido', 'https://api.teste/dados_pdf?numero=1&tipo=Pedido&producao=1', 'https://api.teste/checklist/pdf'];
+  const rs = [];
+  for (const u of urls) rs.push(await c.I.preparar(u, cfg, { local: false }));
+  assert.ok(rs.every(r => r.ok && r.manual && r.via === 'navegador' && r.blob));
+  assert.equal(c.criados.length, 0, 'nenhum print() antes do clique do usuário');
+  assert.match(c.I.textoResultado(rs[0]), /^Pronto: clique em Imprimir/);
+  assert.doesNotMatch(c.I.textoResultado(rs[0]), /Caixa de impressão aberta/);
+  // cada clique = uma impressão, em sequência
+  for (let i = 0; i < rs.length; i++) { assert.equal((await c.I.imprimirBlob(rs[i].blob)).ok, true); assert.equal(c.criados.length, i + 1); }
+  assert.match(c.I.textoResultado({ ok: true, via: 'navegador' }), /^Caixa de impressão aberta/);
+});
+
+test('lote do painel: com o serviço do PC envia direto; se o serviço falha, o documento fica "Pronto" para o botão (com o motivo), sem abrir caixa', async () => {
+  const pdf = resp(200, '%PDF-1.4 x');
+  let c = carregar({ respostas: { 'https://api.teste/dados_pdf': pdf, 'http://127.0.0.1:3917/imprimir': resp(200, '', { ok: true }) } });
+  let r = await c.I.preparar('https://api.teste/dados_pdf?numero=1', cfg, { local: true });
+  assert.equal(JSON.stringify({ ok: r.ok, via: r.via, manual: !!r.manual }), JSON.stringify({ ok: true, via: 'local', manual: false }));
+  c = carregar({ respostas: { 'https://api.teste/dados_pdf': pdf, 'http://127.0.0.1:3917/imprimir': resp(500, '', { error: 'Sem papel' }) } });
+  r = await c.I.preparar('https://api.teste/dados_pdf?numero=1', cfg, { local: true });
+  assert.ok(r.ok && r.manual && r.blob); assert.equal(r.aviso, 'Sem papel'); assert.equal(c.criados.length, 0);
+  assert.match(c.I.textoResultado(r), /^Pronto: clique em Imprimir.*Sem papel/);
+  // sem documento (404) e erro continuam sem botão
+  c = carregar({ respostas: { 'https://api.teste/dados_pdf_vidros': resp(404, '', { error: 'Sem vidros.' }) } });
+  r = await c.I.preparar('https://api.teste/dados_pdf_vidros?numero=1', cfg, { local: false });
+  assert.ok(!r.ok && r.semDocumento && !r.manual);
+});
+
+test('painel: status "Aguardando" para pendentes, botão Imprimir por documento, só os marcados, sem print() no lote', () => {
+  const src = ler('impressao_pdf.js');
+  assert.ok(src.includes("'Aguardando'") && src.includes("textContent = 'Imprimir'"));
+  const lote = src.slice(src.indexOf("bImprimir.addEventListener('click'"), src.indexOf("fundo.addEventListener('mousedown'"));
+  assert.ok(!/imprimirNoNavegador|imprimirBlob|\.print\(/.test(lote), 'o lote não abre caixas do navegador');
+  assert.ok(lote.includes('marcados()') && lote.includes('preparar('));
+});
+
 test('imprimir: pedido sem vidros (404) é "nada a imprimir", erro do servidor e arquivo que não é PDF são erros; o token vai no cabeçalho', async () => {
   const c = carregar({ respostas: {
     'https://api.teste/dados_pdf_vidros': resp(404, '', { error: 'Este pedido não tem vidros.' }),
