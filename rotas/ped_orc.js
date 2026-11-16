@@ -625,6 +625,25 @@ function registrarPedOrc({ rota, pool }) {
           if (foraDosEstados(req, cli[0]?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
         }
       }
+      // transformar Orçamento em Pedido: os itens são gerados do zero (sem `origem`), mas os desenhos do orçamento acompanham os itens que não
+      // mudaram (`desenhoDe` = item de origem). Lidos ANTES de gravar; só valem se o carimbo do orçamento ainda bate com os itens dele.
+      let desenhosConv = [];
+      const od = b.origemDesenhos;
+      if (od && od.tipo === 'Orçamento' && tipo === 'Pedido' && Number.isInteger(od.numero) && od.numero > 0 && preparados.some(x => !x.copia && Number.isInteger(x.item.desenhoDe))) {
+        const linhasOd = await lerDocumento(conn, 'Orçamento', od.numero);
+        if (linhasOd) {
+          let liberado = true;
+          if ((req.acesso?.estados || []).length) {
+            const [cli] = await conn.execute('SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhasOd.cab.RAZAO_SOCIAL]);
+            liberado = !foraDosEstados(req, cli[0]?.ESTADO);
+          }
+          if (liberado) {
+            [desenhosConv] = await conn.execute('SELECT item, png, carimbo FROM web_item_desenhos WHERE tipo = ? AND numero = ?', ['Orçamento', od.numero]);
+            const carimboOd = carimboItens(linhasOd);
+            desenhosConv = desenhosConv.filter(d => d.carimbo === carimboOd);
+          }
+        }
+      }
       // desenhos guardados do documento de origem, lidos ANTES de apagar; só valem se o carimbo ainda bate com os itens de origem
       let desenhosSrc = [];
       if (linhasSrc) {
@@ -684,6 +703,15 @@ function registrarPedOrc({ rota, pool }) {
             [tipo, numero, p.n, d.png, carimbo, agoraLocal()]);
         }
       }
+      const conv = preparados.filter(x => !x.copia && Number.isInteger(x.item.desenhoDe) && desenhosConv.some(d => Number(d.item) === x.item.desenhoDe));
+      if (conv.length) {
+        const carimbo = carimboItens(await lerDocumento(conn, tipo, numero));
+        for (const p of conv) {
+          const d = desenhosConv.find(x => Number(x.item) === p.item.desenhoDe);
+          await conn.execute('INSERT INTO web_item_desenhos (tipo, numero, item, png, carimbo, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
+            [tipo, numero, p.n, d.png, carimbo, agoraLocal()]);
+        }
+      }
       if (divergentes.length) await auditarDoc(conn, req, 'preco_divergente', tipo, numero, { itens: divergentes });
       if (aoGravar) await aoGravar(conn, numero, tipo);
       return { numero };
@@ -708,7 +736,7 @@ function registrarPedOrc({ rota, pool }) {
       if (!linhas) return res.status(404).json({ error: `Orçamento nº ${numero} não encontrado.` });
       const { cli, cabecalho, itens } = await traduzirDoBanco(pool, leitor, linhas);
       if (foraDosEstados(req, cli?.ESTADO)) return res.status(403).json({ error: MSG_SEM_ACESSO });
-      const corpo = OrcamentoPedido.montarCorpo({ cabecalho, itens, clienteCodigo: cli?.CODIGO ?? null, ...p.valores });
+      const corpo = OrcamentoPedido.montarCorpo({ cabecalho, itens, clienteCodigo: cli?.CODIGO ?? null, numeroOrcamento: numero, ...p.valores });
       if (!corpo.ok) return res.status(422).json({ error: corpo.erro });
       if (!(req.body || {}).confirmarDuplicado) {
         const [antes] = await pool.execute('SELECT detalhe FROM web_auditoria WHERE alvo = ? AND acao = ? ORDER BY id DESC LIMIT 1', [`Orçamento ${numero}`, 'orcamento_virou_pedido']);

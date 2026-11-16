@@ -24,13 +24,16 @@ function itemParaGravar(it) {
 }
 
 // { ok, corpo } ou { ok: false, erro }. Item 🔒 (só o VB edita) não tem os dados para o pedido ser gerado do zero: recusa dizendo qual é.
-function montarCorpo({ cabecalho, itens, clienteCodigo, dataPronto, financeiro, situacao }) {
+function montarCorpo({ cabecalho, itens, clienteCodigo, dataPronto, financeiro, situacao, numeroOrcamento }) {
   if (clienteCodigo === null || clienteCodigo === undefined || String(clienteCodigo).trim() === '') return { ok: false, erro: 'O cliente do orçamento não foi encontrado no cadastro.' };
   if (!Array.isArray(itens) || !itens.length) return { ok: false, erro: 'O orçamento não tem itens.' };
   const presos = itens.map((it, i) => (it.travado ? `Item ${i + 1} (${it.descricao || it.frente}): ${it.motivo}` : null)).filter(Boolean);
   if (presos.length) return { ok: false, erro: 'Não dá para transformar em pedido: há item(ns) que só o VB edita (🔒). Exclua da lista ou finalize no VB. ' + presos.join(' | ') };
   return { ok: true, corpo: { modo: 'novo', tipo: 'Pedido', clienteCodigo, clienteFinal: cabecalho.clienteFinal || '', obsGeral: cabecalho.obsGeral || '',
-    dataEntrega: dataPronto, situacao, financeiro, descontoPct: cabecalho.descontoPct || 0, itens: itens.map(itemParaGravar) } };
+    dataEntrega: dataPronto, situacao, financeiro, descontoPct: cabecalho.descontoPct || 0,
+    // o desenho do orçamento acompanha o item que veio dele (o servidor confere o carimbo antes de copiar)
+    ...(Number.isInteger(numeroOrcamento) && numeroOrcamento > 0 ? { origemDesenhos: { tipo: 'Orçamento', numero: numeroOrcamento } } : {}),
+    itens: itens.map(it => ({ ...itemParaGravar(it), ...(Number.isInteger(numeroOrcamento) && it.origem && Number.isInteger(it.origem.item) ? { desenhoDe: it.origem.item } : {}) })) } };
 }
 
 module.exports = { validarPedido, montarCorpo, itemParaGravar };
