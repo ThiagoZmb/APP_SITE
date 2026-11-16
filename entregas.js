@@ -117,6 +117,17 @@
   const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+  // Gaveta do detalhe em telas estreitas: o mesmo limite do CSS (@media max-width) em que a lista e o painel empilham.
+  const LARGURA_GAVETA = 1100;
+  const telaEstreita = larg => { const n = Number(larg); return Number.isFinite(n) && n > 0 && n <= LARGURA_GAVETA; };
+  // 'abrir' | 'fechar' | 'manter': a gaveta existe só em tela estreita e só para vistas do painel (detalhe/formulários), nunca para o vazio
+  function decisaoGaveta({ estreita, aberta, vista }) {
+    const quer = !!estreita && !!vista && vista !== 'vazio-painel';
+    if (quer && !aberta) return 'abrir';
+    if (!quer && aberta) return 'fechar';
+    return 'manter';
+  }
+
   // Ações que o servidor aceita para cada estado (espelha calculo/entregas.js; o servidor continua decidindo)
   function acoesDisponiveis(e) {
     if (!e) return [];
@@ -577,7 +588,55 @@
 
     // ---------- painel ----------
     const VISTAS = ['vazio-painel', 'vista-detalhe', 'vista-agendar', 'vista-cancelar', 'vista-retirada', 'vista-baixa-adm', 'vista-enviada', 'vista-comprovante', 'vista-separar', 'vista-encerrar', 'vista-criar'];
-    function mostrar(nome) { VISTAS.forEach(v => { $(v).hidden = v !== nome; }); }
+    // Gaveta (telas estreitas): o MESMO #painel vira uma folha em tela cheia sobre a lista; no desktop nada muda.
+    // `aberta` = gaveta visível; `empurrou` = há uma entrada no histórico (o botão Voltar do aparelho fecha a gaveta); origem* = a quem devolver o foco.
+    const gav = { aberta: false, empurrou: false, origemId: null, origemEl: null };
+    const telaEstreitaAgora = () => (win.matchMedia ? win.matchMedia('(max-width: ' + LARGURA_GAVETA + 'px)').matches : telaEstreita(win.innerWidth));
+    const bloqueaveis = () => [doc.querySelector('.workspace > .painel:not(#painel)'), doc.querySelector('.container > header'), doc.querySelector('.container > .sidebar')].filter(Boolean);
+    function abrirGaveta() {
+      const painel = $('painel');
+      const ativo = doc.activeElement;
+      gav.origemEl = ativo && ativo !== doc.body ? ativo : null;
+      const linha = gav.origemEl && gav.origemEl.closest ? gav.origemEl.closest('[data-id]') : null;
+      gav.origemId = linha ? linha.getAttribute('data-id') : null;
+      gav.aberta = true;
+      painel.classList.add('gaveta-aberta');
+      painel.setAttribute('role', 'dialog'); painel.setAttribute('aria-modal', 'true'); painel.setAttribute('aria-label', 'Detalhe da entrega');
+      painel.setAttribute('tabindex', '-1');
+      doc.body.classList.add('gaveta-ativa');
+      bloqueaveis().forEach(el => { el.inert = true; });
+      try { win.history.pushState({ gavetaEntregas: true }, ''); gav.empurrou = true; } catch { gav.empurrou = false; }
+      painel.scrollTop = 0;
+      painel.focus({ preventScroll: true }); // o painel (não um botão): durante uma chamada os botões ficam desabilitados e não recebem foco
+    }
+    function fecharGaveta() {
+      if (!gav.aberta) return;
+      const painel = $('painel');
+      gav.aberta = false;
+      painel.classList.remove('gaveta-aberta');
+      ['role', 'aria-modal', 'aria-label', 'tabindex'].forEach(a => painel.removeAttribute(a));
+      doc.body.classList.remove('gaveta-ativa');
+      bloqueaveis().forEach(el => { el.inert = false; });
+      if (gav.empurrou) { gav.empurrou = false; try { win.history.back(); } catch { /* sem histórico */ } }
+      // devolve o foco ao pedido (a lista foi redesenhada: procura pelo id) ou ao botão que abriu
+      const id = gav.origemId ? String(gav.origemId).replace(/[^\w-]/g, '') : '';
+      const volta = (id && doc.querySelector(`#lista [data-id="${id}"]`)) || (gav.origemEl && gav.origemEl.isConnected ? gav.origemEl : null);
+      if (volta) { if (!volta.matches('button, a, input, select, textarea, [tabindex]')) volta.setAttribute('tabindex', '-1'); volta.focus({ preventScroll: true }); }
+      gav.origemId = null; gav.origemEl = null;
+    }
+    // fechar pelo usuário (botão Voltar, Esc, Voltar do aparelho): o detalhe aberto some e a lista volta a ser a tela
+    function fecharPainelPeloUsuario() {
+      limparUrls();
+      estado.det = null;
+      mostrar('vazio-painel');
+      desenharLista();
+    }
+    function mostrar(nome) {
+      VISTAS.forEach(v => { $(v).hidden = v !== nome; });
+      const acao = decisaoGaveta({ estreita: telaEstreitaAgora(), aberta: gav.aberta, vista: nome });
+      if (acao === 'abrir') abrirGaveta(); else if (acao === 'fechar') fecharGaveta();
+      if (gav.aberta) $('painel').scrollTop = 0;
+    }
     function limparUrls() { estado.urls.forEach(u => URL.revokeObjectURL(u)); estado.urls = []; }
 
     async function abrirDetalhe(id) {
@@ -1191,7 +1250,17 @@
         abrirMenu(alvo, teclado ? undefined : ev.clientX, teclado ? undefined : ev.clientY);
       });
       doc.addEventListener('mousedown', ev => { if (menu && !menu.contains(ev.target)) fecharMenu(false); });
-      win.addEventListener('resize', () => fecharMenu(false));
+      win.addEventListener('resize', () => { fecharMenu(false); if (gav.aberta && !telaEstreitaAgora()) fecharGaveta(); }); // alargou/girou: volta ao painel lateral
+      $('gaveta-voltar').addEventListener('click', fecharPainelPeloUsuario);
+      // botão Voltar do aparelho/navegador: fecha a gaveta (a entrada de histórico já foi consumida)
+      win.addEventListener('popstate', () => { if (gav.aberta) { gav.empurrou = false; fecharPainelPeloUsuario(); } });
+      doc.addEventListener('keydown', ev => {
+        if (ev.key !== 'Escape' || !gav.aberta || ev.defaultPrevented) return;
+        const ck = $('ck-janela');
+        if (menu || doc.querySelector('.cc-fundo, .dp-fundo') || (ck && !ck.hidden)) return; // câmera, menu e janelas tratam o próprio Esc
+        ev.preventDefault();
+        fecharPainelPeloUsuario();
+      });
       win.addEventListener('scroll', ev => { if (menu && !(ev.target && ev.target.nodeType === 1 && menu.contains(ev.target))) fecharMenu(false); }, true);
       $('btn-cancelar').addEventListener('click', () => {
         abrirForm('vista-cancelar', ['c-motivo']);
@@ -1266,7 +1335,7 @@
     });
   }
 
-  return { MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, podeBaixaAdministrativa, avisoBaixaAdministrativa, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { LARGURA_GAVETA, telaEstreita, decisaoGaveta, MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, podeBaixaAdministrativa, avisoBaixaAdministrativa, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
     rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
     linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };

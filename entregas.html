@@ -138,7 +138,7 @@
         .ee-grade .ee-bairro { grid-column: span 6; } .ee-grade .ee-cidade { grid-column: span 5; } .ee-grade .ee-uf { grid-column: span 1; }
         #ee-uf { text-align: center; text-transform: uppercase; padding-left: 6px; padding-right: 6px; }
         .ee-aviso { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); font-size: 13px; margin: 0 0 12px; }
-        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 2100; }
         .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
         .toast.ok { background: var(--success-color); }
         .toast.erro { background: var(--danger-color); }
@@ -274,7 +274,26 @@
         #painel .det-vazio { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); text-align: center; font-size: 13px; color: var(--text-light); }
         .aviso-cancelar { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger-color); background: var(--selo-perigo-bg); color: var(--selo-perigo-fg); font-size: 13px; line-height: 1.45; }
         #btn-folha-branco, #btn-criar-entrega { flex: none; }
+        /* ===== Gaveta do detalhe em tela estreita =====
+           Mesmo limite de 1100px em que lista e painel empilham (LARGURA_GAVETA em entregas.js). Abaixo dele o #painel NÃO fica mais
+           perdido no fim da página: ao tocar num pedido vira uma folha em tela cheia (mesmo DOM e mesmas ações) sobre a lista.
+           Empilhamento: toasts 2100 > câmera 3000 / janelas .dp-fundo 2000 > menu 1000 > checklist 70 > gaveta 60 > cabeçalho/menu lateral (<= 40). */
+        .gaveta-topo { display: none; }
+        body.gaveta-ativa { overflow: hidden; }
+        @media (max-width: 1100px) {
+            #painel:not(.gaveta-aberta) { display: none; }
+            #painel.gaveta-aberta { position: fixed; inset: 0; z-index: 60; border: none; border-radius: 0; box-shadow: none; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+            #painel.gaveta-aberta:focus { outline: none; }
+            .gaveta-topo { display: flex; position: sticky; top: 0; z-index: 5; margin: -22px -22px 14px; padding: 12px 16px; background: var(--white); border-bottom: 1px solid var(--border-color); }
+            .gaveta-voltar { width: 100%; min-height: 52px; font-size: 16px; font-weight: 700; justify-content: center; }
+            /* alvos de toque de pelo menos 44px na lista e no calendário */
+            .lista-wrap tbody td { padding-top: 14px; padding-bottom: 14px; }
+            .lista-wrap tbody td button.btn-mini { min-height: 44px; }
+            .etiqueta { min-height: 44px; display: flex; align-items: center; }
+            .dp-caixa.ee-caixa { max-height: calc(100dvh - 32px); }
+        }
         @media (max-width: 480px) {
+            .gaveta-topo { margin: -16px -16px 14px; }
             #painel { padding: 16px; }
             .det-acoes .btn { flex: 1 1 100%; justify-content: center; }
             .busca-linha { flex-wrap: wrap; }
@@ -323,7 +342,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="entrega_editar.js?v=202611191800" defer></script>
-    <script src="entregas.js?v=202611231100" defer></script>
+    <script src="entregas.js?v=202611241000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -365,6 +384,7 @@
                 </section>
 
                 <section class="painel" id="painel" aria-live="polite">
+                    <div class="gaveta-topo"><button type="button" class="btn btn-secondary gaveta-voltar" id="gaveta-voltar">← Voltar à lista</button></div>
                     <p class="vazio" id="vazio-painel">Selecione uma entrega na lista.</p>
 
                     <div id="vista-detalhe" hidden>
