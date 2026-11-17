@@ -192,7 +192,7 @@ test('telas: script carregado onde há impressão, CSP de orcamentos.html libera
   assert.match(csp, /frame-src blob:/); assert.match(csp, /connect-src[^;]*http:\/\/127\.0\.0\.1:3917/);
   for (const f of ['inicio_menu.js', 'painel_inicial.html']) {
     const s = ler(f);
-    assert.ok(/'Imprimir checklist', \(\) => imprimirPdf\(`\$\{(cfg\.apiBase|API_BASE)\}\/checklist\/pdf`\)\)/.test(s), f + ': checklist imprime direto');
+    assert.ok(/'Imprimir checklist', \(\) => imprimirPdf\(`\$\{(cfg\.apiBase|API_BASE)\}\/checklist\/pdf`\), imp\)/.test(s), f + ': checklist imprime direto');
     assert.ok(s.includes('window.ImpressaoPdf.imprimirComAviso('), f);
   }
 });

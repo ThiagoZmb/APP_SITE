@@ -138,7 +138,7 @@ const TODAS = ['pedidos.ver', 'pedidos.pdf', 'pedidos.checklist', 'pedidos.situa
 
 test('menu do calendário: tem todos os itens pedidos para quem tem todas as permissões', () => {
   const r = rotulos(carregarMenu(new Set(TODAS)).itensDoMenu(ped(7)));
-  for (const esperado of ['Alterar data de pronto', 'Entregue', 'Pronto', 'Retirado', 'Em Produção', 'Abrir para editar', 'Abrir PDF', 'Guia de produção',
+  for (const esperado of ['Alterar data de pronto', 'Entregue', 'Pronto', 'Retirado', 'Em Produção', 'Editar pedido', 'Abrir PDF', 'Guia de produção',
     'Imprimir etiquetas (Zebra)', 'Corte de perfil', 'Corte de vidros', 'Imprimir checklist', 'Abrir nota fiscal (DANFE)']) assert.ok(r.includes(esperado), esperado);
 });
 
@@ -158,7 +158,7 @@ test('menu do calendário: cada item some sem a permissão correspondente', () =
   sem('danfe.ver', 'Abrir nota fiscal (DANFE)');
   sem('corte.ver', 'Corte de perfil');
   sem('corte.ver', 'Corte de vidros');
-  sem('orcamentos.criar', 'Abrir para editar');
+  sem('orcamentos.criar', 'Editar pedido');
   assert.deepEqual(rotulos(carregarMenu(new Set(['pedidos.ver'])).itensDoMenu(ped(7))), ['Histórico do pedido'], 'só pedidos.ver: só o histórico');
 });
 
@@ -167,9 +167,9 @@ test('menu do calendário: pedido cancelado não tem data de pronto, situação 
   for (const x of ['Alterar data de pronto', 'Entregue', 'Corte de perfil', 'Corte de vidros']) assert.ok(!r.includes(x), x);
 });
 
-test('"Abrir para editar" volta para a página de onde veio (voltar), com padrão inicio.html', () => {
+test('"Editar pedido" volta para a página de onde veio (voltar), com padrão inicio.html', () => {
   const abrir = voltar => {
-    const it = carregarMenu(new Set(TODAS), voltar).itensDoMenu(ped(7)).find(x => x.rotulo === 'Abrir para editar');
+    const it = carregarMenu(new Set(TODAS), voltar).itensDoMenu(ped(7)).find(x => x.rotulo === 'Editar pedido');
     global.location = {}; it.fn(); const h = global.location.href; delete global.location; return h;
   };
   assert.equal(abrir(undefined), 'orcamentos.html?abrir=Pedido/7&voltar=inicio.html');
@@ -205,7 +205,7 @@ for (const [html, js, ids] of [
     assert.ok(h.indexOf('tema.css') > h.indexOf('calendario.css'));
     // scripts do menu do botão direito + os da tela, todos com ?v= e defer, e na ordem em que dependem uns dos outros
     const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-    assert.deepEqual(scripts, ['situacoes.js', 'layout.js', 'entregas_comum.js', 'calendario_comum.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
+    assert.deepEqual(scripts, ['situacoes.js', 'layout.js', 'entregas_comum.js', 'calendario_comum.js', 'menu_contexto.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
       'danfe_pedido.js', 'etiqueta_zebra.js', 'checklist_pedido.js', 'impressao_pdf.js', js]);
     assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
     assert.doesNotMatch(h, /\son[a-z]+=/i);

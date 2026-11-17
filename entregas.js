@@ -172,11 +172,7 @@
     { sep: true },
     { id: 'historico_pedido', icone: '🕘', rotulo: 'Histórico do pedido', perm: 'pedidos.ver', rota: 'GET /ped_orc/Pedido/:numero/historico' },
     { id: 'etapas', icone: '🧩', rotulo: 'Ver etapas de produção', perm: 'etapas.ver', rota: 'GET /etapas/fila' },
-    { id: 'financeiro_cliente', icone: '💰', rotulo: 'Ver financeiro do cliente', perm: 'clientes.receber valores.ver', rota: 'GET /clientes/financeiro/:codigo' },
-    { sep: true },
-    { id: 'copiar_endereco', icone: '📍', rotulo: 'Copiar endereço', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
-    { id: 'copiar_contato', icone: '📋', rotulo: 'Copiar contato no local', perm: 'entregas.ver', rota: 'GET /entregas/:id' },
-    { id: 'ligar', icone: '📞', rotulo: 'Ligar para o contato', perm: 'entregas.ver', rota: 'GET /entregas/:id' }
+    { id: 'financeiro_cliente', icone: '💰', rotulo: 'Ver financeiro do cliente', perm: 'clientes.receber valores.ver', rota: 'GET /clientes/financeiro/:codigo' }
   ];
   function itensMenuEntrega(e, pode) {
     if (!e || typeof pode !== 'function') return [];
@@ -915,10 +911,6 @@
       if (estado.det && String(estado.det.entrega.id) === String(id)) return estado.det;
       return chamar(`/entregas/${encodeURIComponent(id)}`);
     }
-    async function copiarTexto(texto, vazio, ok) {
-      if (!txt(texto)) { toast(vazio, 'info'); return; }
-      try { await win.navigator.clipboard.writeText(texto); toast(ok, 'ok'); } catch { toast('Não foi possível copiar aqui. Selecione o texto e copie.', 'erro'); }
-    }
     async function executarMenu(it, e, origem) {
       const n = e.numero, enc = encodeURIComponent, api = C.API_BASE;
       const pdf = url => win.abrirPdfAutenticado(url);
@@ -936,14 +928,6 @@
           const d = await detalheDe(e.id);
           if (!d.clienteCodigo) { toast('Não encontrei o cadastro deste cliente.', 'info'); return; }
           win.location.href = `clientes.html?abrir=${enc(d.clienteCodigo)}&aba=financeiro`;
-        });
-        case 'copiar_endereco': return ocupado(async () => { const d = await detalheDe(e.id); await copiarTexto(enderecoTexto(d.entrega), 'Esta entrega não tem endereço.', 'Endereço copiado.'); });
-        case 'copiar_contato': return ocupado(async () => { const d = await detalheDe(e.id); await copiarTexto(d.entrega.contatoLocal, 'Esta entrega não tem contato no local.', 'Contato copiado.'); });
-        case 'ligar': return ocupado(async () => {
-          const d = await detalheDe(e.id);
-          const tel = linkLigar(d.entrega.contatoLocal) || linkLigar((d.clienteEndereco || {}).telefone);
-          if (!tel) { toast('Não há telefone nesta entrega nem no cadastro do cliente.', 'info'); return; }
-          win.location.href = tel;
         });
         default: return undefined;
       }

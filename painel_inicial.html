@@ -264,9 +264,10 @@
         #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202611231000">
+    <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611251100" defer></script>
+    <script src="menu_contexto.js?v=202611271000" defer></script>
     <script src="escolha_data_entrega.js?v=202610301300" defer></script>
     <script src="alterar_data_pronto.js?v=202611051200" defer></script>
     <script src="virar_pedido.js?v=202611221300" defer></script>
@@ -914,15 +915,17 @@
             if (ehPedido) add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) }));
             // imprimir direto desta tela: o PDF é baixado e vai para a janela de impressão, sem abrir outra aba nem outra página
             sep();
-            add('pedidos.pdf', '🖨️', ehPedido ? 'Imprimir PDF' : 'Imprimir orçamento', () => imprimirPdf(urlPdf(numero, false)));
-            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)));
-            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
-            if (ehPedido) add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }));
-            if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${API_BASE}/checklist/pdf`));
+            // submenu "Imprimir" (menu_contexto.js): folhas seguidas com o mesmo `grupo` viram um item principal; cada uma mantém a sua permissão
+            const imp = { grupo: 'Imprimir', iconeGrupo: '🖨️' };
+            add('pedidos.pdf', '🖨️', ehPedido ? 'Imprimir PDF' : 'Imprimir orçamento', () => imprimirPdf(urlPdf(numero, false)), imp);
+            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)), imp);
+            if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`), imp);
+            if (ehPedido) add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }), imp);
+            if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${API_BASE}/checklist/pdf`), imp);
             sep();
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });
             if (ehPedido && !cancelado) add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${encodeURIComponent(numero)}`; });
-            add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Abrir para editar' : 'Abrir para editar ou virar pedido',
+            add('orcamentos.criar valores.ver', '✏️', ehPedido ? 'Editar pedido' : 'Editar orçamento',
                 () => { location.href = `orcamentos.html?abrir=${encodeURIComponent(tipoLista)}/${encodeURIComponent(numero)}&voltar=${voltarParaEstaPagina()}`; });
             // orçamento → pedido: janela com data de pronto, financeiro (A Receber) e produção (Em Produção); "Editar pedido" abre o novo pedido, "Enviar do jeito que está" só cria
             if (!ehPedido && Acesso.pode('orcamentos.criar valores.ver') && !Acesso.pode('orcamentos.salvar pedidos.criar')) L.push({ icone: '📦', rotulo: 'Gerar pedido (sem permissão)', fn: null, desativado: true });
@@ -936,10 +939,10 @@
                 sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(numero));
             }
             if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {
-                sep(); L.push({ titulo: 'Mudar situação para' });
+                sep(); // submenu "Mudar situação": a situação atual continua marcada (✔) e desativada
                 for (const [chave, nome] of Object.entries(SITUACAO_NOME)) {
                     const atual = x.s === chave;
-                    L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(numero, nome), desativado: atual });
+                    L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(numero, nome), desativado: atual, grupo: 'Mudar situação', iconeGrupo: '🔄' });
                 }
             }
             if (!ehPedido && (Acesso.pode('orcamentos.salvar') || Acesso.pode('orcamentos.situacao'))) {
@@ -992,26 +995,9 @@
             const itens = itensDoMenu(x);
             const m = document.createElement('div');
             m.id = 'menu-ctx'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', `Ações do ${tipoLista === 'Pedido' ? 'pedido' : 'orçamento'} ${x.numero}`);
-            m.innerHTML = `<div class="mc-cab">${esc(tipoLista === 'Pedido' ? 'Pedido' : 'Orçamento')} nº ${esc(x.numero)} · ${esc(x.cliente || '')}</div>` + itens.map((it, i) =>
-                it.sep ? '<div class="mc-sep" role="separator"></div>'
-                : it.titulo ? `<div class="mc-tit">${esc(it.titulo)}</div>`
-                : `<button type="button" role="menuitem" data-i="${i}" class="${it.perigo ? 'mc-perigo' : ''}"${it.desativado ? ' disabled' : ''}><span class="mc-ic">${esc(it.icone || '')}</span>${esc(it.rotulo)}</button>`).join('');
-            m.addEventListener('click', e => {
-                const b = e.target.closest('button[data-i]');
-                if (!b) return;
-                const it = itens[Number(b.dataset.i)];
-                fecharMenu(true);
-                if (it && it.fn) it.fn();
-            });
-            m.addEventListener('keydown', e => {
-                const bs = [...m.querySelectorAll('button:not([disabled])')];
-                const i = bs.indexOf(document.activeElement);
-                if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
-                else if (e.key === 'Home') { e.preventDefault(); bs[0].focus(); }
-                else if (e.key === 'End') { e.preventDefault(); bs[bs.length - 1].focus(); }
-                else if (e.key === 'Tab') { e.preventDefault(); fecharMenu(true); }
-            });
+            const montado = window.MenuContexto.montar(itens, esc);
+            m.innerHTML = `<div class="mc-cab">${esc(tipoLista === 'Pedido' ? 'Pedido' : 'Orçamento')} nº ${esc(x.numero)} · ${esc(x.cliente || '')}</div>` + montado.html;
+            window.MenuContexto.ligar(m, { folhas: montado.folhas, fechar: fecharMenu, aoEscolher: it => { if (it.fn) it.fn(); } });
             document.body.appendChild(m);
             const ref = (botao || tr).getBoundingClientRect();
             const x0 = botao || !ev.clientX ? ref.left : ev.clientX, y0 = botao ? ref.bottom + 4 : (ev.clientY || ref.top + 20);

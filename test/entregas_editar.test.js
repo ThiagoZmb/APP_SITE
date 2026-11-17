@@ -218,7 +218,7 @@ const ENTREGA = { id: 1, numero: 601, cliente: 'CLIENTE TESTE LTDA', status: 'ag
 
 test('menu: cada opção só aparece com a permissão da rota que usa (valores só com valores.ver)', () => {
   assert.deepEqual(ids(ENTREGA, podeCom()), []);
-  assert.deepEqual(ids(ENTREGA, podeCom('entregas.ver')), ['detalhe', 'linha_tempo', 'copiar_endereco', 'copiar_contato', 'ligar']);
+  assert.deepEqual(ids(ENTREGA, podeCom('entregas.ver')), ['detalhe', 'linha_tempo']);
   assert.ok(ids(ENTREGA, podeCom('entregas.ver', 'pedidos.pdf')).includes('pdf_pedido'));
   assert.deepEqual(ids(ENTREGA, podeCom('pedidos.pdf')), ['pdf_pedido', 'pdf_producao', 'pdf_vidros']);
   assert.deepEqual(ids(ENTREGA, podeCom('danfe.ver')), ['danfe']);

@@ -150,7 +150,6 @@ _Movido do CLAUDE.md sem alteração; o CLAUDE.md guarda só o resumo._
 | Histórico do pedido | `pedidos.ver` | `GET /ped_orc/Pedido/:numero/historico` |
 | Ver etapas de produção | `etapas.ver` | abre `etapas_producao.html?busca=N` (a tela agora lê `?busca=`) |
 | Ver financeiro do cliente | `clientes.receber` + `valores.ver` (dinheiro; `clientes.receber` é administrativa) | abre `clientes.html?abrir=<código>&aba=financeiro`; o código vem de `clienteCodigo` em `GET /entregas/:id` |
-| Copiar endereço; Copiar contato no local; Ligar | `entregas.ver` | dados do detalhe (telefone do contato ou, na falta, o do cadastro do cliente) |
 
 O motorista (`minhas_entregas`) não ganha menu. Nenhuma rota nova para o menu. **Abrir o pedido "em modo leitura" NÃO foi feito:** `orcamentos.html` não tem modo só leitura (abrir é editar, exige `orcamentos.criar` + `valores.ver`); a consulta é pelo PDF e pelo histórico (decisão pendente do dono).
 

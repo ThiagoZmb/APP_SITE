@@ -961,3 +961,11 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .ip-botao { grid-column: 2; justify-self: start; margin-top: 4px; }
 .ip-botao[hidden] { display: none; }
 .ip-oculto { position: fixed; right: 0; bottom: 0; width: 1px; height: 1px; border: 0; opacity: 0; pointer-events: none; }
+
+/* ===== submenus do menu de contexto do Pedido (menu_contexto.js: "Imprimir", "Mudar situação") ===== */
+.mc-pai { position: relative; }
+.mc-pai .mc-seta { margin-left: auto; padding-left: 12px; color: var(--text-light); font-size: 16px; line-height: 1; }
+.mc-pai[aria-expanded="true"] { background: var(--primary-light); }
+.mc-sub { position: fixed; z-index: 1001; min-width: 230px; max-width: calc(100vw - 16px); padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); font-size: 13.5px; }
+.mc-sub[hidden] { display: none; }
+@media (pointer: coarse) { .mc-pai, .mc-sub button { min-height: 44px; } }

@@ -1,7 +1,7 @@
 // Menu do botão direito nos pedidos das listas da página Início ("Entregas da semana" e "Últimos pedidos"):
-// PDFs, imprimir, abrir para editar, cortes, mudar situação e ver entrega. Mesmas ações e permissões do menu da lista de
+// PDFs, imprimir (submenu), editar pedido, cortes, mudar situação (submenu) e ver entrega. Os submenus vêm de menu_contexto.js. Mesmas ações e permissões do menu da lista de
 // Pedidos e Orçamentos (painel_inicial.html), sem as destrutivas (cancelar/excluir ficam só lá).
-// iniciar({ apiBase, loginUrl, token, pode, docDe, recarregar, esc, voltar? })  (voltar = página para onde "Abrir para editar" volta; padrão inicio.html)
+// iniciar({ apiBase, loginUrl, token, pode, docDe, recarregar, esc, voltar? })  (voltar = página para onde "Editar pedido" volta; padrão inicio.html)
 (function () {
   'use strict';
   const SITUACOES = ['Em Produção', 'Pronto', 'Entregue', 'Retirado'];
@@ -80,13 +80,15 @@
       // nota fiscal (DANFE) do pedido; o servidor confere a permissão e os estados do usuário
       add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, pode: cfg.pode }));
       sep();
-      add('pedidos.pdf', '🖨️', 'Imprimir PDF', () => imprimirPdf(urlPdf(n, false)));
-      add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)));
-      add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(urlVidros(n)));
-      add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
-      add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${cfg.apiBase}/checklist/pdf`));
+      // submenu "Imprimir" (menu_contexto.js): folhas seguidas com o mesmo `grupo` viram um item principal; cada uma mantém a sua permissão
+      const imp = { grupo: 'Imprimir', iconeGrupo: '🖨️' };
+      add('pedidos.pdf', '🖨️', 'Imprimir PDF', () => imprimirPdf(urlPdf(n, false)), imp);
+      add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)), imp);
+      add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(urlVidros(n)), imp);
+      add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }), imp);
+      add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${cfg.apiBase}/checklist/pdf`), imp);
       sep();
-      add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
+      add('orcamentos.criar valores.ver', '✏️', 'Editar pedido', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
       if (!cancelado) add('pedidos.desconto valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, recarregar: cfg.recarregar }));
       if (!cancelado) {
         add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${enc(n)}`; });
@@ -94,8 +96,9 @@
       }
       if (!cancelado && cfg.pode('pedidos.data_pronto')) { sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(x)); }
       if (!cancelado && cfg.pode('pedidos.situacao')) {
-        sep(); L.push({ titulo: 'Mudar situação para' });
-        for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual }); }
+        // submenu "Mudar situação": a situação atual continua marcada (✔) e desativada
+        sep();
+        for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual, grupo: 'Mudar situação', iconeGrupo: '🔄' }); }
       }
       // histórico do pedido (web_auditoria): quem mudou a situação/data de pronto e quando; o servidor confere permissão e estados
       sep(); add('pedidos.ver', '🕘', 'Histórico do pedido', () => window.HistoricoPedido.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }));
@@ -126,27 +129,9 @@
       if (!itens.length) return;
       const m = document.createElement('div');
       m.id = 'menu-ctx'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', `Ações do pedido ${x.numero}`);
-      m.innerHTML = `<div class="mc-cab">Pedido nº ${cfg.esc(x.numero)} · ${cfg.esc(x.cliente || '')}</div>` + itens.map((it, i) =>
-        it.sep ? '<div class="mc-sep" role="separator"></div>'
-          : it.titulo ? `<div class="mc-tit">${cfg.esc(it.titulo)}</div>`
-            : `<button type="button" role="menuitem" data-i="${i}"${it.desativado ? ' disabled' : ''}><span class="mc-ic">${cfg.esc(it.icone || '')}</span>${cfg.esc(it.rotulo)}</button>`).join('');
-      m.addEventListener('click', e => {
-        const b = e.target.closest('button[data-i]');
-        if (!b) return;
-        const it = itens[Number(b.dataset.i)];
-        fechar(true);
-        if (it && it.fn) it.fn();
-      });
-      m.addEventListener('keydown', e => {
-        const bs = [...m.querySelectorAll('button:not([disabled])')];
-        const i = bs.indexOf(document.activeElement);
-        if (!bs.length) return;
-        if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
-        else if (e.key === 'Home') { e.preventDefault(); bs[0].focus(); }
-        else if (e.key === 'End') { e.preventDefault(); bs[bs.length - 1].focus(); }
-        else if (e.key === 'Tab') { e.preventDefault(); fechar(true); }
-      });
+      const montado = window.MenuContexto.montar(itens, cfg.esc);
+      m.innerHTML = `<div class="mc-cab">Pedido nº ${cfg.esc(x.numero)} · ${cfg.esc(x.cliente || '')}</div>` + montado.html;
+      window.MenuContexto.ligar(m, { folhas: montado.folhas, fechar, aoEscolher: it => { if (it.fn) it.fn(); } });
       document.body.appendChild(m);
       const ref = li.getBoundingClientRect();
       const x0 = ev.clientX || ref.left, y0 = ev.clientY || ref.top + 20;

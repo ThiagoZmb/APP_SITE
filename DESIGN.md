@@ -235,6 +235,8 @@ Plano por padrão: superfícies com filete de 1px. A hierarquia vem de um degrau
 
 Camadas sobrepostas (gaveta, ficha lateral, modal, menu de contexto, popover, sugestões): fundo sempre sólido do tema (`var(--bg)` na gaveta/ficha lateral, `var(--surface-2)` ou `var(--white)` em menus e cartões), nunca `rgba`/`hsla` com alfa menor que 1 nem `transparent`. Só o fundo de escurecimento (`*-fundo`, backdrop) é translúcido.
 
+**Menu de contexto com submenu** (botão direito do Pedido: `menu_contexto.js`, classes `.mc-pai`, `.mc-sub`, `.mc-seta` no `tema.css`): ações da mesma família ficam agrupadas em UM item principal com seta (›) e abrem um submenu na mesma tela ("Imprimir", "Mudar situação"); mesmo painel sólido do menu (`var(--white)`, borda e `--shadow-heavy`), sem rótulo de cabeçalho. Abre ao passar o mouse, ao tocar/clicar e por teclado (Enter, Espaço ou seta direita abre; seta esquerda ou Esc fecha só o submenu; Esc de novo fecha o menu; setas, Home e End percorrem). Semântica: pai `role="menuitem"` + `aria-haspopup="menu"` + `aria-expanded`, submenu `role="menu"`. Posição: à direita do item; sem espaço, abre à esquerda; nunca sai da tela. Em tela de toque os itens têm 44px de altura. Item de uma lista que precisa de agrupamento novo: marque as folhas com `grupo` e `iconeGrupo` em vez de criar outro título.
+
 ### Named Rules
 **The Hairline Rule.** Separação é filete de 1px. Cartão não sobe, brilha nem projeta sombra ao passar o ponteiro; só a borda se firma.
 

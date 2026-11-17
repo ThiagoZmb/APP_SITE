@@ -20,7 +20,8 @@ test('painel_inicial: api() mantém o Authorization e aceita cabeçalhos extras 
 test('painel_inicial: nomes do menu escapados (esc) e sem handlers inline novos', () => {
   const bloco = h.slice(h.indexOf('menu do botão direito: ações'), h.indexOf("$('chips-sit').addEventListener"));
   assert.ok(bloco.length > 500);
-  assert.ok(bloco.includes('esc(it.rotulo)'));
+  assert.ok(bloco.includes('MenuContexto.montar(itens, esc)'), 'o menu é montado por menu_contexto.js, que escapa cada rótulo');
+  assert.ok(fs.readFileSync(path.join(__dirname, '..', 'menu_contexto.js'), 'utf8').includes('esc(it.rotulo)'));
   assert.doesNotMatch(bloco, /onclick=|onerror=/);
 });
 
@@ -55,8 +56,8 @@ test('menu do botão direito: quem só tem pedidos.pdf (perfil Representante) v�
 test('menu do botão direito: editar, cortes, situação, entrega, cancelar e excluir exigem a permissão certa', () => {
   const x = { numero: 1, s: 'pronto', entregaStatus: 'agendada' };
   const so = (p) => menuDoPainel(new Set(['pedidos.pdf', ...p]), 'Pedido', x);
-  assert.ok(!so(['orcamentos.criar']).includes('Abrir para editar'), 'editar exige orcamentos.criar + valores.ver');
-  assert.ok(so(['orcamentos.criar', 'valores.ver']).includes('Abrir para editar'));
+  assert.ok(!so(['orcamentos.criar']).includes('Editar pedido'), 'editar exige orcamentos.criar + valores.ver');
+  assert.ok(so(['orcamentos.criar', 'valores.ver']).includes('Editar pedido'));
   assert.ok(so(['corte.ver']).includes('Corte de perfil') && !so([]).includes('Corte de perfil'));
   assert.ok(so(['pedidos.situacao']).includes('Pronto') && !so([]).includes('Pronto'));
   assert.ok(so(['entregas.ver']).some(r => r.startsWith('Ver entrega')) && !so([]).some(r => r.startsWith('Ver entrega')));
