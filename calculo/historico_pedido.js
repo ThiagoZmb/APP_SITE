@@ -30,7 +30,7 @@ const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 // Texto do evento, ou null se a ação não faz parte do histórico. `quando` ('AAAA-MM-DD hh:mm:ss') só serve para dizer "hoje" = dia do registro.
 function resumoDoEvento(acao, detalhe, quando) {
   const d = lerDetalhe(detalhe);
-  const origem = d.origem === 'etapas_producao' ? ' (pela etapa "Pedido finalizado")' : '';
+  const origem = d.origem === 'etapas_producao' ? ' (pela etapa "Pedido finalizado")' : d.origem === 'edicao' ? ' (editando o pedido)' : '';
   switch (acao) {
     case 'pedido_situacao': {
       const de = texto(d.de), para = texto(d.para);

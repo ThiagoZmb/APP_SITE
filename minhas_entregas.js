@@ -471,7 +471,12 @@
           }
         } catch (err) {
           // 409 no registro: a entrega já mudou (outra tela, outro envio) -> mostra a mensagem e volta para a lista atualizada
-          if (err.status === 409 && fase === 'registro') { toast(err.message + ' Já registrado.', 'erro'); fecharBaixa(); await carregar(); return; }
+          // 409 por mudança de estado da entrega ("Esta entrega está em ..."): já foi tratada em outra tela -> volta à lista.
+          // Qualquer outro 409 (ex.: pedido ainda não Pronto) NÃO registrou nada: mostra o motivo no formulário e mantém os dados.
+          if (err.status === 409 && fase === 'registro') {
+            if (/^Esta entrega está em/.test(err.message)) { toast(err.message + ' Já registrado.', 'erro'); fecharBaixa(); await carregar(); return; }
+            $('b-erro').textContent = err.message;
+          }
           throw err;
         }
         fecharBaixa();

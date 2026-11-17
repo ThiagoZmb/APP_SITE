@@ -666,6 +666,8 @@ function registrarPedOrc({ rota, pool }) {
         OBS_GERAL: corta(b.obsGeral, 5000), SITUACAO: tipo === 'Pedido' ? b.situacao : 'Aguardando resposta',
         FINANCEIRO: tipo === 'Pedido' ? b.financeiro : '', REPRESENTANTE: cliente.representante, DATA_ENTREGA: null
       };
+      // data de pronto anterior (cabeçalho travado), capturada ANTES do UPDATE/regravação
+      const dataAntes = b.modo === 'atualizar' && linhasSrc ? String(linhasSrc.cab.DATA_PRONTO ?? '').slice(0, 10) : '';
       let numero;
       if (b.modo === 'atualizar') {
         numero = b.numero;
@@ -711,6 +713,11 @@ function registrarPedOrc({ rota, pool }) {
           await conn.execute('INSERT INTO web_item_desenhos (tipo, numero, item, png, carimbo, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
             [tipo, numero, p.n, d.png, carimbo, agoraLocal()]);
         }
+      }
+      // Pedido existente salvo com outra data de pronto: registra a anterior (lida do cabeçalho travado, antes do UPDATE) e a nova
+      if (b.modo === 'atualizar' && tipo === 'Pedido') {
+        const dataDepois = String(cab.DATA_PRONTO ?? '').slice(0, 10);
+        if (dataAntes !== dataDepois) await auditarDoc(conn, req, 'data_pronto_alterada', tipo, numero, { cliente: cliente.razaoSocial, de: dataAntes || null, para: dataDepois || null, origem: 'edicao' });
       }
       if (divergentes.length) await auditarDoc(conn, req, 'preco_divergente', tipo, numero, { itens: divergentes });
       if (aoGravar) await aoGravar(conn, numero, tipo);
