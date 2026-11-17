@@ -489,17 +489,33 @@
     // a chave de idempotência (por foto) vai na URL: reenviar depois de falha de rede nunca grava a mesma foto duas vezes
     function fotografarChecklist(id) {
       const cartao = estado.lista.find(x => x.id === id) || {};
+      let registrou = false; // só pergunta da baixa se uma foto foi mesmo enviada (aoRegistrar)
       return win.CameraCaptura.capturar(win, {
         titulo: `Checklist assinado · Pedido ${cartao.numero ?? ''}`.trim(),
         enviar: (blob, chave) => chamar(`/minhas_entregas/${encodeURIComponent(id)}/checklist_assinado?chave=${encodeURIComponent(chave)}`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' }),
         aoRegistrar: r => {
+          registrou = true;
           // selo e contagem do cartão mudam na hora, sem recarregar a página
           const e = estado.lista.find(x => x.id === id);
           if (e) { e.checklistAssinado = true; e.qtdChecklistAssinado = Number(r && r.qtdChecklistAssinado) || (Number(e.qtdChecklistAssinado) || 0) + 1; }
           if (!estado.baixa) desenharLista();
         },
-        aoFechar: qtd => { if (qtd) { estado.detalhes.delete(id); toast('Foto do checklist assinado registrada.', 'ok'); } }
+        aoFechar: qtd => {
+          if (!qtd) return;
+          estado.detalhes.delete(id);
+          toast('Foto do checklist assinado registrada.', 'ok');
+          if (registrou) perguntarBaixaDepoisDaFoto(id);
+        }
       });
+    }
+    // "Deseja já dar a baixa nesta entrega?" (2026-11-17): só quando a baixa é possível para este usuário/entrega (mesma regra do botão "Dar baixa");
+    // "Sim" abre o formulário de baixa de sempre (a foto já enviada fica como anexo do checklist); nunca dá a baixa sozinho
+    function perguntarBaixaDepoisDaFoto(id) {
+      const e = estado.lista.find(x => x.id === id);
+      const adm = souAdministrativo();
+      if (!e || estado.baixa || !win.CameraCaptura || !win.CameraCaptura.perguntarBaixa) return;
+      if (!acoesMotorista(e, adm).includes('baixar') || !(adm || souMotorista())) return;
+      win.CameraCaptura.perguntarBaixa(win, { aoSim: () => { ocupado(() => abrirBaixa(id)); } });
     }
 
     // ---------- eventos ----------

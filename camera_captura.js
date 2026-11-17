@@ -315,6 +315,33 @@
     return { fechar: () => encerrar('cancelar'), get estado() { return maq.estado; } };
   }
 
+  // Pergunta "Deseja já dar a baixa nesta entrega?" depois da foto do checklist (2026-11-17). Nunca dá a baixa sozinha:
+  // "Sim" só chama aoSim (a tela abre o formulário de baixa de sempre); "Agora não" (ou Esc) só fecha.
+  function perguntarBaixa(win, opcoes) {
+    const doc = win.document;
+    const o = Object.assign({ pergunta: 'Deseja já dar a baixa nesta entrega?', aoSim: () => {} }, opcoes);
+    const el = (tag, cls, texto) => { const e = doc.createElement(tag); if (cls) e.className = cls; if (texto !== undefined) e.textContent = texto; return e; };
+    const fundo = el('div', 'cc-pergunta-fundo');
+    const caixa = el('div', 'cc-pergunta');
+    caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-labelledby', 'cc-pergunta-titulo');
+    const t = el('p', 'cc-pergunta-titulo', o.pergunta); t.id = 'cc-pergunta-titulo';
+    const dica = el('p', 'cc-pergunta-dica', 'A foto do checklist já foi enviada. A baixa é um passo à parte e só acontece se você confirmar.');
+    const barra = el('div', 'cc-pergunta-barra');
+    const fechar = () => { doc.removeEventListener('keydown', aoTecla); fundo.remove(); };
+    const aoTecla = ev => { if (ev.key === 'Escape') fechar(); };
+    const sim = el('button', 'btn btn-primary cc-grande cc-pergunta-sim', 'Sim, dar a baixa'); sim.type = 'button';
+    const nao = el('button', 'btn btn-secondary cc-grande cc-pergunta-nao', 'Agora não'); nao.type = 'button';
+    sim.addEventListener('click', () => { fechar(); try { o.aoSim(); } catch { /* a tela de trás não derruba a pergunta */ } });
+    nao.addEventListener('click', fechar);
+    barra.append(sim, nao);
+    caixa.append(t, dica, barra);
+    fundo.appendChild(caixa);
+    doc.addEventListener('keydown', aoTecla);
+    doc.body.appendChild(fundo);
+    sim.focus({ preventScroll: true });
+    return { fechar };
+  }
+
   return { LIMITE_BYTES, LADOS_MAX, QUALIDADES, RESTRICOES, escala, planoReducao, reduzirParaCaber, suportaCamera, pararStream,
-    mensagemErroCamera, novaChave, horaHHMM, agoraTexto, podeTentarDeNovo, criarMaquina, TRANSICOES, capturar };
+    mensagemErroCamera, novaChave, horaHHMM, agoraTexto, podeTentarDeNovo, criarMaquina, TRANSICOES, capturar, perguntarBaixa };
 });

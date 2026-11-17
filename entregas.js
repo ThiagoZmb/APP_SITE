@@ -998,10 +998,12 @@
       if (!estado.det) return;
       if (!win.CameraCaptura) { toast('Câmera indisponível. Recarregue a página.', 'erro'); return; }
       const e = estado.det.entrega;
+      let registrou = false; // só pergunta da baixa se uma foto foi mesmo enviada (aoRegistrar)
       return win.CameraCaptura.capturar(win, {
         titulo: `Checklist assinado · Pedido ${e.numero}`,
         enviar: (blob, chave) => chamar(`/entregas/${encodeURIComponent(e.id)}/checklist_assinado?chave=${encodeURIComponent(chave)}`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' }),
         aoRegistrar: r => {
+          registrou = true;
           // o detalhe aberto ganha a miniatura e o selo na hora (se ainda é a mesma entrega), sem recarregar
           if (!estado.det || estado.det.entrega.id !== e.id) return;
           const a = { id: r.anexoId, tipo: 'checklist', mime: 'image/jpeg', criadoEm: win.CameraCaptura.agoraTexto() };
@@ -1011,8 +1013,22 @@
           carregarAnexo(e.id, a, caixa);
           $('d-status').innerHTML = selo(statusDaEntrega(e)) + seloProducao((estado.det.divisao || {}).situacaoPedido) + seloChecklist(estado.det.anexos);
         },
-        aoFechar: async qtd => { if (qtd) { toast('Foto do checklist assinado registrada.', 'ok'); if (!estado.carregando) await recarregarTudo(e.id); } }
+        aoFechar: async qtd => {
+          if (!qtd) return;
+          toast('Foto do checklist assinado registrada.', 'ok');
+          if (!estado.carregando) await recarregarTudo(e.id);
+          if (registrou) perguntarBaixaDepoisDaFoto(e.id);
+        }
       });
+    }
+    // "Deseja já dar a baixa nesta entrega?" (2026-11-17): só se o botão de baixa já está visível para este usuário/entrega
+    // (Dar baixa da entrega, ou Retirada/Comprovante com entregas.concluir). "Sim" faz o mesmo clique desse botão (abre o formulário);
+    // a baixa em si nunca é automática e a foto já enviada continua como anexo.
+    function perguntarBaixaDepoisDaFoto(id) {
+      if (!estado.det || estado.det.entrega.id !== id || !win.CameraCaptura || !win.CameraCaptura.perguntarBaixa) return;
+      const alvo = ['btn-baixa-adm', 'btn-retirada', 'btn-comprovante'].map($).find(b => b && visivel(b));
+      if (!alvo) return;
+      win.CameraCaptura.perguntarBaixa(win, { aoSim: () => { if (visivel(alvo)) alvo.click(); } });
     }
 
     // ---------- baixas: retirada / enviada / comprovante ----------

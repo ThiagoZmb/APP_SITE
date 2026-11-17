@@ -13,6 +13,13 @@
 .cc-barra { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--white); }
 .cc-btn { flex: 1 1 200px; }
 .cc-grande { min-height: 60px; font-size: 18px; font-weight: 700; }
+/* Pergunta "Deseja já dar a baixa?" (perguntarBaixa), por cima de tudo, depois que o painel da câmera fecha */
+.cc-pergunta-fundo { position: fixed; inset: 0; z-index: 3100; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--fundo-modal); }
+.cc-pergunta { width: 100%; max-width: 440px; padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--white); color: var(--text-dark); font-family: var(--font); }
+.cc-pergunta-titulo { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+.cc-pergunta-dica { margin: 0 0 16px; font-size: 14px; color: var(--text-mid); }
+.cc-pergunta-barra { display: flex; flex-wrap: wrap; gap: 10px; }
+.cc-pergunta-barra .btn { flex: 1 1 160px; }
 @media (orientation: landscape) and (max-height: 520px) {
   .cc-fundo { display: grid; grid-template-columns: 1fr 260px; grid-template-rows: auto 1fr auto; }
   .cc-topo { grid-column: 1 / 3; }
