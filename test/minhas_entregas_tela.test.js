@@ -90,10 +90,11 @@ test('rótulos de status e de resultado', () => {
   assert.deepEqual(M.RESULTADOS.map(r => r.id), ['entregue', 'parcial', 'ausente', 'endereco_errado', 'recusa']);
 });
 
-test('acoesMotorista: iniciar só na agendada, baixar só em rota, ocorrência sem ações', () => {
-  assert.deepEqual(M.acoesMotorista({ status: 'agendada' }), ['iniciar']);
+test('acoesMotorista: iniciar só na agendada, baixar em agendada, em rota e ocorrência; nunca em concluída/cancelada', () => {
+  assert.deepEqual(M.acoesMotorista({ status: 'agendada' }), ['iniciar', 'baixar']);
   assert.deepEqual(M.acoesMotorista({ status: 'em_rota' }), ['baixar']);
-  for (const s of ['ocorrencia', 'entregue', 'cancelada', 'a_programar']) assert.deepEqual(M.acoesMotorista({ status: s }), []);
+  assert.deepEqual(M.acoesMotorista({ status: 'ocorrencia' }), ['baixar']);
+  for (const s of ['entregue', 'cancelada', 'a_programar']) assert.deepEqual(M.acoesMotorista({ status: s }), []);
   assert.deepEqual(M.acoesMotorista(null), []);
 });
 

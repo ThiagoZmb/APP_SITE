@@ -16,6 +16,8 @@ const TRANSICOES = {
   entregue: { de: ['em_rota'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
   // baixa dada pelo administrativo (2026-11-13): vale também para a entrega ainda Agendada (a rota grava antes o evento 'saiu' para a história ficar completa)
   baixa_administrativa: { de: ['agendada', 'em_rota'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
+  // baixa do próprio motorista (2026-11-17): de qualquer estado aberto da entrega de motorista (Agendada, Em rota, Ocorrência); Agendada grava antes o evento 'saiu'
+  baixa_motorista: { de: ['agendada', 'em_rota', 'ocorrencia'], tipo: 'motorista', para: 'entregue', evento: 'entregue' },
   retirada: { de: ['agendada'], tipo: 'retirada', para: 'retirado', evento: 'retirada' },
   enviada: { de: ['agendada'], tipo: 'outro_estado', para: 'enviada', evento: 'enviada' },
   comprovante: { de: ['enviada'], tipo: 'outro_estado', para: 'entregue', evento: 'comprovante' },

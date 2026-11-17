@@ -240,11 +240,11 @@ test('administrativo que é o próprio motorista: sem "em nome de"; Agendada ain
   assert.deepEqual(banco.eventos.map(v => v.tipo), ['saiu', 'entregue']);
   for (const v of banco.eventos) assert.doesNotMatch(String(v.motivo), /em nome/);
   assert.equal(JSON.parse(banco.auditoria.find(a => a.acao === 'entrega_entregue').detalhe).emNomeDe, undefined);
-  // o motorista comum (sem a chave) continua sem poder dar baixa em Agendada
+  // o motorista comum (sem a chave) também baixa a própria em Agendada desde 2026-11-17 (saída gravada junto)
   const m = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
   cenario(m.banco);
-  assert.equal((await baixa(m.chamar, 1, { entregueA: 'Zé' })).status, 409);
-  assert.equal(m.banco.eventos.length, 0);
+  assert.equal((await baixa(m.chamar, 1, { entregueA: 'Zé' })).status, 200);
+  assert.deepEqual(m.banco.eventos.map(v => v.tipo), ['saiu', 'entregue']);
 });
 
 // ---- telas ----
@@ -253,11 +253,13 @@ test('minhas_entregas.js: ações do administrativo, aviso e escolha única de r
   assert.deepEqual(M.acoesMotorista({ status: 'agendada', minha: true }, true), ['iniciar', 'baixar']);
   assert.deepEqual(M.acoesMotorista({ status: 'em_rota', minha: false }, true), ['baixar']);
   for (const s of ['ocorrencia', 'entregue', 'cancelada']) assert.deepEqual(M.acoesMotorista({ status: s }, true), []);
-  assert.deepEqual(M.acoesMotorista({ status: 'agendada' }), ['iniciar']); // sem administrativo: igual a antes
+  assert.deepEqual(M.acoesMotorista({ status: 'agendada' }), ['iniciar', 'baixar']); // motorista: também baixa na Agendada (2026-11-17)
   assert.equal(M.baixaSoEntregue({ minha: false }, true, true), true);
-  assert.equal(M.baixaSoEntregue({ minha: true }, true, true), false); // administrativo-motorista na própria: todas as opções
+  assert.equal(M.baixaSoEntregue({ minha: true, status: 'em_rota' }, true, true), false); // administrativo-motorista na própria: todas as opções
   assert.equal(M.baixaSoEntregue({ minha: true }, true, false), true);
-  assert.equal(M.baixaSoEntregue({}, false, true), false);
+  assert.equal(M.baixaSoEntregue({ status: 'em_rota' }, false, true), false);
+  assert.equal(M.baixaSoEntregue({ status: 'agendada' }, false, true), true); // motorista fora de Em rota: só "Entregue"
+  assert.equal(M.baixaSoEntregue({ status: 'ocorrencia' }, false, true), true);
   assert.match(M.avisoBaixaAdministrativa({ status: 'agendada', minha: false, motorista: 'Fulano' }), /ainda não saiu.*em nome do motorista Fulano/);
   assert.equal(M.avisoBaixaAdministrativa({ status: 'em_rota', minha: true }), '');
 });

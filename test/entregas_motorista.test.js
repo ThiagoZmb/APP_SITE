@@ -219,13 +219,38 @@ test('baixa: foto de outra entrega ou de outro usuário é recusada e nada é gr
   assert.equal(banco.pedidos[0].SITUACAO, 'Pronto');
 });
 
-test('baixa antes de sair (agendada): 409', async t => {
+test('baixa direto da Agendada (2026-11-17): grava o evento saiu antes e conclui na mesma transação', async t => {
   const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
   cenario(banco);
   const f = foto(banco, 1);
   const r = await post(chamar, 1, 'baixa', { entregueA: 'M', anexoIds: [f.id] });
+  assert.equal(r.status, 200);
+  assert.equal(banco.entregas[0].status, 'entregue');
+  assert.deepEqual(banco.eventos.map(v => v.tipo), ['saiu', 'entregue']);
+  assert.equal(banco.pedidos[0].SITUACAO, 'Entregue');
+  assert.equal(f.evento_id, banco.eventos[1].id);
+});
+
+test('baixa da Ocorrência (2026-11-17): vale, sem novo evento saiu', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  banco.entregas[0].status = 'ocorrencia';
+  const f = foto(banco, 1);
+  assert.equal((await post(chamar, 1, 'baixa', { entregueA: 'M', anexoIds: [f.id] })).status, 200);
+  assert.equal(banco.entregas[0].status, 'entregue');
+  assert.deepEqual(banco.eventos.map(v => v.tipo), ['entregue']);
+});
+
+test('baixa: entrega de outro motorista continua 404; pedido que não está Pronto continua 409', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
+  cenario(banco);
+  const f = foto(banco, 1);
+  assert.equal((await post(chamar, 2, 'baixa', { entregueA: 'M', anexoIds: [f.id] })).status, 404);
+  banco.pedidos[0].SITUACAO = 'Em Produção';
+  const r = await post(chamar, 1, 'baixa', { entregueA: 'M', anexoIds: [f.id] });
   assert.equal(r.status, 409);
-  assert.doesNotMatch((await r.json()).error, /undefined/);
+  assert.equal(banco.entregas[0].status, 'agendada');
+  assert.equal(banco.eventos.length, 0);
 });
 
 test('ocorrência: motivo obrigatório, tipo válido, parcial exige itens; não muda o pedido', async t => {

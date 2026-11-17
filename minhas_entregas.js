@@ -81,12 +81,13 @@
       if (e.status === 'agendada' || e.status === 'em_rota') r.push('baixar');
       return r;
     }
-    if (e.status === 'agendada') return ['iniciar'];
-    if (e.status === 'em_rota') return ['baixar'];
+    if (e.status === 'agendada') return ['iniciar', 'baixar'];
+    if (e.status === 'em_rota' || e.status === 'ocorrencia') return ['baixar']; // 2026-11-17: motorista baixa em qualquer estado aberto
     return [];
   }
   // só o resultado "Entregue" para o administrativo dando baixa em entrega de outro motorista (ocorrência é do motorista)
-  const baixaSoEntregue = (e, administrativo, ehMotorista) => !!administrativo && !(e && e.minha !== false && ehMotorista);
+  // 2026-11-17: o motorista também só tem "Entregue" quando a entrega ainda não está Em rota (ocorrência só nasce de Em rota)
+  const baixaSoEntregue = (e, administrativo, ehMotorista) => (!!administrativo && !(e && e.minha !== false && ehMotorista)) || (!!e && e.status !== 'em_rota');
   // texto do aviso na tela de baixa do administrativo
   function avisoBaixaAdministrativa(e) {
     if (!e) return '';
@@ -315,7 +316,7 @@
       $('b-titulo').textContent = `Pedido ${e.numero}`;
       $('b-cliente').textContent = e.cliente;
       $('b-erro').textContent = '';
-      const aviso = adm ? avisoBaixaAdministrativa(e) : '';
+      const aviso = avisoBaixaAdministrativa(e);
       $('b-aviso').textContent = aviso;
       $('b-aviso').hidden = !aviso;
       $('b-escolha').hidden = false;

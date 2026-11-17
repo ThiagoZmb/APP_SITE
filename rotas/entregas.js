@@ -14,10 +14,20 @@ const { carregarItensPedidos } = require('./pedido_itens');
 
 const VER = ['entregas.ver'];
 const PROGRAMAR = ['entregas.programar'];
+// Permissões por ação (2026-11-17, pedido do dono: tela de permissões mais detalhada). Antes tudo era entregas.programar;
+// a migração permissoes_entregas_acoes (seguranca/instalacao.js) deu cada uma a quem tinha entregas.programar, menos o
+// reagendar, que é administrativo (PERMISSOES_ADMINISTRATIVAS: sem a chave administrativo.ver ele não vale).
+const REAGENDAR = ['entregas.reagendar'];
+const CANCELAR = ['entregas.cancelar'];
+const CRIAR = ['entregas.criar'];
+const DIVIDIR = ['entregas.dividir'];
+const ENCERRAR_SALDO = ['entregas.encerrar_saldo'];
+const CONCLUIR = ['entregas.concluir'];
+const CHECKLIST_ASSINADO = ['entregas.checklist_assinado'];
 const ROTULO_STATUS = { a_programar: 'A programar', agendada: 'Agendada', em_rota: 'Em rota', ocorrencia: 'Ocorrência', entregue: 'Entregue',
   retirado: 'Retirado', enviada: 'Enviada', cancelada: 'Cancelada' };
 const PARTICIPIO = { agendar: 'agendada', reagendar: 'reagendada', cancelar: 'cancelada', retirada: 'registrada como retirada', enviada: 'marcada como enviada',
-  comprovante: 'confirmada', saiu: 'iniciada', entregue: 'baixada', baixa_administrativa: 'baixada' };
+  comprovante: 'confirmada', saiu: 'iniciada', entregue: 'baixada', baixa_administrativa: 'baixada', baixa_motorista: 'baixada' };
 const participio = acao => (String(acao).startsWith('ocorrencia:') ? 'registrada como ocorrência' : PARTICIPIO[acao] || 'alterada');
 const FINAIS = ['entregue', 'retirado', 'cancelada']; // endereço não muda mais
 // campo do corpo -> coluna e tamanho máximo (endereço de entrega)
@@ -675,12 +685,12 @@ function registrarEntregas({ rota, pool }) {
     if (lido) await gravar(req, res, 'POST /entregas/:id/agendar', 'agendar', null, (conn, atual) => agendamento(conn, atual, lido));
   });
 
-  rota('post', '/entregas/:id/reagendar', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/reagendar', REAGENDAR, async (req, res) => {
     const lido = lerOu400(res, () => lerAgenda(req.body || {}, { exigirTipo: false }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/reagendar', 'reagendar', null, (conn, atual) => agendamento(conn, atual, lido));
   });
 
-  rota('post', '/entregas/:id/cancelar', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/cancelar', CANCELAR, async (req, res) => {
     const motivo = String(req.body?.motivo ?? '').trim();
     if (motivo.length < 3 || motivo.length > 500) return res.status(400).json({ error: 'Informe o motivo (3 a 500 caracteres).' });
     await gravar(req, res, 'POST /entregas/:id/cancelar', 'cancelar', null, async () => ({ cols: {}, motivo }));
@@ -703,6 +713,11 @@ function registrarEntregas({ rota, pool }) {
       const motoristas = ['tipo', 'motoristaCodigo'].some(k => Object.hasOwn(v.edicao, k)) ? (await motoristasValidos(conn)).map(m => m.codigo) : [];
       const r = aplicarEdicao(atual, v.edicao, motoristas);
       if (r.erro) throw new ErroUsuario(r.erro.status, r.erro.msg);
+      // mudar data, tipo ou motorista de entrega que já saiu de "A programar" é reagendar (2026-11-17): exige entregas.reagendar
+      if (atual.status !== 'a_programar' && ['data_agendada', 'tipo', 'motorista_codigo'].some(k => Object.hasOwn(r.cols, k))
+        && !req.acesso.permissoes.has('entregas.reagendar')) {
+        throw new ErroUsuario(403, 'Mudar data, tipo ou motorista de entrega já programada é reagendar: só o administrativo (permissão Reagendar entregas).');
+      }
       return { cols: r.cols, detalhe: { antes: r.antes, depois: r.depois } };
     }, { finalDe: 'a entrega' });
   });
@@ -722,7 +737,7 @@ function registrarEntregas({ rota, pool }) {
     return e;
   }
 
-  rota('put', '/entregas/:id/anexo', PROGRAMAR, lerImagem, async (req, res) => {
+  rota('put', '/entregas/:id/anexo', CONCLUIR, lerImagem, async (req, res) => {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     const tipo = String(req.query.tipo || '');
@@ -753,7 +768,7 @@ function registrarEntregas({ rota, pool }) {
   });
 
   // Foto do checklist assinado (equipe): qualquer status menos Cancelada (antes ou depois da baixa); não mexe em status, pedido nem itens.
-  rota('put', '/entregas/:id/checklist_assinado', PROGRAMAR, lerImagem, async (req, res) => {
+  rota('put', '/entregas/:id/checklist_assinado', CHECKLIST_ASSINADO, lerImagem, async (req, res) => {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Envie uma imagem JPEG ou PNG.' });
@@ -848,13 +863,13 @@ function registrarEntregas({ rota, pool }) {
   });
   const BAIXA = { travarPedido: true };
 
-  rota('post', '/entregas/:id/retirada', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/retirada', CONCLUIR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds) }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
   });
 
-  rota('post', '/entregas/:id/enviada', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/enviada', CONCLUIR, async (req, res) => {
     const b = req.body || {};
     const cols = lerOu400(res, () => {
       const transportadora = String(b.transportadora ?? '').trim();
@@ -865,7 +880,7 @@ function registrarEntregas({ rota, pool }) {
       baixa({ cols, detalhe: { transportadora: cols.transportadora, rastreio: cols.rastreio, previsao: cols.previsao ?? null }, usuario: req.user.id }));
   });
 
-  rota('post', '/entregas/:id/comprovante', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/comprovante', CONCLUIR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }) }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
@@ -882,7 +897,7 @@ function registrarEntregas({ rota, pool }) {
   // A origem (A programar, Agendada ou Ocorrência) fica com o resto; a nova nasce A programar, sem data/motorista/tipo,
   // com o endereço de entrega e o contato copiados da origem. Se a origem não tinha lista ("pedido inteiro"), a lista dela
   // é gerada agora a partir dos itens do pedido. As duas guardam o hash_itens dos itens do pedido de agora.
-  rota('post', '/entregas/:id/separar', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/:id/separar', DIVIDIR, async (req, res) => {
     const id = idDe(req);
     if (id === null) return nao_encontrada(res);
     let pedidoSep;
@@ -918,7 +933,7 @@ function registrarEntregas({ rota, pool }) {
   });
 
   // "Gerar entrega do saldo": cria uma entrega A programar com os itens do pedido dividido que estão sem entrega.
-  rota('post', '/entregas/pedido/:numero/saldo', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/pedido/:numero/saldo', DIVIDIR, async (req, res) => {
     const numero = numeroDe(req);
     if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
     const b = req.body || {};
@@ -940,7 +955,7 @@ function registrarEntregas({ rota, pool }) {
   // "Encerrar saldo" (motivo obrigatório): a sobra passa a contar como coberta (web_entrega_sobras_encerradas, com o hash de agora).
   // Se com isso todas as entregas não canceladas já estão concluídas e nada mais sobra, o pedido fecha aqui (Entregue/Retirado
   // com DATA_ENTREGA de hoje), pela mesma regra da última baixa; senão fecha na última baixa que faltar.
-  rota('post', '/entregas/pedido/:numero/saldo/encerrar', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/pedido/:numero/saldo/encerrar', ENCERRAR_SALDO, async (req, res) => {
     const numero = numeroDe(req);
     if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
     const motivo = String(req.body?.motivo ?? '').trim();
@@ -971,7 +986,7 @@ function registrarEntregas({ rota, pool }) {
   // A varredura só cria entrega para pedido Pronto; esta rota deixa a equipe criar (e depois agendar) a entrega de um pedido Em Produção.
   // Nasce A programar, sequencia 1, sem data/motorista/tipo, com evento 'criada' e auditoria. A baixa continua exigindo pedido Pronto.
   const SITUACOES_CRIAVEIS = ['Pronto', 'Em Produção'];
-  rota('post', '/entregas/pedido/:numero/criar', PROGRAMAR, async (req, res) => {
+  rota('post', '/entregas/pedido/:numero/criar', CRIAR, async (req, res) => {
     const numero = numeroDe(req);
     if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
     const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/criar', async conn => {
@@ -1178,8 +1193,15 @@ function registrarEntregas({ rota, pool }) {
     const usuario = DONO(req);
     const montarBaixa = baixa({ ...lido, usuario });
     const adm = ehAdministrativo(req); // administrativo: qualquer motorista, entrega Agendada ou Em rota (calculo/entregas.js, baixa_administrativa)
-    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', adm ? 'baixa_administrativa' : 'entregue', null,
-      async (conn, atual) => (adm ? autoriaAdministrativa(conn, req, atual, await montarBaixa(conn, atual)) : montarBaixa(conn, atual)),
+    // motorista dono (2026-11-17): baixa de qualquer estado aberto (Agendada, Em rota, Ocorrência); Agendada grava antes o evento 'saiu'
+    const doMotorista = async (conn, atual) => {
+      const r = await montarBaixa(conn, atual);
+      if (atual.status !== STATUS.AGENDADA) return r;
+      await evento(conn, atual.id, agoraLocal(), req.acesso.nome, 'saiu', 'Saída registrada junto com a baixa', { saiuJuntoComABaixa: true });
+      return { ...r, detalhe: { ...(r.detalhe || {}), saiuJuntoComABaixa: true } };
+    };
+    await gravar(req, res, 'POST /minhas_entregas/:id/baixa', adm ? 'baixa_administrativa' : 'baixa_motorista', null,
+      async (conn, atual) => (adm ? autoriaAdministrativa(conn, req, atual, await montarBaixa(conn, atual)) : doMotorista(conn, atual)),
       { ...MOTORISTA, administrativo: adm, ...BAIXA });
   });
 
