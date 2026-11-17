@@ -144,6 +144,8 @@
   // Baixa dada pela administração (administrativo.ver; POST /minhas_entregas/:id/baixa): entrega do tipo Entrega, Agendada ou Em rota.
   // Separada de acoesDisponiveis porque depende de uma permissão (data-perm no botão) e não de programar; o servidor continua decidindo.
   const podeBaixaAdministrativa = e => !!e && e.tipo === 'motorista' && ['agendada', 'em_rota'].includes(e.status);
+  // Motorista (entregas.baixar) na tela da equipe: baixa da PRÓPRIA entrega (e.minha vem do servidor), em Agendada, Em rota ou Ocorrência (2026-11-17)
+  const podeBaixaDoMotorista = e => !!e && e.minha === true && e.tipo === 'motorista' && ['agendada', 'em_rota', 'ocorrencia'].includes(e.status);
   function avisoBaixaAdministrativa(e, nomeDoMotorista) {
     const p = [];
     if (e && e.status === 'agendada') p.push('Esta entrega ainda não saiu: a saída será registrada junto com a baixa.');
@@ -713,10 +715,10 @@
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
       $('btn-foto-checklist').hidden = e.status === 'cancelada'; // antes ou depois da baixa; o servidor também recusa cancelada
       $('btn-editar').hidden = !podeEditarEntrega(e); // concluída/cancelada não edita; o servidor também recusa
-      $('btn-baixa-adm').hidden = !podeBaixaAdministrativa(e); // só aparece com administrativo.ver (data-perm); o servidor confere
+      $('btn-baixa-adm').hidden = !(podeBaixaAdministrativa(e) || podeBaixaDoMotorista(e)); // administrativo.ver ou motorista dono (entregas.baixar), ver baixaPermitida; o servidor confere
       $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
       // um primário por vez: com uma baixa disponível (retirada/enviada/comprovante), Reagendar vira secundário
-      const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a)) || (podeBaixaAdministrativa(e) && !$('btn-baixa-adm').classList.contains('acesso-oculto'));
+      const temBaixa = ['retirada', 'enviada', 'comprovante'].some(a => acoes.includes(a)) || (!$('btn-baixa-adm').hidden && !$('btn-baixa-adm').classList.contains('acesso-oculto'));
       $('btn-reagendar').classList.toggle('btn-primary', !temBaixa);
       $('btn-reagendar').classList.toggle('btn-secondary', temBaixa);
       ajustarGruposDeAcao();
@@ -1284,7 +1286,7 @@
       $('btn-baixa-adm').addEventListener('click', () => {
         abrirForm('vista-baixa-adm', ['ba-quem', 'ba-foto']);
         const e = estado.det.entrega;
-        $('ba-aviso').textContent = avisoBaixaAdministrativa(e, nomeMotorista(e, estado.motoristas));
+        $('ba-aviso').textContent = e.minha ? (e.status === 'agendada' ? 'Esta entrega ainda não saiu: a saída será registrada junto com a baixa.' : '') : avisoBaixaAdministrativa(e, nomeMotorista(e, estado.motoristas));
         $('ba-aviso').hidden = false;
       });
       $('btn-enviada').addEventListener('click', () => {
@@ -1338,7 +1340,7 @@
     });
   }
 
-  return { LARGURA_GAVETA, telaEstreita, decisaoGaveta, MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, podeBaixaAdministrativa, avisoBaixaAdministrativa, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
+  return { LARGURA_GAVETA, telaEstreita, decisaoGaveta, MENU_ENTREGA, itensMenuEntrega, podeEditarEntrega, podeBaixaAdministrativa, podeBaixaDoMotorista, avisoBaixaAdministrativa, resumoEdicao, statusDaEntrega, ABAS, esc, dataValida, dataBR, dataHoraBR, rotuloStatus, corStatus, rotuloTipo, rotuloEvento, eventoExibicao, filtrarAba, contadores, agruparAgenda, montarMes, abaDoStatus, acoesDisponiveis,
     validarAgendamento, corpoAgendar, corpoReagendar, enderecoDoCliente, enderecoDoViaCep, cepLimpo, validarRetirada, validarEnviada, validarComprovante, validarCancelamento, escalaImagem,
     rotuloSequencia, lerNumero, linhasSeparacao, restanteDaOcorrencia, podeGerarRestante, validarSeparacao, corpoSeparar, fichaDoItem, passoDe, ajustarQuantidade, resumoSeparacao, htmlCartaoSeparacao, entregasDoPedido, entregaParaAbrir, filtrarSobras, textoItens, nomeMotorista, rotuloItem,
     linkLigar, htmlItemDetalhe, htmlEventoDetalhe, avisoCancelamento, iniciar };

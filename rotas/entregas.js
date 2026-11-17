@@ -592,7 +592,7 @@ function registrarEntregas({ rota, pool }) {
         divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
           podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && SITUACOES_DIVIDEM.includes(r.situacao_pedido) && !d?.alterado && itensEntrega.length > 0,
           itensSemEntrega: d ? itensResumo(d.sobra) : [] },
-        entrega: { ...paraEntrega(r), motoristaNome: r.motorista_nome || null, statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
+        entrega: { ...paraEntrega(r), motoristaNome: r.motorista_nome || null, minha: r.tipo === 'motorista' && Number(r.motorista_codigo) === DONO(req), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
           canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),

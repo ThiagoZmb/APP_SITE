@@ -206,6 +206,7 @@
             if (el.closest('nav.sidebar')) continue; // o menu se desenha sozinho
             let ok = true;
             if (el.hasAttribute('data-perm')) ok = pode(el.getAttribute('data-perm'));
+            if (ok && el.hasAttribute('data-perm-algum')) ok = String(el.getAttribute('data-perm-algum')).split(/\s+/).filter(Boolean).some(c => pode(c)); // basta UMA das permissões
             if (ok && el.hasAttribute('data-valor')) ok = verValores;
             if (ok && el.hasAttribute('data-sem-valor')) ok = !verValores; // texto alternativo para quem não vê valores
             if (ok && el.tagName === 'A') {

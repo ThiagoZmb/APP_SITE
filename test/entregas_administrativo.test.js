@@ -278,9 +278,13 @@ test('minhas_entregas.html: filtro Todos / Só as minhas só com a chave; confir
 
 test('entregas.html/.js: "Dar baixa da entrega" com administrativo.ver, só Entrega Agendada ou Em rota, mesma rota da baixa', () => {
   const h = ler('entregas.html');
-  assert.match(h, /id="btn-baixa-adm" data-perm="administrativo\.ver" hidden/);
+  assert.match(h, /id="btn-baixa-adm" data-perm-algum="administrativo.ver entregas.baixar" hidden/);
   assert.match(h, /<form id="vista-baixa-adm" hidden>/);
-  assert.match(h, /id="btn-confirmar-baixa-adm" data-perm="administrativo\.ver"/);
+  assert.match(h, /id="btn-confirmar-baixa-adm" data-perm-algum="administrativo\.ver entregas\.baixar"/);
+  // motorista dono na tela da equipe (2026-11-17): só a própria (minha), tipo Entrega, estado aberto
+  assert.equal(E.podeBaixaDoMotorista({ status: 'agendada', tipo: 'motorista', minha: true }), true);
+  assert.equal(E.podeBaixaDoMotorista({ status: 'ocorrencia', tipo: 'motorista', minha: true }), true);
+  for (const e of [{ status: 'agendada', tipo: 'motorista', minha: false }, { status: 'agendada', tipo: 'motorista' }, { status: 'entregue', tipo: 'motorista', minha: true }, { status: 'agendada', tipo: 'retirada', minha: true }, null]) assert.equal(E.podeBaixaDoMotorista(e), false);
   assert.equal(E.podeBaixaAdministrativa({ status: 'agendada', tipo: 'motorista' }), true);
   assert.equal(E.podeBaixaAdministrativa({ status: 'em_rota', tipo: 'motorista' }), true);
   for (const e of [{ status: 'agendada', tipo: 'retirada' }, { status: 'ocorrencia', tipo: 'motorista' }, { status: 'entregue', tipo: 'motorista' }, { status: 'enviada', tipo: 'outro_estado' }, null]) {
