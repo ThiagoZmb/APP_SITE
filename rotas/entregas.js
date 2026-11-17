@@ -1113,7 +1113,7 @@ function registrarEntregas({ rota, pool }) {
           return;
         }
         if (Number(linha.motorista_codigo) !== DONO(req) || linha.tipo !== TIPOS.MOTORISTA) throw new ErroUsuario(404, 'Entrega não encontrada.');
-        if (linha.status !== STATUS.EM_ROTA) throw new ErroUsuario(409, 'Só é possível anexar depois de sair para a entrega.');
+        if (![STATUS.AGENDADA, STATUS.EM_ROTA, STATUS.OCORRENCIA].includes(linha.status)) throw new ErroUsuario(409, 'Só é possível anexar em entrega agendada, em rota ou com ocorrência.'); // 2026-11-17: acompanha a baixa do motorista
       }));
     } catch (err) {
       if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message });

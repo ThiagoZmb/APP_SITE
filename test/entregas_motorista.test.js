@@ -131,11 +131,11 @@ test('entrega atribuída ao motorista mas de outro tipo: 404', async t => {
   assert.equal((await post(chamar, 4, 'saiu')).status, 404);
 });
 
-test('anexo: só em_rota (409 antes), grava como criado_por do motorista; imagem inválida 400; grande 413', async t => {
+test('anexo: agendada, em rota ou ocorrência (2026-11-17, acompanha a baixa), grava como criado_por do motorista; imagem inválida 400; grande 413', async t => {
   const { banco, chamar } = await prepararEntregas(t, { perfil: 'Motorista', usuario: M21 });
   cenario(banco);
   const enviar = (corpo = JPEG, mime = 'image/jpeg', tipo = 'foto') => chamar(`/minhas_entregas/1/anexo?tipo=${tipo}`, 'PUT', corpo, { 'Content-Type': mime });
-  assert.equal((await enviar()).status, 409);
+  assert.equal((await enviar()).status, 201); // Agendada: a foto da baixa não depende de Iniciar rota
   await post(chamar, 1, 'saiu');
   const r = await enviar();
   assert.equal(r.status, 201);
