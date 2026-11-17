@@ -13,7 +13,14 @@ aceitarSidDeTeste(sessoes);
 
 const duplicado = () => Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 });
 const PERFIS = {
-  'Programador': ['entregas.ver', 'entregas.programar'],
+  // equipe completa (como fica um perfil administrativo depois da migração permissoes_entregas_acoes, 2026-11-17): uma permissão por ação
+  'Programador': ['entregas.ver', 'entregas.programar', 'entregas.reagendar', 'entregas.cancelar', 'entregas.criar', 'entregas.dividir',
+    'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado'],
+  // equipe que programava mas não é administrativa: tudo menos reagendar
+  'Programador sem reagendar': ['entregas.ver', 'entregas.programar', 'entregas.cancelar', 'entregas.criar', 'entregas.dividir',
+    'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado'],
+  // só a permissão antiga (perfil que ainda não passou pela migração): só agenda e corrige endereço/contato/observação
+  'Só agendar': ['entregas.ver', 'entregas.programar'],
   'Motorista': ['entregas.baixar'],
   'Motorista com valores': ['entregas.baixar', 'valores.ver'],
   'Somente ver': ['entregas.ver'],

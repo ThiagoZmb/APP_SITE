@@ -1253,4 +1253,84 @@ async function acrescentarPermissoesChecklistEntregas(pool) {
   }
 }
 
-module.exports = { acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Permissões por ação (2026-11-17, pedido do dono: tela de permissões mais detalhada). Uma permissão "grossa" foi desdobrada em várias;
+// para ninguém perder sem querer o que já fazia, cada perfil que tinha a antiga (`de`) recebe as novas (`para`) e cada exceção do usuário
+// na antiga (liberar OU bloquear) é copiada para as novas, com o mesmo tipo. `soComChave` = novas que só valem para o administrativo
+// (PERMISSOES_ADMINISTRATIVAS): vão só ao perfil que tem `de` E `administrativo.ver` e, por exceção "liberar", ao usuário que tem a chave
+// liberada por exceção e um perfil com `de`; as exceções da antiga também são copiadas para elas (o filtro da chave decide no fim).
+// Só acrescenta (INSERT IGNORE: nunca troca uma exceção que já exista). Uma vez por marcador; a auditoria guarda quem recebeu.
+async function desdobrarPermissoes(pool, marcador, regras) {
+  const [feito] = await pool.execute('SELECT id FROM web_auditoria WHERE acao = ? LIMIT 1', [marcador]);
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [comChave] = await conn.execute("SELECT DISTINCT perfil_id FROM web_perfil_permissoes WHERE permissao = 'administrativo.ver' ORDER BY perfil_id");
+    const perfisComChave = new Set(comChave.map(p => Number(p.perfil_id)));
+    const detalhe = {};
+    for (const { de, para = [], soComChave = [] } of regras) {
+      const [perfis] = await conn.execute('SELECT DISTINCT perfil_id FROM web_perfil_permissoes WHERE permissao = ? ORDER BY perfil_id', [de]);
+      const r = detalhe[de] = { perfis: [], perfisChave: [], excecoes: [], usuariosChave: [] };
+      for (const p of perfis) {
+        const id = Number(p.perfil_id);
+        for (const nova of para) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [id, nova]);
+        r.perfis.push(id);
+        if (soComChave.length && perfisComChave.has(id)) {
+          for (const nova of soComChave) await conn.execute('INSERT IGNORE INTO web_perfil_permissoes (perfil_id, permissao) VALUES (?, ?)', [id, nova]);
+          r.perfisChave.push(id);
+        }
+      }
+      const [excecoes] = await conn.execute('SELECT usuario_codigo, tipo FROM web_usuario_excecoes WHERE permissao = ? ORDER BY usuario_codigo', [de]);
+      for (const e of excecoes) {
+        if (e.tipo !== 'liberar' && e.tipo !== 'bloquear') continue;
+        for (const nova of [...para, ...soComChave]) {
+          await conn.execute('INSERT IGNORE INTO web_usuario_excecoes (usuario_codigo, permissao, tipo) VALUES (?, ?, ?)', [e.usuario_codigo, nova, e.tipo]);
+        }
+        r.excecoes.push({ usuario: Number(e.usuario_codigo), tipo: e.tipo });
+      }
+      if (soComChave.length) {
+        // chave liberada por exceção + perfil com a antiga (e a antiga não bloqueada para ele)
+        const [usuarios] = await conn.execute(
+          `SELECT DISTINCT x.usuario_codigo FROM web_usuario_excecoes x
+             JOIN web_usuario_acesso a ON a.usuario_codigo = x.usuario_codigo
+             JOIN web_perfil_permissoes pp ON pp.perfil_id = a.perfil_id AND pp.permissao = ?
+            WHERE x.permissao = 'administrativo.ver' AND x.tipo = 'liberar'
+              AND NOT EXISTS (SELECT 1 FROM web_usuario_excecoes b WHERE b.usuario_codigo = x.usuario_codigo AND b.permissao = ? AND b.tipo = 'bloquear')
+            ORDER BY x.usuario_codigo`, [de, de]);
+        for (const u of usuarios) {
+          for (const nova of soComChave) {
+            await conn.execute('INSERT IGNORE INTO web_usuario_excecoes (usuario_codigo, permissao, tipo) VALUES (?, ?, ?)', [u.usuario_codigo, nova, 'liberar']);
+          }
+          r.usuariosChave.push(Number(u.usuario_codigo));
+        }
+      }
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', marcador, '', JSON.stringify(detalhe)]);
+    await conn.commit();
+    return { feito: true, detalhe };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+// Entregas: entregas.programar (agendar, reagendar, cancelar, endereço, comprovantes, divisão...) virou uma permissão por ação.
+// Quem programava continua fazendo tudo, MENOS reagendar, que passou a ser só do administrativo (decisão do dono, 2026-11-17).
+const REGRAS_ENTREGAS_ACOES = [{
+  de: 'entregas.programar',
+  para: ['entregas.cancelar', 'entregas.criar', 'entregas.dividir', 'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado'],
+  soComChave: ['entregas.reagendar']
+}];
+const acrescentarPermissoesEntregasAcoes = pool => desdobrarPermissoes(pool, 'permissoes_entregas_acoes', REGRAS_ENTREGAS_ACOES);
+
+// Pedidos: a data de pronto saiu de pedidos.situacao e o desconto adicional saiu de orcamentos.criar
+const REGRAS_PEDIDOS_ACOES = [
+  { de: 'pedidos.situacao', para: ['pedidos.data_pronto'] },
+  { de: 'orcamentos.criar', para: ['pedidos.desconto'] }
+];
+const acrescentarPermissoesPedidosAcoes = pool => desdobrarPermissoes(pool, 'permissoes_pedidos_acoes', REGRAS_PEDIDOS_ACOES);
+
+module.exports = { desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

@@ -146,10 +146,10 @@ test('nome do cliente vem do banco: entra por textContent, nunca por innerHTML',
   assert.doesNotMatch(s, /innerHTML/);
 });
 
-test('menus e páginas: item "Ajustar desconto adicional" (Pedido não cancelado, orcamentos.criar + valores.ver) e scripts carregados', () => {
+test('menus e páginas: item "Ajustar desconto adicional" (Pedido não cancelado, pedidos.desconto + valores.ver) e scripts carregados', () => {
   const m = ler('inicio_menu.js'), p = ler('painel_inicial.html');
-  assert.match(m, /if \(!cancelado\) add\('orcamentos\.criar valores\.ver', '💲', 'Ajustar desconto adicional'/);
-  assert.match(p, /if \(ehPedido && !cancelado\) add\('orcamentos\.criar valores\.ver', '💲', 'Ajustar desconto adicional'/);
+  assert.match(m, /if \(!cancelado\) add\('pedidos\.desconto valores\.ver', '💲', 'Ajustar desconto adicional'/);
+  assert.match(p, /if \(ehPedido && !cancelado\) add\('pedidos\.desconto valores\.ver', '💲', 'Ajustar desconto adicional'/);
   for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html', 'painel_inicial.html']) {
     const h = ler(f);
     const a = h.indexOf('calculo/desconto_pedido.js'), b = h.indexOf('desconto_pedido_tela.js');

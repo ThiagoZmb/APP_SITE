@@ -486,7 +486,9 @@
     // folha do checklist assinada e fotografada (anexo tipo 'checklist'); só aparece quando há foto
     const fotosChecklist = anexos => (Array.isArray(anexos) ? anexos : []).filter(a => a.tipo === 'checklist');
     const seloChecklist = anexos => (fotosChecklist(anexos).length ? ' <span class="selo ok" title="Há foto da folha do checklist assinada pelo cliente">Checklist assinado ✓</span>' : '');
-    const botaoAcao = (acao, rotulo) => `<button type="button" class="btn btn-mini btn-secondary" data-acao="${acao}" data-perm="entregas.programar">${rotulo}</button>`;
+    // permissão por ação (2026-11-17): agendar = entregas.programar; reagendar = entregas.reagendar (só administrativo)
+    const PERM_ACAO = { agendar: 'entregas.programar', 'agendar-retirada': 'entregas.programar', reagendar: 'entregas.reagendar' };
+    const botaoAcao = (acao, rotulo) => `<button type="button" class="btn btn-mini btn-secondary" data-acao="${acao}" data-perm="${PERM_ACAO[acao] || 'entregas.programar'}">${rotulo}</button>`;
 
     function desenharAbas() {
       const c = contadores(estado.lista);
@@ -549,14 +551,14 @@
         semanas.map(sem => `<div class="cal-linha">${sem.map(celula).join('')}</div>`).join('') + '</div>';
     }
 
-    // "Saldo a entregar": pedido dividido com item sem entrega (ou alterado depois da divisão). Botões só com entregas.programar.
+    // "Saldo a entregar": pedido dividido com item sem entrega (ou alterado depois da divisão). Gerar = entregas.dividir; encerrar = entregas.encerrar_saldo.
     function htmlSobras(sobras) {
       if (!sobras.length) return '';
       const linhaSobra = s => `<tr class="sobra-linha"><td>${esc(s.numero)}</td><td>${esc(s.cliente)}</td>` +
         `<td>${s.qtdItensSemEntrega ? esc(textoItens(s.itensSemEntrega)) : '—'}${s.alterado ? '<p class="aviso-divisao">Pedido alterado depois da divisão: confira os itens.</p>' : ''}</td>` +
         `<td class="acao">${s.alterado || !s.qtdItensSemEntrega ? '' :
-          `<button type="button" class="btn btn-mini btn-secondary" data-sobra="gerar" data-numero="${esc(s.numero)}" data-perm="entregas.programar">Gerar entrega do saldo</button> ` +
-          `<button type="button" class="btn btn-mini btn-perigo" data-sobra="encerrar" data-numero="${esc(s.numero)}" data-perm="entregas.programar">Encerrar saldo</button>`}</td></tr>`;
+          `<button type="button" class="btn btn-mini btn-secondary" data-sobra="gerar" data-numero="${esc(s.numero)}" data-perm="entregas.dividir">Gerar entrega do saldo</button> ` +
+          `<button type="button" class="btn btn-mini btn-perigo" data-sobra="encerrar" data-numero="${esc(s.numero)}" data-perm="entregas.encerrar_saldo">Encerrar saldo</button>`}</td></tr>`;
       return `<div class="sobras"><h3>Saldo a entregar</h3><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Itens sem entrega</th><th></th></tr></thead>` +
         `<tbody>${sobras.map(linhaSobra).join('')}</tbody></table></div>`;
     }
@@ -866,6 +868,7 @@
       const e = det.entrega, id = e.id;
       win.EntregaEditar.abrir(win, {
         entrega: { ...e, rotuloSequencia: rotuloSequencia(det.divisao) }, motoristas: estado.motoristas || [], motoristaNome: nomeMotorista(e, estado.motoristas),
+        podeReagendar: !!(win.Acesso && win.Acesso.pode('entregas.reagendar')),
         salvar: async corpo => {
           await chamar(`/entregas/${encodeURIComponent(id)}`, { metodo: 'PUT', corpo });
           toast('Entrega atualizada.', 'ok');

@@ -512,9 +512,10 @@ test('tela: ?pedido=N lista TODAS as entregas do pedido e abre a primeira ainda 
   assert.ok(js.includes('estado.pedidoFiltro = pedidoDoLink') && js.includes('entregaParaAbrir(entregasDoPedido(estado.lista, pedidoDoLink))'));
 });
 
-test('entregas.html: botões de divisão/saldo com entregas.programar, formulários em grade, sem estilo inline; versões novas', () => {
+test('entregas.html: botões de divisão (entregas.dividir) e de encerrar saldo (entregas.encerrar_saldo), formulários em grade, sem estilo inline; versões novas', () => {
   const h = ler('entregas.html');
-  for (const id of ['btn-separar', 'btn-restante', 'btn-confirmar-separar', 'btn-confirmar-encerrar']) assert.match(h, new RegExp(`id="${id}"[^>]*data-perm="entregas\\.programar"`), id);
+  for (const id of ['btn-separar', 'btn-restante', 'btn-confirmar-separar']) assert.match(h, new RegExp(`id="${id}"[^>]*data-perm="entregas\\.dividir"`), id);
+  assert.match(h, /id="btn-confirmar-encerrar"[^>]*data-perm="entregas\.encerrar_saldo"/);
   for (const id of ['vista-separar', 'vista-encerrar', 'sp-itens', 'sp-obs', 'en-motivo', 'd-aviso', 'd-itens-titulo']) assert.match(h, new RegExp(`id="${id}"`), id);
   assert.match(h, /#painel \.sep-cartao \{ display: flex; flex-direction: column;/);
   assert.match(h, /\.sep-passo \{ flex: 0 0 auto; width: 44px; height: 44px;/, 'botões − e + com área de toque de 44 px');
@@ -523,7 +524,7 @@ test('entregas.html: botões de divisão/saldo com entregas.programar, formulár
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611201000/);
-  assert.match(h, /entregas\.js\?v=202611241000/);
+  assert.match(h, /entregas\.js\?v=202611251000/);
   assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611231100/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611201000/);
   const js = ler('entregas.js');
@@ -567,7 +568,7 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
   assert.ok(ler('clientes.html').includes('${seloAndamento(p)}'));
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("err.dados.aviso === 'entregas_abertas'") && p.includes('confirmarEntregasAbertas: true'));
-  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611221300/, f);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611251000/, f);
 });
 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {

@@ -87,13 +87,13 @@
       add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${cfg.apiBase}/checklist/pdf`));
       sep();
       add('orcamentos.criar valores.ver', '✏️', 'Abrir para editar', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });
-      if (!cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, recarregar: cfg.recarregar }));
+      if (!cancelado) add('pedidos.desconto valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero: n, apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, recarregar: cfg.recarregar }));
       if (!cancelado) {
         add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${enc(n)}`; });
         add('corte.ver', '🔷', 'Corte de vidros', () => { location.href = `corte_vidros.html?numero=${enc(n)}`; });
       }
+      if (!cancelado && cfg.pode('pedidos.data_pronto')) { sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(x)); }
       if (!cancelado && cfg.pode('pedidos.situacao')) {
-        sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(x));
         sep(); L.push({ titulo: 'Mudar situação para' });
         for (const nome of SITUACOES) { const atual = norm(x.situacao) === norm(nome); L.push({ icone: atual ? '✔' : '', rotulo: nome, fn: () => mudarSituacao(x, nome), desativado: atual }); }
       }
@@ -105,7 +105,7 @@
         sep(); L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${enc(n)}`; } });
       }
       // pedido Pronto ou Em Produção ainda sem entrega: cria e programa a partir daqui (regra do dono, 2026-11-11)
-      if (!x.entregaStatus && ['pronto', 'em producao'].includes(norm(x.situacao)) && cfg.pode('entregas.programar')) {
+      if (!x.entregaStatus && ['pronto', 'em producao'].includes(norm(x.situacao)) && cfg.pode('entregas.criar')) {
         sep(); L.push({ icone: '🚚', rotulo: 'Programar entrega', fn: () => { location.href = `entregas.html?criar=${enc(n)}`; } });
       }
       while (L.length && L[L.length - 1].sep) L.pop();

@@ -82,8 +82,21 @@ test('telas: módulo da janela sem erro de sintaxe; item do menu nas duas telas,
   assert.doesNotThrow(() => new vm.Script(ler('alterar_data_pronto.js'), { filename: 'alterar_data_pronto.js' }));
   assert.doesNotThrow(() => new vm.Script(ler('inicio_menu.js'), { filename: 'inicio_menu.js' }));
   for (const f of ['painel_inicial.html', 'inicio.html']) assert.ok(ler(f).includes('<script src="alterar_data_pronto.js'), f);
-  assert.match(ler('painel_inicial.html'), /Acesso\.pode\(ehPedido \? 'pedidos\.situacao' : 'orcamentos\.salvar'\)\)[\s\S]{0,120}Alterar data de pronto/);
-  assert.match(ler('inicio_menu.js'), /cfg\.pode\('pedidos\.situacao'\)\)[\s\S]{0,120}Alterar data de pronto/);
+  // permissão própria pedidos.data_pronto desde 2026-11-17 (antes: pedidos.situacao)
+  assert.match(ler('painel_inicial.html'), /Acesso\.pode\(ehPedido \? 'pedidos\.data_pronto' : 'orcamentos\.salvar'\)\)[\s\S]{0,120}Alterar data de pronto/);
+  assert.match(ler('inicio_menu.js'), /cfg\.pode\('pedidos\.data_pronto'\)\)[\s\S]{0,120}Alterar data de pronto/);
   assert.ok(!/style|#[0-9a-fA-F]{3,6}\b|rgba?\(|innerHTML/.test(ler('alterar_data_pronto.js')), 'sem estilo nem cor solta no JS (classes dp-* em tema.css)');
   assert.ok(/\.dp-caixa[^}]*var\(--white\)/.test(ler('tema.css')));
+});
+
+test('por ação (2026-11-17): pedido exige pedidos.data_pronto; quem só muda a situação não altera a data', async t => {
+  let banco = bancoPedOrc(); doc(banco, 'Pedido', 5);
+  let c = await prepararPedOrc(t, { banco, perfil: 'Só situação' });
+  assert.equal((await c.chamar(URL('Pedido', 5), 'POST', { dataPronto: '2026-11-20' })).status, 403);
+  assert.equal(banco.pedOrc[0].DATA_PRONTO, '2026-11-10');
+  banco = bancoPedOrc(); doc(banco, 'Pedido', 5);
+  c = await prepararPedOrc(t, { banco, perfil: 'Só data de pronto' });
+  assert.equal((await c.chamar(URL('Pedido', 5), 'POST', { dataPronto: '2026-11-20' })).status, 200);
+  assert.equal(banco.pedOrc[0].DATA_PRONTO, '2026-11-20');
+  assert.equal(banco.pedOrc[0].SITUACAO, 'Em Produção', 'a situação não muda');
 });

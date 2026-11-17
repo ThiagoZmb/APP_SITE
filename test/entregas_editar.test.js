@@ -291,7 +291,7 @@ test('entregas.html/js: botão Editar entrega (só entregas.programar), menu de 
   assert.ok(h.indexOf('id="btn-reagendar"') < h.indexOf('id="btn-editar"'), 'ao lado do Reagendar');
   assert.match(h, /id="btn-mais"[^>]*aria-haspopup="menu"/);
   for (const s of ['danfe_pedido.js', 'historico_pedido_tela.js', 'entrega_editar.js', 'entregas.js']) assert.match(h, new RegExp(`<script src="${s.replace('.', '\\.')}\\?v=\\d+" defer></script>`), s);
-  assert.match(h, /entrega_editar\.js\?v=202611191800/);
+  assert.match(h, /entrega_editar\.js\?v=202611251000/);
   assert.doesNotMatch(h, /\sstyle=/i);
   assert.match(js, /\$\('btn-editar'\)\.hidden = !podeEditarEntrega\(e\)/);
   assert.match(js, /lista'\)\.addEventListener\('contextmenu'/);

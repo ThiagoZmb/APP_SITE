@@ -341,8 +341,8 @@
     <script src="camera_captura.js?v=202611231100" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
-    <script src="entrega_editar.js?v=202611191800" defer></script>
-    <script src="entregas.js?v=202611241000" defer></script>
+    <script src="entrega_editar.js?v=202611251000" defer></script>
+    <script src="entregas.js?v=202611251000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -376,7 +376,7 @@
                         <div class="busca-linha">
                             <div class="busca"><input data-foco-busca type="search" id="busca" placeholder="Buscar por pedido ou cliente" aria-label="Buscar por pedido ou cliente"></div>
                             <button type="button" class="btn btn-secondary" id="btn-atualizar" title="Atualizar as listas e a fila" aria-label="Atualizar as listas de entregas"><svg class="ico-atualizar" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg><span class="rot">Atualizar</span></button>
-                            <button type="button" class="btn btn-secondary" id="btn-criar-entrega" data-perm="entregas.programar" title="Criar a entrega de um pedido Pronto ou Em Produção que ainda não tem entrega">Criar entrega</button>
+                            <button type="button" class="btn btn-secondary" id="btn-criar-entrega" data-perm="entregas.criar" title="Criar a entrega de um pedido Pronto ou Em Produção que ainda não tem entrega">Criar entrega</button>
                             <button type="button" class="btn btn-secondary" id="btn-folha-branco" data-perm="entregas.checklist" title="Checklist de entrega em branco, para preencher à mão">Folha em branco</button>
                         </div>
                     </div>
@@ -406,21 +406,21 @@
                             <div class="acoes" id="d-acoes-principais">
                                 <button type="button" class="btn btn-primary" id="btn-agendar" data-perm="entregas.programar" hidden>Agendar</button>
                                 <button type="button" class="btn btn-secondary" id="btn-agendar-retirada" data-perm="entregas.programar" hidden>Agendar retirada</button>
-                                <button type="button" class="btn btn-primary" id="btn-reagendar" data-perm="entregas.programar" hidden>Reagendar</button>
+                                <button type="button" class="btn btn-primary" id="btn-reagendar" data-perm="entregas.reagendar" hidden>Reagendar</button>
                                 <button type="button" class="btn btn-secondary" id="btn-editar" data-perm="entregas.programar" hidden>Editar entrega</button>
-                                <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.programar" hidden>Dar baixa de retirada</button>
-                                <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.programar" hidden>Marcar como enviada</button>
-                                <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.programar" hidden>Anexar comprovante</button>
+                                <button type="button" class="btn btn-primary" id="btn-retirada" data-perm="entregas.concluir" hidden>Dar baixa de retirada</button>
+                                <button type="button" class="btn btn-primary" id="btn-enviada" data-perm="entregas.concluir" hidden>Marcar como enviada</button>
+                                <button type="button" class="btn btn-primary" id="btn-comprovante" data-perm="entregas.concluir" hidden>Anexar comprovante</button>
                                 <button type="button" class="btn btn-primary" id="btn-baixa-adm" data-perm="administrativo.ver" hidden>Dar baixa da entrega</button>
                             </div>
                             <div class="acoes" id="d-acoes-secundarias">
                                 <button type="button" class="btn btn-secondary" id="btn-checklist" data-perm="entregas.checklist">Checklist de entrega</button>
-                                <button type="button" class="btn btn-secondary" id="btn-foto-checklist" data-perm="entregas.programar" title="Fotografa a folha do checklist assinada pelo cliente">Foto do checklist assinado</button>
-                                <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.programar" hidden>Separar em outra entrega</button>
-                                <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.programar" hidden>Gerar entrega do restante</button>
+                                <button type="button" class="btn btn-secondary" id="btn-foto-checklist" data-perm="entregas.checklist_assinado" title="Fotografa a folha do checklist assinada pelo cliente">Foto do checklist assinado</button>
+                                <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.dividir" hidden>Separar em outra entrega</button>
+                                <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.dividir" hidden>Gerar entrega do restante</button>
                             </div>
                             <div class="det-perigo" id="d-perigo" hidden>
-                                <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="entregas.programar" hidden>Cancelar entrega</button>
+                                <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="entregas.cancelar" hidden>Cancelar entrega</button>
                                 <p>Cancela só esta entrega e pede o motivo antes de confirmar.</p>
                             </div>
                         </section>
@@ -473,7 +473,7 @@
                         <div class="form-group"><label for="f-obs">Observação</label><textarea id="f-obs" maxlength="500"></textarea></div>
                         <p class="erro-form" id="erro-agendar" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-salvar-agenda" data-perm="entregas.programar">Salvar</button>
+                            <button type="submit" class="btn btn-primary" id="btn-salvar-agenda">Salvar</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -484,7 +484,7 @@
                         <div class="form-group"><label for="cr-numero">Número do pedido</label><input id="cr-numero" inputmode="numeric" maxlength="10" autocomplete="off"></div>
                         <p class="erro-form" id="erro-criar" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-confirmar-criar" data-perm="entregas.programar">Criar entrega</button>
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-criar" data-perm="entregas.criar">Criar entrega</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -495,7 +495,7 @@
                         <div class="form-group"><label for="c-motivo">Motivo</label><textarea id="c-motivo" maxlength="500"></textarea></div>
                         <p class="erro-form erro-form-cancelar" id="erro-cancelar" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-perigo" id="btn-confirmar-cancelar" data-perm="entregas.programar">Confirmar cancelamento</button>
+                            <button type="submit" class="btn btn-perigo" id="btn-confirmar-cancelar" data-perm="entregas.cancelar">Confirmar cancelamento</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -506,7 +506,7 @@
                         <div class="form-group"><label for="r-foto">Foto (opcional)</label><input type="file" id="r-foto" accept="image/*"></div>
                         <p class="erro-form" id="erro-retirada" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-confirmar-retirada" data-perm="entregas.programar">Dar baixa</button>
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-retirada" data-perm="entregas.concluir">Dar baixa</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -532,7 +532,7 @@
                         </div>
                         <p class="erro-form" id="erro-enviada" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-confirmar-enviada" data-perm="entregas.programar">Marcar como enviada</button>
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-enviada" data-perm="entregas.concluir">Marcar como enviada</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -543,7 +543,7 @@
                         <div class="form-group"><label for="k-entregue">Entregue a (opcional)</label><input id="k-entregue" maxlength="190"></div>
                         <p class="erro-form" id="erro-comprovante" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-confirmar-comprovante" data-perm="entregas.programar">Confirmar entrega</button>
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-comprovante" data-perm="entregas.concluir">Confirmar entrega</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -559,7 +559,7 @@
                         </div>
                         <p class="erro-form" id="erro-separar" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-primary" id="btn-confirmar-separar" data-perm="entregas.programar">Separar</button>
+                            <button type="submit" class="btn btn-primary" id="btn-confirmar-separar" data-perm="entregas.dividir">Separar</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>
@@ -571,7 +571,7 @@
                         <div class="form-group"><label for="en-motivo">Motivo</label><textarea id="en-motivo" maxlength="500"></textarea></div>
                         <p class="erro-form" id="erro-encerrar" role="alert"></p>
                         <div class="acoes">
-                            <button type="submit" class="btn btn-perigo" id="btn-confirmar-encerrar" data-perm="entregas.programar">Encerrar saldo</button>
+                            <button type="submit" class="btn btn-perigo" id="btn-confirmar-encerrar" data-perm="entregas.encerrar_saldo">Encerrar saldo</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>

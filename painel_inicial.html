@@ -931,8 +931,8 @@
                 // pedido criado: oferece as opções de impressão (pedido, guia, vidros, checklist) e só depois segue (editar = abre o pedido; enviar = fica na lista)
                 aoEditar: async n => { await opcoesImpressao(n, x.cliente); location.href = `orcamentos.html?abrir=Pedido/${encodeURIComponent(n)}` + '&voltar=' + voltarParaEstaPagina(); },
                 aoEnviar: async n => { carregar(); await opcoesImpressao(n, x.cliente); } }));
-            if (ehPedido && !cancelado) add('orcamentos.criar valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero, apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, recarregar: () => carregar() }));
-            if (!cancelado && Acesso.pode(ehPedido ? 'pedidos.situacao' : 'orcamentos.salvar')) {
+            if (ehPedido && !cancelado) add('pedidos.desconto valores.ver', '💲', 'Ajustar desconto adicional', () => window.AjustarDesconto.abrir({ numero, apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, recarregar: () => carregar() }));
+            if (!cancelado && Acesso.pode(ehPedido ? 'pedidos.data_pronto' : 'orcamentos.salvar')) {
                 sep(); add(null, '📅', 'Alterar data de pronto', () => alterarDataPronto(numero));
             }
             if (ehPedido && !cancelado && Acesso.pode('pedidos.situacao')) {
@@ -960,7 +960,7 @@
                 L.push({ icone: '🚚', rotulo: andamento ? `Ver entregas (${andamento})` : `Ver entrega (${ROT_ENTREGA[x.entregaStatus] || x.entregaStatus})`, fn: () => { location.href = `entregas.html?pedido=${encodeURIComponent(numero)}`; } });
             }
             // pedido Pronto ou Em Produção ainda sem entrega: cria e programa a partir daqui (regra do dono, 2026-11-11)
-            if (ehPedido && !x.entregaStatus && ['pronto', 'em producao'].includes(String(x.situacao || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()) && Acesso.pode('entregas.programar')) {
+            if (ehPedido && !x.entregaStatus && ['pronto', 'em producao'].includes(String(x.situacao || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()) && Acesso.pode('entregas.criar')) {
                 sep();
                 L.push({ icone: '🚚', rotulo: 'Programar entrega', fn: () => { location.href = `entregas.html?criar=${encodeURIComponent(numero)}`; } });
             }

@@ -19,6 +19,11 @@ const PERFIS = {
   'Estoquista': doPerfil('Estoquista'),
   'Monta sem valores': ['orcamentos.criar', 'orcamentos.salvar'],
   'Monta sem salvar': ['orcamentos.criar', 'valores.ver'],
+  // só a ação de ajustar o desconto adicional do pedido (permissão própria desde 2026-11-17)
+  'Ajusta desconto': ['pedidos.desconto', 'valores.ver'],
+  // situação e data de pronto do pedido são ações separadas desde 2026-11-17
+  'Só situação': ['pedidos.ver', 'pedidos.situacao'],
+  'Só data de pronto': ['pedidos.ver', 'pedidos.data_pronto'],
   'Representante SP': doPerfil('Administrador'),
   'Representante': doPerfil('Representante')
 };

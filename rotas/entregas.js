@@ -886,7 +886,7 @@ function registrarEntregas({ rota, pool }) {
     if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
   });
 
-  // ==== Divisão da entrega (etapas 4 e 5): só a equipe (entregas.programar); o motorista nunca divide ====
+  // ==== Divisão da entrega (etapas 4 e 5): só a equipe (entregas.dividir; encerrar saldo = entregas.encerrar_saldo); o motorista nunca divide ====
   // Tudo numa transação: trava o pedido e DEPOIS as entregas do número (travarPedidoDividido), relê listas e itens já
   // protegidos, valida e grava. O número vem de uma leitura comum FORA da transação (como nas baixas).
   const numeroDaEntrega = async id => { const [[r]] = await pool.execute('SELECT numero FROM web_entregas WHERE id = ?', [id]); return r ? Number(r.numero) : null; };

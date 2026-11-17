@@ -134,7 +134,7 @@ function carregarMenu(permissoes, voltar) {
     pode: p => String(p).split(' ').every(x => permissoes.has(x)) });
 }
 const rotulos = it => it.filter(x => x.rotulo).map(x => x.rotulo);
-const TODAS = ['pedidos.ver', 'pedidos.pdf', 'pedidos.checklist', 'pedidos.situacao', 'orcamentos.criar', 'valores.ver', 'corte.ver', 'danfe.ver', 'entregas.ver'];
+const TODAS = ['pedidos.ver', 'pedidos.pdf', 'pedidos.checklist', 'pedidos.situacao', 'pedidos.data_pronto', 'pedidos.desconto', 'orcamentos.criar', 'valores.ver', 'corte.ver', 'danfe.ver', 'entregas.ver'];
 
 test('menu do calendário: tem todos os itens pedidos para quem tem todas as permissões', () => {
   const r = rotulos(carregarMenu(new Set(TODAS)).itensDoMenu(ped(7)));
@@ -148,7 +148,8 @@ test('menu do calendário: cada item some sem a permissão correspondente', () =
     assert.ok(!rotulos(carregarMenu(resto).itensDoMenu(p)).includes(rotulo), `${rotulo} sem ${perm}`);
     assert.ok(rotulos(carregarMenu(new Set(TODAS)).itensDoMenu(p)).includes(rotulo), `${rotulo} com ${perm}`);
   };
-  sem('pedidos.situacao', 'Alterar data de pronto');
+  sem('pedidos.data_pronto', 'Alterar data de pronto'); // permissão própria desde 2026-11-17 (antes: pedidos.situacao)
+  sem('pedidos.desconto', 'Ajustar desconto adicional'); // idem (antes: orcamentos.criar)
   sem('pedidos.situacao', 'Entregue');
   sem('pedidos.pdf', 'Abrir PDF');
   sem('pedidos.pdf', 'Guia de produção');

@@ -116,6 +116,8 @@
         #p-permissoes legend { float: left; width: 100%; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--primary-color); padding: 12px 0 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border-color); }
         #p-permissoes legend + label { clear: left; }
         #p-permissoes label { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; padding: 3px 0; cursor: pointer; }
+        #p-permissoes label b { font-weight: 600; }
+        .perm-desc { display: block; font-size: 12px; line-height: 1.35; color: var(--text-light); margin-top: 2px; font-weight: 400; }
         #p-permissoes input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--primary-color); flex-shrink: 0; }
         @media (max-width: 600px) {
             #p-permissoes { gap: 10px; }
@@ -227,7 +229,7 @@
             </div>
             <div class="bloco" id="bloco-grade" hidden>
                 <h4>Permissões</h4>
-                <p class="legenda"><b>Herdar</b> segue o perfil · <b>Liberar</b> e <b>Bloquear</b> são exceções só deste usuário e vencem o perfil.</p>
+                <p class="legenda"><b>Herdar</b> segue o perfil · <b>Liberar</b> e <b>Bloquear</b> são exceções só deste usuário e vencem o perfil. <span class="selo aviso">Só administrativo</span> = só vale com Acesso administrativo.</p>
                 <div class="rolagem" id="grade-permissoes"></div>
             </div>
         </div>
@@ -266,6 +268,7 @@
             </div>
             <div class="bloco">
                 <h4>Permissões do perfil</h4>
+                <p class="legenda">Cada caixa libera uma ação. As marcadas <span class="selo aviso">Só administrativo</span> só valem se o perfil também tiver <b>Acesso administrativo</b>.</p>
                 <div id="p-permissoes"></div>
             </div>
         </div>
@@ -410,6 +413,9 @@
 
         // ----- grade: herdar / liberar / bloquear -----
         const CRITICAS = new Set(['valores.ver', 'admin.usuarios']);
+        // rótulo da ação + descrição (o que a caixa libera) + selo quando só vale para a classe administrativa (catálogo do servidor)
+        const textoPermissao = p => `<b>${esc(p.nome)}</b>${p.administrativa ? ' <span class="selo aviso">Só administrativo</span>' : ''}` +
+            (p.descricao ? `<small class="perm-desc">${esc(p.descricao)}</small>` : '');
         function permissoesDoPerfil(id) {
             const p = perfisCache.find(x => x.id === Number(id));
             return new Set(p && p.ativo ? p.permissoes : []); // perfil desativado não dá nada
@@ -427,7 +433,7 @@
                 const ex = estadoFicha.excecoes.get(p.codigo) || 'herdar';
                 const res = resultadoDe(p.codigo, doPerfil);
                 html += `<tr data-permissao="${esc(p.codigo)}"${CRITICAS.has(p.codigo) ? ' class="critica"' : ''}>
-                    <td><b>${esc(p.nome)}</b></td>
+                    <td>${textoPermissao(p)}</td>
                     <td class="do-perfil">${doPerfil.has(p.codigo) ? '✓' : '—'}</td>
                     <td><span class="tri">${['herdar', 'liberar', 'bloquear'].map(e =>
                         `<button type="button" data-estado="${e}" class="${ex === e ? 'on' : ''}">${e === 'herdar' ? 'Herdar' : e === 'liberar' ? 'Liberar' : 'Bloquear'}</button>`).join('')}</span></td>
@@ -657,7 +663,7 @@
             const areas = [];
             for (const c of catalogo) { let a = areas.find(x => x.nome === c.area); if (!a) areas.push(a = { nome: c.area, itens: [] }); a.itens.push(c); }
             $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(c =>
-                `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> ${esc(c.nome)}</label>`).join('')}</fieldset>`).join('');
+                `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> <span>${textoPermissao(c)}</span></label>`).join('')}</fieldset>`).join('');
             // horário de acesso: só para perfil já criado (a restrição precisa do id)
             $('p-bloco-horario').hidden = !p;
             const NOMES_DIA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'], PADRAO = ['07:00', '18:00'];

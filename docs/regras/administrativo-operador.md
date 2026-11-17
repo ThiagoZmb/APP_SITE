@@ -13,7 +13,7 @@ Implementado **sem campo novo no usuário**: a classe é derivada das permissõe
 `permissoesFinais` (`seguranca/permissoes.js`), depois de somar perfil e exceções:
 
 - **Com `administrativo.ver`** → o usuário ganha `valores.ver` junto (administrativo vê dinheiro).
-- **Sem `administrativo.ver`** → as permissões da lista `PERMISSOES_ADMINISTRATIVAS` **somem**, venham do perfil ou de exceção "liberar": `paineis.ver`, `indicadores.ver`, `financeiro.ver/lancar/excluir`, `gestao.ver/editar`, `precos.ver/editar/gravar`, `clientes.receber`, `clientes.credito`.
+- **Sem `administrativo.ver`** → as permissões da lista `PERMISSOES_ADMINISTRATIVAS` **somem**, venham do perfil ou de exceção "liberar": `paineis.ver`, `indicadores.ver`, `financeiro.ver/lancar/excluir`, `gestao.ver/editar`, `precos.ver/editar/gravar`, `clientes.receber`, `clientes.credito` e (2026-11-17) `entregas.reagendar` (ver `docs/regras/permissoes-por-acao.md`). Na tela de usuários essas caixas têm o selo "Só administrativo".
 - **`valores.ver` NÃO está na lista**: continua valendo sozinha (Vendedor e Representante). Quem não tem nenhuma das duas é operador.
 
 Como o menu, as telas e `registro.rota(...)` já usam essas permissões, tudo que dependia delas fica administrativo de uma vez (Início, Financeiro, Custos e preços, Central de Gestão, indicadores do painel).

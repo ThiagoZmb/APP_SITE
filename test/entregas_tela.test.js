@@ -152,9 +152,19 @@ test('entregas.html: viewport, CSP, abas, permissões e sem handlers inline', ()
   assert.match(h, /<script src="entregas\.js[^"]*" defer>/);
   assert.match(h, /<script src="layout\.js[^"]*" defer>/);
   for (const aba of ['fila', 'agenda', 'em_rota', 'concluidas', 'ocorrencias']) assert.match(h, new RegExp(`data-aba="${aba}"`));
-  for (const id of ['btn-agendar', 'btn-cancelar', 'btn-reagendar', 'btn-comprovante', 'btn-retirada', 'btn-enviada']) {
-    assert.match(h, new RegExp(`id="${id}"[^>]*data-perm="entregas\\.programar"`), id);
-  }
+  // permissão por ação (2026-11-17): cada botão com a sua
+  const PERM = { 'btn-agendar': 'programar', 'btn-agendar-retirada': 'programar', 'btn-editar': 'programar', 'btn-cancelar': 'cancelar', 'btn-reagendar': 'reagendar',
+    'btn-comprovante': 'concluir', 'btn-retirada': 'concluir', 'btn-enviada': 'concluir', 'btn-criar-entrega': 'criar', 'btn-separar': 'dividir', 'btn-restante': 'dividir',
+    'btn-foto-checklist': 'checklist_assinado', 'btn-confirmar-cancelar': 'cancelar', 'btn-confirmar-criar': 'criar', 'btn-confirmar-retirada': 'concluir',
+    'btn-confirmar-enviada': 'concluir', 'btn-confirmar-comprovante': 'concluir', 'btn-confirmar-separar': 'dividir', 'btn-confirmar-encerrar': 'encerrar_saldo' };
+  for (const [id, acao] of Object.entries(PERM)) assert.match(h, new RegExp(`id="${id}"[^>]*data-perm="entregas\\.${acao}"`), id);
+  // o Salvar da agenda serve a Agendar e a Reagendar: sem data-perm próprio (quem abre a janela já passou pelo botão; o servidor confere)
+  assert.match(h, /id="btn-salvar-agenda">/);
+  const js = ler('entregas.js');
+  assert.match(js, /PERM_ACAO = \{ agendar: 'entregas\.programar', 'agendar-retirada': 'entregas\.programar', reagendar: 'entregas\.reagendar' \}/);
+  assert.match(js, /data-sobra="gerar"[^`]*data-perm="entregas\.dividir"/);
+  assert.match(js, /data-sobra="encerrar"[^`]*data-perm="entregas\.encerrar_saldo"/);
+  assert.match(js, /podeReagendar: !!\(win\.Acesso && win\.Acesso\.pode\('entregas\.reagendar'\)\)/);
   assert.doesNotMatch(h, /\son(click|change|submit|input|load)=/i);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
 });

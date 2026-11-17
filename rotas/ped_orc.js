@@ -865,10 +865,11 @@ function registrarPedOrc({ rota, pool }) {
 
   // alterar a DATA DE PRONTO (ped_orc.DATA_PRONTO = "Pronto em" do PDF / data prometida; é o campo "data de entrega" da tela de orçamentos) pelo menu do botão direito.
   // Grava SÓ essa coluna: não muda situação, DATA_ENTREGA nem itens/valores, e não toca em web_entregas (a fila de Entregas só LÊ a data prometida).
-  // Pedido exige pedidos.situacao; Orçamento exige orcamentos.salvar (quem só tem orcamentos.situacao, ex.: Representante, não edita). Pedido cancelado não muda.
-  rota('post', '/ped_orc/:tipo/:numero/data_pronto', [{ algum: ['pedidos.situacao', 'orcamentos.salvar'] }], async (req, res) => {
+  // Pedido exige pedidos.data_pronto (até 2026-11-17 era pedidos.situacao; a migração permissoes_pedidos_acoes deu a nova a quem tinha a antiga);
+  // Orçamento exige orcamentos.salvar (quem só tem orcamentos.situacao, ex.: Representante, não edita). Pedido cancelado não muda.
+  rota('post', '/ped_orc/:tipo/:numero/data_pronto', [{ algum: ['pedidos.data_pronto', 'orcamentos.salvar'] }], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;
-    if (!req.acesso.permissoes.has(alvo.tipo === 'Pedido' ? 'pedidos.situacao' : 'orcamentos.salvar')) return res.status(403).json({ error: MSG_SEM_ACESSO });
+    if (!req.acesso.permissoes.has(alvo.tipo === 'Pedido' ? 'pedidos.data_pronto' : 'orcamentos.salvar')) return res.status(403).json({ error: MSG_SEM_ACESSO });
     const nova = validarData((req.body || {}).dataPronto);
     if (!nova) return res.status(400).json({ error: 'Data de pronto inválida. Use o formato AAAA-MM-DD.' });
     const r = await emTransacao(pool, res, 'POST /ped_orc/data_pronto', async conn => {
@@ -901,7 +902,7 @@ function registrarPedOrc({ rota, pool }) {
   });
 
   // valores atuais para a janela "Ajustar desconto adicional" (só leitura; uma consulta): subtotal, desconto, total e situações. Mesma permissão do ajuste.
-  rota('get', '/ped_orc/:tipo/:numero/desconto', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
+  rota('get', '/ped_orc/:tipo/:numero/desconto', ['pedidos.desconto', 'valores.ver'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;
     if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'O ajuste de desconto vale só para Pedido. Para orçamento, abra para editar.' });
     try {
@@ -920,8 +921,9 @@ function registrarPedOrc({ rota, pool }) {
   // ajustar o DESCONTO ADICIONAL de um Pedido já feito (cliente que decide a forma de pagar depois, ex.: à vista), pelo menu do botão direito.
   // Grava SÓ ped_orc.DESCONTO e ped_orc.TOTAL (TOTAL = SUB_TOTAL × (100 − DESCONTO) ÷ 100, ou o total exato digitado); itens, caixa e entrega não mudam.
   // Corpo: { descontoPct } ou { totalFinal } + { conferencia: { descontoPct, total } } (o que a tela viu; mudou no meio = 409). Cancelado e Recebido são recusados.
-  // Mesma permissão de "Abrir para editar" (orcamentos.criar + valores.ver). Audita desconto_adicional_alterado (antes e depois).
-  rota('post', '/ped_orc/:tipo/:numero/desconto', ['orcamentos.criar', 'valores.ver'], async (req, res) => {
+  // Permissão própria pedidos.desconto + valores.ver (até 2026-11-17 era orcamentos.criar; a migração permissoes_pedidos_acoes deu a nova a quem
+  // tinha a antiga). Audita desconto_adicional_alterado (antes e depois).
+  rota('post', '/ped_orc/:tipo/:numero/desconto', ['pedidos.desconto', 'valores.ver'], async (req, res) => {
     const alvo = validarAlvo(req, res); if (!alvo) return;
     if (alvo.tipo !== 'Pedido') return res.status(400).json({ error: 'O ajuste de desconto vale só para Pedido. Para orçamento, abra para editar.' });
     const b = req.body || {};

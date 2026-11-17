@@ -81,7 +81,14 @@ test('equipe: depois da baixa vale; cancelada 409; limite de 6 fotos; imagem inv
   assert.equal(banco.anexos.filter(a => a.entrega_id === 1).length, 6);
 });
 
-test('equipe sem entregas.programar recebe 403 e nada e gravado', async t => {
+test('equipe sem entregas.checklist_assinado recebe 403 e nada e gravado (so agendar nao basta)', async t => {
+  const so = await prepararEntregas(t, { perfil: 'Só agendar' });
+  cenario(so.banco);
+  assert.equal((await enviarEquipe(so.chamar, 1)).status, 403);
+  assert.equal(so.banco.anexos.length, 0);
+});
+
+test('equipe sem nenhuma permissao de entregas recebe 403 e nada e gravado', async t => {
   const { banco, chamar } = await prepararEntregas(t, { perfil: 'Operador' });
   cenario(banco);
   const r = await enviarEquipe(chamar, 1);
@@ -171,7 +178,7 @@ test('rotas novas estao no registro com permissao e a transacao trava a entrega 
   const i = re => log.findIndex(s => re.test(s));
   if (i(/FOR UPDATE/) >= 0) assert.ok(i(/COUNT\(\*\) AS qtd_fotos/) > i(/FOR UPDATE/));
   const src = ler('rotas/entregas.js');
-  assert.match(src, /rota\('put', '\/entregas\/:id\/checklist_assinado', PROGRAMAR/);
+  assert.match(src, /rota\('put', '\/entregas\/:id\/checklist_assinado', CHECKLIST_ASSINADO/);
   assert.match(src, /rota\('put', '\/minhas_entregas\/:id\/checklist_assinado', MINHAS, guardaMinhas/);
 });
 
@@ -225,7 +232,7 @@ test('idempotencia: chave invalida 400; o motorista tambem reenvia sem duplicar;
 
 test('tela da equipe: botao abre a camera ao vivo (camera_captura.js), sem input de arquivo; selo, miniatura e rotulo do evento', () => {
   const h = ler('entregas.html'), js = ler('entregas.js');
-  assert.match(h, /id="btn-foto-checklist"[^>]*data-perm="entregas\.programar"/);
+  assert.match(h, /id="btn-foto-checklist"[^>]*data-perm="entregas\.checklist_assinado"/);
   assert.doesNotMatch(h, /id="d-foto-checklist"/);
   assert.match(h, /<link rel="stylesheet" href="camera_captura\.css\?v=\d+">/);
   assert.match(h, /<script src="camera_captura\.js\?v=\d+" defer><\/script>[\s\S]*<script src="entregas\.js\?v=/);

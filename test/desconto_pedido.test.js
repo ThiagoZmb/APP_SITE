@@ -109,15 +109,15 @@ test('rota: entradas inválidas = 400 (sem conferência, orçamento, % fora da f
   assert.equal(banco.auditoria.length, 0);
 });
 
-test('rota: exige orcamentos.criar + valores.ver (Estoquista e "sem valores" = 403)', async t => {
-  for (const perfil of ['Estoquista', 'Monta sem valores']) {
+test('rota: exige pedidos.desconto + valores.ver (Estoquista, "sem valores" e quem só monta orçamento = 403)', async t => {
+  for (const perfil of ['Estoquista', 'Monta sem valores', 'Monta sem salvar']) {
     const banco = bancoPedOrc(); doc(banco);
     const { chamar } = await prepararPedOrc(t, { banco, perfil });
     assert.equal((await chamar(URL(), 'POST', { descontoPct: 5, conferencia: conf })).status, 403, perfil);
     assert.equal(banco.pedOrc[0].TOTAL, 980);
   }
   const banco = bancoPedOrc(); doc(banco);
-  const { chamar } = await prepararPedOrc(t, { banco, perfil: 'Monta sem salvar' });
+  const { chamar } = await prepararPedOrc(t, { banco, perfil: 'Ajusta desconto' });
   assert.equal((await chamar(URL(), 'POST', { descontoPct: 5, conferencia: conf })).status, 200);
 });
 

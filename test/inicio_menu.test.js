@@ -17,7 +17,7 @@ function carregarMenu(permissoes) {
 const rotulos = it => it.filter(x => x.rotulo).map(x => x.rotulo);
 
 test('menu do botão direito do início: administrador vê PDFs, imprimir, editar, cortes, situação e entrega', () => {
-  const m = carregarMenu(new Set(['pedidos.pdf', 'orcamentos.criar', 'valores.ver', 'corte.ver', 'pedidos.situacao', 'entregas.ver']));
+  const m = carregarMenu(new Set(['pedidos.pdf', 'orcamentos.criar', 'pedidos.desconto', 'valores.ver', 'corte.ver', 'pedidos.situacao', 'pedidos.data_pronto', 'entregas.ver']));
   const it = m.itensDoMenu({ numero: 7, cliente: 'X', situacao: 'Em Produção', entregaStatus: 'agendada' });
   assert.deepEqual(rotulos(it), ['Abrir PDF', 'Guia de produção', 'Vidros (PDF)', 'Imprimir PDF', 'Imprimir guia de produção', 'Imprimir vidros', 'Imprimir etiquetas (Zebra)',
     'Abrir para editar', 'Ajustar desconto adicional', 'Corte de perfil', 'Corte de vidros', 'Alterar data de pronto', 'Em Produção', 'Pronto', 'Entregue', 'Retirado', 'Ver entrega (Agendada)']);

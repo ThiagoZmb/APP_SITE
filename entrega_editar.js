@@ -64,7 +64,9 @@
   function abrir(win, cfg) {
     const doc = win.document, e = cfg.entrega, anterior = doc.activeElement;
     const mk = (tag, cls, texto) => { const el = doc.createElement(tag); if (cls) el.className = cls; if (texto !== undefined) el.textContent = texto; return el; };
-    const travada = agendaTravada(e);
+    // sem a permissão Reagendar entregas (só administrativo, 2026-11-17), entrega já programada não muda tipo, data nem motorista aqui
+    const semReagendar = cfg.podeReagendar === false && e.status !== 'a_programar' && !agendaTravada(e);
+    const travada = agendaTravada(e) || semReagendar;
     const grupo = (id, rotulo, controle) => { const g = mk('div', 'form-group'); const l = mk('label', '', rotulo); l.htmlFor = id; controle.id = id; g.append(l, controle); return g; };
     const campo = (id, rotulo, max, extra) => { const i = mk('input'); i.maxLength = max; if (extra) Object.assign(i, extra); return grupo(id, rotulo, i); };
 
@@ -85,7 +87,8 @@
     fs.append(grade);
     const contato = campo('ee-contato', 'Contato no local', 190);
     const obsC = mk('textarea'); obsC.maxLength = 500; const gObs = grupo('ee-obs', 'Observação', obsC);
-    const aviso = mk('p', 'ee-aviso', travada ? 'Com a entrega em rota ou enviada, tipo, data e motorista não mudam aqui (use Reagendar). O restante pode ser corrigido.' : '');
+    const aviso = mk('p', 'ee-aviso', semReagendar ? 'Mudar tipo, data ou motorista de entrega já programada é reagendar, que só o administrativo faz. O restante pode ser corrigido.'
+      : travada ? 'Com a entrega em rota ou enviada, tipo, data e motorista não mudam aqui (use Reagendar). O restante pode ser corrigido.' : '');
     aviso.hidden = !travada;
     const erro = mk('p', 'erro-form'); erro.setAttribute('role', 'alert');
     const acoes = mk('div', 'dp-acoes');
