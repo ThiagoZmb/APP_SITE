@@ -1021,6 +1021,38 @@ function registrarEntregas({ rota, pool }) {
     if (r) res.status(201).json(r);
   });
 
+  // ==== Registrar entrega antiga (2026-11-17): pedido já Entregue/Retirado (feito pelo VB) que NUNCA teve linha em web_entregas ====
+  // A varredura só cria entrega para pedido Pronto; sem esta rota não há como anexar a foto do checklist assinado de pedido antigo.
+  // Nasce JÁ CONCLUÍDA (entregue/retirado, como a situação do pedido), sem tipo/data/motorista, com evento 'criada' e auditoria.
+  // NÃO muda o pedido (nem situação, nem data), não mexe em estoque/caixa; só com pedido sem nenhuma entrega.
+  rota('post', '/entregas/pedido/:numero/registrar_antiga', CRIAR, async (req, res) => {
+    const numero = numeroDe(req);
+    if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/registrar_antiga', async conn => {
+      const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
+      if (!ped[0]) throw new ErroUsuario(404, 'Pedido não encontrado.');
+      const est = filtroEstados(req, 'c.ESTADO');
+      if (est.sql) {
+        const [ok] = await conn.execute(
+          `SELECT 1 AS ok FROM ped_orc p JOIN cadastro_clientes c ON c.RAZAO_SOCIAL = p.RAZAO_SOCIAL WHERE p.NUMERO = ? AND p.TIPO = 'Pedido' AND ${est.sql}`,
+          [numero, ...est.params]);
+        if (!ok.length) throw new ErroUsuario(404, 'Pedido não encontrado.');
+      }
+      const situacao = String(ped[0].SITUACAO ?? '').trim();
+      const status = statusConcluidoPara(situacao);
+      if (!status) throw new ErroUsuario(409, `Só pedido já Entregue ou Retirado pode ter entrega antiga registrada (situação atual: ${situacao || '—'}).`);
+      const [existentes] = await conn.execute('SELECT * FROM web_entregas WHERE numero = ? ORDER BY sequencia, id FOR UPDATE', [numero]);
+      if (existentes.length) throw new ErroUsuario(409, 'Este pedido já tem entrega no sistema: procure por ele na aba Concluídas.');
+      const agora = agoraLocal();
+      const [ins] = await conn.execute('INSERT INTO web_entregas (numero, sequencia, status, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?)',
+        [numero, 1, status, agora, agora]);
+      await evento(conn, ins.insertId, agora, req.acesso.nome, 'criada', `Entrega antiga registrada pela equipe (pedido ${situacao} fora da web)`, null);
+      await auditar(conn, agora, req.acesso.nome, 'entrega_antiga_registrada', numero, { entregaId: ins.insertId, situacaoPedido: situacao, status });
+      return { entrega: paraEntrega({ id: ins.insertId, numero, sequencia: 1, status, criado_em: agora, atualizado_em: agora }), situacaoPedido: situacao };
+    });
+    if (r) res.status(201).json(r);
+  });
+
   // ==== Rotas do motorista (/minhas_entregas) ====
   // Isolamento: toda rota passa por buscarDoMotorista (motorista_codigo = req.user.id). Nada daqui devolve dinheiro,
   // nem para quem tem valores.ver: só se leem colunas de endereço, contato, itens (descrição/quantidade) e histórico.

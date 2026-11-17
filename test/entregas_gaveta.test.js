@@ -55,7 +55,7 @@ test('entregas.html: topo da gaveta, CSS abaixo de 1100px, empilhamento e versã
   assert.match(h, /#ent-menu \{[^}]*z-index: 1000/);
   assert.match(h, /\.ck-fundo \{[^}]*z-index: 70/);
   assert.match(h, /#toasts \{[^}]*z-index: 2100/);
-  assert.match(h, /entregas\.js\?v=202611261000/);
+  assert.match(h, /entregas\.js\?v=202611271000/);
   // ações e permissões continuam no mesmo painel
   assert.match(h, /id="btn-baixa-adm" data-perm-algum="administrativo.ver entregas.baixar"/);
   assert.match(h, /id="btn-foto-checklist" data-perm="entregas\.checklist_assinado"/);

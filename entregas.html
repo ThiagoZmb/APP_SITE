@@ -342,7 +342,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="entrega_editar.js?v=202611251000" defer></script>
-    <script src="entregas.js?v=202611261000" defer></script>
+    <script src="entregas.js?v=202611271000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -416,6 +416,8 @@
                             <div class="acoes" id="d-acoes-secundarias">
                                 <button type="button" class="btn btn-secondary" id="btn-checklist" data-perm="entregas.checklist">Checklist de entrega</button>
                                 <button type="button" class="btn btn-secondary" id="btn-foto-checklist" data-perm="entregas.checklist_assinado" title="Fotografa a folha do checklist assinada pelo cliente">Foto do checklist assinado</button>
+                                <button type="button" class="btn btn-secondary" id="btn-arquivo-checklist" data-perm="entregas.checklist_assinado" title="Anexa uma ou mais imagens (JPEG ou PNG) da folha do checklist assinada, por exemplo de folhas antigas; vale também para entrega já concluída">Escolher arquivo(s) do checklist</button>
+                                <input type="file" id="in-arquivo-checklist" accept="image/jpeg,image/png" multiple hidden>
                                 <button type="button" class="btn btn-secondary" id="btn-separar" data-perm="entregas.dividir" hidden>Separar em outra entrega</button>
                                 <button type="button" class="btn btn-secondary" id="btn-restante" data-perm="entregas.dividir" hidden>Gerar entrega do restante</button>
                             </div>
@@ -480,11 +482,12 @@
 
                     <form id="vista-criar" hidden>
                         <h2>Criar entrega</h2>
-                        <p class="aviso-divisao" role="note">Para pedido Pronto ou Em Produção que ainda não tem entrega. Depois de criada, ela aparece em A programar e pode ser agendada. A baixa (Entregue/Retirado) só é possível quando o pedido estiver Pronto.</p>
+                        <p class="aviso-divisao" role="note">Para pedido Pronto ou Em Produção que ainda não tem entrega. Depois de criada, ela aparece em A programar e pode ser agendada. A baixa (Entregue/Retirado) só é possível quando o pedido estiver Pronto. Pedido que já está Entregue ou Retirado e não aparece em Concluídas (entregue antes da web): use "Registrar entrega antiga" para criá-la já concluída e anexar a folha do checklist assinado.</p>
                         <div class="form-group"><label for="cr-numero">Número do pedido</label><input id="cr-numero" inputmode="numeric" maxlength="10" autocomplete="off"></div>
                         <p class="erro-form" id="erro-criar" role="alert"></p>
                         <div class="acoes">
                             <button type="submit" class="btn btn-primary" id="btn-confirmar-criar" data-perm="entregas.criar">Criar entrega</button>
+                            <button type="button" class="btn btn-secondary" id="btn-registrar-antiga" data-perm="entregas.criar" title="Para pedido que já está Entregue ou Retirado e nunca teve entrega no sistema (feito pelo VB): cria a entrega já concluída, para anexar a folha do checklist assinado">Registrar entrega antiga</button>
                             <button type="button" class="btn btn-secondary voltar">Voltar</button>
                         </div>
                     </form>

@@ -257,3 +257,75 @@ test('tela do motorista: botao no cartao (perm do motorista ou administrativo), 
   assert.match(js, /Checklist assinado ✓/);
   assert.ok(e.checklistAssinado);
 });
+
+// ---- folhas antigas pelo computador (2026-11-17): arquivo em vez de camera, entrega concluida, "Registrar entrega antiga" ----
+test('equipe: entrega Entregue e Retirado aceitam a foto (nada muda no status nem no pedido); so cancelada e recusada', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  cenario(banco);
+  banco.semear.pedido({ NUMERO: 606, SITUACAO: 'Retirado' });
+  banco.semear.entrega({ status: 'retirado', numero: 606 });
+  for (const id of [3, 6]) {
+    assert.equal((await enviarEquipe(chamar, id)).status, 201);
+    const d = await (await chamar(`/entregas/${id}`)).json();
+    assert.equal(d.anexos.filter(a => a.tipo === 'checklist').length, 1); // o detalhe da concluida devolve a foto para a tela mostrar
+  }
+  assert.equal(banco.entregas.find(e => e.id === 3).status, 'entregue');
+  assert.equal(banco.entregas.find(e => e.id === 6).status, 'retirado');
+  assert.equal((await enviarEquipe(chamar, 4)).status, 409);
+});
+
+test('registrar entrega antiga: pedido Entregue/Retirado sem entrega ganha entrega JA concluida, evento, auditoria; pedido intacto; depois aceita foto', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente();
+  banco.semear.pedido({ NUMERO: 701, SITUACAO: 'Entregue' });
+  banco.semear.pedido({ NUMERO: 702, SITUACAO: 'Retirado' });
+  const reg = n => chamar(`/entregas/pedido/${n}/registrar_antiga`, 'POST', {});
+  const r = await reg(701);
+  assert.equal(r.status, 201);
+  const j = await r.json();
+  assert.equal(j.entrega.status, 'entregue');
+  assert.equal((await (await reg(702)).json()).entrega.status, 'retirado');
+  assert.equal(banco.entregas.length, 2);
+  assert.equal(banco.eventos.filter(v => v.tipo === 'criada').length, 2);
+  assert.equal(banco.auditoria.filter(x => x.acao === 'entrega_antiga_registrada' && x.alvo === '701').length, 1);
+  assert.equal(banco.pedidos.find(p => p.NUMERO === 701).SITUACAO, 'Entregue');
+  // a varredura (abrir Entregas) nao mexe nela, e ela aparece como concluida
+  const lista = await (await chamar('/entregas')).json();
+  assert.deepEqual(lista.entregas.map(e => e.status).sort(), ['entregue', 'retirado']);
+  assert.equal(banco.eventos.filter(v => v.tipo !== 'criada').length, 0);
+  // repetir = 409 (ja tem entrega); foto vale na entrega registrada
+  const dup = await reg(701);
+  assert.equal(dup.status, 409);
+  assert.match((await dup.json()).error, /já tem entrega/);
+  assert.equal((await enviarEquipe(chamar, j.entrega.id)).status, 201);
+});
+
+test('registrar entrega antiga: recusa Pronto/Em Producao/Cancelado (409), inexistente (404) e nao cria nada', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente();
+  banco.semear.pedido({ NUMERO: 711, SITUACAO: 'Pronto' });
+  banco.semear.pedido({ NUMERO: 712, SITUACAO: 'Em Produção' });
+  banco.semear.pedido({ NUMERO: 713, SITUACAO: 'Cancelado' });
+  for (const n of [711, 712, 713]) assert.equal((await chamar(`/entregas/pedido/${n}/registrar_antiga`, 'POST', {})).status, 409);
+  assert.equal((await chamar('/entregas/pedido/999/registrar_antiga', 'POST', {})).status, 404);
+  assert.equal(banco.entregas.length, 0);
+});
+
+test('registrar entrega antiga: rota exige entregas.criar e o sistema continua sem tabela nova', () => {
+  assert.match(ler('rotas/entregas.js'), /rota\('post', '\/entregas\/pedido\/:numero\/registrar_antiga', CRIAR,/);
+});
+
+test('tela da equipe: "Escolher arquivo(s)" sem capture, JPEG/PNG, multiplo, mesmo PUT com chave, reduz no navegador, limite de 6; registrar antiga', () => {
+  const h = ler('entregas.html'), js = ler('entregas.js');
+  assert.match(h, /id="btn-arquivo-checklist"[^>]*data-perm="entregas\.checklist_assinado"/);
+  assert.match(h, /<input type="file" id="in-arquivo-checklist" accept="image\/jpeg,image\/png" multiple hidden>/);
+  assert.doesNotMatch(h, /id="in-arquivo-checklist"[^>]*capture/);
+  assert.match(js, /MAX_FOTOS_CHECKLIST = 6/);
+  assert.match(js, /CameraCaptura\.reduzirParaCaber\(img\.naturalWidth, img\.naturalHeight/);
+  assert.match(js, /\/checklist_assinado\?chave=\$\{encodeURIComponent\(win\.CameraCaptura\.novaChave\(win\)\)\}`, \{ metodo: 'PUT', binario: blob, mime: 'image\/jpeg' \}/);
+  assert.match(js, /\$\('btn-arquivo-checklist'\)\.hidden = e\.status === 'cancelada'/); // aparece na entrega concluida
+  assert.doesNotMatch(js.slice(js.indexOf('async function enviarArquivosChecklist'), js.indexOf('function perguntarBaixaDepoisDaFoto')), /perguntarBaixa/); // nunca pergunta da baixa
+  assert.match(h, /id="btn-registrar-antiga"[^>]*data-perm="entregas\.criar"/);
+  assert.match(js, /\/registrar_antiga`, \{ metodo: 'POST'/);
+  assert.match(h, /entregas\.js\?v=202611271000/);
+});

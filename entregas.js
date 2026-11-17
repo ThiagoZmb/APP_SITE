@@ -714,6 +714,7 @@
       const acoes = acoesDisponiveis(e);
       ['agendar', 'reagendar', 'cancelar', 'retirada', 'enviada', 'comprovante'].forEach(a => { $('btn-' + a).hidden = !acoes.includes(a); });
       $('btn-foto-checklist').hidden = e.status === 'cancelada'; // antes ou depois da baixa; o servidor também recusa cancelada
+      $('btn-arquivo-checklist').hidden = e.status === 'cancelada'; // mesma regra, a partir de arquivo (folhas antigas, pelo computador)
       $('btn-editar').hidden = !podeEditarEntrega(e); // concluída/cancelada não edita; o servidor também recusa
       $('btn-baixa-adm').hidden = !(podeBaixaAdministrativa(e) || podeBaixaDoMotorista(e)); // administrativo.ver ou motorista dono (entregas.baixar), ver baixaPermitida; o servidor confere
       $('btn-agendar-retirada').hidden = !acoes.includes('agendar'); // mesma regra do Agendar: só A programar
@@ -858,6 +859,25 @@
           $('erro-criar').textContent = err.message; return;
         }
         toast(`Entrega criada para o pedido ${numero}.`, 'ok');
+        await carregar();
+        if (r && r.entrega) await abrirDetalhe(r.entrega.id); else mostrar('vazio-painel');
+      });
+    }
+
+    // Registrar entrega antiga: pedido já Entregue/Retirado sem nenhuma entrega no sistema; nasce concluída (não muda o pedido)
+    function enviarRegistrarAntiga() {
+      const numero = txt($('cr-numero').value);
+      if (!/^[0-9]{1,10}$/.test(numero) || Number(numero) < 1) { $('erro-criar').textContent = 'Informe o número do pedido (somente dígitos).'; return; }
+      $('erro-criar').textContent = '';
+      return ocupado(async () => {
+        let r;
+        try { r = await chamar(`/entregas/pedido/${encodeURIComponent(numero)}/registrar_antiga`, { metodo: 'POST', corpo: {} }); } catch (err) {
+          await carregar();
+          const alvo = entregaParaAbrir(entregasDoPedido(estado.lista, numero));
+          if (alvo && /já tem entrega/.test(err.message || '')) { toast(`O pedido ${numero} já tem entrega: aberta ao lado.`, 'ok'); await abrirDetalhe(alvo.id); return; }
+          $('erro-criar').textContent = err.message; return;
+        }
+        toast(`Entrega antiga registrada para o pedido ${numero}.`, 'ok');
         await carregar();
         if (r && r.entrega) await abrirDetalhe(r.entrega.id); else mostrar('vazio-painel');
       });
@@ -1020,6 +1040,62 @@
           if (registrou) perguntarBaixaDepoisDaFoto(e.id);
         }
       });
+    }
+    // ---------- foto do checklist assinado a partir de ARQUIVO (PC, folhas antigas escaneadas/fotografadas; 2026-11-17) ----------
+    // Mesmo PUT, mesma chave de idempotência e mesmos limites da câmera (até 6 por entrega, 1 MB cada): a imagem é reduzida no navegador
+    // (JPEG, até 2000 px) antes de enviar. Vale para entrega concluída (não pergunta da baixa: o botão de baixa nem aparece). Um arquivo por vez.
+    const MAX_FOTOS_CHECKLIST = 6;
+    const lerArquivoImagem = arquivo => new Promise((ok, falha) => {
+      const url = win.URL.createObjectURL(arquivo), i = new win.Image();
+      i.onload = () => { win.URL.revokeObjectURL(url); ok(i); };
+      i.onerror = () => { win.URL.revokeObjectURL(url); falha(new Error('Não foi possível ler a imagem.')); };
+      i.src = url;
+    });
+    async function reduzirArquivoChecklist(arquivo) {
+      const img = await lerArquivoImagem(arquivo);
+      return win.CameraCaptura.reduzirParaCaber(img.naturalWidth, img.naturalHeight, (l, a, q) => new Promise(ok => {
+        const c = doc.createElement('canvas'); c.width = l; c.height = a;
+        c.getContext('2d').drawImage(img, 0, 0, l, a);
+        c.toBlob(ok, 'image/jpeg', q);
+      }));
+    }
+    async function enviarArquivosChecklist(arquivos) {
+      if (!estado.det || !win.CameraCaptura || estado.enviandoArquivos) return;
+      const e = estado.det.entrega;
+      const livres = Math.max(0, MAX_FOTOS_CHECKLIST - fotosChecklist(estado.det.anexos).length);
+      if (!livres) { toast(`Esta entrega já tem ${MAX_FOTOS_CHECKLIST} fotos do checklist assinado.`, 'erro'); return; }
+      const lista = arquivos.slice(0, livres);
+      const sobraram = arquivos.length - lista.length;
+      estado.enviandoArquivos = true;
+      const botao = $('btn-arquivo-checklist'), rotulo = botao.textContent;
+      botao.disabled = true;
+      let enviados = 0;
+      try {
+        for (let i = 0; i < lista.length; i++) {
+          botao.textContent = `Enviando ${i + 1} de ${lista.length}…`;
+          try {
+            const blob = await reduzirArquivoChecklist(lista[i]);
+            const r = await chamar(`/entregas/${encodeURIComponent(e.id)}/checklist_assinado?chave=${encodeURIComponent(win.CameraCaptura.novaChave(win))}`, { metodo: 'PUT', binario: blob, mime: 'image/jpeg' });
+            enviados++;
+            if (estado.det && estado.det.entrega.id === e.id) {
+              const a = { id: r.anexoId, tipo: 'checklist', mime: 'image/jpeg', criadoEm: win.CameraCaptura.agoraTexto() };
+              estado.det.anexos.push(a);
+              const caixa = $('d-anexos');
+              caixa.querySelectorAll('.det-vazio').forEach(x => x.remove());
+              carregarAnexo(e.id, a, caixa);
+              $('d-status').innerHTML = selo(statusDaEntrega(e)) + seloProducao((estado.det.divisao || {}).situacaoPedido) + seloChecklist(estado.det.anexos);
+            }
+          } catch (err) {
+            toast(`${lista[i].name || 'Arquivo ' + (i + 1)}: ${err.message}`, 'erro');
+            if (err && err.status === 409) break; // limite atingido ou entrega cancelada: os próximos também seriam recusados
+          }
+        }
+      } finally {
+        estado.enviandoArquivos = false;
+        botao.disabled = false; botao.textContent = rotulo;
+      }
+      if (enviados) toast(enviados === 1 ? 'Foto do checklist assinado registrada.' : `${enviados} fotos do checklist assinado registradas.`, 'ok');
+      if (sobraram > 0) toast(`Só cabem ${MAX_FOTOS_CHECKLIST} fotos por entrega: ${sobraram} arquivo(s) não foram enviados.`, 'erro');
     }
     // "Deseja já dar a baixa nesta entrega?" (2026-11-17): só se o botão de baixa já está visível para este usuário/entrega
     // (Dar baixa da entrega, ou Retirada/Comprovante com entregas.concluir). "Sim" faz o mesmo clique desse botão (abre o formulário);
@@ -1221,6 +1297,7 @@
     function ligar() {
       doc.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { estado.aba = b.getAttribute('data-aba'); estado.pedidoFiltro = ''; desenharLista(); }));
       $('btn-atualizar').addEventListener('click', atualizar);
+      $('btn-registrar-antiga').addEventListener('click', enviarRegistrarAntiga);
       $('btn-criar-entrega').addEventListener('click', () => abrirForm('vista-criar', ['cr-numero']));
       $('busca').addEventListener('input', ev => { estado.busca = ev.target.value.trim(); desenharLista(); });
       $('lista').addEventListener('click', ev => {
@@ -1298,6 +1375,14 @@
       $('btn-checklist').addEventListener('click', ev => { if (checklist && estado.det) checklist.abrir(estado.det.entrega.id, ev.currentTarget); });
       $('btn-folha-branco').addEventListener('click', () => { if (checklist) checklist.abrirBranco(); });
       $('btn-foto-checklist').addEventListener('click', fotografarChecklist);
+      $('btn-arquivo-checklist').addEventListener('click', () => { if (estado.det && !estado.enviandoArquivos) $('in-arquivo-checklist').click(); });
+      $('in-arquivo-checklist').addEventListener('change', ev => {
+        const arquivos = [...ev.target.files].filter(f => /^image\/(jpeg|png)$/.test(f.type || ''));
+        const recusados = ev.target.files.length - arquivos.length;
+        ev.target.value = '';
+        if (recusados) toast(`${recusados} arquivo(s) ignorados: só JPEG ou PNG.`, 'erro');
+        if (arquivos.length) enviarArquivosChecklist(arquivos);
+      });
       $('btn-retirada').addEventListener('click', () => abrirForm('vista-retirada', ['r-entregue', 'r-foto']));
       $('btn-baixa-adm').addEventListener('click', () => {
         abrirForm('vista-baixa-adm', ['ba-quem', 'ba-foto']);
