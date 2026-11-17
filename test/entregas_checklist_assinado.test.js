@@ -300,6 +300,38 @@ test('registrar entrega antiga: pedido Entregue/Retirado sem entrega ganha entre
   assert.equal((await enviarEquipe(chamar, j.entrega.id)).status, 201);
 });
 
+test('registrar entrega antiga: a data real do pedido (DATA_ENTREGA) vira a data da entrega; vazia/invalida fica sem data; lista e detalhe mostram', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente();
+  banco.semear.pedido({ NUMERO: 721, SITUACAO: 'Entregue', DATA_ENTREGA: '2026-10-23 00:00:00' });
+  banco.semear.pedido({ NUMERO: 722, SITUACAO: 'Retirado', DATA_ENTREGA: null });
+  banco.semear.pedido({ NUMERO: 723, SITUACAO: 'Entregue', DATA_ENTREGA: '0000-00-00' });
+  const r = await (await chamar('/entregas/pedido/721/registrar_antiga', 'POST', {})).json();
+  assert.equal(r.entrega.dataAgendada, '2026-10-23');
+  assert.equal(banco.entregas.find(e => e.numero === 721).data_agendada, '2026-10-23');
+  for (const n of [722, 723]) assert.equal((await (await chamar(`/entregas/pedido/${n}/registrar_antiga`, 'POST', {})).json()).entrega.dataAgendada, null);
+  const lista = (await (await chamar('/entregas')).json()).entregas;
+  assert.equal(lista.find(e => e.numero === 721).dataAgendada, '2026-10-23');
+  assert.equal(lista.find(e => e.numero === 722).dataAgendada, null);
+  assert.equal((await (await chamar(`/entregas/${r.entrega.id}`)).json()).entrega.dataAgendada, '2026-10-23');
+  assert.equal(banco.pedidos.find(p => p.NUMERO === 721).DATA_ENTREGA, '2026-10-23 00:00:00'); // pedido intacto
+});
+
+test('entrega concluida ja registrada SEM data usa ped_orc.DATA_ENTREGA como reserva (lista e detalhe); aberta nunca', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  banco.semear.cliente();
+  banco.semear.pedido({ NUMERO: 731, SITUACAO: 'Entregue', DATA_ENTREGA: '2026-10-23' });
+  banco.semear.entrega({ numero: 731, status: 'entregue' });
+  banco.semear.pedido({ NUMERO: 732, SITUACAO: 'Pronto', DATA_ENTREGA: '2026-10-24' });
+  banco.semear.entrega({ numero: 732, status: 'a_programar' });
+  const lista = (await (await chamar('/entregas')).json()).entregas;
+  assert.equal(lista.find(e => e.numero === 731).dataAgendada, '2026-10-23');
+  assert.equal(lista.find(e => e.numero === 732).dataAgendada, null);
+  const id = banco.entregas.find(e => e.numero === 731).id;
+  assert.equal((await (await chamar(`/entregas/${id}`)).json()).entrega.dataAgendada, '2026-10-23');
+  assert.equal(banco.entregas.find(e => e.id === id).data_agendada, null); // so leitura: nada gravado
+});
+
 test('registrar entrega antiga: recusa Pronto/Em Producao/Cancelado (409), inexistente (404) e nao cria nada', async t => {
   const { banco, chamar } = await prepararEntregas(t);
   banco.semear.cliente();

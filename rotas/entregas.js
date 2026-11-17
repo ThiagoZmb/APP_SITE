@@ -395,6 +395,10 @@ async function motoristasValidos(conn) {
 }
 
 const dia = v => (v ? String(v).slice(0, 10) : null);
+// data válida AAAA-MM-DD do banco (vazia, '0000-00-00' ou lixo = null; nunca inventa)
+const diaValido = v => { const d = dia(v); return d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d !== '0000-00-00' ? d : null; };
+// entrega CONCLUÍDA sem data própria (ex.: entrega antiga registrada): usa a data real de entrega do pedido (ped_orc.DATA_ENTREGA), só leitura
+const dataDaEntrega = (r, dataPedido) => dia(r.data_agendada) || (['entregue', 'retirado'].includes(r.status) ? diaValido(dataPedido) : null);
 const paraEntrega = r => ({
   id: r.id, numero: r.numero, status: r.status, tipo: r.tipo || null, dataAgendada: dia(r.data_agendada), motoristaCodigo: r.motorista_codigo ?? null,
   endereco: { rua: r.endereco_rua ?? null, numero: r.endereco_numero ?? null, bairro: r.endereco_bairro ?? null, cidade: r.endereco_cidade ?? null,
@@ -511,7 +515,7 @@ function registrarEntregas({ rota, pool }) {
       if (est.sql) { where.push(est.sql); params.push(...est.params); }
       // a lista e as sobras dos pedidos divididos são independentes: saem juntas (uma ida ao banco a menos de espera)
       const [[linhas, itensPedidos], sobras] = await Promise.all([pool.execute(
-        `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
+        `SELECT e.id, e.numero, e.status, e.tipo, CAST(e.data_agendada AS CHAR) AS data_agendada, CAST(p.DATA_ENTREGA AS CHAR) AS data_entrega_pedido, CAST(p.DATA_PRONTO AS CHAR) AS data_prometida, CAST(p.DATA AS CHAR) AS data_pedido,
                 p.RAZAO_SOCIAL AS cliente, p.CLIENTE_FINAL AS cliente_final, COALESCE(e.endereco_cidade, c.CIDADE) AS cidade, COALESCE(e.endereco_uf, c.ESTADO) AS uf,
                 u.NOME AS motorista, p.SITUACAO AS situacao_pedido,
                 (SELECT v.usuario FROM web_entrega_eventos v WHERE v.entrega_id = e.id AND v.tipo = 'cancelada' ORDER BY v.id DESC LIMIT 1) AS cancelada_por,
@@ -532,7 +536,7 @@ function registrarEntregas({ rota, pool }) {
         statusExibicao: statusExibicao({ status: l.status, situacaoPedido: l.situacao_pedido, canceladaPor: l.cancelada_por }), cliente: l.cliente || '', clienteFinal: l.cliente_final || '', cidade: l.cidade || '', uf: l.uf || '',
         dataPrometida: l.data_prometida ? String(l.data_prometida).slice(0, 10) : null, // previsão de ficar pronto (ped_orc.DATA_PRONTO)
         dataPedido: l.data_pedido ? String(l.data_pedido).slice(0, 10) : null,
-        dataAgendada: l.data_agendada ? String(l.data_agendada).slice(0, 10) : null,
+        dataAgendada: dataDaEntrega(l, l.data_entrega_pedido),
         motorista: l.motorista || null, qtdOcorrencias: Number(l.qtd_ocorrencias) || 0, situacaoPedido: l.situacao_pedido || null,
         ...camposOrdem(l), ...(itensPedidos.get(Number(l.numero)) || {})
       })), sobras });
@@ -562,7 +566,7 @@ function registrarEntregas({ rota, pool }) {
     try {
       const est = filtroEstados(req, 'c.ESTADO');
       const [[r]] = await pool.execute(
-        `SELECT e.*, p.SITUACAO AS situacao_pedido, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido,
+        `SELECT e.*, p.SITUACAO AS situacao_pedido, p.RAZAO_SOCIAL AS cliente, p.DATA_PRONTO AS prometida, p.DATA AS data_pedido, CAST(p.DATA_ENTREGA AS CHAR) AS data_entrega_pedido,
                 c.ENDERECO AS cli_endereco, c.NUMERO AS cli_numero, c.BAIRRO AS cli_bairro, c.CIDADE AS cli_cidade,
                 c.CODIGO AS cli_codigo, c.ESTADO AS cli_estado, c.CEP AS cli_cep, c.TELEFONE AS cli_telefone, mu.NOME AS motorista_nome
          FROM web_entregas e
@@ -592,7 +596,7 @@ function registrarEntregas({ rota, pool }) {
         divisao: { ...ordem, dividido: !!d?.dividido, alterado: !!d?.alterado, situacaoPedido: r.situacao_pedido ?? null,
           podeSeparar: STATUS_DIVISIVEIS.includes(r.status) && SITUACOES_DIVIDEM.includes(r.situacao_pedido) && !d?.alterado && itensEntrega.length > 0,
           itensSemEntrega: d ? itensResumo(d.sobra) : [] },
-        entrega: { ...paraEntrega(r), motoristaNome: r.motorista_nome || null, minha: r.tipo === 'motorista' && Number(r.motorista_codigo) === DONO(req), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
+        entrega: { ...paraEntrega(r), dataAgendada: dataDaEntrega(r, r.data_entrega_pedido), motoristaNome: r.motorista_nome || null, minha: r.tipo === 'motorista' && Number(r.motorista_codigo) === DONO(req), statusExibicao: statusExibicao({ status: r.status, situacaoPedido: r.situacao_pedido,
           canceladaPor: [...eventos].reverse().find(v => v.tipo === 'cancelada')?.usuario }), cliente: r.cliente || '', dataPrometida: dia(r.prometida), dataPedido: dia(r.data_pedido) },
         eventos: eventos.map(v => ({ id: v.id, quando: v.quando, usuario: v.usuario, tipo: v.tipo, motivo: v.motivo ?? null, entregueA: v.entregue_a ?? null,
           detalhe: typeof v.detalhe === 'string' ? (() => { try { return JSON.parse(v.detalhe); } catch { return null; } })() : (v.detalhe ?? null) })),
@@ -991,7 +995,7 @@ function registrarEntregas({ rota, pool }) {
     if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
     const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/criar', async conn => {
       // ordem de trava ped_orc -> web_entregas (a mesma da baixa e da divisão)
-      const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
+      const [ped] = await conn.execute("SELECT SITUACAO, CAST(DATA_ENTREGA AS CHAR) AS DATA_ENTREGA FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
       if (!ped[0]) throw new ErroUsuario(404, 'Pedido não encontrado.');
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) {
@@ -1023,13 +1027,13 @@ function registrarEntregas({ rota, pool }) {
 
   // ==== Registrar entrega antiga (2026-11-17): pedido já Entregue/Retirado (feito pelo VB) que NUNCA teve linha em web_entregas ====
   // A varredura só cria entrega para pedido Pronto; sem esta rota não há como anexar a foto do checklist assinado de pedido antigo.
-  // Nasce JÁ CONCLUÍDA (entregue/retirado, como a situação do pedido), sem tipo/data/motorista, com evento 'criada' e auditoria.
+  // Nasce JÁ CONCLUÍDA (entregue/retirado, como a situação do pedido), sem tipo/motorista e com a data real de entrega do pedido (DATA_ENTREGA, se válida), com evento 'criada' e auditoria.
   // NÃO muda o pedido (nem situação, nem data), não mexe em estoque/caixa; só com pedido sem nenhuma entrega.
   rota('post', '/entregas/pedido/:numero/registrar_antiga', CRIAR, async (req, res) => {
     const numero = numeroDe(req);
     if (numero === null) return res.status(404).json({ error: 'Pedido não encontrado.' });
     const r = await emTransacao(pool, res, 'POST /entregas/pedido/:numero/registrar_antiga', async conn => {
-      const [ped] = await conn.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
+      const [ped] = await conn.execute("SELECT SITUACAO, CAST(DATA_ENTREGA AS CHAR) AS DATA_ENTREGA FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [numero]);
       if (!ped[0]) throw new ErroUsuario(404, 'Pedido não encontrado.');
       const est = filtroEstados(req, 'c.ESTADO');
       if (est.sql) {
@@ -1044,11 +1048,13 @@ function registrarEntregas({ rota, pool }) {
       const [existentes] = await conn.execute('SELECT * FROM web_entregas WHERE numero = ? ORDER BY sequencia, id FOR UPDATE', [numero]);
       if (existentes.length) throw new ErroUsuario(409, 'Este pedido já tem entrega no sistema: procure por ele na aba Concluídas.');
       const agora = agoraLocal();
-      const [ins] = await conn.execute('INSERT INTO web_entregas (numero, sequencia, status, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?)',
-        [numero, 1, status, agora, agora]);
+      // a data real de entrega do pedido (ped_orc.DATA_ENTREGA, só lida) vira a data da entrega; vazia/inválida = sem data (nunca inventa)
+      const dataReal = diaValido(ped[0].DATA_ENTREGA);
+      const [ins] = await conn.execute('INSERT INTO web_entregas (numero, sequencia, status, data_agendada, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?, ?)',
+        [numero, 1, status, dataReal, agora, agora]);
       await evento(conn, ins.insertId, agora, req.acesso.nome, 'criada', `Entrega antiga registrada pela equipe (pedido ${situacao} fora da web)`, null);
       await auditar(conn, agora, req.acesso.nome, 'entrega_antiga_registrada', numero, { entregaId: ins.insertId, situacaoPedido: situacao, status });
-      return { entrega: paraEntrega({ id: ins.insertId, numero, sequencia: 1, status, criado_em: agora, atualizado_em: agora }), situacaoPedido: situacao };
+      return { entrega: paraEntrega({ id: ins.insertId, numero, sequencia: 1, status, data_agendada: dataReal, criado_em: agora, atualizado_em: agora }), situacaoPedido: situacao };
     });
     if (r) res.status(201).json(r);
   });

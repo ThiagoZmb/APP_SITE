@@ -142,6 +142,8 @@ function bancoEntregas() {
 
     // ---- baixa com várias entregas por pedido (etapa 3): trava do pedido antes da entrega e releitura das entregas ----
     [/^SELECT numero FROM web_entregas WHERE id = \?$/, (sql, [id]) => entregas.filter(e => e.id === id).map(e => ({ numero: e.numero }))],
+    [/^SELECT SITUACAO, CAST\(DATA_ENTREGA AS CHAR\) AS DATA_ENTREGA FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido' FOR UPDATE$/, (sql, [numero]) =>
+      pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO, DATA_ENTREGA: x.DATA_ENTREGA ?? null }))],
     [/^SELECT SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido' FOR UPDATE$/, (sql, [numero]) =>
       pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO }))],
     [/^SELECT e\.id, e\.status, e\.hash_itens, \(SELECT COUNT\(\*\) FROM web_entrega_itens i WHERE i\.entrega_id = e\.id\) AS qtd_linhas_itens\s+FROM web_entregas e WHERE e\.numero = \? FOR UPDATE$/, (sql, [numero]) =>
@@ -202,7 +204,7 @@ function bancoEntregas() {
           || String(a.e.data_agendada).localeCompare(String(b.e.data_agendada)) || a.e.numero - b.e.numero)
         .map(({ e, ped, cli }) => ({
           id: e.id, numero: e.numero, status: e.status, tipo: e.tipo, data_agendada: e.data_agendada,
-          data_prometida: ped.DATA_PRONTO || null, data_pedido: ped.DATA || null, cliente: ped.RAZAO_SOCIAL, situacao_pedido: ped.SITUACAO ?? null,
+          data_prometida: ped.DATA_PRONTO || null, data_pedido: ped.DATA || null, data_entrega_pedido: ped.DATA_ENTREGA || null, cliente: ped.RAZAO_SOCIAL, situacao_pedido: ped.SITUACAO ?? null,
           cidade: e.endereco_cidade || cli?.CIDADE || null, uf: e.endereco_uf || cli?.ESTADO || null,
           motorista: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME || null,
           qtd_ocorrencias: String(eventos.filter(v => v.entrega_id === e.id && OCORRENCIAS.includes(v.tipo)).length),
@@ -276,7 +278,7 @@ function bancoEntregas() {
       const e = entregas.find(x => x.id === id); if (!e) return [];
       const ped = pedidoDe(e); const cli = clienteDe(ped);
       if (sql.includes('c.ESTADO IN') && !(cli && estados.includes(cli.ESTADO))) return [];
-      return [{ ...e, situacao_pedido: ped?.SITUACAO ?? null, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_PRONTO ?? null, data_pedido: ped?.DATA ?? null,
+      return [{ ...e, situacao_pedido: ped?.SITUACAO ?? null, cliente: ped?.RAZAO_SOCIAL ?? null, prometida: ped?.DATA_PRONTO ?? null, data_pedido: ped?.DATA ?? null, data_entrega_pedido: ped?.DATA_ENTREGA ?? null,
         cli_endereco: cli?.ENDERECO ?? null, cli_numero: cli?.NUMERO ?? null, cli_bairro: cli?.BAIRRO ?? null, cli_cidade: cli?.CIDADE ?? null,
         cli_estado: cli?.ESTADO ?? null, cli_cep: cli?.CEP ?? null, cli_telefone: cli?.TELEFONE ?? null,
         motorista_nome: usuarios.find(u => u.CODIGO === e.motorista_codigo)?.NOME ?? null }];
