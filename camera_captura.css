@@ -18,6 +18,13 @@
 .cc-pergunta { width: 100%; max-width: 440px; padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--white); color: var(--text-dark); font-family: var(--font); }
 .cc-pergunta-titulo { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
 .cc-pergunta-dica { margin: 0 0 16px; font-size: 14px; color: var(--text-mid); }
+.cc-pergunta-data { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+.cc-pergunta-opcao { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; cursor: pointer; }
+.cc-pergunta-opcao input { width: 20px; height: 20px; flex: none; }
+.cc-pergunta-campo { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; color: var(--text-dark); background: var(--white); }
+.cc-pergunta-campo:disabled { opacity: 0.5; }
+.cc-pergunta-erro { margin: 0 0 12px; min-height: 0; font-size: 14px; color: var(--danger-fg); }
+.cc-pergunta-erro:empty { display: none; }
 .cc-pergunta-barra { display: flex; flex-wrap: wrap; gap: 10px; }
 .cc-pergunta-barra .btn { flex: 1 1 160px; }
 @media (orientation: landscape) and (max-height: 520px) {

@@ -315,26 +315,70 @@
     return { fechar: () => encerrar('cancelar'), get estado() { return maq.estado; } };
   }
 
-  // Pergunta "Deseja já dar a baixa nesta entrega?" depois da foto do checklist (2026-11-17). Nunca dá a baixa sozinha:
-  // "Sim" só chama aoSim (a tela abre o formulário de baixa de sempre); "Agora não" (ou Esc) só fecha.
+  // ---- data da baixa (2026-11-17): "Hoje" (nada é enviado; o servidor usa a data de hoje) ou "Outra data" (AAAA-MM-DD, nunca futura) ----
+  const DATA_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function hojeISO(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  function dataBR(iso) { const m = DATA_ISO.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; }
+  function dataIsoValida(s) {
+    const m = DATA_ISO.exec(String(s || ''));
+    if (!m) return false;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+  }
+  // modo 'hoje' -> dataEntrega null (sem data no corpo); 'outra' -> exige data válida e não futura. Devolve { ok, dataEntrega } ou { ok: false, erro }.
+  function escolherDataBaixa(modo, valor, hoje) {
+    if (modo !== 'outra') return { ok: true, dataEntrega: null };
+    const v = String(valor || '').trim();
+    if (!v) return { ok: false, erro: 'Informe a data da entrega.' };
+    if (!dataIsoValida(v)) return { ok: false, erro: 'Data da entrega inválida.' };
+    if (v > hoje) return { ok: false, erro: 'A data da entrega não pode ser futura.' };
+    return { ok: true, dataEntrega: v };
+  }
+
+  // Pergunta "Deseja já dar a baixa nesta entrega?" depois da foto do checklist (2026-11-17), com a escolha da data da entrega.
+  // Nunca dá a baixa sozinha: "Sim, dar a baixa" só chama aoSim({ dataEntrega }) (dataEntrega = null para "Hoje"; a tela abre o formulário
+  // de baixa de sempre já com a data escolhida); "Não dar baixa agora" (ou Esc) só fecha, e a foto já está salva.
   function perguntarBaixa(win, opcoes) {
     const doc = win.document;
     const o = Object.assign({ pergunta: 'Deseja já dar a baixa nesta entrega?', aoSim: () => {} }, opcoes);
+    const hoje = hojeISO();
     const el = (tag, cls, texto) => { const e = doc.createElement(tag); if (cls) e.className = cls; if (texto !== undefined) e.textContent = texto; return e; };
     const fundo = el('div', 'cc-pergunta-fundo');
     const caixa = el('div', 'cc-pergunta');
     caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-labelledby', 'cc-pergunta-titulo');
     const t = el('p', 'cc-pergunta-titulo', o.pergunta); t.id = 'cc-pergunta-titulo';
     const dica = el('p', 'cc-pergunta-dica', 'A foto do checklist já foi enviada. A baixa é um passo à parte e só acontece se você confirmar.');
+    const grupo = el('div', 'cc-pergunta-data'); grupo.setAttribute('role', 'radiogroup'); grupo.setAttribute('aria-label', 'Data da entrega');
+    const opcao = (valor, rotulo, id) => {
+      const lab = el('label', 'cc-pergunta-opcao'); lab.setAttribute('for', id);
+      const r = el('input'); r.type = 'radio'; r.name = 'cc-data-baixa'; r.value = valor; r.id = id; r.checked = valor === 'hoje';
+      lab.append(r, el('span', null, rotulo));
+      return { lab, r };
+    };
+    const oHoje = opcao('hoje', `Hoje (${dataBR(hoje)})`, 'cc-data-hoje');
+    const oOutra = opcao('outra', 'Outra data', 'cc-data-outra');
+    const campo = el('input', 'cc-pergunta-campo'); campo.type = 'date'; campo.id = 'cc-data-valor'; campo.max = hoje; campo.disabled = true;
+    campo.setAttribute('aria-label', 'Outra data da entrega');
+    const erro = el('p', 'cc-pergunta-erro'); erro.setAttribute('role', 'alert');
+    grupo.append(oHoje.lab, oOutra.lab, campo);
     const barra = el('div', 'cc-pergunta-barra');
     const fechar = () => { doc.removeEventListener('keydown', aoTecla); fundo.remove(); };
     const aoTecla = ev => { if (ev.key === 'Escape') fechar(); };
+    const modo = () => (oOutra.r.checked ? 'outra' : 'hoje');
+    const aoMudar = () => { campo.disabled = modo() !== 'outra'; erro.textContent = ''; if (!campo.disabled && campo.focus) campo.focus({ preventScroll: true }); };
+    oHoje.r.addEventListener('change', aoMudar);
+    oOutra.r.addEventListener('change', aoMudar);
     const sim = el('button', 'btn btn-primary cc-grande cc-pergunta-sim', 'Sim, dar a baixa'); sim.type = 'button';
-    const nao = el('button', 'btn btn-secondary cc-grande cc-pergunta-nao', 'Agora não'); nao.type = 'button';
-    sim.addEventListener('click', () => { fechar(); try { o.aoSim(); } catch { /* a tela de trás não derruba a pergunta */ } });
+    const nao = el('button', 'btn btn-secondary cc-grande cc-pergunta-nao', 'Não dar baixa agora'); nao.type = 'button';
+    sim.addEventListener('click', () => {
+      const r = escolherDataBaixa(modo(), campo.value, hojeISO());
+      if (!r.ok) { erro.textContent = r.erro; if (campo.focus) campo.focus({ preventScroll: true }); return; } // data ruim: a pergunta continua aberta
+      fechar();
+      try { o.aoSim({ dataEntrega: r.dataEntrega }); } catch { /* a tela de trás não derruba a pergunta */ }
+    });
     nao.addEventListener('click', fechar);
     barra.append(sim, nao);
-    caixa.append(t, dica, barra);
+    caixa.append(t, dica, grupo, erro, barra);
     fundo.appendChild(caixa);
     doc.addEventListener('keydown', aoTecla);
     doc.body.appendChild(fundo);
@@ -343,5 +387,5 @@
   }
 
   return { LIMITE_BYTES, LADOS_MAX, QUALIDADES, RESTRICOES, escala, planoReducao, reduzirParaCaber, suportaCamera, pararStream,
-    mensagemErroCamera, novaChave, horaHHMM, agoraTexto, podeTentarDeNovo, criarMaquina, TRANSICOES, capturar, perguntarBaixa };
+    mensagemErroCamera, novaChave, horaHHMM, agoraTexto, podeTentarDeNovo, criarMaquina, TRANSICOES, capturar, perguntarBaixa, escolherDataBaixa, hojeISO, dataBR };
 });

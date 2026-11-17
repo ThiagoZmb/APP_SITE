@@ -154,7 +154,8 @@
     return erros;
   }
 
-  const corpoBaixa = (f, anexoIds) => ({ entregueA: txt(f.entregueA), anexoIds });
+  // dataEntrega (AAAA-MM-DD) só vem da pergunta pós-foto do checklist ("Outra data"); sem ela o corpo é o de sempre e o servidor usa hoje
+  const corpoBaixa = (f, anexoIds, dataEntrega) => ({ entregueA: txt(f.entregueA), anexoIds, ...(dataEntrega ? { dataEntrega } : {}) });
   function corpoOcorrencia(resultado, f) {
     const b = { tipo: resultado, motivo: txt(f.motivo) };
     if (resultado === 'parcial') {
@@ -305,14 +306,17 @@
       $('b-previa').hidden = true; $('b-previa').removeAttribute('src');
     }
 
-    async function abrirBaixa(id) {
+    // `dataEntrega` (opcional): escolhida na pergunta pós-foto do checklist ("Outra data"); null = hoje, como sempre
+    async function abrirBaixa(id, dataEntrega = null) {
       const e = estado.lista.find(x => x.id === id);
       if (!e) return;
       let det = estado.detalhes.get(id);
       if (!det) { det = await chamar(`/minhas_entregas/${encodeURIComponent(id)}`); estado.detalhes.set(id, det); }
       const adm = souAdministrativo();
       const soEntregue = baixaSoEntregue(e, adm, souMotorista());
-      estado.baixa = { entrega: e, det, resultado: null, foto: null, assinatura: null, soEntregue };
+      estado.baixa = { entrega: e, det, resultado: null, foto: null, assinatura: null, soEntregue, dataEntrega: dataEntrega || null };
+      $('b-data-aviso').textContent = dataEntrega ? `Data da entrega: ${C.dataBR(dataEntrega)}` : '';
+      $('b-data-aviso').hidden = !dataEntrega;
       $('b-titulo').textContent = `Pedido ${e.numero}`;
       $('b-cliente').textContent = e.cliente;
       $('b-erro').textContent = '';
@@ -333,7 +337,7 @@
       $('b-form').hidden = false;
       $('b-resultado').textContent = rotuloResultado(resultado);
       $('b-erro').textContent = '';
-      $('b-sec-entregue').hidden = resultado !== 'entregue';
+      $('b-sec-entregue').hidden = resultado !== 'entregue'; // o aviso da data escolhida (b-data-aviso) fica dentro desta seção: só na entrega concluída
       $('b-sec-motivo').hidden = resultado === 'entregue';
       $('b-sec-itens').hidden = resultado !== 'parcial';
       $('b-quem').value = ''; $('b-foto').value = ''; $('b-motivo').value = '';
@@ -463,7 +467,7 @@
             const ids = arquivo ? [await enviarFoto(id, arquivo)] : [];
             if (estado.traco.tem) ids.push(await enviarAssinatura(id));
             fase = 'registro';
-            await chamar(`/minhas_entregas/${encodeURIComponent(id)}/baixa`, { metodo: 'POST', corpo: corpoBaixa(f, ids) });
+            await chamar(`/minhas_entregas/${encodeURIComponent(id)}/baixa`, { metodo: 'POST', corpo: corpoBaixa(f, ids, b.dataEntrega) });
             toast('Entrega registrada.', 'ok');
           } else {
             fase = 'registro';
@@ -515,7 +519,7 @@
       const adm = souAdministrativo();
       if (!e || estado.baixa || !win.CameraCaptura || !win.CameraCaptura.perguntarBaixa) return;
       if (!acoesMotorista(e, adm).includes('baixar') || !(adm || souMotorista())) return;
-      win.CameraCaptura.perguntarBaixa(win, { aoSim: () => { ocupado(() => abrirBaixa(id)); } });
+      win.CameraCaptura.perguntarBaixa(win, { aoSim: ({ dataEntrega } = {}) => { ocupado(() => abrirBaixa(id, dataEntrega || null)); } });
     }
 
     // ---------- eventos ----------

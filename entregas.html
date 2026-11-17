@@ -333,16 +333,16 @@
         }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611271000">
-    <link rel="stylesheet" href="camera_captura.css?v=202611261000">
+    <link rel="stylesheet" href="camera_captura.css?v=202611271000">
     <script src="layout.js?v=202611251100" defer></script>
     <script src="situacoes.js?v=202611191300" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
     <script src="entrega_checklist.js?v=202611191400" defer></script>
-    <script src="camera_captura.js?v=202611261000" defer></script>
+    <script src="camera_captura.js?v=202611271000" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="entrega_editar.js?v=202611251000" defer></script>
-    <script src="entregas.js?v=202611271000" defer></script>
+    <script src="entregas.js?v=202611271100" defer></script>
 </head>
 <body>
     <div class="container">
@@ -505,6 +505,7 @@
 
                     <form id="vista-retirada" hidden>
                         <h2>Baixa de retirada</h2>
+                        <p class="aviso-divisao" id="r-data-aviso" role="status" hidden></p>
                         <div class="form-group"><label for="r-entregue">Entregue a</label><input id="r-entregue" maxlength="190"></div>
                         <div class="form-group"><label for="r-foto">Foto (opcional)</label><input type="file" id="r-foto" accept="image/*"></div>
                         <p class="erro-form" id="erro-retirada" role="alert"></p>
@@ -517,6 +518,7 @@
                     <form id="vista-baixa-adm" hidden>
                         <h2>Baixa da entrega</h2>
                         <p class="aviso-divisao" id="ba-aviso" role="status" hidden></p>
+                        <p class="aviso-divisao" id="ba-data-aviso" role="status" hidden></p>
                         <div class="form-group"><label for="ba-quem">Quem recebeu</label><input id="ba-quem" maxlength="190" autocomplete="off"></div>
                         <div class="form-group"><label for="ba-foto">Foto do canhoto (opcional)</label><input type="file" id="ba-foto" accept="image/*"></div>
                         <p class="erro-form" id="erro-baixa-adm" role="alert"></p>
@@ -542,6 +544,7 @@
 
                     <form id="vista-comprovante" hidden>
                         <h2>Anexar comprovante</h2>
+                        <p class="aviso-divisao" id="k-data-aviso" role="status" hidden></p>
                         <div class="form-group"><label for="k-foto">Foto do comprovante</label><input type="file" id="k-foto" accept="image/*"></div>
                         <div class="form-group"><label for="k-entregue">Entregue a (opcional)</label><input id="k-entregue" maxlength="190"></div>
                         <p class="erro-form" id="erro-comprovante" role="alert"></p>

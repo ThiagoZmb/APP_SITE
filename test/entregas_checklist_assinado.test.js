@@ -359,5 +359,5 @@ test('tela da equipe: "Escolher arquivo(s)" sem capture, JPEG/PNG, multiplo, mes
   assert.doesNotMatch(js.slice(js.indexOf('async function enviarArquivosChecklist'), js.indexOf('function perguntarBaixaDepoisDaFoto')), /perguntarBaixa/); // nunca pergunta da baixa
   assert.match(h, /id="btn-registrar-antiga"[^>]*data-perm="entregas\.criar"/);
   assert.match(js, /\/registrar_antiga`, \{ metodo: 'POST'/);
-  assert.match(h, /entregas\.js\?v=202611271000/);
+  assert.match(h, /entregas\.js\?v=202611271100/);
 });

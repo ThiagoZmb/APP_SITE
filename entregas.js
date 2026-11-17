@@ -1084,12 +1084,22 @@
     // "Deseja já dar a baixa nesta entrega?" (2026-11-17): só se o botão de baixa já está visível para este usuário/entrega
     // (Dar baixa da entrega, ou Retirada/Comprovante com entregas.concluir). "Sim" faz o mesmo clique desse botão (abre o formulário);
     // a baixa em si nunca é automática e a foto já enviada continua como anexo.
+    // Com a data (2026-11-17): a pergunta oferece "Hoje" ou "Outra data"; a escolhida segue para o formulário aberto (aviso "Data da entrega")
+    // e vai no corpo da baixa como `dataEntrega` (só "Outra data"; "Hoje" não manda nada e o servidor usa hoje).
+    const AVISO_DATA_BAIXA = { 'btn-retirada': 'r-data-aviso', 'btn-baixa-adm': 'ba-data-aviso', 'btn-comprovante': 'k-data-aviso' };
     function perguntarBaixaDepoisDaFoto(id) {
       if (!estado.det || estado.det.entrega.id !== id || !win.CameraCaptura || !win.CameraCaptura.perguntarBaixa) return;
       const alvo = ['btn-baixa-adm', 'btn-retirada', 'btn-comprovante'].map($).find(b => b && visivel(b));
       if (!alvo) return;
-      win.CameraCaptura.perguntarBaixa(win, { aoSim: () => { if (visivel(alvo)) alvo.click(); } });
+      win.CameraCaptura.perguntarBaixa(win, { aoSim: ({ dataEntrega } = {}) => {
+        if (!visivel(alvo)) return;
+        alvo.click(); // abre o formulário (abrirForm zera a data); só depois ela é definida
+        estado.dataEntregaBaixa = dataEntrega || null;
+        const aviso = $(AVISO_DATA_BAIXA[alvo.id]);
+        if (aviso && dataEntrega) { aviso.textContent = `Data da entrega: ${dataBR(dataEntrega)}`; aviso.hidden = false; }
+      } });
     }
+    const comDataBaixa = corpo => (estado.dataEntregaBaixa ? { ...corpo, dataEntrega: estado.dataEntregaBaixa } : corpo);
 
     // ---------- baixas: retirada / enviada / comprovante ----------
     function enviarRetirada() {
@@ -1098,7 +1108,7 @@
       if (erro) return;
       const e = estado.det.entrega, arq = $('r-foto').files[0];
       return ocupado(async () => {
-        const corpo = { entregueA: txt($('r-entregue').value), anexoIds: arq ? [await enviarFoto(e.id, arq)] : [] };
+        const corpo = comDataBaixa({ entregueA: txt($('r-entregue').value), anexoIds: arq ? [await enviarFoto(e.id, arq)] : [] });
         await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo });
         toast('Retirada registrada.', 'ok');
         await recarregarTudo(e.id);
@@ -1112,7 +1122,7 @@
       if (erro) return;
       const e = estado.det.entrega, arq = $('ba-foto').files[0];
       return ocupado(async () => {
-        const corpo = { entregueA: quem, anexoIds: arq ? [await enviarFoto(e.id, arq, '/minhas_entregas')] : [] };
+        const corpo = comDataBaixa({ entregueA: quem, anexoIds: arq ? [await enviarFoto(e.id, arq, '/minhas_entregas')] : [] });
         await chamar(`/minhas_entregas/${encodeURIComponent(e.id)}/baixa`, { metodo: 'POST', corpo });
         toast('Baixa registrada.', 'ok');
         await recarregarTudo(e.id);
@@ -1139,7 +1149,7 @@
       const e = estado.det.entrega;
       return ocupado(async () => {
         const id = await enviarFoto(e.id, arq);
-        await chamar(`/entregas/${encodeURIComponent(e.id)}/comprovante`, { metodo: 'POST', corpo: { entregueA: txt($('k-entregue').value), anexoIds: [id] } });
+        await chamar(`/entregas/${encodeURIComponent(e.id)}/comprovante`, { metodo: 'POST', corpo: comDataBaixa({ entregueA: txt($('k-entregue').value), anexoIds: [id] }) });
         toast('Comprovante registrado.', 'ok');
         await recarregarTudo(e.id);
       });
@@ -1274,6 +1284,8 @@
       limpar.forEach(id => { const el = $(id); if (el.type === 'file') el.value = ''; else el.value = ''; });
       doc.querySelectorAll('.erro-form').forEach(x => { x.textContent = ''; });
       estado.anexoEnviado = null;
+      estado.dataEntregaBaixa = null; // a data da pergunta pós-foto só vale para o formulário aberto por ela (perguntarBaixaDepoisDaFoto)
+      Object.values(AVISO_DATA_BAIXA).forEach(id => { const p = $(id); if (p) { p.hidden = true; p.textContent = ''; } });
       mostrar(nome);
     }
 

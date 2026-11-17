@@ -794,6 +794,16 @@ function registrarEntregas({ rota, pool }) {
     return t || null;
   };
 
+  // Data da entrega opcional na baixa (2026-11-17, "Outra data" da pergunta depois da foto do checklist): AAAA-MM-DD válida e nunca
+  // futura; ausente/vazia = hoje (comportamento de sempre). Vira DATA_ENTREGA do pedido quando a baixa o fecha e vai no evento/auditoria.
+  const lerDataEntrega = v => {
+    if (v === undefined || v === null || v === '') return null;
+    const d = typeof v === 'string' ? validarData(v.trim()) : null;
+    if (!d) throw bad('Data da entrega inválida: use AAAA-MM-DD.');
+    if (d > hojeLocal()) throw bad('A data da entrega não pode ser futura.');
+    return d;
+  };
+
   // Como o VB (Pedido_Entregue/Pedido_Retirado): grava SITUACAO e DATA_ENTREGA (data da entrega). Nunca sobrescreve pedido Cancelado.
   // Se o UPDATE não atingir linha, o SELECT distingue "já está no destino" (sucesso, p.ex. o VB já marcou) de cancelado/excluído (409 e rollback).
   const PEDIDO_CANCELADO = 'O pedido foi cancelado ou excluído no sistema; fale com a equipe.';
@@ -801,9 +811,9 @@ function registrarEntregas({ rota, pool }) {
   // e Cancelado seguem as regras de antes: baixarPedido/PEDIDO_CANCELADO)
   const SITUACOES_COM_BAIXA = ['Pronto', 'Entregue', 'Retirado', 'Cancelado'];
   const MSG_BAIXA_NAO_PRONTO = s => `O pedido ainda não está Pronto (situação atual: ${s || '—'}). A baixa só é possível depois que o pedido estiver Pronto.`;
-  async function baixarPedido(c, numero, situacao) {
+  async function baixarPedido(c, numero, situacao, dataEntrega = null) {
     const [up] = await c.execute(
-      "UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = 'Pedido' AND SITUACAO <> 'Cancelado'", [situacao, hojeLocal(), numero]);
+      "UPDATE ped_orc SET SITUACAO = ?, DATA_ENTREGA = ? WHERE NUMERO = ? AND TIPO = 'Pedido' AND SITUACAO <> 'Cancelado'", [situacao, dataEntrega || hojeLocal(), numero]);
     if (up.affectedRows === 1) return;
     const [[p]] = await c.execute("SELECT SITUACAO FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido'", [numero]);
     if (p && p.SITUACAO === situacao) return;
@@ -851,15 +861,16 @@ function registrarEntregas({ rota, pool }) {
   // Regra da última baixa: o pedido só vira Entregue/Retirado (com DATA_ENTREGA) quando esta baixa conclui a última entrega
   // não cancelada e não sobra item sem entrega; senão continua como está (Pronto) e a baixa fica só na entrega (evento + auditoria).
   // Com UMA entrega por pedido (todas as anteriores à divisão) é exatamente o comportamento de antes.
-  const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, usuario }) => async (conn, atual) => ({
-    cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}) },
+  // `dataEntrega` (opcional, já validada por lerDataEntrega): a data informada vai no detalhe do evento/auditoria e em DATA_ENTREGA
+  const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, dataEntrega = null, usuario }) => async (conn, atual) => ({
+    cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}), ...(dataEntrega ? { dataEntrega } : {}) },
     depois: async (c, { eventoId, status, pedido }) => {
       await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
       if (!pedidoPara(status)) return null;
       // (2026-11-11) entrega de pedido Em Produção pode ser criada e agendada, mas só se baixa o que está Pronto
       if (pedido && !SITUACOES_COM_BAIXA.includes(String(pedido.SITUACAO ?? '').trim())) throw new ErroUsuario(409, MSG_BAIXA_NAO_PRONTO(pedido.SITUACAO));
       const fim = await fechamento(c, atual, status);
-      if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao); return null; }
+      if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao, dataEntrega); return null; }
       // baixa que não é a última: o pedido não muda, mas pedido Cancelado ou excluído continua recusando a baixa
       if (!pedido || pedido.SITUACAO === 'Cancelado') throw new ErroUsuario(409, PEDIDO_CANCELADO);
       return { pedidoFechado: false, motivoPedidoAberto: fim.motivo };
@@ -869,7 +880,7 @@ function registrarEntregas({ rota, pool }) {
 
   rota('post', '/entregas/:id/retirada', CONCLUIR, async (req, res) => {
     const b = req.body || {};
-    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds) }));
+    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds), dataEntrega: lerDataEntrega(b.dataEntrega) }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
   });
 
@@ -886,7 +897,7 @@ function registrarEntregas({ rota, pool }) {
 
   rota('post', '/entregas/:id/comprovante', CONCLUIR, async (req, res) => {
     const b = req.body || {};
-    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }) }));
+    const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: false }), anexoIds: lerAnexoIds(b.anexoIds, { minimo: 1 }), dataEntrega: lerDataEntrega(b.dataEntrega) }));
     if (lido) await gravar(req, res, 'POST /entregas/:id/comprovante', 'comprovante', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
   });
 
@@ -1225,7 +1236,8 @@ function registrarEntregas({ rota, pool }) {
     const lido = lerOu400(res, () => {
       const entregueA = lerEntregueA(b.entregueA, { obrigatorio: true });
       const anexoIds = lerAnexoIds(b.anexoIds); // foto e assinatura são opcionais; os que vierem são conferidos em vincularAnexos (dono, entrega, soltos)
-      return { entregueA, anexoIds };
+      const dataEntrega = lerDataEntrega(b.dataEntrega);
+      return { entregueA, anexoIds, dataEntrega };
     });
     if (!lido) return;
     const usuario = DONO(req);
