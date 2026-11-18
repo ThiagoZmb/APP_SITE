@@ -93,6 +93,7 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .folha-cli { font-weight: 600; }
 /* selo de entrega do pedido (só para quem tem entregas.ver): cores pelo mapa único (.selo do tema.css); na etiqueta da grade, texto curto */
 .selo-ent { margin-left: 2px; }
+.selo-ent-ic { width: 14px; height: 14px; flex: none; vertical-align: -2px; margin-right: 4px; }
 .etq-ent { font-size: 10.5px; font-weight: 600; opacity: .9; }
 .etq.achou .etq-ent { color: var(--on-primary); opacity: 1; }
 .folha-final, .folha-sit { color: var(--text-light); }

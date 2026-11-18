@@ -501,12 +501,12 @@ test('a linha não tem mais ícones de perfil/vidro/serralheria/pintura (nenhuma
 
 test('selo de entrega: marcada (data e +N), retirada, a agendar, concluída, sem entrega (pronto = aviso, produção = neutro); sem `entrega` nada aparece', () => {
   const com = (classe, entrega) => ped(1, { classe, entrega });
-  assert.match(K.htmlLinhaFolha(com('producao', { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 }), 'abertos', ''), /<span class="selo info selo-ent"[^>]*>Entrega 14\/11<\/span>/);
+  assert.match(K.htmlLinhaFolha(com('producao', { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 }), 'abertos', ''), /<span class="selo info selo-ent"[^>]*><svg class="selo-ent-ic"[^]*?<\/svg>Entrega 14\/11<\/span>/);
   assert.match(K.htmlLinhaFolha(com('pronto', { estado: 'marcada', tipo: 'retirada', data: '2026-11-14', qtdMais: 2 }), 'abertos', ''), />Retirada 14\/11 \+2<\/span>/);
-  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'a_agendar', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*>Entrega a agendar</);
-  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'concluida', tipo: '', data: '', qtdMais: 0 })), /selo ok selo-ent[^>]*>Entrega concluída</);
-  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*>Sem entrega</);
-  assert.match(K.htmlLinhaDia(com('producao', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo neutro selo-ent[^>]*>Sem entrega</);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'a_agendar', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*><svg[^]*?<\/svg>Entrega a agendar</);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'concluida', tipo: '', data: '', qtdMais: 0 })), /selo ok selo-ent[^>]*><svg[^]*?<\/svg>Entrega concluída</);
+  assert.match(K.htmlLinhaDia(com('pronto', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo aviso selo-ent[^>]*><svg[^]*?<\/svg>Sem entrega</);
+  assert.match(K.htmlLinhaDia(com('producao', { estado: 'nenhuma', tipo: '', data: '', qtdMais: 0 })), /selo neutro selo-ent[^>]*><svg[^]*?<\/svg>Sem entrega</);
   assert.match(K.htmlEtiqueta(com('producao', { estado: 'marcada', tipo: 'motorista', data: '2026-11-14', qtdMais: 0 }), 'abertos', ''), /<span class="etq-ent"[^>]*>Ent\. 14\/11<\/span>/);
   for (const h of [K.htmlEtiqueta(ped(2), 'abertos', ''), K.htmlLinhaFolha(ped(2), 'abertos', ''), K.htmlLinhaDia(ped(2))]) assert.doesNotMatch(h, /selo-ent|etq-ent|Sem entrega/);
 });

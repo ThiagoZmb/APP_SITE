@@ -142,7 +142,9 @@
     if (e.estado === 'nenhuma') return { cor: p.classe === 'pronto' ? S.cor('entrega', 'a_programar') : 'neutro', curto: 'Sem entrega', texto: 'Sem entrega', dica: 'Este pedido ainda não tem entrega marcada' };
     return null;
   }
-  const seloEntrega = p => { const i = infoEntrega(p); return i ? `<span class="selo ${i.cor} selo-ent" title="${esc(i.dica)}">${esc(i.texto)}</span>` : ''; };
+  // Ícone de caminhão do selo de entrega (SVG inline, stroke currentColor, como o menu lateral; tamanho em calendario.css). Só decorativo: o texto e o title já dizem tudo.
+  const ICONE_CAMINHAO = '<svg class="selo-ent-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-3"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>';
+  const seloEntrega = p => { const i = infoEntrega(p); return i ? `<span class="selo ${i.cor} selo-ent" title="${esc(i.dica)}">${ICONE_CAMINHAO}${esc(i.texto)}</span>` : ''; };
   const etqEntrega = p => { const i = infoEntrega(p); return i ? ` <span class="etq-ent" title="${esc(i.dica)}">${esc(i.curto)}</span>` : ''; };
 
   // Etiqueta do pedido no calendário (classe etq: "chip" já é do tema.css). É um <li data-numero> focável: o InicioMenu abre o menu pelo botão direito, pela tecla de menu e por Shift+F10.
