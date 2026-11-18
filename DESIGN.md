@@ -268,6 +268,11 @@ Cantos curtos e consistentes: **6px** (controles, botões, linhas de ranking), *
 - **Carga adiada que depende de filtro** (período, cliente, mês): `const analises = OlhoResumos.carga(renderAnalises); analises.atualizar();` a cada mudança. Olho fechado: só marca "desatualizado" (nada é buscado nem desenhado); ao abrir carrega uma vez; aberto: recarrega na hora; reabrir sem mudança reaproveita o que já veio. Chamada compartilhada com a parte de trabalho deve ser separada com segurança (ex.: `/estoque/resumo?parte=filtros|totais`); se não der, só esconda. `OlhoResumos.aoMudar(fn)` avisa abrir/fechar (ex.: sair de uma aba que só existe com o olho aberto); mais de um `data-olho-destino` gera um botão em cada um (ex.: lista e ficha lateral).
 - **Atalho que existia só no resumo** (ex.: cartões "No mínimo"/"Em falta" do Estoque): ganha chip equivalente na área de trabalho e, com a lista filtrada, a faixa `.filtro-ativo` ("Mostrando só..." + "Limpar filtro"), definida no `tema.css`.
 
+### Impressão de listas
+- Padrão para imprimir uma lista como está na tela (`impressao_lista.js` + `impressao_lista.css`, botão `.btn.btn-secondary.btn-mini` "Imprimir" ao lado de "Atualizar"): o JS monta um bloco `#area-impressao` só com cabeçalho (título, data/hora, filtros ativos, total de linhas, aviso de parcial), tabela e rodapé; a classe `imprimindo-lista` no body esconde o resto da página no `@media print`. A4 paisagem, cabeçalho da tabela repetido em cada página (`table-header-group`), linha sem quebrar (`break-inside: avoid`).
+- **Exceção deliberada às variáveis do tema:** papel não usa o tema escuro; `impressao_lista.css` redefine as variáveis para claras (fundo branco, tinta preta, selos só com contorno) apenas dentro de `@media print` e com a classe do body. Nunca vaza para a tela.
+- Coluna de dinheiro (`valor: true`) só com `valores.ver`; total e resumos só com o olho aberto; ícones decorativos não saem.
+
 ### Inputs / Fields
 - Fundo Grafite de Fundo (mais escuro que o painel), filete firme, raio 6px, altura mínima 42px; rótulo 12px/700 Tinta Média sem maiúsculas.
 - **Foco:** borda cobre + anel de 3px. **Somente leitura:** número em cobre. **Desabilitado:** `#181c22`, borda tracejada, cursor bloqueado.

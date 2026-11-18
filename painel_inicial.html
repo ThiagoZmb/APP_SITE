@@ -264,6 +264,7 @@
         #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
+    <link rel="stylesheet" href="impressao_lista.css?v=202611181000">
     <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611251100" defer></script>
@@ -278,6 +279,7 @@
     <script src="etiqueta_zebra.js?v=202611201300" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="impressao_pdf.js?v=202611231000" defer></script>
+    <script src="impressao_lista.js?v=202611181000" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
@@ -339,6 +341,7 @@
                         </div>
                         <div class="busca"><input type="search" id="search-input" aria-label="Buscar na lista de pedidos e orçamentos" placeholder="Buscar em todos os campos: número, cliente, valor, data, observação..."></div>
                         <button type="button" class="btn btn-secondary btn-mini" id="refresh-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Atualizar</button>
+                        <button type="button" class="btn btn-secondary btn-mini" id="print-btn" aria-label="Imprimir a lista como está na tela"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7"/></svg>Imprimir</button>
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
                     <div class="tabela-wrap">
@@ -776,34 +779,76 @@
             const tem = ITENS_DOC.filter(([k]) => x[k]);
             return tem.length ? ` <span class="itens-doc" role="img" aria-label="Contém: ${tem.map(t => t[2]).join(', ')}">${tem.map(([, e, nome]) => `<span class="item-doc" title="${nome}">${e}</span>`).join('')}</span>` : '';
         };
-        function renderLista() {
+        // Colunas da lista, na ordem da tabela da tela. `celula(x, papel)` devolve o HTML da célula; no papel (papel = true) os
+        // ícones decorativos não saem. `valor: true` = coluna de dinheiro (data-valor na tela; some do papel sem valores.ver).
+        const COLUNAS = [
+            { id: 'numero', rotulo: 'Número', tdClasse: 'order-number', celula: (x, papel) => esc(x.numero) + (papel ? '' : iconesItens(x)) },
+            { id: 'cliente', rotulo: 'Cliente', celula: x => `<b>${esc(x.cliente)}</b>` },
+            { id: 'clienteFinal', rotulo: 'Cliente final', celula: x => esc(x.clienteFinal || '-') },
+            { id: 'data', rotulo: 'Data', celula: x => esc(x.data) },
+            { id: 'prontoEm', rotulo: 'Pronto em', celula: x => esc(x.prontoEm || '-') },
+            { id: 'valor', rotulo: 'Valor', num: true, valor: true, celula: x => `<b>${moeda(x.v)}</b>` },
+            { id: 'observacao', rotulo: 'Observação', celula: x => esc(x.observacao || '-') },
+            { id: 'situacao', rotulo: 'Situação', celula: x => Situacoes.selo(tipoLista === 'Pedido' ? 'pedido' : 'orcamento', tipoLista === 'Pedido' ? (VALOR_SIT[x.s] || x.situacao) : x.situacao, x.situacao || '-') },
+            { id: 'financeiro', rotulo: 'Financeiro', valor: true, celula: x => x.financeiro ? Situacoes.selo('financeiro', x.financeiro) : '-' },
+            { id: 'entrega', rotulo: 'Entrega', celula: x => `${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}` }
+        ];
+        const MAX_LINHAS_LISTA = 500;
+        // A lista exatamente como a tela a mostra: período, cliente, aba, chip de situação e busca aplicados; `visiveis` = o corte
+        // de MAX_LINHAS_LISTA linhas que vai para a tabela. A impressão usa a MESMA função (nada é rebuscado no servidor).
+        function listaDaTela() {
             const j = janela();
             const base = entre(doCliente(tipoLista === 'Pedido' ? pedidos : orcamentos), j.ini, j.fim);
-            const cont = {}; base.forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
-            $('chips-sit').innerHTML = tipoLista === 'Pedido'
-                ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
-                    .map(([k, t]) => `<button type="button" class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}" aria-pressed="${k === filtroSit}">${t}</button>`).join('') : '';
             // busca em todos os campos do registro (o que a lista mostra e o que mais vier da API); várias palavras = todas precisam aparecer
             const palavras = norm($('search-input').value).split(/\s+/).filter(Boolean);
             const lista = base.filter(x => (tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit) &&
                 (!palavras.length || palavras.every(p => textoBusca(x).includes(p))));
+            return { j, base, lista, visiveis: lista.slice(0, MAX_LINHAS_LISTA) };
+        }
+        // classe de divisor entre semanas (segunda a domingo) de cada linha, na ordem em que aparecem
+        function classesDivisor(linhas) {
+            let anterior = null;
+            return linhas.map(x => {
+                const semana = semanaDaData(x.data);
+                const classe = semana && anterior && semana !== anterior ? 'divisor-semana' : '';
+                if (semana) anterior = semana;
+                return classe;
+            });
+        }
+        // Imprime a lista como está na tela agora (mesmos filtros, busca e corte de linhas). O total em dinheiro só vai para o
+        // papel com valores.ver E com o olho dos resumos aberto (fechado, nenhum total analítico sai); resumos e gráficos nunca saem.
+        function imprimirLista() {
+            const { j, lista, visiveis } = listaDaTela();
+            const podeValores = Acesso.pode('valores.ver');
+            const divisores = classesDivisor(visiveis);
+            const periodo = $('periodo').selectedOptions[0]?.textContent || j.nome;
+            const intervalo = $('periodo-txt').textContent;
+            window.ImpressaoLista.imprimir(window, {
+                titulo: tipoLista === 'Pedido' ? 'Pedidos' : 'Orçamentos',
+                geradoEm: new Date().toLocaleString('pt-BR'),
+                filtros: [['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
+                    ['Situação', tipoLista === 'Pedido' && filtroSit ? NOME_SIT[filtroSit] : ''], ['Busca', $('search-input').value.trim()]],
+                podeValores,
+                colunas: COLUNAS,
+                linhas: visiveis.map((x, i) => ({ classe: divisores[i], celulas: Object.fromEntries(COLUNAS.map(c => [c.id, c.celula(x, true)])) })),
+                filtradas: lista.length,
+                total: podeValores && OlhoResumos.visivel() ? moeda(soma(lista)) : ''
+            });
+        }
+        function renderLista() {
+            const { j, base, lista, visiveis } = listaDaTela();
+            const cont = {}; base.forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
+            $('chips-sit').innerHTML = tipoLista === 'Pedido'
+                ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
+                    .map(([k, t]) => `<button type="button" class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}" aria-pressed="${k === filtroSit}">${t}</button>`).join('') : '';
             $('lista-titulo').textContent = `Lista de ${tipoLista === 'Pedido' ? 'pedidos' : 'orçamentos'}`;
             $('lista-qtd').textContent = `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
             $('lista-total').textContent = moeda(soma(lista));
-            const MAX = 500;
-            let semanaAnterior = null;
-            $('orders-tbody').innerHTML = (lista.slice(0, MAX).map(x => {
-                const semana = semanaDaData(x.data);
-                const classes = [semana && semanaAnterior && semana !== semanaAnterior ? 'divisor-semana' : ''].filter(Boolean).join(' ');
-                if (semana) semanaAnterior = semana;
-                return `
-                <tr data-numero="${esc(x.numero)}" tabindex="0"${classes ? ` class="${classes}"` : ''}>
-                    <td class="order-number">${esc(x.numero)}${iconesItens(x)}</td><td><b>${esc(x.cliente)}</b></td><td>${esc(x.clienteFinal || '-')}</td>
-                    <td>${esc(x.data)}</td><td>${esc(x.prontoEm || '-')}</td><td class="num" data-valor><b>${moeda(x.v)}</b></td>
-                    <td>${esc(x.observacao || '-')}</td><td>${Situacoes.selo(tipoLista === 'Pedido' ? 'pedido' : 'orcamento', tipoLista === 'Pedido' ? (VALOR_SIT[x.s] || x.situacao) : x.situacao, x.situacao || '-')}</td>
-                    <td data-valor>${x.financeiro ? Situacoes.selo('financeiro', x.financeiro) : '-'}</td><td>${esc(x.dataEntrega || '-')}${seloEntrega(x.entregaStatus)}${seloAndamento(x)}</td>
-                </tr>`;
-            }).join('') + (lista.length > MAX ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
+            const divisores = classesDivisor(visiveis);
+            $('orders-tbody').innerHTML = (visiveis.map((x, i) => `
+                <tr data-numero="${esc(x.numero)}" tabindex="0"${divisores[i] ? ` class="${divisores[i]}"` : ''}>
+                    ${COLUNAS.map(c => `<td${c.tdClasse || c.num ? ` class="${c.tdClasse || 'num'}"` : ''}${c.valor ? ' data-valor' : ''}>${c.celula(x, false)}</td>`).join('')}
+                </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
         }
         // Agrupa visualmente por semana civil (segunda a domingo), usando a data do pedido/orçamento.
@@ -1027,6 +1072,7 @@
         }));
         $('search-input').addEventListener('input', renderLista);
         $('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));
+        $('print-btn').addEventListener('click', imprimirLista);
 
         // ================= FILTROS =================
         function aplicarCliente(nome) {

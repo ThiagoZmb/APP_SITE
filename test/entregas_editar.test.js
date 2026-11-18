@@ -295,7 +295,8 @@ test('entregas.html/js: botão Editar entrega (só entregas.programar), menu de 
   assert.doesNotMatch(h, /\sstyle=/i);
   assert.match(js, /\$\('btn-editar'\)\.hidden = !podeEditarEntrega\(e\)/);
   assert.match(js, /lista'\)\.addEventListener\('contextmenu'/);
-  assert.match(js, /data-mais/);
+  assert.doesNotMatch(js, /data-mais|ent-mais|td class="mais"/, 'a linha da tabela não tem mais botão ⋯ (só o botão direito e Shift+F10)');
+  assert.doesNotMatch(h, /ent-mais/);
   assert.match(js, /metodo: 'PUT', corpo/);
   assert.match(js, /abrirMenu\(ev\.currentTarget\)/);
   // o menu não chama nenhuma rota de escrita

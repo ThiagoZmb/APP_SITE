@@ -508,15 +508,14 @@
       else if (aba === 'ocorrencias') resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${esc(e.qtdOcorrencias)}</td><td class="acao">${botaoAcao('reagendar', 'Reagendar')}</td>`;
       else resto = `<td>${esc(dataBR(e.dataAgendada))}</td><td>${esc(e.motorista || rotuloTipo(e.tipo))}</td><td>${selo(statusDaEntrega(e))}${seloProducao(e.situacaoPedido)}</td>` +
         (aba === 'em_rota' ? `<td class="acao">${e.status === 'em_rota' ? botaoAcao('reagendar', 'Reagendar') : ''}</td>` : ''); // só em_rota: a equipe destrava; enviada segue o fluxo próprio
-      const mais = `<td class="mais"><button type="button" class="ent-mais" data-mais="${esc(e.id)}" aria-haspopup="menu" aria-label="Consultar a entrega do pedido ${esc(e.numero)}" title="Consultar (PDFs, nota fiscal, histórico...)">⋯</button></td>`;
       const classes = [estado.det && estado.det.entrega.id === e.id ? 'selecionado' : '', statusDaEntrega(e) === 'retirada_agendada' ? 'linha-retirada' : ''].filter(Boolean).join(' ');
-      return `<tr data-id="${esc(e.id)}"${classes ? ` class="${classes}"` : ''}>${tdBase}${resto}${mais}</tr>`;
+      return `<tr data-id="${esc(e.id)}"${classes ? ` class="${classes}"` : ''}>${tdBase}${resto}</tr>`;
     }
     const CABECALHO = {
-      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', '', ''],
-      ocorrencias: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', '', ''],
-      outras: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', ''],
-      em_rota: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '', '']
+      fila: ['Pedido', 'Data do pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Prometido', 'Status', ''],
+      ocorrencias: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Agendada', 'Motorista/Tipo', 'Ocorr.', ''],
+      outras: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status'],
+      em_rota: ['Pedido', 'Cliente', 'Cliente final', 'Cidade/UF', 'Data', 'Motorista/Tipo', 'Status', '']
     };
 
     // Agenda em calendário mensal: cada entrega é uma etiqueta colorida pelo status; clicar abre o detalhe
@@ -895,7 +894,7 @@
       });
     }
 
-    // ---------- Menu do botão direito / Shift+F10 / "⋯" (só consulta e fiscalização: nada altera pedido ou entrega) ----------
+    // ---------- Menu do botão direito / Shift+F10 (só consulta e fiscalização: nada altera pedido ou entrega) ----------
     const pode = c => !!(win.Acesso && win.Acesso.pode(c));
     const tokenAtual = () => (getAuth() || {}).token || '';
     let menu = null, origemMenu = null;
@@ -933,7 +932,7 @@
       }
     }
     function abrirMenu(el, x, y) {
-      const id = el.getAttribute('data-id') || el.getAttribute('data-mais') || (estado.det && estado.det.entrega.id);
+      const id = el.getAttribute('data-id') || (estado.det && estado.det.entrega.id);
       const e = entregaDoId(id);
       if (!e) return;
       const itens = itensMenuEntrega(e, pode);
@@ -1304,8 +1303,6 @@
           if (sobra.getAttribute('data-sobra') === 'gerar') gerarSobra(numero); else abrirEncerrar(numero);
           return;
         }
-        const maisBtn = ev.target.closest('[data-mais]');
-        if (maisBtn) { abrirMenu(maisBtn); return; }
         const nav = ev.target.closest('[data-mes]');
         if (nav) {
           const h = new win.Date(), m = estado.mes || { ano: h.getFullYear(), mes: h.getMonth() };
@@ -1337,7 +1334,7 @@
       $('btn-mais').addEventListener('click', ev => abrirMenu(ev.currentTarget));
       // botão direito (e Shift+F10 / tecla de menu, que disparam "contextmenu" no item focado) nas linhas e nos cartões do calendário
       $('lista').addEventListener('contextmenu', ev => {
-        const alvo = ev.target.closest('[data-mais], tr[data-id], .etiqueta[data-id]');
+        const alvo = ev.target.closest('tr[data-id], .etiqueta[data-id]');
         if (!alvo) return;
         ev.preventDefault();
         const teclado = ev.clientX === 0 && ev.clientY === 0;
