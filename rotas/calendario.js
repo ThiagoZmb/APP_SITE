@@ -37,17 +37,29 @@ function registrarCalendario({ rota, pool }) {
     for (const e of linhas) { const n = Number(e.numero); if (!mapa.has(n)) mapa.set(n, []); mapa.get(n).push(e); }
     return mapa;
   }
+  // pedidos cuja data de pronto já foi trocada (web_auditoria 'data_pronto_alterada' com data anterior): ganham "RA" no lugar do "P". UMA consulta IN; só a web registra (o VB não aparece)
+  async function carregarReagendados(numeros) {
+    const [linhas] = await pool.execute(
+      `SELECT alvo, detalhe FROM web_auditoria WHERE acao = 'data_pronto_alterada' AND alvo IN (${numeros.map(() => '?').join(',')})`, numeros.map(n => `Pedido ${n}`));
+    const set = new Set();
+    for (const l of linhas) {
+      let d = null; try { d = JSON.parse(l.detalhe); } catch { /* detalhe ilegível: ignora */ }
+      if (d && d.de) set.add(Number(String(l.alvo).replace(/^Pedido\s+/, '')));
+    }
+    return set;
+  }
   const podeVerEntregas = req => !!(req.acesso && req.acesso.permissoes && req.acesso.permissoes.has('entregas.ver'));
   // itens do balão (com cores) e entregas saem JUNTOS (ida e volta ao banco ~190 ms); falha em qualquer um só tira aquele enfeite, nunca a lista
   async function enriquecer(req, linhas) {
     if (!linhas.length) return [];
     const numeros = linhas.map(r => r.numero);
     const comEntregas = podeVerEntregas(req);
-    const [itens, entregas] = await Promise.all([
+    const [itens, entregas, reagendados] = await Promise.all([
       carregarItens(numeros).catch(err => { console.error('Erro itens do calendário:', err.message); return new Map(); }),
-      comEntregas ? carregarEntregas(numeros.map(Number)).catch(err => { console.error('Erro entregas do calendário:', err.message); return null; }) : null
+      comEntregas ? carregarEntregas(numeros.map(Number)).catch(err => { console.error('Erro entregas do calendário:', err.message); return null; }) : null,
+      carregarReagendados(numeros.map(Number)).catch(err => { console.error('Erro reagendados do calendário:', err.message); return new Set(); })
     ]);
-    return linhas.map(r => ({ ...r, ...(itens.get(Number(r.numero)) || {}), ...(entregas ? { entregas: entregas.get(Number(r.numero)) || [] } : {}) }));
+    return linhas.map(r => ({ ...r, ...(itens.get(Number(r.numero)) || {}), reagendado: reagendados.has(Number(r.numero)), ...(entregas ? { entregas: entregas.get(Number(r.numero)) || [] } : {}) }));
   }
   const resumo = dias => ({ qtdPedidos: dias.reduce((n, d) => n + d.qtdPedidos, 0), qtdAtrasados: dias.reduce((n, d) => n + d.qtdAtrasados, 0) });
 

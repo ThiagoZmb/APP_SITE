@@ -79,7 +79,8 @@ const montar = (linhas, hoje = '2026-11-05') => linhas.map(l => K.montarPedido(l
 
 test('montarPedido: classe, atraso, datas e valor numérico', () => {
   const p = K.montarPedido(linha(7, 'Em Produção', '2026-11-01 00:00:00', { data_entrega: '0001-01-01', cliente: ' Fulano  ' }), '2026-11-05');
-  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, prontoEm: '2026-11-01', dataEntrega: '', itens: [], qtdItens: 0, valor: 100.5 });   // sem ícones de composição; sem `entregas` na linha (usuário sem entregas.ver) = sem a chave `entrega`
+  assert.deepEqual(p, { numero: 7, cliente: 'Fulano', clienteFinal: '', situacao: 'Em Produção', classe: 'producao', atrasado: true, reagendado: false, prontoEm: '2026-11-01', dataEntrega: '', itens: [], qtdItens: 0, valor: 100.5 });   // sem ícones de composição; sem `entregas` na linha (usuário sem entregas.ver) = sem a chave `entrega`
+  assert.equal(K.montarPedido({ ...linha(7, 'Em Produção', '2026-11-01'), reagendado: true }, '2026-11-05').reagendado, true, 'reagendado vem da auditoria e só vale com true');
 });
 
 test('agruparPorDia: abertos tira entregue/retirado/cancelado; todos mantém; ordem por data e número; contagens', () => {

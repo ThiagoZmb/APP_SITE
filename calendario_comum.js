@@ -123,7 +123,7 @@
   const urlMes = (mes, situacao, visao) => `calendario.html?mes=${encodeURIComponent(mes)}&situacao=${encodeURIComponent(situacao)}${visao === 'grade' ? '&visao=grade' : ''}`;
   // Balão (title) e rótulo de acessibilidade: o mesmo texto nas três visões e na página do dia. Os itens do pedido vêm de textoItens (entregas_comum.js).
   const { textoItens } = C;
-  const rotuloPedido = p => `Pedido: ${p.numero}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}${textoItens(p)}`;
+  const rotuloPedido = p => `Pedido: ${p.numero}${p.reagendado ? ' (RA = data de pronto reagendada)' : ''}\nCliente: ${p.cliente || '—'}\nCliente final: ${p.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(p.situacao || 'sem situação').toUpperCase()}${p.atrasado ? ' ⚠ ATRASADO' : ''}${textoItens(p)}`;
   // Entrega do pedido (só vem na API para quem tem entregas.ver; sem `p.entrega` nada aparece). Cores só do mapa único (situacoes.js, grupo entrega).
   // marcada = "Entrega 14/11" (Retirada / Envio conforme o tipo; "+N" quando há outras entregas ativas); a_agendar = "Entrega a agendar";
   // concluida = "Entrega concluída"; nenhuma = "Sem entrega" (aviso se o pedido está Pronto, neutro se ainda em produção). Pedido fechado não manda `entrega`.
@@ -196,7 +196,7 @@
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
     const rot = rotuloPedido(p) + rotuloAchou(p, busca);
     return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
-      `<span class="folha-p">P ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit} ${seloSituacao(p)}${seloEntrega(p) ? ' ' + seloEntrega(p) : ''}` +
+      `<span class="folha-p">${p.reagendado ? 'RA' : 'P'} ${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit} ${seloSituacao(p)}${seloEntrega(p) ? ' ' + seloEntrega(p) : ''}` +
       (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
   }
   function htmlFolha(semanas, situacao, busca) {

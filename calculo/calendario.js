@@ -208,6 +208,7 @@ function montarPedido(r, hoje) {
     situacao,
     classe,
     atrasado: atrasado(situacao, prontoEm, hoje),
+    reagendado: r.reagendado === true, // data de pronto já trocada pela web (vem da auditoria); a tela mostra "RA" no lugar do "P"
     prontoEm,
     dataEntrega: dataISO(r.data_entrega),
     itens: Array.isArray(r.itens) ? r.itens : [],
