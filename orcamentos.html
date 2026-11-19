@@ -463,6 +463,16 @@
             html body #quadro-serr-produto .grid-form { grid-template-columns: minmax(0, 1fr) !important; }
         }
         /* sistema de correr: o nome do sistema é longo (4/5 da linha), o transpasse é um número curto (1/5) */
+        /* revestimento e divisores em 2 linhas: 1) revestimento (largo) + cor; 2) divisor (largo) + quantidades (curtas) */
+        html body .grid-form.linha-revest-divisor { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; gap: 8px 14px !important; }
+        html body .linha-revest-divisor .fg-revest { grid-column: span 7; }
+        html body .linha-revest-divisor .fg-cor-revest { grid-column: span 5; }
+        html body .linha-revest-divisor .fg-divisor { grid-column: span 6; }
+        html body .linha-revest-divisor .fg-div-h, html body .linha-revest-divisor .fg-div-v { grid-column: span 3; }
+        @media (max-width: 600px) {
+            html body .linha-revest-divisor > .form-group { grid-column: 1 / -1 !important; }
+            html body .linha-revest-divisor > .fg-div-h, html body .linha-revest-divisor > .fg-div-v { grid-column: span 6 !important; }
+        }
         html body .grid-form.linha-sistema-correr { grid-template-columns: minmax(0, 4fr) minmax(90px, 1fr) !important; }
         html body .form-group label, html body .viz-check { font-size: 11.5px !important; margin-bottom: 3px !important; }
         html body .form-group input:not([type=checkbox]):not([type=radio]), html body .form-group select, html body #desconto {
@@ -728,12 +738,12 @@
                     <!-- REVESTIMENTO + DIVISOR + QUANTIDADES (fiel ao VB) -->
                     <div class="secao-item secao-porta">
                         <h4>🟩 Revestimento e divisores</h4>
-                        <div class="grid-form">
-                            <div class="form-group"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Cor do revestimento</label><select id="f-cor-revest" disabled><option value="">— escolha o revestimento —</option></select></div>
-                            <div class="form-group"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
-                            <div class="form-group"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
+                        <div class="grid-form linha-revest-divisor">
+                            <div class="form-group fg-revest"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
+                            <div class="form-group fg-cor-revest"><label>Cor do revestimento</label><select id="f-cor-revest" disabled><option value="">— escolha o revestimento —</option></select></div>
+                            <div class="form-group fg-divisor"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
+                            <div class="form-group fg-div-h"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
+                            <div class="form-group fg-div-v"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
                         </div>
                     </div>
                     <!-- COMPLEMENTOS DA SERRALHERIA (frmSelecaoComplementos) -->
