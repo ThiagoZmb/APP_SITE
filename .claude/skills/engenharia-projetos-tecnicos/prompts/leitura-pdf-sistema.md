@@ -32,12 +32,12 @@ Um item é um grupo de portas IGUAIS (mesmas medidas e mesmos materiais). Portas
 Para cada item, registre a `quantidade` e, em `valores`, um registro por campo que você encontrou no desenho. Campo não encontrado: simplesmente não inclua (o sistema registra como ausente). Para cada valor:
 
 - `texto`: o valor exatamente como está escrito no desenho, sem converter (por exemplo `206,3`, `79,5`, `PERFIL 3136`, `INOX ESCOVADO`). Exceções: `tipoFrente` usa um dos códigos `porta_giro`, `porta_basculante`, `frente_gaveta`, `porta_correr`; listas (`furos`, `posicoesPuxador`, `ladosFuros`) separam os elementos com ponto e vírgula (`10,5; 90`).
-- `pagina`: número da página do PDF (a primeira página é 1), não o número impresso na prancha.
+- `pagina`: número da página do PDF (a primeira página é 1), não o número impresso na prancha; use 0 se não souber.
 - `trecho`: o texto literal em volta, curto, que permite achar o ponto no desenho (por exemplo `PORTAS EM PERFIL DE ALUMÍNIO COR INOX ESCOVADO + VIDRO PINTADO` ou `cota 206,3 na elevação C`).
 - `confianca`: de 0 a 1, o quanto você tem certeza da leitura (cota nítida e legenda clara: 0,8 a 0,9; dedução pelo desenho, como o tipo de frente: 0,5 a 0,7; leitura duvidosa: abaixo de 0,5).
 - `unidadeSeNumero`: para números SEM unidade escrita ao lado, a unidade que vale. Use `cm` quando a convenção de projeto de arquitetura e a escala indicam centímetros (o caso comum), `mm` quando a prancha declara milímetros, e `desconhecida` quando não dá para concluir. Para texto (perfil, cor...) use `nao_se_aplica`. O sistema converte para mm e marca a unidade como inferida; uma pessoa confirma.
 - `motivoUnidade`: por que você concluiu a unidade (por exemplo `escala 1/25 e convenção de arquitetura: cm`), ou vazio.
-- `candidatos`: só quando o desenho mostra valores DIFERENTES para a mesma coisa (por exemplo a vista diz 206,3 e o corte diz 210): coloque em `texto` a leitura principal e as outras em `candidatos`, cada uma com página e trecho. Nunca escolha entre elas em silêncio. Sem conflito: lista vazia.
+- `candidatos`: só nos valores de campo, quando o desenho mostra valores DIFERENTES para a mesma coisa (por exemplo a vista diz 206,3 e o corte diz 210): coloque em `texto` a leitura principal e, em `candidatos`, UM TEXTO por leitura alternativa, no formato `leitura | pagina N | trecho curto` (por exemplo `210 | pagina 3 | corte B`). Nunca escolha entre elas em silêncio. Sem conflito: lista vazia.
 
 Regras de leitura:
 - Nunca preencha com valor típico, zero ou palpite. Valor que não está no desenho fica de fora.

@@ -8,10 +8,10 @@ const Imp = require('../importar_itens.js');
 const { montarConferencia } = require('../leitura/conferencia');
 
 const SERVICO = pathToFileURL(path.join(__dirname, '..', '.claude', 'skills', 'engenharia-projetos-tecnicos', 'scripts', 'lib', 'servico.mjs')).href;
-const lido = (texto, extra = {}) => ({ texto, pagina: 1, trecho: `t ${texto}`, confianca: 0.7, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [], ...extra });
+const lido = (texto, extra = {}) => ({ texto, pagina: 1, trecho: `t ${texto}`, confianca: 0.7, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', ...extra });
 const porta = id => ({ id, categoria: 'porta_aluminio', legenda: 'PORTA', quantidade: lido('1'), valores: [
-  { campo: 'altura', ...lido('2000', { unidadeSeNumero: 'mm' }) }, { campo: 'largura', ...lido('500 mm') }, { campo: 'tipoFrente', ...lido('porta_giro') },
-  { campo: 'perfil', ...lido('Perfil P') }, { campo: 'acabamentoPerfil', ...lido('Anodizado') }] });
+  { campo: 'altura', candidatos: [], ...lido('2000', { unidadeSeNumero: 'mm' }) }, { campo: 'largura', candidatos: [], ...lido('500 mm') }, { campo: 'tipoFrente', candidatos: [], ...lido('porta_giro') },
+  { campo: 'perfil', candidatos: [], ...lido('Perfil P') }, { campo: 'acabamentoPerfil', candidatos: [], ...lido('Anodizado') }] });
 const IDS = id => ['qtd', 'altura', 'largura', 'tipoFrente', 'perfil', 'acabamentoPerfil'].map(c => `${id}.${c}`);
 
 async function conferencia(decisoes) {
@@ -107,7 +107,7 @@ test('ponta a ponta: só o item conferido entra na importação; o não conferid
 test('item pronto pela skill, mas com valor opcional inferido não conferido, não é importável', async () => {
   const s = await import(SERVICO);
   const mapa = s.carregarMapa();
-  const l = { itens: [{ ...porta('P1'), valores: [...porta('P1').valores, { campo: 'corPerfil', ...lido('Preto') }] }], contagens: [], cotas: [], textoSuspeito: [], observacoes: '' };
+  const l = { itens: [{ ...porta('P1'), valores: [...porta('P1').valores, { campo: 'corPerfil', candidatos: [], ...lido('Preto') }] }], contagens: [], cotas: [], textoSuspeito: [], observacoes: '' };
   const p = s.processarLeitura(l, { arquivo: 'a.pdf', paginas: 1, mapa });
   const doc = s.aplicarDecisoes(p.doc, { confirmar: IDS('P1') }, { por: 'Ana', em: '2026-10-26T10:00:00Z' }).doc;
   const a = s.avaliar(doc, mapa);

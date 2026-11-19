@@ -29,13 +29,14 @@ function gerarPdf(paginas = 2) {
 }
 
 // ---------------- leitura do modelo (formato de esquemaLeitura) ----------------
-const lido = (texto, extra = {}) => ({ texto, pagina: 1, trecho: `trecho ${texto}`, confianca: 0.8, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [], ...extra });
+const lido = (texto, extra = {}) => ({ texto, pagina: 1, trecho: `trecho ${texto}`, confianca: 0.8, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', ...extra });
+const campoLido = (campo, l) => ({ campo, candidatos: [], ...l }); // só os valores de campo têm candidatos (esquema enxuto)
 const cm = t => lido(t, { unidadeSeNumero: 'cm', motivoUnidade: 'escala 1/25' });
 const LEITURA_OK = {
   itens: [
     { id: 'P1', categoria: 'porta_aluminio', legenda: 'PORTAS EM PERFIL', quantidade: lido('2'), valores: [
-      { campo: 'altura', ...cm('206,3') }, { campo: 'largura', ...cm('45') }, { campo: 'tipoFrente', ...lido('porta_giro') },
-      { campo: 'perfil', ...lido('Perfil P') }, { campo: 'acabamentoPerfil', ...lido('Anodizado') }] },
+      campoLido('altura', cm('206,3')), campoLido('largura', cm('45')), campoLido('tipoFrente', lido('porta_giro')),
+      campoLido('perfil', lido('Perfil P')), campoLido('acabamentoPerfil', lido('Anodizado'))] },
     { id: 'E1', categoria: 'estante_perfil_aluminio', legenda: 'ESTANTE', quantidade: lido('1'), valores: [] },
   ],
   contagens: [], cotas: [], textoSuspeito: [], observacoes: 'Leitura de teste.',

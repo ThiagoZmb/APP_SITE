@@ -11,9 +11,9 @@ import { validarMapa } from '../scripts/lib/mapear.mjs';
 
 const MAPA = carregarMapa('portas-aluminio');
 const QUEM = { por: 'Fulano', em: '2026-10-26T14:00:00-03:00' };
-const lido = (texto, extra = {}) => ({ texto, pagina: 2, trecho: `trecho ${texto}`, confianca: 0.8, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [], ...extra });
+const lido = (texto, extra = {}) => ({ texto, pagina: 2, trecho: `trecho ${texto}`, confianca: 0.8, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', ...extra });
 const cm = (texto, extra = {}) => lido(texto, { unidadeSeNumero: 'cm', motivoUnidade: 'escala 1/25', ...extra });
-const campo = (c, l) => ({ campo: c, ...l });
+const campo = (c, l) => ({ campo: c, candidatos: [], ...l });
 const porta = (id = 'P1', valores = null, extra = {}) => ({
   id, categoria: 'porta_aluminio', legenda: 'PORTAS EM PERFIL DE ALUMÍNIO', quantidade: lido('2'),
   valores: valores ?? [campo('altura', cm('206,3')), campo('largura', cm('45')), campo('tipoFrente', lido('porta_giro')),
@@ -105,14 +105,14 @@ test('número ambíguo ou unidade desconhecida: nunca adivinha (ausente + pendê
 });
 
 test('leituras diferentes da mesma coisa viram conflitante (nunca escolhe); repetição do campo também', () => {
-  const r = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: [{ texto: '210', pagina: 3, trecho: 'corte', confianca: 0.5 }] })),
+  const r = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: ['210 | pagina 3 | corte'] })),
     campo('largura', cm('45')), campo('largura', cm('46'))])]));
   const v = valores(r.doc);
   assert.equal(v.get('P1.altura').estado, 'conflitante');
   assert.deepEqual(v.get('P1.altura').candidatos.map(c => c.valor), [2063, 2100]);
   assert.equal(v.get('P1.largura').estado, 'conflitante');
   // candidato igual ao principal não é conflito
-  const r2 = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: [{ texto: '206,3', pagina: 3, trecho: 'x', confianca: 0.5 }] }))])]));
+  const r2 = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: ['206,3 | pagina 3 | x'] }))])]));
   assert.equal(valores(r2.doc).get('P1.altura').estado, 'inferido');
 });
 
@@ -180,7 +180,7 @@ test('decisões inválidas não mudam nada: confirmar ausente, confirmar e rejei
 });
 
 test('conflito: a pessoa escolhe o candidato', () => {
-  const r = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: [{ texto: '210', pagina: 3, trecho: 'corte', confianca: 0.5 }] })),
+  const r = processar(leitura([porta('P1', [campo('altura', cm('206,3', { candidatos: ['210 | pagina 3 | corte'] })),
     campo('largura', cm('45')), campo('tipoFrente', lido('porta_giro')), campo('perfil', lido('PERFIL 3136')), campo('acabamentoPerfil', lido('Anodizado'))])]));
   const d = aplicarDecisoes(r.doc, { resolver: [{ conflitante: 'P1.altura', candidato: 'P1.altura.c2' }], confirmar: IDS_P1.filter(i => i !== 'P1.altura') }, QUEM);
   const a = avaliar(d.doc, MAPA);
@@ -208,4 +208,21 @@ test('limite de itens e textos longos são cortados; documento continua válido'
   assert.equal(r.doc.itens.length, 200);
   assert.ok(r.doc.itens[0].atributos.perfil.valor.length <= 190);
   assert.equal(validarProjeto(r.doc).ok, true);
+});
+
+test('esquema enviado à API é enxuto: sem união (anyOf), candidatos só nos valores de campo e como textos', () => {
+  const e = esquemaLeitura(MAPA);
+  const texto = JSON.stringify(e);
+  assert.ok(!texto.includes('anyOf'), 'a API recusa gramática grande demais; sem uniões');
+  assert.deepEqual(e.properties.itens.items.properties.valores.items.properties.candidatos, { type: 'array', items: { type: 'string' } });
+  assert.equal(e.properties.itens.items.properties.quantidade.properties.candidatos, undefined);
+  assert.equal((texto.match(/candidatos/g) || []).length, 2); // 1 no schema + 1 em "required" do item de valores
+});
+
+test('candidato em texto: "leitura | pagina N | trecho" e o formato antigo em objeto continua aceito', async () => {
+  const { normalizarCandidato } = await import('../scripts/lib/leitura.mjs');
+  assert.deepEqual(normalizarCandidato('210 | pagina 3 | corte B'), { texto: '210', pagina: 3, trecho: 'corte B' });
+  assert.deepEqual(normalizarCandidato('210'), { texto: '210', pagina: null, trecho: '' });
+  assert.deepEqual(normalizarCandidato('210 | vista frontal'), { texto: '210', pagina: null, trecho: 'vista frontal' });
+  assert.deepEqual(normalizarCandidato({ texto: '1', pagina: 2, trecho: 'x' }), { texto: '1', pagina: 2, trecho: 'x' });
 });

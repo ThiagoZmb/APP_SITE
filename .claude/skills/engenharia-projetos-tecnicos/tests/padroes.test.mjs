@@ -134,7 +134,7 @@ test('padrões inválidos lançam erro (confiança 1 ou status não aprovado)', 
 
 test('processarLeitura com { padroes } completa o que falta; sem ela o comportamento é o de antes', () => {
   const mapa = carregarMapa();
-  const leitura = { itens: [{ id: 'P1', categoria: 'porta_aluminio', legenda: 'PORTAS CRISTALEIRA, PERFIL PRETO', quantidade: { texto: '2', pagina: 1, trecho: '2 PORTAS', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] },
+  const leitura = { itens: [{ id: 'P1', categoria: 'porta_aluminio', legenda: 'PORTAS CRISTALEIRA, PERFIL PRETO', quantidade: { texto: '2', pagina: 1, trecho: '2 PORTAS', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '' },
     valores: [{ campo: 'corPerfil', texto: 'PRETO FOSCO', pagina: 1, trecho: 'PERFIL PRETO FOSCO', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] }] }],
   cotas: [], contagens: [], textoSuspeito: [], observacoes: '' };
   const sem = processarLeitura(leitura, { arquivo: 'p.pdf', paginas: 1, mapa });
@@ -211,7 +211,7 @@ test('mapa: auxiliares entram na leitura (schema e campos) e só viram valor se 
   const mapa = carregarMapa();
   const campos = camposLeituraDe(mapa);
   assert.ok(campos.includes('qtdFurosPorPorta') && campos.includes('qtdFurosTotal'));
-  const leitura = { itens: [{ id: 'P1', categoria: 'porta_aluminio', legenda: '', quantidade: { texto: '2', pagina: 1, trecho: '2', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] }, valores: [
+  const leitura = { itens: [{ id: 'P1', categoria: 'porta_aluminio', legenda: '', quantidade: { texto: '2', pagina: 1, trecho: '2', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '' }, valores: [
     { campo: 'qtdFurosTotal', texto: '6', pagina: 1, trecho: '6 furos de caneco', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] }] }],
   cotas: [], contagens: [], textoSuspeito: [], observacoes: '' };
   const r = processarLeitura(leitura, { arquivo: 'p.pdf', paginas: 1, mapa });

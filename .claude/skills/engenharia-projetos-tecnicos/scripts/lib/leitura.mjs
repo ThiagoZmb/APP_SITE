@@ -43,14 +43,24 @@ const unidadeSaida = conversao => (conversao === 'comprimento' ? 'mm' : conversa
 
 // ---------- schema da leitura (compatível com saída estruturada: sem recursão, sem min/max, additionalProperties false) ----------
 const STR = { type: 'string' };
-const PAGINA = { anyOf: [{ type: 'integer' }, { type: 'null' }] };
+// sem união (anyOf): a API recusa esquemas que compilam numa gramática grande demais. Página 0 = não sei (paginaValida trata como ausente).
+const PAGINA = { type: 'integer' };
 const objeto = properties => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
-const CANDIDATO = objeto({ texto: STR, pagina: PAGINA, trecho: STR, confianca: { type: 'number' } });
-const valorLido = extra => objeto({
+// Candidatos (leituras diferentes da MESMA coisa) só nos valores de campo e como lista de TEXTOS simples: objetos aninhados em lista
+// dentro de lista estouram o limite de gramática da API. Formato de cada texto: "leitura" ou "leitura | pagina N | trecho".
+const valorLido = (extra, comCandidatos = false) => objeto({
   ...extra, texto: STR, pagina: PAGINA, trecho: STR, confianca: { type: 'number' },
   unidadeSeNumero: { type: 'string', enum: UNIDADES_LEITURA }, motivoUnidade: STR,
-  candidatos: { type: 'array', items: CANDIDATO },
+  ...(comCandidatos ? { candidatos: { type: 'array', items: STR } } : {}),
 });
+
+// candidato em texto → { texto, pagina, trecho } (o formato antigo, em objeto, continua aceito)
+export function normalizarCandidato(c) {
+  if (typeof c !== 'string') return c;
+  const [texto, pag, ...resto] = c.split('|').map(x => x.trim());
+  const pagina = /^p[aá]gina\s+(\d+)$/i.test(pag ?? '') ? Number(pag.replace(/\D/g, '')) : null;
+  return { texto: texto ?? '', pagina, trecho: (pagina === null && pag ? [pag, ...resto] : resto).join(' | ') };
+}
 
 export function esquemaLeitura(mapa) {
   const valor = valorLido({});
@@ -62,7 +72,7 @@ export function esquemaLeitura(mapa) {
         categoria: { type: 'string', enum: categoriasDo(mapa) },
         legenda: STR,
         quantidade: valor,
-        valores: { type: 'array', items: valorLido({ campo: { type: 'string', enum: camposLeitura(mapa).map(c => c.campo) } }) },
+        valores: { type: 'array', items: valorLido({ campo: { type: 'string', enum: camposLeitura(mapa).map(c => c.campo) } }, true) },
       }),
     },
     contagens: { type: 'array', items: objeto({ item: STR, descricao: STR, declarado: valor, contado: valor }) },
@@ -114,7 +124,8 @@ function interpretar(l, conversao) {
 }
 
 // ---------- montagem do documento ----------
-export function leituraParaProjeto(leitura, { arquivo, sha256, paginas, mapa }) {
+export function leituraParaProjeto(leituraBruta, { arquivo, sha256, paginas, mapa }) {
+  const leitura = { ...leituraBruta, itens: (leituraBruta.itens || []).map(it => ({ ...it, valores: (it.valores || []).map(v => ({ ...v, candidatos: (v.candidatos || []).map(normalizarCandidato) })) })) };
   const nomeArquivo = curto(arquivo, 120) || 'projeto.pdf';
   const pendencias = [];
   const alertas = [];
