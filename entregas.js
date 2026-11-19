@@ -416,6 +416,8 @@
   const htmlEventoDetalhe = (rotulo, quando, usuario, texto) => `<li><span class="det-tempo-rot">${esc(rotulo)}</span>` +
     `<span class="det-tempo-meta">${esc([dataHoraBR(quando), usuario].filter(Boolean).join(' · '))}</span>` +
     (texto ? `<div class="det-tempo-txt">${esc(texto)}</div>` : '') + '</li>';
+  const TEXTO_PEDIDO_NAO_PRONTO = 'O pedido está Em Produção. Marcar como Pronto e dar a baixa?';
+
   // texto da confirmação do cancelamento: o que acontece de verdade (a equipe não reabre uma entrega cancelada)
   function avisoCancelamento(det) {
     const e = (det && det.entrega) || {};
@@ -1108,7 +1110,15 @@
       const e = estado.det.entrega, arq = $('r-foto').files[0];
       return ocupado(async () => {
         const corpo = comDataBaixa({ entregueA: txt($('r-entregue').value), anexoIds: arq ? [await enviarFoto(e.id, arq)] : [] });
-        await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo });
+        // pedido Em Produção: o servidor AVISA (409 + aviso 'pedido_nao_pronto') e não grava nada; confirmado, reenvia com marcarPronto
+        // (mesmos anexos, sem reenviar a foto): marca o pedido como Pronto e dá a baixa na mesma operação
+        try {
+          await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo });
+        } catch (err) {
+          if (!(err && err.status === 409 && err.dados && err.dados.aviso === 'pedido_nao_pronto')) throw err;
+          if (!win.confirm(TEXTO_PEDIDO_NAO_PRONTO)) return;
+          await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo: { ...corpo, marcarPronto: true } });
+        }
         toast('Retirada registrada.', 'ok');
         await recarregarTudo(e.id);
       });

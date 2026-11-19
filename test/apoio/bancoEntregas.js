@@ -17,6 +17,9 @@ const PERFIS = {
   'Programador': ['entregas.ver', 'entregas.programar', 'entregas.reagendar', 'entregas.cancelar', 'entregas.criar', 'entregas.dividir',
     'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado'],
   // equipe que programava mas não é administrativa: tudo menos reagendar
+  // equipe completa + mudar situação do pedido (pode marcar Pronto na baixa de retirada, 2026-11-19)
+  'Programador com situação': ['entregas.ver', 'entregas.programar', 'entregas.reagendar', 'entregas.cancelar', 'entregas.criar', 'entregas.dividir',
+    'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado', 'pedidos.situacao'],
   'Programador sem reagendar': ['entregas.ver', 'entregas.programar', 'entregas.cancelar', 'entregas.criar', 'entregas.dividir',
     'entregas.encerrar_saldo', 'entregas.concluir', 'entregas.checklist_assinado'],
   // só a permissão antiga (perfil que ainda não passou pela migração): só agenda e corrige endereço/contato/observação
@@ -146,6 +149,9 @@ function bancoEntregas() {
       pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO, DATA_ENTREGA: x.DATA_ENTREGA ?? null }))],
     [/^SELECT SITUACAO FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido' FOR UPDATE$/, (sql, [numero]) =>
       pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ SITUACAO: x.SITUACAO }))],
+    // baixa de retirada que marca o pedido Pronto (aplicarSituacaoPedido precisa do cabeçalho inteiro)
+    [/^SELECT \* FROM ped_orc WHERE NUMERO = \? AND TIPO = 'Pedido' FOR UPDATE$/, (sql, [numero]) =>
+      pedidos.filter(x => x.NUMERO === numero && x.TIPO === 'Pedido').map(x => ({ ...x }))],
     [/^SELECT e\.id, e\.status, e\.hash_itens, \(SELECT COUNT\(\*\) FROM web_entrega_itens i WHERE i\.entrega_id = e\.id\) AS qtd_linhas_itens\s+FROM web_entregas e WHERE e\.numero = \? FOR UPDATE$/, (sql, [numero]) =>
       entregas.filter(e => e.numero === numero).map(e => ({ id: e.id, status: e.status, hash_itens: e.hash_itens ?? null, qtd_linhas_itens: String(estado.entregaItens.filter(i => i.entrega_id === e.id).length) }))],
     [/^SELECT entrega_id, numero_item, quantidade FROM web_entrega_itens WHERE entrega_id IN/, (sql, ids) =>

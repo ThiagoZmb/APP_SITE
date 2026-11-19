@@ -655,7 +655,7 @@ function registrarEntregas({ rota, pool }) {
       } else if (FINAIS.includes(atual.status)) {
         throw new ErroUsuario(409, `Esta entrega está em '${ROTULO_STATUS[atual.status] || atual.status}' e ${finalDe} não pode mais ser alterado.`);
       }
-      const { cols, motivo = null, detalhe = null, entregueA = null, depois = null } = await montar(conn, atual);
+      const { cols, motivo = null, detalhe = null, entregueA = null, depois = null } = await montar(conn, atual, pedido);
       const agora = agoraLocal();
       const novo = { ...cols, status, atualizado_em: agora };
       const chaves = Object.keys(novo);
@@ -862,26 +862,55 @@ function registrarEntregas({ rota, pool }) {
   // não cancelada e não sobra item sem entrega; senão continua como está (Pronto) e a baixa fica só na entrega (evento + auditoria).
   // Com UMA entrega por pedido (todas as anteriores à divisão) é exatamente o comportamento de antes.
   // `dataEntrega` (opcional, já validada por lerDataEntrega): a data informada vai no detalhe do evento/auditoria e em DATA_ENTREGA
-  const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, dataEntrega = null, usuario }) => async (conn, atual) => ({
-    cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}), ...(dataEntrega ? { dataEntrega } : {}) },
-    depois: async (c, { eventoId, status, pedido }) => {
-      await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
-      if (!pedidoPara(status)) return null;
-      // (2026-11-11) entrega de pedido Em Produção pode ser criada e agendada, mas só se baixa o que está Pronto
-      if (pedido && !SITUACOES_COM_BAIXA.includes(String(pedido.SITUACAO ?? '').trim())) throw new ErroUsuario(409, MSG_BAIXA_NAO_PRONTO(pedido.SITUACAO));
-      const fim = await fechamento(c, atual, status);
-      if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao, dataEntrega); return null; }
-      // baixa que não é a última: o pedido não muda, mas pedido Cancelado ou excluído continua recusando a baixa
-      if (!pedido || pedido.SITUACAO === 'Cancelado') throw new ErroUsuario(409, PEDIDO_CANCELADO);
-      return { pedidoFechado: false, motivoPedidoAberto: fim.motivo };
-    }
-  });
+  // Baixa de retirada com o pedido Em Produção (2026-11-19, decisão do dono): só a rota de retirada OFERECE a opção (`ofereceMarcarPronto`).
+  // Sem `marcarPronto: true` no corpo = 409 com `aviso: 'pedido_nao_pronto'` (a tela pergunta e reenvia) e nada muda. Com ele, e com a
+  // permissão `pedidos.situacao` (`podeMarcarPronto`), o pedido vira Pronto pela MESMA função do menu de situação e da etapa
+  // "Pedido finalizado" (aplicarSituacaoPedido) e a baixa segue, tudo na transação da baixa. Só Em Produção; outras situações seguem bloqueadas.
+  const EM_PRODUCAO = 'Em Produção';
+  const MSG_SEM_PERMISSAO_PRONTO = ' Marcar o pedido como Pronto exige a permissão de mudar a situação do pedido; peça a quem tem.';
+  const baixa = ({ cols = {}, entregueA = null, anexoIds = [], detalhe = null, dataEntrega = null, usuario, quemNome = '',
+    ofereceMarcarPronto = false, marcarPronto = false, podeMarcarPronto = false }) => async (conn, atual, pedidoTravado) => {
+    const marcaPronto = !!(ofereceMarcarPronto && marcarPronto && podeMarcarPronto && pedidoTravado && String(pedidoTravado.SITUACAO ?? '').trim() === EM_PRODUCAO);
+    return {
+      cols, entregueA, detalhe: { ...(detalhe || {}), ...(anexoIds.length ? { anexoIds } : {}), ...(dataEntrega ? { dataEntrega } : {}), ...(marcaPronto ? { marcouPedidoPronto: true } : {}) },
+      ...(marcaPronto ? { motivo: 'Pedido estava Em Produção e foi marcado como Pronto junto com a baixa' } : {}),
+      depois: async (c, { eventoId, status, pedido }) => {
+        await vincularAnexos(c, atual.id, eventoId, anexoIds, usuario);
+        if (!pedidoPara(status)) return null;
+        let extra = null;
+        // (2026-11-11) entrega de pedido Em Produção pode ser criada e agendada, mas só se baixa o que está Pronto
+        if (pedido && !SITUACOES_COM_BAIXA.includes(String(pedido.SITUACAO ?? '').trim())) {
+          const emProducao = String(pedido.SITUACAO ?? '').trim() === EM_PRODUCAO;
+          if (!marcaPronto) {
+            if (ofereceMarcarPronto && emProducao && podeMarcarPronto) throw new ErroUsuario(409, MSG_BAIXA_NAO_PRONTO(pedido.SITUACAO), { aviso: 'pedido_nao_pronto', situacaoPedido: EM_PRODUCAO });
+            throw new ErroUsuario(409, MSG_BAIXA_NAO_PRONTO(pedido.SITUACAO) + (ofereceMarcarPronto && emProducao ? MSG_SEM_PERMISSAO_PRONTO : ''));
+          }
+        }
+        if (marcaPronto) {
+          const [[cab] = []] = await c.execute("SELECT * FROM ped_orc WHERE NUMERO = ? AND TIPO = 'Pedido' FOR UPDATE", [atual.numero]);
+          if (!cab) throw new ErroUsuario(409, PEDIDO_CANCELADO);
+          // require tardio: ped_orc.js já importa este módulo (encerrarEntregasDoPedido); o ciclo só importa se resolvido na carga
+          await require('./ped_orc').aplicarSituacaoPedido(c, { acesso: { nome: quemNome } }, { tipo: 'Pedido', numero: atual.numero }, cab, { nova: 'Pronto', origem: 'baixa_entrega' });
+          pedido.SITUACAO = 'Pronto';
+          extra = { pedidoMarcadoPronto: true, situacaoAnterior: EM_PRODUCAO };
+        }
+        const fim = await fechamento(c, atual, status);
+        if (fim.fechar) { await baixarPedido(c, atual.numero, fim.situacao, dataEntrega); return extra; }
+        // baixa que não é a última: o pedido não muda, mas pedido Cancelado ou excluído continua recusando a baixa
+        if (!pedido || pedido.SITUACAO === 'Cancelado') throw new ErroUsuario(409, PEDIDO_CANCELADO);
+        return { ...(extra || {}), pedidoFechado: false, motivoPedidoAberto: fim.motivo };
+      }
+    };
+  };
   const BAIXA = { travarPedido: true };
 
   rota('post', '/entregas/:id/retirada', CONCLUIR, async (req, res) => {
     const b = req.body || {};
     const lido = lerOu400(res, () => ({ entregueA: lerEntregueA(b.entregueA, { obrigatorio: true }), anexoIds: lerAnexoIds(b.anexoIds), dataEntrega: lerDataEntrega(b.dataEntrega) }));
-    if (lido) await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id }), BAIXA);
+    if (lido) {
+      const pronto = { ofereceMarcarPronto: true, marcarPronto: b.marcarPronto === true, podeMarcarPronto: req.acesso.permissoes.has('pedidos.situacao'), quemNome: req.acesso.nome };
+      await gravar(req, res, 'POST /entregas/:id/retirada', 'retirada', null, baixa({ ...lido, usuario: req.user.id, ...pronto }), BAIXA);
+    }
   });
 
   rota('post', '/entregas/:id/enviada', CONCLUIR, async (req, res) => {

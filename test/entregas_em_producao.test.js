@@ -123,10 +123,77 @@ test('baixa pela equipe (retirada) recusada com 409 se o pedido está Em Produç
   const e = cenarioBaixa(banco, 'Em Produção');
   const r = await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria' });
   assert.equal(r.status, 409);
-  assert.match((await r.json()).error, /ainda não está Pronto/);
+  const j = await r.json();
+  assert.match(j.error, /ainda não está Pronto/);
+  assert.match(j.error, /exige a permissão de mudar a situação/); // Programador não tem pedidos.situacao
+  assert.equal(j.aviso, undefined);
   assert.equal(e.status, 'agendada');
   assert.equal(banco.pedidos[0].SITUACAO, 'Em Produção');
   assert.equal(banco.eventos.length, 0);
+});
+
+test('retirada com pedido Em Produção e pedidos.situacao: 409 com aviso pedido_nao_pronto, sem marcarPronto nada muda', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Programador com situação' });
+  const e = cenarioBaixa(banco, 'Em Produção');
+  const r = await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria' });
+  assert.equal(r.status, 409);
+  const j = await r.json();
+  assert.equal(j.aviso, 'pedido_nao_pronto');
+  assert.equal(j.situacaoPedido, 'Em Produção');
+  assert.equal(e.status, 'agendada');
+  assert.equal(banco.pedidos[0].SITUACAO, 'Em Produção');
+  assert.equal(banco.eventos.length, 0);
+  assert.equal(banco.auditoria.length, 0);
+});
+
+test('retirada com marcarPronto: pedido vira Pronto e depois Retirado na mesma operação, com evento e auditoria, sem entrega duplicada', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Programador com situação' });
+  const e = cenarioBaixa(banco, 'Em Produção');
+  const r = await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria', marcarPronto: true });
+  assert.equal(r.status, 200);
+  assert.equal(e.status, 'retirado');
+  assert.equal(banco.pedidos[0].SITUACAO, 'Retirado');
+  assert.ok(banco.pedidos[0].DATA_ENTREGA);
+  assert.equal(banco.entregas.length, 1);
+  const ev = banco.eventos.find(v => v.tipo === 'retirada');
+  assert.match(ev.motivo, /Em Produção e foi marcado como Pronto/);
+  assert.equal(JSON.parse(ev.detalhe).marcouPedidoPronto, true);
+  const sit = banco.auditoria.find(a => a.acao === 'pedido_situacao');
+  assert.deepEqual([JSON.parse(sit.detalhe).de, JSON.parse(sit.detalhe).para, JSON.parse(sit.detalhe).origem], ['Em Produção', 'Pronto', 'baixa_entrega']);
+  const aud = JSON.parse(banco.auditoria.find(a => a.acao === 'entrega_retirada').detalhe);
+  assert.equal(aud.pedidoMarcadoPronto, true);
+  assert.equal(aud.situacaoAnterior, 'Em Produção');
+});
+
+test('retirada com marcarPronto sem pedidos.situacao continua 409 e nada é gravado', async t => {
+  const { banco, chamar } = await prepararEntregas(t);
+  const e = cenarioBaixa(banco, 'Em Produção');
+  const r = await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria', marcarPronto: true });
+  assert.equal(r.status, 409);
+  assert.equal(e.status, 'agendada');
+  assert.equal(banco.pedidos[0].SITUACAO, 'Em Produção');
+  assert.equal(banco.eventos.length, 0);
+  assert.equal(banco.auditoria.length, 0);
+});
+
+test('marcarPronto não libera outras situações: Orçamento e Cancelado seguem recusando a baixa', async t => {
+  for (const sit of ['Orçamento', 'Cancelado']) {
+    const { banco, chamar } = await prepararEntregas(t, { perfil: 'Programador com situação' });
+    const e = cenarioBaixa(banco, sit);
+    const r = await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria', marcarPronto: true });
+    assert.equal(r.status, 409);
+    assert.equal((await r.json()).aviso, undefined);
+    assert.equal(banco.pedidos[0].SITUACAO, sit);
+    assert.equal(e.status, 'agendada');
+  }
+});
+
+test('marcarPronto com o pedido já Pronto é inofensivo: baixa normal', async t => {
+  const { banco, chamar } = await prepararEntregas(t, { perfil: 'Programador com situação' });
+  const e = cenarioBaixa(banco, 'Pronto');
+  assert.equal((await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria', marcarPronto: true })).status, 200);
+  assert.equal(banco.pedidos[0].SITUACAO, 'Retirado');
+  assert.equal(banco.auditoria.some(a => a.acao === 'pedido_situacao'), false);
 });
 
 test('baixa do motorista recusada com 409 se o pedido está Em Produção; com o pedido Pronto passa', async t => {
@@ -150,4 +217,12 @@ test('baixa com pedido Pronto segue funcionando como antes', async t => {
   const e = cenarioBaixa(banco, 'Pronto');
   assert.equal((await chamar(`/entregas/${e.id}/retirada`, 'POST', { entregueA: 'Maria' })).status, 200);
   assert.equal(banco.pedidos[0].SITUACAO, 'Retirado');
+});
+
+test('entregas.js (tela): aviso pedido_nao_pronto pede confirmação e reenvia a retirada com marcarPronto', () => {
+  const fs = require('node:fs');
+  const src = fs.readFileSync(require('node:path').join(__dirname, '..', 'entregas.js'), 'utf8');
+  assert.match(src, /err\.dados\.aviso === 'pedido_nao_pronto'/);
+  assert.match(src, /O pedido está Em Produção\. Marcar como Pronto e dar a baixa\?/);
+  assert.match(src, /corpo: \{ \.\.\.corpo, marcarPronto: true \}/);
 });

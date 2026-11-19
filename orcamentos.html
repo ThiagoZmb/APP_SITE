@@ -350,6 +350,10 @@
         html body #btn-add-acessorio:hover { background: var(--info-bg) !important; }
         html body #btn-adicionar:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
         #tab-itens.ocultar-pct .col-pct { display: none; }
+        /* modo atendimento (cliente olhando a tela): a porcentagem some da lista, inclusive o botão e o realce da linha */
+        body.modo-atendimento #tab-itens .col-pct, body.modo-atendimento #btn-ver-pct { display: none !important; }
+        html body.modo-atendimento tbody tr.com-pct td { background: transparent; }
+        html body.modo-atendimento tbody tr.com-pct:hover td { background: var(--hover-linha); }
         #tab-itens .col-pct { white-space: nowrap; }
         #itens-tbody tr.travado td { background: rgba(107, 170, 232, .10); }
         .cadeado { cursor: help; margin-right: 4px; }
