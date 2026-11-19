@@ -28,14 +28,15 @@ const limitar = c => (typeof c === 'number' && Number.isFinite(c) ? Math.min(1, 
 // ---------- campos do domínio ----------
 // → [{ campo, raiz, tipo, conversao }] na ordem do mapa; conversao: comprimento | lista_comprimento | inteiro | numero | texto
 export function camposLeitura(mapa) {
-  return mapa.campos.filter(c => /^(dimensoes|atributos)\.[^.]/.test(c.origem)).map(c => {
+  const auxiliares = (mapa.auxiliares ?? []).map(a => ({ campo: a.campo, raiz: a.raiz, tipo: a.tipo, obrigatorio: false, destino: null, conversao: a.tipo === 'texto' ? 'texto' : 'inteiro', auxiliar: true }));
+  return [...mapa.campos.filter(c => /^(dimensoes|atributos)\.[^.]/.test(c.origem)).map(c => {
     const [raiz, ...resto] = c.origem.split('.');
     let conversao = 'texto';
     if (c.tipo === 'numero') conversao = c.unidade === 'mm' ? 'comprimento' : 'numero';
     else if (c.tipo === 'inteiro') conversao = 'inteiro';
     else if (c.tipo === 'lista' && c.itemTipo === 'numero') conversao = c.unidade === 'mm' ? 'lista_comprimento' : 'lista_numero';
     return { campo: resto.join('.'), raiz, tipo: c.tipo, obrigatorio: c.obrigatorio === true, destino: c.destino, conversao };
-  });
+  }), ...auxiliares];
 }
 const categoriasDo = mapa => [...(mapa.categorias ?? []), ...(mapa.foraDoEscopo?.tipos ?? [])];
 const unidadeSaida = conversao => (conversao === 'comprimento' ? 'mm' : conversao === 'inteiro' ? 'un' : null);
@@ -187,6 +188,7 @@ export function leituraParaProjeto(leitura, { arquivo, sha256, paginas, mapa }) 
     const completo = categoriasMapa.has(item.tipo);
     for (const c of campos) {
       if (!completo && !lidos.has(c.campo)) continue;
+      if (c.auxiliar && !lidos.has(c.campo)) continue; // auxiliar não lido: não vira "ausente" nem pendência
       item[c.raiz][c.campo] = montarValor(lidos.get(c.campo) ?? null, `${id}.${c.campo}`, c.conversao, `${id} ${c.campo}`);
     }
     return item;

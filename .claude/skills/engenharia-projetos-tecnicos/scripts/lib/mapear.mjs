@@ -38,6 +38,13 @@ export function validarMapa(mapa) {
     if (!ehObjeto(f) || !Array.isArray(f.tipos) || f.tipos.length === 0 || f.tipos.some(t => typeof t !== 'string' || !t.trim())) erros.push('"foraDoEscopo" deve ter "tipos" (lista não vazia de textos)');
     if (ehObjeto(f) && f.motivo !== undefined && typeof f.motivo !== 'string') erros.push('"foraDoEscopo.motivo" deve ser texto');
   }
+  // "auxiliares" (opcional): campos que a LEITURA preenche mas que não viram campo do item da tela (usados pelos padrões)
+  if (mapa.auxiliares !== undefined) {
+    if (!Array.isArray(mapa.auxiliares)) erros.push('"auxiliares" deve ser uma lista');
+    else for (const [i, a] of mapa.auxiliares.entries()) {
+      if (!ehObjeto(a) || typeof a.campo !== 'string' || !a.campo || a.raiz !== 'atributos' || !['inteiro', 'texto'].includes(a.tipo)) erros.push(`auxiliares[${i}]: precisa de campo (texto), raiz "atributos" e tipo "inteiro" ou "texto"`);
+    }
+  }
   const destinos = new Set();
   for (const [i, c] of (Array.isArray(mapa.campos) ? mapa.campos : []).entries()) {
     const nome = `campos[${i}]`;

@@ -17,3 +17,10 @@ test('furosPorRegra: um furo fica no meio; entradas inválidas lançam erro', ()
   assert.throws(() => furosPorRegra(2000, 2.5));
   assert.throws(() => furosPorRegra(NaN, 2));
 });
+
+test('deBaseParaTopo converte e recusa posição que não cabe', async () => {
+  const { deBaseParaTopo } = await import('../scripts/lib/furos.mjs');
+  assert.deepEqual(deBaseParaTopo([100, 900], 2000), [1100, 1900]);
+  assert.equal(deBaseParaTopo([100, 2500], 2000), null);
+  assert.equal(deBaseParaTopo([], 2000), null);
+});

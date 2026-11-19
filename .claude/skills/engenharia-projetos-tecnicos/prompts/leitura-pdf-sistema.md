@@ -41,6 +41,7 @@ Para cada item, registre a `quantidade` e, em `valores`, um registro por campo q
 
 Regras de leitura:
 - Nunca preencha com valor típico, zero ou palpite. Valor que não está no desenho fica de fora.
+- Unidade das cotas: em PEDIDO SIMPLES (uma a poucas páginas, elevação com a lista do pedido, sem escala 1/50, 1/25 ou 1/5), números inteiros de 3 ou 4 dígitos (570, 995, 2607) estão em MILÍMETROS: use `unidadeSeNumero` = `mm` e explique em `motivoUnidade`. Em projeto executivo de arquitetura (várias pranchas, escala, vírgula decimal como 206,3) continue usando `cm`. Em dúvida, `desconhecida`.
 - Os padrões da empresa (perfil padrão, acabamento pela cor, vidro padrão e outros) são aplicados pelo SISTEMA depois da sua leitura, nunca por você: transcreva só o que está no desenho (inclusive palavras como "cristaleira", "bronze", "preto fosco", "champanhe", que o sistema usa) e deixe de fora o que não está escrito.
 - Largura individual de porta NÃO cotada: não divida a largura total pelo número de portas (a folga entre portas é desconhecida). Deixe a largura de fora e explique em `observacoes`.
 - Não aplique descontos de fabricação; transcreva a medida do desenho (em porta de correr, a medida do VÃO).
@@ -58,10 +59,12 @@ Regras de leitura:
 - `corPerfil`: cor do perfil.
 - `puxador`, `tipoPuxador`, `acabamentoPuxador`, `corPuxador`, `tamanhoPuxador`: puxador (nome/código), tipo (embutido, sobreposto, toda extensão), acabamento, cor e tamanho (número).
 - `posicoesPuxador`: posição do puxador em cada folha, uma por folha separada por ponto e vírgula (por exemplo `Lateral Direita Centro; Lateral Esquerda Centro`).
+- `qtdFurosPorPorta`, `qtdFurosTotal`: quantidade de dobradiças (furos de caneco) POR PORTA quando o projeto diz, ou o TOTAL do item (por exemplo "6 furos de caneco" para 2 portas). Só o número, como está escrito; não calcule posições (o sistema calcula).
 - `revestimento`, `corRevestimento`: o que preenche a porta (vidro, espelho, palhinha...) e sua cor.
 - `divisor`, `divisoresHorizontais`, `divisoresVerticais`: perfil divisor e quantas travessas horizontais e verticais por porta.
 - `sistema`, `transpasse`: sistema de correr (ou `Sem sistema`) e transpasse entre folhas (número).
-- `furos`, `ladosFuros`: posições dos furos de dobradiça medidas a partir da base (números separados por ponto e vírgula) e o lado de cada folha (Esquerdo, Direito, Superior, Inferior).
+- `furos`, `ladosFuros`: posições dos furos de dobradiça em mm, exatamente como cotadas (números separados por ponto e vírgula), e o lado de cada folha (Esquerdo, Direito, Superior, Inferior). O sistema trabalha sempre do TOPO para a base: se o desenho cota os furos a partir do topo da porta, tudo certo; se cota a partir da BASE (de baixo para cima), transcreva as cotas como estão e registre `referenciaFuros` = `base` (o sistema converte).
+- `referenciaFuros`: `topo` ou `base`, só quando o desenho deixa claro de onde as posições dos furos são medidas; se não diz, deixe de fora.
 - `observacao`: observação técnica curta do item que não cabe nos outros campos.
 
 # Verificações cruzadas

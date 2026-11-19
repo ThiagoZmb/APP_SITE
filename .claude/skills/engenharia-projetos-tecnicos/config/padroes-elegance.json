@@ -1,5 +1,5 @@
 {
-  "versao": "1.0.0",
+  "versao": "1.1.0",
   "dominio": "portas-aluminio",
   "metadados": {
     "data": "2026-11-19",
@@ -7,39 +7,196 @@
     "status": "aprovado",
     "motivo": "Padrões de orçamento da Elegance para completar pedidos simples de portas quando o projeto não diz tudo. Decisões do usuário em 2026-11-19 (ver references/esquadrias-aluminio.md). Valores vindos daqui entram SEMPRE como inferidos (metodo configuracao) com pendência: uma pessoa confere antes de lançar. O código aplica; o modelo de leitura nunca aplica padrão."
   },
-  "aplicaA": ["porta_aluminio"],
+  "aplicaA": [
+    "porta_aluminio"
+  ],
   "confianca": 0.6,
-
   "perfil": {
     "padrao": "3345",
     "motivoPadrao": "perfil não informado: o mais comum é o 3345",
     "porContexto": [
-      { "valor": "3026", "textoContem": ["cristaleira"], "motivo": "cristaleira (porta de vidro em móvel de vidros) usa o perfil 3026" }
+      {
+        "valor": "3026",
+        "textoContem": [
+          "cristaleira"
+        ],
+        "motivo": "cristaleira (porta de vidro em móvel de vidros) usa o perfil 3026"
+      }
     ]
   },
-
   "acabamentoPorCor": [
-    { "corContem": ["champanhe", "champagne"], "acabamento": "Anodizado Bronze", "motivo": "\"perfil champanhe\" = anodizado bronze" },
-    { "corContem": ["bronze"], "acabamento": "Anodizado Bronze", "motivo": "\"perfil bronze\" = anodizado bronze" },
-    { "corContem": ["preto"], "acabamento": "Pintura Sólida Alumínio", "motivo": "perfil preto = pintura sólida (sempre fosco; nunca brilho em orçamento)" },
-    { "corContem": ["onix"], "acabamento": "Pintura Metálica Alumínio", "motivo": "Onix é cor metálica no cadastro de cores" }
+    {
+      "corContem": [
+        "champanhe",
+        "champagne"
+      ],
+      "acabamento": "Anodizado Bronze",
+      "motivo": "\"perfil champanhe\" = anodizado bronze"
+    },
+    {
+      "corContem": [
+        "bronze"
+      ],
+      "acabamento": "Anodizado Bronze",
+      "motivo": "\"perfil bronze\" = anodizado bronze"
+    },
+    {
+      "corContem": [
+        "preto"
+      ],
+      "acabamento": "Pintura Sólida Alumínio",
+      "motivo": "perfil preto = pintura sólida (sempre fosco; nunca brilho em orçamento)"
+    },
+    {
+      "corContem": [
+        "onix"
+      ],
+      "acabamento": "Pintura Metálica Alumínio",
+      "motivo": "Onix é cor metálica no cadastro de cores"
+    }
   ],
-
   "acabamentoNaoPermitido": {
-    "porPerfil": { "3026": ["Anodizado Bronze"] },
+    "porPerfil": {
+      "3026": [
+        "Anodizado Bronze"
+      ]
+    },
     "alternativa": "Pintura Metálica Alumínio",
     "motivo": "o perfil não permite esse acabamento no cadastro (acabamentos_permitidos, conferido em 2026-11-19); usar pintura metálica. O servidor/tela confere o cadastro vivo na importação."
   },
-
   "normalizacoes": [
-    { "campo": "revestimento", "quandoTextoIgual": ["incolor", "vidro incolor"], "valor": "Incolor (Extra Clear) 4mm", "motivo": "vidro padrão do orçamento" },
-    { "campo": "revestimento", "quandoTextoIgual": ["espelho"], "valor": "Espelho Prata 4mm", "motivo": "espelho sem tipo (bronze, fumê...) = Espelho Prata 4mm" },
-    { "campo": "revestimento", "quandoTextoIgual": ["reflecta bronze", "vidro reflecta bronze", "reflecta"], "valor": "Reflecta Bronze 4mm", "motivo": "reflecta mais comum no orçamento" },
-    { "campo": "corPerfil", "quandoTextoIgual": ["preto fosco", "preto"], "valor": "Preto", "motivo": "preto é o padrão (99,99% é fosco); se não for, cor a definir" }
+    {
+      "campo": "revestimento",
+      "quandoTextoIgual": [
+        "incolor",
+        "vidro incolor"
+      ],
+      "valor": "Incolor (Extra Clear) 4mm",
+      "motivo": "vidro padrão do orçamento"
+    },
+    {
+      "campo": "revestimento",
+      "quandoTextoIgual": [
+        "canelado",
+        "vidro canelado"
+      ],
+      "valor": "Canelado 4mm",
+      "motivo": "canelado sem espessura = Canelado 4mm (padrão do orçamento; vidro é sempre 4 mm)"
+    },
+    {
+      "campo": "revestimento",
+      "quandoTextoIgual": [
+        "espelho"
+      ],
+      "valor": "Espelho Prata 4mm",
+      "motivo": "espelho sem tipo (bronze, fumê...) = Espelho Prata 4mm"
+    },
+    {
+      "campo": "revestimento",
+      "quandoTextoIgual": [
+        "reflecta bronze",
+        "vidro reflecta bronze",
+        "reflecta"
+      ],
+      "valor": "Reflecta Bronze 4mm",
+      "motivo": "reflecta mais comum no orçamento"
+    },
+    {
+      "campo": "corPerfil",
+      "quandoTextoIgual": [
+        "preto fosco",
+        "preto"
+      ],
+      "valor": "Preto",
+      "motivo": "preto é o padrão (99,99% é fosco); se não for, cor a definir"
+    }
   ],
-
   "tipoFrente": {
     "alturaMaiorQueLargura": "porta_giro",
     "motivo": "sem especificação, altura maior que a largura = porta de giro"
-  }
+  },
+  "furos": {
+    "referencia": "topo",
+    "margemMm": 100,
+    "motivo": "projeto sem posição cotada: desconta 100 mm de cada extremidade e distribui os furos igualmente (a partir do topo; basculante: ao longo da largura)"
+  },
+  "revestimentoDesconhecido": {
+    "data": "2026-11-19",
+    "fonte": "revestimentos_permitidos (todos os perfis); conferir o cadastro vivo na importação",
+    "motivo": "vidro lido que não existe no cadastro NÃO é escolhido pelo sistema: o campo fica vazio e o texto do projeto vai na observação do item, para o usuário decidir",
+    "nomes": [
+      "Acidato 4mm",
+      "ACM 3mm",
+      "Aramado 6mm",
+      "Argentato Bronze 4mm",
+      "Argentato Prata 4mm",
+      "Canelado 4mm",
+      "Canelado 4mm Pintado Metálico",
+      "Canelado 4mm Pintado Sólido",
+      "Chapa de Aço Lisa 20 (0,95mm) Pintado Metálico",
+      "Chapa de Aço Lisa 20 (0,95mm) Pintado Sólido",
+      "Chapa Perfurada (0,9mm) Pintado Metálico",
+      "Chapa Perfurada (0,9mm) Pintado Sólido",
+      "Espelho Bronze 4mm",
+      "Espelho Fumê 4mm",
+      "Espelho Prata 4mm",
+      "Espelho Prata com Verniz 4mm",
+      "Incolor (Extra Clear) 4mm",
+      "Incolor (Extra Clear) 6mm",
+      "Incolor (Extra Clear) 8mm",
+      "Incolor 4mm",
+      "Incolor 6mm",
+      "Incolor 8mm",
+      "Incolor Película Jateada 4mm",
+      "Incolor Temperado (Extra Clear) 4mm",
+      "Incolor Temperado (Extra Clear) 6mm",
+      "Incolor Temperado (Extra Clear) 8mm",
+      "Incolor Temperado 4mm",
+      "Incolor Temperado 6mm",
+      "Incolor Temperado 8mm",
+      "Miniboreal",
+      "Palha Sextavada Algodão",
+      "Palha Sextavada Natural",
+      "Pintado Metálico (Comum) 4mm",
+      "Pintado Metálico (Extra Clear) 4mm",
+      "Pintado Sólido (Comum) 4mm",
+      "Pintado Sólido (Extra Clear) 4mm",
+      "Policarbonato Alveolar Incolor 4mm",
+      "Reflecta Bronze 4mm",
+      "Reflecta Bronze Pintado Metálico 4mm",
+      "Reflecta Bronze Pintado Sólido 4mm",
+      "Reflecta Fumê 4mm",
+      "Reflecta Fumê Pintado Metálico 4mm",
+      "Reflecta Fumê Pintado Sólido 4mm",
+      "Reflecta Incolor 4mm",
+      "Ripado Curvo",
+      "Ripado Curvo Metálico",
+      "Ripado Curvo Sólido",
+      "Ripado Light 20",
+      "Ripado Light 20 Metálico",
+      "Ripado Light 20 Sólido",
+      "Ripado Light 21",
+      "Ripado Light 21 Metálico",
+      "Ripado Light 21 Sólido",
+      "Ripado Light 22",
+      "Ripado Light 22 Metálico",
+      "Ripado Light 22 Sólido",
+      "Tela expandida (1,5mm) Pintado Metálico",
+      "Tela expandida (1,5mm) Pintado Sólido",
+      "Tela PVC Tressé",
+      "Tela PVC Tressé Slim"
+    ]
+  },
+  "observacoes": [
+    {
+      "id": "puxador-igual-anterior",
+      "quandoTextoContem": [
+        "puxador igual",
+        "igual ao pedido anterior",
+        "igual ao anterior"
+      ],
+      "quandoVazio": "puxador",
+      "texto": "ATENÇÃO: o projeto pede \"puxador igual ao pedido anterior\"; definir o puxador antes de produzir."
+    }
+  ]
 }

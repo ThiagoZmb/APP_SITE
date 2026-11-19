@@ -14,3 +14,10 @@ export function furosPorRegra(dimensaoMm, quantidade, margemMm = MARGEM_FURO_MM)
   const posicoes = Array.from({ length: quantidade }, (_, i) => Math.round(margemMm + (util * i) / (quantidade - 1)));
   return [...new Set(posicoes)];
 }
+
+// O sistema mede os furos SEMPRE do topo para a base (decisão do usuário, 2026-11-19). Se o desenho cotou a partir da base,
+// converte: posição do topo = dimensão - posição da base. Devolve null se alguma posição não cabe na porta (não converte no escuro).
+export function deBaseParaTopo(listaMm, dimensaoMm) {
+  if (!Array.isArray(listaMm) || !listaMm.length || !Number.isFinite(dimensaoMm) || listaMm.some(n => !Number.isFinite(n) || n <= 0 || n >= dimensaoMm)) return null;
+  return [...new Set(listaMm.map(n => Math.round(dimensaoMm - n)))].sort((a, b) => a - b);
+}

@@ -5,6 +5,8 @@ import { aplicarPadroes, validarPadroes } from '../scripts/lib/padroes.mjs';
 import { validarProjeto } from '../scripts/lib/validacao.mjs';
 import { ausente, inferido, confirmado } from '../scripts/lib/valor.mjs';
 import { processarLeitura, carregarMapa, carregarPadroes } from '../scripts/lib/servico.mjs';
+import { camposLeitura } from '../scripts/lib/leitura.mjs';
+const camposLeituraDe = mapa => camposLeitura(mapa).map(c => c.campo);
 
 const PADROES = JSON.parse(readFileSync(new URL('../config/padroes-elegance.json', import.meta.url), 'utf8'));
 const ARQ = 'pedido.pdf';
@@ -105,7 +107,7 @@ test('normalizações: vidro incolor/reflecta bronze e preto fosco viram os nome
   const r = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'reflecta bronze') }), PADROES);
   assert.equal(r.doc.itens[0].atributos.revestimento.valor, 'Reflecta Bronze 4mm');
   const n = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'Canelado') }), PADROES);
-  assert.equal(n.doc.itens[0].atributos.revestimento.valor, 'Canelado');
+  assert.equal(n.doc.itens[0].atributos.revestimento.valor, 'Canelado 4mm');
 });
 
 test('tipo de frente: altura maior que a largura = giro; sem medidas ou largura maior não muda', () => {
@@ -145,4 +147,95 @@ test('processarLeitura com { padroes } completa o que falta; sem ela o comportam
   assert.equal(a.corPerfil.valor, 'Preto');
   assert.equal(a.acabamentoPerfil.valor, 'Pintura Sólida Alumínio');
   assert.ok(com.padroesAplicados.length >= 3);
+});
+
+// ---------- etapa 2 ----------
+const mmv = (id, v) => confirmado({ id, valor: v, unidade: 'mm', metodo: 'texto_vetorial', origem: o(String(v)) });
+const inteiro = (id, v) => inferido({ id, valor: v, unidade: 'un', metodo: 'leitura_visual', origem: o(String(v)), confianca: 0.8 });
+
+test('furos: 5 por porta em altura 2337 = 100;634;1169;1703;2237 (giro), pela regra das pontas', () => {
+  const { doc } = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro'), qtdFurosPorPorta: inteiro('P1.qtdFurosPorPorta', 5) }, { altura: mmv('P1.altura', 2337), largura: mmv('P1.largura', 346) }), PADROES);
+  const f = doc.itens[0].atributos.furos;
+  assert.equal(f.valor, '100;634;1169;1703;2237');
+  assert.equal(f.estado, 'inferido');
+  assert.equal(f.metodo, 'configuracao');
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
+});
+
+test('furos: total do item dividido pelas portas; basculante usa a largura; divisão não inteira não chuta', () => {
+  const a = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro'), qtdFurosTotal: inteiro('P1.qtdFurosTotal', 6) }, { altura: mmv('P1.altura', 2363), largura: mmv('P1.largura', 336) }), PADROES);
+  assert.equal(a.doc.itens[0].atributos.furos.valor, '100;1182;2263'); // 6 furos / 2 portas = 3
+  const b = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_basculante'), qtdFurosPorPorta: inteiro('P1.qtdFurosPorPorta', 2) }, { altura: mmv('P1.altura', 558), largura: mmv('P1.largura', 904) }), PADROES);
+  assert.equal(b.doc.itens[0].atributos.furos.valor, '100;804');
+  const c = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro'), qtdFurosTotal: inteiro('P1.qtdFurosTotal', 5) }, { altura: mmv('P1.altura', 2000), largura: mmv('P1.largura', 500) }), PADROES);
+  assert.equal(c.doc.itens[0].atributos.furos?.estado ?? 'ausente', 'ausente'); // 5 / 2 portas não é inteiro
+});
+
+test('furos: posição lida no projeto manda; sem quantidade ou sem tipo de frente não há furos', () => {
+  const lidos = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro'), furos: lido('P1.furos', '150;900'), qtdFurosPorPorta: inteiro('P1.qtdFurosPorPorta', 5) }, { altura: mmv('P1.altura', 2000), largura: mmv('P1.largura', 500) }), PADROES);
+  assert.equal(lidos.doc.itens[0].atributos.furos.valor, '150;900');
+  const semQtd = aplicarPadroes(projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro') }, { altura: mmv('P1.altura', 2000), largura: mmv('P1.largura', 500) }), PADROES);
+  assert.equal(semQtd.doc.itens[0].atributos.furos?.estado ?? 'ausente', 'ausente');
+  const semTipo = aplicarPadroes(projeto({ qtdFurosPorPorta: inteiro('P1.qtdFurosPorPorta', 3) }, { altura: mmv('P1.altura', 500), largura: mmv('P1.largura', 900) }), PADROES);
+  assert.equal(semTipo.doc.itens[0].atributos.furos?.estado ?? 'ausente', 'ausente');
+});
+
+test('vidro que não existe no cadastro: campo fica vazio e o texto vai para a observação; vidro do cadastro não muda', () => {
+  const { doc } = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'VIDRO MINI CANELADO') }), PADROES);
+  const a = doc.itens[0].atributos;
+  assert.equal(a.revestimento.estado, 'ausente');
+  assert.match(a.observacao.valor, /MINI CANELADO/);
+  assert.match(a.observacao.valor, /não existe no cadastro/);
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
+  const ok = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'Miniboreal') }), PADROES);
+  assert.equal(ok.doc.itens[0].atributos.revestimento.valor, 'Miniboreal');
+  const canelado = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'Canelado') }), PADROES);
+  assert.equal(canelado.doc.itens[0].atributos.revestimento.valor, 'Canelado 4mm');
+});
+
+test('observação já existente é preservada ao acrescentar o aviso do vidro', () => {
+  const { doc } = aplicarPadroes(projeto({ revestimento: lido('P1.revestimento', 'vidro mini canelado'), observacao: lido('P1.observacao', 'Entregar na obra') }), PADROES);
+  assert.match(doc.itens[0].atributos.observacao.valor, /^Entregar na obra .*mini canelado/i);
+});
+
+test('"puxador igual ao pedido anterior" gera aviso na observação em vez de inventar o puxador', () => {
+  const { doc } = aplicarPadroes(projeto(), PADROES, { textos: ['* PUXADOR IGUAL AO PEDIDO ANTERIOR'] });
+  const a = doc.itens[0].atributos;
+  assert.match(a.observacao.valor, /puxador igual ao pedido anterior/);
+  assert.equal(a.puxador, undefined);
+  const lidoP = aplicarPadroes(projeto({ puxador: lido('P1.puxador', '2018 E') }), PADROES, { textos: ['puxador igual ao anterior'] });
+  assert.equal(lidoP.doc.itens[0].atributos.observacao?.estado ?? 'ausente', 'ausente');
+});
+
+test('mapa: auxiliares entram na leitura (schema e campos) e só viram valor se lidos', () => {
+  const mapa = carregarMapa();
+  const campos = camposLeituraDe(mapa);
+  assert.ok(campos.includes('qtdFurosPorPorta') && campos.includes('qtdFurosTotal'));
+  const leitura = { itens: [{ id: 'P1', categoria: 'porta_aluminio', legenda: '', quantidade: { texto: '2', pagina: 1, trecho: '2', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] }, valores: [
+    { campo: 'qtdFurosTotal', texto: '6', pagina: 1, trecho: '6 furos de caneco', confianca: 0.9, unidadeSeNumero: 'nao_se_aplica', motivoUnidade: '', candidatos: [] }] }],
+  cotas: [], contagens: [], textoSuspeito: [], observacoes: '' };
+  const r = processarLeitura(leitura, { arquivo: 'p.pdf', paginas: 1, mapa });
+  assert.equal(r.ok, true, JSON.stringify(r.erros));
+  assert.equal(r.doc.itens[0].atributos.qtdFurosTotal.valor, 6);
+  assert.equal(r.doc.itens[0].atributos.qtdFurosPorPorta, undefined); // não lido: nem "ausente" nem pendência
+  assert.equal(r.doc.pendencias.some(p => p.refs.includes('P1.qtdFurosPorPorta')), false);
+});
+
+test('furos cotados a partir da BASE são convertidos para o TOPO; do topo ou sem referência ficam como lidos', () => {
+  const dims = { altura: mmv('P1.altura', 2000), largura: mmv('P1.largura', 500) };
+  const frente = lido('P1.tipoFrente', 'porta_giro');
+  const base = projeto({ tipoFrente: frente, furos: lido('P1.furos', '100;900'), referenciaFuros: lido('P1.referenciaFuros', 'Base') }, dims);
+  assert.equal(aplicarPadroes(base, PADROES).doc.itens[0].atributos.furos.valor, '1100;1900');
+  const topo = projeto({ tipoFrente: frente, furos: lido('P1.furos', '100;900'), referenciaFuros: lido('P1.referenciaFuros', 'topo') }, dims);
+  assert.equal(aplicarPadroes(topo, PADROES).doc.itens[0].atributos.furos.valor, '100;900');
+  const semRef = projeto({ tipoFrente: frente, furos: lido('P1.furos', '100;900') }, dims);
+  assert.equal(aplicarPadroes(semRef, PADROES).doc.itens[0].atributos.furos.valor, '100;900');
+});
+
+test('furos da base que não cabem na porta não são convertidos no escuro: pendência', () => {
+  const x = projeto({ tipoFrente: lido('P1.tipoFrente', 'porta_giro'), furos: lido('P1.furos', '100;2500'), referenciaFuros: lido('P1.referenciaFuros', 'base') }, { altura: mmv('P1.altura', 2000), largura: mmv('P1.largura', 500) });
+  const { doc } = aplicarPadroes(x, PADROES);
+  assert.equal(doc.itens[0].atributos.furos.valor, '100;2500');
+  assert.ok(doc.pendencias.some(p => p.id === 'pend-ref-P1.furos'));
+  assert.equal(validarProjeto(doc).ok, true, JSON.stringify(validarProjeto(doc).erros));
 });

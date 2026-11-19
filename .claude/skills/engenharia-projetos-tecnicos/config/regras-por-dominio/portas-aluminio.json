@@ -18,6 +18,11 @@
     "acessorios": [],
     "obs": ""
   },
+  "auxiliares": [
+    { "campo": "referenciaFuros", "raiz": "atributos", "tipo": "texto", "motivo": "de onde o desenho mede as posições dos furos: \"topo\" ou \"base\". A tela e o sistema usam sempre o TOPO; o código converte quando a leitura disser \"base\"." },
+    { "campo": "qtdFurosPorPorta", "raiz": "atributos", "tipo": "inteiro", "motivo": "dobradiças (furos de caneco) por porta, quando o projeto diz; o sistema calcula as posições (config/padroes-elegance.json). Não vira campo do item da tela." },
+    { "campo": "qtdFurosTotal", "raiz": "atributos", "tipo": "inteiro", "motivo": "total de furos de caneco do item quando o projeto dá o total (por exemplo 6 furos para 2 portas); o sistema divide pelo número de portas." }
+  ],
   "campos": [
     {
       "destino": "frente", "origem": "atributos.tipoFrente", "tipo": "texto", "obrigatorio": true,
