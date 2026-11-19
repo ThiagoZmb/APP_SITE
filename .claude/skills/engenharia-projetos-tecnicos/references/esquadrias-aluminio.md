@@ -34,6 +34,7 @@ Valem para pedidos de portas em que o projeto não diz tudo. Aprovadas por: usu�
 - **"Perfil champanhe/champagne"** = acabamento **Anodizado Bronze**.
 - **Vidro sem nome igual no cadastro** (ex.: "mini canelado"): não escolher; deixar o vidro vazio e registrar o texto do projeto na observação do item, para o usuário decidir.
 - **Sem especificação, vale o desenho** (quantidade de portas, medidas lidas das cotas).
+- **Furos de dobradiça (giro e basculante)**: procurar no projeto a quantidade de dobradiças ("furos de caneco"), o lado e as cotas de posição. A tela mede os furos em mm **do topo para a base** (padrão), com uma lista única para todas as folhas e um lado por folha (Esquerdo/Direito; basculante Superior/Inferior, oposto ao puxador). **Posição cotada no projeto manda.** Sem cota, usar a regra da empresa (aprovada em 2026-11-19): **desconta 100 mm de cada extremidade e distribui os furos igualmente** no que sobra (`scripts/lib/furos.mjs`, `furosPorRegra`; ex.: 5 furos em 2337 mm = 100;634;1169;1703;2237). Entra como `calculado` **inferido** (regra `furos-100mm-das-pontas`) até a pessoa confirmar. Sem quantidade de dobradiças no projeto, `furos` fica ausente com pendência (não estimar pela imagem 3D). "N furos para M portas" = N ÷ M por porta (inferido).
 - Texto com valores literais no PDF (quantidade, tipo de frente, cor do perfil, vidro) entra como confirmado; cota solta no desenho entra como inferido até a pessoa confirmar.
 
 ## Onde o item nasce e como o servidor o consome

@@ -1,8 +1,9 @@
 # Changelog
 
-## Não lançado — 2026-11-19 (só documentação)
+## Não lançado — 2026-11-19
 
-- Lote 2 de amostras reais: 4 pedidos simples de portas (texto vetorial) montados, conferidos pelo usuário e salvos como golden em `amostras_pdf/golden/` (fora do git). Novas regras de preenchimento em `references/esquadrias-aluminio.md` ("Padrões da Elegance para completar pedidos simples"), aprovadas pelo usuário do sistema. Nenhum script, schema ou mapa mudou.
+- Novo `scripts/lib/furos.mjs` (`furosPorRegra`: 100 mm das pontas, furos igualmente distribuídos) com teste; regra aprovada pelo usuário em 2026-11-19.
+- Lote 2 e 3 de amostras reais: 4 pedidos simples de portas (texto vetorial) montados, conferidos pelo usuário e salvos como golden em `amostras_pdf/golden/` (fora do git). Novas regras de preenchimento em `references/esquadrias-aluminio.md` ("Padrões da Elegance para completar pedidos simples"), aprovadas pelo usuário do sistema. Nenhum script, schema ou mapa mudou.
 
 ## 0.4.0 — 2026-10-26
 
