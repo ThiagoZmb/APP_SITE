@@ -5,7 +5,8 @@
   'use strict';
   const dataISO = v => { const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v ?? '')); return m ? m[1] : ''; };
 
-  function perguntar({ tipo, numero, cliente, dataAtual }) {
+  // subtitulo (opcional) = texto livre no lugar de "Pedido nº N · cliente" (usado pelo lote do calendário)
+  function perguntar({ tipo, numero, cliente, dataAtual, subtitulo }) {
     return new Promise(resolver => {
       const atual = dataISO(dataAtual);
       const fundo = document.createElement('div');
@@ -14,7 +15,7 @@
       caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-label', 'Alterar data de pronto');
       caixa.className = 'dp-caixa';
       const t = document.createElement('div'); t.className = 'dp-titulo'; t.textContent = 'Alterar data de pronto';
-      const p = document.createElement('div'); p.className = 'dp-sub'; p.textContent = `${tipo === 'Pedido' ? 'Pedido' : 'Orçamento'} nº ${numero}${cliente ? ' · ' + cliente : ''}`;
+      const p = document.createElement('div'); p.className = 'dp-sub'; p.textContent = subtitulo || `${tipo === 'Pedido' ? 'Pedido' : 'Orçamento'} nº ${numero}${cliente ? ' · ' + cliente : ''}`;
       const rotulo = document.createElement('label'); rotulo.textContent = 'Nova data de pronto:'; rotulo.className = 'dp-rotulo';
       const entrada = document.createElement('input'); entrada.type = 'date'; entrada.id = 'alterar-data-pronto'; entrada.value = atual; rotulo.htmlFor = entrada.id;
       entrada.className = 'dp-data';

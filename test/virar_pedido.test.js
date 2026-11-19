@@ -191,3 +191,20 @@ test('histórico do pedido mostra "Criado a partir do orçamento nº N" sem dinh
   const r = H.montarHistorico([{ quando: '2026-11-13 10:00:00', quem: 'Ana', acao: 'orcamento_virou_pedido', detalhe: JSON.stringify({ orcamento: 21440, cliente: 'X', financeiro: 'A Receber' }) }]);
   assert.equal(r[0].resumo, 'Criado a partir do orçamento nº 21440');
 });
+
+test('observações gerais: sem o campo vale a do orçamento; com o campo (mesmo vazio) vale o da janela; validação de tipo e tamanho', async t => {
+  const deps = { canonico: (l, v) => l.find(x => x.toLowerCase() === String(v).toLowerCase()) || null, SITUACOES: ['Em Produção'], FINANCEIROS: ['A Receber'], validarData: v => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null) };
+  assert.equal(OrcamentoPedido.validarPedido({ dataPronto: '2026-12-01', obsGeral: '  Entregar de manhã ' }, deps).valores.obsGeral, 'Entregar de manhã');
+  assert.equal(OrcamentoPedido.validarPedido({ dataPronto: '2026-12-01', obsGeral: 5 }, deps).ok, false);
+  assert.equal(OrcamentoPedido.validarPedido({ dataPronto: '2026-12-01', obsGeral: 'x'.repeat(5001) }, deps).ok, false);
+  const { banco, chamar, numeroOrc } = await comOrcamento(t);
+  const r1 = await chamar(URL(numeroOrc), 'POST', { dataPronto: '2026-12-01' });
+  assert.equal(r1.status, 200);
+  const n1 = (await r1.json()).numero;
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Pedido' && p.NUMERO === n1).OBS_GERAL, 'Obs geral');
+  const r2 = await chamar(URL(numeroOrc), 'POST', { dataPronto: '2026-12-01', obsGeral: 'Só avisar antes de entregar', confirmarDuplicado: true });
+  assert.equal(r2.status, 200);
+  const n2 = (await r2.json()).numero;
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Pedido' && p.NUMERO === n2).OBS_GERAL, 'Só avisar antes de entregar');
+  assert.equal(banco.pedOrc.find(p => p.TIPO === 'Orçamento').OBS_GERAL, 'Obs geral', 'o orçamento não muda');
+});

@@ -81,7 +81,7 @@
       if (res.status === 401) { win.localStorage.removeItem('auth'); win.location.href = LOGIN_URL; throw new Error('Sessão expirada'); }
       if (blob && res.ok) return res.blob();
       const dados = await res.json().catch(() => ({}));
-      if (!res.ok) { const e = new Error(dados.error || `Erro HTTP ${res.status}`); e.status = res.status; throw e; }
+      if (!res.ok) { const e = new Error(dados.error || `Erro HTTP ${res.status}`); e.status = res.status; e.dados = dados; throw e; }
       return dados;
     }
     return { getAuth, chamar };

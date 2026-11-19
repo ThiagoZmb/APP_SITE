@@ -21,7 +21,7 @@
   // data de pronto sugerida: a do orçamento, se ainda não passou; senão vazia (a pessoa escolhe)
   const dataSugerida = (v, hoje = hojeISO()) => { const d = paraISO(v); return d && d >= hoje ? d : ''; };
 
-  function perguntar({ numero, cliente, dataPronto }) {
+  function perguntar({ numero, cliente, dataPronto, obsGeral }) {
     return new Promise(resolver => {
       const fundo = document.createElement('div'); fundo.className = 'dp-fundo';
       const caixa = document.createElement('div'); caixa.className = 'dp-caixa vp-caixa';
@@ -32,6 +32,7 @@
       const data = document.createElement('input'); data.type = 'date'; data.className = 'dp-data'; data.value = dataSugerida(dataPronto);
       const opcoes = (lista, padrao) => { const s = document.createElement('select'); s.className = 'dp-data'; for (const o of lista) s.add(new Option(o, o)); s.value = padrao; return s; };
       const fin = opcoes(FINANCEIROS, PADRAO.financeiro), sit = opcoes(SITUACOES, PADRAO.situacao);
+      const obs = document.createElement('textarea'); obs.className = 'dp-data vp-obs'; obs.rows = 4; obs.maxLength = 5000; obs.value = String(obsGeral ?? '');
       const nota = document.createElement('div'); nota.className = 'dp-sub vp-nota';
       nota.textContent = 'O orçamento continua como está; o pedido é criado com um número novo, com os mesmos itens e valores.';
       const acoes = document.createElement('div'); acoes.className = 'dp-acoes vp-acoes';
@@ -41,11 +42,11 @@
       const valida = () => /^\d{4}-\d{2}-\d{2}$/.test(data.value);
       const atualizar = () => { const ok = valida(); bEditar.disabled = !ok; bEnviar.disabled = !ok; };
       const fecha = valor => { document.removeEventListener('keydown', teclas, true); fundo.remove(); resolver(valor); };
-      const escolher = acao => { if (valida()) fecha({ acao, dataPronto: data.value, financeiro: fin.value, situacao: sit.value }); };
+      const escolher = acao => { if (valida()) fecha({ acao, dataPronto: data.value, financeiro: fin.value, situacao: sit.value, obsGeral: obs.value }); };
       const teclas = e => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecha(null); }
         else if (e.key === 'Tab') {
-          const itens = [data, fin, sit, bEnviar, bEditar, bCancelar].filter(x => !x.disabled), i = itens.indexOf(document.activeElement);
+          const itens = [data, fin, sit, obs, bEnviar, bEditar, bCancelar].filter(x => !x.disabled), i = itens.indexOf(document.activeElement);
           e.preventDefault(); itens[(i + (e.shiftKey ? itens.length - 1 : 1) + itens.length) % itens.length].focus();
         }
       };
@@ -56,18 +57,25 @@
       fundo.addEventListener('mousedown', e => { if (e.target === fundo) fecha(null); });
       document.addEventListener('keydown', teclas, true);
       acoes.append(bCancelar, bEditar, bEnviar);
-      caixa.append(t, sub, ...campo('vp-data', 'Data de pronto', data), ...campo('vp-financeiro', 'Financeiro', fin), ...campo('vp-producao', 'Produção', sit), nota, acoes);
+      caixa.append(t, sub, ...campo('vp-data', 'Data de pronto', data), ...campo('vp-financeiro', 'Financeiro', fin), ...campo('vp-producao', 'Produção', sit), ...campo('vp-obs', 'Observações gerais do pedido', obs), nota, acoes);
       fundo.append(caixa); document.body.append(fundo);
       atualizar(); data.focus();
     });
   }
 
   async function executar({ numero, cliente, dataPronto, prontoEm, apiBase, loginUrl, token, aoEditar, aoEnviar }) {
-    const e = await perguntar({ numero, cliente, dataPronto: dataPronto || prontoEm });
+    // observações gerais do orçamento gravado, para conferir/editar antes de criar o pedido (falha na leitura = campo vazio e o servidor mantém a do orçamento)
+    let obsGeral;
+    try {
+      const r0 = await fetch(`${apiBase}/ped_orc/${encodeURIComponent('Orçamento')}/${encodeURIComponent(numero)}`, { headers: { Authorization: 'Bearer ' + token() } });
+      if (r0.status === 401) { localStorage.removeItem('auth'); location.href = loginUrl; return; }
+      if (r0.ok) obsGeral = String(((await r0.json().catch(() => ({}))).cabecalho || {}).obsGeral ?? '');
+    } catch { /* sem a leitura: o campo abre vazio e não é enviado */ }
+    const e = await perguntar({ numero, cliente, dataPronto: dataPronto || prontoEm, obsGeral });
     if (!e) return;
     const url = `${apiBase}/ped_orc/orcamentos/${encodeURIComponent(numero)}/virar_pedido`;
     const enviar = confirmarDuplicado => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
-      body: JSON.stringify({ dataPronto: e.dataPronto, financeiro: e.financeiro, situacao: e.situacao, ...(confirmarDuplicado ? { confirmarDuplicado: true } : {}) }) });
+      body: JSON.stringify({ dataPronto: e.dataPronto, financeiro: e.financeiro, situacao: e.situacao, ...(obsGeral !== undefined ? { obsGeral: e.obsGeral } : {}), ...(confirmarDuplicado ? { confirmarDuplicado: true } : {}) }) });
     let numeroNovo;
     try {
       let r = await enviar(false);

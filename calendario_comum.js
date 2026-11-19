@@ -192,19 +192,22 @@
   }
   // Visão em lista, como a folha de papel da produção: cada dia com pedido vira um bloco (data e dia da semana) e uma linha por pedido
   // "P 23392 - Cliente | Cliente final". A linha é <li data-numero>: o menu do botão direito funciona como no calendário.
-  function htmlLinhaFolha(p, situacao, busca) {
+  // `marcados` (Set de números como texto) só vem quando a seleção em lote está ligada (o usuário pode mudar data de pronto ou situação): aí a linha ganha a caixa de seleção.
+  function htmlLinhaFolha(p, situacao, busca, marcados) {
+    const sel = marcados ? marcados.has(String(p.numero)) : false;
+    const caixa = marcados ? `<input type="checkbox" class="sel-pedido" data-sel="${esc(p.numero)}" aria-label="Selecionar o pedido ${esc(p.numero)}"${sel ? ' checked' : ''}> ` : '';
     const sit = situacao === 'todos' && SIGLA_CLASSE[p.classe] ? ` <span class="folha-sit">(${esc(SIGLA_CLASSE[p.classe])})</span>` : '';
     const rot = rotuloPedido(p) + rotuloAchou(p, busca);
-    return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` +
+    return `<li class="folha-linha${p.atrasado ? ' atraso' : ''}${classeAchou(p, busca)}${sel ? ' sel' : ''}" data-numero="${esc(p.numero)}" tabindex="0" title="${esc(rot)}" aria-label="${esc(rot)}">` + caixa +
       `<span class="folha-p">${p.reagendado ? 'RA ' : ''}${esc(p.numero)}</span> - <span class="folha-cli">${esc(p.cliente || '—')}</span>${p.clienteFinal ? ` | <span class="folha-final">${esc(p.clienteFinal)}</span>` : ''}${sit} ${seloSituacao(p)}${seloEntrega(p) ? ' ' + seloEntrega(p) : ''}` +
       (p.atrasado ? ' <span class="folha-atraso">Atrasado</span>' : '') + '</li>';
   }
-  function htmlFolha(semanas, situacao, busca) {
+  function htmlFolha(semanas, situacao, busca, marcados) {
     const dias = semanas.flat().filter(c => c.doMes && c.pedidos.length);
     if (!dias.length) return '<p class="vazio">Nenhum pedido previsto neste mês.</p>';
     const sem = classesSemana(dias);
     return dias.map((c, i) => `<section class="folha-dia${sem[i]}${c.hoje ? ' hoje' : ''}${c.pedidos.some(p => pedidoCasa(p, busca)) ? ' dia-achou' : ''}"><h3><a href="${esc(urlDia(c.dia, situacao))}">${esc(dataBR(c.dia))} (${DIAS_EXTENSO[new Date(c.dia + 'T00:00:00Z').getUTCDay()]})</a></h3>` +
-      `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao, busca)).join('')}</ul></section>`).join('');
+      `<ul>${c.pedidos.map(p => htmlLinhaFolha(p, situacao, busca, marcados)).join('')}</ul></section>`).join('');
   }
   // alternador "Calendário | Lista" ao lado do título: só os botões (o contêiner #cal-visao é o .tipo-toggle do tema.css, o mesmo de Pedidos | Orçamentos no Início)
   function htmlVisao(visao) {

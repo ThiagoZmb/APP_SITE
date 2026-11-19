@@ -11,6 +11,7 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const K = typeof module === 'object' && module.exports ? require('./calendario_comum.js') : raiz.CalendarioComum;
+  const L = typeof module === 'object' && module.exports ? require('./calendario_lote.js') : raiz.CalendarioLote;   // ações em lote (selecionar vários pedidos), regras em calendario_lote.js
 
   // ?mes=AAAA-MM&situacao=... da URL; mês ausente/inválido = mês de hoje
   function lerConsulta(search, hoje) {
@@ -24,7 +25,13 @@
     if (!base) return;
     const { doc, $, chamar, toast, getAuth } = base;
     const hoje = K.hojeISO(win);
-    const estado = Object.assign({ pedidos: new Map(), consulta: 0, busca: '', termoRolado: '', semanas: [], atual: -1, seqBusca: 0, achadosSrv: null, dadosMes: null }, lerConsulta(win.location.search, hoje));
+    const estado = Object.assign({ pedidos: new Map(), consulta: 0, busca: '', termoRolado: '', semanas: [], atual: -1, seqBusca: 0, achadosSrv: null, dadosMes: null, sel: { marcados: new Set(), ancora: '' }, emLote: false }, lerConsulta(win.location.search, hoje));
+
+    // Seleção em lote (só na visão Lista): liga para quem pode mudar data de pronto ou situação; as rotas conferem a permissão de novo a cada pedido.
+    const podeLote = { dataPronto: !!(win.Acesso && win.Acesso.pode('pedidos.data_pronto')), situacao: !!(win.Acesso && win.Acesso.pode('pedidos.situacao')) };
+    const loteLigado = podeLote.dataPronto || podeLote.situacao;
+    const marcadosOuNulo = () => (loteLigado ? estado.sel.marcados : null);
+    const ordemTela = () => L.numerosNaOrdem(estado.semanas);
 
     function desenhar(d) {
       estado.dadosMes = d;
@@ -36,9 +43,10 @@
       $('cal-situacao').innerHTML = K.htmlSituacao(estado.situacao);
       $('cal-corpo').dataset.modo = estado.visao;   // não pode ser data-visao: é o atributo dos botões e o closest() pegaria o contêiner
       estado.semanas = semanas;
-      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao, estado.busca);
+      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao, estado.busca, marcadosOuNulo());
       $('cal-grade').innerHTML = K.htmlGrade(semanas, estado.situacao, estado.busca);
       $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao, estado.busca);
+      aposDesenho();
       atualizarBusca();
     }
     // Resultado da pesquisa no servidor (todas as datas): sempre em Lista (a grade é de um mês só); datas completas, agrupado por dia.
@@ -53,9 +61,10 @@
       estado.semanas = semanas;
       estado.pedidos = new Map();
       for (const dia of d.dias || []) for (const p of dia.pedidos) estado.pedidos.set(String(p.numero), p);
-      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao, estado.busca);
+      $('cal-folha').innerHTML = K.htmlFolha(semanas, estado.situacao, estado.busca, marcadosOuNulo());
       $('cal-grade').innerHTML = '';
       $('cal-lista').innerHTML = K.htmlListaDias(semanas, estado.situacao, estado.busca);
+      aposDesenho();
       atualizarBusca();
     }
 
@@ -164,6 +173,110 @@
         if (minha === estado.consulta) $('cal-corpo').removeAttribute('aria-busy');
       }
     }
+
+    // ---------- ações em lote (visão Lista) ----------
+    // Cada pedido selecionado vai, UM POR UM e em sequência, para a rota individual que já existe (calendario_lote.js); nada de regra nova aqui.
+    const barraLote = $('cal-lote'), resumoLote = $('cal-lote-resumo');
+    function pintarSelecao() {   // marca/desmarca as linhas já desenhadas sem redesenhar a lista
+      for (const li of doc.querySelectorAll('#cal-folha li[data-numero]')) {
+        const marcado = estado.sel.marcados.has(li.dataset.numero), cb = li.querySelector('.sel-pedido');
+        li.classList.toggle('sel', marcado);
+        if (cb) cb.checked = marcado;
+      }
+    }
+    function atualizarBarraLote() {
+      if (!barraLote) return;
+      const n = estado.sel.marcados.size;
+      barraLote.hidden = !loteLigado || n === 0 || $('cal-corpo').dataset.modo !== 'lista';
+      if (barraLote.hidden) return;
+      barraLote.innerHTML = L.htmlBarra(n, podeLote);
+      barraLote.setAttribute('aria-busy', estado.emLote ? 'true' : 'false');
+      for (const el of barraLote.querySelectorAll('button, select')) el.disabled = estado.emLote;
+    }
+    function aposDesenho() {   // pedido que saiu da tela (outro mês, filtro) deixa de estar selecionado
+      estado.sel = { marcados: new Set(L.manterVisiveis(estado.sel.marcados, ordemTela())), ancora: estado.sel.ancora };
+      pintarSelecao();
+      atualizarBarraLote();
+    }
+    function limparSelecao() { estado.sel = { marcados: new Set(), ancora: '' }; pintarSelecao(); atualizarBarraLote(); }
+    const numerosSelecionados = () => L.manterVisiveis(estado.sel.marcados, ordemTela());
+
+    // Clique na caixa (ou Ctrl/Cmd+clique na linha); Shift marca a faixa desde o último clicado
+    function aoSelecionar(ev) {
+      if (!loteLigado || estado.emLote) return;
+      const li = ev.target.closest && ev.target.closest('#cal-folha li[data-numero]');
+      if (!li || ev.target.closest('a')) return;
+      const caixa = ev.target.closest('.sel-pedido');
+      if (!caixa && !(ev.ctrlKey || ev.metaKey || ev.shiftKey)) return;
+      const n = li.dataset.numero;
+      const marcar = caixa ? caixa.checked : !estado.sel.marcados.has(n);
+      estado.sel = L.aplicarSelecao(estado.sel, ordemTela(), n, { marcar, faixa: ev.shiftKey });
+      pintarSelecao(); atualizarBarraLote();
+    }
+
+    async function executarAcao(descricao, numeros, chamarUm) {
+      estado.emLote = true; atualizarBarraLote();
+      $('cal-corpo').setAttribute('aria-busy', 'true');
+      const nomes = new Map([...estado.pedidos].map(([k, p]) => [k, p.cliente || '']));
+      let resultados;
+      try {
+        resultados = await L.executarLote(numeros, chamarUm, {
+          parar: err => !!err && err.message === 'Sessão expirada',   // chamar() já mandou para o login
+          aoProgresso: (feitos, total) => { if (resumoLote) { resumoLote.hidden = false; resumoLote.textContent = `Aplicando… ${feitos} de ${total}`; } }
+        });
+      } finally { estado.emLote = false; }
+      const r = L.resumoLote(resultados, descricao, nomes);
+      estado.sel = { marcados: new Set(r.numerosFalha), ancora: '' };   // os que falharam continuam selecionados, para tentar de novo
+      if (resumoLote) {
+        resumoLote.hidden = false;
+        resumoLote.className = `cal-lote-resumo ${r.todosOk ? 'ok' : 'falha'}`;
+        resumoLote.innerHTML = L.htmlResumo(r, K.esc);
+        resumoLote.setAttribute('role', r.todosOk ? 'status' : 'alert');
+      }
+      toast(r.titulo, r.todosOk ? 'info' : 'erro');
+      await carregar();   // recarrega o mês (ou a pesquisa) mantendo filtros; o pedido pode ter mudado de dia
+      $('cal-corpo').removeAttribute('aria-busy');
+      aposDesenho();
+    }
+
+    async function loteDataPronto() {
+      const numeros = numerosSelecionados();
+      if (!numeros.length || !podeLote.dataPronto || !win.AlterarDataPronto) return;
+      const nova = await win.AlterarDataPronto.perguntar({ tipo: 'Pedido', subtitulo: `${numeros.length} pedido(s) selecionado(s)`, dataAtual: '' });
+      if (!nova) return;
+      await executarAcao('data de pronto', numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/data_pronto`, { metodo: 'POST', corpo: { dataPronto: nova } }));
+    }
+    async function loteSituacao(nome) {
+      const numeros = numerosSelecionados();
+      if (!numeros.length || !podeLote.situacao || !L.SITUACOES_LOTE.includes(nome)) return;
+      let escolha = '';
+      if (nome === 'Entregue' || nome === 'Retirado') {
+        if (!win.EscolhaDataEntrega) return;
+        escolha = await win.EscolhaDataEntrega.perguntar({ numero: '', cliente: '', nome, dataAtual: '', dataPronto: '', lote: numeros.length });
+        if (!escolha) return;
+      } else if (!win.confirm(`Mudar a situação de ${numeros.length} pedido(s) para "${nome}"?`)) return;
+      const corpo = L.corpoSituacao(nome, escolha);
+      await executarAcao(`situação ${nome}`, numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/situacao`, { metodo: 'POST', corpo }));
+    }
+
+    doc.addEventListener('click', aoSelecionar);
+    doc.addEventListener('mousedown', ev => { if (ev.shiftKey && ev.target.closest && ev.target.closest('#cal-folha li[data-numero]')) ev.preventDefault(); });   // Shift+clique não seleciona texto
+    if (barraLote) {
+      barraLote.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-lote]'); if (!b) return;
+        if (b.dataset.lote === 'limpar') limparSelecao(); else if (b.dataset.lote === 'data_pronto') loteDataPronto();
+      });
+      barraLote.addEventListener('change', ev => {
+        const sel = ev.target.closest('[data-lote-sit]'); if (!sel || !sel.value) return;
+        const nome = sel.value; sel.value = ''; loteSituacao(nome);
+      });
+    }
+    if (resumoLote) resumoLote.addEventListener('click', ev => { if (ev.target.closest('[data-lote-fechar-resumo]')) resumoLote.hidden = true; });
+    doc.addEventListener('keydown', ev => {   // Esc limpa a seleção (a pesquisa, o menu do botão direito e as janelas têm o Esc deles)
+      if (ev.key !== 'Escape' || !estado.sel.marcados.size || estado.emLote || ev.defaultPrevented) return;
+      if (ev.target === campo || doc.getElementById('menu-ctx') || doc.querySelector('.dp-fundo, [role="dialog"]')) return;
+      limparSelecao();
+    });
 
     const irParaODia = el => { const cel = el.closest('.cel[data-dia]'); if (cel) win.location.href = K.urlDia(cel.dataset.dia, estado.situacao); };
 

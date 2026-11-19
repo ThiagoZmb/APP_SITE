@@ -844,6 +844,7 @@ select option:disabled { color: var(--text-disabled); }
 /* janela "Transformar em pedido" (virar_pedido.js): reaproveita os dp-*; campos empilhados e três botões que quebram de linha no celular */
 .vp-caixa { max-width: 440px; }
 .vp-rotulo { margin-top: 14px; }
+.vp-obs { width: 100%; box-sizing: border-box; resize: vertical; min-height: 5em; font: inherit; }
 .vp-nota { margin: 16px 0 0; font-size: 13px; line-height: 1.4; }
 .vp-acoes { flex-wrap: wrap; }
 

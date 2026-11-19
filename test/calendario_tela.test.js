@@ -206,7 +206,7 @@ for (const [html, js, ids] of [
     // scripts do menu do botão direito + os da tela, todos com ?v= e defer, e na ordem em que dependem uns dos outros
     const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
     assert.deepEqual(scripts, ['situacoes.js', 'layout.js', 'entregas_comum.js', 'calendario_comum.js', 'menu_contexto.js', 'inicio_menu.js', 'escolha_data_entrega.js', 'alterar_data_pronto.js', 'calculo/desconto_pedido.js', 'desconto_pedido_tela.js', 'historico_pedido_tela.js',
-      'danfe_pedido.js', 'etiqueta_zebra.js', 'checklist_pedido.js', 'impressao_pdf.js', js]);
+      'danfe_pedido.js', 'etiqueta_zebra.js', 'checklist_pedido.js', 'impressao_pdf.js', ...(js === 'calendario.js' ? ['calendario_lote.js'] : []), js]);
     assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
     assert.doesNotMatch(h, /\son[a-z]+=/i);
     assert.doesNotMatch(h, /\sstyle=/i);
@@ -257,7 +257,7 @@ test('visão em lista: um bloco por dia com pedido (data e dia da semana), uma l
   assert.equal((h.match(/<section class="folha-dia/g) || []).length, 2);          // só os dias com pedido
   assert.match(h, /09\/11\/2026 \(segunda-feira\)/);
   assert.match(h, /11\/11\/2026 \(quarta-feira\)/);
-  assert.match(h, /P 23392<\/span> - <span class="folha-cli">P &amp; G Comércio<\/span> \| <span class="folha-final">Gilma Goulart<\/span>/);   // escapa HTML
+  assert.match(h, />23392<\/span> - <span class="folha-cli">P &amp; G Comércio<\/span> \| <span class="folha-final">Gilma Goulart<\/span>/);   // escapa HTML
   assert.match(h, /data-numero="23405"/);                                          // o menu do botão direito acha a linha
   assert.ok(!/23405<\/span> - <span class="folha-cli">Oceanstop<\/span> \|/.test(h), 'sem cliente final não põe a barra');
   assert.match(K.htmlFolha(K.montarGrade([], '2026-11', ''), 'abertos'), /Nenhum pedido previsto/);
