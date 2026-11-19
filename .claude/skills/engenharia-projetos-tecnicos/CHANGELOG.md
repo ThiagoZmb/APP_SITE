@@ -1,5 +1,9 @@
 # Changelog
 
+## Não lançado — 2026-11-19 (só documentação)
+
+- Lote 2 de amostras reais: 4 pedidos simples de portas (texto vetorial) montados, conferidos pelo usuário e salvos como golden em `amostras_pdf/golden/` (fora do git). Novas regras de preenchimento em `references/esquadrias-aluminio.md` ("Padrões da Elegance para completar pedidos simples"), aprovadas pelo usuário do sistema. Nenhum script, schema ou mapa mudou.
+
 ## 0.4.0 — 2026-10-26
 
 Leitura de PDF na web. Pedido do usuário: vendedores em terminais diferentes, sem Claude Code e sem poppler, lendo o projeto direto na tela de orçamentos.

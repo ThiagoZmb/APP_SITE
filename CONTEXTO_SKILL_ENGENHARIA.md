@@ -1,5 +1,7 @@
 # Contexto de trabalho — Skill `engenharia-projetos-tecnicos`
 
+> **Atualização 2026-11-19:** a skill está na 0.4.0 (leitura de PDF pela web na `main`). Golden real: amostra1 + 4 pedidos do lote 2 em `amostras_pdf/golden/`. Regras de preenchimento de pedidos simples: `references/esquadrias-aluminio.md`. As seções abaixo (0.3.2, "próximos passos") são do histórico de 2026-10-26. Próximo: PORTA VIDRO-1, PEDIDO DE ORÇAMENTO-2, PORTA E METALON, porta bascula; depois os projetos grandes.
+
 Resumo da conversa no app Claude (2026-10-26) para continuar o trabalho no VS Code.
 Pedido original completo: `PROMPT_SKILL_ENGENHARIA.md` (raiz, não versionado).
 Transcrição integral exportada em `C:\Users\Família\Downloads\session-export-1793024012620.zip`.

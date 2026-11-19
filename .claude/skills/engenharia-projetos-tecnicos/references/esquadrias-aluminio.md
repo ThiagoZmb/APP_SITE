@@ -18,6 +18,24 @@ As famílias 2 e 3 **são registráveis no projeto** como itens desses tipos (co
 
 Uma legenda que mistura famílias (por exemplo "portas em perfil 3136" dentro de um louceiro) deve ser registrada pelo que a Elegance fabrica: as portas em perfil de alumínio são família 1 (`porta_giro` etc., com `perfil` e `puxador` em `atributos`); a estrutura do louceiro é família 2. Em dúvida, registre pendência e pergunte; não escolha.
 
+## Padrões da Elegance para completar pedidos simples (decisão do usuário, 2026-11-19)
+
+Valem para pedidos de portas em que o projeto não diz tudo. Aprovadas por: usuário do sistema. São **padrões de orçamento**: o valor entra como informado por uma pessoa (`--informar`), nunca como se estivesse no PDF, e a pessoa confere antes de lançar.
+
+- **Unidade**: cota sem unidade escrita em pedido simples = **mm** (em projeto executivo de arquitetura em cm continua valendo a regra de `cotas-e-unidades.md`).
+- **Perfil**: cristaleira (porta de vidro em móvel de vidros) = **3026**; perfil não informado = **3345** (o mais comum).
+- **Acabamento**: "perfil bronze" = **Anodizado Bronze**; se o perfil não permite esse acabamento (`acabamentos_permitidos`, ex.: o 3026), usar **Pintura Metálica Alumínio**. "Preto fosco" = **Pintura Sólida Alumínio** com cor **Preto** (preto é o padrão; se não for, cor "Cor a definir"). **Nunca** usar acabamento "Brilho" em orçamento (99,99% é fosco).
+- **Cor**: nomes do cadastro `cores` (ex.: "Onix", metálica; "Bronze 1001", metálica; "Preto", sólida). "Titânio" se assemelha ao **Onix**.
+- **Vidro**: padrão **"Incolor (Extra Clear) 4mm"**; reflecta = **"Reflecta Bronze 4mm"** (o mais usado). Vidro é sempre 4 mm.
+- **Largura**: se o pedido dá a largura total e o número de portas, dividir a total pelo número de portas (sem folga).
+- **Altura**: para efeito de orçamento vale a cota do conjunto, mesmo que inclua gavetas ou lateral.
+- **Puxador**: se o projeto não fala, fica sem puxador. Se diz "igual ao pedido anterior", **não inventar**: gerar observação do item avisando que o puxador precisa ser definido.
+- **Tipo de frente**: dobradiça/giro escrito = Porta de giro; "basculante" escrito = Porta basculante. Sem texto: dobradiças na **vertical** = giro, na **horizontal** = basculante; sem nenhuma indicação, **altura maior que a largura = giro**.
+- **"Perfil champanhe/champagne"** = acabamento **Anodizado Bronze**.
+- **Vidro sem nome igual no cadastro** (ex.: "mini canelado"): não escolher; deixar o vidro vazio e registrar o texto do projeto na observação do item, para o usuário decidir.
+- **Sem especificação, vale o desenho** (quantidade de portas, medidas lidas das cotas).
+- Texto com valores literais no PDF (quantidade, tipo de frente, cor do perfil, vidro) entra como confirmado; cota solta no desenho entra como inferido até a pessoa confirmar.
+
 ## Onde o item nasce e como o servidor o consome
 
 | Etapa | Onde |
