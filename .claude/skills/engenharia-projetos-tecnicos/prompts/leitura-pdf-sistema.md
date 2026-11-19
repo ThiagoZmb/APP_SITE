@@ -41,6 +41,7 @@ Para cada item, registre a `quantidade` e, em `valores`, um registro por campo q
 
 Regras de leitura:
 - Nunca preencha com valor típico, zero ou palpite. Valor que não está no desenho fica de fora.
+- Os padrões da empresa (perfil padrão, acabamento pela cor, vidro padrão e outros) são aplicados pelo SISTEMA depois da sua leitura, nunca por você: transcreva só o que está no desenho (inclusive palavras como "cristaleira", "bronze", "preto fosco", "champanhe", que o sistema usa) e deixe de fora o que não está escrito.
 - Largura individual de porta NÃO cotada: não divida a largura total pelo número de portas (a folga entre portas é desconhecida). Deixe a largura de fora e explique em `observacoes`.
 - Não aplique descontos de fabricação; transcreva a medida do desenho (em porta de correr, a medida do VÃO).
 - Cor e acabamento são coisas diferentes: acabamento do perfil é o tratamento (anodizado, pintado, escovado); cor é a cor (preto, bronze, natural). "Inox escovado" descreve o acabamento, não a cor. Em dúvida, registre só no campo que você tem certeza e explique em `observacoes`.

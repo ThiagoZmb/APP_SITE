@@ -198,7 +198,7 @@ body #cal-corpo:not([data-modo="lista"]) .btn-imprimir { display: none; }
 .sel-pedido:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); border-radius: 3px; }
 .folha-linha.sel { background: var(--primary-light); box-shadow: inset 3px 0 0 var(--primary-color); }
 .folha-linha.sel.atraso { box-shadow: inset 3px 0 0 var(--danger-color); }
-.cal-lote { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 25; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 10px 16px; background: var(--white); color: var(--text-dark); border: 1px solid var(--border-strong); border-top: 3px solid var(--primary-color); border-radius: 12px; box-shadow: var(--shadow-heavy); }
+.cal-lote { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 25; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 10px 16px; background: color-mix(in srgb, var(--primary-color) 9%, var(--white)); color: var(--text-dark); border: 1px solid color-mix(in srgb, var(--primary-color) 35%, var(--border-strong)); border-top: 3px solid var(--primary-color); border-radius: 12px; box-shadow: var(--shadow-heavy); }
 .cal-lote[hidden], .cal-lote-resumo[hidden] { display: none; }
 .cal-lote-qtd { font-weight: 800; }
 .cal-lote select { padding: 6px 10px; background: var(--bg); color: var(--text-dark); border: 1px solid var(--border-control); border-radius: var(--radius-sm); font: inherit; cursor: pointer; }

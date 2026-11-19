@@ -1,0 +1,45 @@
+{
+  "versao": "1.0.0",
+  "dominio": "portas-aluminio",
+  "metadados": {
+    "data": "2026-11-19",
+    "responsavel": "usuário do sistema",
+    "status": "aprovado",
+    "motivo": "Padrões de orçamento da Elegance para completar pedidos simples de portas quando o projeto não diz tudo. Decisões do usuário em 2026-11-19 (ver references/esquadrias-aluminio.md). Valores vindos daqui entram SEMPRE como inferidos (metodo configuracao) com pendência: uma pessoa confere antes de lançar. O código aplica; o modelo de leitura nunca aplica padrão."
+  },
+  "aplicaA": ["porta_aluminio"],
+  "confianca": 0.6,
+
+  "perfil": {
+    "padrao": "3345",
+    "motivoPadrao": "perfil não informado: o mais comum é o 3345",
+    "porContexto": [
+      { "valor": "3026", "textoContem": ["cristaleira"], "motivo": "cristaleira (porta de vidro em móvel de vidros) usa o perfil 3026" }
+    ]
+  },
+
+  "acabamentoPorCor": [
+    { "corContem": ["champanhe", "champagne"], "acabamento": "Anodizado Bronze", "motivo": "\"perfil champanhe\" = anodizado bronze" },
+    { "corContem": ["bronze"], "acabamento": "Anodizado Bronze", "motivo": "\"perfil bronze\" = anodizado bronze" },
+    { "corContem": ["preto"], "acabamento": "Pintura Sólida Alumínio", "motivo": "perfil preto = pintura sólida (sempre fosco; nunca brilho em orçamento)" },
+    { "corContem": ["onix"], "acabamento": "Pintura Metálica Alumínio", "motivo": "Onix é cor metálica no cadastro de cores" }
+  ],
+
+  "acabamentoNaoPermitido": {
+    "porPerfil": { "3026": ["Anodizado Bronze"] },
+    "alternativa": "Pintura Metálica Alumínio",
+    "motivo": "o perfil não permite esse acabamento no cadastro (acabamentos_permitidos, conferido em 2026-11-19); usar pintura metálica. O servidor/tela confere o cadastro vivo na importação."
+  },
+
+  "normalizacoes": [
+    { "campo": "revestimento", "quandoTextoIgual": ["incolor", "vidro incolor"], "valor": "Incolor (Extra Clear) 4mm", "motivo": "vidro padrão do orçamento" },
+    { "campo": "revestimento", "quandoTextoIgual": ["espelho"], "valor": "Espelho Prata 4mm", "motivo": "espelho sem tipo (bronze, fumê...) = Espelho Prata 4mm" },
+    { "campo": "revestimento", "quandoTextoIgual": ["reflecta bronze", "vidro reflecta bronze", "reflecta"], "valor": "Reflecta Bronze 4mm", "motivo": "reflecta mais comum no orçamento" },
+    { "campo": "corPerfil", "quandoTextoIgual": ["preto fosco", "preto"], "valor": "Preto", "motivo": "preto é o padrão (99,99% é fosco); se não for, cor a definir" }
+  ],
+
+  "tipoFrente": {
+    "alturaMaiorQueLargura": "porta_giro",
+    "motivo": "sem especificação, altura maior que a largura = porta de giro"
+  }
+}

@@ -115,7 +115,7 @@ function registrarLeituraPdf({ rota, pool, opcoes = {} }) {
         if (controle.signal.aborted) throw new ErroLeitura(controle.signal.reason === 'tempo' ? 'tempo' : 'cancelada', MENSAGENS[controle.signal.reason === 'tempo' ? 'tempo' : 'cancelada']);
         mudar(t, 'validando');
         const p = r.json === null ? { ok: false, erros: ['a resposta não é um JSON válido'] }
-          : servico.processarLeitura(r.json, { arquivo: t.arquivo, sha256: t.sha256, paginas: t.paginas, mapa });
+          : servico.processarLeitura(r.json, { arquivo: t.arquivo, sha256: t.sha256, paginas: t.paginas, mapa, padroes: servico.carregarPadroes() });
         if (p.ok) {
           const a = servico.avaliar(p.doc, mapa);
           if (!a.ok) throw new ErroLeitura('formato', MENSAGENS.formato);

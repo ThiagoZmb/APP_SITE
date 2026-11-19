@@ -20,6 +20,8 @@ Uma legenda que mistura famílias (por exemplo "portas em perfil 3136" dentro de
 
 ## Padrões da Elegance para completar pedidos simples (decisão do usuário, 2026-11-19)
 
+> **Fonte de verdade em código:** `config/padroes-elegance.json` (aplicado por `scripts/lib/padroes.mjs`, CLI `scripts/aplicar-padroes.mjs`, e automaticamente pela leitura de PDF na web). Este texto explica; se divergir do JSON, vale o JSON. Hoje o código cobre perfil, acabamento pela cor, vidro/cor normalizados e tipo de frente por proporção; furos (`furos.mjs`), unidade mm e observações de puxador/vidro ainda são feitos na montagem manual.
+
 Valem para pedidos de portas em que o projeto não diz tudo. Aprovadas por: usuário do sistema. São **padrões de orçamento**: o valor entra como informado por uma pessoa (`--informar`), nunca como se estivesse no PDF, e a pessoa confere antes de lançar.
 
 - **Unidade**: cota sem unidade escrita em pedido simples = **mm** (em projeto executivo de arquitetura em cm continua valendo a regra de `cotas-e-unidades.md`).
@@ -27,6 +29,9 @@ Valem para pedidos de portas em que o projeto não diz tudo. Aprovadas por: usu�
 - **Acabamento**: "perfil bronze" = **Anodizado Bronze**; se o perfil não permite esse acabamento (`acabamentos_permitidos`, ex.: o 3026), usar **Pintura Metálica Alumínio**. "Preto fosco" = **Pintura Sólida Alumínio** com cor **Preto** (preto é o padrão; se não for, cor "Cor a definir"). **Nunca** usar acabamento "Brilho" em orçamento (99,99% é fosco).
 - **Cor**: nomes do cadastro `cores` (ex.: "Onix", metálica; "Bronze 1001", metálica; "Preto", sólida). "Titânio" se assemelha ao **Onix**.
 - **Vidro**: padrão **"Incolor (Extra Clear) 4mm"**; reflecta = **"Reflecta Bronze 4mm"** (o mais usado). Vidro é sempre 4 mm.
+- **Espelho**: sem tipo definido (bronze, fumê...) = **"Espelho Prata 4mm"** (decisão de 2026-11-19).
+- **Puxador Slim** (Alternativa Slim): é **obrigatoriamente embutido**, tamanho **máximo 400 mm** (se o projeto pede mais, usar 400 e avisar na observação).
+- **Furos de dobradiça sem definição no projeto**: deixar **sem furos** (não afeta o custo da porta; decisão de 2026-11-19). Isso substitui a pendência "furos ausente" para este caso.
 - **Largura**: se o pedido dá a largura total e o número de portas, dividir a total pelo número de portas (sem folga).
 - **Altura**: para efeito de orçamento vale a cota do conjunto, mesmo que inclua gavetas ou lateral.
 - **Puxador**: se o projeto não fala, fica sem puxador. Se diz "igual ao pedido anterior", **não inventar**: gerar observação do item avisando que o puxador precisa ser definido.

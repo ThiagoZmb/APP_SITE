@@ -6,6 +6,7 @@
 //   validação                   → validacao.mjs (schema + 7 regras)
 //   verificação cruzada         → cruzada.mjs (soma de cotas, contagens; config/nucleo.json)
 //   itens da tela               → mapear.mjs (montarSaida, o mesmo do montar-itens.mjs)
+//   padrões da Elegance         → padroes.mjs + config/padroes-elegance.json (código aplica; modelo só transcreve)
 //   confirmação humana          → confirmacao.mjs (aplicarConfirmacoes, o mesmo do confirmar-valores.mjs)
 // ============================================================
 import { readFileSync } from 'node:fs';
@@ -15,6 +16,7 @@ import { montarSaida, validarMapa } from './mapear.mjs';
 import { aplicarConfirmacoes } from './confirmacao.mjs';
 import { carregarConfig } from './io.mjs';
 import { esquemaLeitura, validarLeitura, leituraParaProjeto, camposLeitura } from './leitura.mjs';
+import { aplicarPadroes } from './padroes.mjs';
 
 export { esquemaLeitura, camposLeitura };
 
@@ -35,14 +37,29 @@ export function textoSistema(mapa) {
 
 // Leitura do modelo → projeto-tecnico validado.
 // → { ok: true, doc, extras } | { ok: false, erros: [texto] } (erros servem para pedir a correção ao modelo)
-export function processarLeitura(leitura, { arquivo, sha256, paginas, mapa }) {
+// Padrões da empresa (config/padroes-elegance.json): lidos do disco; o servidor passa o resultado em { padroes }
+export function carregarPadroes() {
+  return JSON.parse(readFileSync(new URL('../../config/padroes-elegance.json', import.meta.url), 'utf8'));
+}
+
+// padroes (opcional): completa campos AUSENTES com os padrões aprovados, sempre como inferido + pendência
+export function processarLeitura(leitura, { arquivo, sha256, paginas, mapa, padroes = null }) {
   const forma = validarLeitura(leitura, mapa);
   if (!forma.ok) return { ok: false, erros: forma.erros };
   let r;
   try { r = leituraParaProjeto(leitura, { arquivo, sha256, paginas, mapa }); } catch (e) { return { ok: false, erros: [e.message] }; }
-  const v = validarProjeto(r.doc);
+  let doc = r.doc;
+  let padroesAplicados = [];
+  if (padroes) {
+    try {
+      const x = aplicarPadroes(doc, padroes, { legendas: r.extras.legendas, textos: r.extras.observacoes });
+      doc = x.doc;
+      padroesAplicados = x.aplicados;
+    } catch (e) { return { ok: false, erros: [e.message] }; }
+  }
+  const v = validarProjeto(doc);
   if (!v.ok) return { ok: false, erros: v.erros.slice(0, 20).map(e => `${e.caminho}: ${e.mensagem}`) };
-  return { ok: true, doc: r.doc, extras: r.extras };
+  return { ok: true, doc, extras: r.extras, padroesAplicados };
 }
 
 // Projeto (sem as pendências da verificação cruzada) → documento verificado + itens da tela.
