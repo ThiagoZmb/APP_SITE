@@ -49,5 +49,27 @@
     return { ok: true, bloqueios: [], confirmacoes };
   }
 
-  return { soDigitos, camposComNaoDigito, textoNaoInteiro, textoConfirmacao, avaliar };
+  // Decide o que a tela faz com a resposta de POST /regras/verificar_item. resposta = { rede: true } (fetch falhou) ou { status, json }.
+  // Devolve { ok, confirmacoes, mensagem, login }: mensagem = texto do alert (vazio = nada a mostrar); login = true no 401 (vai para o login).
+  function decidirConsulta(resposta, confirmar) {
+    const falha = mensagem => ({ ok: false, confirmacoes: [], mensagem, login: false });
+    const r = resposta || {};
+    if (r.rede) return falha('Sem conexão com o servidor para conferir as regras do item. O item NÃO foi adicionado; tente de novo.');
+    if (r.status === 401) return { ok: false, confirmacoes: [], mensagem: '', login: true };
+    const json = r.json && typeof r.json === 'object' ? r.json : {};
+    const okHttp = r.status >= 200 && r.status < 300;
+    if (!okHttp || !Array.isArray(json.regras)) {
+      return falha((r.status === 403 ? 'Sem permissão para conferir as regras do item. ' : 'Não foi possível conferir as regras do item. ') +
+        (json.error ? json.error + ' ' : '(HTTP ' + r.status + ') ') + 'O item NÃO foi adicionado.');
+    }
+    const a = avaliar(json.regras, confirmar);
+    return { ok: a.ok, confirmacoes: a.confirmacoes, mensagem: a.bloqueios.length ? 'Corrija antes de adicionar o item:\n\n- ' + a.bloqueios.join('\n- ') : '', login: false };
+  }
+
+  // Item com SÓ as confirmações dadas agora: nunca herda as do item antigo (na edição a confirmação é pedida de novo)
+  function comConfirmacoes(item, aceitas) {
+    return Object.assign({}, item, { confirmacoes: Array.isArray(aceitas) ? aceitas.slice() : [] });
+  }
+
+  return { soDigitos, camposComNaoDigito, textoNaoInteiro, textoConfirmacao, avaliar, decidirConsulta, comConfirmacoes };
 });

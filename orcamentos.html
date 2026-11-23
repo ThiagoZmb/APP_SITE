@@ -2837,24 +2837,16 @@
         }
         // Consulta o servidor (POST /regras/verificar_item) com o item coletado; { ok, confirmacoes }. Falha de rede/401/403/500 = não adiciona.
         async function consultarRegras(item) {
-            let res, json = {};
+            let resposta;
             try {
-                res = await fetch(`${API_BASE}/regras/verificar_item`, { method: 'POST',
+                const res = await fetch(`${API_BASE}/regras/verificar_item`, { method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return { ok: false, confirmacoes: [] }; }
-                json = await res.json().catch(() => ({}));
-            } catch {
-                alert('Sem conexão com o servidor para conferir as regras do item. O item NÃO foi adicionado; tente de novo.');
-                return { ok: false, confirmacoes: [] };
-            }
-            if (!res.ok || !Array.isArray(json.regras)) {
-                alert((res.status === 403 ? 'Sem permissão para conferir as regras do item. ' : 'Não foi possível conferir as regras do item. ') +
-                    (json.error ? json.error + ' ' : `(HTTP ${res.status}) `) + 'O item NÃO foi adicionado.');
-                return { ok: false, confirmacoes: [] };
-            }
-            const r = RegrasTela.avaliar(json.regras, texto => confirm(texto));
-            if (r.bloqueios.length) alert('Corrija antes de adicionar o item:\n\n- ' + r.bloqueios.join('\n- '));
-            return { ok: r.ok, confirmacoes: r.confirmacoes };
+                resposta = { status: res.status, json: await res.json().catch(() => ({})) };
+            } catch { resposta = { rede: true }; }
+            const d = RegrasTela.decidirConsulta(resposta, texto => confirm(texto));
+            if (d.login) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; }
+            else if (d.mensagem) alert(d.mensagem);
+            return { ok: d.ok, confirmacoes: d.confirmacoes };
         }
         let consultandoRegras = false;
         async function adicionarItem() {
@@ -2883,7 +2875,7 @@
             let regras;
             try { regras = await consultarRegras(item); } finally { consultandoRegras = false; }
             if (!regras.ok) return;
-            item.confirmacoes = regras.confirmacoes;
+            Object.assign(item, RegrasTela.comConfirmacoes(item, regras.confirmacoes)); // só as de agora, nunca as do item antigo
             definirDesenho(item, capturarDesenho());
             if (editandoIndex >= 0) {
                 const antigo = itens[editandoIndex];
@@ -3355,7 +3347,7 @@
             const inp = e.target.closest('input.cp-qtd');
             const c = inp && complementosSerr[Number(inp.dataset.i)];
             if (!c) return;
-            c.qtd = Math.max(0.01, parseFloat(String(inp.value).replace(',', '.')) || 1);
+            c.qtd = Math.max(1, parseInt(inp.value, 10) || 1); // quantidade inteira (o campo só aceita dígitos); vazio ou 0 vira 1
             c.valorTotal = c.valorUnitario != null ? Math.round(c.valorUnitario * c.qtd * 100) / 100 : null; // o motor confirma em seguida
             renderComplementos();
             calcularPrecoAutomatico();

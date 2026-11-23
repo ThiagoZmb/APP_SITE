@@ -56,10 +56,72 @@ test('tela: regras_tela.js é carregado e consultarRegras chama a rota com token
   const c = corpoDe('async function consultarRegras');
   assert.ok(c.includes('/regras/verificar_item'));
   assert.ok(c.includes("'Authorization': 'Bearer ' + getToken()"));
-  assert.ok(c.includes('res.status === 401') && c.includes('LOGIN_URL'));
-  assert.ok(c.includes('RegrasTela.avaliar'));
-  assert.ok(c.includes('catch'), 'erro de rede não passa batido');
-  assert.match(c, /ok:\s*false/);
+  assert.ok(c.includes('RegrasTela.decidirConsulta'), 'a decisão vem da função pura testada abaixo');
+  assert.ok(c.includes('d.login') && c.includes('LOGIN_URL'), '401 vai para o login');
+  assert.ok(c.includes('catch { resposta = { rede: true }; }'), 'falha de rede vira resposta { rede: true }');
+  assert.ok(c.includes('return { ok: d.ok, confirmacoes: d.confirmacoes }'));
+});
+
+const sim = () => true;
+const nao = () => false;
+test('decidirConsulta: rede, 401, 403, 500 e corpo sem array regras = NÃO adicionar, com a mensagem certa', () => {
+  const rede = R.decidirConsulta({ rede: true }, sim);
+  assert.deepEqual([rede.ok, rede.confirmacoes, rede.login], [false, [], false]);
+  assert.match(rede.mensagem, /Sem conexão.*NÃO foi adicionado/);
+  const l401 = R.decidirConsulta({ status: 401, json: {} }, sim);
+  assert.deepEqual([l401.ok, l401.login, l401.mensagem], [false, true, '']);
+  const l403 = R.decidirConsulta({ status: 403, json: { error: 'Sem permissão.' } }, sim);
+  assert.equal(l403.ok, false);
+  assert.match(l403.mensagem, /Sem permissão para conferir as regras.*Sem permissão\..*NÃO foi adicionado/);
+  const l500 = R.decidirConsulta({ status: 500, json: {} }, sim);
+  assert.equal(l500.ok, false);
+  assert.match(l500.mensagem, /Não foi possível conferir as regras.*\(HTTP 500\).*NÃO foi adicionado/);
+  for (const resp of [{ status: 200, json: {} }, { status: 200, json: { regras: 'x' } }, { status: 200, json: null }, undefined]) {
+    const d = R.decidirConsulta(resp, sim);
+    assert.equal(d.ok, false, JSON.stringify(resp));
+    assert.deepEqual(d.confirmacoes, []);
+  }
+  let perguntou = 0; // falha de HTTP nunca chega a perguntar, mesmo com regras no corpo
+  R.decidirConsulta({ status: 500, json: { regras: [{ codigo: 'x', nivel: 'confirma', mensagem: 'm' }] } }, () => { perguntou++; return true; });
+  assert.equal(perguntou, 0);
+});
+
+test('decidirConsulta: bloqueia = não adicionar listando TODAS as mensagens; sem pergunta', () => {
+  let perguntou = 0;
+  const d = R.decidirConsulta({ status: 200, json: { regras: [
+    { codigo: 'a', nivel: 'bloqueia', mensagem: 'Erro A' }, { codigo: 'b', nivel: 'confirma', mensagem: 'Conf B' }, { codigo: 'c', nivel: 'bloqueia', mensagem: 'Erro C' }] } },
+  () => { perguntou++; return true; });
+  assert.equal(d.ok, false);
+  assert.deepEqual(d.confirmacoes, []);
+  assert.ok(d.mensagem.includes('Erro A') && d.mensagem.includes('Erro C') && !d.mensagem.includes('Conf B'));
+  assert.equal(perguntou, 0);
+});
+
+test('decidirConsulta: confirma/avisa — aceitar adiciona com os códigos; recusar não adiciona; sem regras adiciona direto', () => {
+  const resp = { status: 200, json: { regras: [{ codigo: 'x', nivel: 'confirma', mensagem: 'M1' }, { codigo: 'y', nivel: 'avisa', mensagem: 'M2' }] } };
+  const aceito = R.decidirConsulta(resp, sim);
+  assert.deepEqual([aceito.ok, aceito.confirmacoes, aceito.mensagem], [true, ['x', 'y'], '']);
+  const recusado = R.decidirConsulta(resp, nao);
+  assert.deepEqual([recusado.ok, recusado.confirmacoes], [false, []]);
+  const segundaRecusa = R.decidirConsulta(resp, t => !t.includes('M2'));
+  assert.deepEqual([segundaRecusa.ok, segundaRecusa.confirmacoes], [false, []]);
+  assert.deepEqual(R.decidirConsulta({ status: 200, json: { regras: [] } }, nao), { ok: true, confirmacoes: [], mensagem: '', login: false });
+});
+
+test('comConfirmacoes: só os códigos aceitos agora, nunca os do item antigo (edição pede de novo)', () => {
+  const antigo = { frente: 'Porta de giro', confirmacoes: ['sem_revestimento'] };
+  assert.deepEqual(R.comConfirmacoes(antigo, []).confirmacoes, []);
+  assert.deepEqual(R.comConfirmacoes(antigo, ['medida_pequena']).confirmacoes, ['medida_pequena']);
+  assert.deepEqual(R.comConfirmacoes(antigo, undefined).confirmacoes, []);
+  assert.deepEqual(antigo.confirmacoes, ['sem_revestimento'], 'não muda o item recebido');
+  assert.equal(R.comConfirmacoes(antigo, []).frente, 'Porta de giro');
+});
+
+test('complemento: o change do campo normaliza para inteiro >= 1, sem 0,01 nem vírgula', () => {
+  assert.ok(html.includes('c.qtd = Math.max(1, parseInt(inp.value, 10) || 1);'));
+  assert.ok(!html.includes('Math.max(0.01'));
+  const cp = html.match(/<input[^>]*class="cp-qtd"[^>]*>/)[0];
+  assert.ok(!/min=|step=/.test(cp), cp);
 });
 
 test('adicionarItem: consulta o livro depois das checagens locais e do coletarForm, antes do push; erro não adiciona', () => {
@@ -75,8 +137,7 @@ test('adicionarItem: consulta o livro depois das checagens locais e do coletarFo
   assert.ok(iValor > iColeta && iConsulta > iValor, 'consulta depois das checagens locais');
   assert.ok(iConsulta < iPush && iConsulta < iEdit, 'consulta antes de adicionar/atualizar');
   assert.match(a, /if \(!regras\.ok\) return;/);
-  assert.ok(a.includes('item.confirmacoes = regras.confirmacoes'), 'códigos aceitos vão em item.confirmacoes');
-  assert.ok(a.includes('delete item.confirmacoes') || a.includes('item.confirmacoes ='), 'edição não reaproveita as confirmações do item antigo');
+  assert.ok(a.includes('RegrasTela.comConfirmacoes(item, regras.confirmacoes)'), 'códigos aceitos agora vão em item.confirmacoes (função testada)');
   assert.ok(a.includes('consultandoRegras'), 'trava de clique duplo');
   // preserva o resto do fluxo
   assert.ok(a.includes('definirDesenho(item, capturarDesenho())'));
