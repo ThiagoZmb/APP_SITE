@@ -16,7 +16,11 @@ test('ao virar pedido o salvar cria um pedido novo, sem tratar os itens como có
   assert.match(html, /const converte = !!docAberto && docAberto\.tipo !== tipo;/);
   assert.match(html, /docAberto\?\.impressao && !converte \? \{ impressao/);
   assert.match(html, /modo === 'novo' && docAberto\?\.impressao && !converte \? \{ origemDocumento/);
-  assert.match(html, /it\.origem && !converte \? \{ origem: it\.origem \}/);
+  // os campos de origem do item saem de RegrasTela.origemNoCorpo: sem conversão, `origem`; na conversão nunca `origem` (cópia), só conversaoDe
+  assert.ok(html.includes('...RegrasTela.origemNoCorpo(it, converte)'));
+  const R = require('../regras_tela.js');
+  assert.equal(R.origemNoCorpo({ origem: { item: 1, estado: 'intacto' } }, true).origem, undefined);
+  assert.deepEqual(R.origemNoCorpo({ origem: { item: 1, estado: 'intacto' } }, false), { origem: { item: 1, estado: 'intacto' } });
 });
 
 test('sistema de correr: campo do sistema 4/5 e transpasse 1/5 (regra com !important, pois o grid-form geral também usa)', () => {
