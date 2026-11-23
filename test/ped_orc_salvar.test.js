@@ -312,3 +312,16 @@ test('porta de correr: QTD editada de acessório do sistema é gravada; inválid
   assert.deepEqual(await gravado(sis(1, 1)), [['Trilho Sup', 1, 1600, 40], ['Roldana', 1, 0, 15]]);
   assert.deepEqual(await gravado(sis(0, 10000)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
 });
+
+// Mudança de comportamento do livro de regras (2026-11-23): quantidade DECIMAL de acessório não "volta à tabela" mais;
+// a regra numero_inteiro recusa o item inteiro com 400 "Acessório n (quantidade)" e nada é gravado.
+test('porta de correr: QTD decimal (2.5) de acessório do sistema agora é RECUSADA (400 "Acessório 2 (quantidade)"), não volta à tabela; nada gravado', async t => {
+  const { banco, chamar } = await prepararPedOrc(t);
+  const acessorios = [{ nome: 'Trilho Sup', qtd: 2, origem: 'SISTEMA DE CORRER' }, { nome: 'Roldana', qtd: 2.5, origem: 'SISTEMA DE CORRER' }];
+  const r = await salvar(chamar, corpo({ itens: [correr({ acessorios })] }));
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /^Item 1: Acessório 2 \(quantidade\): só números inteiros/);
+  assert.equal(banco.pedOrc.length, 0);
+  assert.equal(banco.complementos.length, 0);
+  assert.equal(banco.listaItens.length, 0);
+});
