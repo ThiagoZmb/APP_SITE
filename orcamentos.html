@@ -656,7 +656,7 @@
                         <div id="correr-modo" class="correr-modo" role="status"></div>
                         <div class="grid-form linha-sistema-correr">
                             <div class="form-group"><label for="f-sistema">Sistema (trilhos)</label><select id="f-sistema"><option value="">Carregando...</option></select></div>
-                            <div class="form-group"><label for="f-transpasse">Transpasse (mm)</label><input type="number" id="f-transpasse" placeholder="0"></div>
+                            <div class="form-group"><label for="f-transpasse">Transpasse (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-transpasse" placeholder="0"></div>
                         </div>
                         <div class="viz-status" id="correr-portas"></div>
                         <div id="correr-larguras" class="correr-larguras" hidden></div>
@@ -676,9 +676,9 @@
                     <div class="secao-item" id="quadro-medidas">
                         <h4 id="tit-medidas">📐 Medidas e quantidade</h4>
                         <div class="grid-form">
-                            <div class="form-group"><label for="f-qtd">Qtd</label><input type="number" id="f-qtd" min="1" value="1"></div>
-                            <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="number" id="f-altura" placeholder="0"></div>
-                            <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="number" id="f-largura" placeholder="0"></div>
+                            <div class="form-group"><label for="f-qtd">Qtd</label><input type="text" inputmode="numeric" data-inteiro id="f-qtd" value="1"></div>
+                            <div class="form-group f-porta"><label for="f-altura">Altura (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-altura" placeholder="0"></div>
+                            <div class="form-group f-porta"><label for="f-largura">Largura (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-largura" placeholder="0"></div>
                             <div class="form-group f-porta" id="wrap-pares">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-pares"> Par de Portas (fatura 2 folhas)</label>
@@ -689,16 +689,16 @@
                             <table id="tab-medidas-serr">
                                 <thead><tr><th></th><th><span class="longo">Medida (mm)</span><span class="curto">mm</span></th><th></th><th><span class="longo">Nº de barras</span><span class="curto">barras</span></th><th><span class="longo">= Metros de barra</span><span class="curto">metros</span></th></tr></thead>
                                 <tbody>
-                                    <tr><th scope="row">Altura</th><td><input type="number" id="f-altura-serr" min="0" placeholder="0" aria-label="Altura (mm)"></td><td class="vezes">×</td>
-                                        <td><input type="number" id="f-qtd-a" min="1" value="1" aria-label="Barras na altura"></td><td class="metros" id="m-a">—</td></tr>
-                                    <tr><th scope="row">Largura</th><td><input type="number" id="f-largura-serr" min="0" placeholder="0" aria-label="Largura (mm)"></td><td class="vezes">×</td>
-                                        <td><input type="number" id="f-qtd-l" min="1" value="1" aria-label="Barras na largura"></td><td class="metros" id="m-l">—</td></tr>
-                                    <tr><th scope="row"><span class="longo">Profundidade</span><span class="curto">Prof.</span></th><td><input type="number" id="f-profundidade" min="0" placeholder="0" aria-label="Profundidade (mm)"></td><td class="vezes">×</td>
-                                        <td><input type="number" id="f-qtd-p" min="1" value="1" aria-label="Barras na profundidade"></td><td class="metros" id="m-p">—</td></tr>
+                                    <tr><th scope="row">Altura</th><td><input type="text" inputmode="numeric" data-inteiro id="f-altura-serr" placeholder="0" aria-label="Altura (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="text" inputmode="numeric" data-inteiro id="f-qtd-a" value="1" aria-label="Barras na altura"></td><td class="metros" id="m-a">—</td></tr>
+                                    <tr><th scope="row">Largura</th><td><input type="text" inputmode="numeric" data-inteiro id="f-largura-serr" placeholder="0" aria-label="Largura (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="text" inputmode="numeric" data-inteiro id="f-qtd-l" value="1" aria-label="Barras na largura"></td><td class="metros" id="m-l">—</td></tr>
+                                    <tr><th scope="row"><span class="longo">Profundidade</span><span class="curto">Prof.</span></th><td><input type="text" inputmode="numeric" data-inteiro id="f-profundidade" placeholder="0" aria-label="Profundidade (mm)"></td><td class="vezes">×</td>
+                                        <td><input type="text" inputmode="numeric" data-inteiro id="f-qtd-p" value="1" aria-label="Barras na profundidade"></td><td class="metros" id="m-p">—</td></tr>
                                 </tbody>
                                 <tfoot><tr><td colspan="4" class="total-rot"><span class="longo">Total de barra por peça</span><span class="curto">Total por peça</span></td><td class="metros total" id="m-total">—</td></tr></tfoot>
                             </table>
-                            <div class="soldas-linha"><label for="f-soldas">Pontos de solda</label><input type="number" id="f-soldas" min="0" value="0"></div>
+                            <div class="soldas-linha"><label for="f-soldas">Pontos de solda</label><input type="text" inputmode="numeric" data-inteiro id="f-soldas" value="0"></div>
                             <div class="acoes-peca">
                                 <button type="button" class="btn btn-secondary" id="btn-peca-inserir">➕ Inserir peça na lista</button>
                                 <button type="button" class="btn-mini" id="btn-peca-cancelar" style="display:none">Cancelar edição</button>
@@ -732,7 +732,7 @@
                             <div class="form-group"><label>Puxador</label><select id="f-puxador"><option value="">— escolha o puxador —</option></select></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Acabamento do puxador</label><select id="f-acab-pux"><option value="">— escolha o puxador —</option></select><small id="aviso-acab-pux" style="display:none;color:var(--warning-color)"></small></div>
                             <div class="form-group f-pux-extra" style="display:none"><label>Cor do puxador</label><select id="f-cor-pux" disabled><option value="">— escolha o acabamento —</option></select></div>
-                            <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="number" id="f-tamanho-pux" placeholder="Ex.: 800"></div>
+                            <div class="form-group f-pux-extra" style="display:none"><label>Tamanho do puxador (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-tamanho-pux" placeholder="Ex.: 800"></div>
                             <div class="form-group f-pux-extra" style="display:none">
                                 <label>&nbsp;</label>
                                 <label class="viz-check"><input type="checkbox" id="chk-toda-ext"> Toda extensão</label>
@@ -746,8 +746,8 @@
                             <div class="form-group fg-revest"><label>Revestimento</label><select id="f-revest"><option value="">— escolha o perfil —</option></select></div>
                             <div class="form-group fg-cor-revest"><label>Cor do revestimento</label><select id="f-cor-revest" disabled><option value="">— escolha o revestimento —</option></select></div>
                             <div class="form-group fg-divisor"><label>Divisor</label><select id="f-divisor"><option value="">— escolha o perfil —</option></select></div>
-                            <div class="form-group fg-div-h"><label>Divisores Horizontais (qtd)</label><input type="number" id="f-div-h" min="0" value="0"></div>
-                            <div class="form-group fg-div-v"><label>Divisores Verticais (qtd)</label><input type="number" id="f-div-v" min="0" value="0"></div>
+                            <div class="form-group fg-div-h"><label>Divisores Horizontais (qtd)</label><input type="text" inputmode="numeric" data-inteiro id="f-div-h" value="0"></div>
+                            <div class="form-group fg-div-v"><label>Divisores Verticais (qtd)</label><input type="text" inputmode="numeric" data-inteiro id="f-div-v" value="0"></div>
                         </div>
                     </div>
                     <!-- COMPLEMENTOS DA SERRALHERIA (frmSelecaoComplementos) -->
@@ -778,8 +778,8 @@
                             <div class="form-group"><label>Produto</label><select id="f-av-produto"><option value="">— escolha o tipo —</option></select></div>
                             <div class="form-group av-acab" style="display:none"><label>Acabamento</label><select id="f-av-acab"><option value="">— escolha o produto —</option></select></div>
                             <div class="form-group av-cor" style="display:none"><label>Cor</label><select id="f-av-cor" disabled><option value="">— escolha o acabamento —</option></select></div>
-                            <div class="form-group av-alt" style="display:none"><label id="lbl-av-alt">Tamanho (mm)</label><input type="number" id="f-av-alt" min="0" placeholder="0"></div>
-                            <div class="form-group av-larg" style="display:none"><label>Largura (mm)</label><input type="number" id="f-av-larg" min="0" placeholder="0"></div>
+                            <div class="form-group av-alt" style="display:none"><label id="lbl-av-alt">Tamanho (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-av-alt" placeholder="0"></div>
+                            <div class="form-group av-larg" style="display:none"><label>Largura (mm)</label><input type="text" inputmode="numeric" data-inteiro id="f-av-larg" placeholder="0"></div>
                         </div>
                     </div>
                     <!-- ACESSÓRIOS (lstvAcessorios do frmPortasAbrir/frmPortasCorrer) -->
@@ -1016,6 +1016,7 @@
     <script src="virar_pedido.js?v=202611231000"></script>
     <script src="impressao_pdf.js?v=202611231000"></script>
     <script src="peso_tela.js?v=202610290900"></script>
+    <script src="regras_tela.js?v=202611231100"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script src="auditoria_calculo.js?v=202611191400"></script>
     <script>
@@ -2068,7 +2069,7 @@
         function criarLinhaNaTela(valor) {
             const linha = document.createElement('div');
             linha.className = 'linha-furo';
-            linha.innerHTML = '<label></label><input type="number" min="0" step="1"><span>mm</span>' +
+            linha.innerHTML = '<label></label><input type="text" inputmode="numeric" data-inteiro><span>mm</span>' +
                               '<button type="button" class="rem" title="Remover furo">X</button>';
             const inp = linha.querySelector('input');
             if (valor != null) inp.value = valor;
@@ -2806,7 +2807,58 @@
             const r = await fetch(`${API_BASE}${caminho}`, { method: metodo, headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': tipoConteudo }, body: corpo });
             if (!r.ok) throw new Error('HTTP ' + r.status);
         };
-        function adicionarItem() {
+        // Livro de regras (docs/superpowers/specs/2026-11-23-livro-de-regras-design.md): tamanhos e quantidades só inteiros.
+        // O filtro roda em fase de captura para limpar o texto ANTES dos outros ouvintes de 'input' lerem o campo (digitar e colar).
+        document.addEventListener('input', e => {
+            const el = e.target;
+            if (!el || !el.matches || !el.matches('[data-inteiro]')) return;
+            const limpo = RegrasTela.soDigitos(el.value);
+            if (limpo !== el.value) el.value = limpo;
+        }, true);
+        // campos estáticos (id, rótulo); só os visíveis entram, os escondidos pertencem a outra frente
+        const CAMPOS_TEXTO_INTEIRO = [['f-qtd', 'Quantidade'], ['f-altura', 'Altura'], ['f-largura', 'Largura'], ['f-transpasse', 'Transpasse'],
+            ['f-altura-serr', 'Altura da peça'], ['f-qtd-a', 'Barras na altura'], ['f-largura-serr', 'Largura da peça'], ['f-qtd-l', 'Barras na largura'],
+            ['f-profundidade', 'Profundidade'], ['f-qtd-p', 'Barras na profundidade'], ['f-soldas', 'Pontos de solda'], ['f-tamanho-pux', 'Tamanho do puxador'],
+            ['f-div-h', 'Divisores horizontais'], ['f-div-v', 'Divisores verticais'], ['f-av-alt', 'Tamanho (avulso)'], ['f-av-larg', 'Largura (avulso)']];
+        const IDS_PECA_SERR = ['f-altura-serr', 'f-qtd-a', 'f-largura-serr', 'f-qtd-l', 'f-profundidade', 'f-qtd-p', 'f-soldas', 'f-qtd'];
+        // TEXTO CRU dos campos de tamanho/quantidade (coletarForm converte com parseFloat/parseInt e esconderia um decimal): devolve os rótulos com algo além de dígitos
+        function textoCruNaoInteiro(soSerralheria) {
+            const campos = [];
+            const lista = soSerralheria ? CAMPOS_TEXTO_INTEIRO.filter(([id]) => IDS_PECA_SERR.includes(id)) : CAMPOS_TEXTO_INTEIRO;
+            lista.forEach(([id, rotulo]) => { const el = document.getElementById(id); if (el && el.offsetParent !== null) campos.push({ rotulo, valor: el.value }); });
+            if (!soSerralheria) {
+                const linhas = (seletor, rotulo) => document.querySelectorAll(seletor).forEach((el, i) => campos.push({ rotulo: rotulo + ' ' + (i + 1), valor: el.value }));
+                linhas('#pnl-furacoes input', 'Furo');
+                linhas('#correr-larguras input', 'Largura da porta');
+                linhas('#quadro-acessorios .ac-qtd', 'Acessório (quantidade)');
+                linhas('#quadro-complementos .cp-qtd', 'Complemento (quantidade)');
+            }
+            return RegrasTela.camposComNaoDigito(campos);
+        }
+        // Consulta o servidor (POST /regras/verificar_item) com o item coletado; { ok, confirmacoes }. Falha de rede/401/403/500 = não adiciona.
+        async function consultarRegras(item) {
+            let res, json = {};
+            try {
+                res = await fetch(`${API_BASE}/regras/verificar_item`, { method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+                if (res.status === 401) { localStorage.removeItem('auth'); window.location.href = LOGIN_URL; return { ok: false, confirmacoes: [] }; }
+                json = await res.json().catch(() => ({}));
+            } catch {
+                alert('Sem conexão com o servidor para conferir as regras do item. O item NÃO foi adicionado; tente de novo.');
+                return { ok: false, confirmacoes: [] };
+            }
+            if (!res.ok || !Array.isArray(json.regras)) {
+                alert((res.status === 403 ? 'Sem permissão para conferir as regras do item. ' : 'Não foi possível conferir as regras do item. ') +
+                    (json.error ? json.error + ' ' : `(HTTP ${res.status}) `) + 'O item NÃO foi adicionado.');
+                return { ok: false, confirmacoes: [] };
+            }
+            const r = RegrasTela.avaliar(json.regras, texto => confirm(texto));
+            if (r.bloqueios.length) alert('Corrija antes de adicionar o item:\n\n- ' + r.bloqueios.join('\n- '));
+            return { ok: r.ok, confirmacoes: r.confirmacoes };
+        }
+        let consultandoRegras = false;
+        async function adicionarItem() {
+            if (consultandoRegras) return;
             if (!temClienteSelecionado()) { alert('Selecione o cliente antes de adicionar itens.'); return; }
             if (frenteAtual === 'Serralheria') {
                 if (medidasSerrPreenchidas()) { alert('Há uma peça nas medidas que ainda não está na lista. Clique em "Inserir peça na lista" (ou limpe as medidas) antes de adicionar o conjunto.'); return; }
@@ -2818,12 +2870,20 @@
                 if (faltam && !confirm(`${faltam} folha(s) sem posição do puxador (o puxador dessas folhas não entra no preço nem no desenho).\n\nPara posicionar, clique em "🎯 Posicionar puxador" e depois no desenho, em cada folha.\n\nAdicionar mesmo assim?`)) return;
             }
             if (precoPendente) { alert('O preço ainda está sendo recalculado com a última mudança. Aguarde o valor aparecer e clique de novo.'); return; }
+            const ruinsCru = textoCruNaoInteiro(false);
+            if (ruinsCru.length) { alert(RegrasTela.textoNaoInteiro(ruinsCru)); return; }
             const item = coletarForm();
             if (item.valor <= 0) { alert('Informe o valor do item (ele é calculado automaticamente ao escolher perfil/material e medidas).'); return; }
             // valor salvo intacto (edição sem recálculo) já tem a % da lista: grava igual; valor do motor é a BASE: a % entra uma vez
             Object.assign(item, AuditoriaCalculo.valorAoAtualizar({ valorCampo: item.valor, editando: editandoIndex >= 0,
                 campoTemSalvo: !!(edicaoPreco && edicaoPreco.campoTemSalvo), antigo: editandoIndex >= 0 ? itens[editandoIndex] : null,
                 baseSalva: edicaoPreco && edicaoPreco.base, fatorHistorico }));
+            // livro de regras: o servidor confere o item (sem o desenho); na edição a confirmação é pedida de novo (nunca reaproveita a do item antigo)
+            consultandoRegras = true;
+            let regras;
+            try { regras = await consultarRegras(item); } finally { consultandoRegras = false; }
+            if (!regras.ok) return;
+            item.confirmacoes = regras.confirmacoes;
             definirDesenho(item, capturarDesenho());
             if (editandoIndex >= 0) {
                 const antigo = itens[editandoIndex];
@@ -3085,7 +3145,7 @@
             document.querySelector('#quadro-complementos tbody').innerHTML = complementosSerr.map((c, i) => `
                 <tr data-id="${escapeHtml(c.id)}">
                     <td>${escapeHtml(c.tipo)}</td><td>${escapeHtml(c.descricao)}</td><td>${escapeHtml(c.unidade)}</td>
-                    <td><input type="number" class="cp-qtd" min="0.01" step="any" value="${c.qtd}" data-i="${i}"></td>
+                    <td><input type="text" inputmode="numeric" data-inteiro class="cp-qtd" value="${c.qtd}" data-i="${i}"></td>
                     <td data-valor>${c.valorUnitario != null ? formatCurrency(c.valorUnitario) : '—'}</td>
                     <td data-valor>${c.valorTotal != null ? formatCurrency(c.valorTotal) : '—'}</td>
                     <td><button type="button" class="btn-mini cp-remover" data-i="${i}" title="Remover complemento">🗑️</button></td>
@@ -3215,6 +3275,8 @@
         }
         async function inserirPecaSerr() {
             if (!val('f-produto') || !val('f-material')) { alert('Escolha o produto e o material da peça.'); return; }
+            const ruinsCru = textoCruNaoInteiro(true);
+            if (ruinsCru.length) { alert(RegrasTela.textoNaoInteiro(ruinsCru)); return; }
             const p = { produto: val('f-produto'), material: val('f-material'), acabSerr: val('f-acab-serr'), corSerr: val('f-cor-serr'),
                 altura: parseFloat(val('f-altura-serr')) || 0, largura: parseFloat(val('f-largura-serr')) || 0, profundidade: parseFloat(val('f-profundidade')) || 0,
                 qtd: qtdEfetiva(), qtdAltura: qtdEixo('f-qtd-a'), qtdLargura: qtdEixo('f-qtd-l'), qtdProfundidade: qtdEixo('f-qtd-p'), soldas: Math.max(0, parseInt(val('f-soldas')) || 0) };
@@ -3348,7 +3410,7 @@
             const textoBox = umaPorta ? 'Largura da porta (mm) — em branco = igual ao vão; se for menor, o trilho continua com o tamanho do vão' : 'Largura de cada porta (mm) — deixe em branco para a automática';
             if (box.querySelectorAll('input').length !== n || box.querySelector('small')?.textContent !== textoBox) {
                 box.innerHTML = '<small>' + textoBox + '</small><div class="cl-linha">' +
-                    Array.from({ length: n }, (_, i) => `<label>Porta ${i + 1}<input type="number" min="1" step="1" data-i="${i}"></label>`).join('') + '</div>';
+                    Array.from({ length: n }, (_, i) => `<label>Porta ${i + 1}<input type="text" inputmode="numeric" data-inteiro data-i="${i}"></label>`).join('') + '</div>';
             }
             box.querySelectorAll('input').forEach((inp, i) => {
                 inp.placeholder = String(umaPorta ? (parseFloat(val('f-largura')) || m.largura) : m.largura);
@@ -3388,7 +3450,7 @@
             document.querySelector('#quadro-acessorios tbody').innerHTML = acessoriosItem.map((a, i) => `
                 <tr data-nome="${escapeHtml(a.nome)}" data-origem="${escapeHtml(a.origem)}">
                     <td>${escapeHtml(a.nome)}</td>
-                    <td><input type="number" class="ac-qtd" min="1" max="9999" step="1" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? `title="Quantidade do sistema: ${a.qtdMax || a.qtd}; pode ser alterada"` : ''}></td>
+                    <td><input type="text" inputmode="numeric" data-inteiro class="ac-qtd" value="${a.qtd}" data-i="${i}" ${a.origem === ORIGEM_SIS ? `title="Quantidade do sistema: ${a.qtdMax || a.qtd}; pode ser alterada"` : ''}></td>
                     <td>${a.tamanho || 0}</td>
                     <td data-valor>${a.valorUnitario != null ? formatCurrency(a.valorUnitario) : '—'}</td>
                     <td data-valor>${a.valorTotal != null ? formatCurrency(a.valorTotal) : '—'}</td>
@@ -3618,6 +3680,8 @@
                 itens: itens.map(it => ({ frente: it.frente, qtd: it.qtd, altura: it.altura, largura: it.largura,
                     profundidade: it.profundidade, soldas: it.soldas, furos: it.furos, detalhes: it.detalhes,
                     acessorios: it.acessorios || [], historico: it.historico || '', obs: it.obs || '', valorTela: it.valor,
+                    // livro de regras: códigos que o usuário aceitou ao adicionar o item (o servidor pede de novo se faltar)
+                    confirmacoes: Array.isArray(it.confirmacoes) ? it.confirmacoes : [],
                     // serralheria: o conjunto inteiro (peças, barras por eixo e complementos) — o servidor recalcula o preço com tudo isso
                     ...(it.frente === 'Serralheria' ? { pecas: it.pecas || [], complementos: (it.complementos || []).map(c => ({ id: c.id, qtd: c.qtd })),
                         qtdAltura: it.qtdAltura, qtdLargura: it.qtdLargura, qtdProfundidade: it.qtdProfundidade } : {}),
