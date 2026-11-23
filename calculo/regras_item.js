@@ -34,6 +34,41 @@ function dimensaoDaPortaParaPuxador(item) {
   return Math.max(a == null ? 0 : a, l == null ? 0 : l);
 }
 
+// Tamanhos e quantidades que só podem ser inteiros (regra do dono, 2026-11-23). Dinheiro (valor, descontoPct) NÃO entra.
+// caminho: chaves a seguir; '*' percorre os elementos de um array ({n} no rótulo = posição, de 1 em diante).
+const CAMPOS_INTEIROS = Object.freeze([
+  ['Altura', ['altura']], ['Largura', ['largura']], ['Profundidade', ['profundidade']], ['Soldas', ['soldas']],
+  ['Quantidade', ['qtd']], ['Qtd. de altura', ['qtdAltura']], ['Qtd. de largura', ['qtdLargura']], ['Qtd. de profundidade', ['qtdProfundidade']],
+  ['Tamanho do puxador', ['detalhes', 'tamanhoPux']], ['Divisores horizontais', ['detalhes', 'divH']], ['Divisores verticais', ['detalhes', 'divV']],
+  ['Transpasse', ['detalhes', 'transpasse']], ['Largura da folha {n}', ['detalhes', 'largurasFolhas', '*']],
+  ['Furo {n}', ['furos', 'lista', '*']],
+  ['Acessório {n} (quantidade)', ['acessorios', '*', 'qtd']], ['Acessório {n} (tamanho)', ['acessorios', '*', 'tamanho']],
+  ['Peça {n} (altura)', ['pecas', '*', 'altura']], ['Peça {n} (largura)', ['pecas', '*', 'largura']], ['Peça {n} (profundidade)', ['pecas', '*', 'profundidade']],
+  ['Peça {n} (quantidade)', ['pecas', '*', 'qtd']], ['Peça {n} (qtd. de altura)', ['pecas', '*', 'qtdAltura']], ['Peça {n} (qtd. de largura)', ['pecas', '*', 'qtdLargura']],
+  ['Peça {n} (qtd. de profundidade)', ['pecas', '*', 'qtdProfundidade']], ['Peça {n} (soldas)', ['pecas', '*', 'soldas']],
+  ['Complemento {n} (quantidade)', ['complementos', '*', 'qtd']],
+].map(([rotulo, caminho]) => Object.freeze({ rotulo, caminho: Object.freeze(caminho) })));
+
+// Vazio/ausente não dispara (obrigatoriedade é de outras regras); número exige inteiro; texto só dígitos.
+function valorNaoInteiro(v) {
+  if (v == null) return false;
+  if (typeof v === 'number') return !Number.isInteger(v);
+  const t = String(v).trim();
+  return t !== '' && !/^\d+$/.test(t);
+}
+
+function camposInteirosInvalidos(item) {
+  const out = [];
+  const visitar = (no, caminho, i, rotulo, n) => {
+    if (no == null) return;
+    if (i === caminho.length) { if (valorNaoInteiro(no)) out.push(rotulo.replace('{n}', n)); return; }
+    if (caminho[i] === '*') { if (Array.isArray(no)) no.forEach((x, j) => visitar(x, caminho, i + 1, rotulo, j + 1)); return; }
+    if (typeof no === 'object') visitar(no[caminho[i]], caminho, i + 1, rotulo, n);
+  };
+  for (const c of CAMPOS_INTEIROS) visitar(item, c.caminho, 0, c.rotulo, 1);
+  return out;
+}
+
 const REGRAS = Object.freeze([
   {
     codigo: 'itens_minimo', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.DOCUMENTO,
@@ -99,14 +134,22 @@ const REGRAS = Object.freeze([
       return t != null && dim != null && t > dim ? 'O puxador (' + t + ' mm) é maior que a porta (' + dim + ' mm).' : null;
     },
   },
+  {
+    codigo: 'numero_inteiro', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.ITEM,
+    titulo: 'Tamanhos e quantidades só aceitam números inteiros',
+    // devolve uma mensagem por campo inválido (verifica pode devolver lista)
+    verifica: item => camposInteirosInvalidos(item).map(r => r + ': só números inteiros, sem vírgula nem ponto.'),
+  },
 ]);
 
 function rodar(escopo, alvo) {
   const out = [];
   for (const r of REGRAS) {
     if (r.escopo !== escopo) continue;
-    const mensagem = r.verifica(alvo);
-    if (mensagem) out.push({ codigo: r.codigo, nivel: r.nivel, mensagem });
+    const res = r.verifica(alvo);
+    for (const mensagem of (Array.isArray(res) ? res : [res])) {
+      if (mensagem) out.push({ codigo: r.codigo, nivel: r.nivel, mensagem });
+    }
   }
   return out;
 }
@@ -115,4 +158,4 @@ const avaliar = item => rodar(ESCOPOS.ITEM, item);
 const avaliarDocumento = corpo => rodar(ESCOPOS.DOCUMENTO, corpo);
 const livro = () => REGRAS.map(({ codigo, nivel, escopo, titulo }) => ({ codigo, nivel, escopo, titulo }));
 
-module.exports = { LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, dimensaoDaPortaParaPuxador, REGRAS, avaliar, avaliarDocumento, livro };
+module.exports = { CAMPOS_INTEIROS, LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, dimensaoDaPortaParaPuxador, REGRAS, avaliar, avaliarDocumento, livro };
