@@ -31,12 +31,12 @@ Falha de rede, 401, 403 ou 500 na consulta: o item NÃO é adicionado (`decidirC
 | `acabamento_puxador` | bloqueia | item | porta com puxador escolhido e SEM acabamento nem no puxador nem no perfil (com o do perfil o sistema completa: o motor usa o acabamento do perfil para o puxador, `acabamentoDoPuxador` em `calculo/precos.js` e `acabPuxadorDoPerfil` em `calculo/engenharia.js`; na prática já coberta por `acabamento_perfil`) |
 | `cor_obrigatoria` | bloqueia | item | porta cujo acabamento do perfil é do tipo "pintado" (`tipoCorDoAcabamento`, `calculo/cores.js`) sem `cor`, ou cujo acabamento EFETIVO do puxador (`acabamentoEfetivoDoPuxador`: com puxador, o do perfil e, sem ele, o do puxador, como o motor) é pintado sem `corPux` (o motor grava a cor do puxador = `corPux`, sem cair na do perfil) |
 | `sem_revestimento` | confirma | item | porta sem revestimento: "Sem revestimento escolhido. Inserir na lista mesmo assim?" |
-| `porta_medida_pequena` | avisa | item | porta com altura ou largura maior que 0 e menor que `LIMITES.portaMedidaAlertaMm` (300 mm) |
+| `porta_medida_pequena` | avisa | item | porta com altura ou largura maior que 0 e menor que `LIMITES.portaMedidaAlertaMm` (300 mm). **Não vale para "Frente de gaveta"** (decisão do dono, 2026-11-23: gavetas costumam ter 120 a 250 mm e avisariam sempre); vale para porta de giro, basculante e de correr |
 | `puxador_embutido_limites` | bloqueia | item | `tipoPuxador` contendo "embutido" (sem diferenciar caixa) com tamanho fora de 50 a 400 mm (`LIMITES`) |
 | `puxador_maior_que_porta` | bloqueia | item | tamanho do puxador maior que a dimensão da porta; não vale para "toda extensão" (`todaExt`). A dimensão segue o motor de preço: posição TOPO/BASE = largura, outra posição = altura, sem posição = a maior das duas |
 | `numero_inteiro` | bloqueia | item | qualquer campo da lista `CAMPOS_INTEIROS` com algo além de dígitos; uma mensagem por campo: "<rótulo>: só números inteiros, sem vírgula nem ponto." |
 
-"Porta" = `item.frente` (sem diferenciar caixa) em: porta de giro, porta basculante, frente de gaveta, porta de correr. Serralheria e Avulso não entram nas regras de porta (só em `numero_inteiro`).
+"Porta" = `item.frente` (sem diferenciar caixa) em: porta de giro, porta basculante, frente de gaveta, porta de correr. Serralheria e Avulso não entram nas regras de porta (só em `numero_inteiro`). Exceção: `porta_medida_pequena` deixa de fora a "Frente de gaveta"; as demais regras a tratam como porta.
 
 `CAMPOS_INTEIROS` cobre altura, largura, profundidade, soldas, quantidades (`qtd`, `qtdAltura`, `qtdLargura`, `qtdProfundidade`), tamanho do puxador, divisores H/V, transpasse, larguras das folhas, furos, e os arrays de acessórios, peças e complementos (rótulo com a posição, ex. "Peça 2 (altura)"). Campo vazio ou ausente não dispara (obrigatoriedade é de outras regras).
 

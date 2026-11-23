@@ -115,7 +115,8 @@ const REGRAS = Object.freeze([
     codigo: 'porta_medida_pequena', nivel: NIVEIS.AVISA, escopo: ESCOPOS.ITEM,
     titulo: 'Porta com altura ou largura abaixo de ' + LIMITES.portaMedidaAlertaMm + ' mm',
     verifica: item => {
-      if (!ehPorta(item)) return null;
+      // Frente de gaveta fica de fora: costuma ter 120 a 250 mm de altura e avisaria sempre (decisao do dono, 2026-11-23).
+      if (!ehPorta(item) || texto(item.frente).toLowerCase() === 'frente de gaveta') return null;
       const lim = LIMITES.portaMedidaAlertaMm;
       const a = inteiroOuNull(item.altura), l = inteiroOuNull(item.largura);
       if ((a != null && a > 0 && a < lim) || (l != null && l > 0 && l < lim)) {

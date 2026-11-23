@@ -197,3 +197,18 @@ test('numero_inteiro: negativo, -0, NaN e tipos fora do escopo', () => {
   assert.strictEqual(com({}), 0);
   assert.strictEqual(com([1]), 0);
 });
+
+test('porta_medida_pequena nao vale para Frente de gaveta (decisao do dono, 2026-11-23)', () => {
+  const gaveta = (extra) => ({ frente: 'Frente de gaveta', altura: 120, largura: 600, detalhes: { perfil: 'P1', acabamento: 'Anodizado' }, ...extra });
+  assert.strictEqual(achar(gaveta(), 'porta_medida_pequena'), undefined);
+  assert.strictEqual(achar(gaveta({ frente: ' frente de GAVETA ', altura: 250 }), 'porta_medida_pequena'), undefined);
+  // as outras frentes continuam avisando
+  assert.strictEqual(achar(porta({}, { altura: 299 }), 'porta_medida_pequena').nivel, 'avisa');
+  assert.strictEqual(achar({ frente: 'Porta basculante', altura: 900, largura: 250, detalhes: {} }, 'porta_medida_pequena').nivel, 'avisa');
+  assert.strictEqual(achar({ frente: 'Porta de Correr', altura: 250, largura: 900, detalhes: {} }, 'porta_medida_pequena').nivel, 'avisa');
+});
+
+test('Frente de gaveta continua sendo porta nas outras regras', () => {
+  const r = achar({ frente: 'Frente de gaveta', altura: 600, largura: 600, detalhes: { perfil: 'P1', acabamento: '' } }, 'acabamento_perfil');
+  assert.strictEqual(r.nivel, 'bloqueia');
+});
