@@ -85,8 +85,8 @@ test('lista de posições mais curta que as folhas: as que faltam usam a da folh
 // ---------------- ida e volta: salvar → abrir ----------------
 const itemGiro = (mudar = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, largura: 500, profundidade: 0, soldas: 0, obs: '',
   furos: { lista: [], lados: [] },
-  detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: 'Puxador T', tipoPuxador: 'Total', tipoPuxadorNativo: 'Total',
-    acabPux: '', corPux: '', tamanhoPux: '500', todaExt: true, revestimento: 'Vidro V', corRevest: 'Incolor', divisor: '', divH: 0, divV: 0,
+  detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: 'Puxador T', acabPux: 'Anodizado', corPux: 'Preto', tipoPuxador: 'Total', tipoPuxadorNativo: 'Total',
+    tamanhoPux: '500', todaExt: true, revestimento: 'Vidro V', corRevest: 'Incolor', divisor: '', divH: 0, divV: 0,
     posicoesFolhas: ['Topo Total', 'Lateral Direita Total'] },
   acessorios: [], historico: '', valorTela: 627.58, ...mudar });
 const corpo = itens => ({ modo: 'novo', tipo: 'Pedido', clienteCodigo: 7, clienteFinal: '', obsGeral: '', descontoPct: 0,
@@ -129,7 +129,7 @@ test('salvar → abrir com posições diferentes por folha: preço por folha, um
 
 test('salvar: pares espelhados continuam com o preço de antes (uma porta × qtd)', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
-  const item = itemGiro({ valorTela: 0, detalhes: { ...itemGiro().detalhes, puxador: 'Puxador X', tipoPuxador: 'Sobreposto', tipoPuxadorNativo: 'Sobreposto',
+  const item = itemGiro({ valorTela: 0, detalhes: { ...itemGiro().detalhes, puxador: 'Puxador X', acabPux: 'Anodizado', corPux: 'Preto', tipoPuxador: 'Sobreposto', tipoPuxadorNativo: 'Sobreposto',
     tamanhoPux: '300', todaExt: false, posicoesFolhas: ['Lateral Direita Superior', 'Lateral Esquerda Superior'] } });
   const r = await chamar('/ped_orc/salvar', 'POST', corpo([item]));
   assert.equal(r.status, 200);

@@ -19,7 +19,7 @@ function banco(pesos = PESOS) {
 const giro = (mudar = {}, det = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, largura: 500, furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: 'Puxador X', tamanhoPux: 1500, revestimento: 'Vidro 4mm', corRevest: 'Incolor',
     divisor: '', divH: 0, divV: 0, posicoesFolhas: ['Lateral Esquerda', 'Lateral Esquerda'], ...det }, ...mudar });
-const correr = (mudar = {}, det = {}) => ({ frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, furos: { lista: [], lados: [] },
+const correr = (mudar = {}, det = {}) => ({ frente: 'Porta de Correr', confirmacoes: ['sem_revestimento'], qtd: 2, altura: 2100, largura: 1600, furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'Sem sistema', transpasse: 0, posicoesFolhas: ['', ''], ...det }, ...mudar });
 const chamarPeso = (chamar, itens) => chamar('/peso/itens', 'POST', { itens });
 const nomes = (v, acc = new Set()) => {

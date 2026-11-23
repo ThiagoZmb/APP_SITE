@@ -120,7 +120,7 @@ test('diferença de até 1 centavo não avisa; a % da lista entra na comparaçã
 test('posição de puxador não reconhecida: salva mesmo assim (sem bloquear)', async t => {
   const { banco, chamar } = await prepararPedOrc(t);
   const item = giro({ qtd: 1, acessorios: [], furos: { lista: [], lados: [] }, valorTela: 710.08,
-    detalhes: { ...giro().detalhes, puxador: 'Puxador X', tipoPuxador: 'Sobreposto', posicoesFolhas: ['XYZ'] } });
+    detalhes: { ...giro().detalhes, puxador: 'Puxador X', acabPux: 'Anodizado', corPux: 'Preto', tipoPuxador: 'Sobreposto', posicoesFolhas: ['XYZ'] } });
   const r = await salvar(chamar, corpo({ itens: [item] }));
   assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
   assert.equal(banco.pedOrc.length, 1);
@@ -180,7 +180,7 @@ test('atualizar número inexistente: 404 sugerindo número novo', async t => {
 
 // correr S1 (desconto 40), vão 2100×1600, 2 folhas, transpasse 50 → folhas 2060×825
 // perfil 2×(2060+825) = 5,77 m × 100 = 577 por folha × 2 = 1154 + Trilho 2 × 40/m × 1,6 m + Roldana 4×15 = 1342
-const correr = (mudar = {}) => ({ frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
+const correr = (mudar = {}) => ({ frente: 'Porta de Correr', confirmacoes: ['sem_revestimento'], qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'S1', transpasse: '50', desempenador: false, posicoesFolhas: ['', ''] },
   acessorios: [], historico: '', valorTela: 671, ...mudar });
 
@@ -310,5 +310,5 @@ test('porta de correr: QTD editada de acessório do sistema é gravada; inválid
   assert.deepEqual(await gravado(sis(2, 4)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
   assert.deepEqual(await gravado(sis(3, 6)), [['Trilho Sup', 3, 1600, 40], ['Roldana', 6, 0, 15]]);
   assert.deepEqual(await gravado(sis(1, 1)), [['Trilho Sup', 1, 1600, 40], ['Roldana', 1, 0, 15]]);
-  assert.deepEqual(await gravado(sis(0, 2.5)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
+  assert.deepEqual(await gravado(sis(0, 10000)), [['Trilho Sup', 2, 1600, 40], ['Roldana', 4, 0, 15]]);
 });

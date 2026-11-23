@@ -75,7 +75,7 @@ test('buscar por número exato e por parte do cliente, no máximo 20, mais recen
 });
 
 // ---------- salvar documento aberto (Task 3) ----------
-const correr = { frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
+const correr = { frente: 'Porta de Correr', confirmacoes: ['sem_revestimento'], qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'S1', transpasse: '50', desempenador: false, posicoesFolhas: ['', ''] },
   acessorios: [], historico: '', valorTela: 671 };
 const avulso = { frente: 'Avulso', qtd: 2, altura: 3000, largura: 0, obs: '', furos: { lista: [], lados: [] },

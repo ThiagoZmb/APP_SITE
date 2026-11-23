@@ -6,6 +6,7 @@ const { semValores } = require('../seguranca/valores');
 const { criarLeitor, lerCliente, precoAcessorio, valoresAcessorio, precoComAcessorios, precoSerralheria, fatorHistorico, ErroPreco, ErroCadastro } = require('../calculo/precos');
 const { larguraRealDoVao, acessoriosDoSistema, folhasDoItem, agruparFolhas, medidasVidro, medidasPerfil, exigePerfil, temSistemaCorrer, ErroEngenharia } = require('../calculo/engenharia');
 const { linhaComercial } = require('../calculo/linhas_vb');
+const Regras = require('../calculo/regras_item');
 const DescontoPedido = require('../calculo/desconto_pedido');
 const OrcamentoPedido = require('../calculo/orcamento_pedido');
 const { ACOES_HISTORICO, LIMITE_HISTORICO, montarHistorico } = require('../calculo/historico_pedido');
@@ -149,7 +150,8 @@ class ErroItem extends Error {
 
 // Validação do corpo, na ordem e com as mensagens do VB (SalvarPedidoOrçamentoToolStripMenuItem_Click)
 function validar(b) {
-  if (!Array.isArray(b.itens) || b.itens.length === 0) return 'Favor inserir pelomenos 1 item no pedido!';
+  const erroDoc = Regras.avaliarDocumento(b).find(r => r.nivel === Regras.NIVEIS.BLOQUEIA);   // fonte única: itens_minimo (mesma mensagem do VB)
+  if (erroDoc) return erroDoc.mensagem;
   if (b.itens.length > MAX_ITENS) return `No máximo ${MAX_ITENS} itens por documento.`;
   if (!String(b.clienteCodigo ?? '').trim()) return 'Favor selecionar um cliente!';
   if (!TIPOS.includes(b.tipo)) return "Favor escolher entre 'Pedido' ou 'Orçamento' !";
@@ -186,6 +188,13 @@ function validar(b) {
         }
       }
     }
+    // livro de regras (calculo/regras_item.js): bloqueia sempre recusa; confirma exige o código em item.confirmacoes; avisa nunca bloqueia
+    const achados = Regras.avaliar(it);
+    const bloqueio = achados.find(r => r.nivel === Regras.NIVEIS.BLOQUEIA);
+    if (bloqueio) return `Item ${i + 1}: ${bloqueio.mensagem}`;
+    const confirmadas = Array.isArray(it.confirmacoes) ? it.confirmacoes : [];
+    const pendente = achados.find(r => r.nivel === Regras.NIVEIS.CONFIRMA && !confirmadas.includes(r.codigo));
+    if (pendente) return `Item ${i + 1}: confirmação pendente — ${pendente.mensagem}`;
   }
   return null;
 }

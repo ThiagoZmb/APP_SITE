@@ -261,8 +261,8 @@ test('fluxo completo: importa, calcula no motor da tela e o /ped_orc/salvar acei
   const { banco, chamar } = await prepararPedOrc(t);
   comCatalogos(banco);
   const dados = arquivo([
-    itemSkill('P1', giro({}, { revestimento: 'vidro  v' })),   // grafia diferente do cadastro: ajustada
-    itemSkill('P2', correr()),
+    itemSkill('P1', giro({}, { revestimento: 'vidro  v', acabPux: 'Anodizado' })),   // grafia diferente do cadastro: ajustada
+    itemSkill('P2', correr({}, { acabPux: 'Anodizado' })),
     itemSkill('P3', giro({}, { perfil: 'Perfil Z' })),          // fora do cadastro
     itemSkill('P4', correr({}, { sistema: 'S9' })),              // sistema inexistente
     itemSkill('P5', giro(), { pendencias: [{ id: 'p', tipo: 'conflitante', destino: 'largura', mensagem: 'Largura 500 ou 550?', bloqueante: true, refs: [] }] })

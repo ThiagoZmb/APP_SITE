@@ -31,14 +31,13 @@ for (const [nome, pos, lados] of [
   });
 }
 
-test('furos decimais que viram o mesmo inteiro ao gravar não travam o item', async t => {
+// (antes: furos decimais que viravam o mesmo inteiro; agora o servidor recusa decimais, ver RECUSADAS abaixo)
+test('furos decimais são recusados com 400', async t => {
   const { chamar } = await prepararPedOrc(t);
   const it = item([D, D, D], ['Esquerdo', 'Esquerdo', 'Esquerdo']);
   it.furos.lista = [100.4, 100.2, 700.5, 1300, 1900];
   const r = await chamar('/ped_orc/salvar', 'POST', corpo('Orçamento', [it]));
-  const { numero } = await r.json();
-  const aberto = await (await chamar(`/ped_orc/${encodeURIComponent('Orçamento')}/${numero}`)).json();
-  assert.equal(aberto.itens[0].travado, undefined, aberto.itens[0].motivo);
+  assert.equal(r.status, 400);
 });
 
 // ------------------------------------------------------------------------------------------------
@@ -84,9 +83,6 @@ const VARIACOES = [
   ['caso do dono, 3 folhas iguais', {}, {}],
   ['perfil e puxador com espaços nas pontas', {}, { perfil: ' 3345 ', puxador: ' 2018 E ' }],
   ['acabamento + cor separados', {}, { acabamento: 'Anodizado', cor: 'Inox Escovado', acabPux: 'Anodizado', corPux: 'Inox Escovado' }],
-  ['tamanho do puxador com vírgula', {}, { tamanhoPux: '150,0' }],
-  ['tamanho do puxador decimal 150,4', {}, { tamanhoPux: '150,4' }],
-  ['altura e largura decimais', { altura: 2234.4, largura: 544.6 }, {}],
   ['altura e largura como texto', { altura: '2234', largura: '545' }, {}],
   ['qtd como texto', { qtd: '3' }, {}],
   ['posições D,E,D e furos do lado oposto', { furos: FUROS4(['Esquerdo', 'Direito', 'Esquerdo']) }, { posicoesFolhas: [L, LE, L] }],
@@ -99,8 +95,6 @@ const VARIACOES = [
   ['lados vazios', { furos: FUROS4([]) }, {}],
   ['furos fora de ordem e repetidos', { furos: { lista: [1900, 100, 700, 100, 1300], lados: ['Direito', 'Direito', 'Direito'] } }, {}],
   ['furos como texto', { furos: { lista: ['100', '700', '1300', '1900'], lados: ['Direito', 'Direito', 'Direito'] } }, {}],
-  ['furos decimais', { furos: { lista: [100.5, 700.5, 1300.4, 1900.6], lados: ['Direito', 'Direito', 'Direito'] } }, {}],
-  ['furos com zero e negativo', { furos: { lista: [0, 100, -5, 700, 1300, 1900], lados: ['Direito', 'Direito', 'Direito'] } }, {}],
   ['sem furos', { furos: { lista: [], lados: [] } }, {}],
   ['qtd 1', { qtd: 1 }, { posicoesFolhas: [L] }],
   ['qtd 2 com posições diferentes', { qtd: 2 }, { posicoesFolhas: [L, LE] }],
@@ -112,7 +106,7 @@ const VARIACOES = [
   ['sem puxador', {}, { puxador: '', posicoesFolhas: ['', '', ''], tamanhoPux: '' }],
   ['tamanho do puxador vazio', {}, { tamanhoPux: '' }],
   ['revestimento com cor', {}, { corRevest: 'Incolor' }],
-  ['sem revestimento', {}, { revestimento: '', corRevest: '' }],
+  ['sem revestimento (confirmado)', { confirmacoes: ['sem_revestimento'] }, { revestimento: '', corRevest: '' }],
   ['obs com espaços nas pontas', { obs: '  Ver furação  ' }, {}],
   ['obs vazia', { obs: '' }, {}],
   ['obs com quebra de linha', { obs: 'Ver\r\nfuração' }, {}],
@@ -126,6 +120,25 @@ for (const [nome, mud, det] of VARIACOES) {
     const { aberto, mysql } = await gravarELer(t, it);
     assert.equal(aberto.travado, undefined, `${aberto.motivo} -> ${aberto.detalheTecnico}`);
     assert.equal(mysql.travado, undefined, `(valores como o MySQL) ${mysql.motivo} -> ${mysql.detalheTecnico}`);
+  });
+}
+
+// Decimais e negativos deixaram de ser gravados (livro de regras, numero_inteiro): o servidor recusa e nada é gravado.
+const RECUSADAS = [
+  ['tamanho do puxador com vírgula', {}, { tamanhoPux: '150,0' }, /Tamanho do puxador/],
+  ['tamanho do puxador decimal 150,4', {}, { tamanhoPux: '150,4' }, /Tamanho do puxador/],
+  ['altura e largura decimais', { altura: 2234.4, largura: 544.6 }, {}, /Altura/],
+  ['furos decimais', { furos: { lista: [100.5, 700.5, 1300.4, 1900.6], lados: ['Direito', 'Direito', 'Direito'] } }, {}, /Furo 1/],
+  ['furos com zero e negativo', { furos: { lista: [0, 100, -5, 700, 1300, 1900], lados: ['Direito', 'Direito', 'Direito'] } }, {}, /Furo 3/]
+];
+for (const [nome, mud, det, msg] of RECUSADAS) {
+  test(`caso do dono, recusada: ${nome}`, async t => {
+    const banco = bancoPedOrc();
+    const { chamar } = await prepararPedOrc(t, { banco });
+    const r = await chamar('/ped_orc/salvar', 'POST', corpo('Orçamento', [itemDoDono(mud, det)]));
+    assert.equal(r.status, 400);
+    assert.match((await r.json()).error, msg);
+    assert.equal(banco.pedOrc.length, 0);
   });
 }
 

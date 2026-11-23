@@ -12,7 +12,7 @@ const giro = (mudar = {}) => ({ frente: 'Porta de giro', qtd: 2, altura: 2000, l
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: 'Vidro V', corRevest: 'Incolor',
     divisor: '', divH: 0, divV: 0, posicoesFolhas: ['', ''] },
   acessorios: [{ nome: 'Fechadura', qtd: 1, origem: 'MANUAL' }], historico: '', valorTela: 705.08, ...mudar });
-const correr = { frente: 'Porta de Correr', qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
+const correr = { frente: 'Porta de Correr', confirmacoes: ['sem_revestimento'], qtd: 2, altura: 2100, largura: 1600, obs: '', furos: { lista: [], lados: [] },
   detalhes: { perfil: 'Perfil P', acabamento: 'Anodizado', cor: 'Preto', puxador: '', revestimento: '', sistema: 'S1', transpasse: '50', desempenador: false, posicoesFolhas: ['', ''] },
   acessorios: [], historico: '', valorTela: 671 };
 const corpo = (mudar = {}) => ({ modo: 'novo', tipo: 'Pedido', clienteCodigo: 7, clienteFinal: 'Fulano', obsGeral: 'obs', descontoPct: 0,
