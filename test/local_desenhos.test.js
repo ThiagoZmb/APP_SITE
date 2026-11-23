@@ -28,6 +28,13 @@ test('listar: só os PDFs do pedido, o mais recente primeiro; outro número e ou
   await assert.rejects(() => d.listar('../x'), e => e.status === 400);
 });
 
+test('paginaTodos: nome do arquivo escapado (nunca vira HTML) e sem script', () => {
+  const { paginaTodos } = require('../local/desenhos');
+  const h = paginaTodos('1', [{ nome: '1"><img src=x onerror=alert(1)>.pdf' }]);
+  assert.doesNotMatch(h, /<img|<script|onerror=alert\(1\)>/);
+  assert.match(h, /&lt;img/);
+});
+
 test('listar: pasta inacessível = 503 com mensagem clara (sem derrubar o serviço)', async () => {
   const d = criarDesenhos({ pasta: path.join(os.tmpdir(), 'nao-existe-' + Date.now()) });
   await assert.rejects(() => d.listar('1'), e => e.status === 503 && /pasta dos desenhos/.test(e.message));
@@ -59,6 +66,14 @@ test('serviço local: GET /desenhos lista, GET /desenhos/arquivo entrega o PDF e
   assert.equal(pdf.headers.get('content-type'), 'application/pdf');
   assert.match(await pdf.text(), /^%PDF-/);
   assert.equal((await get('/desenhos/arquivo?nome=' + encodeURIComponent('../x.pdf'))).status, 404);
+  const todos = await get('/desenhos/ver?numero=500');
+  assert.equal(todos.status, 200);
+  assert.match(todos.headers.get('content-type'), /text\/html/);
+  const pagina = await todos.text();
+  assert.equal((pagina.match(/<iframe/g) || []).length, 2, 'um quadro por desenho, tudo numa aba só');
+  assert.ok(pagina.indexOf('500(1).pdf') < pagina.indexOf('500.pdf'), 'mais recente primeiro');
+  assert.match(pagina, /src="\/desenhos\/arquivo\?nome=500\(1\)\.pdf"/);
+  assert.equal((await get('/desenhos/ver?numero=abc')).status, 400);
   assert.equal((await get('/desenhos?numero=abc')).status, 400);
   assert.equal((await fetch(base + '/desenhos?numero=500', { headers: { Origin: 'https://site-malicioso.example' } })).status, 403);
   assert.equal((await fetch(base + '/desenhos?numero=500', { method: 'POST', headers: { Origin: 'https://thiagozmb.github.io' } })).status, 405);

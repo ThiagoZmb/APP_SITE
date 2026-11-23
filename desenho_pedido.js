@@ -1,16 +1,16 @@
 // "Ver desenho" do menu do botão direito do Pedido: abre o PDF do desenho (SketchUp) que está na pasta de rede da empresa.
 // Só o serviço local do PC (127.0.0.1:3917, local/desenhos.js) enxerga essa pasta: a tela pergunta a ele quais arquivos existem para o
-// número do pedido (GET /desenhos?numero=) e abre o escolhido numa aba (GET /desenhos/arquivo?nome=). Com mais de um arquivo (22125(1).pdf,
-// 22125(2).pdf...) abre TODOS direto, uma aba por desenho (a janela de escolha só aparece se o navegador bloquear alguma aba). Sem o serviço local não há plano B: o servidor da API não alcança a pasta.
+// número do pedido (GET /desenhos?numero=) e abre UMA aba: o PDF, se houver um só, ou a página /desenhos/ver com todos os desenhos
+// empilhados (22125(1).pdf, 22125(2).pdf...). Uma aba só porque o navegador bloqueia a segunda aba aberta pelo mesmo clique.
+// Sem o serviço local não há plano B: o servidor da API não alcança a pasta.
 // DesenhoPedido.ver(numero)
 (function () {
   'use strict';
   const LOCAL = 'http://127.0.0.1:3917';
   const SEM_SERVICO = 'Não consegui falar com o serviço local deste PC (porta 3917), que é quem enxerga a pasta dos desenhos. Abra o sistema no PC da empresa com o serviço ligado.';
 
-  const el = (tag, classe, texto) => { const e = document.createElement(tag); if (classe) e.className = classe; if (texto !== undefined) e.textContent = texto; return e; };
   const urlArquivo = nome => `${LOCAL}/desenhos/arquivo?nome=${encodeURIComponent(nome)}`;
-  const dataBR = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const urlTodos = numero => `${LOCAL}/desenhos/ver?numero=${encodeURIComponent(numero)}`;
 
   async function listar(numero) {
     const ctl = new AbortController();
@@ -24,55 +24,13 @@
     return Array.isArray(d.arquivos) ? d.arquivos : [];
   }
 
-  // janela de escolha (vários arquivos); fecha com Esc, clique fora ou "Fechar"
-  function escolher(numero, arquivos, bloqueio) {
-    const fundo = el('div', 'dp-fundo');
-    const caixa = el('div', 'dp-caixa');
-    caixa.setAttribute('role', 'dialog'); caixa.setAttribute('aria-modal', 'true'); caixa.setAttribute('aria-labelledby', 'dsn-titulo');
-    caixa.style.maxWidth = '460px';
-    const titulo = el('div', 'dp-titulo', 'Ver desenho'); titulo.id = 'dsn-titulo';
-    const sub = el('div', 'dp-sub', bloqueio
-      ? `Pedido nº ${numero} · o navegador bloqueou ${arquivos.length} aba(s). Abra por aqui ou permita pop-ups deste site para abrir todos de uma vez.`
-      : `Pedido nº ${numero} · ${arquivos.length} desenhos encontrados (o mais recente primeiro).`);
-    const lista = el('div'); lista.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto';
-    const fechar = () => { document.removeEventListener('keydown', aoTecla, true); fundo.remove(); };
-    const aoTecla = e => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
-    for (const a of arquivos) {
-      const b = el('button', 'btn btn-secondary'); b.type = 'button'; b.style.cssText = 'text-align:left;display:block;width:100%';
-      b.append(el('span', '', a.nome), el('small', '', dataBR(a.modificado) ? '  ·  ' + dataBR(a.modificado) : ''));
-      b.addEventListener('click', () => { window.open(urlArquivo(a.nome), '_blank', 'noopener'); fechar(); });
-      lista.append(b);
-    }
-    const acoes = el('div', 'dp-acoes');
-    // abre todos numa só ação (uma aba por desenho). O navegador pode deixar passar só a primeira aba: o texto da janela avisa
-    // (com 'noopener' o window.open devolve sempre null, então não dá para detectar o bloqueio).
-    const todos = el('button', 'btn btn-primary', `Abrir todos (${arquivos.length})`); todos.type = 'button';
-    todos.addEventListener('click', () => { for (const a of arquivos) window.open(urlArquivo(a.nome), '_blank', 'noopener'); fechar(); });
-    acoes.append(todos);
-    const fecha = el('button', 'btn btn-secondary', 'Fechar'); fecha.type = 'button'; fecha.addEventListener('click', fechar);
-    acoes.append(fecha);
-    caixa.append(titulo, sub, lista, acoes); fundo.append(caixa);
-    fundo.addEventListener('mousedown', e => { if (e.target === fundo) fechar(); });
-    document.addEventListener('keydown', aoTecla, true);
-    document.body.append(fundo);
-    (lista.querySelector('button') || fecha).focus();
-  }
-
   async function ver(numero) {
     const n = String(numero ?? '').trim();
     if (!/^\d{1,9}$/.test(n)) { alert('Número de pedido inválido.'); return; }
     try {
       const arquivos = await listar(n);
       if (!arquivos.length) { alert(`Não há desenho do pedido nº ${n} na pasta "Para conferir PDF".`); return; }
-      // abre TODOS direto, uma aba por desenho (mais recente primeiro). Sem 'noopener' no open (para saber se o navegador bloqueou);
-      // o vínculo é cortado logo depois. Se alguma aba for bloqueada (pop-up), cai na janela com a lista para abrir os que faltaram.
-      const bloqueados = arquivos.filter(a => {
-        const w = window.open(urlArquivo(a.nome), '_blank');
-        if (!w) return true;
-        try { w.opener = null; } catch { /* aba de outra origem: já sem acesso */ }
-        return false;
-      });
-      if (bloqueados.length) escolher(n, bloqueados, true);
+      window.open(arquivos.length === 1 ? urlArquivo(arquivos[0].nome) : urlTodos(n), '_blank', 'noopener');
     } catch (err) { alert(err.message); }
   }
 

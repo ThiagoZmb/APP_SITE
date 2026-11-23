@@ -17,6 +17,19 @@ const numeroValido = v => typeof v === 'string' && /^\d{1,9}$/.test(v);
 const ehPdf = nome => /\.pdf$/i.test(nome);
 const doPedido = (nome, numero) => ehPdf(nome) && nome.startsWith(numero) && !/^\d/.test(nome.slice(numero.length));
 
+const html = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Página com todos os PDFs do pedido empilhados (cada um num quadro de tela cheia, o mais recente primeiro). Só texto escapado; sem script.
+function paginaTodos(numero, arquivos) {
+  const quadros = arquivos.map(a => `<section><h2>${html(a.nome)}</h2><iframe src="/desenhos/arquivo?nome=${encodeURIComponent(a.nome)}" title="${html(a.nome)}"></iframe></section>`).join('\n');
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desenhos do pedido ${html(numero)}</title>
+<style>body{margin:0;background:#1c1c1e;color:#f2f2f7;font:14px system-ui,sans-serif}h1{margin:0;padding:10px 14px;font-size:16px}
+section{padding:0 14px 14px}h2{margin:10px 0 6px;font-size:14px;font-weight:600}iframe{width:100%;height:calc(100vh - 70px);border:0;background:#fff;border-radius:6px}</style></head>
+<body><h1>Pedido ${html(numero)} · ${arquivos.length} desenho(s)</h1>
+${quadros || '<p style="padding:14px">Nenhum desenho encontrado.</p>'}</body></html>`;
+}
+
 function criarDesenhos({ pasta = process.env.ELEGANCE_DESENHOS || PASTA_PADRAO } = {}) {
   async function listar(numero) {
     if (!numeroValido(numero)) throw Object.assign(new Error('Número de pedido inválido'), { status: 400 });
@@ -46,6 +59,13 @@ function criarDesenhos({ pasta = process.env.ELEGANCE_DESENHOS || PASTA_PADRAO }
       if (url.pathname === '/desenhos') {
         return responder(res, 200, { ok: true, pasta, arquivos: await listar(url.searchParams.get('numero')) });
       }
+      if (url.pathname === '/desenhos/ver') { // uma única aba com TODOS os desenhos do pedido (o navegador bloqueia várias abas de um clique só)
+        const numero = url.searchParams.get('numero');
+        const arquivos = await listar(numero);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; frame-src 'self'; style-src 'unsafe-inline'" });
+        return res.end(paginaTodos(numero, arquivos));
+      }
       if (url.pathname === '/desenhos/arquivo') {
         const caminho = await resolver(url.searchParams.get('nome'));
         if (!caminho) return responder(res, 404, { error: 'Desenho não encontrado' });
@@ -64,4 +84,4 @@ function criarDesenhos({ pasta = process.env.ELEGANCE_DESENHOS || PASTA_PADRAO }
   return { listar, resolver, tratar, pasta };
 }
 
-module.exports = { criarDesenhos, doPedido, numeroValido, PASTA_PADRAO };
+module.exports = { criarDesenhos, paginaTodos, doPedido, numeroValido, PASTA_PADRAO };

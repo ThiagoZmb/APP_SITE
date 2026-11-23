@@ -72,7 +72,7 @@ const servidor = http.createServer(async (req, res) => {
       if (!sefaz) return responder(res, 503, { error: 'O módulo da SEFAZ não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await sefaz.tratar(req, res, url, { origemPermitida: !!origem && ORIGENS.has(origem) });
     }
-    if (url.pathname === '/desenhos' || url.pathname === '/desenhos/arquivo') {
+    if (url.pathname === '/desenhos' || url.pathname === '/desenhos/arquivo' || url.pathname === '/desenhos/ver') {
       if (!desenhos) return responder(res, 503, { error: 'O módulo dos desenhos não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       // a listagem vem por fetch do site (Origin conferido acima); o PDF abre direto numa aba (navegação não manda Origin)
       return await desenhos.tratar(req, res, url, { responder });
