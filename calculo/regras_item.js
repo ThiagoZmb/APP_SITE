@@ -52,8 +52,9 @@ const CAMPOS_INTEIROS = Object.freeze([
 // Vazio/ausente não dispara (obrigatoriedade é de outras regras); número exige inteiro; texto só dígitos.
 function valorNaoInteiro(v) {
   if (v == null) return false;
-  if (typeof v === 'number') return !Number.isInteger(v);
-  const t = String(v).trim();
+  if (typeof v === 'number') return !(Number.isInteger(v) && v >= 0 && !Object.is(v, -0));
+  if (typeof v !== 'string') return false; // boolean/objeto/array: fora do escopo da regra
+  const t = v.trim();
   return t !== '' && !/^\d+$/.test(t);
 }
 

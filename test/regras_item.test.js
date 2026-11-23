@@ -169,3 +169,16 @@ test('numero_inteiro: dinheiro nao entra e uma mensagem por campo', () => {
   assert.strictEqual(inteiros(porta({ divH: '1,5' }, { altura: '1,5' })).length, 2);
   assert.ok(R.CAMPOS_INTEIROS.length > 0 && Object.isFrozen(R.CAMPOS_INTEIROS));
 });
+
+test('numero_inteiro: negativo, -0, NaN e tipos fora do escopo', () => {
+  const com = v => inteiros(porta({}, { altura: v })).length;
+  assert.strictEqual(com(-3), 1);
+  assert.strictEqual(com(-0), 1);
+  assert.strictEqual(com(NaN), 1);
+  assert.strictEqual(com(Infinity), 1);
+  assert.strictEqual(com(0), 0);
+  assert.strictEqual(com(1500), 0);
+  assert.strictEqual(com(true), 0);
+  assert.strictEqual(com({}), 0);
+  assert.strictEqual(com([1]), 0);
+});
