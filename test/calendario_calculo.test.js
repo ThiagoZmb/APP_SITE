@@ -114,6 +114,16 @@ test('linhaItem: porta, porta de correr, serviço, revestimento e serralheria ed
   assert.ok(!JSON.stringify(K.linhaItem(porta)).includes('999'), 'preço nunca entra');
 });
 
+test('linhaItem: porta de correr mostra o tamanho REAL das folhas, não o vão da descrição', () => {
+  const r = { TIPO_PRODUTO: 'Porta de correr', QTD: 1, DESCRICAO: 'Tam: 2450x1700mm | Per: Sottile Pintura Sólida Alumínio | Sist: Sem sistema' };
+  assert.equal(K.linhaItem(r, [{ altura: 2410, largura: 850 }, { altura: 2410, largura: 850 }]).texto, 'Porta de correr 2410 × 850 (2 folhas) – Perfil Sottile Pintura Sólida Alumínio');
+  assert.equal(K.linhaItem(r, [{ altura: 2410, largura: 850 }]).texto, 'Porta de correr 2410 × 850 – Perfil Sottile Pintura Sólida Alumínio');
+  assert.equal(K.linhaItem(r, [{ altura: 2410, largura: 850 }, { altura: 2410, largura: 900 }]).texto, 'Porta de correr 2410 × 850 + 2410 × 900 – Perfil Sottile Pintura Sólida Alumínio');
+  assert.equal(K.linhaItem(r, []).texto, 'Porta de correr 2450 × 1700 – Perfil Sottile Pintura Sólida Alumínio'); // sem folhas: cai na descrição
+  const m = K.agruparItens([{ NUMERO: 7, ITEM: 1, ...r }], undefined, K.agruparFolhas([{ NUMERO: 7, ITEM_PEDIDO: 1, QTD: 2, ALTURA: 2410, LARGURA: 850 }]));
+  assert.match(m.get(7).itens[0].texto, /2410 × 850 \(2 folhas\)/);
+});
+
 test('linhaItem: saneia HTML/controle, corta texto longo, QTD inválida vira 1 e item sem texto some', () => {
   const x = K.linhaItem({ TIPO_PRODUTO: 'Serviço', QTD: 0, DESCRICAO: '<img src=x onerror=1>' + 'a'.repeat(200) });
   assert.equal(x.qtd, 1);

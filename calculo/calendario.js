@@ -87,7 +87,24 @@ const cortar = (s, n = MAX_TEXTO_ITEM) => (s.length > n ? s.slice(0, n - 1).trim
 //  - Portas (DESCRICAO de várias linhas "Tamanho: 2425x670 mm / Perfil: 1036 (Anodizado Bronze)"): "Porta de giro 2425 × 670 – Perfil 1036 (Anodizado Bronze)"
 //  - Porta de correr (uma linha "Tam: ... | Per: ..."): idem
 //  - Demais (Serviço, Revestimento, Metalons, Perfil...): "Tipo: descrição" (a descrição é cortada em 90 caracteres)
-function linhaItem(r) {
+// Porta de correr: a descrição guarda o VÃO ("Tam: altura x largura do vão"); o balão mostra o tamanho REAL das folhas
+// (ped_orc_itens_v4.ALTURA/LARGURA de cada folha), `folhas` = [{ altura, largura }]. Sem folhas válidas, cai no texto da descrição.
+const medidaMM = n => String(Math.round(Number(n) * 100) / 100).replace('.', ',');
+function tamanhoFolhas(folhas) {
+  const grupos = new Map();
+  for (const f of Array.isArray(folhas) ? folhas : []) {
+    const a = Number(f?.altura), l = Number(f?.largura);
+    if (!(a > 0) || !(l > 0)) continue;
+    const k = `${a}x${l}`;
+    grupos.set(k, { a, l, n: (grupos.get(k)?.n || 0) + 1 });
+  }
+  if (!grupos.size) return '';
+  const total = [...grupos.values()].reduce((s, g) => s + g.n, 0);
+  const texto = [...grupos.values()].map(g => `${medidaMM(g.a)} × ${medidaMM(g.l)}${grupos.size > 1 && g.n > 1 ? ` (${g.n}×)` : ''}`).join(' + ');
+  return total > 1 && grupos.size === 1 ? `${texto} (${total} folhas)` : texto;
+}
+
+function linhaItem(r, folhas) {
   const tipo = limpar(r.TIPO_PRODUTO ?? r.tipo_produto);
   const bruta = String(r.DESCRICAO ?? r.descricao ?? '');
   const qtd = Math.max(1, parseInt(r.QTD ?? r.qtd, 10) || 1);
@@ -95,7 +112,8 @@ function linhaItem(r) {
   const tam = /(?:Tamanho|Tam):\s*(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)\s*mm/i.exec(bruta);
   if (tam && /^porta|^frente/i.test(tipo)) {
     const perfil = /(?:Perfil|Per):\s*([^\r\n|]+)/i.exec(bruta);
-    texto = `${tipo} ${tam[1]} × ${tam[2]}${perfil && limpar(perfil[1]) ? ' – Perfil ' + limpar(perfil[1]) : ''}`;
+    const real = /^porta de correr$/i.test(tipo) ? tamanhoFolhas(folhas) : '';
+    texto = `${tipo} ${real || `${tam[1]} × ${tam[2]}`}${perfil && limpar(perfil[1]) ? ' – Perfil ' + limpar(perfil[1]) : ''}`;
   } else {
     const desc = limpar(bruta.split(/\r?\n/)[0]);
     const obs = limpar(r.OBSERVACAO ?? r.observacao);
@@ -137,9 +155,22 @@ function agruparCores(v4, serralheria) {
   return saida;
 }
 
+// Linhas de ped_orc_itens_v4 (uma por grupo de folhas; QTD = nº de folhas iguais) -> Map 'numero|item' -> [{ altura, largura }] (uma entrada por folha)
+function agruparFolhas(v4) {
+  const mapa = new Map();
+  for (const r of Array.isArray(v4) ? v4 : []) {
+    const chave = `${Number(r.NUMERO ?? r.numero)}|${Number(r.ITEM_PEDIDO ?? r.item_pedido)}`;
+    const n = Math.min(24, Math.max(1, parseInt(r.QTD ?? r.qtd, 10) || 1));
+    if (!mapa.has(chave)) mapa.set(chave, []);
+    for (let i = 0; i < n; i++) mapa.get(chave).push({ altura: r.ALTURA ?? r.altura, largura: r.LARGURA ?? r.largura });
+  }
+  return mapa;
+}
+
 // Linhas de ped_orc_lista_itens (qualquer ordem) -> Map numero -> { itens: [{ qtd, texto, cores? }] (até MAX_ITENS_BALAO, na ordem do ITEM), qtdItens (total real) }
 // `cores` (opcional) = Map de agruparCores; o item só ganha `cores` quando há cor cadastrada.
-function agruparItens(linhas, cores) {
+// `folhas` (opcional) = Map 'numero|item' -> [{ altura, largura }] (agruparFolhas): tamanho real das folhas da porta de correr.
+function agruparItens(linhas, cores, folhas) {
   const porPedido = new Map();
   for (const r of Array.isArray(linhas) ? linhas : []) {
     const numero = Number(r.NUMERO ?? r.numero);
@@ -149,7 +180,7 @@ function agruparItens(linhas, cores) {
   const saida = new Map();
   for (const [numero, lista] of porPedido) {
     const itens = lista.sort((a, b) => (Number(a.ITEM ?? a.item) || 0) - (Number(b.ITEM ?? b.item) || 0)).map(r => {
-      const linha = linhaItem(r);
+      const linha = linhaItem(r, folhas instanceof Map ? folhas.get(`${numero}|${Number(r.ITEM ?? r.item)}`) : undefined);
       const c = linha && cores instanceof Map ? cores.get(`${numero}|${Number(r.ITEM ?? r.item)}`) : '';
       return c ? { ...linha, cores: c } : linha;
     }).filter(Boolean);
@@ -239,4 +270,4 @@ function agruparPorDia(pedidos, situacao = 'abertos') {
   });
 }
 
-module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens, agruparCores, resumoEntregaCalendario, validarBusca, MAX_BUSCA, MAX_PEDIDOS_BUSCA };
+module.exports = { SITUACOES_FILTRO, diasNoMes, somarDias, validarData, validarMes, validarSituacao, classificarSituacao, emAberto, atrasado, dataISO, montarPedido, agruparPorDia, MAX_ITENS_BALAO, linhaItem, agruparItens, agruparCores, agruparFolhas, resumoEntregaCalendario, validarBusca, MAX_BUSCA, MAX_PEDIDOS_BUSCA };
