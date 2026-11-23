@@ -2,14 +2,14 @@
 // Só o serviço local do PC (127.0.0.1:3917, local/desenhos.js) enxerga essa pasta: a tela pergunta a ele quais arquivos existem para o
 // número do pedido (GET /desenhos?numero=) e abre UMA aba: o PDF, se houver um só, ou a página /desenhos/ver com todos os desenhos
 // empilhados (22125(1).pdf, 22125(2).pdf...). Uma aba só porque o navegador bloqueia a segunda aba aberta pelo mesmo clique.
-// Sem o serviço local não há plano B: o servidor da API não alcança a pasta.
+// O serviço procura primeiro em "Para conferir PDF" e, se não achar, nas outras pastas (Prontos, Outros). Sem o serviço local não há plano B: o servidor da API não alcança a pasta.
 // DesenhoPedido.ver(numero)
 (function () {
   'use strict';
   const LOCAL = 'http://127.0.0.1:3917';
   const SEM_SERVICO = 'Não consegui falar com o serviço local deste PC (porta 3917), que é quem enxerga a pasta dos desenhos. Abra o sistema no PC da empresa com o serviço ligado.';
 
-  const urlArquivo = nome => `${LOCAL}/desenhos/arquivo?nome=${encodeURIComponent(nome)}`;
+  const urlArquivo = caminho => `${LOCAL}/desenhos/arquivo?caminho=${encodeURIComponent(caminho)}`; // caminho relativo à pasta Exportados (pode estar em Prontos/...)
   const urlTodos = numero => `${LOCAL}/desenhos/ver?numero=${encodeURIComponent(numero)}`;
 
   async function listar(numero) {
@@ -29,8 +29,8 @@
     if (!/^\d{1,9}$/.test(n)) { alert('Número de pedido inválido.'); return; }
     try {
       const arquivos = await listar(n);
-      if (!arquivos.length) { alert(`Não há desenho do pedido nº ${n} na pasta "Para conferir PDF".`); return; }
-      window.open(arquivos.length === 1 ? urlArquivo(arquivos[0].nome) : urlTodos(n), '_blank', 'noopener');
+      if (!arquivos.length) { alert(`Não há desenho do pedido nº ${n} nas pastas de desenhos (Para conferir PDF, Prontos e Outros).`); return; }
+      window.open(arquivos.length === 1 ? urlArquivo(arquivos[0].caminho) : urlTodos(n), '_blank', 'noopener');
     } catch (err) { alert(err.message); }
   }
 
