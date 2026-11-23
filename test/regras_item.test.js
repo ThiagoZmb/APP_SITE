@@ -32,10 +32,13 @@ test('acabamento_perfil', () => {
   assert.strictEqual(achar(porta({ perfil: 'P1' }, { frente: 'Serralheria' }), 'acabamento_perfil'), undefined);
 });
 
-test('acabamento_puxador', () => {
+test('acabamento_puxador: só bloqueia com o do puxador E o do perfil vazios (o motor usa o do perfil: precos.js acabamentoDoPuxador, engenharia.js acabPuxadorDoPerfil)', () => {
   assert.strictEqual(achar(porta({ puxador: 'X', acabPux: '' }), 'acabamento_puxador').nivel, 'bloqueia');
+  assert.strictEqual(achar(porta({ puxador: 'X', acabPux: '', acabamento: '' }), 'acabamento_puxador').nivel, 'bloqueia');
   assert.strictEqual(achar(porta({ acabPux: '' }), 'acabamento_puxador'), undefined);
   assert.strictEqual(achar(porta({ puxador: 'X', acabPux: 'Anodizado' }), 'acabamento_puxador'), undefined);
+  assert.strictEqual(achar(porta({ perfil: 'P1', acabamento: 'Anodizado', puxador: 'X', acabPux: '' }), 'acabamento_puxador'), undefined,
+    'acabamento do puxador vazio, mas o do perfil existe: o sistema completa');
 });
 
 test('cor_obrigatoria', () => {
@@ -44,6 +47,18 @@ test('cor_obrigatoria', () => {
   assert.strictEqual(achar(porta({ acabamento: 'Anodizado' }), 'cor_obrigatoria'), undefined);
   assert.strictEqual(achar(porta({ acabPux: 'Pintura Metálica', corPux: '' }), 'cor_obrigatoria').nivel, 'bloqueia');
   assert.strictEqual(achar(porta({ acabPux: 'Pintura Metálica', corPux: 'Prata' }), 'cor_obrigatoria'), undefined);
+});
+
+test('cor_obrigatoria do puxador usa o acabamento EFETIVO do motor (o do perfil; sem ele, o do puxador)', () => {
+  // puxador sem acabamento próprio, perfil pintado com cor: o puxador sai pintado, então a cor do puxador é exigida (o motor grava corPux)
+  const r = achar(porta({ acabamento: 'Pintura Metálica', cor: 'Prata', puxador: 'X', acabPux: '', corPux: '' }), 'cor_obrigatoria');
+  assert.strictEqual(r.nivel, 'bloqueia');
+  assert.strictEqual(r.mensagem, 'Escolha a cor do puxador.');
+  assert.strictEqual(achar(porta({ acabamento: 'Pintura Metálica', cor: 'Prata', puxador: 'X', acabPux: '', corPux: 'Prata' }), 'cor_obrigatoria'), undefined);
+  // perfil anodizado vale para o puxador (o motor ignora o acabamento pintado digitado no puxador): não exige cor do puxador
+  assert.strictEqual(achar(porta({ acabamento: 'Anodizado', puxador: 'X', acabPux: 'Pintura Metálica', corPux: '' }), 'cor_obrigatoria'), undefined);
+  // sem perfil: vale o do puxador
+  assert.strictEqual(achar(porta({ acabamento: '', puxador: 'X', acabPux: 'Pintura Sólida', corPux: '' }), 'cor_obrigatoria').mensagem, 'Escolha a cor do puxador.');
 });
 
 test('sem_revestimento', () => {

@@ -113,15 +113,20 @@ test('imprimirLista usa só as linhas filtradas visíveis (chip de situação, c
   assert.equal(t.chamadas[0].linhas.length, 4);
   assert.equal(t.chamadas[0].titulo, 'Pedidos');
   t.api.set({ filtroSit: 'pronto', cliente: 'Ana' });
+  t.api.imprimirLista();
+  assert.deepEqual(t.chamadas[1].linhas.map(l => l.celulas.numero), ['1', '4']);
+  assert.deepEqual(t.chamadas[1].filtros, [['Período', 'Últimos 6 meses (01/06/2026 a 18/11/2026)'], ['Cliente', 'Ana'], ['Situação', 'Pronto']]);
+  // com texto na busca vale a BUSCA GLOBAL: cliente e chip são ignorados e o cabeçalho diz isso
   t.campos['search-input'].value = '4';
   t.api.imprimirLista();
-  const c = t.chamadas[1];
+  const c = t.chamadas[2];
   assert.deepEqual(c.linhas.map(l => l.celulas.numero), ['4']);
   assert.equal(c.filtradas, 1);
-  assert.deepEqual(c.filtros, [['Período', 'Últimos 6 meses (01/06/2026 a 18/11/2026)'], ['Cliente', 'Ana'], ['Situação', 'Pronto'], ['Busca', '4']]);
+  assert.deepEqual(c.filtros, [['Busca em todos os registros', '4']]);
+  assert.match(I.textoFiltros(c.filtros), /Busca em todos os registros: 4/);
   // a lista da tela e a do papel são a mesma função
   assert.deepEqual(Array.from(t.api.listaDaTela().visiveis, x => x.numero), [4]);
-  assert.match(painel, /function renderLista\(\) \{\s*const \{ j, base, lista, visiveis \} = listaDaTela\(\);/);
+  assert.match(painel, /function renderLista\(\) \{\s*const \{ j, base, lista, visiveis, buscaGlobal \} = listaDaTela\(\);/);
   const corpo = painel.slice(painel.indexOf('function imprimirLista()'), painel.indexOf('function renderLista()'));
   assert.doesNotMatch(corpo, /\bapi\(|fetch\(|buscarTipo|carregar\(/, 'não vai ao servidor');
 });

@@ -210,6 +210,9 @@
         .lista-topo .busca { margin: 0; min-width: 240px; }
         .chips-sit { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 22px 12px; }
         .chips-sit:empty { display: none; }
+        .busca-aviso { padding: 0 22px 10px; font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .busca-aviso[hidden] { display: none; }
+        .busca-aviso button { background: none; border: 0; padding: 0; font: inherit; color: var(--text-dark); text-decoration: underline; cursor: pointer; }
         .tabela-wrap { max-height: 520px; min-width: 0; overflow-x: hidden; }
         #orders-table { width: 100%; table-layout: fixed; }
         #orders-table th, #orders-table td { overflow: hidden; text-overflow: ellipsis; }
@@ -345,6 +348,7 @@
                         <button type="button" class="btn btn-secondary btn-mini" id="print-btn" aria-label="Imprimir a lista como está na tela"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7"/></svg>Imprimir</button>
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
+                    <p class="busca-aviso" id="busca-aviso" role="status" hidden></p>
                     <div class="tabela-wrap">
                         <table id="orders-table">
                             <colgroup><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:11%"></colgroup>
@@ -797,14 +801,20 @@
         const MAX_LINHAS_LISTA = 500;
         // A lista exatamente como a tela a mostra: período, cliente, aba, chip de situação e busca aplicados; `visiveis` = o corte
         // de MAX_LINHAS_LISTA linhas que vai para a tabela. A impressão usa a MESMA função (nada é rebuscado no servidor).
+        // BUSCA GLOBAL: com texto na busca, a lista ignora período, cliente e chip de situação e procura em TODOS os registros da aba
+        // (o servidor já devolve a lista inteira, sem limite de data; estados e valores.ver já foram aplicados lá). Sem texto, tudo volta ao normal.
+        const palavrasDaBusca = () => norm($('search-input').value).split(/\s+/).filter(Boolean);
+        const bateBusca = (x, palavras) => palavras.every(p => textoBusca(x).includes(p));
         function listaDaTela() {
             const j = janela();
-            const base = entre(doCliente(tipoLista === 'Pedido' ? pedidos : orcamentos), j.ini, j.fim);
+            const todos = tipoLista === 'Pedido' ? pedidos : orcamentos;
+            const base = entre(doCliente(todos), j.ini, j.fim); // base dos chips e do período (não muda com a busca)
             // busca em todos os campos do registro (o que a lista mostra e o que mais vier da API); várias palavras = todas precisam aparecer
-            const palavras = norm($('search-input').value).split(/\s+/).filter(Boolean);
-            const lista = base.filter(x => (tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit) &&
-                (!palavras.length || palavras.every(p => textoBusca(x).includes(p))));
-            return { j, base, lista, visiveis: lista.slice(0, MAX_LINHAS_LISTA) };
+            const palavras = palavrasDaBusca();
+            const buscaGlobal = palavras.length > 0;
+            const lista = buscaGlobal ? todos.filter(x => bateBusca(x, palavras))
+                : base.filter(x => tipoLista !== 'Pedido' || !filtroSit || x.s === filtroSit);
+            return { j, base, lista, buscaGlobal, visiveis: lista.slice(0, MAX_LINHAS_LISTA) };
         }
         // classe de divisor entre semanas (segunda a domingo) de cada linha, na ordem em que aparecem
         function classesDivisor(linhas) {
@@ -819,7 +829,7 @@
         // Imprime a lista como está na tela agora (mesmos filtros, busca e corte de linhas). O total em dinheiro só vai para o
         // papel com valores.ver E com o olho dos resumos aberto (fechado, nenhum total analítico sai); resumos e gráficos nunca saem.
         function imprimirLista() {
-            const { j, lista, visiveis } = listaDaTela();
+            const { j, lista, visiveis, buscaGlobal } = listaDaTela();
             const podeValores = Acesso.pode('valores.ver');
             const divisores = classesDivisor(visiveis);
             const periodo = $('periodo').selectedOptions[0]?.textContent || j.nome;
@@ -827,8 +837,9 @@
             window.ImpressaoLista.imprimir(window, {
                 titulo: tipoLista === 'Pedido' ? 'Pedidos' : 'Orçamentos',
                 geradoEm: new Date().toLocaleString('pt-BR'),
-                filtros: [['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
-                    ['Situação', tipoLista === 'Pedido' && filtroSit ? NOME_SIT[filtroSit] : ''], ['Busca', $('search-input').value.trim()]],
+                filtros: buscaGlobal ? [['Busca em todos os registros', $('search-input').value.trim()]]
+                    : [['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
+                        ['Situação', tipoLista === 'Pedido' && filtroSit ? NOME_SIT[filtroSit] : '']],
                 podeValores,
                 colunas: COLUNAS,
                 linhas: visiveis.map((x, i) => ({ classe: divisores[i], celulas: Object.fromEntries(COLUNAS.map(c => [c.id, c.celula(x, true)])) })),
@@ -836,20 +847,36 @@
                 total: podeValores && OlhoResumos.visivel() ? moeda(soma(lista)) : ''
             });
         }
+        // Aviso da busca global (texto discreto sob os chips): diz que período/cliente/situação estão sendo ignorados, avisa o corte
+        // de 500 linhas e quantos achados há na outra aba (só se ela já foi carregada; a busca carrega a outra aba em segundo plano).
+        function renderAvisoBusca(buscaGlobal, qtd) {
+            const el = $('busca-aviso');
+            if (!buscaGlobal) { el.hidden = true; el.textContent = ''; return; }
+            const outro = OUTRO_TIPO[tipoLista];
+            const palavras = palavrasDaBusca();
+            let html = 'Busca em todos os registros: ignora período, cliente e situação.';
+            if (qtd > MAX_LINHAS_LISTA) html += ` Resultado cortado: mostrando ${num(MAX_LINHAS_LISTA)} de ${num(qtd)}; refine a busca.`;
+            if (carregado[outro]) {
+                const n = (outro === 'Pedido' ? pedidos : orcamentos).filter(x => bateBusca(x, palavras)).length;
+                if (n) html += ` Também há <button type="button" id="busca-outra-aba">${num(n)} em ${outro === 'Pedido' ? 'Pedidos' : 'Orçamentos'}</button>.`;
+            }
+            el.innerHTML = html; el.hidden = false;
+        }
         function renderLista() {
-            const { j, base, lista, visiveis } = listaDaTela();
+            const { j, base, lista, visiveis, buscaGlobal } = listaDaTela();
             const cont = {}; base.forEach(x => cont[x.s] = (cont[x.s] || 0) + 1);
-            $('chips-sit').innerHTML = tipoLista === 'Pedido'
+            $('chips-sit').innerHTML = tipoLista === 'Pedido' && !buscaGlobal // busca global ignora o chip: some enquanto houver texto
                 ? [['', `Todas (${base.length})`], ...Object.keys(NOME_SIT).filter(k => cont[k]).map(k => [k, `${NOME_SIT[k]} (${cont[k]})`])]
                     .map(([k, t]) => `<button type="button" class="chip${k === filtroSit ? ' ativo' : ''}" data-sit="${k}" aria-pressed="${k === filtroSit}">${t}</button>`).join('') : '';
+            renderAvisoBusca(buscaGlobal, lista.length);
             $('lista-titulo').textContent = `Lista de ${tipoLista === 'Pedido' ? 'pedidos' : 'orçamentos'}`;
-            $('lista-qtd').textContent = `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
+            $('lista-qtd').textContent = buscaGlobal ? `${num(lista.length)} registro(s) · busca em todos os registros` : `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
             $('lista-total').textContent = moeda(soma(lista));
             const divisores = classesDivisor(visiveis);
             $('orders-tbody').innerHTML = (visiveis.map((x, i) => `
                 <tr data-numero="${esc(x.numero)}" tabindex="0" title="${esc(balaoDaLinha(x))}"${divisores[i] ? ` class="${divisores[i]}"` : ''}>
                     ${COLUNAS.map(c => `<td${c.tdClasse || c.num ? ` class="${c.tdClasse || 'num'}"` : ''}${c.valor ? ' data-valor' : ''}>${c.celula(x, false)}</td>`).join('')}
-                </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
+                </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — ${buscaGlobal ? 'refine o texto da busca.' : 'use a busca ou o período para refinar.'}</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
             carregarBaloes(visiveis);
         }
@@ -1107,7 +1134,22 @@
             garantirTipos([tipoPedido]).then(() => { if (tipoLista === tipoPedido) renderLista(); })
                 .catch(e => { $('lista-qtd').textContent = '⚠️ Erro ao carregar: ' + e.message; });
         }));
-        $('search-input').addEventListener('input', renderLista);
+        // Busca global: debounce de 300 ms; com texto, a outra aba também é carregada (para contar os achados lá). Uma resposta
+        // antiga (texto ou aba que já mudou) é descartada. Limpar o texto volta à lista com os filtros (renderLista imediato).
+        let tBusca = null, seqBusca = 0;
+        $('search-input').addEventListener('input', () => {
+            clearTimeout(tBusca);
+            if (!palavrasDaBusca().length) { seqBusca++; renderLista(); return; }
+            tBusca = setTimeout(() => {
+                renderLista();
+                const meu = ++seqBusca, outro = OUTRO_TIPO[tipoLista];
+                if (carregado[outro]) return;
+                garantirTipos([outro]).then(() => { if (meu === seqBusca && palavrasDaBusca().length) renderLista(); }).catch(() => { /* só a contagem da outra aba falha */ });
+            }, 300);
+        });
+        $('busca-aviso').addEventListener('click', e => {
+            if (e.target.closest('#busca-outra-aba')) document.querySelector(`.toggle-btn[data-tipo="${OUTRO_TIPO[tipoLista]}"]`).click();
+        });
         $('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));
         $('print-btn').addEventListener('click', imprimirLista);
 
