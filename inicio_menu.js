@@ -77,6 +77,8 @@
       add('pedidos.pdf', '📄', 'Abrir PDF', () => window.abrirPdfAutenticado(urlPdf(n, false)));
       add('pedidos.pdf', '🏭', 'Guia de produção', () => window.abrirPdfAutenticado(urlPdf(n, true)));
       add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => window.abrirPdfAutenticado(urlVidros(n)));
+      // desenho (SketchUp) do pedido: PDF da pasta de rede, aberto pelo serviço local do PC da empresa (desenho_pedido.js)
+      add('pedidos.pdf', '📐', 'Ver desenho', () => window.DesenhoPedido.ver(n));
       // nota fiscal (DANFE) do pedido; o servidor confere a permissão e os estados do usuário
       add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, pode: cfg.pode }));
       sep();

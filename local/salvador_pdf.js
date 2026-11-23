@@ -26,6 +26,10 @@ try { zebra = require('./zebra').criarZebra(); } catch { zebra = null; }
 let impressao = null;
 try { impressao = require('./impressao').criarImpressao(); } catch { impressao = null; }
 
+// Ver desenho (local/desenhos.js, rotas GET /desenhos*): PDFs do SketchUp na pasta de rede. Mesma regra: sem o módulo, /desenhos* responde 503.
+let desenhos = null;
+try { desenhos = require('./desenhos').criarDesenhos(); } catch { desenhos = null; }
+
 function nomeValido(nome) {
   return typeof nome === 'string' && nome.length > 4 && nome.length <= 200 && /\.pdf$/i.test(nome)
     && !/[\\/:*?"<>|\x00-\x1f]/.test(nome) && nome !== '.' && !nome.startsWith('..');
@@ -68,7 +72,12 @@ const servidor = http.createServer(async (req, res) => {
       if (!sefaz) return responder(res, 503, { error: 'O módulo da SEFAZ não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       return await sefaz.tratar(req, res, url, { origemPermitida: !!origem && ORIGENS.has(origem) });
     }
-    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra, imprimir: !!impressao && impressao.configurada() });
+    if (url.pathname === '/desenhos' || url.pathname === '/desenhos/arquivo') {
+      if (!desenhos) return responder(res, 503, { error: 'O módulo dos desenhos não está instalado neste PC. Rode de novo o instalador do serviço local.' });
+      // a listagem vem por fetch do site (Origin conferido acima); o PDF abre direto numa aba (navegação não manda Origin)
+      return await desenhos.tratar(req, res, url, { responder });
+    }
+    if (req.method === 'GET' && url.pathname === '/ping') return responder(res, 200, { ok: true, raiz: RAIZ, sefaz: !!sefaz, zebra: !!zebra, imprimir: !!impressao && impressao.configurada(), desenhos: !!desenhos });
     if (req.method === 'GET' && url.pathname === '/impressoras') {
       if (!zebra) return responder(res, 503, { error: 'O módulo da Zebra não está instalado neste PC. Rode de novo o instalador do serviço local.' });
       try { return responder(res, 200, await zebra.diagnostico()); } catch (e) { return responder(res, 500, { error: 'Não foi possível listar as impressoras do Windows: ' + e.message }); }

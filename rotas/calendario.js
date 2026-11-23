@@ -110,6 +110,29 @@ function registrarCalendario({ rota, pool }) {
     }
   });
 
+  // Balão da lista de Pedidos e Orçamentos (painel_inicial.html): itens e cores de até 300 documentos de uma vez, só texto (sem dinheiro).
+  // GET /pedidos/balao?tipo=Pedido|Orçamento&numeros=1,2,3  -> { itens: { "<numero>": { itens, qtdItens } } }; estados restritos filtram pelo cliente.
+  rota('get', '/pedidos/balao', VER, async (req, res) => {
+    const tipo = req.query.tipo === 'Orçamento' ? 'Orçamento' : 'Pedido';
+    const numeros = [...new Set(String(req.query.numeros ?? '').split(',').map(s => s.trim()).filter(s => /^\d{1,9}$/.test(s)).map(Number))];
+    if (!numeros.length || numeros.length > 300) return res.status(400).json({ error: 'Informe de 1 a 300 números.' });
+    try {
+      let permitidos = numeros;
+      const est = filtroEstados(req, 'c.ESTADO');
+      if (est.sql) {
+        const [ok] = await pool.execute(
+          `SELECT p.NUMERO AS numero FROM ped_orc p INNER JOIN cadastro_clientes c ON p.RAZAO_SOCIAL = c.RAZAO_SOCIAL
+           WHERE p.TIPO = ? AND p.NUMERO IN (${numeros.map(() => '?').join(',')}) AND ${est.sql}`, [tipo, ...numeros, ...est.params]);
+        permitidos = ok.map(r => Number(r.numero));
+      }
+      const mapa = permitidos.length ? await carregarItensPedidos(pool, permitidos, { cores: true, tipo }) : new Map();
+      res.json({ itens: Object.fromEntries([...mapa.entries()].map(([n, v]) => [String(n), v])) });
+    } catch (err) {
+      console.error('Erro GET /pedidos/balao:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Erro de servidor' });
+    }
+  });
+
   rota('get', '/calendario/dia', VER, async (req, res) => {
     const data = validarData(req.query.data);
     if (!data) return res.status(400).json({ error: 'Data inválida. Use o formato AAAA-MM-DD.' });

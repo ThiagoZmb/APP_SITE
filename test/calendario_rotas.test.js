@@ -181,6 +181,22 @@ test('itens do balão: UMA consulta IN a ped_orc_lista_itens por chamada (mês e
   assert.deepEqual(dia.pedidos.find(p => p.numero === 11).itens, [], 'pedido sem itens: lista vazia');
 });
 
+test('GET /pedidos/balao: itens com tamanho real da porta de correr, tipo fixo no SQL, números validados e sem dinheiro', async t => {
+  const { f, chamar } = await preparar(t);
+  f.regras.unshift(
+    [SQL_LISTA_ANY, [{ NUMERO: 10, ITEM: 1, TIPO_PRODUTO: 'Porta de correr', QTD: 1, DESCRICAO: 'Tam: 2450x1700mm | Per: Sottile', OBSERVACAO: '' }]],
+    [/FROM ped_orc_itens_v4 WHERE TIPO = 'Pedido' AND NUMERO IN/, [{ NUMERO: 10, ITEM_PEDIDO: 1, QTD: 2, ALTURA: 2410, LARGURA: 850, COR_PERFIL: 'Preto', COR_PUXADOR: '', COR_DIVISOR: '', COR_REVESTIMENTO: '' }]]);
+  const r = await chamar(1, '/pedidos/balao?tipo=Pedido&numeros=10,abc,11');
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.itens['10'].itens[0].texto, 'Porta de correr 2410 × 850 (2 folhas) – Perfil Sottile');
+  assert.equal(d.itens['10'].itens[0].cores, 'perfil Preto');
+  assert.doesNotMatch(JSON.stringify(d), /UNITARIO|TOTAL|valor/i);
+  assert.equal((await chamar(1, '/pedidos/balao?tipo=Pedido&numeros=abc')).status, 400);
+  assert.equal((await chamar(1, '/pedidos/balao?tipo=Pedido')).status, 400);
+});
+const SQL_LISTA_ANY = /FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/;
+
 test('itens do balão: falha na leitura dos itens não derruba o calendário (balão sem a seção)', async t => {
   const { f, chamar } = await preparar(t);
   f.regras.unshift([/FROM ped_orc_lista_itens WHERE TIPO = 'Pedido' AND NUMERO IN/, () => { throw new Error('falha'); }]);

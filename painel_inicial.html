@@ -278,6 +278,7 @@
     <script src="danfe_pedido.js?v=202611051300" defer></script>
     <script src="etiqueta_zebra.js?v=202611201300" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
+    <script src="desenho_pedido.js?v=202611231100" defer></script>
     <script src="impressao_pdf.js?v=202611231000" defer></script>
     <script src="impressao_lista.js?v=202611181000" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
@@ -346,7 +347,7 @@
                     <div class="chips-sit" id="chips-sit"></div>
                     <div class="tabela-wrap">
                         <table id="orders-table">
-                            <colgroup><col style="width:8%"><col style="width:13%"><col style="width:12%"><col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:12%"><col style="width:9%"><col style="width:10%"><col style="width:12%"></colgroup>
+                            <colgroup><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:11%"></colgroup>
                             <thead><tr><th>Número</th><th>Cliente</th><th>Cliente final</th><th>Data</th><th>Pronto em</th><th class="num" data-valor>Valor</th><th>Observação</th><th>Situação</th><th data-valor>Financeiro</th><th>Entrega</th></tr></thead>
                             <tbody id="orders-tbody"></tbody>
                         </table>
@@ -846,10 +847,44 @@
             $('lista-total').textContent = moeda(soma(lista));
             const divisores = classesDivisor(visiveis);
             $('orders-tbody').innerHTML = (visiveis.map((x, i) => `
-                <tr data-numero="${esc(x.numero)}" tabindex="0"${divisores[i] ? ` class="${divisores[i]}"` : ''}>
+                <tr data-numero="${esc(x.numero)}" tabindex="0" title="${esc(balaoDaLinha(x))}"${divisores[i] ? ` class="${divisores[i]}"` : ''}>
                     ${COLUNAS.map(c => `<td${c.tdClasse || c.num ? ` class="${c.tdClasse || 'num'}"` : ''}${c.valor ? ' data-valor' : ''}>${c.celula(x, false)}</td>`).join('')}
                 </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — use a busca ou o período para refinar.</td></tr>` : ''))
                 || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
+            carregarBaloes(visiveis);
+        }
+        // ---- Balão (title) de cada linha: mesmo conteúdo do Calendário de pedidos (dados, situação, itens com o tamanho real e cores) ----
+        // Os itens vêm de GET /pedidos/balao (só texto, sem dinheiro), em lotes de 300, depois que a tabela já apareceu; falha só tira os itens.
+        const baloesItens = new Map(); // 'Tipo|numero' -> { itens, qtdItens } ({} = documento sem itens)
+        const baloesPedidos = new Set(); // lotes em andamento (evita pedir duas vezes)
+        function textoItensBalao(p) {
+            const itens = Array.isArray(p && p.itens) ? p.itens.filter(i => i && i.texto) : [];
+            if (!itens.length) return '';
+            const mais = Math.max(0, (Number(p.qtdItens) || 0) - itens.length);
+            return '\n\nItens:\n' + itens.map(i => `• ${Number(i.qtd) > 0 ? i.qtd : 1}× ${i.texto}${i.cores ? `\n    Cores: ${i.cores}` : ''}`).join('\n') + (mais ? `\n… e mais ${mais} ${mais === 1 ? 'item' : 'itens'}` : '');
+        }
+        function balaoDaLinha(x) {
+            const doc = tipoLista === 'Pedido' ? 'Pedido' : 'Orçamento';
+            return `${doc}: ${x.numero}\nCliente: ${x.cliente || '—'}\nCliente final: ${x.clienteFinal || '—'}\n▶ SITUAÇÃO: ${String(x.situacao || 'sem situação').toUpperCase()}${textoItensBalao(baloesItens.get(`${tipoLista}|${x.numero}`))}`;
+        }
+        async function carregarBaloes(visiveis) {
+            const tipo = tipoLista;
+            const faltam = visiveis.map(x => String(x.numero)).filter(n => !baloesItens.has(`${tipo}|${n}`) && !baloesPedidos.has(`${tipo}|${n}`));
+            for (let i = 0; i < faltam.length; i += 300) {
+                const lote = faltam.slice(i, i + 300);
+                lote.forEach(n => baloesPedidos.add(`${tipo}|${n}`));
+                try {
+                    const r = await api(`/pedidos/balao?tipo=${encodeURIComponent(tipo)}&numeros=${lote.join(',')}`);
+                    lote.forEach(n => baloesItens.set(`${tipo}|${n}`, (r.itens && r.itens[n]) || {}));
+                } catch (e) { /* sem itens no balão; o resto da tela segue */ }
+                lote.forEach(n => baloesPedidos.delete(`${tipo}|${n}`));
+                if (tipo !== tipoLista) return; // o usuário trocou de aba: a tabela de agora é outra
+                for (const x of visiveis) {
+                    if (!lote.includes(String(x.numero))) continue;
+                    const tr = $('orders-tbody').querySelector(`tr[data-numero="${CSS.escape(String(x.numero))}"]`);
+                    if (tr) tr.title = balaoDaLinha(x);
+                }
+            }
         }
         // Agrupa visualmente por semana civil (segunda a domingo), usando a data do pedido/orçamento.
         function semanaDaData(valor) {
@@ -956,6 +991,8 @@
             add('pedidos.pdf', '📄', 'Abrir PDF', () => abrirPdfAutenticado(urlPdf(numero, false)));
             if (ehPedido) add('pedidos.pdf', '🏭', 'Guia de produção', () => abrirPdfAutenticado(urlPdf(numero, true)));
             if (ehPedido) add('pedidos.pdf', '🪟', 'Vidros (PDF)', () => abrirPdfAutenticado(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`));
+            // desenho (SketchUp) do pedido: PDF da pasta de rede, aberto pelo serviço local do PC da empresa (desenho_pedido.js)
+            if (ehPedido) add('pedidos.pdf', '📐', 'Ver desenho', () => window.DesenhoPedido.ver(numero));
             // nota fiscal (DANFE) do pedido: só Pedido (orçamento não tem nota); o servidor confere a permissão e os estados do usuário
             if (ehPedido) add('danfe.ver', '🧾', 'Abrir nota fiscal (DANFE)', () => window.DanfePedido.abrir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) }));
             // imprimir direto desta tela: o PDF é baixado e vai para a janela de impressão, sem abrir outra aba nem outra página
