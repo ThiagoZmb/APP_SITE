@@ -64,21 +64,28 @@ async function salvoEAberto(t) {
   const aberto = await (await ctx.chamar(`/ped_orc/Pedido/${numero}`)).json();
   return { ...ctx, numero, aberto };
 }
+const TABELAS = ['pedOrc', 'listaItens', 'itensV4', 'vidros', 'perfis', 'furacao', 'complementos', 'serralheria', 'serralheriaComp'];
+const semId = r => Object.fromEntries(Object.entries(r).filter(([k]) => !['id', 'ID', 'DATA'].includes(k)));
+const foto = (banco, numero) => Object.fromEntries(TABELAS.map(t => [t, banco[t].filter(r => Number(r.NUMERO) === numero).map(semId)]));
 const atualizar = (aberto, numero, itens) => corpo({ modo: 'atualizar', numero, impressao: aberto.impressao, itens });
 
 test('pedido antigo: itens intactos que violariam as regras são aceitos (200)', async t => {
-  const { chamar, numero, aberto } = await salvoEAberto(t);
+  const { banco, chamar, numero, aberto } = await salvoEAberto(t);
+  const antes = foto(banco, numero);
   const origem = aberto.itens.map(i => i.origem);
   const itens = origem.map(o => ({ origem: { ...o, estado: 'intacto' }, frente: 'Porta de giro', altura: 1.5, detalhes: { perfil: 'X', acabamento: '' } }));
   const r = await salvar(chamar, atualizar(aberto, numero, itens));
   assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.deepEqual(foto(banco, numero), antes, 'o item intacto continua igual ao do banco (nada vindo do corpo ruim)');
 });
 
 test('item editado que viola regra: 400', async t => {
-  const { chamar, numero, aberto } = await salvoEAberto(t);
+  const { banco, chamar, numero, aberto } = await salvoEAberto(t);
+  const antes = foto(banco, numero);
   const it = aberto.itens[0];
   const itens = [{ ...it, valorTela: it.valor, origem: { ...it.origem, estado: 'editado' }, altura: 1.5 }];
   const r = await salvar(chamar, atualizar(aberto, numero, itens));
   assert.equal(r.status, 400);
   assert.match((await r.json()).error, /^Item 1: Altura/);
+  assert.deepEqual(foto(banco, numero), antes, 'recusado: o pedido existente ficou intacto');
 });
