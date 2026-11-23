@@ -63,7 +63,7 @@ Item cópia = `origem.estado` em `intacto`, `so_pct` ou `travado` (`ehCopia`, em
 ## Decisões do dono (2026-11-23)
 
 - **Não existe "embutido total"**: o "total" só existe no sobreposto ("Sobreposto Total"). O embutido nunca é "toda extensão" e a regra de 50 a 400 mm vale sempre para ele.
-- **Tamanhos e quantidades só inteiros** (sem vírgula, ponto, sinal ou letra). Não vale para dinheiro (valor, desconto, %). Na tela, os campos `data-inteiro` filtram ao digitar e colar: na PRIMEIRA vírgula ou ponto o resto é descartado (`2100,5` vira `2100`, nunca `21005`; `1.234` vira `1`) e letra, sinal e espaço só são tirados (`12 a 3` vira `123`); quando algo é tirado aparece um aviso curto no canto (`#toasts`, aparência `.toast` do `tema.css`), que não bloqueia. `adicionarItem` ainda confere o texto cru antes de coletar o item (o `parseFloat`/`parseInt` esconderia um decimal).
+- **Tamanhos e quantidades só inteiros** (sem vírgula, ponto, sinal ou letra). Não vale para dinheiro (valor, desconto, %). Na tela, os campos `data-inteiro` filtram ao digitar e colar: o PRIMEIRO vírgula ou ponto FICA no campo e o que vem depois dele é descartado (`2100,5` vira `2100,`, nunca `21005`; `1.234` vira `1.`) e letra, sinal e espaço só são tirados (`12 a 3` vira `123`); quando há separador no campo ou algo é tirado aparece um aviso curto no canto ("Só números inteiros: apague a vírgula/ponto."; `#toasts`, aparência `.toast` do `tema.css`), que não bloqueia. Como o separador fica no campo, `adicionarItem` confere o texto cru antes de coletar o item e recusa com a mensagem do campo até a pessoa apagar a vírgula/ponto (o `parseFloat`/`parseInt` esconderia um decimal); digitar mais algarismos depois do separador não muda nada (são descartados).
 - **Quantidade decimal de acessório** (ex.: 2,5 numa linha do sistema de correr) não "volta à tabela" mais: a regra `numero_inteiro` recusa o item com 400 "Acessório n (quantidade)" e nada é gravado (`test/ped_orc_salvar.test.js`).
 
 ## `confirmacoes`
@@ -86,7 +86,7 @@ O `?v=` do `layout.js` NÃO foi trocado (mexeria em todas as páginas): o item "
 
 **Teste manual depois de publicar** (Chrome no computador e no Android):
 
-- Filtro de inteiros: digitar letras, digitar `2100,5` e `150.5` (deve ficar `2100`/`150` com o aviso no canto), colar `12 a 3` (fica `123`).
+- Filtro de inteiros: digitar letras, digitar `2100,5` e `150.5` (o campo termina em `2100,`/`150.` com o aviso "apague a vírgula/ponto" no canto; "Adicionar item" recusa com a mensagem do campo até apagar a vírgula/ponto), colar `12 a 3` (fica `123`).
 - `confirm()` da porta sem revestimento: OK adiciona; Cancelar não adiciona e deixa corrigir.
 - Editar um item antigo que tinha medida decimal: a tela pede o inteiro antes de atualizar.
 - Importar itens por JSON e salvar: item que viole regra é recusado com "Para resolver, abra o item N (✏️) e clique em Atualizar."

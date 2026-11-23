@@ -1020,7 +1020,7 @@
     <script src="virar_pedido.js?v=202611231000"></script>
     <script src="impressao_pdf.js?v=202611231000"></script>
     <script src="peso_tela.js?v=202610290900"></script>
-    <script src="regras_tela.js?v=202611231500"></script>
+    <script src="regras_tela.js?v=202611231600"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script src="auditoria_calculo.js?v=202611191400"></script>
     <script>
@@ -2826,12 +2826,13 @@
             clearTimeout(timerAvisoRapido);
             timerAvisoRapido = setTimeout(() => caixa.replaceChildren(), 4000);
         }
-        // R10: na primeira vírgula/ponto o resto é descartado (nunca '2100,5' -> '21005') e a tela avisa o que tirou
+        // I2: o primeiro vírgula/ponto FICA no campo (o resto é descartado: '2100,5' -> '2100,', nunca '21005'); a tela avisa e adicionarItem recusa até apagar
         document.addEventListener('input', e => {
             const el = e.target;
             if (!el || !el.matches || !el.matches('[data-inteiro]')) return;
             const r = RegrasTela.filtrarInteiro(el.value);
-            if (r.removeu) { el.value = r.valor; avisoRapido(RegrasTela.textoFiltroInteiro(r)); }
+            if (r.removeu) el.value = r.valor;
+            if (r.removeu || r.decimal) avisoRapido(RegrasTela.textoFiltroInteiro(r));
         }, true);
         // campos estáticos (id, rótulo); só os visíveis entram, os escondidos pertencem a outra frente
         const CAMPOS_TEXTO_INTEIRO = [['f-qtd', 'Quantidade'], ['f-altura', 'Altura'], ['f-largura', 'Largura'], ['f-transpasse', 'Transpasse'],

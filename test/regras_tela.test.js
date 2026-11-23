@@ -189,13 +189,32 @@ test('conferência do texto cru cobre os campos estáticos e as linhas dinâmica
   assert.ok(corpoDe('async function inserirPecaSerr').includes('textoCruNaoInteiro'));
 });
 
-test('filtrarInteiro + textoFiltroInteiro (R10): diz se algo foi removido e se era decimal, para o aviso visível', () => {
-  assert.deepEqual(R.filtrarInteiro('2100,5'), { valor: '2100', removeu: true, decimal: true });
-  assert.deepEqual(R.filtrarInteiro('2100'), { valor: '2100', removeu: false, decimal: false });
-  assert.deepEqual(R.filtrarInteiro('21a'), { valor: '21', removeu: true, decimal: false });
+test('filtrarInteiro (I2): mantém o PRIMEIRO separador e descarta o que vem depois (digitar tecla a tecla nunca vira 21005)', () => {
+  const casos = [['2100,5', '2100,'], ['2100,', '2100,'], ['150.5', '150.'], ['1.234,5', '1.'], [',5', ','], ['12 a 3', '123'], ['', ''], ['abc', ''], ['2100', '2100']];
+  for (const [entrada, saida] of casos) assert.equal(R.filtrarInteiro(entrada).valor, saida, JSON.stringify(entrada));
+  // digitar 2100,5 tecla a tecla: o campo nunca chega a 21005
+  let campo = '';
+  for (const tecla of '2100,5') campo = R.filtrarInteiro(campo + tecla).valor;
+  assert.equal(campo, '2100,');
+  assert.equal(R.filtrarInteiro('2100,').removeu, false);
+  assert.equal(R.filtrarInteiro('2100,').decimal, true);
+  assert.equal(R.filtrarInteiro('2100,5').removeu, true);
+  assert.equal(R.filtrarInteiro('2100').decimal, false);
+  assert.equal(R.filtrarInteiro('21a').removeu, true);
+});
+
+test('textoFiltroInteiro (I2): avisa o que fazer quando há separador; letras têm aviso próprio; nada a avisar = vazio', () => {
   assert.equal(R.textoFiltroInteiro(R.filtrarInteiro('2100')), '');
-  assert.match(R.textoFiltroInteiro(R.filtrarInteiro('2100,5')), /depois da vírgula\/ponto foi descartada/);
+  assert.match(R.textoFiltroInteiro(R.filtrarInteiro('2100,')), /apague a vírgula\/ponto/);
+  assert.match(R.textoFiltroInteiro(R.filtrarInteiro('2100,5')), /apague a vírgula\/ponto/);
   assert.match(R.textoFiltroInteiro(R.filtrarInteiro('21a')), /letras, sinais e espaços/);
+});
+
+test('campo com o separador mantido (2100,) é recusado pela conferência do texto cru até apagar a vírgula', () => {
+  const mantido = R.filtrarInteiro('2100,5').valor;
+  assert.deepEqual(R.camposComNaoDigito([{ rotulo: 'Altura', valor: mantido }]), ['Altura']);
+  assert.deepEqual(R.camposComNaoDigito([{ rotulo: 'Altura', valor: R.filtrarInteiro('2100').valor }]), []);
+  assert.match(R.textoNaoInteiro(['Altura']), /Só números inteiros \(sem vírgula, ponto, sinal ou letra\) em: Altura/);
 });
 
 test('filtro de dígitos (R10): mostra um aviso não bloqueante (toast no #toasts, classes do tema) quando algo foi removido', () => {

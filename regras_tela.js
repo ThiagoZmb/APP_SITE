@@ -10,23 +10,25 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Filtro dos campos de tamanho/quantidade (digitar e colar). Decisão R10 (revisão final): na PRIMEIRA vírgula ou ponto o resto é
-  // descartado ('2100,5' -> '2100', nunca '21005', que seria dez vezes maior); antes disso, letra, sinal e espaço só são tirados.
-  // Devolve { valor, removeu, decimal }: removeu = o texto mudou (a tela avisa); decimal = havia vírgula/ponto (parte depois dela sumiu).
+  // Filtro dos campos de tamanho/quantidade (digitar e colar). Decisão I2: o PRIMEIRO separador (vírgula ou ponto) FICA no campo e tudo o que vem
+  // depois dele é descartado ('2100,5' -> '2100,'); assim digitar tecla a tecla nunca vira '21005' (dez vezes maior) e a conferência do texto
+  // cru em adicionarItem (camposComNaoDigito) recusa o item até a pessoa apagar o separador. Antes do separador, letra, sinal e espaço só são tirados.
+  // Devolve { valor, removeu, decimal }: removeu = o texto mudou; decimal = há vírgula/ponto no campo (a tela avisa nos dois casos).
   function filtrarInteiro(texto) {
     const t = String(texto == null ? '' : texto);
     const corte = t.search(/[.,]/);
-    const valor = (corte >= 0 ? t.slice(0, corte) : t).replace(/\D/g, '');
+    const digitos = (corte >= 0 ? t.slice(0, corte) : t).replace(/\D/g, '');
+    const valor = corte >= 0 ? digitos + t.charAt(corte) : digitos;
     return { valor, removeu: valor !== t, decimal: corte >= 0 };
   }
   function soDigitos(texto) {
-    return filtrarInteiro(texto).valor;
+    return filtrarInteiro(texto).valor.replace(/\D/g, '');
   }
-  // Aviso curto (não bloqueia) quando o filtro mexeu no que foi digitado/colado; vazio = nada a avisar
+  // Aviso curto (não bloqueia) quando há separador no campo ou o filtro mexeu no que foi digitado/colado; vazio = nada a avisar
   function textoFiltroInteiro(r) {
-    if (!r || !r.removeu) return '';
-    return r.decimal ? 'Só números inteiros: a parte depois da vírgula/ponto foi descartada. Confira o valor.'
-      : 'Só números inteiros: letras, sinais e espaços foram tirados.';
+    if (!r) return '';
+    if (r.decimal) return 'Só números inteiros: apague a vírgula/ponto.';
+    return r.removeu ? 'Só números inteiros: letras, sinais e espaços foram tirados.' : '';
   }
 
   // Campos de origem do item no corpo de POST /ped_orc/salvar (gravar() em orcamentos.html).
