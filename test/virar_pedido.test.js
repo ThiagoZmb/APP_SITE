@@ -208,3 +208,30 @@ test('observações gerais: sem o campo vale a do orçamento; com o campo (mesmo
   assert.equal(banco.pedOrc.find(p => p.TIPO === 'Pedido' && p.NUMERO === n2).OBS_GERAL, 'Só avisar antes de entregar');
   assert.equal(banco.pedOrc.find(p => p.TIPO === 'Orçamento').OBS_GERAL, 'Obs geral', 'o orçamento não muda');
 });
+
+// C1 (revisão final do livro de regras): o corpo de virar_pedido é montado pelo SERVIDOR a partir do orçamento gravado;
+// os itens são cópias sem mudança e não passam de novo pelo livro de regras (só itens_minimo, do documento, continua valendo).
+test('livro de regras: orçamento com porta sem revestimento (confirmada ao salvar) vira pedido (200)', async t => {
+  const ctx = await prepararPedOrc(t);
+  const it = item(); it.detalhes = { ...it.detalhes, revestimento: '' }; it.confirmacoes = ['sem_revestimento'];
+  const r0 = await ctx.chamar('/ped_orc/salvar', 'POST', { ...corpoOrc, itens: [it] });
+  assert.equal(r0.status, 200, JSON.stringify(await r0.clone().json()));
+  const r = await ctx.chamar(URL((await r0.json()).numero), 'POST', { dataPronto: '2026-12-01' });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(ctx.banco.pedOrc.filter(p => p.TIPO === 'Pedido').length, 1);
+});
+
+test('livro de regras: orçamento antigo (gravado antes das regras/VB) que viola um "bloqueia" vira pedido mesmo assim — decisão: documento já gravado não é revalidado', async t => {
+  const { banco, chamar, numeroOrc } = await comOrcamento(t);
+  // simula o orçamento antigo: o acabamento do perfil some no banco (o livro bloquearia "Escolha o acabamento do perfil.")
+  for (const l of banco.itensV4.filter(x => x.TIPO === 'Orçamento')) l.ACABAMENTO_PERFIL = null;
+  const r = await chamar(URL(numeroOrc), 'POST', { dataPronto: '2026-12-01' });
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(banco.pedOrc.filter(p => p.TIPO === 'Pedido').length, 1);
+});
+
+test('livro de regras: a opção interna de virar_pedido não vem do corpo da requisição (campos forjados não mudam nada)', () => {
+  const src = ler('rotas/ped_orc.js');
+  assert.match(src, /gravarDocumento\(req, res, corpo\.corpo, \{ origemServidor: true,/);
+  assert.ok(!/b\.origemServidor|req\.body\.origemServidor|\(req\.body \|\| \{\}\)\.origemServidor/.test(src), 'nunca lida do corpo');
+});

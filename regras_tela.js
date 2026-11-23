@@ -10,9 +10,35 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // Só dígitos: tira vírgula, ponto, sinal, letra e espaço (digitar e colar)
+  // Filtro dos campos de tamanho/quantidade (digitar e colar). Decisão R10 (revisão final): na PRIMEIRA vírgula ou ponto o resto é
+  // descartado ('2100,5' -> '2100', nunca '21005', que seria dez vezes maior); antes disso, letra, sinal e espaço só são tirados.
+  // Devolve { valor, removeu, decimal }: removeu = o texto mudou (a tela avisa); decimal = havia vírgula/ponto (parte depois dela sumiu).
+  function filtrarInteiro(texto) {
+    const t = String(texto == null ? '' : texto);
+    const corte = t.search(/[.,]/);
+    const valor = (corte >= 0 ? t.slice(0, corte) : t).replace(/\D/g, '');
+    return { valor, removeu: valor !== t, decimal: corte >= 0 };
+  }
   function soDigitos(texto) {
-    return String(texto == null ? '' : texto).replace(/\D/g, '');
+    return filtrarInteiro(texto).valor;
+  }
+  // Aviso curto (não bloqueia) quando o filtro mexeu no que foi digitado/colado; vazio = nada a avisar
+  function textoFiltroInteiro(r) {
+    if (!r || !r.removeu) return '';
+    return r.decimal ? 'Só números inteiros: a parte depois da vírgula/ponto foi descartada. Confira o valor.'
+      : 'Só números inteiros: letras, sinais e espaços foram tirados.';
+  }
+
+  // Campos de origem do item no corpo de POST /ped_orc/salvar (gravar() em orcamentos.html).
+  // Sem conversão: o item aberto do banco vai com `origem` (cópia/edição conferida pela impressão digital).
+  // Conversão (tipo trocado, ex.: orçamento virando pedido): item do banco SEM edição (intacto ou só %) vai como `conversaoDe` e o servidor o
+  // remonta do documento gravado (sem revalidar o livro de regras); `desenhoDe` leva o desenho. Editado ou novo: nada (é item novo).
+  function origemNoCorpo(it, converte) {
+    const o = it && it.origem;
+    if (!o) return {};
+    if (!converte) return { origem: o };
+    if (o.estado === 'intacto' || o.estado === 'so_pct') return { conversaoDe: { item: o.item, estado: o.estado }, desenhoDe: o.item };
+    return {};
   }
 
   // campos = [{ rotulo, valor }] com o TEXTO CRU digitado; devolve os rótulos que têm algo além de dígitos (vazio não conta)
@@ -66,10 +92,22 @@
     return { ok: a.ok, confirmacoes: a.confirmacoes, mensagem: a.bloqueios.length ? 'Corrija antes de adicionar o item:\n\n- ' + a.bloqueios.join('\n- ') : '', login: false };
   }
 
+  // Põe o item conferido na lista DEPOIS da consulta ao servidor. `antigo` = o objeto do item em edição capturado ANTES da consulta
+  // (nunca o índice lido depois: durante a ida ao servidor a lista pode mudar). Novo (antigo null) entra no fim.
+  // Editado: substitui o MESMO objeto onde ele estiver agora, herdando a origem dele como 'editado'; se ele saiu da lista, nada muda (false).
+  function colocarNaLista(itens, item, antigo) {
+    if (!antigo) { itens.push(item); return true; }
+    const pos = itens.indexOf(antigo);
+    if (pos < 0) return false;
+    if (antigo.origem) item.origem = { item: antigo.origem.item, estado: 'editado' }; // o servidor recalcula com o preço de hoje
+    itens[pos] = item;
+    return true;
+  }
+
   // Item com SÓ as confirmações dadas agora: nunca herda as do item antigo (na edição a confirmação é pedida de novo)
   function comConfirmacoes(item, aceitas) {
     return Object.assign({}, item, { confirmacoes: Array.isArray(aceitas) ? aceitas.slice() : [] });
   }
 
-  return { soDigitos, camposComNaoDigito, textoNaoInteiro, textoConfirmacao, avaliar, decidirConsulta, comConfirmacoes };
+  return { filtrarInteiro, soDigitos, textoFiltroInteiro, origemNoCorpo, camposComNaoDigito, textoNaoInteiro, textoConfirmacao, avaliar, decidirConsulta, colocarNaLista, comConfirmacoes };
 });

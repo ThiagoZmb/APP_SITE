@@ -559,11 +559,15 @@
         .avl-hist b { color: var(--warning-fg); }
         .avl-acoes { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 20px; background: var(--white); border-top: 1px solid var(--border-color); }
         html body .avl-acoes .btn-primary { min-width: 120px; }
+        /* aviso curto do filtro de inteiros (aparência .toast no tema.css) */
+        #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 10px; z-index: 60; max-width: calc(100vw - 32px); }
+        #toasts .toast { max-width: 380px; font-size: 14px; }
     </style>
     <link rel="stylesheet" href="auditoria_calculo.css?v=202611111800">
     <script src="layout.js?v=202611251100" defer></script>
 </head>
 <body>
+    <div id="toasts" aria-live="polite"></div>
     <div class="container">
         <header>
             <div class="logo" id="user-empresa"></div>
@@ -1016,7 +1020,7 @@
     <script src="virar_pedido.js?v=202611231000"></script>
     <script src="impressao_pdf.js?v=202611231000"></script>
     <script src="peso_tela.js?v=202610290900"></script>
-    <script src="regras_tela.js?v=202611231100"></script>
+    <script src="regras_tela.js?v=202611231500"></script>
     <script src="leitura_pdf.js?v=202610262000"></script>
     <script src="auditoria_calculo.js?v=202611191400"></script>
     <script>
@@ -2809,11 +2813,25 @@
         };
         // Livro de regras (docs/superpowers/specs/2026-11-23-livro-de-regras-design.md): tamanhos e quantidades só inteiros.
         // O filtro roda em fase de captura para limpar o texto ANTES dos outros ouvintes de 'input' lerem o campo (digitar e colar).
+        // Aviso curto e não bloqueante no canto (#toasts; aparência .toast do tema.css); um por vez, some sozinho
+        let timerAvisoRapido = 0;
+        function avisoRapido(texto) {
+            const caixa = document.getElementById('toasts');
+            if (!caixa || !texto) return;
+            caixa.replaceChildren();
+            const t = document.createElement('div');
+            t.className = 'toast info';
+            t.textContent = texto;
+            caixa.appendChild(t);
+            clearTimeout(timerAvisoRapido);
+            timerAvisoRapido = setTimeout(() => caixa.replaceChildren(), 4000);
+        }
+        // R10: na primeira vírgula/ponto o resto é descartado (nunca '2100,5' -> '21005') e a tela avisa o que tirou
         document.addEventListener('input', e => {
             const el = e.target;
             if (!el || !el.matches || !el.matches('[data-inteiro]')) return;
-            const limpo = RegrasTela.soDigitos(el.value);
-            if (limpo !== el.value) el.value = limpo;
+            const r = RegrasTela.filtrarInteiro(el.value);
+            if (r.removeu) { el.value = r.valor; avisoRapido(RegrasTela.textoFiltroInteiro(r)); }
         }, true);
         // campos estáticos (id, rótulo); só os visíveis entram, os escondidos pertencem a outra frente
         const CAMPOS_TEXTO_INTEIRO = [['f-qtd', 'Quantidade'], ['f-altura', 'Altura'], ['f-largura', 'Largura'], ['f-transpasse', 'Transpasse'],
@@ -2870,19 +2888,17 @@
             Object.assign(item, AuditoriaCalculo.valorAoAtualizar({ valorCampo: item.valor, editando: editandoIndex >= 0,
                 campoTemSalvo: !!(edicaoPreco && edicaoPreco.campoTemSalvo), antigo: editandoIndex >= 0 ? itens[editandoIndex] : null,
                 baseSalva: edicaoPreco && edicaoPreco.base, fatorHistorico }));
+            // item em edição e desenho capturados ANTES da ida ao servidor (durante a consulta a lista e o formulário não podem decidir nada)
+            const antigo = editandoIndex >= 0 ? itens[editandoIndex] : null;
+            const desenho = capturarDesenho();
             // livro de regras: o servidor confere o item (sem o desenho); na edição a confirmação é pedida de novo (nunca reaproveita a do item antigo)
             consultandoRegras = true;
             let regras;
             try { regras = await consultarRegras(item); } finally { consultandoRegras = false; }
             if (!regras.ok) return;
             Object.assign(item, RegrasTela.comConfirmacoes(item, regras.confirmacoes)); // só as de agora, nunca as do item antigo
-            definirDesenho(item, capturarDesenho());
-            if (editandoIndex >= 0) {
-                const antigo = itens[editandoIndex];
-                if (antigo.origem) item.origem = { item: antigo.origem.item, estado: 'editado' }; // o servidor recalcula com o preço de hoje
-                itens[editandoIndex] = item; editandoIndex = -1;
-            }
-            else itens.push(item);
+            definirDesenho(item, desenho);
+            if (!RegrasTela.colocarNaLista(itens, item, antigo)) { alert('O item que estava sendo editado saiu da lista; nada foi alterado.'); return; }
             renderItens();
             limparForm();
         }
@@ -2956,6 +2972,7 @@
             atualizarPesoLista();
         }
         function editarItem(i) {
+            if (consultandoRegras) return; // conferindo outro item no servidor: a lista fica parada até a resposta
             const it = itens[i];
             clearTimeout(timerPreco); seqPreco++; definirPrecoPendente(false); // nada de resposta antiga caindo no item aberto
             // manter: o valor do banco fica no campo e nada recalcula sozinho; campoTemSalvo: o campo ainda tem o valor salvo
@@ -2982,6 +2999,7 @@
         // Copia o item inteiro para o fim da lista; o nº do item é a posição, então a cópia recebe o próximo número.
         // Sem "origem": a cópia é item novo (o servidor calcula do zero), não "intacto" do documento aberto.
         function copiarItem(i) {
+            if (consultandoRegras) return;
             const it = itens[i];
             if (!it || it.travado) return;
             const copia = JSON.parse(JSON.stringify(it));
@@ -2991,6 +3009,7 @@
             renderItens();
         }
         function removerItem(i) {
+            if (consultandoRegras) return;
             if (!confirm('Remover este item do orçamento?')) return;
             itens.splice(i, 1);
             renderItens();
@@ -3663,6 +3682,8 @@
                 ...(modo === 'novo' && docAberto?.impressao && !converte ? { origemDocumento: { tipo: docAberto.tipo, numero: docAberto.numero } } : {}),
                 // orçamento virando pedido: os desenhos dos itens que não mudaram acompanham (o servidor confere o carimbo)
                 ...(converte && docAberto.tipo === 'Orçamento' ? { origemDesenhos: { tipo: 'Orçamento', numero: docAberto.numero } } : {}),
+                // conversão: itens do banco sem edição são remontados pelo servidor a partir do documento gravado (conferido pela impressão digital)
+                ...(converte && docAberto.impressao ? { origemConversao: { tipo: docAberto.tipo, numero: docAberto.numero, impressao: docAberto.impressao } } : {}),
                 clienteCodigo: $s('sel-cliente').value,
                 clienteFinal: $s('ped-cliente-final').value, obsGeral: $s('ped-obs').value,
                 dataEntrega: $s('ped-entrega').value,
@@ -3677,8 +3698,8 @@
                     // serralheria: o conjunto inteiro (peças, barras por eixo e complementos) — o servidor recalcula o preço com tudo isso
                     ...(it.frente === 'Serralheria' ? { pecas: it.pecas || [], complementos: (it.complementos || []).map(c => ({ id: c.id, qtd: c.qtd })),
                         qtdAltura: it.qtdAltura, qtdLargura: it.qtdLargura, qtdProfundidade: it.qtdProfundidade } : {}),
-                    ...(it.origem && !converte ? { origem: it.origem } : {}),
-                    ...(it.origem && converte && ['intacto', 'so_pct'].includes(it.origem.estado) ? { desenhoDe: it.origem.item } : {}) }))
+                    // origem (sem conversão) ou conversaoDe + desenhoDe (conversão, item do banco sem edição): regras em RegrasTela.origemNoCorpo
+                    ...RegrasTela.origemNoCorpo(it, converte) }))
             };
             let res, json = {};
             try {

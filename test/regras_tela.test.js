@@ -14,10 +14,16 @@ const corpoDe = (nome) => {
   return html.slice(ini, Math.min(...[prox, prox2].filter(n => n > 0)));
 };
 
-test('soDigitos: tira tudo que não é dígito (digitar e colar)', () => {
-  assert.equal(R.soDigitos('12,5'), '125');
+test('soDigitos (R10): corta na PRIMEIRA vírgula/ponto e descarta o resto (nunca vira número 10x maior); letra/sinal/espaço só são tirados', () => {
+  assert.equal(R.soDigitos('2100,5'), '2100');
+  assert.equal(R.soDigitos('150.5'), '150');
+  assert.equal(R.soDigitos('1.234'), '1', 'ponto de milhar também corta: a pessoa vê o aviso e corrige');
+  assert.equal(R.soDigitos('12,5'), '12');
+  assert.equal(R.soDigitos('abc12'), '12');
+  assert.equal(R.soDigitos(''), '');
+  assert.equal(R.soDigitos('12 a 3'), '123', 'colar "12 a 3": sem vírgula/ponto, só os não dígitos saem');
   assert.equal(R.soDigitos('-3'), '3');
-  assert.equal(R.soDigitos('1.200 mm'), '1200');
+  assert.equal(R.soDigitos('1.200 mm'), '1');
   assert.equal(R.soDigitos('abc'), '');
   assert.equal(R.soDigitos(null), '');
   assert.equal(R.soDigitos(40), '40');
@@ -131,8 +137,8 @@ test('adicionarItem: consulta o livro depois das checagens locais e do coletarFo
   const iColeta = a.indexOf('coletarForm()');
   const iValor = a.indexOf('item.valor <= 0');
   const iConsulta = a.indexOf('await consultarRegras(item)');
-  const iPush = a.indexOf('itens.push(item)');
-  const iEdit = a.indexOf('itens[editandoIndex] = item');
+  const iPush = a.indexOf('RegrasTela.colocarNaLista(itens, item, antigo)');
+  const iEdit = iPush;
   assert.ok(iCheck >= 0 && iCru > iCheck && iColeta > iCru, 'texto cru conferido antes do coletarForm');
   assert.ok(iValor > iColeta && iConsulta > iValor, 'consulta depois das checagens locais');
   assert.ok(iConsulta < iPush && iConsulta < iEdit, 'consulta antes de adicionar/atualizar');
@@ -140,7 +146,7 @@ test('adicionarItem: consulta o livro depois das checagens locais e do coletarFo
   assert.ok(a.includes('RegrasTela.comConfirmacoes(item, regras.confirmacoes)'), 'códigos aceitos agora vão em item.confirmacoes (função testada)');
   assert.ok(a.includes('consultandoRegras'), 'trava de clique duplo');
   // preserva o resto do fluxo
-  assert.ok(a.includes('definirDesenho(item, capturarDesenho())'));
+  assert.ok(a.includes('definirDesenho(item, desenho)'));
   assert.ok(a.includes('AuditoriaCalculo.valorAoAtualizar'));
 });
 
@@ -168,7 +174,7 @@ test('campos de tamanho e quantidade: texto numérico com data-inteiro; dinheiro
 });
 
 test('filtro de dígitos: um ouvinte de input em fase de captura limpa os campos data-inteiro (digitar e colar)', () => {
-  assert.match(html, /document\.addEventListener\('input', [^]*?\[data-inteiro\][^]*?RegrasTela\.soDigitos[^]*?, true\)/);
+  assert.match(html, /document\.addEventListener\('input', [^]*?\[data-inteiro\][^]*?RegrasTela\.filtrarInteiro[^]*?, true\)/);
 });
 
 test('nada na tela depende de type=number nos campos trocados', () => {
@@ -181,4 +187,72 @@ test('conferência do texto cru cobre os campos estáticos e as linhas dinâmica
   for (const id of ['f-altura', 'f-qtd', 'f-tamanho-pux', 'f-div-h', 'f-av-alt', 'f-soldas']) assert.ok(f.includes(id) || html.includes(`['${id}'`), id);
   assert.ok(f.includes('#pnl-furacoes input') && f.includes('.ac-qtd') && f.includes('.cp-qtd') && f.includes('#correr-larguras input'));
   assert.ok(corpoDe('async function inserirPecaSerr').includes('textoCruNaoInteiro'));
+});
+
+test('filtrarInteiro + textoFiltroInteiro (R10): diz se algo foi removido e se era decimal, para o aviso visível', () => {
+  assert.deepEqual(R.filtrarInteiro('2100,5'), { valor: '2100', removeu: true, decimal: true });
+  assert.deepEqual(R.filtrarInteiro('2100'), { valor: '2100', removeu: false, decimal: false });
+  assert.deepEqual(R.filtrarInteiro('21a'), { valor: '21', removeu: true, decimal: false });
+  assert.equal(R.textoFiltroInteiro(R.filtrarInteiro('2100')), '');
+  assert.match(R.textoFiltroInteiro(R.filtrarInteiro('2100,5')), /depois da vírgula\/ponto foi descartada/);
+  assert.match(R.textoFiltroInteiro(R.filtrarInteiro('21a')), /letras, sinais e espaços/);
+});
+
+test('filtro de dígitos (R10): mostra um aviso não bloqueante (toast no #toasts, classes do tema) quando algo foi removido', () => {
+  const ouvinte = html.match(/document\.addEventListener\('input', [^]*?, true\);/)[0];
+  assert.ok(ouvinte.includes('RegrasTela.filtrarInteiro(el.value)'));
+  assert.ok(ouvinte.includes('RegrasTela.textoFiltroInteiro'));
+  assert.ok(ouvinte.includes('avisoRapido('));
+  assert.ok(/<div id="toasts" aria-live="polite"><\/div>/.test(html));
+  const f = corpoDe('function avisoRapido');
+  assert.ok(f.includes("'toast info'") && f.includes('textContent') && !f.includes('innerHTML') && !/style\./.test(f));
+});
+
+test('origemNoCorpo (C1/R9): sem conversão vai a origem; na conversão, intacto/só % viram conversaoDe + desenhoDe; editado/novo vão sem nada', () => {
+  const o = { item: 3, estado: 'intacto' };
+  assert.deepEqual(R.origemNoCorpo({ origem: o }, false), { origem: o });
+  assert.deepEqual(R.origemNoCorpo({ origem: o }, true), { conversaoDe: { item: 3, estado: 'intacto' }, desenhoDe: 3 });
+  assert.deepEqual(R.origemNoCorpo({ origem: { item: 2, estado: 'so_pct' } }, true), { conversaoDe: { item: 2, estado: 'so_pct' }, desenhoDe: 2 });
+  assert.deepEqual(R.origemNoCorpo({ origem: { item: 2, estado: 'editado' } }, true), {});
+  assert.deepEqual(R.origemNoCorpo({}, true), {});
+  assert.deepEqual(R.origemNoCorpo({}, false), {});
+});
+
+test('salvar (C1/R9): a conversão manda origemConversao com a impressão digital e os campos de origem vêm de RegrasTela.origemNoCorpo', () => {
+  const g = corpoDe('async function gravar');
+  assert.ok(g.includes("...(converte && docAberto.impressao ? { origemConversao: { tipo: docAberto.tipo, numero: docAberto.numero, impressao: docAberto.impressao } } : {})"));
+  assert.ok(g.includes('...RegrasTela.origemNoCorpo(it, converte)'));
+  assert.ok(!g.includes("['intacto', 'so_pct'].includes(it.origem.estado) ? { desenhoDe"), 'desenhoDe agora sai de origemNoCorpo');
+});
+
+test('colocarNaLista (I1): usa o item em edição capturado ANTES da consulta, nunca o índice lido depois', () => {
+  const a = { n: 'A', origem: { item: 1, estado: 'intacto' } }, b = { n: 'B', origem: { item: 2, estado: 'intacto' } };
+  const lista = [a, b];
+  const novoA = { n: 'A2' };
+  assert.equal(R.colocarNaLista(lista, novoA, a), true);
+  assert.deepEqual(lista.map(x => x.n), ['A2', 'B']);
+  assert.deepEqual(novoA.origem, { item: 1, estado: 'editado' }, 'origem do A, não do B');
+  const l2 = [b, a];   // a lista mudou de ordem durante a consulta
+  const novo2 = { n: 'A3' };
+  R.colocarNaLista(l2, novo2, a);
+  assert.deepEqual(l2.map(x => x.n), ['B', 'A3']);
+  const l3 = [b];      // o item em edição saiu da lista: nada muda
+  assert.equal(R.colocarNaLista(l3, { n: 'X' }, a), false);
+  assert.deepEqual(l3.map(x => x.n), ['B']);
+  const l4 = [b];
+  assert.equal(R.colocarNaLista(l4, { n: 'N' }, null), true);
+  assert.deepEqual(l4.map(x => x.n), ['B', 'N']);
+});
+
+test('adicionarItem (I1): índice em edição e desenho capturados ANTES do await; lista travada durante a consulta', () => {
+  const a = corpoDe('async function adicionarItem');
+  const iAwait = a.indexOf('await consultarRegras(item)');
+  const iAntigo = a.indexOf('const antigo = editandoIndex >= 0 ? itens[editandoIndex] : null;');
+  const iDesenho = a.indexOf('const desenho = capturarDesenho();');
+  assert.ok(iAntigo >= 0 && iAntigo < iAwait, 'item em edição capturado antes');
+  assert.ok(iDesenho >= 0 && iDesenho < iAwait, 'desenho capturado antes');
+  const depois = a.slice(iAwait);
+  assert.ok(!depois.includes('capturarDesenho()') && !depois.includes('itens[editandoIndex]'), 'nada lido do estado da tela depois do await');
+  assert.ok(depois.includes('RegrasTela.colocarNaLista(itens, item, antigo)'));
+  for (const f of ['function editarItem', 'function copiarItem', 'function removerItem']) assert.ok(corpoDe(f).includes('if (consultandoRegras) return;'), f);
 });

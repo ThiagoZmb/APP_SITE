@@ -19,6 +19,13 @@ function inteiroOuNull(v) {
 const texto = v => (v == null ? '' : String(v).trim());
 const det = item => (item && item.detalhes && typeof item.detalhes === 'object' ? item.detalhes : {});
 
+// Acabamento do puxador que o motor usa de fato: com puxador, o do perfil; sem ele, o do puxador
+// (mesma leitura de acabamentoDoPuxador em precos.js e de folhasDoItem com acabPuxadorDoPerfil em engenharia.js). Sem puxador: o do campo.
+function acabamentoEfetivoDoPuxador(item) {
+  const d = det(item);
+  return texto(d.puxador) ? (texto(d.acabamento) || texto(d.acabPux)) : texto(d.acabPux);
+}
+
 function ehPorta(item) {
   return FRENTES_PORTA.includes(texto(item && item.frente).toLowerCase());
 }
@@ -84,7 +91,8 @@ const REGRAS = Object.freeze([
   {
     codigo: 'acabamento_puxador', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.ITEM,
     titulo: 'Porta com puxador exige acabamento do puxador',
-    verifica: item => (ehPorta(item) && texto(det(item).puxador) && !texto(det(item).acabPux) ? 'Escolha o acabamento do puxador.' : null),
+    // só quando nem o puxador nem o perfil têm acabamento: com o do perfil, o sistema completa (o puxador usa o do perfil)
+    verifica: item => (ehPorta(item) && texto(det(item).puxador) && !acabamentoEfetivoDoPuxador(item) ? 'Escolha o acabamento do puxador.' : null),
   },
   {
     codigo: 'cor_obrigatoria', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.ITEM,
@@ -93,7 +101,8 @@ const REGRAS = Object.freeze([
       if (!ehPorta(item)) return null;
       const d = det(item);
       if (tipoCorDoAcabamento(d.acabamento) && !texto(d.cor)) return 'Escolha a cor do perfil.';
-      if (tipoCorDoAcabamento(d.acabPux) && !texto(d.corPux)) return 'Escolha a cor do puxador.';
+      // cor do puxador = corPux (o motor grava corPuxador = corPux, sem cair na do perfil); o acabamento é o efetivo
+      if (tipoCorDoAcabamento(acabamentoEfetivoDoPuxador(item)) && !texto(d.corPux)) return 'Escolha a cor do puxador.';
       return null;
     },
   },
@@ -159,4 +168,4 @@ const avaliar = item => rodar(ESCOPOS.ITEM, item);
 const avaliarDocumento = corpo => rodar(ESCOPOS.DOCUMENTO, corpo);
 const livro = () => REGRAS.map(({ codigo, nivel, escopo, titulo }) => ({ codigo, nivel, escopo, titulo }));
 
-module.exports = { CAMPOS_INTEIROS, LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, dimensaoDaPortaParaPuxador, REGRAS, avaliar, avaliarDocumento, livro };
+module.exports = { CAMPOS_INTEIROS, LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, acabamentoEfetivoDoPuxador, dimensaoDaPortaParaPuxador, REGRAS, avaliar, avaliarDocumento, livro };

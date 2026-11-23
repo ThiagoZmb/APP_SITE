@@ -149,9 +149,12 @@ class ErroItem extends Error {
 }
 
 // Validação do corpo, na ordem e com as mensagens do VB (SalvarPedidoOrçamentoToolStripMenuItem_Click)
-function validar(b) {
+// itensDoServidor (opção INTERNA, nunca lida do corpo): posições dos itens que o próprio servidor montou a partir de um documento já
+// gravado (virar_pedido e a conversão da tela); são cópias sem mudança e não passam de novo pelo livro de regras (mesma razão do 'intacto').
+function validar(b, { itensDoServidor = new Set() } = {}) {
   const erroDoc = Regras.avaliarDocumento(b).find(r => r.nivel === Regras.NIVEIS.BLOQUEIA);   // fonte única: itens_minimo (mesma mensagem do VB)
   if (erroDoc) return erroDoc.mensagem;
+  if (!Array.isArray(b.itens)) return 'Favor inserir pelomenos 1 item no pedido!';   // guarda: nunca 500, qualquer que seja o nível de itens_minimo
   if (b.itens.length > MAX_ITENS) return `No máximo ${MAX_ITENS} itens por documento.`;
   if (!String(b.clienteCodigo ?? '').trim()) return 'Favor selecionar um cliente!';
   if (!TIPOS.includes(b.tipo)) return "Favor escolher entre 'Pedido' ou 'Orçamento' !";
@@ -189,12 +192,14 @@ function validar(b) {
       }
     }
     // livro de regras (calculo/regras_item.js): bloqueia sempre recusa; confirma exige o código em item.confirmacoes; avisa nunca bloqueia
+    if (itensDoServidor.has(i)) continue;
     const achados = Regras.avaliar(it);
+    const comoResolver = ` Para resolver, abra o item ${i + 1} (✏️) e clique em Atualizar.`;
     const bloqueio = achados.find(r => r.nivel === Regras.NIVEIS.BLOQUEIA);
-    if (bloqueio) return `Item ${i + 1}: ${bloqueio.mensagem}`;
+    if (bloqueio) return `Item ${i + 1}: ${bloqueio.mensagem}${comoResolver}`;
     const confirmadas = Array.isArray(it.confirmacoes) ? it.confirmacoes : [];
     const pendente = achados.find(r => r.nivel === Regras.NIVEIS.CONFIRMA && !confirmadas.includes(r.codigo));
-    if (pendente) return `Item ${i + 1}: confirmação pendente — ${pendente.mensagem}`;
+    if (pendente) return `Item ${i + 1}: confirmação pendente — ${pendente.mensagem}${comoResolver}`;
   }
   return null;
 }
@@ -583,11 +588,49 @@ function registrarPedOrc({ rota, pool }) {
 
   // Salvar_Ped_Orc_Blindado: novo número ou atualizar, tudo numa transação
   // `aoGravar(conn, numero, tipo)` (opcional): roda DENTRO da mesma transação, depois de tudo gravado (ex.: auditoria de "orçamento virou pedido")
-  async function gravarDocumento(req, res, b, { aoGravar } = {}) {
+  // Orçamento aberto na tela com o tipo trocado e salvo ("converte" de gravar() em orcamentos.html): cada item que veio do banco SEM edição
+  // chega com `conversaoDe` = { item, estado: 'intacto' | 'so_pct' } e é REMONTADO aqui a partir do documento gravado (conferido pela impressão
+  // digital em `origemConversao`), como faz virar_pedido; do corpo só vêm a % e o valor do 'so_pct'. Os itens são gerados do zero depois
+  // (vidros/perfis do pedido), não copiados. Devolve as posições remontadas (o livro de regras não as revalida) ou lança ErroUsuario.
+  async function remontarConversao(req, b) {
+    const posicoes = new Set();
+    const marcados = (Array.isArray(b.itens) ? b.itens : []).map((it, i) => [it, i]).filter(([it]) => it && typeof it === 'object' && it.conversaoDe != null);
+    if (!marcados.length) return posicoes;
+    const oc = b.origemConversao;
+    if (!(oc && TIPOS.includes(oc.tipo) && oc.tipo !== b.tipo && Number.isInteger(oc.numero) && oc.numero > 0 && typeof oc.impressao === 'string' && oc.impressao))
+      throw new ErroUsuario(400, 'Documento de origem não informado.');
+    const linhas = await lerDocumento(pool, oc.tipo, oc.numero);
+    if (!linhas || impressaoDigital(linhas, oc.tipo) !== oc.impressao) throw new ErroUsuario(409, MSG_ALTERADO, { erro: 'alterado' });
+    const { cli, itens: doBanco } = await traduzirDoBanco(pool, leitor, linhas);
+    if (foraDosEstados(req, cli?.ESTADO)) throw new ErroUsuario(403, MSG_SEM_ACESSO);
+    for (const [it, i] of marcados) {
+      const c = it.conversaoDe;
+      const k = c && c.item;
+      const src = c && ['intacto', 'so_pct'].includes(c.estado) && Number.isInteger(k) && k > 0
+        ? doBanco.find(x => x.origem && x.origem.estado === 'intacto' && x.origem.item === k) : null;
+      if (!src) throw new ErroUsuario(400, `Item ${i + 1}: não pertence a este documento.`);
+      b.itens[i] = { ...OrcamentoPedido.itemParaGravar(src), desenhoDe: k,
+        ...(c.estado === 'so_pct' ? { historico: it.historico || '', valorTela: it.valorTela } : {}) };
+      posicoes.add(i);
+    }
+    return posicoes;
+  }
+
+  async function gravarDocumento(req, res, b, { aoGravar, origemServidor = false } = {}) {
     if (b.tipo === 'Pedido' && !req.acesso.permissoes.has('pedidos.criar'))
       return res.status(403).json({ error: 'Sem permissão para salvar como pedido.', faltando: ['pedidos.criar'] });
     if (b.tipo === 'Pedido') { b.situacao = canonico(SITUACOES_PEDIDO, b.situacao) ?? b.situacao; b.financeiro = canonico(FINANCEIROS, b.financeiro) ?? b.financeiro; }
-    const erro = validar(b);
+    // origemServidor: só virar_pedido passa (o corpo inteiro foi montado aqui a partir do orçamento gravado); nunca vem da requisição
+    let itensDoServidor;
+    try {
+      itensDoServidor = origemServidor ? new Set((Array.isArray(b.itens) ? b.itens : []).map((_, i) => i)) : await remontarConversao(req, b);
+    } catch (err) {
+      if (err instanceof ErroUsuario) return res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
+      if (err instanceof ErroCadastro) return res.status(503).json({ error: 'Não foi possível salvar: erro ao ler o cadastro. Nada foi gravado; tente de novo.', codigo: 'erro_cadastro' });
+      console.error('Erro POST /ped_orc/salvar (conversão):', err.message);
+      return res.status(500).json({ error: 'Erro de servidor' });
+    }
+    const erro = validar(b, { itensDoServidor });
     if (erro) return res.status(400).json({ error: erro });
 
     let cliente, preparados = [];
@@ -762,7 +805,8 @@ function registrarPedOrc({ rota, pool }) {
         }
       }
       const detalhe = { cliente: cabecalho.razaoSocial, dataPronto: p.valores.dataPronto, financeiro: p.valores.financeiro, situacao: p.valores.situacao };
-      await gravarDocumento(req, res, corpo.corpo, { aoGravar: async (conn, novo) => {
+      // origemServidor: corpo montado AQUI a partir do orçamento gravado; os itens não passam de novo pelo livro de regras (só itens_minimo)
+      await gravarDocumento(req, res, corpo.corpo, { origemServidor: true, aoGravar: async (conn, novo) => {
         await auditarDoc(conn, req, 'orcamento_virou_pedido', 'Pedido', novo, { orcamento: numero, ...detalhe });
         await auditarDoc(conn, req, 'orcamento_virou_pedido', 'Orçamento', numero, { pedido: novo, ...detalhe });
       } });
