@@ -59,7 +59,8 @@
         { href: 'danfe_envio.html', texto: 'Enviar arquivos', icone: 'financeiro', sub: true },   // subitem do Financeiro (envio dos PDFs das notas fiscais e vínculo com o pedido)
         { href: 'gestao.html', texto: 'Central de Gestão', icone: 'gestao', sub: true },   // subitem do Financeiro (metas, caixa e orçamento)
         { href: 'usuarios.html', texto: 'Usuários', icone: 'usuarios' },
-        { href: 'portal_admin.html', texto: 'Portal do cliente', icone: 'usuarios', sub: true }   // subitem de Usuários (liberar empresas do portal e convidar)
+        { href: 'portal_admin.html', texto: 'Portal do cliente', icone: 'usuarios', sub: true },   // subitem de Usuários (liberar empresas do portal e convidar)
+        { href: 'regras.html', texto: 'Livro de regras', icone: 'usuarios', sub: true }   // subitem de Usuários (regras que o sistema confere ao salvar; só leitura)
     ];
     // ----- Modo atendimento: o cliente acompanha o orçamento na tela, então o vendedor não mostra dados gerais da empresa -----
     // Quem tem 'atendimento.modo' começa cada sessão com o modo ligado e pode desligar/ligar a qualquer momento (botão no topo).
@@ -110,6 +111,7 @@
         'corte_vidros.html': ['corte.ver'],
         'usuarios.html': ['admin.usuarios'],
         'portal_admin.html': ['portal.gerir'],
+        'regras.html': ['administrativo.ver'],
         'etapas_producao.html': ['etapas.ver'],   // antes de minhas_entregas: quem só tem as etapas (chão de fábrica) cai aqui depois do login
         'minhas_entregas.html': [{ algum: ['entregas.baixar', 'administrativo.ver'] }]   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre; o administrativo (+ entregas.ver, o servidor confere) vê todas as entregas e dá a baixa
     };

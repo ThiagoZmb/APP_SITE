@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Livro de regras</title>
+    <link rel="stylesheet" href="regras.css?v=202611231800">
+    <link rel="stylesheet" href="tema.css?v=202611271000">
+    <script src="layout.js?v=202611251100" defer></script>
+    <script src="entregas_comum.js?v=202611281000" defer></script>
+    <script src="regras.js?v=202611231800" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Livro de regras</h1>
+            <p class="welcome-subtitle">As regras que o sistema confere ao adicionar um item ou salvar um orçamento ou pedido. Três níveis: Bloqueia não deixa adicionar nem salvar; Pergunta pede confirmação antes de seguir; Avisa mostra um alerta, mas deixa seguir.</p>
+
+            <section class="painel">
+                <div class="tabela-wrap" id="regras-corpo"><p class="vazio">Carregando…</p></div>
+            </section>
+
+            <section class="painel">
+                <div class="painel-corpo">
+                    <h2>Limites atuais</h2>
+                    <div id="limites"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>
