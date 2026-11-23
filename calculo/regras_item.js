@@ -23,6 +23,17 @@ function ehPorta(item) {
   return FRENTES_PORTA.includes(texto(item && item.frente).toLowerCase());
 }
 
+// Mesma leitura do motor (precos.js ~317): posição TOPO/BASE = puxador horizontal (largura); outra posição = vertical (altura); sem posição, a maior das duas.
+function dimensaoDaPortaParaPuxador(item) {
+  const d = det(item);
+  const a = inteiroOuNull(item && item.altura), l = inteiroOuNull(item && item.largura);
+  const pos = texto(Array.isArray(d.posicoesFolhas) && d.posicoesFolhas.length ? d.posicoesFolhas[0] : d.posicao).toUpperCase();
+  if (pos && (pos.includes('TOPO') || pos.includes('BASE'))) return l != null ? l : null;
+  if (pos) return a != null ? a : null;
+  if (a == null && l == null) return null;
+  return Math.max(a == null ? 0 : a, l == null ? 0 : l);
+}
+
 const REGRAS = Object.freeze([
   {
     codigo: 'itens_minimo', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.DOCUMENTO,
@@ -68,6 +79,26 @@ const REGRAS = Object.freeze([
       return null;
     },
   },
+  {
+    codigo: 'puxador_embutido_limites', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.ITEM,
+    titulo: 'Puxador embutido entre ' + LIMITES.puxadorEmbutidoMinMm + ' e ' + LIMITES.puxadorEmbutidoMaxMm + ' mm',
+    verifica: item => {
+      if (!ehPorta(item) || !texto(det(item).tipoPuxador).toLowerCase().includes('embutido')) return null;
+      const t = inteiroOuNull(det(item).tamanhoPux);
+      if (t == null) return null;
+      const { puxadorEmbutidoMinMm: mn, puxadorEmbutidoMaxMm: mx } = LIMITES;
+      return t < mn || t > mx ? 'Puxador embutido deve ter entre ' + mn + ' e ' + mx + ' mm.' : null;
+    },
+  },
+  {
+    codigo: 'puxador_maior_que_porta', nivel: NIVEIS.BLOQUEIA, escopo: ESCOPOS.ITEM,
+    titulo: 'Puxador não pode ser maior que a porta',
+    verifica: item => {
+      if (!ehPorta(item) || det(item).todaExt === true || texto(det(item).todaExt).toLowerCase() === 'true') return null;
+      const t = inteiroOuNull(det(item).tamanhoPux), dim = dimensaoDaPortaParaPuxador(item);
+      return t != null && dim != null && t > dim ? 'O puxador (' + t + ' mm) é maior que a porta (' + dim + ' mm).' : null;
+    },
+  },
 ]);
 
 function rodar(escopo, alvo) {
@@ -84,4 +115,4 @@ const avaliar = item => rodar(ESCOPOS.ITEM, item);
 const avaliarDocumento = corpo => rodar(ESCOPOS.DOCUMENTO, corpo);
 const livro = () => REGRAS.map(({ codigo, nivel, escopo, titulo }) => ({ codigo, nivel, escopo, titulo }));
 
-module.exports = { LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, REGRAS, avaliar, avaliarDocumento, livro };
+module.exports = { LIMITES, NIVEIS, ESCOPOS, inteiroOuNull, ehPorta, dimensaoDaPortaParaPuxador, REGRAS, avaliar, avaliarDocumento, livro };

@@ -79,3 +79,32 @@ test('avaliar nao traz regras de documento; livro sem verifica', () => {
     assert.ok(x.codigo && x.nivel && x.escopo && x.titulo);
   }
 });
+
+test('puxador_embutido_limites', () => {
+  const emb = (t, extra) => porta({ tipoPuxador: 'Embutido', tamanhoPux: t, ...extra });
+  for (const t of ['49', '401']) assert.strictEqual(achar(emb(t), 'puxador_embutido_limites').nivel, 'bloqueia', t);
+  for (const t of ['50', '400', '', 'abc']) assert.strictEqual(achar(emb(t), 'puxador_embutido_limites'), undefined, t);
+  assert.strictEqual(achar(emb('500', { todaExt: true }), 'puxador_embutido_limites').nivel, 'bloqueia');
+  assert.strictEqual(achar(porta({ tipoPuxador: 'Sobreposto', tamanhoPux: '5000' }), 'puxador_embutido_limites'), undefined);
+  assert.strictEqual(achar(porta({ tipoPuxador: 'Embutido', tamanhoPux: '10' }, { frente: 'Serralheria' }), 'puxador_embutido_limites'), undefined);
+});
+
+test('puxador_maior_que_porta', () => {
+  const p = (t, extra, det) => porta({ tipoPuxador: 'Sobreposto', tamanhoPux: t, ...det }, extra);
+  assert.strictEqual(achar(p('2200'), 'puxador_maior_que_porta').nivel, 'bloqueia');
+  assert.strictEqual(achar(p('2100'), 'puxador_maior_que_porta'), undefined);
+  assert.strictEqual(achar(p('2200', {}, { todaExt: true }), 'puxador_maior_que_porta'), undefined);
+  assert.strictEqual(achar(p(''), 'puxador_maior_que_porta'), undefined);
+  assert.strictEqual(achar(p('1000', {}, { posicao: 'Topo' }), 'puxador_maior_que_porta').nivel, 'bloqueia');
+  assert.strictEqual(achar(p('900', {}, { posicao: 'Topo' }), 'puxador_maior_que_porta'), undefined);
+});
+
+test('dimensaoDaPortaParaPuxador', () => {
+  const d = R.dimensaoDaPortaParaPuxador;
+  assert.strictEqual(d({ altura: 2100, largura: 900, detalhes: {} }), 2100);
+  assert.strictEqual(d({ altura: 2100, largura: 900, detalhes: { posicao: 'Topo' } }), 900);
+  assert.strictEqual(d({ altura: 2100, largura: 900, detalhes: { posicoesFolhas: ['Base'] } }), 900);
+  assert.strictEqual(d({ altura: 2100, largura: 900, detalhes: { posicao: 'Esquerda' } }), 2100);
+  assert.strictEqual(d({ altura: 'x', largura: '', detalhes: {} }), null);
+  assert.strictEqual(d({ altura: 'x', largura: 800, detalhes: {} }), 800);
+});
