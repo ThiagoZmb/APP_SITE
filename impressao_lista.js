@@ -34,6 +34,12 @@
             : { parcial: false, texto: `${nf(n)} registro(s)` };
     }
 
+    // Nome sugerido do arquivo PDF: "Orcamentos_<cliente>_<AAAA-MM-DD>" (sem acento nem caractere proibido; cliente vazio some).
+    function nomeArquivo(prefixo, cliente, dataISO) {
+        const limpa = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9-]+/g, '_').replace(/^[_-]+|[_-]+$/g, '').slice(0, 50).replace(/_+$/, '');
+        return [limpa(prefixo) || 'Lista', limpa(cliente), limpa(dataISO)].filter(Boolean).join('_');
+    }
+
     function htmlDocumento(cfg) {
         const c = cfg || {};
         const colunas = colunasVisiveis(c.colunas, c.podeValores !== false);
@@ -62,7 +68,8 @@
         doc.body.appendChild(area);
         doc.body.classList.add('imprimindo-lista');
         const tituloAntes = doc.title;
-        doc.title = `${(cfg && cfg.titulo) || 'Lista'} - ${(cfg && cfg.geradoEm) || ''}`.replace(/[\\/:*?"<>|]+/g, '-').trim();   // vira o nome do arquivo ao "salvar como PDF"
+        // vira o nome do arquivo ao "salvar como PDF": `nomeArquivo` (de nomeArquivo()) quando a tela dá um; senão título + data/hora
+        doc.title = (cfg && cfg.nomeArquivo) || `${(cfg && cfg.titulo) || 'Lista'} - ${(cfg && cfg.geradoEm) || ''}`.replace(/[\\/:*?"<>|]+/g, '-').trim();
         const limpar = () => {
             win.removeEventListener('afterprint', limpar);
             doc.body.classList.remove('imprimindo-lista');
@@ -74,5 +81,5 @@
         return area;
     }
 
-    return { esc, colunasVisiveis, textoFiltros, resumoQuantidade, htmlDocumento, imprimir };
+    return { esc, colunasVisiveis, textoFiltros, resumoQuantidade, nomeArquivo, htmlDocumento, imprimir };
 });

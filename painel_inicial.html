@@ -267,7 +267,7 @@
         #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
-    <link rel="stylesheet" href="impressao_lista.css?v=202611181000">
+    <link rel="stylesheet" href="impressao_lista.css?v=202611241000">
     <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="situacoes.js?v=202611191300"></script>
     <script src="layout.js?v=202611251100" defer></script>
@@ -283,7 +283,7 @@
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="desenho_pedido.js?v=202611231500" defer></script>
     <script src="impressao_pdf.js?v=202611231000" defer></script>
-    <script src="impressao_lista.js?v=202611181000" defer></script>
+    <script src="impressao_lista.js?v=202611241000" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
@@ -346,7 +346,9 @@
                         <div class="busca"><input type="search" id="search-input" aria-label="Buscar na lista de pedidos e orçamentos" placeholder="Buscar em todos os campos: número, cliente, valor, data, observação..."></div>
                         <button type="button" class="btn btn-secondary btn-mini" id="refresh-btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Atualizar</button>
                         <button type="button" class="btn btn-secondary btn-mini" id="print-btn" aria-label="Imprimir a lista como está na tela"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7"/></svg>Imprimir</button>
+                        <button type="button" class="btn btn-secondary btn-mini" id="pdf-btn" aria-label="Salvar a lista como está na tela em arquivo PDF"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14l3 3 3-3"/></svg>Salvar PDF</button>
                     </div>
+                    <p class="busca-aviso" id="pdf-dica" role="status" hidden>Na janela de impressão que abrir, escolha "Salvar como PDF" em Destino e confirme; o nome do arquivo já vem sugerido.</p>
                     <div class="chips-sit" id="chips-sit"></div>
                     <p class="busca-aviso" id="busca-aviso" role="status" hidden></p>
                     <div class="tabela-wrap">
@@ -828,8 +830,13 @@
         }
         // Imprime a lista como está na tela agora (mesmos filtros, busca e corte de linhas). O total em dinheiro só vai para o
         // papel com valores.ver E com o olho dos resumos aberto (fechado, nenhum total analítico sai); resumos e gráficos nunca saem.
-        function imprimirLista() {
+        // `salvar` = botão "Salvar PDF": o MESMO documento, só com o título da página trocado pelo nome de arquivo sugerido
+        // (Pedidos|Orcamentos_<cliente>_<AAAA-MM-DD>); o usuário escolhe "Salvar como PDF" como destino na caixa de impressão.
+        function imprimirLista(salvar) {
             const { j, lista, visiveis, buscaGlobal } = listaDaTela();
+            const hoje = new Date(), pad = n => String(n).padStart(2, '0');
+            const nomeArquivo = salvar === true ? window.ImpressaoLista.nomeArquivo(tipoLista === 'Pedido' ? 'Pedidos' : 'Orcamentos', buscaGlobal ? '' : cliente,
+                `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}`) : '';
             const podeValores = Acesso.pode('valores.ver');
             const divisores = classesDivisor(visiveis);
             const periodo = $('periodo').selectedOptions[0]?.textContent || j.nome;
@@ -837,6 +844,7 @@
             window.ImpressaoLista.imprimir(window, {
                 titulo: tipoLista === 'Pedido' ? 'Pedidos' : 'Orçamentos',
                 geradoEm: new Date().toLocaleString('pt-BR'),
+                nomeArquivo,
                 filtros: buscaGlobal ? [['Busca em todos os registros', $('search-input').value.trim()]]
                     : [['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
                         ['Situação', tipoLista === 'Pedido' && filtroSit ? NOME_SIT[filtroSit] : '']],
@@ -1151,7 +1159,14 @@
             if (e.target.closest('#busca-outra-aba')) document.querySelector(`.toggle-btn[data-tipo="${OUTRO_TIPO[tipoLista]}"]`).click();
         });
         $('refresh-btn').addEventListener('click', () => carregar({ varrer: true }));
-        $('print-btn').addEventListener('click', imprimirLista);
+        $('print-btn').addEventListener('click', () => imprimirLista(false));
+        $('pdf-btn').addEventListener('click', () => {
+            const dica = $('pdf-dica');
+            dica.hidden = false;
+            const esconder = () => { dica.hidden = true; window.removeEventListener('afterprint', esconder); };
+            window.addEventListener('afterprint', esconder);
+            imprimirLista(true);
+        });
 
         // ================= FILTROS =================
         function aplicarCliente(nome) {

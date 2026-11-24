@@ -74,7 +74,7 @@ test('imprimir: põe o bloco no body com a classe, chama print e limpa tudo no a
 // ---------- a tela: o botão e a função que escolhe as linhas ----------
 test('painel_inicial.html: botão "Imprimir" na barra da lista, ligado a imprimirLista; CSS e script com ?v= e sem script inline novo', () => {
   assert.match(painel, /<button type="button" class="btn btn-secondary btn-mini" id="print-btn"[^>]*>[^]*?Imprimir<\/button>/);
-  assert.match(painel, /\$\('print-btn'\)\.addEventListener\('click', imprimirLista\)/);
+  assert.match(painel, /\$\('print-btn'\)\.addEventListener\('click', \(\) => imprimirLista\(false\)\)/);
   assert.match(painel, /<link rel="stylesheet" href="impressao_lista\.css\?v=\d+">\s*<link rel="stylesheet" href="tema\.css\?v=\d+">/);
   assert.match(painel, /<script src="impressao_lista\.js\?v=\d+" defer><\/script>/);
   const topo = painel.slice(painel.indexOf('class="lista-topo"'), painel.indexOf('id="chips-sit"'));
@@ -196,4 +196,43 @@ test('versão do ?v= do CSS e do JS de impressão sobem juntas', () => {
   const v = [...painel.matchAll(/impressao_lista\.(?:css|js)\?v=(\d+)/g)].map(m => m[1]);
   assert.equal(v.length, 2);
   assert.equal(new Set(v).size, 1);
+});
+
+// ---------- Salvar PDF (mesmo documento, só o título da página vira o nome do arquivo) ----------
+test('nomeArquivo: sem acento nem caractere proibido, cliente vazio some', () => {
+  assert.equal(I.nomeArquivo('Orcamentos', 'Construtora São João Ltda.', '2026-11-24'), 'Orcamentos_Construtora_Sao_Joao_Ltda_2026-11-24');
+  assert.equal(I.nomeArquivo('Pedidos', '', '2026-11-24'), 'Pedidos_2026-11-24');
+  assert.equal(I.nomeArquivo('Pedidos', 'A/B:C*?', '2026-11-24'), 'Pedidos_A_B_C_2026-11-24');
+  assert.equal(I.nomeArquivo('', null, ''), 'Lista');
+});
+
+test('imprimir com nomeArquivo usa-o como título e restaura o título no afterprint', () => {
+  const ouvintes = {}; const filhos = [];
+  const body = { classes: new Set(), classList: { add(c) { body.classes.add(c); }, remove(c) { body.classes.delete(c); } }, appendChild(e) { filhos.push(e); } };
+  const doc = { title: 'Pedidos e Orçamentos', body, getElementById: () => null, createElement: () => ({ id: '', innerHTML: '', remove() {} }) };
+  const win = { document: doc, print() { assert.equal(doc.title, 'Orcamentos_Ana_2026-11-24'); }, addEventListener: (n, f) => { ouvintes[n] = f; }, removeEventListener() {} };
+  I.imprimir(win, { titulo: 'Orçamentos', geradoEm: 'x', nomeArquivo: 'Orcamentos_Ana_2026-11-24', colunas: COLS, linhas: [], filtros: [] });
+  ouvintes.afterprint();
+  assert.equal(doc.title, 'Pedidos e Orçamentos');
+});
+
+test('painel_inicial.html: botão "Salvar PDF" ao lado de Imprimir, dica visível só ao salvar, sem script inline', () => {
+  assert.match(painel, /id="pdf-btn"[^>]*>[^]*?Salvar PDF<\/button>/);
+  assert.match(painel, /id="pdf-dica" role="status" hidden>[^<]*Salvar como PDF/);
+  assert.match(painel, /\$\('pdf-btn'\)\.addEventListener\('click'[^]*?imprimirLista\(true\)/);
+  assert.match(painel, /\$\('print-btn'\)\.addEventListener\('click', \(\) => imprimirLista\(false\)\)/);
+  assert.ok(painel.indexOf('id="print-btn"') < painel.indexOf('id="pdf-btn"'));
+});
+
+test('imprimirLista(true) passa nomeArquivo; imprimirLista(false) não', () => {
+  const t = tela({ pedidos: [reg(1, 'Ana', 'pronto')] });
+  t.ctx.window.ImpressaoLista.nomeArquivo = I.nomeArquivo;
+  t.api.set({ cliente: 'Ana' });
+  t.api.imprimirLista(true);
+  assert.match(t.chamadas[0].nomeArquivo, /^Pedidos_Ana_\d{4}-\d{2}-\d{2}$/);
+  t.api.imprimirLista(false);
+  assert.equal(t.chamadas[1].nomeArquivo, '');
+  t.campos['search-input'].value = '1';
+  t.api.imprimirLista(true);
+  assert.match(t.chamadas[2].nomeArquivo, /^Pedidos_\d{4}-\d{2}-\d{2}$/, 'busca global ignora o cliente');
 });
