@@ -15,3 +15,19 @@ qrcode.js
   Origem:   pacote npm "qrcode-generator@1.4.4" (package/qrcode.js), https://github.com/kazuhikoarase/qrcode-generator
   Uso:      etiquetas_qr.html (desenho do QR das etiquetas de estoque, para impressão)
   Obs.:     conteúdo original, sem alterações (cabeçalho de licença mantido).
+
+jspdf.umd.min.js
+  Nome:     jsPDF (geração de PDF no navegador)
+  Versão:   2.5.2
+  Licença:  MIT
+  Origem:   pacote npm "jspdf@2.5.2" (package/dist/jspdf.umd.min.js), https://github.com/parallax/jsPDF
+  Uso:      painel_inicial.html, botão "Salvar PDF" (impressao_lista.js: baixa a lista em PDF A4 paisagem, sem caixa de impressão)
+  Obs.:     conteúdo original, sem alterações. Só se usa o desenho de texto/tabela; html() e imagens não são usados.
+
+jspdf.plugin.autotable.min.js
+  Nome:     jsPDF-AutoTable (tabelas no jsPDF)
+  Versão:   3.8.4
+  Licença:  MIT
+  Origem:   pacote npm "jspdf-autotable@3.8.4" (dist/jspdf.plugin.autotable.min.js), https://github.com/simonbengtsson/jsPDF-AutoTable
+  Uso:      o mesmo do jsPDF (precisa ser carregado depois dele)
+  Obs.:     conteúdo original, sem alterações.

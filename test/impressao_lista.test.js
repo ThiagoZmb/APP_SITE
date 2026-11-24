@@ -95,7 +95,7 @@ function tela({ pedidos = [], orcamentos = [], pode = () => true, olho = false }
     textoBusca: x => String(Object.values(x).join(' ')).toLowerCase(), iconesItens: () => ' <span class="itens-doc">ICONE</span>',
     semanaDaData: () => '', seloEntrega: () => '', seloAndamento: () => '', Situacoes: { selo: (_a, _b, t) => `<span class="selo">${t}</span>` },
     Acesso: { pode: p => pode(p) }, OlhoResumos: { visivel: () => olho },
-    window: { ImpressaoLista: { imprimir: (_w, cfg) => chamadas.push({ ...cfg, colunas: cfg.colunas, linhas: plano(cfg.linhas), filtros: plano(cfg.filtros) }) } }
+    window: { ImpressaoLista: (() => { const reg = (_w, cfg) => chamadas.push({ ...cfg, colunas: cfg.colunas, linhas: plano(cfg.linhas), filtros: plano(cfg.filtros) }); return { imprimir: reg, salvarPdf: (w, cfg) => { reg(w, cfg); chamadas[chamadas.length - 1].salvou = true; } }; })() }
   };
   vm.createContext(ctx);
   vm.runInContext(`let tipoLista = 'Pedido', filtroSit = '', cliente = ''; let pedidos = ${JSON.stringify(pedidos)}, orcamentos = ${JSON.stringify(orcamentos)};
@@ -216,12 +216,42 @@ test('imprimir com nomeArquivo usa-o como título e restaura o título no afterp
   assert.equal(doc.title, 'Pedidos e Orçamentos');
 });
 
-test('painel_inicial.html: botão "Salvar PDF" ao lado de Imprimir, dica visível só ao salvar, sem script inline', () => {
+test('painel_inicial.html: botão "Salvar PDF" ao lado de Imprimir, baixa direto (sem dica de impressão), bibliotecas em vendor/ antes do script', () => {
   assert.match(painel, /id="pdf-btn"[^>]*>[^]*?Salvar PDF<\/button>/);
-  assert.match(painel, /id="pdf-dica" role="status" hidden>[^<]*Salvar como PDF/);
+  assert.doesNotMatch(painel, /pdf-dica/);
   assert.match(painel, /\$\('pdf-btn'\)\.addEventListener\('click'[^]*?imprimirLista\(true\)/);
   assert.match(painel, /\$\('print-btn'\)\.addEventListener\('click', \(\) => imprimirLista\(false\)\)/);
   assert.ok(painel.indexOf('id="print-btn"') < painel.indexOf('id="pdf-btn"'));
+  const a = painel.indexOf('vendor/jspdf.umd.min.js'), b = painel.indexOf('vendor/jspdf.plugin.autotable.min.js'), c = painel.indexOf('impressao_lista.js?v=');
+  assert.ok(a > 0 && a < b && b < c);
+  assert.match(ler('vendor/LEIA-ME.txt'), /jspdf\.umd\.min\.js[^]*?2\.5\.2[^]*?MIT[^]*?jspdf\.plugin\.autotable\.min\.js[^]*?3\.8\.4/);
+});
+
+test('planoPdf: mesmas colunas e regras de dinheiro; texto puro; PARCIAL e total só quando a tela manda', () => {
+  const cfg = { titulo: 'Pedidos', geradoEm: '24/11/2026 10:00', colunas: COLS, linhas: [linha(1)], filtradas: 3, filtros: [['Cliente', 'Ana']], total: 'R$ 300,00' };
+  const com = I.planoPdf({ ...cfg, podeValores: true });
+  const sem = I.planoPdf({ ...cfg, podeValores: false });
+  assert.deepEqual(com.cabecalho, I.colunasVisiveis(COLS, true).map(c => c.rotulo));
+  assert.deepEqual(sem.cabecalho, I.colunasVisiveis(COLS, false).map(c => c.rotulo));
+  assert.ok(sem.cabecalho.length < com.cabecalho.length);
+  assert.equal(com.parcial, true);
+  assert.match(com.qtd, /PARCIAL/);
+  assert.equal(com.total, 'R$ 300,00');
+  assert.equal(I.planoPdf({ ...cfg, total: '' }).total, '');
+  assert.equal(com.filtros, 'Cliente: Ana');
+  assert.equal(I.textoDaCelula('<span class="selo">A &amp; B &lt;x&gt;</span> — “ok”'), 'A & B <x> - "ok"');
+});
+
+test('salvarPdf: sem biblioteca avisa; com jsPDF falso desenha em A4 paisagem e salva com o nome sugerido', () => {
+  assert.throws(() => I.salvarPdf({}, {}), /Biblioteca de PDF/);
+  const reg = { salvo: null, opts: null, tabela: null, textos: [] };
+  function JsPDF(o) { reg.opts = o; }
+  Object.assign(JsPDF.prototype, { setFont() {}, setFontSize() {}, text(t) { reg.textos.push(t); }, splitTextToSize(t) { return [t]; },
+    autoTable(o) { reg.tabela = o; }, getNumberOfPages: () => 1, save(n) { reg.salvo = n; } });
+  I.salvarPdf({ jspdf: { jsPDF: JsPDF } }, { titulo: 'Pedidos', geradoEm: 'x', nomeArquivo: 'Pedidos_Ana_2026-11-24', colunas: COLS, podeValores: true, linhas: [linha(1)], filtradas: 1, filtros: [] });
+  assert.deepEqual(reg.opts, { orientation: 'landscape', unit: 'mm', format: 'a4' });
+  assert.equal(reg.salvo, 'Pedidos_Ana_2026-11-24.pdf');
+  assert.equal(reg.tabela.body.length, 1);
 });
 
 test('imprimirLista(true) passa nomeArquivo; imprimirLista(false) não', () => {
@@ -232,6 +262,7 @@ test('imprimirLista(true) passa nomeArquivo; imprimirLista(false) não', () => {
   assert.match(t.chamadas[0].nomeArquivo, /^Pedidos_Ana_\d{4}-\d{2}-\d{2}$/);
   t.api.imprimirLista(false);
   assert.equal(t.chamadas[1].nomeArquivo, '');
+  assert.notEqual(t.chamadas[1].salvou, true);
   t.campos['search-input'].value = '1';
   t.api.imprimirLista(true);
   assert.match(t.chamadas[2].nomeArquivo, /^Pedidos_\d{4}-\d{2}-\d{2}$/, 'busca global ignora o cliente');

@@ -40,6 +40,53 @@
         return [limpa(prefixo) || 'Lista', limpa(cliente), limpa(dataISO)].filter(Boolean).join('_');
     }
 
+    // Texto puro de uma célula (o html já escapado de quem monta a linha): tira tags e decodifica as entidades de esc().
+    // Só caracteres que a fonte padrão do PDF (Latin-1) desenha: travessão e similares viram "-".
+    function textoDaCelula(html) {
+        return String(html ?? '').replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+            .replace(/[‒-―−]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/…/g, '...').replace(/[^ -ÿ]/g, '').trim();
+    }
+
+    // Plano do PDF (puro, testável): MESMAS colunas visíveis (sem dinheiro sem valores.ver), linhas, filtros, total de linhas e aviso PARCIAL do papel.
+    function planoPdf(cfg) {
+        const c = cfg || {};
+        const colunas = colunasVisiveis(c.colunas, c.podeValores !== false);
+        const linhas = c.linhas || [];
+        const qtd = resumoQuantidade(linhas.length, c.filtradas);
+        return {
+            titulo: textoDaCelula(c.titulo), geradoEm: textoDaCelula(c.geradoEm), filtros: textoDaCelula(textoFiltros(c.filtros)),
+            qtd: textoDaCelula(qtd.texto), parcial: qtd.parcial, total: c.total ? textoDaCelula(c.total) : '',
+            cabecalho: colunas.map(col => textoDaCelula(col.rotulo)), numericas: colunas.map(col => !!col.num),
+            corpo: linhas.map(l => colunas.map(col => textoDaCelula((l.celulas || {})[col.id])))
+        };
+    }
+
+    // Baixa a lista em PDF (A4 paisagem) pelo jsPDF + AutoTable copiados em vendor/, sem caixa de impressão. Nada vai ao servidor.
+    function salvarPdf(win, cfg) {
+        const jsPDF = win.jspdf && win.jspdf.jsPDF;
+        if (!jsPDF) throw new Error('Biblioteca de PDF não carregada. Recarregue a página.');
+        const p = planoPdf(cfg);
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        if (typeof doc.autoTable !== 'function') throw new Error('Biblioteca de tabelas do PDF não carregada. Recarregue a página.');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(p.titulo, 10, 12);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        doc.text(`Gerado em ${p.geradoEm}  |  ${p.qtd}${p.total ? `  |  Total: ${p.total}` : ''}`, 10, 18);
+        const filtros = doc.splitTextToSize(p.filtros, 277);
+        doc.text(filtros, 10, 23);
+        doc.autoTable({
+            head: [p.cabecalho], body: p.corpo.length ? p.corpo : [[{ content: 'Nenhum registro na tela', colSpan: p.cabecalho.length || 1 }]],
+            startY: 23 + filtros.length * 4 + 2, margin: { left: 10, right: 10, bottom: 12 }, theme: 'grid',
+            styles: { fontSize: 7.5, cellPadding: 1.2, textColor: 0, lineColor: 120, lineWidth: 0.1, overflow: 'linebreak' },
+            headStyles: { fillColor: 235, textColor: 0, fontStyle: 'bold' },
+            columnStyles: Object.fromEntries(p.numericas.map((n, i) => [i, { halign: n ? 'right' : 'left' }])),
+            didDrawPage: () => {
+                doc.setFontSize(8);
+                doc.text(`Elegance - ${p.titulo} - ${p.geradoEm}  |  Página ${doc.getNumberOfPages()}`, 10, 205);
+            }
+        });
+        doc.save(`${(cfg && cfg.nomeArquivo) || 'Lista'}.pdf`);
+    }
+
     function htmlDocumento(cfg) {
         const c = cfg || {};
         const colunas = colunasVisiveis(c.colunas, c.podeValores !== false);
@@ -81,5 +128,5 @@
         return area;
     }
 
-    return { esc, colunasVisiveis, textoFiltros, resumoQuantidade, nomeArquivo, htmlDocumento, imprimir };
+    return { esc, colunasVisiveis, textoFiltros, resumoQuantidade, nomeArquivo, textoDaCelula, planoPdf, salvarPdf, htmlDocumento, imprimir };
 });
