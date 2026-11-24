@@ -84,7 +84,8 @@ test('datas inválidas: 400 sem consulta; cliente e estados viram parâmetros, n
 });
 
 test('painel_inicial.html: duas datas dentro do bloco do olho e do dinheiro; carrega só em renderAnalises ou com o olho aberto; sem teto', () => {
-  assert.match(painel, /<span class="total-periodo" data-resumo data-valor title="[^"]*cancelados[^"]*">[^]*?id="tp-de"[^]*?id="tp-ate"[^]*?id="tp-res"/);
+  // as datas ficam sempre visíveis (só com valores.ver); só o resultado fica atrás do olho
+  assert.match(painel, /<span class="total-periodo" data-valor title="[^"]*cancelados[^"]*">[^]*?id="tp-de"[^]*?id="tp-ate"[^]*?<span data-resumo>[^]*?id="tp-res"/);
   const analises = painel.slice(painel.indexOf('async function renderAnalises'), painel.indexOf('const analises = OlhoResumos.carga'));
   assert.match(analises, /carregarTotalPeriodo\(\)/);
   assert.match(painel, /if \(OlhoResumos\.visivel\(\)\) carregarTotalPeriodo\(\); else analises\.atualizar\(\)/);
