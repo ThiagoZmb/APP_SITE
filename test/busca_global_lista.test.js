@@ -68,7 +68,7 @@ test('/dados_lista: estados restritos continuam valendo e sem valores.ver o valo
 function tela({ pedidos = [], orcamentos = [] } = {}) {
   const ini = painel.indexOf('const COLUNAS = ['), fim = painel.indexOf('function renderAvisoBusca(');
   assert.ok(ini > 0 && fim > ini);
-  const campos = { 'search-input': { value: '' } };
+  const campos = { 'search-input': { value: '' }, 'tp-de': { value: '' }, 'tp-ate': { value: '' } };
   const norm = t => String(t || '').toLowerCase().trim();
   const ctx = {
     $: id => campos[id], norm, esc: String, moeda: String, soma: l => l.length,

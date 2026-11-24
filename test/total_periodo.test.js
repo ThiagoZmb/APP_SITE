@@ -85,13 +85,15 @@ test('datas inválidas: 400 sem consulta; cliente e estados viram parâmetros, n
 
 test('painel_inicial.html: duas datas dentro do bloco do olho e do dinheiro; carrega só em renderAnalises ou com o olho aberto; sem teto', () => {
   // as datas ficam sempre visíveis (só com valores.ver); só o resultado fica atrás do olho
-  assert.match(painel, /<span class="total-periodo" data-valor title="[^"]*cancelados[^"]*">[^]*?id="tp-de"[^]*?id="tp-ate"[^]*?<span data-resumo>[^]*?id="tp-res"/);
+  assert.match(painel, /<span class="total-periodo" data-valor title="[^"]*cancelados[^"]*">[^]*?id="tp-de"[^]*?id="tp-ate"[^]*?id="tp-res"/);
   const analises = painel.slice(painel.indexOf('async function renderAnalises'), painel.indexOf('const analises = OlhoResumos.carga'));
   assert.match(analises, /carregarTotalPeriodo\(\)/);
-  assert.match(painel, /if \(OlhoResumos\.visivel\(\)\) carregarTotalPeriodo\(\); else analises\.atualizar\(\)/);
+  // consulta pedida de propósito: as datas disparam o total sem depender do olho; renderTudo recarrega ao trocar o cliente
+  assert.match(painel, /\['tp-de', 'tp-ate'\]\.forEach\(id => \$\(id\)\.addEventListener\('change', aoMudarDatas\)\)/);
+  assert.match(painel, /if \(!OlhoResumos\.visivel\(\)\) carregarTotalPeriodo\(\);/);
   const fn = painel.slice(painel.indexOf('async function carregarTotalPeriodo'), painel.indexOf('// ================= RESUMO LOCAL'));
   assert.match(fn, /\/pedidos\/total_periodo\?de=/);
   assert.match(fn, /Acesso\.pode\('valores\.ver'\)/);
   assert.doesNotMatch(fn, /listaDaTela|MAX_LINHAS_LISTA|filtroSit|search-input/);
-  assert.equal((painel.match(/carregarTotalPeriodo\(\)/g) || []).length, 3, 'definição, renderAnalises e o ouvinte das datas');
+  assert.equal((painel.match(/carregarTotalPeriodo\(\)/g) || []).length, 4, 'definição, renderAnalises, renderTudo (olho fechado) e as datas');
 });

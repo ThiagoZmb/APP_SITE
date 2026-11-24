@@ -161,6 +161,8 @@
         .filtros input { min-width: 260px; }
         .filtros .total-periodo { flex-basis: 100%; text-align: right; font-size: 12px; color: var(--text-light); }
         .filtros .total-periodo input { min-width: 0; min-height: 30px; padding: 3px 6px; font-size: 12px; }
+        .filtros .total-periodo .tp-limpar { border: none; background: none; color: inherit; font-weight: 800; cursor: pointer; font-size: 13px; }
+        .filtros .total-periodo .tp-limpar[hidden] { display: none; }
         .filtros .total-periodo b { color: var(--text-dark); }
         .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
@@ -327,7 +329,7 @@
                 <span class="filtro-cliente" id="chip-cliente"><span id="chip-cliente-txt"></span><button type="button" id="limpar-cliente" title="Remover filtro" aria-label="Remover filtro de cliente">✕</button></span>
                 <span class="periodo-txt" id="periodo-txt"></span>
                 <span class="total-periodo" data-valor title="Soma do valor dos pedidos com data entre as duas datas escolhidas (e do cliente filtrado). Pedidos cancelados e orçamentos não entram; a busca e o chip de situação da lista não alteram este total. Abra o olho (Resumos) para ver o total.">
-                    Total dos pedidos de <input type="date" id="tp-de" aria-label="Total dos pedidos: data inicial"> a <input type="date" id="tp-ate" aria-label="Total dos pedidos: data final"><span data-resumo>: <span id="tp-res" role="status">Escolha a data inicial e a final para ver o total.</span></span>
+                    Total dos pedidos de <input type="date" id="tp-de" aria-label="Total dos pedidos: data inicial"> a <input type="date" id="tp-ate" aria-label="Total dos pedidos: data final"><button type="button" class="tp-limpar" id="tp-limpar" title="Limpar as datas e voltar ao Período" aria-label="Limpar as datas e voltar ao Período" hidden>✕</button>: <span id="tp-res" role="status">Escolha a data inicial e a final para ver o total.</span>
                 </span>
             </section>
 
@@ -505,9 +507,16 @@
         }
 
         // Atualiza a lista e as análises; o olho controla apenas a visibilidade dos resumos.
+        // texto do período (ou das datas escolhidas) e botão ✕ das datas
+        function atualizarTextoPeriodo() {
+            const j = janela(), dj = intervaloEscolhido();
+            $('tp-limpar').hidden = !($('tp-de').value || $('tp-ate').value);
+            $('periodo-txt').textContent = dj ? `${dj.nome} · datas escolhidas` : j.ini.getFullYear() > 1900 ? `${j.ini.toLocaleDateString('pt-BR')} a ${(j.fim < hoje ? j.fim : hoje).toLocaleDateString('pt-BR')}` : 'todo o histórico';
+        }
+        // datas escolhidas mudaram: só a lista e o cabeçalho dela (sem rede e sem refazer as análises do olho)
+        function renderDatasELista() { atualizarTextoPeriodo(); renderLista(); }
         function renderTudo() {
-            const j = janela();
-            $('periodo-txt').textContent = j.ini.getFullYear() > 1900 ? `${j.ini.toLocaleDateString('pt-BR')} a ${(j.fim < hoje ? j.fim : hoje).toLocaleDateString('pt-BR')}` : 'todo o histórico';
+            atualizarTextoPeriodo();
             $('chip-cliente').classList.toggle('ativo', !!cliente);
             $('chip-cliente-txt').textContent = cliente ? 'Cliente: ' + cliente : '';
             $('titulo').textContent = cliente || 'Pedidos e Orçamentos';
@@ -515,6 +524,7 @@
                 : 'Situação da produção, vendas, conversão de orçamentos e o que vende mais — tudo em uma tela.';
             renderLista();
             analises.atualizar();
+            if (!OlhoResumos.visivel()) carregarTotalPeriodo(); // com o olho aberto, renderAnalises já carrega
         }
 
         // Analises (Operacao agora, Resultado do periodo, Leitura rapida, graficos, rankings): so rodam com o olho aberto
@@ -833,8 +843,21 @@
         // (o servidor já devolve a lista inteira, sem limite de data; estados e valores.ver já foram aplicados lá). Sem texto, tudo volta ao normal.
         const palavrasDaBusca = () => norm($('search-input').value).split(/\s+/).filter(Boolean);
         const bateBusca = (x, palavras) => palavras.every(p => textoBusca(x).includes(p));
+        // DATAS ESCOLHIDAS (#tp-de/#tp-ate): com as DUAS preenchidas e válidas (data real, inicial <= final) a lista, os chips, a impressão e o
+        // Salvar PDF usam SÓ esse intervalo no lugar do seletor Período (filtro no cliente: /dados_lista já traz tudo, e a busca global precisa disso).
+        // Indicadores e gráficos do olho continuam no Período. Devolve { ini, fim, nome, personalizado: true } ou null.
+        function intervaloEscolhido() {
+            const de = $('tp-de').value, ate = $('tp-ate').value, re = /^(\d{4})-(\d{2})-(\d{2})$/;
+            const a = re.exec(de), b = re.exec(ate);
+            if (!a || !b || de > ate) return null;
+            const ini = new Date(+a[1], +a[2] - 1, +a[3]), fim = new Date(+b[1], +b[2] - 1, +b[3], 23, 59, 59, 999);
+            if (ini.getMonth() !== +a[2] - 1 || ini.getDate() !== +a[3] || fim.getMonth() !== +b[2] - 1 || fim.getDate() !== +b[3]) return null;
+            const br = t => t.split('-').reverse().join('/');
+            return { ini, fim, nome: `${br(de)} a ${br(ate)}`, personalizado: true };
+        }
+        const janelaDaLista = () => intervaloEscolhido() || janela();
         function listaDaTela() {
-            const j = janela();
+            const j = janelaDaLista();
             const todos = tipoLista === 'Pedido' ? pedidos : orcamentos;
             const base = entre(doCliente(todos), j.ini, j.fim); // base dos chips e do período (não muda com a busca)
             // busca em todos os campos do registro (o que a lista mostra e o que mais vier da API); várias palavras = todas precisam aparecer
@@ -865,14 +888,14 @@
                 `${hoje.getFullYear()}-${pad(hoje.getMonth() + 1)}-${pad(hoje.getDate())}`) : '';
             const podeValores = Acesso.pode('valores.ver');
             const divisores = classesDivisor(visiveis);
-            const periodo = $('periodo').selectedOptions[0]?.textContent || j.nome;
+            const periodo = j.personalizado ? j.nome : ($('periodo').selectedOptions[0]?.textContent || j.nome);
             const intervalo = $('periodo-txt').textContent;
             window.ImpressaoLista[salvar === true ? 'salvarPdf' : 'imprimir'](window, {
                 titulo: tipoLista === 'Pedido' ? 'Pedidos' : 'Orçamentos',
                 geradoEm: new Date().toLocaleString('pt-BR'),
                 nomeArquivo,
                 filtros: buscaGlobal ? [['Busca em todos os registros', $('search-input').value.trim()]]
-                    : [['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
+                    : [j.personalizado ? ['Datas escolhidas', j.nome] : ['Período', intervalo && intervalo !== periodo ? `${periodo} (${intervalo})` : periodo], ['Cliente', cliente],
                         ['Situação', tipoLista === 'Pedido' && filtroSit ? NOME_SIT[filtroSit] : '']],
                 podeValores,
                 colunas: COLUNAS,
@@ -1202,7 +1225,10 @@
         }
         $('periodo').addEventListener('change', renderTudo);
         // data do total: olho aberto recarrega só o total; fechado só marca as análises como desatualizadas (carrega ao abrir)
-        ['tp-de', 'tp-ate'].forEach(id => $(id).addEventListener('change', () => { if (OlhoResumos.visivel()) carregarTotalPeriodo(); else analises.atualizar(); }));
+        // as datas mexem na lista (filtro no cliente, sem rede) e no total (consulta pedida de propósito: não depende do olho); ✕ limpa e volta ao Período
+        const aoMudarDatas = () => { renderDatasELista(); carregarTotalPeriodo(); };
+        ['tp-de', 'tp-ate'].forEach(id => $(id).addEventListener('change', aoMudarDatas));
+        $('tp-limpar').addEventListener('click', () => { $('tp-de').value = ''; $('tp-ate').value = ''; aoMudarDatas(); });
         $('f-cliente').addEventListener('change', () => {
             const v = $('f-cliente').value.trim();
             if (!v || [...$('l-clientes').options].some(o => o.value === v)) aplicarCliente(v);

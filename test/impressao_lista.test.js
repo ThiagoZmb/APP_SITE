@@ -86,12 +86,13 @@ test('painel_inicial.html: botão "Imprimir" na barra da lista, ligado a imprimi
 function tela({ pedidos = [], orcamentos = [], pode = () => true, olho = false } = {}) {
   const ini = painel.indexOf('const COLUNAS = ['), fim = painel.indexOf('function renderLista()');
   assert.ok(ini > 0 && fim > ini);
-  const campos = { 'search-input': { value: '' }, periodo: { selectedOptions: [{ textContent: 'Últimos 6 meses' }] }, 'periodo-txt': { textContent: '01/06/2026 a 18/11/2026' } };
+  const campos = { 'search-input': { value: '' }, periodo: { selectedOptions: [{ textContent: 'Últimos 6 meses' }] }, 'periodo-txt': { textContent: '01/06/2026 a 18/11/2026' }, 'tp-de': { value: '' }, 'tp-ate': { value: '' } };
+  const entreArgs = [];
   const chamadas = [];
   const plano = o => JSON.parse(JSON.stringify(o));
   const ctx = {
     $: id => campos[id], esc: I.esc, moeda: v => 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ','), norm: t => String(t || '').toLowerCase().trim(),
-    janela: () => ({ ini: null, fim: null, nome: 'últimos 6 meses' }), entre: l => l, soma: l => l.reduce((s, x) => s + x.v, 0),
+    janela: () => ({ ini: null, fim: null, nome: 'últimos 6 meses' }), entre: (l, a, b) => { entreArgs.push([a, b]); return l; }, soma: l => l.reduce((s, x) => s + x.v, 0),
     textoBusca: x => String(Object.values(x).join(' ')).toLowerCase(), iconesItens: () => ' <span class="itens-doc">ICONE</span>',
     semanaDaData: () => '', seloEntrega: () => '', seloAndamento: () => '', Situacoes: { selo: (_a, _b, t) => `<span class="selo">${t}</span>` },
     Acesso: { pode: p => pode(p) }, OlhoResumos: { visivel: () => olho },
@@ -102,8 +103,8 @@ function tela({ pedidos = [], orcamentos = [], pode = () => true, olho = false }
     const NOME_SIT = { producao: 'Em produção', pronto: 'Pronto' }, VALOR_SIT = { producao: 'em_producao', pronto: 'pronto' };
     const doCliente = l => cliente ? l.filter(x => x.cliente === cliente) : l;
     ${painel.slice(ini, fim)}
-    this.api = { listaDaTela, imprimirLista, set(o) { if ('tipoLista' in o) tipoLista = o.tipoLista; if ('filtroSit' in o) filtroSit = o.filtroSit; if ('cliente' in o) cliente = o.cliente; } };`, ctx);
-  return { api: ctx.api, campos, chamadas, ctx };
+    this.api = { listaDaTela, imprimirLista, intervaloEscolhido, janelaDaLista, set(o) { if ('tipoLista' in o) tipoLista = o.tipoLista; if ('filtroSit' in o) filtroSit = o.filtroSit; if ('cliente' in o) cliente = o.cliente; } };`, ctx);
+  return { api: ctx.api, campos, chamadas, ctx, entreArgs };
 }
 const reg = (numero, cliente, s, v = 100) => ({ numero, cliente, s, v, situacao: s === 'pronto' ? 'Pronto' : 'Em Produção', data: '10/11/2026', financeiro: 'Aberto', clienteFinal: '', observacao: '' });
 
@@ -266,4 +267,52 @@ test('imprimirLista(true) passa nomeArquivo; imprimirLista(false) não', () => {
   t.campos['search-input'].value = '1';
   t.api.imprimirLista(true);
   assert.match(t.chamadas[2].nomeArquivo, /^Pedidos_\d{4}-\d{2}-\d{2}$/, 'busca global ignora o cliente');
+});
+
+// ---------- DATAS ESCOLHIDAS: a lista (e impressão/PDF) usa só o intervalo, no lugar do seletor Período ----------
+test('intervaloEscolhido: só com as duas datas reais e inicial <= final; senão null (volta ao Período)', () => {
+  const t = tela({ pedidos: [reg(1, 'Ana', 'pronto')] });
+  const set = (de, ate) => { t.campos['tp-de'].value = de; t.campos['tp-ate'].value = ate; return t.api.intervaloEscolhido(); };
+  assert.equal(set('', ''), null);
+  assert.equal(set('2026-11-01', ''), null);
+  assert.equal(set('2026-11-10', '2026-11-01'), null);
+  assert.equal(set('2026-02-30', '2026-03-05'), null);
+  assert.equal(set('lixo', '2026-03-05'), null);
+  const r = set('2026-11-01', '2026-11-24');
+  assert.equal(r.nome, '01/11/2026 a 24/11/2026');
+  assert.equal(r.personalizado, true);
+  assert.equal(r.ini.getDate(), 1);
+  assert.equal(r.fim.getDate(), 24); assert.equal(r.fim.getHours(), 23, 'o dia final inteiro entra');
+  assert.equal(set('2026-11-24', '2026-11-24').ini.getDate(), 24);
+});
+
+test('com datas escolhidas listaDaTela filtra por elas (não pelo Período) e a impressão/PDF dizem o intervalo; ✕ volta ao Período', () => {
+  const t = tela({ pedidos: [reg(1, 'Ana', 'pronto'), reg(2, 'Bia', 'producao')] });
+  t.api.listaDaTela();
+  assert.equal(t.entreArgs.at(-1)[0], null, 'sem datas: janela() do Período (mock devolve ini null)');
+  t.campos['tp-de'].value = '2026-11-01'; t.campos['tp-ate'].value = '2026-11-24';
+  t.api.listaDaTela();
+  assert.equal(t.entreArgs.at(-1)[0].getMonth(), 10);
+  assert.equal(t.entreArgs.at(-1)[1].getDate(), 24);
+  t.api.imprimirLista(false);
+  assert.deepEqual(t.chamadas[0].filtros[0], ['Datas escolhidas', '01/11/2026 a 24/11/2026']);
+  assert.equal(t.chamadas[0].filtros.some(f => f[0] === 'Período'), false);
+  t.campos['search-input'].value = '1';
+  t.api.imprimirLista(false);
+  assert.deepEqual(t.chamadas[1].filtros, [['Busca em todos os registros', '1']], 'busca global continua ignorando período e datas');
+  t.campos['search-input'].value = ''; t.campos['tp-de'].value = ''; t.campos['tp-ate'].value = '';
+  t.api.imprimirLista(false);
+  assert.equal(t.chamadas[2].filtros[0][0], 'Período');
+});
+
+test('painel_inicial.html: datas ligam a lista sem rede (renderDatasELista), há ✕ para limpar e os indicadores do olho seguem no Período', () => {
+  assert.match(painel, /id="tp-limpar"[^>]*aria-label="Limpar as datas e voltar ao Período"[^>]*hidden>/);
+  assert.match(painel, /function renderDatasELista\(\) \{ atualizarTextoPeriodo\(\); renderLista\(\); \}/);
+  assert.match(painel, /const aoMudarDatas = \(\) => \{ renderDatasELista\(\); carregarTotalPeriodo\(\); \}/);
+  assert.match(painel, /\$\('tp-limpar'\)\.addEventListener\('click'/);
+  assert.match(painel, /function listaDaTela\(\) \{\s*const j = janelaDaLista\(\);/);
+  const analises = painel.slice(painel.indexOf('async function renderAnalises'), painel.indexOf('const analises = OlhoResumos.carga'));
+  assert.match(analises, /const j = janela\(\);/, 'análises do olho continuam no seletor Período');
+  const fn = painel.slice(painel.indexOf('function renderDatasELista'), painel.indexOf('function renderTudo'));
+  assert.doesNotMatch(fn, /api\(|fetch\(|carregar\(/);
 });
