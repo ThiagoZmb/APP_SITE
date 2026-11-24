@@ -159,6 +159,9 @@
         .filtros label { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-light); }
         .filtros select, .filtros input { padding: 9px 12px; border: 1px solid var(--border-control); border-radius: 10px; font-size: 14px; background: var(--white); min-height: 40px; }
         .filtros input { min-width: 260px; }
+        .filtros .total-periodo { flex-basis: 100%; text-align: right; font-size: 12px; color: var(--text-light); }
+        .filtros .total-periodo input { min-width: 0; min-height: 30px; padding: 3px 6px; font-size: 12px; }
+        .filtros .total-periodo b { color: var(--text-dark); }
         .filtros .periodo-txt { margin-left: auto; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .filtro-cliente { display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--primary-light); color: var(--primary-color); font-weight: 700; font-size: 13px; }
         .filtro-cliente.ativo { display: inline-flex; }
@@ -323,6 +326,9 @@
                 <datalist id="l-clientes"></datalist>
                 <span class="filtro-cliente" id="chip-cliente"><span id="chip-cliente-txt"></span><button type="button" id="limpar-cliente" title="Remover filtro" aria-label="Remover filtro de cliente">✕</button></span>
                 <span class="periodo-txt" id="periodo-txt"></span>
+                <span class="total-periodo" data-resumo data-valor title="Soma do valor dos pedidos com data entre as duas datas escolhidas (e do cliente filtrado). Pedidos cancelados e orçamentos não entram; a busca e o chip de situação da lista não alteram este total.">
+                    Total dos pedidos de <input type="date" id="tp-de" aria-label="Total dos pedidos: data inicial"> a <input type="date" id="tp-ate" aria-label="Total dos pedidos: data final">: <span id="tp-res" role="status">Escolha a data inicial e a final para ver o total.</span>
+                </span>
             </section>
 
             <div id="carregando" role="status" aria-live="polite">Carregando pedidos e orçamentos...</div>
@@ -521,6 +527,7 @@
             } catch (e) { return; } // a propria carga da lista ja mostra o erro
             if (meu !== seqAnalises) return; // filtro mudou enquanto buscava: a rodada mais nova assume
             const j = janela();
+            carregarTotalPeriodo();
             calcularResumo(j);
             renderMensal();
             calcularOperacao();
@@ -531,6 +538,24 @@
             renderRankings(j);
         }
         const analises = OlhoResumos.carga(renderAnalises);
+
+        // Total dos pedidos entre DUAS DATAS escolhidas (independente do seletor Período). Atrás do olho (o bloco é data-resumo e só
+        // carrega em renderAnalises/ao mudar a data com o olho aberto) e do dinheiro (data-valor + rota com valores.ver). A soma é do
+        // servidor, sobre todos os pedidos (sem teto de 500): GET /pedidos/total_periodo; Cancelado e orçamentos não entram.
+        let seqTotal = 0;
+        async function carregarTotalPeriodo() {
+            if (!Acesso.pode('valores.ver')) return; // sem a permissão nem se pede ao servidor
+            const el = $('tp-res'), de = $('tp-de').value, ate = $('tp-ate').value;
+            const meu = ++seqTotal;
+            if (!de || !ate) { el.textContent = 'Escolha a data inicial e a final para ver o total.'; return; }
+            if (de > ate) { el.textContent = 'A data inicial não pode ser depois da final.'; return; }
+            el.textContent = 'Calculando...';
+            try {
+                const d = await api('/pedidos/total_periodo?de=' + encodeURIComponent(de) + '&ate=' + encodeURIComponent(ate) + (cliente ? '&cliente=' + encodeURIComponent(cliente) : ''));
+                if (meu !== seqTotal) return;
+                el.innerHTML = `<b>${esc(moeda(d.valores.total))}</b> · ${num(d.qtdPedidos)} pedido(s) · sem cancelados${cliente ? ' · ' + esc(cliente) : ''}`;
+            } catch (e) { if (meu === seqTotal) el.textContent = 'Não foi possível calcular: ' + e.message; }
+        }
 
         // ================= RESUMO LOCAL (só para "Leitura rápida" e ranking de clientes) =================
         // Os blocos "Operação agora" e "Resultado do período" NÃO usam estas contas: os números deles vêm do servidor
@@ -1176,6 +1201,8 @@
             window.scrollTo({ top: 0, behavior: SEM_MOVIMENTO ? 'auto' : 'smooth' });
         }
         $('periodo').addEventListener('change', renderTudo);
+        // data do total: olho aberto recarrega só o total; fechado só marca as análises como desatualizadas (carrega ao abrir)
+        ['tp-de', 'tp-ate'].forEach(id => $(id).addEventListener('change', () => { if (OlhoResumos.visivel()) carregarTotalPeriodo(); else analises.atualizar(); }));
         $('f-cliente').addEventListener('change', () => {
             const v = $('f-cliente').value.trim();
             if (!v || [...$('l-clientes').options].some(o => o.value === v)) aplicarCliente(v);
