@@ -29,10 +29,13 @@
         funcionarios: ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M17 8h4M17 12h4"/>'),
         corte: ic('<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>'),
         gestao: ic('<path d="M3 20h18"/><rect x="5" y="11" width="3.5" height="9"/><rect x="10.25" y="6" width="3.5" height="14"/><rect x="15.5" y="3" width="3.5" height="17"/>'),
-        precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>')
+        precos: ic('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
+        tarefas: ic('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 10h3M8 15h9"/>')
     };
     const MENU = [
         // O logo Elegance leva à primeira página liberada; Pedidos e Orçamentos é o destino padrão.
+        { secao: 'Pessoal' },
+        { href: 'tarefas.html', texto: 'Minha semana', icone: 'tarefas' },   // caderno pessoal: sem permissão (fora de PAGINAS, não vira a primeira página de ninguém)
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
@@ -66,7 +69,7 @@
     // Quem tem 'atendimento.modo' começa cada sessão com o modo ligado e pode desligar/ligar a qualquer momento (botão no topo).
     // É um recurso de tela (privacidade na frente do cliente), não uma barreira de segurança: quem decide o acesso continua sendo o servidor.
     const ATEND_CHAVE = 'atendimento', ATEND_CLIENTE = 'atendimento_cliente';
-    const ATEND_BLOQUEADAS = ['inicio.html', 'graficos_pedidos.html', 'financeiro.html', 'custos.html', 'gestao.html'];
+    const ATEND_BLOQUEADAS = ['inicio.html', 'graficos_pedidos.html', 'financeiro.html', 'custos.html', 'gestao.html', 'tarefas.html'];
     const ss = { ler: k => { try { return sessionStorage.getItem(k); } catch { return null; } },
         gravar: (k, v) => { try { if (v === null || v === '') sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { /* sem armazenamento: vale só nesta página */ } } };
     const atendTem = acesso => (acesso?.permissoes || []).includes('atendimento.modo');

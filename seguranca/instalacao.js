@@ -561,6 +561,18 @@ const TABELAS = [
      observacao VARCHAR(500) NULL,
      detalhe TEXT NULL,
      KEY idx_producao_evento (numero, etapa)
+   ) ${OPCOES}`,
+  // ----- Minha semana: caderno pessoal de tarefas, uma linha por tarefa (utf8mb4 em OPCOES: aceita emoji) -----
+  `CREATE TABLE IF NOT EXISTS \`web_tarefas\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     usuario_codigo INT NOT NULL,
+     quadro ENUM('dia','tarefas','notas') NOT NULL,
+     data DATE NULL,
+     texto VARCHAR(300) NOT NULL,
+     feita TINYINT(1) NOT NULL DEFAULT 0,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     KEY ix_tarefas_usuario (usuario_codigo, quadro, data)
    ) ${OPCOES}`
 ];
 

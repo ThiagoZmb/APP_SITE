@@ -41,6 +41,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Ações em lote na lista de Pedidos** (`painel_lote.js`, `lote.css`, só a aba Pedidos de `painel_inicial.html`): caixas de seleção e barra "Alterar data de pronto" / "Mudar situação" com as mesmas funções e rotas do lote do calendário (`calendario_lote.js`); cada ação só com a sua permissão. Regras em `docs/regras/outras-regras.md`. **Verificado só no Edge headless com API simulada.**
 - Indicadores "Operação agora" e "Resultado do período" de `painel_inicial.html` só com a permissão `indicadores.ver` (regras em `docs/regras/outras-regras.md`).
 - **Atalho no celular (PWA)** (`manifest.webmanifest`, `sw.js`, `pwa.js`, `icones/`): instalável pelo Chrome/Safari a partir da URL do GitHub Pages; service worker sem nenhum cache de dados; caminhos relativos por causa de `/APP_SITE/`. Passo a passo em `docs/atalho_celular.md`.
+- **Minha semana** (`tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_semana.js`, tabela `web_tarefas`): caderno semanal pessoal de tarefas (sete dias, Tarefas e Notas), em linhas, com caixinha de concluído; qualquer usuário logado, cada um vê somente o seu. **Verificado só no Edge headless com banco em memória; não testado em celular real nem em produção.** Regras na seção 5, "Minha semana".
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Administrativo × Operador** (permissão-chave `administrativo.ver`; `seguranca/permissoes.js`, coluna "Classe" em `usuarios.html`): quem tem a chave vê gráficos, indicadores, resumos/totais, telas de gestão e dinheiro; o operador (saída de estoque, status, etapas, entregas) não recebe informação administrativa; Vendedor/Representante ficam "só valores". Regras na seção 5, "Administrativo × Operador".
 - **Baixa de estoque por QR** (`baixa_qr.html/.js`, `etiquetas_qr.html/.js`, `rotas/estoque_qr.js`, `calculo/estoque_qr.js`, `vendor/`): o funcionário que só retira material (perfil com apenas `estoque.ver` + `estoque.movimentar`) cai direto na câmera do celular, lê o QR da etiqueta (= `estoque.CODIGO_BARRA`), confere nome e quantidade em estoque, ajusta a quantidade e dá baixa pela saída de estoque de sempre (`POST /estoque/saida`); `etiquetas_qr.html` imprime as etiquetas com QR (`estoque.editar`). **Não testado em aparelho real.** Regras na seção 5, "Baixa de estoque por QR".
@@ -67,6 +68,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
   fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
+  minha_semana.js        Minha semana: GET/POST /minha_semana, PUT/DELETE /minha_semana/:id (só login; sempre pelo usuário do token; validação em calculo/minha_semana.js)
   checklist.js           Checklist de produção em PDF no banco (web_checklist): GET /checklist/pdf, GET /checklist/info, PUT /checklist (validação em calculo/checklist.js)
   danfe.js               DANFE (nota fiscal em PDF) pelo pedido: /danfe/existentes, PUT /danfe/:chave, /danfe/pedido/:n, /danfe/:chave/pdf, /danfe/lista, /danfe/vinculo (validação em calculo/danfe.js)
   pesos.js               Peso por produto (web_pesos): /pesos, /pesos/produtos (validação e cálculo em calculo/peso.js)
@@ -86,6 +88,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
 calculo/                 Funções puras (testáveis sem banco)
   precos.js              Motor de preço: portas, serralheria, avulso, acessórios; leitor do cadastro
   precos_formacao.js / precos_referencias.js / custos.js / custos_sugestao.js   Formação de preço e custos
+  minha_semana.js        Minha semana: validação de quadro/data/texto e os sete dias da semana (puras)
   calendario.js          Calendário de pedidos: validação de mês/data/situação, "em aberto", atraso, agrupamento por dia (puras)
   etapas_producao.js     Etapas de produção: as 6 etapas, N/A automático, estado efetivo, validação da mudança (permissão, finalizar exige anteriores, forçar), corte completo, decisão do automático, fila (puras)
   entregas.js            Máquina de status das entregas (`proximo`, `pedidoPara`) e validação de anexo
@@ -126,6 +129,7 @@ regras_tela.js           Livro de regras na tela de orçamentos: funções puras
 regras.html/.js/.css     Página de leitura do Livro de regras (código, nível, onde vale, limites); `administrativo.ver`; subitem de Usuários no menu
 calendario.html/.js, calendario_dia.html/.js, calendario_comum.js, calendario.css   Telas do calendário de pedidos (mês e dia); o menu do botão direito é o `inicio_menu.js`
 menu_contexto.js         Menu do botão direito do Pedido com SUBMENUS ("Imprimir", "Mudar situação"): `MenuContexto.montar`/`ligar`, usado por `inicio_menu.js` e `painel_inicial.html`; as folhas com `grupo` viram o item principal (padrão em DESIGN.md)
+tarefas.html/.js         Minha semana: caderno pessoal (cada linha grava numa fila própria; datas sem toISOString)
 etapas_producao.html/.js/.css   Tela das etapas de produção (tabela de botões-estado; cartões no celular; menu próprio no botão direito/Shift+F10/"⋯")
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
 baixa_qr.html/.js        Tela do celular: câmera + jsQR, cartão do item, quantidade e "Dar baixa" (lógica pura testada no Node)
@@ -283,6 +287,10 @@ Pedidos e caixa se ligam ao cliente pela razão social; renomear cliente com his
 ### Portal do cliente: identidade (etapa 2)
 Identidade externa (convite, senha, 2º fator, sessão opaca no cookie `__Host-portal`); empresa conferida a cada requisição; rotas só por `registro.portal*`; o cliente já vê pedidos e status (etapa 3a, somente leitura, isolados por `req.portal.empresaCodigo`); o cliente com `financeiro.ver` também vê o financeiro (etapa 3b, somente leitura, mesmo isolamento); o cliente com `documentos.ver` abre o PDF do pedido (sem preços nem observação geral) e o DANFE das notas ligadas ao pedido (etapa 3c, mesmo isolamento, 404 uniforme); o administrador geral da empresa gerencia os usuários da própria empresa (etapa 4: convite, permissões concedíveis, papel, desativar, reenviar, remover; sempre ao menos um administrador ativo; isolamento por empresa com 404 uniforme). Guia do dono: `docs/portal_configuracao.md`.
 > Regras completas: `docs/regras/portal-identidade.md` (ler antes de mexer neste módulo).
+
+### Minha semana (caderno de tarefas pessoal, tabela `web_tarefas`)
+Só login, sem permissão; o dono da linha é sempre `req.user.id`, linha alheia = 404 (nem o administrador vê) e o texto nunca vai para auditoria nem log. Fora de `PAGINAS` e escondida no modo atendimento. Não lê nem altera tabela do VB.
+> Regras completas: `docs/regras/minha-semana.md` (ler antes de mexer neste módulo).
 
 ### Recebimentos atrasados automáticos
 `UPDATE fluxo_de_caixa` (**escrita em tabela do VB**): marca como `Atrasado` as entradas `A Receber` já vencidas, na subida do servidor e no login; idempotente, nunca mexe em saídas.
