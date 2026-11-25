@@ -520,6 +520,7 @@
                 return;
             }
             const hoje = new Date();
+            const vv = Acesso.pode('valores.ver'); // sem a permissão a lista não mostra o valor
 
             // últimos 6 pedidos (lista já vem ordenada por número desc)
             pedidosInicio = pedidos; // o menu do botão direito procura o pedido aqui
