@@ -2,7 +2,7 @@
 // tarefas.html — "Minha semana": caderno pessoal de tarefas (sete dias, Tarefas e Notas). Cada um vê só o seu.
 // Rotas: GET /minha_semana?inicio=, POST /minha_semana, PUT e DELETE /minha_semana/:id.
 // Funções puras testadas no Node (test/minha_semana_tela.test.js); o desenho da tela fica no fim (só no navegador).
-// O texto da tarefa só entra na tela por input.value; o resto, por textContent.
+// O texto da tarefa só entra na tela pelo value do campo (textarea que cresce); o resto, por textContent.
 // ==========================================================================
 (function (raiz, fabrica) {
   const lib = fabrica(raiz);
@@ -14,7 +14,7 @@
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
 
   const MIN_LINHAS = 8;
-  // ordem do celular (e do teclado); no computador o CSS põe em 3 colunas: Seg Ter Qua | Qui Sex Sáb | Tarefas Notas Domingo
+  // ordem de leitura, do teclado e da tela: da esquerda para a direita (o CSS só decide quantas colunas cabem)
   const DIAS = [['seg', 'Segunda'], ['ter', 'Terça'], ['qua', 'Quarta'], ['qui', 'Quinta'], ['sex', 'Sexta'], ['sab', 'Sábado'], ['dom', 'Domingo']];
 
   // ---------- datas: a conta é em UTC e a leitura é pelos campos, para o dia nunca voltar um por causa do fuso ----------
@@ -34,6 +34,9 @@
 
   // mesma limpeza do servidor (calculo/minha_semana.js): uma linha só, sem espaços nas pontas
   const limpar = t => String(t ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
+
+  // cada tarefa é uma linha só: o que for colado com quebras vira espaço (a quebra visual é do campo, não do texto)
+  const semQuebra = t => String(t ?? '').replace(/\r\n|[\r\n\u2028\u2029]/g, ' ');
 
   // ---------- rascunho no navegador: SÓ o que o servidor ainda não confirmou ----------
   // Sessão expirada, aba descartada no celular ou rede caída não podem levar o texto junto. Uma chave por usuário (id do
@@ -272,13 +275,16 @@
       li.classList.toggle('feita', caixa.checked);
     }
     const salvar = item => item.linha.salvarTexto(item.input.value).then(() => pintar(item));
+    // o campo cresce com o texto, para ele aparecer inteiro em coluna estreita
+    const ajustar = campo => { campo.style.height = 'auto'; campo.style.height = campo.scrollHeight + 'px'; };
+    const ajustarTodos = () => { for (const item of estado.linhas) ajustar(item.input); };
 
     function novaLinha(q, dados, rascunho) {
       const volta = rascunho ? retomar(chamar, rascunho, rascunhos) : null;
       const linha = volta ? volta.linha
         : criarLinha(chamar, { quadro: q.quadro, data: q.data, texto: '', feita: false, ...dados }, { rascunhos, chave: novaChave() });
       const li = criar('li', 'linha');
-      const item = { linha, li, quadro: q, input: criar('input'), caixa: null, aviso: criar('p', 'linha-aviso') };
+      const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso') };
       if (q.quadro !== 'notas') {   // nota é anotação: sem caixinha
         item.caixa = criar('input');
         item.caixa.type = 'checkbox';
@@ -294,29 +300,46 @@
         li.append(item.caixa);
       }
       const input = item.input;
-      input.type = 'text';
+      input.rows = 1;
       input.maxLength = 300;
       input.autocomplete = 'off';
       input.enterKeyHint = 'next';
       input.value = volta ? rascunho.entrada.texto : linha.dados.texto;
       input.setAttribute('aria-label', q.rotulo);
       input.addEventListener('input', () => {
+        if (semQuebra(input.value) !== input.value) {   // colado com várias linhas
+          const cursor = input.selectionStart;
+          input.value = semQuebra(input.value).slice(0, 300);
+          input.setSelectionRange(cursor, cursor);
+        }
+        ajustar(input);
         linha.anotar(input.value, item.caixa ? item.caixa.checked && !!input.value.trim() : undefined);
         if (item.caixa) item.caixa.disabled = !input.value.trim();
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);   // sempre uma vazia no fim
       });
       input.addEventListener('blur', () => { salvar(item); });
-      input.addEventListener('keydown', ev => {
-        if (ev.key !== 'Enter' || ev.isComposing || input.readOnly) return;
-        ev.preventDefault();
+      // Enter salva e vai para a próxima linha; nunca entra uma quebra no texto
+      const enter = () => {
+        if (input.readOnly) return;
         salvar(item);
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);
-        li.nextElementSibling?.querySelector('input[type="text"]').focus();
+        li.nextElementSibling?.querySelector('textarea').focus();
+      };
+      input.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' || ev.isComposing) return;
+        ev.preventDefault();
+        enter();
+      });
+      input.addEventListener('beforeinput', ev => {   // teclado de celular que não informa a tecla
+        if ((ev.inputType !== 'insertLineBreak' && ev.inputType !== 'insertParagraph') || ev.isComposing) return;
+        ev.preventDefault();
+        enter();
       });
       li.append(input, item.aviso);
       q.lista.append(li);
       estado.linhas.push(item);
       pintar(item);
+      ajustar(input);
       if (volta) {
         li.classList.add('erro');
         item.aviso.textContent = 'Texto que não tinha sido salvo. Salvando…';
@@ -358,6 +381,7 @@
         for (let n = usadas; n < Math.max(MIN_LINHAS, usadas + 1); n++) novaLinha(q);
       }
       estado.mostrada = inicio;
+      ajustarTodos();   // com a página inteira montada a largura é a final (barra de rolagem)
       // no celular os quadros ficam um embaixo do outro: a semana atual abre em hoje
       if (win.matchMedia('(max-width: 700px)').matches) semana.querySelector('.quadro.hoje')?.scrollIntoView({ block: 'start' });
     }
@@ -416,9 +440,11 @@
       ev.preventDefault();
       ev.returnValue = '';
     });
+    win.addEventListener('resize', ajustarTodos);   // mudou a largura da coluna, mudam as quebras
+    doc.fonts?.ready.then(ajustarTodos);
     ligarSaida(win, () => { for (const item of estado.linhas) if (!item.input.readOnly) salvar(item); });
     irPara(estado.alvo);
   }
 
-  return { segundaDe, somarDias, rotuloSemana, criarLinha, idDoToken, criarRascunhos, casarRascunhos, retomar, recuperarFora, ligarSaida, iniciar };
+  return { segundaDe, somarDias, rotuloSemana, semQuebra, criarLinha, idDoToken, criarRascunhos, casarRascunhos, retomar, recuperarFora, ligarSaida, iniciar };
 });

@@ -17,7 +17,8 @@ Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_
 
 ## Tela
 - Menu **Pessoal > Minha semana**. Fica fora de `PAGINAS` (nunca é a primeira página de ninguém) e está em `ATEND_BLOQUEADAS` (no modo atendimento some do menu e nada é buscado).
-- Computador: 3 colunas (Seg, Ter, Qua | Qui, Sex, Sáb | Tarefas, Notas, Domingo). Celular (até 700px): uma coluna, de Segunda a Domingo e depois Tarefas e Notas; a semana atual abre rolada até hoje.
+- A leitura é sempre da esquerda para a direita (pedido do dono, como a semana do Google Agenda), e a ordem do DOM é a mesma (Tab segue Segunda → Domingo). Quem manda é a largura da área (já sem o menu lateral): a partir de 960px, uma fileira com os 7 dias e, embaixo, Tarefas e Notas lado a lado; menos que isso, 4 colunas (Seg a Qui, Sex a Dom, depois Tarefas e Notas, metade cada). Celular (até 700px de tela): uma coluna, de Segunda a Domingo, Tarefas e Notas; a semana atual abre rolada até hoje.
+- Cada linha é um `textarea` que cresce com o texto (aparece inteiro, quebrando linha). O texto continua sendo uma linha só: Enter salva e passa para a próxima sem inserir quebra, e o que for colado com quebras vira espaço.
 - Cada quadro tem no mínimo 8 linhas e sempre uma vazia no fim. Salva no Enter e ao sair da linha. Apagar todo o texto exclui. Notas não têm caixinha.
 - Tarefas e Notas não mudam com a semana. Tarefa não concluída fica no dia em que foi escrita.
 - Cada linha grava em fila (uma operação por vez), para não nascer tarefa repetida. Se falhar, o texto fica, a linha ganha borda vermelha e aviso, e Enter tenta de novo. Com texto não salvo, a semana não troca e o navegador avisa ao sair.

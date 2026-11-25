@@ -13,31 +13,39 @@
         .barra-semana { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
         .barra-semana .btn { min-height: 40px; min-width: 40px; }
         .rotulo-semana { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; min-width: 13ch; text-align: center; }
-        .semana { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: "seg qui tar" "ter sex not" "qua sab dom"; gap: 12px; }
+        /* ordem de leitura = ordem do DOM (Segunda -> Domingo, Tarefas, Notas); a largura que vale é a da área, já sem o menu lateral */
+        .semana-area { container-type: inline-size; }
+        .semana { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .q-tar, .q-not { grid-column: span 2; }
         .semana > .vazio { grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-light); }
         .quadro { background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 12px 12px; min-width: 0; scroll-margin-top: 32px; }
         .quadro.hoje { border-color: var(--primary-borda); }
-        .quadro h2 { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border-strong); }
+        .quadro h2 { font-size: 15px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border-strong); }
         .q-data { font-size: 13px; font-weight: 500; color: var(--text-light); font-variant-numeric: tabular-nums; }
         .q-hoje { margin-left: auto; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--primary-color); }
-        .q-seg { grid-area: seg; } .q-ter { grid-area: ter; } .q-qua { grid-area: qua; } .q-qui { grid-area: qui; } .q-sex { grid-area: sex; }
-        .q-sab { grid-area: sab; } .q-dom { grid-area: dom; } .q-tar { grid-area: tar; } .q-not { grid-area: not; }
+        /* tela larga: uma fileira com os sete dias; 14 trilhas para Tarefas e Notas dividirem a largura embaixo */
+        @container (min-width: 960px) {
+            .semana { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+            .quadro { grid-column: span 2; padding-left: 8px; padding-right: 8px; }
+            .q-tar, .q-not { grid-column: span 7; }
+        }
         .linhas { list-style: none; }
-        .linha { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; min-height: 34px; padding: 0 4px; border: 1px solid transparent; border-bottom-color: var(--border-color); }
+        .linha { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 6px; min-height: 34px; padding: 0 4px; border: 1px solid transparent; border-bottom-color: var(--border-color); }
         .linha:focus-within { border-bottom-color: var(--primary-color); }
-        .linha input[type="checkbox"] { flex: none; }
+        .linha input[type="checkbox"] { flex: none; margin-top: 8px; }
         .linha input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
-        .linha input[type="text"] { flex: 1; min-width: 0; height: 32px; border: 0; background: transparent; color: var(--text-dark); font-size: 14px; text-overflow: ellipsis; }
-        .linha.feita input[type="text"] { text-decoration: line-through; color: var(--text-light); }
+        .linha textarea { flex: 1; min-width: 0; height: 32px; padding: 6px 0; line-height: 20px; border: 0; background: transparent; color: var(--text-dark); font-size: 13.5px; resize: none; overflow: hidden; overflow-wrap: anywhere; }
+        .linha.feita textarea { text-decoration: line-through; color: var(--text-light); }
         .linha.erro { border-color: var(--danger-color); border-radius: var(--radius-sm); }
         .linha-aviso { flex-basis: 100%; font-size: 12px; color: var(--danger-fg); padding-bottom: 4px; }
         .aviso-semana { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--danger-bg); border: 1px solid var(--danger-borda); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
         .toast { min-width: 260px; max-width: 380px; font-size: 14px; }
-        @media (pointer: coarse) { .linha { min-height: 44px; } .linha input[type="text"] { height: 42px; } .barra-semana .btn { min-height: 44px; min-width: 44px; } }
+        @media (pointer: coarse) { .linha { min-height: 44px; } .linha input[type="checkbox"] { margin-top: 13px; } .linha textarea { height: 42px; padding: 11px 0; } .barra-semana .btn { min-height: 44px; min-width: 44px; } }
         @media (max-width: 700px) {
             .semana { display: flex; flex-direction: column; }
-            .linha input[type="text"] { font-size: 16px; }   /* abaixo de 16px o iPhone amplia a tela ao tocar */
+            .q-tar, .q-not { grid-column: auto; }
+            .linha textarea { font-size: 16px; }   /* abaixo de 16px o iPhone amplia a tela ao tocar */
             #toasts { left: 16px; right: 16px; bottom: 16px; }
             .toast { min-width: 0; }
         }
@@ -45,7 +53,7 @@
     <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="layout.js?v=202611291000" defer></script>
     <script src="entregas_comum.js?v=202611281000" defer></script>
-    <script src="tarefas.js?v=202611291000" defer></script>
+    <script src="tarefas.js?v=202611291100" defer></script>
 </head>
 <body>
     <div class="container">
@@ -76,7 +84,7 @@
                 <span id="aviso-texto"></span>
                 <button type="button" class="btn btn-secondary btn-mini" id="btn-tentar">Tentar de novo</button>
             </div>
-            <div class="semana" id="semana"></div>
+            <div class="semana-area"><div class="semana" id="semana"></div></div>
         </main>
     </div>
     <div id="toasts" aria-live="polite"></div>

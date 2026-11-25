@@ -7,17 +7,17 @@ Uma lista de tarefas do dia, sem horários, com cara de caderno pautado, e uma c
 
 ```
  Minha semana        [‹]  23/11 a 29/11  [›]  [Hoje]
- ┌ Segunda 23/11 ─┐ ┌ Quinta 26/11 ──┐ ┌ TAREFAS ───────┐
- │[✓] ~~Ligar~~   │ │[ ] ...         │ │[ ] ...         │
- │[ ] ...         │ │                │ │                │
- └────────────────┘ └────────────────┘ └────────────────┘
- ┌ Terça ─────────┐ ┌ Sexta ─────────┐ ┌ NOTAS ─────────┐
- └────────────────┘ └────────────────┘ └────────────────┘
- ┌ Quarta ────────┐ ┌ Sábado ────────┐ ┌ Domingo ───────┐
- └────────────────┘ └────────────────┘ └────────────────┘
+ ┌ Seg 23 ──┐┌ Ter 24 ──┐┌ Qua 25 ──┐┌ Qui 26 ──┐┌ Sex 27 ──┐┌ Sáb 28 ──┐┌ Dom 29 ──┐
+ │[✓] ~~Li~~││[ ] ...   ││[ ] texto ││          ││          ││          ││          │
+ │[ ] ...   ││          ││    longo ││          ││          ││          ││          │
+ └──────────┘└──────────┘└──────────┘└──────────┘└──────────┘└──────────┘└──────────┘
+ ┌ TAREFAS ───────────────────────────────┐┌ NOTAS ──────────────────────────────────┐
+ │[ ] ...                                 ││ ...                                     │
+ └────────────────────────────────────────┘└─────────────────────────────────────────┘
 ```
 
 - Sete quadros de dia mais Tarefas e Notas, com linhas pautadas. O dia de hoje fica destacado.
+- Ordem horizontal, da esquerda para a direita, como a visão de semana do Google Agenda (mudança pedida pelo dono; antes o desenho era em 3 colunas, coluna a coluna). Em telas menores quebra em 4 colunas, na mesma leitura. Texto longo quebra linha e aparece inteiro.
 - Escrever na linha vazia e apertar Enter cria a tarefa e abre a próxima. Sair da linha também salva.
 - Marcar a caixinha risca o texto; desmarcar desfaz.
 - Apagar todo o texto de uma linha exclui a tarefa.

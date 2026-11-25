@@ -364,3 +364,36 @@ test('M2: aba escondida ou fechada salva o que falta pela mesma fila, sem POST r
   assert.deepEqual(api.chamadas.map(c => c[0]), ['POST']);
   assert.match(ler('tarefas.js'), /ligarSaida\(win, /);
 });
+
+// ---------- grade horizontal (como a semana do Google Agenda) e texto que quebra linha ----------
+test('grade: 7 colunas Segunda -> Domingo na tela larga, Tarefas e Notas lado a lado embaixo; nada de coluna a coluna', () => {
+  const h = ler('tarefas.html'), js = ler('tarefas.js');
+  assert.doesNotMatch(h, /grid-template-areas|grid-area:|grid-auto-flow: *column|column-count/, 'a ordem na tela é a ordem do DOM (Tab segue Segunda -> Domingo)');
+  assert.match(js, /\['seg', 'Segunda'\], \['ter', 'Terça'\], \['qua', 'Quarta'\], \['qui', 'Quinta'\], \['sex', 'Sexta'\], \['sab', 'Sábado'\], \['dom', 'Domingo'\]/);
+  assert.ok(js.indexOf("nome: 'Tarefas'") < js.indexOf("nome: 'Notas'"));
+  assert.match(h, /\.semana-area \{ container-type: inline-size; \}/);
+  // intermediário: 4 colunas, Tarefas e Notas com metade cada
+  assert.match(h, /\.semana \{ display: grid; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(h, /\.q-tar, \.q-not \{ grid-column: span 2; \}/);
+  // largo: 14 trilhas = 7 dias de 2 e Tarefas/Notas de 7
+  assert.match(h, /@container \(min-width: 960px\) \{[^@]*repeat\(14, minmax\(0, 1fr\)\)[^@]*\.quadro \{ grid-column: span 2;[^@]*\.q-tar, \.q-not \{ grid-column: span 7; \}/);
+  assert.match(h, /@media \(max-width: 700px\) \{\s*\.semana \{ display: flex; flex-direction: column; \}/);
+});
+
+test('linha: textarea que cresce, maxlength 300, Enter sem quebra (e sem atrapalhar o IME), texto só por value', () => {
+  const h = ler('tarefas.html'), js = ler('tarefas.js');
+  assert.match(js, /criar\('textarea'\)/);
+  assert.match(js, /input\.rows = 1/);
+  assert.match(js, /input\.maxLength = 300/);
+  assert.match(js, /ev\.key !== 'Enter' \|\| ev\.isComposing/);
+  assert.match(js, /insertLineBreak/);   // teclado de celular que não manda a tecla Enter
+  assert.match(js, /scrollHeight/);
+  assert.match(js, /addEventListener\('resize'/);
+  assert.doesNotMatch(js, /input\.textContent|input\.innerText/);
+  assert.match(h, /\.linha textarea \{[^}]*resize: none;[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere/);
+  assert.match(h, /tarefas\.js\?v=202611291100/);
+});
+
+test('semQuebra: texto colado com várias linhas vira uma linha só, mantendo os espaços digitados', () => {
+  assert.equal(T.semQuebra('a\r\nb\nc d '), 'a b c d ');
+});
