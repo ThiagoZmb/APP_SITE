@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Semana dos administradores</title>
+    <style>
+        /* casca, botões e cores: tema.css (DESIGN.md); aqui só o caderno pautado. Cópia de tarefas.html: mudança de tela lá se repete aqui */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body { color: var(--text-dark); min-height: 100vh; }
+        .barra-semana { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+        .barra-semana .btn { min-height: 40px; min-width: 40px; }
+        .rotulo-semana { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; min-width: 13ch; text-align: center; }
+        /* ordem de leitura = ordem do DOM (Segunda -> Domingo, Tarefas, Notas); a largura que vale é a da área, já sem o menu lateral */
+        .semana-area { container-type: inline-size; }
+        .semana { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .q-tar, .q-not { grid-column: span 2; }
+        .semana > .vazio { grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-light); }
+        .quadro { background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 12px 12px; min-width: 0; scroll-margin-top: 32px; }
+        .quadro.hoje { border-color: var(--primary-borda); }
+        .quadro h2 { font-size: 15px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border-strong); }
+        .q-data { font-size: 13px; font-weight: 500; color: var(--text-light); font-variant-numeric: tabular-nums; }
+        .q-hoje { margin-left: auto; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--primary-color); }
+        /* tela larga: uma fileira com os sete dias; 14 trilhas para Tarefas e Notas dividirem a largura embaixo */
+        @container (min-width: 960px) {
+            .semana { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+            .quadro { grid-column: span 2; padding-left: 8px; padding-right: 8px; }
+            .q-tar, .q-not { grid-column: span 7; }
+        }
+        .linhas { list-style: none; }
+        .linha { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 6px; min-height: 34px; padding: 0 4px; border: 1px solid transparent; border-bottom-color: var(--border-color); }
+        .linha:focus-within { border-bottom-color: var(--primary-color); }
+        .linha input[type="checkbox"] { flex: none; margin-top: 8px; }
+        .linha input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
+        .linha textarea { flex: 1; min-width: 0; height: 32px; padding: 6px 0; line-height: 20px; border: 0; background: transparent; color: var(--text-dark); font-size: 13.5px; resize: none; overflow: hidden; overflow-wrap: anywhere; }
+        .linha.feita textarea { text-decoration: line-through; color: var(--text-light); }
+        .linha.erro { border-color: var(--danger-color); border-radius: var(--radius-sm); }
+        .sino { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 32px; border: 0; background: transparent; color: var(--text-light); cursor: pointer; opacity: .6; border-radius: var(--radius-sm); }
+        .sino svg { width: 15px; height: 15px; }
+        .sino:hover, .sino:focus-visible, .linha:focus-within .sino, .sino.marcado { opacity: 1; }
+        .sino.marcado { color: var(--primary-color); }
+        .sino.vazia { visibility: hidden; }
+        .linha-hora { flex-basis: 100%; font-size: 11px; line-height: 14px; color: var(--primary-color); padding-bottom: 3px; font-variant-numeric: tabular-nums; }
+        .alarme-escolha { margin: auto !important; width: min(380px, calc(100vw - 32px)); }
+        .alarme-escolha .dlg-cab p { overflow-wrap: anywhere; }
+        .alarme-escolha input { width: 100%; min-height: 44px; padding: 8px 10px; font-size: 16px; }
+        .alarme-escolha .dlg-rodape .btn { min-height: 40px; }
+        .linha-aviso { flex-basis: 100%; font-size: 12px; color: var(--danger-fg); padding-bottom: 4px; }
+        .linha-autor { flex-basis: 100%; font-size: 11px; line-height: 14px; color: var(--text-light); padding-bottom: 3px; overflow-wrap: anywhere; }
+        .linha-duvida { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 6px; font-size: 12px; }
+        .linha-duvida p { flex-basis: 100%; color: var(--danger-fg); overflow-wrap: anywhere; }
+        .aviso-semana { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--danger-bg); border: 1px solid var(--danger-borda); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 380px; font-size: 14px; }
+        @media (pointer: coarse) { .linha { min-height: 44px; } .linha input[type="checkbox"] { margin-top: 13px; } .linha textarea { height: 42px; padding: 11px 0; } .sino { width: 36px; height: 42px; } .alarme-escolha .dlg-rodape .btn { min-height: 44px; } .barra-semana .btn { min-height: 44px; min-width: 44px; } }
+        @media (max-width: 700px) {
+            .semana { display: flex; flex-direction: column; }
+            .q-tar, .q-not { grid-column: auto; }
+            .linha textarea { font-size: 16px; }   /* abaixo de 16px o iPhone amplia a tela ao tocar */
+            #toasts { left: 16px; right: 16px; bottom: 16px; }
+            .toast { min-width: 0; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202611271000">
+    <script src="layout.js?v=202611291300" defer></script>
+    <script src="entregas_comum.js?v=202611281000" defer></script>
+    <script src="tarefas_admin.js?v=202611291200" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Semana dos administradores</h1>
+            <p class="welcome-subtitle">Caderno compartilhado: o que você escreve aqui, todos os administradores veem.</p>
+
+            <div class="barra-semana" id="barra-semana">
+                <button type="button" class="btn btn-secondary btn-mini" id="btn-anterior" aria-label="Semana anterior">‹</button>
+                <span class="rotulo-semana" id="rotulo-semana" aria-live="polite"></span>
+                <button type="button" class="btn btn-secondary btn-mini" id="btn-proxima" aria-label="Próxima semana">›</button>
+                <button type="button" class="btn btn-secondary btn-mini" id="btn-hoje">Hoje</button>
+            </div>
+            <div class="aviso-semana" id="aviso-semana" role="alert" hidden>
+                <span id="aviso-texto"></span>
+                <button type="button" class="btn btn-secondary btn-mini" id="btn-tentar">Tentar de novo</button>
+            </div>
+            <div class="semana-area"><div class="semana" id="semana"></div></div>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

@@ -11,9 +11,10 @@ Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_
 - Nenhuma tabela do VB é lida ou alterada.
 
 ## Dados e rotas
-- `web_tarefas`: uma linha por tarefa; `quadro` = `dia`, `tarefas` ou `notas`; `data` só no quadro `dia`; `texto` de 1 a 300 caracteres (quebra de linha vira espaço); `feita`.
+- `web_tarefas`: uma linha por tarefa; `quadro` = `dia`, `tarefas` ou `notas`; `data` só no quadro `dia`; `texto` de 1 a 300 caracteres (quebra de linha vira espaço); `feita`; `alarme` opcional (dias e Tarefas), com `alarme_visto` e `alarme_adiado` (colunas acrescentadas na subida se faltarem).
 - `GET /minha_semana?inicio=AAAA-MM-DD`: os sete dias a partir de `inicio`, mais todas as linhas de `tarefas` e `notas`, na ordem de criação.
-- `POST /minha_semana`, `PUT /minha_semana/:id` (`texto` e/ou `feita`), `DELETE /minha_semana/:id`.
+- `POST /minha_semana`, `PUT /minha_semana/:id` (`texto`, `feita` e/ou `alarme`), `DELETE /minha_semana/:id`.
+- Alarme (sino na linha, janela de aviso em qualquer tela, OK e Adiar): `docs/regras/semana-administradores-alarmes.md`, junto com a Semana dos administradores (cópia compartilhada desta página).
 
 ## Tela
 - Menu **Pessoal > Minha semana**. Fica fora de `PAGINAS` (nunca é a primeira página de ninguém) e está em `ATEND_BLOQUEADAS` (no modo atendimento some do menu e nada é buscado).
@@ -40,4 +41,4 @@ Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_
 - Não há atualização automática: o que foi escrito em outro aparelho aparece ao trocar de semana, ao tocar em "Hoje" ou ao reabrir a página. Dois aparelhos editando a mesma linha: vale a última gravação.
 - Se o servidor gravar uma linha nova, a resposta se perder e a nova tentativa for na mesma tela aberta (sem recarregar), nasce outra igual.
 - Usuário sem nenhuma permissão de tela não consegue entrar no sistema (regra do login, anterior a este módulo).
-- Fora do escopo: horários, lembretes, compartilhar, impressão, transferir pendências.
+- Fora do escopo: repetição de alarme, aviso com o sistema fechado, compartilhar (há a página própria dos administradores), impressão, transferir pendências.

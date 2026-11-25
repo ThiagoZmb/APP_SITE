@@ -78,6 +78,7 @@ const CATALOGO = [
   { codigo: 'etapas.montagem', nome: 'Dar OK na etapa Portas montadas', area: 'Etapas de produção' },
   { codigo: 'etapas.finalizar', nome: 'Dar OK em Pedido finalizado (marca o pedido como Pronto)', area: 'Etapas de produção' },
   { codigo: 'etapas.gerir', nome: 'Gerir todas as etapas de produção: qualquer etapa, N/A, desfazer e forçar o finalizado', area: 'Etapas de produção' },
+  { codigo: 'tarefas_admin.usar', nome: 'Semana dos administradores', area: 'Pessoal' },
   { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos e Gestão; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
   { codigo: 'administrativo.ver', nome: 'Acesso administrativo: gráficos, indicadores, resumos e totais, telas de gestão e valores em dinheiro (sem ela o usuário é operador; com "Valores financeiros" e sem esta, é "só valores")', area: 'Especial' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
@@ -161,6 +162,7 @@ const DESCRICOES = {
   'etapas.montagem': 'Dá OK (ou desfaz) na etapa Portas montadas.',
   'etapas.finalizar': 'Dá OK em Pedido finalizado, o que marca o pedido como Pronto.',
   'etapas.gerir': 'Mexe em qualquer etapa, marca N/A e força o finalizado.',
+  'tarefas_admin.usar': 'Abre a Semana dos administradores (caderno compartilhado: ver, escrever, marcar e apagar) e recebe os alarmes dele. Só vale com Acesso administrativo.',
   'atendimento.modo': 'Entra já no Modo atendimento (tela limpa para atender o cliente); o usuário pode desligar.',
   'administrativo.ver': 'Chave da classe administrativa: libera gráficos, indicadores, totais, gestão e dinheiro. Sem ela, as permissões marcadas "Só administrativo" não valem.',
   'valores.ver': 'Mostra preços e valores em dinheiro nas telas.',
@@ -177,14 +179,16 @@ const PERMISSOES_ADMINISTRATIVAS = [
   'paineis.ver', 'indicadores.ver', 'financeiro.ver', 'financeiro.lancar', 'financeiro.excluir', 'gestao.ver', 'gestao.editar',
   'precos.ver', 'precos.editar', 'precos.gravar', 'clientes.receber', 'clientes.credito',
   // permissões por ação (2026-11-17): "Reagendar entregas só pode ser feita pelo administrativo" (pedido do dono)
-  'entregas.reagendar'
+  'entregas.reagendar',
+  // semana compartilhada entre administradores (2026-11-25)
+  'tarefas_admin.usar'
 ];
 for (const p of CATALOGO) p.administrativa = PERMISSOES_ADMINISTRATIVAS.includes(p.codigo);
 const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS.filter(c => c !== 'atendimento.modo') },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.data_pronto' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir' && c !== 'indicadores.ver' && c !== 'produtos.dependencias') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.data_pronto' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir' && c !== 'indicadores.ver' && c !== 'produtos.dependencias' && c !== 'tarefas_admin.usar') },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'pedidos.desconto', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

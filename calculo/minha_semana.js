@@ -39,8 +39,9 @@ function validarNova(corpo) {
   return { ok: true, valor: { quadro, data: quadro === 'dia' ? data : null, texto: t.texto } };
 }
 
+// `alarme`: 'AAAA-MM-DD HH:MM' ou null (remove). A rota ainda recusa alarme no quadro notas.
 function validarMudanca(corpo) {
-  const { texto, feita } = corpo || {};
+  const { texto, feita, alarme } = corpo || {};
   const valor = {};
   if (texto !== undefined) {
     const t = limparTexto(texto);
@@ -50,6 +51,10 @@ function validarMudanca(corpo) {
   if (feita !== undefined) {
     if (typeof feita !== 'boolean') return { ok: false, motivo: 'Marcação inválida.' };
     valor.feita = feita;
+  }
+  if (alarme !== undefined) {
+    if (alarme !== null && !require('./alarmes').validarAlarme(alarme)) return { ok: false, motivo: 'Data ou hora do alarme inválida.' };
+    valor.alarme = alarme;
   }
   if (!Object.keys(valor).length) return { ok: false, motivo: 'Nada para mudar.' };
   return { ok: true, valor };

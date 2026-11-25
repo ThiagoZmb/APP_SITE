@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, acrescentarPermissoesProdutosDependencias, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes } = require('./seguranca/instalacao');
+const { acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, acrescentarPermissoesProdutosDependencias, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesTarefasAdmin } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
@@ -58,6 +58,8 @@ const { registrarPesos } = require('./rotas/pesos');
 const { registrarDanfe } = require('./rotas/danfe');
 const { registrarChecklist } = require('./rotas/checklist');
 const { registrarMinhaSemana } = require('./rotas/minha_semana');
+const { registrarSemanaAdmin } = require('./rotas/semana_admin');
+const { registrarAlarmes } = require('./rotas/alarmes');
 const { registrarEntregaChecklist } = require('./rotas/entrega_checklist');
 const { registrarFluxoVarios } = require('./rotas/fluxo_varios');
 const { registrarPerfilSecoes } = require('./rotas/perfil_secoes');
@@ -1865,6 +1867,8 @@ registrarPesos({ rota: registro.rota, pool });
 registrarDanfe({ rota: registro.rota, pool, foraDosEstados });
 registrarChecklist({ rota: registro.rota, pool });
 registrarMinhaSemana({ rota: registro.rota, pool });
+registrarSemanaAdmin({ rota: registro.rota, pool });
+registrarAlarmes({ rota: registro.rota, pool });
 registrarFluxoVarios({ rota: registro.rota, pool });
 registrarPerfilSecoes({ rota: registro.rota, pool });
 registrarProdutosDependencias({ rota: registro.rota, pool });
@@ -1930,6 +1934,7 @@ async function iniciar() {
   // permissões por ação (2026-11-17): depois da chave administrativa, porque o reagendar só vai a quem já é administrativo
   if ((await acrescentarPermissoesEntregasAcoes(pool)).feito) console.log('[permissões] entregas.programar desdobrada por ação (reagendar só para perfis administrativos)');
   if ((await acrescentarPermissoesPedidosAcoes(pool)).feito) console.log('[permissões] pedidos.data_pronto (de pedidos.situacao) e pedidos.desconto (de orcamentos.criar) acrescentadas');
+  if ((await acrescentarPermissoesTarefasAdmin(pool)).feito) console.log('[permissões] tarefas_admin.usar acrescentada ao Administrador');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
   if (process.env.NODE_ENV !== 'test') {

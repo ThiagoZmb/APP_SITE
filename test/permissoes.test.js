@@ -4,9 +4,9 @@ const { CATALOGO, CODIGOS, PERFIS_INICIAIS, permissoesFinais, atende } = require
 
 const perfil = nome => PERFIS_INICIAIS.find(p => p.nome === nome);
 
-test('catálogo tem 79 permissões e códigos únicos', () => {
-  assert.equal(CATALOGO.length, 79); // + produtos.dependencias (2026-11-11); + 7 de entregas e pedidos.data_pronto/desconto (2026-11-17)
-  assert.equal(CODIGOS.size, 79);
+test('catálogo tem 80 permissões e códigos únicos', () => {
+  assert.equal(CATALOGO.length, 80); // + tarefas_admin.usar (2026-11-25); + produtos.dependencias (2026-11-11); + 7 de entregas e pedidos.data_pronto/desconto (2026-11-17)
+  assert.equal(CODIGOS.size, 80);
   assert.ok(CODIGOS.has('entregas.checklist')); // checklist externo de entrega (2026-11-12)
   assert.ok(CODIGOS.has('precos.gravar'));
   assert.equal(CATALOGO.find(p => p.codigo === 'precos.editar').nome, 'Editar ligações de custo, parâmetros e margens');
@@ -20,7 +20,7 @@ test('Interno completo = todas menos admin.usuarios, pedidos.criar, cancelar e e
   assert.ok(p.permissoes.includes('precos.ver') && !p.permissoes.includes('precos.editar') && !p.permissoes.includes('precos.gravar'));
   assert.ok(p.permissoes.includes('estoque.desfazer') && p.permissoes.includes('orcamentos.salvar'));
   assert.ok(!p.permissoes.includes('admin.usuarios') && !p.permissoes.includes('pedidos.criar') && !p.permissoes.includes('pedidos.cancelar') && !p.permissoes.includes('pedidos.excluir'));
-  assert.equal(perfil("Administrador").permissoes.length, 78);
+  assert.equal(perfil("Administrador").permissoes.length, 79);
   assert.ok(p.permissoes.includes('corte.ver') && p.permissoes.includes('corte.planejar')); // plano de corte: Interno completo planeja
   assert.ok(!p.permissoes.includes('corte.parametros')); // parâmetros e retalhos manuais: só o Administrador
   assert.ok(!p.permissoes.includes('gestao.ver') && !p.permissoes.includes('gestao.editar')); // Central de Gestão: só o Administrador na migração
@@ -131,7 +131,7 @@ test('com a chave: o usuário ganha valores.ver sozinho (a classe administrativa
 
 test('sem a chave: as permissões administrativas SOMEM, venham do perfil ou de exceção "liberar"', () => {
   const todas = ['paineis.ver', 'indicadores.ver', 'financeiro.ver', 'financeiro.lancar', 'financeiro.excluir', 'gestao.ver', 'gestao.editar',
-    'precos.ver', 'precos.editar', 'precos.gravar', 'clientes.receber', 'clientes.credito', 'entregas.reagendar'];
+    'precos.ver', 'precos.editar', 'precos.gravar', 'clientes.receber', 'clientes.credito', 'entregas.reagendar', 'tarefas_admin.usar'];
   assert.deepEqual([...PERMISSOES_ADMINISTRATIVAS].sort(), [...todas].sort());
   const doPerfil = finais([...todas, 'estoque.ver', 'pedidos.ver']);
   for (const c of todas) assert.ok(!doPerfil.has(c), c);

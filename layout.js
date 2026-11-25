@@ -6,6 +6,8 @@
 (function () {
     // Atalho no celular (PWA): pwa.js põe as tags do manifesto, se faltarem, e registra o sw.js (que não guarda dados).
     try { const s = document.createElement("script"); s.src = new URL("pwa.js", (document.currentScript && document.currentScript.src) || location.href).href; document.head.appendChild(s); } catch (e) { /* sem o atalho o sistema funciona igual */ }
+    // Alarmes das semanas (janela com som em qualquer tela): alarmes.js, com a mesma versão ?v= do layout.js.
+    try { const base = (document.currentScript && document.currentScript.src) || location.href; const u = new URL("alarmes.js", base); u.search = new URL(base).search; const s = document.createElement("script"); s.src = u.href; document.head.appendChild(s); } catch (e) { /* sem os alarmes o sistema funciona igual */ }
     const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
     const API = 'https://elegance-backend-hrho.onrender.com';
     const ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -36,6 +38,7 @@
         // O logo Elegance leva à primeira página liberada; Pedidos e Orçamentos é o destino padrão.
         { secao: 'Pessoal' },
         { href: 'tarefas.html', texto: 'Minha semana', icone: 'tarefas' },   // caderno pessoal: sem permissão (fora de PAGINAS, não vira a primeira página de ninguém)
+        { href: 'tarefas_admin.html', texto: 'Semana dos administradores', icone: 'tarefas' },   // o mesmo caderno, compartilhado (tarefas_admin.usar)
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
@@ -69,7 +72,7 @@
     // Quem tem 'atendimento.modo' começa cada sessão com o modo ligado e pode desligar/ligar a qualquer momento (botão no topo).
     // É um recurso de tela (privacidade na frente do cliente), não uma barreira de segurança: quem decide o acesso continua sendo o servidor.
     const ATEND_CHAVE = 'atendimento', ATEND_CLIENTE = 'atendimento_cliente';
-    const ATEND_BLOQUEADAS = ['inicio.html', 'graficos_pedidos.html', 'financeiro.html', 'custos.html', 'gestao.html', 'tarefas.html'];
+    const ATEND_BLOQUEADAS = ['inicio.html', 'graficos_pedidos.html', 'financeiro.html', 'custos.html', 'gestao.html', 'tarefas.html', 'tarefas_admin.html'];
     const ss = { ler: k => { try { return sessionStorage.getItem(k); } catch { return null; } },
         gravar: (k, v) => { try { if (v === null || v === '') sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { /* sem armazenamento: vale só nesta página */ } } };
     const atendTem = acesso => (acesso?.permissoes || []).includes('atendimento.modo');
@@ -81,7 +84,7 @@
         cliente: () => ss.ler(ATEND_CLIENTE) || '',
         definirCliente: nome => ss.gravar(ATEND_CLIENTE, String(nome || '').trim()),
         paginasBloqueadas: ATEND_BLOQUEADAS.slice(),
-        alternar: () => { ss.gravar(ATEND_CHAVE, atendAtivoPara(auth()?.acesso) ? '0' : '1'); }
+        alternar: () => { ss.gravar(ATEND_CHAVE, atendAtivoPara(auth()?.acesso) ? '0' : '1'); window.dispatchEvent?.(new CustomEvent('atendimento-mudou')); }
     };
     // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem define a página padrão após o login.
     // Página nova: acrescentar aqui e no MENU.
@@ -115,6 +118,7 @@
         'usuarios.html': ['admin.usuarios'],
         'portal_admin.html': ['portal.gerir'],
         'regras.html': ['administrativo.ver'],
+        'tarefas_admin.html': ['tarefas_admin.usar'],   // nunca é a primeira página (ver primeiraPaginaDe)
         'etapas_producao.html': ['etapas.ver'],   // antes de minhas_entregas: quem só tem as etapas (chão de fábrica) cai aqui depois do login
         'minhas_entregas.html': [{ algum: ['entregas.baixar', 'administrativo.ver'] }]   // por último: quem tem só entregas.baixar (motorista) cai aqui; os demais mantêm a primeira página de sempre; o administrativo (+ entregas.ver, o servidor confere) vê todas as entregas e dá a baixa
     };
@@ -168,14 +172,14 @@
         return String(codigos || '').split(/\s+/).filter(Boolean).every(c => tem.includes(c));
     };
     const atendeItem = (item, tem) => typeof item === 'string' ? tem.includes(item) : (item?.algum || []).some(c => tem.includes(c));
-    // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona); null = nenhuma
+    // primeira página do mapa que o acesso abre (graficos_pedidos só redireciona; a semana compartilhada não é destino de login); null = nenhuma
     // Estoquista: só estoque.ver + estoque.movimentar (e nenhuma outra) entra direto na leitura de QR; qualquer permissão a mais mantém a primeira página de sempre
     const PERMISSOES_BAIXA_QR = ['estoque.ver', 'estoque.movimentar'];
     const somenteBaixa = acesso => {
         const tem = acesso?.permissoes || [];
         return tem.length === PERMISSOES_BAIXA_QR.length && PERMISSOES_BAIXA_QR.every(c => tem.includes(c));
     };
-    const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html')) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html'
+    const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html')) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html' && p !== 'tarefas_admin.html'
         && !(atendAtivoPara(acesso) && atendBloqueia(p))
         && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
     // Destino da logo do menu: o Início, se este acesso pode vê-lo (permissão da página e modo atendimento); senão a primeira página de sempre
@@ -619,8 +623,8 @@
             aviso?.remove(); aviso = null;
         }
         const fetchOriginal = window.fetch.bind(window);
-        // consultas automáticas em segundo plano (preço, peso, ping do salvador de PDF) não mostram o ícone: aconteceriam a cada alteração do formulário
-        const SEGUNDO_PLANO = /\/(peso\/itens|calcular_preco|ped_orc\/sistema_correr)(\?|$)|127\.0\.0\.1:3917/;
+        // consultas automáticas em segundo plano (preço, peso, ping do salvador de PDF, alarmes e atualização da semana compartilhada) não mostram o ícone
+        const SEGUNDO_PLANO = /\/(peso\/itens|calcular_preco|ped_orc\/sistema_correr|alarmes)(\?|$)|\/semana_admin\?[^#]*&auto=1|127\.0\.0\.1:3917/;
         window.fetch = (...args) => {
             const alvo = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
             if (SEGUNDO_PLANO.test(alvo)) return fetchOriginal(...args);

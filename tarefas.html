@@ -37,11 +37,21 @@
         .linha textarea { flex: 1; min-width: 0; height: 32px; padding: 6px 0; line-height: 20px; border: 0; background: transparent; color: var(--text-dark); font-size: 13.5px; resize: none; overflow: hidden; overflow-wrap: anywhere; }
         .linha.feita textarea { text-decoration: line-through; color: var(--text-light); }
         .linha.erro { border-color: var(--danger-color); border-radius: var(--radius-sm); }
+        .sino { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 32px; border: 0; background: transparent; color: var(--text-light); cursor: pointer; opacity: .6; border-radius: var(--radius-sm); }
+        .sino svg { width: 15px; height: 15px; }
+        .sino:hover, .sino:focus-visible, .linha:focus-within .sino, .sino.marcado { opacity: 1; }
+        .sino.marcado { color: var(--primary-color); }
+        .sino.vazia { visibility: hidden; }
+        .linha-hora { flex-basis: 100%; font-size: 11px; line-height: 14px; color: var(--primary-color); padding-bottom: 3px; font-variant-numeric: tabular-nums; }
+        .alarme-escolha { margin: auto !important; width: min(380px, calc(100vw - 32px)); }
+        .alarme-escolha .dlg-cab p { overflow-wrap: anywhere; }
+        .alarme-escolha input { width: 100%; min-height: 44px; padding: 8px 10px; font-size: 16px; }
+        .alarme-escolha .dlg-rodape .btn { min-height: 40px; }
         .linha-aviso { flex-basis: 100%; font-size: 12px; color: var(--danger-fg); padding-bottom: 4px; }
         .aviso-semana { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--danger-bg); border: 1px solid var(--danger-borda); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
         #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
         .toast { min-width: 260px; max-width: 380px; font-size: 14px; }
-        @media (pointer: coarse) { .linha { min-height: 44px; } .linha input[type="checkbox"] { margin-top: 13px; } .linha textarea { height: 42px; padding: 11px 0; } .barra-semana .btn { min-height: 44px; min-width: 44px; } }
+        @media (pointer: coarse) { .linha { min-height: 44px; } .linha input[type="checkbox"] { margin-top: 13px; } .linha textarea { height: 42px; padding: 11px 0; } .sino { width: 36px; height: 42px; } .alarme-escolha .dlg-rodape .btn { min-height: 44px; } .barra-semana .btn { min-height: 44px; min-width: 44px; } }
         @media (max-width: 700px) {
             .semana { display: flex; flex-direction: column; }
             .q-tar, .q-not { grid-column: auto; }
@@ -51,9 +61,9 @@
         }
     </style>
     <link rel="stylesheet" href="tema.css?v=202611271000">
-    <script src="layout.js?v=202611291000" defer></script>
+    <script src="layout.js?v=202611291300" defer></script>
     <script src="entregas_comum.js?v=202611281000" defer></script>
-    <script src="tarefas.js?v=202611291100" defer></script>
+    <script src="tarefas.js?v=202611291200" defer></script>
 </head>
 <body>
     <div class="container">

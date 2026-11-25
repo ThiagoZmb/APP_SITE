@@ -391,7 +391,7 @@ test('linha: textarea que cresce, maxlength 300, Enter sem quebra (e sem atrapal
   assert.match(js, /addEventListener\('resize'/);
   assert.doesNotMatch(js, /input\.textContent|input\.innerText/);
   assert.match(h, /\.linha textarea \{[^}]*resize: none;[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere/);
-  assert.match(h, /tarefas\.js\?v=202611291100/);
+  assert.match(h, /tarefas\.js\?v=202611291200/);
 });
 
 test('semQuebra: texto colado com várias linhas vira uma linha só, mantendo os espaços digitados', () => {

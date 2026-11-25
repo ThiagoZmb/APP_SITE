@@ -38,6 +38,15 @@
   // cada tarefa é uma linha só: o que for colado com quebras vira espaço (a quebra visual é do campo, não do texto)
   const semQuebra = t => String(t ?? '').replace(/\r\n|[\r\n\u2028\u2029]/g, ' ');
 
+  // ---------- alarme: 'AAAA-MM-DD HH:MM', a hora como foi digitada ----------
+  const horaCurta = q => `${q.slice(8, 10)}/${q.slice(5, 7)} ${q.slice(11, 16)}`;
+  // valor inicial do campo: o dia da linha às 9h; hoje, dia passado ou quadro Tarefas: a próxima hora cheia
+  function sugestaoDeAlarme(data, agora) {
+    if (data && data > isoLocal(agora)) return data + ' 09:00';
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), agora.getHours() + 1);
+    return `${isoLocal(d)} ${dois(d.getHours())}:00`;
+  }
+
   // ---------- rascunho no navegador: SÓ o que o servidor ainda não confirmou ----------
   // Sessão expirada, aba descartada no celular ou rede caída não podem levar o texto junto. Uma chave por usuário (id do
   // login), uma entrada por linha; some quando o servidor confirma. Armazenamento bloqueado: a tela funciona sem rascunho.
@@ -71,17 +80,18 @@
   // `dados` = o que o servidor já tem; `alvo` = o que a pessoa quer. As operações entram numa fila (uma por vez), o que
   // impede dois POSTs da mesma linha; se uma falha, o alvo fica guardado e a próxima tentativa grava a diferença.
   function criarLinha(chamar, inicial, { rascunhos, chave } = {}) {
-    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita };
-    const alvo = { texto: dados.texto, feita: dados.feita };
+    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: inicial.alarme || null };
+    const alvo = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };
     let fila = Promise.resolve();
     let naFila = 0;
-    const escrito = { texto: dados.texto, feita: dados.feita };   // o último digitado/marcado, antes mesmo de entrar na fila
+    const escrito = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };   // o último digitado/marcado, antes mesmo de entrar na fila
     let enviado = null;   // texto de um POST sem resposta: pode ter chegado ao servidor
 
     function guardar() {
       if (!rascunhos) return;
-      if (!enviado && escrito.texto === dados.texto && (!dados.id || escrito.feita === dados.feita)) return rascunhos.remover(chave);
-      rascunhos.gravar(chave, { id: dados.id, quadro: dados.quadro, data: dados.data, texto: escrito.texto, feita: escrito.feita, ...(enviado ? { enviado } : {}) });
+      if (!enviado && escrito.texto === dados.texto && (!dados.id || (escrito.feita === dados.feita && escrito.alarme === dados.alarme))) return rascunhos.remover(chave);
+      rascunhos.gravar(chave, { id: dados.id, quadro: dados.quadro, data: dados.data, texto: escrito.texto, feita: escrito.feita,
+        ...(escrito.alarme !== dados.alarme ? { alarme: escrito.alarme } : {}), ...(enviado ? { enviado } : {}) });
     }
     function anotar(texto, feita) {
       if (texto !== undefined) escrito.texto = limpar(texto);
@@ -89,12 +99,13 @@
       guardar();
     }
 
-    const esquecer = () => { dados.id = null; dados.texto = ''; dados.feita = false; };
+    const esquecer = () => { dados.id = null; dados.texto = ''; dados.feita = false; dados.alarme = null; };
     async function excluir() {
       try { await chamar('/minha_semana/' + dados.id, { metodo: 'DELETE' }); } catch (e) { if (e.status !== 404) throw e; }
       esquecer();
       alvo.feita = false;
-      if (!escrito.texto) escrito.feita = false;
+      alvo.alarme = null;   // o alarme era da tarefa apagada
+      if (!escrito.texto) { escrito.feita = false; escrito.alarme = null; }
       guardar();
     }
     async function criar() {
@@ -116,6 +127,7 @@
       const corpo = {};
       if (alvo.texto !== dados.texto) corpo.texto = alvo.texto;
       if (alvo.feita !== dados.feita) corpo.feita = alvo.feita;
+      if (alvo.alarme !== dados.alarme) corpo.alarme = alvo.alarme;
       if (!Object.keys(corpo).length) return;
       try {
         await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo });
@@ -142,11 +154,13 @@
       mensagem: '',
       get texto() { return alvo.texto; },
       get feita() { return alvo.feita; },
+      get alarme() { return alvo.alarme; },
       // há algo que o servidor ainda não tem?
-      pendente: () => naFila > 0 || alvo.texto !== dados.texto || (!!dados.id && alvo.feita !== dados.feita),
+      pendente: () => naFila > 0 || alvo.texto !== dados.texto || (!!dados.id && (alvo.feita !== dados.feita || alvo.alarme !== dados.alarme)),
       anotar,
       salvarTexto: t => { anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
-      marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); }
+      marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
+      alarmar: q => { escrito.alarme = q || null; guardar(); return enfileirar(() => { alvo.alarme = q || null; }); }
     };
     function enfileirar(aplicar) {
       naFila++;
@@ -195,6 +209,7 @@
     linha.anotar(entrada.texto, entrada.feita);
     let pronto = linha.salvarTexto(entrada.texto);
     if (entrada.texto && entrada.quadro !== 'notas' && !!entrada.feita !== !!base?.feita) pronto = linha.marcar(entrada.feita);
+    if (entrada.texto && entrada.quadro !== 'notas' && entrada.alarme !== undefined) pronto = linha.alarmar(entrada.alarme);
     return { linha, pronto };
   }
 
@@ -247,8 +262,11 @@
     const chamar = async (caminho, opcoes) => {
       const agora = quemSou();
       if (agora !== null && agora !== dono) { win.location.reload(); throw new Error('Outro usuário entrou neste navegador.'); }
-      return api.chamar(caminho, opcoes);
+      const resposta = await api.chamar(caminho, opcoes);
+      gravou(opcoes?.metodo);
+      return resposta;
     };
+    const gravou = metodo => { if (metodo === 'PUT' || metodo === 'DELETE') win.dispatchEvent(new win.CustomEvent('alarmes-mudou')); };
     const rascunhos = criarRascunhos(() => win.localStorage, dono);
     // só o que já estava guardado ao abrir é retomado (o que nasce depois pertence às linhas da tela)
     const estado = { mostrada: null, alvo: segundaDe(new Date()), geracao: 0, linhas: [], herdados: rascunhos.ler(), recuperacao: null };
@@ -266,6 +284,7 @@
 
     function pintar(item) {
       const { linha, li, aviso: msg, input, caixa } = item;
+      pintarSino(item);
       li.classList.toggle('erro', linha.erro);
       msg.hidden = !linha.erro;
       msg.textContent = linha.erro ? `Não salvou: ${linha.mensagem.replace(/\.$/, '')}. Aperte Enter na linha para tentar de novo.` : '';
@@ -275,6 +294,79 @@
       li.classList.toggle('feita', caixa.checked);
     }
     const salvar = item => item.linha.salvarTexto(item.input.value).then(() => pintar(item));
+    // ---------- alarme da linha ----------
+    function criarSino(item) {
+      const botao = criar('button', 'sino');
+      botao.type = 'button';
+      botao.title = 'Alarme';
+      const SVG = 'http://www.w3.org/2000/svg';
+      const icone = doc.createElementNS(SVG, 'svg');
+      for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) icone.setAttribute(k, v);
+      const traco = doc.createElementNS(SVG, 'path');
+      traco.setAttribute('d', 'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 8H4c0-1 2-2 2-8M10 21h4');
+      icone.append(traco);
+      botao.append(icone);
+      botao.addEventListener('click', () => { if (!item.editor) abrirEditor(item); });
+      return { botao, hora: criar('p', 'linha-hora') };
+    }
+    function pintarSino(item) {
+      const { sino, linha, input } = item;
+      if (!sino) return;
+      const vazia = !input.value.trim();
+      if (vazia || input.readOnly) fecharEditor(item);
+      sino.botao.classList.toggle('vazia', vazia);
+      sino.botao.disabled = vazia || input.readOnly;
+      const quando = vazia ? null : linha.alarme;
+      sino.botao.classList.toggle('marcado', !!quando);
+      sino.botao.setAttribute('aria-label', quando ? `Alarme em ${horaCurta(quando)}: trocar ou remover` : 'Pôr alarme');
+      sino.hora.textContent = quando ? 'Alarme ' + horaCurta(quando) : '';
+      sino.hora.hidden = !quando;
+    }
+    function fecharEditor(item) {
+      const janela = item.editor;
+      if (!janela) return;
+      item.editor = null;
+      janela.close();
+      janela.remove();
+    }
+    // janela própria (DESIGN.md): nas colunas estreitas o campo de data e hora não cabe dentro da linha
+    function abrirEditor(item) {
+      const janela = criar('dialog', 'dlg-padrao alarme-escolha');
+      const cab = criar('div', 'dlg-cab'), corpo = criar('div', 'dlg-corpo'), rodape = criar('div', 'dlg-rodape');
+      const titulo = criar('h3', '', 'Alarme');
+      titulo.id = 'alarme-escolha-titulo';
+      janela.setAttribute('aria-labelledby', titulo.id);
+      cab.append(titulo, criar('p', '', item.input.value));
+      const campo = criar('input');
+      campo.type = 'datetime-local';
+      campo.setAttribute('aria-label', 'Data e hora do alarme');
+      campo.value = (item.linha.alarme || sugestaoDeAlarme(item.quadro.data, new Date())).replace(' ', 'T');
+      corpo.append(campo);
+      const sair = () => { fecharEditor(item); item.sino.botao.focus(); };
+      const gravar = quando => {
+        fecharEditor(item);
+        salvar(item);   // o texto vai primeiro (linha nova ainda não existe no servidor); o alarme entra na mesma fila
+        item.linha.alarmar(quando).then(() => pintar(item));
+        pintar(item);
+        item.input.focus();
+      };
+      const confirmar = () => {
+        const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(campo.value);
+        if (!m) return toast('Escolha a data e a hora do alarme.', 'erro');
+        gravar(m[1] + ' ' + m[2]);
+      };
+      const botao = (classe, rotulo, acao) => { const b = criar('button', 'btn ' + classe, rotulo); b.type = 'button'; b.addEventListener('click', acao); return b; };
+      if (item.linha.alarme) rodape.append(botao('btn-secondary', 'Remover', () => gravar(null)));
+      rodape.append(botao('btn-secondary', 'Cancelar', sair), botao('btn-primary', 'Salvar', confirmar));
+      campo.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); confirmar(); } });
+      janela.addEventListener('cancel', ev => { ev.preventDefault(); sair(); });   // Esc
+      janela.append(cab, corpo, rodape);
+      item.editor = janela;
+      doc.body.append(janela);
+      janela.showModal();
+      campo.focus();
+    }
+
     // o campo cresce com o texto, para ele aparecer inteiro em coluna estreita
     const ajustar = campo => { campo.style.height = 'auto'; campo.style.height = campo.scrollHeight + 'px'; };
     const ajustarTodos = () => { for (const item of estado.linhas) ajustar(item.input); };
@@ -299,6 +391,7 @@
         });
         li.append(item.caixa);
       }
+      if (q.quadro !== 'notas') item.sino = criarSino(item);
       const input = item.input;
       input.rows = 1;
       input.maxLength = 300;
@@ -315,6 +408,7 @@
         ajustar(input);
         linha.anotar(input.value, item.caixa ? item.caixa.checked && !!input.value.trim() : undefined);
         if (item.caixa) item.caixa.disabled = !input.value.trim();
+        pintarSino(item);
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);   // sempre uma vazia no fim
       });
       input.addEventListener('blur', () => { salvar(item); });
@@ -335,7 +429,7 @@
         ev.preventDefault();
         enter();
       });
-      li.append(input, item.aviso);
+      li.append(input, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso);
       q.lista.append(li);
       estado.linhas.push(item);
       pintar(item);
@@ -446,5 +540,5 @@
     irPara(estado.alvo);
   }
 
-  return { segundaDe, somarDias, rotuloSemana, semQuebra, criarLinha, idDoToken, criarRascunhos, casarRascunhos, retomar, recuperarFora, ligarSaida, iniciar };
+  return { segundaDe, somarDias, rotuloSemana, semQuebra, horaCurta, sugestaoDeAlarme, criarLinha, idDoToken, criarRascunhos, casarRascunhos, retomar, recuperarFora, ligarSaida, iniciar };
 });

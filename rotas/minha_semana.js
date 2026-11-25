@@ -3,12 +3,13 @@
 // outra pessoa responde 404 e nem o administrador vê a lista alheia. O texto nunca vai para a auditoria nem para o log.
 const { agoraLocal } = require('./transacao');
 const { validarData, diasDaSemana, validarNova, validarMudanca } = require('../calculo/minha_semana');
+const { alarmeDoBanco } = require('../calculo/alarmes');
 
 const SO_LOGIN = [];
-const COLUNAS = 'id, quadro, data, texto, feita';
+const COLUNAS = 'id, quadro, data, texto, feita, alarme';
 const NAO_ACHOU = { error: 'Tarefa não encontrada.' };
 
-const linha = l => ({ id: Number(l.id), quadro: l.quadro, data: l.data ? String(l.data).slice(0, 10) : null, texto: l.texto, feita: !!Number(l.feita) });
+const linha = l => ({ id: Number(l.id), quadro: l.quadro, data: l.data ? String(l.data).slice(0, 10) : null, texto: l.texto, feita: !!Number(l.feita), alarme: alarmeDoBanco(l.alarme) });
 const idValido = s => (/^[1-9]\d{0,8}$/.test(s) ? Number(s) : null);
 
 function registrarMinhaSemana({ rota, pool }) {
@@ -36,7 +37,7 @@ function registrarMinhaSemana({ rota, pool }) {
       const [r] = await pool.execute(
         'INSERT INTO web_tarefas (usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em) VALUES (?, ?, ?, ?, 0, ?, ?)',
         [req.user.id, quadro, data, texto, quando, quando]);
-      res.status(201).json({ id: r.insertId, quadro, data, texto, feita: false });
+      res.status(201).json({ id: r.insertId, quadro, data, texto, feita: false, alarme: null });
     } catch (err) { erro500(res, 'POST /minha_semana', err); }
   });
 
@@ -47,6 +48,16 @@ function registrarMinhaSemana({ rota, pool }) {
     if (!v.ok) return res.status(400).json({ error: v.motivo });
     try {
       const campos = [], valores = [];
+      if (v.valor.alarme !== undefined) {
+        const [[antes]] = await pool.execute(`SELECT ${COLUNAS} FROM web_tarefas WHERE id = ? AND usuario_codigo = ?`, [id, req.user.id]);
+        if (!antes) return res.status(404).json(NAO_ACHOU);
+        if (v.valor.alarme && antes.quadro === 'notas') return res.status(400).json({ error: 'Notas não têm alarme.' });
+        // horário novo volta a tocar: o "já vi" e o adiamento eram do horário antigo
+        if (v.valor.alarme !== alarmeDoBanco(antes.alarme)) {
+          campos.push('alarme = ?', 'alarme_visto = ?', 'alarme_adiado = ?');
+          valores.push(v.valor.alarme, null, null);
+        }
+      }
       if (v.valor.texto !== undefined) { campos.push('texto = ?'); valores.push(v.valor.texto); }
       if (v.valor.feita !== undefined) { campos.push('feita = ?'); valores.push(v.valor.feita ? 1 : 0); }
       campos.push('atualizado_em = ?'); valores.push(agoraLocal());

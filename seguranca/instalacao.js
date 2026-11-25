@@ -573,6 +573,31 @@ const TABELAS = [
      criado_em DATETIME NULL,
      atualizado_em DATETIME NULL,
      KEY ix_tarefas_usuario (usuario_codigo, quadro, data)
+   ) ${OPCOES}`,
+  // ----- Semana dos administradores: o mesmo caderno, compartilhado. `versao` impede que um sobrescreva o outro sem saber -----
+  `CREATE TABLE IF NOT EXISTS \`web_tarefas_admin\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     quadro ENUM('dia','tarefas','notas') NOT NULL,
+     data DATE NULL,
+     texto VARCHAR(300) NOT NULL,
+     feita TINYINT(1) NOT NULL DEFAULT 0,
+     alarme DATETIME NULL,
+     versao INT NOT NULL DEFAULT 1,
+     criada_por_codigo INT NOT NULL,
+     criada_por VARCHAR(100) NOT NULL,
+     feita_por VARCHAR(100) NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     KEY ix_tarefas_admin_quadro (quadro, data)
+   ) ${OPCOES}`,
+  // "já avisei" e adiamento do alarme compartilhado, um por pessoa; só vale enquanto `alarme` for o mesmo da tarefa
+  `CREATE TABLE IF NOT EXISTS \`web_tarefas_admin_avisos\` (
+     tarefa_id INT NOT NULL,
+     usuario_codigo INT NOT NULL,
+     alarme DATETIME NOT NULL,
+     visto TINYINT NOT NULL DEFAULT 0,
+     adiado DATETIME NULL,
+     PRIMARY KEY (tarefa_id, usuario_codigo)
    ) ${OPCOES}`
 ];
 
@@ -616,6 +641,12 @@ async function instalarTabelas(pool) {
   const [[sr] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_perfil_secoes' AND COLUMN_NAME = 'semente_rev'");
   if (!Number(sr?.n)) await pool.execute('ALTER TABLE web_perfil_secoes ADD COLUMN semente_rev INT NULL');
+  // alarme da Minha semana: web_tarefas já pode existir no banco publicado, então as colunas entram se faltarem
+  for (const coluna of ['alarme', 'alarme_visto', 'alarme_adiado']) {
+    const [[al] = []] = await pool.execute(
+      `SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = '${coluna}'`);
+    if (!Number(al?.n)) await pool.execute(`ALTER TABLE web_tarefas ADD COLUMN ${coluna} DATETIME NULL`);
+  }
   await migrarEntregasVarias(pool);
 }
 
@@ -822,6 +853,9 @@ async function darAoAdministrador(pool, marcador, permissoes) {
     conn.release();
   }
 }
+
+// Semana dos administradores: a permissão começa só no perfil Administrador
+const acrescentarPermissoesTarefasAdmin = pool => darAoAdministrador(pool, 'permissoes_tarefas_admin', ['tarefas_admin.usar']);
 
 const acrescentarPermissoesPrecos = pool => darAoAdministrador(pool, 'permissoes_precos', ['precos.ver', 'precos.editar']);
 const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'permissoes_precos_gravar', ['precos.gravar']);
@@ -1345,4 +1379,4 @@ const REGRAS_PEDIDOS_ACOES = [
 ];
 const acrescentarPermissoesPedidosAcoes = pool => desdobrarPermissoes(pool, 'permissoes_pedidos_acoes', REGRAS_PEDIDOS_ACOES);
 
-module.exports = { desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesTarefasAdmin, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
