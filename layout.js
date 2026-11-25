@@ -584,7 +584,14 @@
         document.body.appendChild(barra);
         let aviso = null;
 
-        let emAndamento = 0, timerBarra = null, timerAviso = null;
+        let emAndamento = 0, gravacoes = 0, timerBarra = null, timerAviso = null;
+        // "Salvando" enquanto houver pelo menos uma gravação; só consultas = "Carregando". Troca só o nó de texto (os 3 <b> ficam)
+        function mostrarTexto() {
+            const t = gravacoes > 0 ? 'Salvando' : 'Carregando';
+            const noTexto = barra.querySelector('.cg-texto').firstChild;
+            noTexto.nodeValue = t;
+            barra.setAttribute('aria-label', t);
+        }
         let ultimoClique = null, quandoClique = 0;
         document.addEventListener('click', e => {
             ultimoClique = e.target.closest('button, a[href], [role="button"], tr[data-i], tr[data-codigo], tr[data-numero]');
@@ -606,7 +613,9 @@
             el.classList.remove('processando'); el.removeAttribute('aria-busy');
             if ('disabled' in el) el.disabled = o.desabilitadoAntes;
         }
-        function comecou() {
+        function comecou(gravacao) {
+            if (gravacao) gravacoes++;
+            mostrarTexto();
             if (emAndamento++ > 0) return;
             timerBarra = setTimeout(() => barra.classList.add('ativo'), ATRASO_BARRA);
             timerAviso = setTimeout(() => {
@@ -616,7 +625,9 @@
                 document.body.appendChild(aviso);
             }, ATRASO_AVISO);
         }
-        function terminou() {
+        function terminou(gravacao) {
+            if (gravacao) gravacoes--;
+            mostrarTexto();
             if (--emAndamento > 0) return;
             clearTimeout(timerBarra); clearTimeout(timerAviso);
             barra.classList.remove('ativo');
@@ -625,14 +636,24 @@
         const fetchOriginal = window.fetch.bind(window);
         // consultas automáticas em segundo plano (preço, peso, ping do salvador de PDF, alarmes e atualização da semana compartilhada) não mostram o ícone
         const SEGUNDO_PLANO = /\/(peso\/itens|calcular_preco|ped_orc\/sistema_correr|alarmes)(\?|$)|\/semana_admin\?[^#]*&auto=1|127\.0\.0\.1:3917/;
+        // gravação = POST/PUT/PATCH que muda dados; não contam as chamadas que só consultam ou autenticam
+        const METODOS_GRAVACAO = /^(POST|PUT|PATCH)$/;
+        const SO_CONSULTA = /\/(login|logout|regras\/verificar_item|leitura_pdf|ler_imagem|calcular_preco|peso\/itens|danfe\/existentes|estoque\/codigo_barras)(\/|\?|$)/;
+        function ehGravacao(alvo, args) {
+            const init = args[1] || {};
+            const req = args[0];
+            const metodo = String(init.method || (req && typeof req === 'object' && req.method) || 'GET').toUpperCase();
+            return METODOS_GRAVACAO.test(metodo) && !SO_CONSULTA.test(alvo);
+        }
         window.fetch = (...args) => {
             const alvo = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
             if (SEGUNDO_PLANO.test(alvo)) return fetchOriginal(...args);
             const el = ultimoClique && Date.now() - quandoClique < JANELA_CLIQUE && ultimoClique.isConnected ? ultimoClique : null;
-            comecou();
+            const gravacao = ehGravacao(alvo, args);
+            comecou(gravacao);
             if (el) ocupar(el);
             const p = fetchOriginal(...args);
-            p.finally(() => { terminou(); if (el) liberar(el); }).catch(() => {});
+            p.finally(() => { terminou(gravacao); if (el) liberar(el); }).catch(() => {});
             return p;
         };
     }
