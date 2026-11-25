@@ -223,3 +223,24 @@ test('tela: lista do diálogo Abrir mostra cliente final e não mostra valor', (
   assert.doesNotMatch(trecho, /formatCurrency|\.total/);
   assert.match(html, /placeholder="Número, cliente ou cliente final"/);
 });
+
+test('abrir: TIPO_PUXADOR antigo "LATERAL <lado> Total" usa o tipo do cadastro do puxador e não trava', async t => {
+  const banco = bancoPedOrc();
+  banco.produtos.push({ MODELO: 'Pux L', VALOR_FIXO: 50, DESCONTO_VIDRO: 0, DESC_PERF_PUX: 0, TIPO_PUXADOR: 'Sobreposto', SITUACAO: 'Ativo' });
+  const item = { ...correr, detalhes: { ...correr.detalhes, puxador: 'Pux L', acabPux: 'Anodizado', tipoPuxador: 'Sobreposto Total', tamanhoPux: 2060,
+    posicoesFolhas: ['Lateral Esquerda Total', 'Lateral Direita Total'] } };
+  const { chamar, numero } = await salvoEAberto(t, { tipo: 'Orçamento', itens: [item], banco });
+  const folhas = banco.itensV4.filter(r => Number(r.NUMERO) === numero);
+  assert.equal(folhas.length, 2);
+  folhas[0].TIPO_PUXADOR = 'LATERAL Esquerda Total';
+  folhas[1].TIPO_PUXADOR = 'LATERAL DIREITA Total';
+  const aberto = await (await abrir(chamar, 'Orçamento', numero)).json();
+  const [it] = aberto.itens;
+  assert.equal(it.travado, undefined, it.motivo);
+  assert.equal(it.detalhes.tipoPuxador, 'Sobreposto Total');
+  // salvar sem mexer: o item intacto é copiado, com o texto antigo do jeito que estava
+  const antes = foto(banco, numero);
+  const r = await salvar(chamar, atualizar(aberto, { tipo: 'Orçamento', dataEntrega: undefined, situacao: undefined, financeiro: undefined }));
+  assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.deepEqual(foto(banco, numero).itensV4, antes.itensV4);
+});

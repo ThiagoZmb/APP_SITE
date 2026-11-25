@@ -25,6 +25,23 @@ const igual = (a, b) => (typeof a === 'number' || typeof b === 'number') ? num(a
 const arred2 = v => Math.round(v * 100) / 100;
 const porItem = (lista, n, campo = 'ITEM_PEDIDO') => lista.filter(r => Number(r[campo]) === n);
 
+// Formato antigo do VB: TIPO_PUXADOR = "LATERAL <Esquerda|Direita> Total" (o lado também está em POSICAO_PUXADOR, e é de lá que ele vale)
+const TIPO_LATERAL = /^LATERAL\s+(ESQUERDA|DIREITA)\s+TOTAL$/i;
+// puxadores cujo tipo no cadastro precisa ser lido para traduzir o documento (vazio no caso normal)
+const puxadoresComTipoLateral = linhas => [...new Set(linhas.itensV4.filter(c => TIPO_LATERAL.test(txt(c.TIPO_PUXADOR)) && txt(c.PUXADOR)).map(c => txt(c.PUXADOR)))];
+
+// Troca o formato antigo pelo tipo que a tela grava para esse puxador (orcamentos.html: tipoPuxadorDaPorta, com toda a extensão).
+// Só quando a posição da linha é toda lateral Total e o cadastro diz Sobreposto ou Total; senão a linha fica como está (e as travas valem).
+function normalizarTipoLateral(c, correr, puxadores) {
+  if (!TIPO_LATERAL.test(txt(c.TIPO_PUXADOR))) return c;
+  const posicoes = txt(c.POSICAO_PUXADOR).split(',').map(p => p.trim()).filter(Boolean);
+  if (!posicoes.length || !posicoes.every(p => TIPO_LATERAL.test(p))) return c;
+  const cadastro = txt(puxadores[txt(c.PUXADOR)]);
+  if (!/^(sobreposto|total|sobreposto total)$/i.test(cadastro)) return c;
+  const base = /sobreposto/i.test(cadastro) || correr ? 'Sobreposto' : '';
+  return { ...c, TIPO_PUXADOR: base ? `${base} Total` : 'Total' };
+}
+
 // detalhe = texto técnico (só nomes de coluna e valores de cadastro, nunca dinheiro) para diagnosticar; o motivo mostrado ao usuário não muda
 class Trava extends Error { constructor(msg, detalhe = '') { super(msg); this.detalhe = detalhe; } }
 
@@ -82,16 +99,18 @@ function sequenciasDeFuros(furacao) {
   return seqs;
 }
 
-function traduzirPorta(l, linhas, sistemas) {
+function traduzirPorta(l, linhas, sistemas, puxadores) {
   const n = Number(l.ITEM);
   const cfgsBanco = porItem(linhas.itensV4, n).sort((a, b) => num(a.ITEM) - num(b.ITEM));
   if (!cfgsBanco.length) throw new Trava('item antigo, sem as folhas gravadas');
   // porta de correr do VB com QTD = nº de folhas em cada linha (deveria ser 1): lê como uma folha por linha
-  const cfgs = FRENTE_DA_TELA[l.TIPO_PRODUTO] === 'Porta de Correr' && qtdInfladaVB(cfgsBanco, l.DESCRICAO) ? cfgsBanco.map(c => ({ ...c, QTD: 1 })) : cfgsBanco;
+  const ehPortaCorrer = FRENTE_DA_TELA[l.TIPO_PRODUTO] === 'Porta de Correr';
+  const cfgs = (ehPortaCorrer && qtdInfladaVB(cfgsBanco, l.DESCRICAO) ? cfgsBanco.map(c => ({ ...c, QTD: 1 })) : cfgsBanco)
+    .map(c => normalizarTipoLateral(c, ehPortaCorrer, puxadores));
   if (cfgs.some(c => txt(c.USINAGEM_PERFIL) || txt(c.USINAGEM_PUXADOR))) throw new Trava('tem usinagem gravada');
   const c0 = cfgs[0];
   // porta de correr: cada folha pode ter largura própria (LarguraEditada do VB); o resto continua igual em todas
-  const correr = FRENTE_DA_TELA[l.TIPO_PRODUTO] === 'Porta de Correr';
+  const correr = ehPortaCorrer;
   const comuns = correr ? CAMPOS_COMUNS.filter(k => k !== 'LARGURA') : CAMPOS_COMUNS;
   if (cfgs.some(c => comuns.some(k => !igual(c[k], c0[k])))) throw new Trava('folhas com medidas ou materiais diferentes entre si');
   const seqs = sequenciasDeFuros(porItem(linhas.furacao, n, 'ITEM'));
@@ -190,13 +209,13 @@ function traduzirAvulso(l, linhas) {
     detalhes: { ...detalhesVazios(), categoria: l.TIPO_PRODUTO, avProduto: txt(c.PERFIL), avAcab: txt(c.ACABAMENTO_PERFIL), avCor: txt(c.COR_PERFIL) }, obs: txt(l.OBSERVACAO) };
 }
 
-function traduzirDocumento(linhas, { sistemas = {}, componentesSerr = {} } = {}) {
+function traduzirDocumento(linhas, { sistemas = {}, componentesSerr = {}, puxadores = {} } = {}) {
   const itens = [...linhas.lista].sort((a, b) => num(a.ITEM) - num(b.ITEM)).map(l => {
     const origem = { item: Number(l.ITEM), estado: 'intacto' };
     const historico = txt(l.PORCENTAGEM);
     try {
       let it;
-      if (FRENTE_DA_TELA[l.TIPO_PRODUTO]) it = traduzirPorta(l, linhas, sistemas);
+      if (FRENTE_DA_TELA[l.TIPO_PRODUTO]) it = traduzirPorta(l, linhas, sistemas, puxadores);
       else if (l.TIPO_PRODUTO === 'Metalons') it = traduzirSerralheria(l, linhas, componentesSerr);
       else if (CATEGORIAS_AVULSO.includes(l.TIPO_PRODUTO)) it = traduzirAvulso(l, linhas);
       else throw new Trava('tipo de produto que só o VB edita');
@@ -235,4 +254,4 @@ function carimboItens(linhas = {}) {
     tabela(linhas.lista, COLUNAS_LISTA_CARIMBO), tabela(linhas.itensV4), tabela(linhas.furacao)])).digest('hex');
 }
 
-module.exports = { traduzirDocumento, impressaoDigital, carimboItens };
+module.exports = { traduzirDocumento, impressaoDigital, carimboItens, puxadoresComTipoLateral };

@@ -12,7 +12,7 @@ const OrcamentoPedido = require('../calculo/orcamento_pedido');
 const { ACOES_HISTORICO, LIMITE_HISTORICO, montarHistorico } = require('../calculo/historico_pedido');
 const express = require('express');
 const { validarPng } = require('../calculo/png');
-const { traduzirDocumento, impressaoDigital, carimboItens } = require('../calculo/leitura_vb');
+const { traduzirDocumento, impressaoDigital, carimboItens, puxadoresComTipoLateral } = require('../calculo/leitura_vb');
 const { emTransacao, ErroUsuario, ehDuplicado, agoraLocal, hojeLocal, validarData } = require('./estoque_movimentos');
 const { liberarPlanosDoPedido } = require('./corte');
 const { liberarPlanosVidroDoPedido } = require('./corte_vidros');
@@ -450,17 +450,21 @@ async function lerSistemaCorrer(db, nome, folhas) {
 }
 
 // Documento lido do banco → formato da tela (cabeçalho + itens), com o cliente (CODIGO, ESTADO). Usado por GET /ped_orc/:tipo/:numero e por virar_pedido.
-// Cliente, componentes da serralheria e sistemas de correr são independentes entre si: saem JUNTOS (cada ida ao banco custa ~190 ms).
+// Cliente, componentes da serralheria, sistemas de correr (e, só para o formato antigo de TIPO_PUXADOR, o cadastro do puxador) são independentes entre si: saem JUNTOS (cada ida ao banco custa ~190 ms).
 async function traduzirDoBanco(db, leitor, linhas) {
   const produtosSerr = [...new Set(linhas.serralheria.map(s => s.PRODUTO))];
-  const [[cli], componentes, sistemas] = await Promise.all([
+  const nomesPux = puxadoresComTipoLateral(linhas);
+  const [[cli], componentes, sistemas, cadastroPux] = await Promise.all([
     db.execute('SELECT CODIGO, ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1', [linhas.cab.RAZAO_SOCIAL]),
     Promise.all(produtosSerr.map(p => leitor.componentesSerralheria(p))),
-    sistemasDoDocumento(db, linhas)
+    sistemasDoDocumento(db, linhas),
+    Promise.all(nomesPux.map(p => leitor.produto(p)))
   ]);
   const componentesSerr = {};
   produtosSerr.forEach((p, i) => { componentesSerr[p] = componentes[i]; });
-  return { cli: cli[0], ...traduzirDocumento(linhas, { sistemas, componentesSerr }) };
+  const puxadores = {};
+  nomesPux.forEach((p, i) => { puxadores[p] = cadastroPux[i]?.tipoPuxador || ''; });
+  return { cli: cli[0], ...traduzirDocumento(linhas, { sistemas, componentesSerr, puxadores }) };
 }
 
 function registrarPedOrc({ rota, pool }) {
