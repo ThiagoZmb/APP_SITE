@@ -1,5 +1,7 @@
 # Minha semana (caderno de tarefas pessoal)
 
+> **Alarmes EM STAND BY** (decisão do dono, até o sistema ir para o HostGator): desligados pela chave `ALARMES_ATIVOS = false` em `layout.js`, sem apagar código, tabelas nem dados (sem sino, sem janela, sem `GET /alarmes`; o alarme gravado fica intacto). Para religar: trocar para `true` e subir o `?v=`.
+
 Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_semana.js`, tabela `web_tarefas`. Testes: `test/minha_semana_rotas.test.js` e `test/minha_semana_tela.test.js`. Desenho aprovado: `docs/superpowers/specs/2026-11-25-minha-semana-design.md`.
 
 ## Privacidade

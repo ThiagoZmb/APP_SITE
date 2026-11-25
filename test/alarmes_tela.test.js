@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+globalThis.ALARMES_ATIVOS = true;   // em stand by no sistema (layout.js); aqui se testa o estado ligado
 const L = require('../alarmes.js');
 const T = require('../tarefas.js');
 const A = require('../tarefas_admin.js');

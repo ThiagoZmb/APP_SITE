@@ -6,8 +6,12 @@
 (function () {
     // Atalho no celular (PWA): pwa.js põe as tags do manifesto, se faltarem, e registra o sw.js (que não guarda dados).
     try { const s = document.createElement("script"); s.src = new URL("pwa.js", (document.currentScript && document.currentScript.src) || location.href).href; document.head.appendChild(s); } catch (e) { /* sem o atalho o sistema funciona igual */ }
+    // Alarmes das semanas EM STAND BY até o sistema ir para o HostGator (decisão do dono); nada foi apagado.
+    // Para religar: trocar para true e subir o ?v= (do layout.js, tarefas.js e tarefas_admin.js nos .html).
+    const ALARMES_ATIVOS = false;
+    window.ALARMES_ATIVOS = ALARMES_ATIVOS;   // tarefas.js e tarefas_admin.js: sino, horário, editor e campo alarme
     // Alarmes das semanas (janela com som em qualquer tela): alarmes.js, com a mesma versão ?v= do layout.js.
-    try { const base = (document.currentScript && document.currentScript.src) || location.href; const u = new URL("alarmes.js", base); u.search = new URL(base).search; const s = document.createElement("script"); s.src = u.href; document.head.appendChild(s); } catch (e) { /* sem os alarmes o sistema funciona igual */ }
+    if (ALARMES_ATIVOS) try { const base = (document.currentScript && document.currentScript.src) || location.href; const u = new URL("alarmes.js", base); u.search = new URL(base).search; const s = document.createElement("script"); s.src = u.href; document.head.appendChild(s); } catch (e) { /* sem os alarmes o sistema funciona igual */ }
     const LOGIN_URL = 'https://thiagozmb.github.io/APP_SITE/login.html';
     const API = 'https://elegance-backend-hrho.onrender.com';
     const ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;

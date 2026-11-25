@@ -40,6 +40,10 @@
   const semQuebra = t => String(t ?? '').replace(/\r\n|[\r\n\u2028\u2029]/g, ' ');
 
   // ---------- alarme: 'AAAA-MM-DD HH:MM', a hora como foi digitada ----------
+  // Em stand by pela chave ALARMES_ATIVOS (layout.js). Desligada, a linha não lê nem envia alarme: aqui ele é sempre
+  // null e o que está gravado no servidor não é tocado.
+  const alarmesAtivos = () => globalThis.ALARMES_ATIVOS === true;
+  const doAlarme = q => (alarmesAtivos() && q) || null;
   const horaCurta = q => `${q.slice(8, 10)}/${q.slice(5, 7)} ${q.slice(11, 16)}`;
   // valor inicial do campo: o dia da linha às 9h; hoje, dia passado ou quadro Tarefas: a próxima hora cheia
   function sugestaoDeAlarme(data, agora) {
@@ -81,7 +85,7 @@
   // `dados` = o que o servidor tem (na versão que a pessoa está vendo); `alvo` = o que a pessoa quer. As operações entram numa
   // fila (uma por vez). Se outra pessoa mudou a linha (409) ou apagou (404), nada mais é enviado até a pessoa decidir.
   const CAMPOS = ['texto', 'feita', 'alarme'];
-  const copiar = l => ({ id: l.id ?? null, quadro: l.quadro, data: l.data ?? null, texto: l.texto || '', feita: !!l.feita, alarme: l.alarme || null,
+  const copiar = l => ({ id: l.id ?? null, quadro: l.quadro, data: l.data ?? null, texto: l.texto || '', feita: !!l.feita, alarme: doAlarme(l.alarme),
     versao: l.versao ?? null, criadaPor: l.criadaPor || '', feitaPor: l.feitaPor || null });
 
   const autoria = d => (!d.id || !d.criadaPor ? '' : d.criadaPor + (d.feita && d.feitaPor ? ' · feita por ' + d.feitaPor : ''));
@@ -202,8 +206,8 @@
       zerar,
       salvarTexto: t => { anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
       marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
-      salvar: (t, b, q = alvo.alarme) => { escrito.alarme = q || null; anotar(t, b); return enfileirar(() => { alvo.texto = limpar(t); alvo.feita = !!b; alvo.alarme = q || null; }); },
-      alarmar: q => { escrito.alarme = q || null; guardar(); return enfileirar(() => { alvo.alarme = q || null; }); },
+      salvar: (t, b, q = alvo.alarme) => { escrito.alarme = doAlarme(q); anotar(t, b); return enfileirar(() => { alvo.texto = limpar(t); alvo.feita = !!b; alvo.alarme = doAlarme(q); }); },
+      alarmar: q => { escrito.alarme = doAlarme(q); guardar(); return enfileirar(() => { alvo.alarme = doAlarme(q); }); },
       // conflito: grava o meu sobre a versão nova; o que eu não mudei fica como a outra pessoa deixou
       manterMeu: () => enfileirar(() => {
         const atual = linha.conflito;
@@ -259,7 +263,7 @@
         if (base) usados.add(base.id);
       }
       // nada escrito e nada no servidor para apagar, ou nada diferente do que a pessoa já via
-      const semMudanca = !!entrada.base && entrada.texto === entrada.base.texto && entrada.feita === entrada.base.feita && (entrada.alarme ?? null) === (entrada.base.alarme ?? null);
+      const semMudanca = !!entrada.base && entrada.texto === entrada.base.texto && entrada.feita === entrada.base.feita && doAlarme(entrada.alarme) === doAlarme(entrada.base.alarme);
       return { chave, entrada, base, descartar: semMudanca || (!entrada.texto && (!base || !!base.sumiu)) };
     });
   }
@@ -524,7 +528,7 @@
         });
         li.append(item.caixa);
       }
-      if (q.quadro !== 'notas') item.sino = criarSino(item);
+      if (alarmesAtivos() && q.quadro !== 'notas') item.sino = criarSino(item);
       const input = item.input;
       input.rows = 1;
       input.maxLength = 300;

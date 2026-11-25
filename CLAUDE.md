@@ -298,6 +298,7 @@ Só login, sem permissão; o dono da linha é sempre `req.user.id`, linha alheia
 > Regras completas: `docs/regras/minha-semana.md` (ler antes de mexer neste módulo).
 
 ### Semana compartilhada e alarmes
+**Alarmes EM STAND BY** até o sistema ir para o HostGator: `ALARMES_ATIVOS = false` em `layout.js` (nada foi apagado; para religar, `true` e subir o `?v=`).
 Cópia compartilhada (`tarefas_admin.usar`, só administrativa; pessoal e compartilhada nunca se misturam); versão por linha (409 com a linha atual, nada é sobrescrito); alarme nas duas páginas, que toca em qualquer tela aberta pelo relógio do aparelho, com OK/Adiar por pessoa. Texto fora de log e auditoria.
 > Regras completas: `docs/regras/semana-administradores-alarmes.md` (ler antes de mexer neste módulo).
 

@@ -39,6 +39,10 @@
   const semQuebra = t => String(t ?? '').replace(/\r\n|[\r\n\u2028\u2029]/g, ' ');
 
   // ---------- alarme: 'AAAA-MM-DD HH:MM', a hora como foi digitada ----------
+  // Em stand by pela chave ALARMES_ATIVOS (layout.js). Desligada, a linha não lê nem envia alarme: aqui ele é sempre
+  // null e o que está gravado no servidor não é tocado.
+  const alarmesAtivos = () => globalThis.ALARMES_ATIVOS === true;
+  const doAlarme = q => (alarmesAtivos() && q) || null;
   const horaCurta = q => `${q.slice(8, 10)}/${q.slice(5, 7)} ${q.slice(11, 16)}`;
   // valor inicial do campo: o dia da linha às 9h; hoje, dia passado ou quadro Tarefas: a próxima hora cheia
   function sugestaoDeAlarme(data, agora) {
@@ -80,7 +84,7 @@
   // `dados` = o que o servidor já tem; `alvo` = o que a pessoa quer. As operações entram numa fila (uma por vez), o que
   // impede dois POSTs da mesma linha; se uma falha, o alvo fica guardado e a próxima tentativa grava a diferença.
   function criarLinha(chamar, inicial, { rascunhos, chave } = {}) {
-    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: inicial.alarme || null };
+    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: doAlarme(inicial.alarme) };
     const alvo = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };
     let fila = Promise.resolve();
     let naFila = 0;
@@ -160,7 +164,7 @@
       anotar,
       salvarTexto: t => { anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
       marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
-      alarmar: q => { escrito.alarme = q || null; guardar(); return enfileirar(() => { alvo.alarme = q || null; }); }
+      alarmar: q => { escrito.alarme = doAlarme(q); guardar(); return enfileirar(() => { alvo.alarme = doAlarme(q); }); }
     };
     function enfileirar(aplicar) {
       naFila++;
@@ -391,7 +395,7 @@
         });
         li.append(item.caixa);
       }
-      if (q.quadro !== 'notas') item.sino = criarSino(item);
+      if (alarmesAtivos() && q.quadro !== 'notas') item.sino = criarSino(item);
       const input = item.input;
       input.rows = 1;
       input.maxLength = 300;
