@@ -42,7 +42,7 @@ Funcionalidades (páginas HTML na raiz):
 - Indicadores "Operação agora" e "Resultado do período" de `painel_inicial.html` só com a permissão `indicadores.ver` (regras em `docs/regras/outras-regras.md`).
 - **Atalho no celular (PWA)** (`manifest.webmanifest`, `sw.js`, `pwa.js`, `icones/`): instalável pelo Chrome/Safari a partir da URL do GitHub Pages; service worker sem nenhum cache de dados; caminhos relativos por causa de `/APP_SITE/`. Passo a passo em `docs/atalho_celular.md`.
 - **Minha semana** (`tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_semana.js`, tabela `web_tarefas`): caderno semanal pessoal de tarefas (sete dias, Tarefas e Notas), em linhas, com caixinha de concluído; qualquer usuário logado, cada um vê somente o seu. **Verificado só no Edge headless com banco em memória; não testado em celular real nem em produção.** Regras na seção 5, "Minha semana".
-- **Semana dos administradores e alarmes** (`tarefas_admin.html/.js`, `rotas/semana_admin.js`, `rotas/alarmes.js`, `calculo/alarmes.js`, `alarmes.js`): cópia **compartilhada** da Minha semana (permissão `tarefas_admin.usar`, só administrativa, começa no Administrador), com autoria, atualização a cada minuto e conflito sem sobrescrever (versão por linha; `web_tarefas_admin`, `web_tarefas_admin_avisos`); **alarme opcional nas duas páginas** (sino na linha), com janela e som em qualquer tela aberta, OK e Adiar 10 minutos. Ajuste de tela na Minha semana precisa ser repetido na cópia. **Não testado em MySQL real, celular real nem por duas pessoas reais.** Regras em `docs/regras/semana-administradores-alarmes.md`.
+- **Semana compartilhada e alarmes** (`tarefas_admin.html/.js`, `rotas/semana_admin.js`, `rotas/alarmes.js`, `calculo/alarmes.js`, `alarmes.js`): cópia **compartilhada** da Minha semana (permissão `tarefas_admin.usar`, só administrativa, começa no Administrador), com autoria, atualização a cada minuto e conflito sem sobrescrever (versão por linha; `web_tarefas_admin`, `web_tarefas_admin_avisos`); **alarme opcional nas duas páginas** (sino na linha), com janela e som em qualquer tela aberta, OK e Adiar 10 minutos. Ajuste de tela na Minha semana precisa ser repetido na cópia. **Não testado em MySQL real, celular real nem por duas pessoas reais.** Regras em `docs/regras/semana-administradores-alarmes.md`.
 - Administração de usuários, perfis e permissões (`usuarios.html`, `rotas/admin.js`, `seguranca/`).
 - **Administrativo × Operador** (permissão-chave `administrativo.ver`; `seguranca/permissoes.js`, coluna "Classe" em `usuarios.html`): quem tem a chave vê gráficos, indicadores, resumos/totais, telas de gestão e dinheiro; o operador (saída de estoque, status, etapas, entregas) não recebe informação administrativa; Vendedor/Representante ficam "só valores". Regras na seção 5, "Administrativo × Operador".
 - **Baixa de estoque por QR** (`baixa_qr.html/.js`, `etiquetas_qr.html/.js`, `rotas/estoque_qr.js`, `calculo/estoque_qr.js`, `vendor/`): o funcionário que só retira material (perfil com apenas `estoque.ver` + `estoque.movimentar`) cai direto na câmera do celular, lê o QR da etiqueta (= `estoque.CODIGO_BARRA`), confere nome e quantidade em estoque, ajusta a quantidade e dá baixa pela saída de estoque de sempre (`POST /estoque/saida`); `etiquetas_qr.html` imprime as etiquetas com QR (`estoque.editar`). **Não testado em aparelho real.** Regras na seção 5, "Baixa de estoque por QR".
@@ -70,7 +70,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
   fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
   minha_semana.js        Minha semana: GET/POST /minha_semana, PUT/DELETE /minha_semana/:id (só login; sempre pelo usuário do token; validação em calculo/minha_semana.js)
-  semana_admin.js        Semana dos administradores: GET/POST /semana_admin, PUT/DELETE /semana_admin/:id com versão (tarefas_admin.usar)
+  semana_admin.js        Semana compartilhada: GET/POST /semana_admin, PUT/DELETE /semana_admin/:id com versão (tarefas_admin.usar)
   alarmes.js             Alarmes das duas semanas: GET /alarmes, POST /alarmes/:origem/:id/ok e /adiar (validação em calculo/alarmes.js)
   checklist.js           Checklist de produção em PDF no banco (web_checklist): GET /checklist/pdf, GET /checklist/info, PUT /checklist (validação em calculo/checklist.js)
   danfe.js               DANFE (nota fiscal em PDF) pelo pedido: /danfe/existentes, PUT /danfe/:chave, /danfe/pedido/:n, /danfe/:chave/pdf, /danfe/lista, /danfe/vinculo (validação em calculo/danfe.js)
@@ -133,7 +133,7 @@ regras.html/.js/.css     Página de leitura do Livro de regras (código, nível,
 calendario.html/.js, calendario_dia.html/.js, calendario_comum.js, calendario.css   Telas do calendário de pedidos (mês e dia); o menu do botão direito é o `inicio_menu.js`
 menu_contexto.js         Menu do botão direito do Pedido com SUBMENUS ("Imprimir", "Mudar situação"): `MenuContexto.montar`/`ligar`, usado por `inicio_menu.js` e `painel_inicial.html`; as folhas com `grupo` viram o item principal (padrão em DESIGN.md)
 tarefas.html/.js         Minha semana: caderno pessoal (cada linha grava numa fila própria; datas sem toISOString)
-tarefas_admin.html/.js   Semana dos administradores: cópia compartilhada de tarefas.html/.js (mudança de tela se repete nas duas)
+tarefas_admin.html/.js   Semana compartilhada: cópia compartilhada de tarefas.html/.js (mudança de tela se repete nas duas)
 alarmes.js               Janela dos alarmes em qualquer tela (carregado pelo layout.js)
 etapas_producao.html/.js/.css   Tela das etapas de produção (tabela de botões-estado; cartões no celular; menu próprio no botão direito/Shift+F10/"⋯")
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
@@ -297,7 +297,7 @@ Identidade externa (convite, senha, 2º fator, sessão opaca no cookie `__Host-p
 Só login, sem permissão; o dono da linha é sempre `req.user.id`, linha alheia = 404 (nem o administrador vê) e o texto nunca vai para auditoria nem log. Fora de `PAGINAS` e escondida no modo atendimento. Não lê nem altera tabela do VB.
 > Regras completas: `docs/regras/minha-semana.md` (ler antes de mexer neste módulo).
 
-### Semana dos administradores e alarmes
+### Semana compartilhada e alarmes
 Cópia compartilhada (`tarefas_admin.usar`, só administrativa; pessoal e compartilhada nunca se misturam); versão por linha (409 com a linha atual, nada é sobrescrito); alarme nas duas páginas, que toca em qualquer tela aberta pelo relógio do aparelho, com OK/Adiar por pessoa. Texto fora de log e auditoria.
 > Regras completas: `docs/regras/semana-administradores-alarmes.md` (ler antes de mexer neste módulo).
 

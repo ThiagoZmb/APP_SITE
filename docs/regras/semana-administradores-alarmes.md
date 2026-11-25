@@ -1,11 +1,11 @@
-# Semana dos administradores e alarmes
+# Semana compartilhada e alarmes
 
 Arquivos: `tarefas_admin.html`, `tarefas_admin.js`, `rotas/semana_admin.js`, `rotas/alarmes.js`, `calculo/alarmes.js`, `alarmes.js` (carregado pelo `layout.js` em todas as telas). Tabelas `web_tarefas_admin` e `web_tarefas_admin_avisos`; colunas `alarme`, `alarme_visto` e `alarme_adiado` em `web_tarefas`. Testes: `test/semana_admin_rotas.test.js`, `test/semana_admin_tela.test.js`, `test/alarmes_rotas.test.js`, `test/alarmes_tela.test.js` (banco em memória: `test/apoio/bancoSemana.js`). Desenho aprovado: `docs/superpowers/specs/2026-11-25-semana-administradores-alarmes-design.md`.
 
-A Semana dos administradores é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Quadros, texto, datas e grade seguem `docs/regras/minha-semana.md`.
+A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Quadros, texto, datas e grade seguem `docs/regras/minha-semana.md`.
 
 ## Quem entra
-- Permissão `tarefas_admin.usar` ("Semana dos administradores", área Pessoal), em `PERMISSOES_ADMINISTRATIVAS`: sem a chave `administrativo.ver` ela não vale.
+- Permissão `tarefas_admin.usar` ("Semana compartilhada", área Pessoal), em `PERMISSOES_ADMINISTRATIVAS`: sem a chave `administrativo.ver` ela não vale.
 - Começa só no perfil Administrador (`acrescentarPermissoesTarefasAdmin`, marcador `permissoes_tarefas_admin`, depois da chave administrativa na subida). O dono pode dá-la a outra pessoa na tela de Usuários.
 - Sem ela: 403 nas quatro rotas, nenhum alarme compartilhado, menu escondido. No modo atendimento a página some e nada é buscado. Nunca é a primeira página depois do login.
 

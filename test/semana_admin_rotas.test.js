@@ -1,4 +1,4 @@
-// Semana dos administradores (compartilhada): rotas/semana_admin.js, permissão tarefas_admin.usar. Banco simulado em memória.
+// Semana compartilhada: rotas/semana_admin.js, permissão tarefas_admin.usar. Banco simulado em memória.
 process.env.JWT_SECRET = 'teste';
 process.env.NODE_ENV = 'test';
 const test = require('node:test');
@@ -139,7 +139,7 @@ test('falha do banco: 500, log só com rótulo e código', async t => {
 
 test('permissão: no catálogo, só administrativa, só no perfil Administrador', () => {
   const p = CATALOGO.find(x => x.codigo === 'tarefas_admin.usar');
-  assert.equal(p.nome, 'Semana dos administradores');
+  assert.equal(p.nome, 'Semana compartilhada');
   assert.ok(p.descricao.length >= 15 && p.administrativa);
   assert.ok(PERMISSOES_ADMINISTRATIVAS.includes('tarefas_admin.usar'));
   for (const perfil of PERFIS_INICIAIS) assert.equal(perfil.permissoes.includes('tarefas_admin.usar'), perfil.nome === 'Administrador', perfil.nome);

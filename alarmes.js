@@ -179,7 +179,7 @@
     function mostrar(a) {
       if (!janela) criarJanela();
       const data = `${a.quando.slice(8, 10)}/${a.quando.slice(5, 7)} ${a.quando.slice(11)}`;
-      partes.quando.textContent = `${data} · ${a.origem === 'admin' ? 'Semana dos administradores' : 'Minha semana'}`;
+      partes.quando.textContent = `${data} · ${a.origem === 'admin' ? 'Semana compartilhada' : 'Minha semana'}`;
       partes.texto.textContent = a.texto;
       if (!janela.open) janela.showModal();
       tocar();

@@ -1,5 +1,5 @@
 // ==========================================================================
-// tarefas_admin.html — "Semana dos administradores": o mesmo caderno, compartilhado por quem tem tarefas_admin.usar.
+// tarefas_admin.html — "Semana compartilhada": o mesmo caderno, compartilhado por quem tem tarefas_admin.usar.
 // Cópia de tarefas.js (escolha do dono): ajuste de tela feito lá precisa ser repetido aqui.
 // Rotas: GET /semana_admin?inicio=, POST /semana_admin, PUT e DELETE /semana_admin/:id (com a versão que se está vendo).
 // Funções puras testadas no Node (test/semana_admin_tela.test.js); o desenho da tela fica no fim (só no navegador).
@@ -662,7 +662,7 @@
       semana.setAttribute('aria-busy', 'false');
       $('barra-semana').hidden = true;
       $('btn-tentar').hidden = true;
-      $('aviso-texto').textContent = 'Você não tem mais acesso à Semana dos administradores.';
+      $('aviso-texto').textContent = 'Você não tem mais acesso à Semana compartilhada.';
       aviso.hidden = false;
     }
 

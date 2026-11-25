@@ -14,7 +14,7 @@ Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_
 - `web_tarefas`: uma linha por tarefa; `quadro` = `dia`, `tarefas` ou `notas`; `data` só no quadro `dia`; `texto` de 1 a 300 caracteres (quebra de linha vira espaço); `feita`; `alarme` opcional (dias e Tarefas), com `alarme_visto` e `alarme_adiado` (colunas acrescentadas na subida se faltarem).
 - `GET /minha_semana?inicio=AAAA-MM-DD`: os sete dias a partir de `inicio`, mais todas as linhas de `tarefas` e `notas`, na ordem de criação.
 - `POST /minha_semana`, `PUT /minha_semana/:id` (`texto`, `feita` e/ou `alarme`), `DELETE /minha_semana/:id`.
-- Alarme (sino na linha, janela de aviso em qualquer tela, OK e Adiar): `docs/regras/semana-administradores-alarmes.md`, junto com a Semana dos administradores (cópia compartilhada desta página).
+- Alarme (sino na linha, janela de aviso em qualquer tela, OK e Adiar): `docs/regras/semana-administradores-alarmes.md`, junto com a Semana compartilhada (cópia desta página).
 
 ## Tela
 - Menu **Pessoal > Minha semana**. Fica fora de `PAGINAS` (nunca é a primeira página de ninguém) e está em `ATEND_BLOQUEADAS` (no modo atendimento some do menu e nada é buscado).

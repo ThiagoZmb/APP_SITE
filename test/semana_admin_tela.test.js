@@ -1,4 +1,4 @@
-// Semana dos administradores (tela): conflito (409), linha apagada (404), atualização automática, rascunho próprio, menu e permissão.
+// Semana compartilhada (tela): conflito (409), linha apagada (404), atualização automática, rascunho próprio, menu e permissão.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -251,7 +251,7 @@ function montarMenu({ permissoes, sessao = {} }) {
 test('menu: logo depois de Minha semana, só com a permissão, escondida no modo atendimento', () => {
   const com = montarMenu({ permissoes: ['tarefas_admin.usar', 'administrativo.ver'] });
   assert.doesNotMatch(com.item, /hidden/);
-  assert.match(com.html, /<span>Minha semana<\/span><\/a><a class="menu-item( grupo)?" href="tarefas_admin\.html"><svg[^]*?<\/svg><span>Semana dos administradores<\/span>/);
+  assert.match(com.html, /<span>Minha semana<\/span><\/a><a class="menu-item( grupo)?" href="tarefas_admin\.html"><svg[^]*?<\/svg><span>Semana compartilhada<\/span>/);
   assert.equal(com.window.Acesso.podePagina('tarefas_admin.html'), true);
   assert.deepEqual([...com.window.ACESSO_PAGINAS['tarefas_admin.html']], ['tarefas_admin.usar']);
   const chaves = Object.keys(com.window.ACESSO_PAGINAS);
@@ -275,8 +275,8 @@ test('menu: não vira a primeira página de quem já tinha outra', () => {
 
 test('tarefas_admin.html: mesma casca e CSP da pessoal, mesma versão do layout.js, ids que o script usa', () => {
   const h = ler('tarefas_admin.html'), p = ler('tarefas.html');
-  assert.match(h, /<title>Elegance Dashboard - Semana dos administradores<\/title>/);
-  assert.match(h, /<h1 class="welcome-title">Semana dos administradores<\/h1>/);
+  assert.match(h, /<title>Elegance Dashboard - Semana compartilhada<\/title>/);
+  assert.match(h, /<h1 class="welcome-title">Semana compartilhada<\/h1>/);
   const csp = x => /Content-Security-Policy" content="([^"]+)"/.exec(x)[1];
   assert.equal(csp(h), csp(p));
   assert.equal(/layout\.js\?v=\d+/.exec(h)[0], /layout\.js\?v=\d+/.exec(p)[0]);

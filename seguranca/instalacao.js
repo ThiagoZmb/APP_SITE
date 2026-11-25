@@ -574,7 +574,7 @@ const TABELAS = [
      atualizado_em DATETIME NULL,
      KEY ix_tarefas_usuario (usuario_codigo, quadro, data)
    ) ${OPCOES}`,
-  // ----- Semana dos administradores: o mesmo caderno, compartilhado. `versao` impede que um sobrescreva o outro sem saber -----
+  // ----- Semana compartilhada: o mesmo caderno, compartilhado. `versao` impede que um sobrescreva o outro sem saber -----
   `CREATE TABLE IF NOT EXISTS \`web_tarefas_admin\` (
      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
      quadro ENUM('dia','tarefas','notas') NOT NULL,
@@ -854,7 +854,7 @@ async function darAoAdministrador(pool, marcador, permissoes) {
   }
 }
 
-// Semana dos administradores: a permissão começa só no perfil Administrador
+// Semana compartilhada: a permissão começa só no perfil Administrador
 const acrescentarPermissoesTarefasAdmin = pool => darAoAdministrador(pool, 'permissoes_tarefas_admin', ['tarefas_admin.usar']);
 
 const acrescentarPermissoesPrecos = pool => darAoAdministrador(pool, 'permissoes_precos', ['precos.ver', 'precos.editar']);

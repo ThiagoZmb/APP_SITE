@@ -1,4 +1,4 @@
-// Semana dos administradores: caderno de tarefas compartilhado (tabela web_tarefas_admin). Nenhuma tabela do VB é lida ou alterada.
+// Semana compartilhada: caderno de tarefas compartilhado (tabela web_tarefas_admin). Nenhuma tabela do VB é lida ou alterada.
 // Todas as rotas exigem tarefas_admin.usar. Quem tem vê e mexe nas mesmas linhas; a autoria vem SEMPRE do login (nunca do corpo).
 // `versao` protege contra sobrescrita: quem envia uma versão antiga recebe 409 com a linha atual e nada é gravado.
 // O texto nunca vai para a auditoria nem para o log.

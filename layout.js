@@ -38,7 +38,7 @@
         // O logo Elegance leva à primeira página liberada; Pedidos e Orçamentos é o destino padrão.
         { secao: 'Pessoal' },
         { href: 'tarefas.html', texto: 'Minha semana', icone: 'tarefas' },   // caderno pessoal: sem permissão (fora de PAGINAS, não vira a primeira página de ninguém)
-        { href: 'tarefas_admin.html', texto: 'Semana dos administradores', icone: 'tarefas' },   // o mesmo caderno, compartilhado (tarefas_admin.usar)
+        { href: 'tarefas_admin.html', texto: 'Semana compartilhada', icone: 'tarefas' },   // o mesmo caderno, compartilhado (tarefas_admin.usar)
         { secao: 'Comercial' },
         { href: 'painel_inicial.html', texto: 'Pedidos e Orçamentos', icone: 'pedidos' },
         { href: 'orcamentos.html', texto: 'Novo orçamento', icone: 'novo', sub: true },
