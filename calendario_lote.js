@@ -1,5 +1,6 @@
 // ==========================================================================
 // Ações em LOTE do calendário de pedidos (visão Lista de calendario.html): selecionar vários pedidos e aplicar "Alterar data de pronto" ou "Mudar situação".
+// Também usado pela aba Pedidos de painel_inicial.html (painel_lote.js).
 // Funções puras (testadas no Node, test/calendario_lote.test.js). NENHUMA regra de negócio aqui: cada pedido é enviado, UM POR UM e em sequência,
 // às rotas que já existem (POST /ped_orc/Pedido/:n/data_pronto e /situacao), então permissão, estados do usuário, validação e auditoria
 // (web_auditoria, Histórico do pedido) são exatamente os da ação individual. Uma falha não impede os outros pedidos.
@@ -114,5 +115,38 @@
       + '<button type="button" class="btn btn-mini btn-secondary" data-lote="limpar">Limpar seleção</button>';
   }
 
-  return { SITUACOES_LOTE, MAX_FALHAS_VISIVEIS, numerosNaOrdem, intervalo, aplicarSelecao, manterVisiveis, textoSelecionados, corpoSituacao, motivoErro, executarLote, resumoLote, htmlResumo, htmlBarra };
+  // ---------- ligação compartilhada pelas duas telas (calendario.js e painel_lote.js): perguntas e execução com resumo ----------
+  // data de pronto nova para `qtd` pedidos (janela de sempre, alterar_data_pronto.js); null = desistiu
+  async function perguntarData(win, qtd) {
+    if (!win.AlterarDataPronto) return null;
+    return (await win.AlterarDataPronto.perguntar({ tipo: 'Pedido', subtitulo: `${qtd} pedido(s) selecionado(s)`, dataAtual: '' })) || null;
+  }
+  // corpo do POST /situacao para `qtd` pedidos (Entregue/Retirado = janela de data de entrega; os outros = confirmação); null = desistiu
+  async function perguntarSituacao(win, nome, qtd) {
+    if (!SITUACOES_LOTE.includes(nome)) return null;
+    let escolha = '';
+    if (nome === 'Entregue' || nome === 'Retirado') {
+      if (!win.EscolhaDataEntrega) return null;
+      escolha = await win.EscolhaDataEntrega.perguntar({ numero: '', cliente: '', nome, dataAtual: '', dataPronto: '', lote: qtd });
+      if (!escolha) return null;
+    } else if (!win.confirm(`Mudar a situação de ${qtd} pedido(s) para "${nome}"?`)) return null;
+    return corpoSituacao(nome, escolha);
+  }
+  // executarLote + progresso e resumo no `painel` (elemento, opcional). Sessão expirada interrompe. Devolve o resumo de resumoLote.
+  async function rodarLote(numeros, chamarUm, { descricao, nomes, painel, esc } = {}) {
+    const resultados = await executarLote(numeros, chamarUm, {
+      parar: err => !!err && err.message === 'Sessão expirada',   // quem chama a API já mandou para o login
+      aoProgresso: (feitos, total) => { if (painel) { painel.hidden = false; painel.textContent = `Aplicando… ${feitos} de ${total}`; } }
+    });
+    const r = resumoLote(resultados, descricao, nomes);
+    if (painel) {
+      painel.hidden = false;
+      painel.className = `cal-lote-resumo ${r.todosOk ? 'ok' : 'falha'}`;
+      painel.innerHTML = htmlResumo(r, esc);
+      painel.setAttribute('role', r.todosOk ? 'status' : 'alert');
+    }
+    return r;
+  }
+
+  return { perguntarData, perguntarSituacao, rodarLote, SITUACOES_LOTE, MAX_FALHAS_VISIVEIS, numerosNaOrdem, intervalo, aplicarSelecao, manterVisiveis, textoSelecionados, corpoSituacao, motivoErro, executarLote, resumoLote, htmlResumo, htmlBarra };
 });

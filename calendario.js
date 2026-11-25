@@ -218,21 +218,11 @@
       estado.emLote = true; atualizarBarraLote();
       $('cal-corpo').setAttribute('aria-busy', 'true');
       const nomes = new Map([...estado.pedidos].map(([k, p]) => [k, p.cliente || '']));
-      let resultados;
+      let r;
       try {
-        resultados = await L.executarLote(numeros, chamarUm, {
-          parar: err => !!err && err.message === 'Sessão expirada',   // chamar() já mandou para o login
-          aoProgresso: (feitos, total) => { if (resumoLote) { resumoLote.hidden = false; resumoLote.textContent = `Aplicando… ${feitos} de ${total}`; } }
-        });
+        r = await L.rodarLote(numeros, chamarUm, { descricao, nomes, painel: resumoLote, esc: K.esc });
       } finally { estado.emLote = false; }
-      const r = L.resumoLote(resultados, descricao, nomes);
       estado.sel = { marcados: new Set(r.numerosFalha), ancora: '' };   // os que falharam continuam selecionados, para tentar de novo
-      if (resumoLote) {
-        resumoLote.hidden = false;
-        resumoLote.className = `cal-lote-resumo ${r.todosOk ? 'ok' : 'falha'}`;
-        resumoLote.innerHTML = L.htmlResumo(r, K.esc);
-        resumoLote.setAttribute('role', r.todosOk ? 'status' : 'alert');
-      }
       toast(r.titulo, r.todosOk ? 'info' : 'erro');
       await carregar();   // recarrega o mês (ou a pesquisa) mantendo filtros; o pedido pode ter mudado de dia
       $('cal-corpo').removeAttribute('aria-busy');
@@ -241,21 +231,16 @@
 
     async function loteDataPronto() {
       const numeros = numerosSelecionados();
-      if (!numeros.length || !podeLote.dataPronto || !win.AlterarDataPronto) return;
-      const nova = await win.AlterarDataPronto.perguntar({ tipo: 'Pedido', subtitulo: `${numeros.length} pedido(s) selecionado(s)`, dataAtual: '' });
+      if (!numeros.length || !podeLote.dataPronto) return;
+      const nova = await L.perguntarData(win, numeros.length);
       if (!nova) return;
       await executarAcao('data de pronto', numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/data_pronto`, { metodo: 'POST', corpo: { dataPronto: nova } }));
     }
     async function loteSituacao(nome) {
       const numeros = numerosSelecionados();
-      if (!numeros.length || !podeLote.situacao || !L.SITUACOES_LOTE.includes(nome)) return;
-      let escolha = '';
-      if (nome === 'Entregue' || nome === 'Retirado') {
-        if (!win.EscolhaDataEntrega) return;
-        escolha = await win.EscolhaDataEntrega.perguntar({ numero: '', cliente: '', nome, dataAtual: '', dataPronto: '', lote: numeros.length });
-        if (!escolha) return;
-      } else if (!win.confirm(`Mudar a situação de ${numeros.length} pedido(s) para "${nome}"?`)) return;
-      const corpo = L.corpoSituacao(nome, escolha);
+      if (!numeros.length || !podeLote.situacao) return;
+      const corpo = await L.perguntarSituacao(win, nome, numeros.length);
+      if (!corpo) return;
       await executarAcao(`situação ${nome}`, numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/situacao`, { metodo: 'POST', corpo }));
     }
 

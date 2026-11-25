@@ -229,12 +229,20 @@
             #orders-table { table-layout: auto; width: max-content; min-width: 100%; }
             #orders-table col { width: auto !important; }
             #orders-table th, #orders-table td { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
-            #orders-table td:nth-child(2), #orders-table td:nth-child(3), #orders-table td:nth-child(7) { max-width: 180px; }
+            #orders-table:not(.com-sel) td:nth-child(2), #orders-table:not(.com-sel) td:nth-child(3), #orders-table:not(.com-sel) td:nth-child(7),
+            #orders-table.com-sel td:nth-child(3), #orders-table.com-sel td:nth-child(4), #orders-table.com-sel td:nth-child(8) { max-width: 180px; }
             #orders-table .selo { max-width: none; }
         }
         #orders-tbody tr { cursor: pointer; }
         #orders-tbody tr.divisor-semana td { border-top: 2px solid var(--primary-color); }
         td.num, th.num { text-align: right; }
+        /* seleção em lote (só aba Pedidos; painel_lote.js): coluna estreita à esquerda; barra e resumo em lote.css */
+        #orders-table col.col-sel { width: 42px; }
+        #orders-table th.col-sel, #orders-table td.col-sel { text-align: center; cursor: pointer; text-overflow: clip; }
+        #orders-table td.col-sel .sel-pedido, #orders-table th.col-sel input { margin: 0; }
+        #lote-resumo { margin: 0 22px 12px; }
+        body.com-barra-lote { padding-bottom: 90px; }
+        @media (max-width: 768px) { #lote-barra { left: 8px; right: 8px; max-width: none; transform: none; } }
         .rodape-l { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 22px 14px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-light); font-weight: 600; }
         .rodape-l b { color: var(--text-dark); }
         #carregando { padding: 60px 0; text-align: center; color: var(--text-light); font-weight: 600; }
@@ -272,6 +280,7 @@
         #menu-ctx button.mc-perigo { color: var(--danger-fg); }
         #menu-ctx .mc-ic { width: 20px; text-align: center; flex: none; }
     </style>
+    <link rel="stylesheet" href="lote.css?v=202611281200">
     <link rel="stylesheet" href="impressao_lista.css?v=202611241100">
     <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="situacoes.js?v=202611191300"></script>
@@ -291,6 +300,8 @@
     <script src="vendor/jspdf.umd.min.js" defer></script>
     <script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
     <script src="impressao_lista.js?v=202611241100" defer></script>
+    <script src="calendario_lote.js?v=202611281200" defer></script>
+    <script src="painel_lote.js?v=202611281200" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
@@ -360,6 +371,7 @@
                     </div>
                     <div class="chips-sit" id="chips-sit"></div>
                     <p class="busca-aviso" id="busca-aviso" role="status" hidden></p>
+                    <div id="lote-resumo" class="cal-lote-resumo" tabindex="-1" hidden></div>
                     <div class="tabela-wrap">
                         <table id="orders-table">
                             <colgroup><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:9%"><col style="width:9%"><col style="width:11%"></colgroup>
@@ -400,6 +412,7 @@
             </div>
         </main>
     </div>
+    <div id="lote-barra" class="cal-lote" role="region" aria-label="Ações em lote nos pedidos selecionados" hidden></div>
 
     <script>
         const API_BASE = 'https://elegance-backend-hrho.onrender.com';
@@ -447,6 +460,7 @@
         // ================= ESTADO =================
         let pedidos = [], orcamentos = [];
         let tipoLista = 'Pedido', filtroSit = '', cliente = '';
+        let lote = null; // seleção em lote da aba Pedidos (painel_lote.js, criado no DOMContentLoaded, depois dos scripts defer)
         const graficos = {};
 
         // ================= PERÍODO (e o período anterior equivalente, para comparar) =================
@@ -930,11 +944,14 @@
             $('lista-qtd').textContent = buscaGlobal ? `${num(lista.length)} registro(s) · busca em todos os registros` : `${num(lista.length)} registro(s) · ${j.nome}${cliente ? ' · ' + cliente : ''}`;
             $('lista-total').textContent = moeda(soma(lista));
             const divisores = classesDivisor(visiveis);
+            lote?.preparar(visiveis.map(x => x.numero)); // desmarca quem saiu da tela e põe/tira a coluna de seleção
+            const colunas = lote ? lote.colunas() : 10;
             $('orders-tbody').innerHTML = (visiveis.map((x, i) => `
                 <tr data-numero="${esc(x.numero)}" tabindex="0" title="${esc(balaoDaLinha(x))}"${divisores[i] ? ` class="${divisores[i]}"` : ''}>
-                    ${COLUNAS.map(c => `<td${c.tdClasse || c.num ? ` class="${c.tdClasse || 'num'}"` : ''}${c.valor ? ' data-valor' : ''}>${c.celula(x, false)}</td>`).join('')}
-                </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="10" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — ${buscaGlobal ? 'refine o texto da busca.' : 'use a busca ou o período para refinar.'}</td></tr>` : ''))
-                || '<tr><td colspan="10" class="vazio">Nenhum registro encontrado</td></tr>';
+                    ${lote ? lote.celula(x.numero) : ''}${COLUNAS.map(c => `<td${c.tdClasse || c.num ? ` class="${c.tdClasse || 'num'}"` : ''}${c.valor ? ' data-valor' : ''}>${c.celula(x, false)}</td>`).join('')}
+                </tr>`).join('') + (lista.length > MAX_LINHAS_LISTA ? `<tr><td colspan="${colunas}" class="vazio">Mostrando os ${MAX_LINHAS_LISTA} mais recentes — ${buscaGlobal ? 'refine o texto da busca.' : 'use a busca ou o período para refinar.'}</td></tr>` : ''))
+                || `<tr><td colspan="${colunas}" class="vazio">Nenhum registro encontrado</td></tr>`;
+            lote?.depoisDeDesenhar();
             carregarBaloes(visiveis);
         }
         // ---- Balão (title) de cada linha: mesmo conteúdo do Calendário de pedidos (dados, situação, itens com o tamanho real e cores) ----
@@ -1001,6 +1018,7 @@
             } catch (err) { alert(err.message); }
         }
         $('orders-tbody').addEventListener('click', e => {
+            if (lote && lote.clique(e)) return; // caixa de seleção, Ctrl/Shift+clique: não abre o PDF
             const tr = e.target.closest('tr[data-numero]');
             if (tr && Acesso.pode('pedidos.pdf')) abrirPdfAutenticado(`${API_BASE}/dados_pdf?numero=${encodeURIComponent(tr.dataset.numero)}&tipo=${encodeURIComponent(tipoLista)}`);
         });
@@ -1175,7 +1193,8 @@
         }
         $('orders-tbody').addEventListener('contextmenu', e => { const tr = e.target.closest('tr[data-numero]'); if (tr) abrirMenu(e, tr); });
         document.addEventListener('mousedown', e => { if (menuCtx && !menuCtx.contains(e.target)) fecharMenu(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && menuCtx) fecharMenu(true); });
+        // Esc fecha o menu; sem menu, limpa a seleção em lote
+        document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (menuCtx) fecharMenu(true); else if (lote) lote.tecla(e); });
         document.addEventListener('scroll', fecharMenu, true);
         window.addEventListener('resize', fecharMenu);
         window.addEventListener('blur', fecharMenu);
@@ -1183,6 +1202,7 @@
         document.querySelectorAll('.toggle-btn').forEach(b => b.addEventListener('click', () => {
             tipoLista = b.dataset.tipo; filtroSit = '';
             document.querySelectorAll('.toggle-btn').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+            lote?.trocouAba(); // a seleção é só de Pedidos e não passa de uma aba para a outra
             if (carregado[tipoLista]) { renderLista(); return; }
             // A outra lista só é buscada agora (ou ao abrir o olho).
             $('orders-tbody').innerHTML = '<tr><td colspan="10" class="vazio">Carregando...</td></tr>';
@@ -1245,6 +1265,8 @@
             if (!Acesso.paginaLiberada()) return; // sem permissão: o layout.js já mostrou "Sem acesso"
             cliente = new URLSearchParams(location.search).get('cliente') || '';
             $('f-cliente').value = cliente;
+            lote = window.PainelLote.criar({ win: window, esc, api, tipo: () => tipoLista, recarregar: () => carregar(),
+                nomes: () => new Map(pedidos.map(x => [String(x.numero), x.cliente || ''])) });
             carregar().then(() => { if (!document.querySelector('dialog[open]')) $('search-input').focus(); });
         });
     </script>
