@@ -112,6 +112,34 @@ const { hojeLocal, agoraLocal } = require('./estoque_movimentos');
 const VER = 'estoque.ver';
 const ADMIN = 'administrativo.ver';   // curva ABC, previsão de falta e itens parados são análises administrativas: o operador não vê
 
+// as consultas das análises, usadas também pela sugestão dos pedidos a fornecedor
+async function carregarAnalises(pool, { hoje, janela, verValores, classe = '' }) {
+  const ini = somarDias(hoje, -(janela - 1)), iniAnt = somarDias(ini, -janela), ini12 = somarDias(hoje, -364);
+  const mes12 = mesesAte(hoje, 12)[0] + '-01';
+  // o VB pode ter datas zeradas (0000-00-00) ou digitadas errado: só conta de 2000 até hoje
+  const DESDE = '2000-01-01 00:00:00', ATE = `${somarDias(hoje, 1)} 00:00:00`;
+  const [itens] = await pool.execute(
+    `SELECT CODIGO, NOME_PRODUTO, CLASSE, UNIDADE, QTD_ESTOQUE, MIN_ESTOQUE, SITUACAO, VALOR FROM estoque
+     WHERE (SITUACAO = 'Ativo' OR (SITUACAO = 'Inativo' AND QTD_ESTOQUE <> 0))`);
+  // saída → produto ligada no banco: a comparação do MySQL ignora maiúsculas, acentos e espaço no fim,
+  // como o VB espera (saida_estoque não tem chave estrangeira para o estoque)
+  const [saidasPorProduto] = await pool.execute(
+    `SELECT e.CODIGO, SUM(CASE WHEN s.DATA >= ? THEN s.QTD ELSE 0 END) AS janela,
+       SUM(CASE WHEN s.DATA >= ? AND s.DATA < ? THEN s.QTD ELSE 0 END) AS anterior,
+       SUM(CASE WHEN s.DATA >= ? THEN s.QTD ELSE 0 END) AS ano, MAX(s.DATA) AS ultima
+     FROM saida_estoque s JOIN estoque e ON e.NOME_PRODUTO = s.NOME_PRODUTO
+     WHERE s.DATA >= ? AND s.DATA < ? GROUP BY e.CODIGO`,
+    [`${ini} 00:00:00`, `${iniAnt} 00:00:00`, `${ini} 00:00:00`, `${ini12} 00:00:00`, DESDE, ATE]);
+  const [saidasPorMes] = await pool.execute(
+    "SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(QTD) AS qtd FROM saida_estoque WHERE DATA >= ? AND DATA < ? GROUP BY mes", [DESDE, ATE]);
+  const [entradasPorMes] = await pool.execute(
+    "SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(QTD) AS qtd FROM entrada_estoque WHERE DATA >= ? AND DATA < ? GROUP BY mes", [mes12, ATE]);
+  const [[{ primeira }]] = await pool.execute('SELECT MIN(DATA) AS primeira FROM saida_estoque WHERE DATA >= ? AND DATA < ?', [DESDE, ATE]);
+  const [prazos] = await pool.execute('SELECT produto_codigo, prazo_dias FROM web_estoque_reposicao');
+  return calcularAnalises({ hoje, janela, verValores,
+    itens, saidasPorProduto, saidasPorMes, entradasPorMes, primeiraSaida: primeira || null, prazos, classe });
+}
+
 function registrarEstoqueAnalises({ rota, pool }) {
   const falha = (res, rotaNome, err) => {
     console.error(`Erro ${rotaNome}:`, err.message);
@@ -122,32 +150,8 @@ function registrarEstoqueAnalises({ rota, pool }) {
   rota('get', '/estoque/analises', [VER, { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }, ADMIN], async (req, res) => {
     const janela = JANELAS.includes(Number(req.query.janela)) ? Number(req.query.janela) : 90;
     const classe = String(req.query.classe || '').trim().slice(0, 45);
-    const hoje = hojeLocal();
-    const ini = somarDias(hoje, -(janela - 1)), iniAnt = somarDias(ini, -janela), ini12 = somarDias(hoje, -364);
-    const mes12 = mesesAte(hoje, 12)[0] + '-01';
-    // o VB pode ter datas zeradas (0000-00-00) ou digitadas errado: só conta de 2000 até hoje
-    const DESDE = '2000-01-01 00:00:00', ATE = `${somarDias(hoje, 1)} 00:00:00`;
     try {
-      const [itens] = await pool.execute(
-        `SELECT CODIGO, NOME_PRODUTO, CLASSE, UNIDADE, QTD_ESTOQUE, MIN_ESTOQUE, SITUACAO, VALOR FROM estoque
-         WHERE (SITUACAO = 'Ativo' OR (SITUACAO = 'Inativo' AND QTD_ESTOQUE <> 0))`);
-      // saída → produto ligada no banco: a comparação do MySQL ignora maiúsculas, acentos e espaço no fim,
-      // como o VB espera (saida_estoque não tem chave estrangeira para o estoque)
-      const [saidasPorProduto] = await pool.execute(
-        `SELECT e.CODIGO, SUM(CASE WHEN s.DATA >= ? THEN s.QTD ELSE 0 END) AS janela,
-           SUM(CASE WHEN s.DATA >= ? AND s.DATA < ? THEN s.QTD ELSE 0 END) AS anterior,
-           SUM(CASE WHEN s.DATA >= ? THEN s.QTD ELSE 0 END) AS ano, MAX(s.DATA) AS ultima
-         FROM saida_estoque s JOIN estoque e ON e.NOME_PRODUTO = s.NOME_PRODUTO
-         WHERE s.DATA >= ? AND s.DATA < ? GROUP BY e.CODIGO`,
-        [`${ini} 00:00:00`, `${iniAnt} 00:00:00`, `${ini} 00:00:00`, `${ini12} 00:00:00`, DESDE, ATE]);
-      const [saidasPorMes] = await pool.execute(
-        "SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(QTD) AS qtd FROM saida_estoque WHERE DATA >= ? AND DATA < ? GROUP BY mes", [DESDE, ATE]);
-      const [entradasPorMes] = await pool.execute(
-        "SELECT DATE_FORMAT(DATA, '%Y-%m') AS mes, SUM(QTD) AS qtd FROM entrada_estoque WHERE DATA >= ? AND DATA < ? GROUP BY mes", [mes12, ATE]);
-      const [[{ primeira }]] = await pool.execute('SELECT MIN(DATA) AS primeira FROM saida_estoque WHERE DATA >= ? AND DATA < ?', [DESDE, ATE]);
-      const [prazos] = await pool.execute('SELECT produto_codigo, prazo_dias FROM web_estoque_reposicao');
-      res.json(calcularAnalises({ hoje, janela, verValores: req.acesso.permissoes.has('valores.ver'),
-        itens, saidasPorProduto, saidasPorMes, entradasPorMes, primeiraSaida: primeira || null, prazos, classe }));
+      res.json(await carregarAnalises(pool, { hoje: hojeLocal(), janela, verValores: req.acesso.permissoes.has('valores.ver'), classe }));
     } catch (err) { falha(res, 'GET /estoque/analises', err); }
   });
 
@@ -168,4 +172,4 @@ function registrarEstoqueAnalises({ rota, pool }) {
   });
 }
 
-module.exports = { calcularAnalises, registrarEstoqueAnalises, JANELAS, PRAZO_PADRAO };
+module.exports = { calcularAnalises, carregarAnalises, registrarEstoqueAnalises, JANELAS, PRAZO_PADRAO };
