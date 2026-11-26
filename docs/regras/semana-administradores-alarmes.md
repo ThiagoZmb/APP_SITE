@@ -7,9 +7,10 @@ Arquivos: `tarefas_admin.html`, `tarefas_admin.js`, `rotas/semana_admin.js`, `ro
 A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Quadros, texto, datas e grade seguem `docs/regras/minha-semana.md`.
 
 ## Quem entra
-- Permissão `tarefas_admin.usar` ("Semana compartilhada", área Pessoal), em `PERMISSOES_ADMINISTRATIVAS`: sem a chave `administrativo.ver` ela não vale.
-- Começa só no perfil Administrador (`acrescentarPermissoesTarefasAdmin`, marcador `permissoes_tarefas_admin`, depois da chave administrativa na subida). O dono pode dá-la a outra pessoa na tela de Usuários.
-- Sem ela: 403 nas quatro rotas, nenhum alarme compartilhado, menu escondido. No modo atendimento a página some e nada é buscado. Nunca é a primeira página depois do login.
+- Permissão `tarefas_admin.usar` ("Semana compartilhada", área Pessoal), em `PERMISSOES_ADMINISTRATIVAS`: sem a chave `administrativo.ver` ela não vale, nem com exceção "liberar".
+- **Automática** (decisão do dono, 2026-11-26): todo usuário ativo com `administrativo.ver` recebe a permissão, esteja ou não no perfil (`permissoesFinais`). Só se tira com a exceção "Bloquear" no usuário. A caixa do perfil não faz diferença: na tela ela fica travada e acompanha o Acesso administrativo.
+- A migração antiga (`acrescentarPermissoesTarefasAdmin`, só no perfil Administrador) continua no código, sem efeito prático.
+- Sem ela: 403 nas quatro rotas, nenhum alarme compartilhado, menu escondido. No modo atendimento a página só some para quem não tem `administrativo.ver` (para o administrativo ela continua no menu e abre). Nunca é a primeira página depois do login.
 
 ## Rotas e versão
 - `GET /semana_admin?inicio=`, `POST /semana_admin`, `PUT /semana_admin/:id` (`texto`, `feita`, `alarme`, `versao`), `DELETE /semana_admin/:id` (`versao` no corpo ou na URL).

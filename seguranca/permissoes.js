@@ -79,7 +79,7 @@ const CATALOGO = [
   { codigo: 'etapas.finalizar', nome: 'Dar OK em Pedido finalizado (marca o pedido como Pronto)', area: 'Etapas de produção' },
   { codigo: 'etapas.gerir', nome: 'Gerir todas as etapas de produção: qualquer etapa, N/A, desfazer e forçar o finalizado', area: 'Etapas de produção' },
   { codigo: 'tarefas_admin.usar', nome: 'Semana compartilhada', area: 'Pessoal' },
-  { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos e Gestão; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
+  { codigo: 'atendimento.modo', nome: 'Iniciar no Modo atendimento (esconde Início, gráficos, Financeiro, Custos, Gestão e, de quem não é administrativo, as agendas; só mostra pedidos do cliente atual; o usuário pode desligar)', area: 'Especial' },
   { codigo: 'administrativo.ver', nome: 'Acesso administrativo: gráficos, indicadores, resumos e totais, telas de gestão e valores em dinheiro (sem ela o usuário é operador; com "Valores financeiros" e sem esta, é "só valores")', area: 'Especial' },
   { codigo: 'valores.ver', nome: 'Valores financeiros em qualquer tela', area: 'Especial' },
   { codigo: 'admin.usuarios', nome: 'Gerenciar usuários, perfis e permissões', area: 'Administração' },
@@ -162,8 +162,8 @@ const DESCRICOES = {
   'etapas.montagem': 'Dá OK (ou desfaz) na etapa Portas montadas.',
   'etapas.finalizar': 'Dá OK em Pedido finalizado, o que marca o pedido como Pronto.',
   'etapas.gerir': 'Mexe em qualquer etapa, marca N/A e força o finalizado.',
-  'tarefas_admin.usar': 'Abre a Semana compartilhada (caderno: ver, escrever, marcar e apagar) e recebe os alarmes dele. Só vale com Acesso administrativo.',
-  'atendimento.modo': 'Entra já no Modo atendimento (tela limpa para atender o cliente); o usuário pode desligar.',
+  'tarefas_admin.usar': 'Abre a Semana compartilhada (caderno: ver, escrever, marcar e apagar) e recebe os alarmes dele. Automática para quem tem Acesso administrativo, mesmo fora do perfil; para tirar de alguém, use Bloquear no usuário.',
+  'atendimento.modo': 'Entra já no Modo atendimento (tela limpa para atender o cliente); o usuário pode desligar. O modo também esconde Minha semana e Semana compartilhada de quem não tem Acesso administrativo.',
   'administrativo.ver': 'Chave da classe administrativa: libera gráficos, indicadores, totais, gestão e dinheiro. Sem ela, as permissões marcadas "Só administrativo" não valem.',
   'valores.ver': 'Mostra preços e valores em dinheiro nas telas.',
   'admin.usuarios': 'Cria e edita usuários, perfis e permissões (esta tela).',
@@ -200,7 +200,8 @@ const PERFIS_INICIAIS = [
       'etapas.pintura_perfil', 'etapas.pintura_vidro', 'etapas.montagem', 'etapas.finalizar', 'entregas.ver', 'entregas.checklist', 'corte.ver'] }
 ];
 
-// perfil + exceções "liberar" − exceções "bloquear"; inativo = nada; códigos fora do catálogo são ignorados
+// perfil + exceções "liberar" − exceções "bloquear"; inativo = nada; códigos fora do catálogo são ignorados.
+// A chave administrativo.ver traz valores.ver e tarefas_admin.usar (esta, salvo exceção "bloquear").
 function permissoesFinais({ permissoesPerfil = [], excecoes = [], ativo }) {
   const final = new Set();
   if (!ativo) return final;
@@ -211,8 +212,11 @@ function permissoesFinais({ permissoesPerfil = [], excecoes = [], ativo }) {
     else if (e.tipo === 'bloquear') final.delete(e.permissao);
   }
   // a chave administrativa decide: com ela vem o dinheiro; sem ela as permissões administrativas somem
-  if (final.has('administrativo.ver')) final.add('valores.ver');
-  else for (const c of PERMISSOES_ADMINISTRATIVAS) final.delete(c);
+  if (final.has('administrativo.ver')) {
+    final.add('valores.ver');
+    // Semana compartilhada (2026-11-26): automática para todo administrativo, esteja ou não no perfil; só "bloquear" no usuário tira
+    if (!excecoes.some(e => e.permissao === 'tarefas_admin.usar' && e.tipo === 'bloquear')) final.add('tarefas_admin.usar');
+  } else for (const c of PERMISSOES_ADMINISTRATIVAS) final.delete(c);
   return final;
 }
 

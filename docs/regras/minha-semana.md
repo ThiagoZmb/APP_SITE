@@ -19,7 +19,7 @@ Arquivos: `tarefas.html`, `tarefas.js`, `rotas/minha_semana.js`, `calculo/minha_
 - Alarme (sino na linha, janela de aviso em qualquer tela, OK e Adiar): `docs/regras/semana-administradores-alarmes.md`, junto com a Semana compartilhada (cópia desta página).
 
 ## Tela
-- Menu **Pessoal > Minha semana**. Fica fora de `PAGINAS` (nunca é a primeira página de ninguém) e está em `ATEND_BLOQUEADAS` (no modo atendimento some do menu e nada é buscado).
+- Menu **Pessoal > Minha semana**. Fica fora de `PAGINAS` (nunca é a primeira página de ninguém) e está em `ATEND_BLOQUEADAS` (no modo atendimento some do menu e nada é buscado, **menos para quem tem `administrativo.ver`**, que continua vendo e usando).
 - A leitura é sempre da esquerda para a direita (pedido do dono, como a semana do Google Agenda), e a ordem do DOM é a mesma (Tab segue Segunda → Domingo). Quem manda é a largura da área (já sem o menu lateral): a partir de 960px, uma fileira com os 7 dias e, embaixo, Tarefas e Notas lado a lado; menos que isso, 4 colunas (Seg a Qui, Sex a Dom, depois Tarefas e Notas, metade cada). Celular (até 700px de tela): uma coluna, de Segunda a Domingo, Tarefas e Notas; a semana atual abre rolada até hoje.
 - Cada linha é um `textarea` que cresce com o texto (aparece inteiro, quebrando linha). O texto continua sendo uma linha só: Enter salva e passa para a próxima sem inserir quebra, e o que for colado com quebras vira espaço.
 - Cada quadro tem no mínimo 8 linhas e sempre uma vazia no fim. Salva no Enter e ao sair da linha. Apagar todo o texto exclui. Notas não têm caixinha.

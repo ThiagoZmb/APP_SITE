@@ -142,7 +142,7 @@
     </style>
     <link rel="stylesheet" href="tema.css?v=202611271000">
     <script src="situacoes.js?v=202611191300"></script>
-    <script src="layout.js?v=202611291400" defer></script>
+    <script src="layout.js?v=202611301000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -420,9 +420,12 @@
             const p = perfisCache.find(x => x.id === Number(id));
             return new Set(p && p.ativo ? p.permissoes : []); // perfil desativado não dá nada
         }
+        // Semana compartilhada: automática para quem tem Acesso administrativo; só "Bloquear" no usuário tira (regra do servidor, permissoesFinais)
+        const AUTOMATICA = 'tarefas_admin.usar';
         function resultadoDe(codigo, doPerfil) {
             if (!estadoFicha.ativo) return false;
             const ex = estadoFicha.excecoes.get(codigo);
+            if (codigo === AUTOMATICA) return ex !== 'bloquear' && resultadoDe('administrativo.ver', doPerfil);
             return ex === 'liberar' ? true : ex === 'bloquear' ? false : doPerfil.has(codigo);
         }
         function renderGrade() {
@@ -434,7 +437,7 @@
                 const res = resultadoDe(p.codigo, doPerfil);
                 html += `<tr data-permissao="${esc(p.codigo)}"${CRITICAS.has(p.codigo) ? ' class="critica"' : ''}>
                     <td>${textoPermissao(p)}</td>
-                    <td class="do-perfil">${doPerfil.has(p.codigo) ? '✓' : '—'}</td>
+                    <td class="do-perfil">${p.codigo === AUTOMATICA ? 'Automática' : doPerfil.has(p.codigo) ? '✓' : '—'}</td>
                     <td><span class="tri">${['herdar', 'liberar', 'bloquear'].map(e =>
                         `<button type="button" data-estado="${e}" class="${ex === e ? 'on' : ''}">${e === 'herdar' ? 'Herdar' : e === 'liberar' ? 'Liberar' : 'Bloquear'}</button>`).join('')}</span></td>
                     <td class="resultado ${res ? 'sim' : 'nao'}">${res ? 'Sim' : 'Não'}</td>
@@ -662,8 +665,11 @@
             const marcadas = new Set(p ? p.permissoes : []);
             const areas = [];
             for (const c of catalogo) { let a = areas.find(x => x.nome === c.area); if (!a) areas.push(a = { nome: c.area, itens: [] }); a.itens.push(c); }
-            $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(c =>
-                `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> <span>${textoPermissao(c)}</span></label>`).join('')}</fieldset>`).join('');
+            // a automática não se marca no perfil: a caixa (travada) só acompanha o Acesso administrativo
+            const caixa = c => c.codigo === AUTOMATICA
+                ? `<label><input type="checkbox" id="p-automatica" disabled${marcadas.has('administrativo.ver') ? ' checked' : ''}> <span>${textoPermissao(c)}</span></label>`
+                : `<label><input type="checkbox" data-permissao="${esc(c.codigo)}"${marcadas.has(c.codigo) ? ' checked' : ''}> <span>${textoPermissao(c)}</span></label>`;
+            $('p-permissoes').innerHTML = areas.map(a => `<fieldset><legend>${esc(a.nome)}</legend>${a.itens.map(caixa).join('')}</fieldset>`).join('');
             // horário de acesso: só para perfil já criado (a restrição precisa do id)
             $('p-bloco-horario').hidden = !p;
             const NOMES_DIA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'], PADRAO = ['07:00', '18:00'];
@@ -681,6 +687,9 @@
             mostrarFichaPerfil(true);
             $('p-nome').focus();
         }
+        $('p-permissoes').addEventListener('change', e => {
+            if (e.target.dataset.permissao === 'administrativo.ver' && $('p-automatica')) $('p-automatica').checked = e.target.checked;
+        });
         $('h-usar').addEventListener('change', () => { $('h-dias').hidden = !$('h-usar').checked; });
         $('h-dias').addEventListener('change', e => {
             const lib = e.target.closest('.h-lib'); if (!lib) return;
@@ -699,9 +708,11 @@
             const nome = $('p-nome').value.trim();
             if (!nome) return toast('Informe o nome do perfil.', 'erro');
             const marcadas = new Set([...document.querySelectorAll('#p-permissoes input[data-permissao]:checked')].map(x => x.dataset.permissao));
+            const original = perfisCache.find(x => x.id === perfilAtual.id);
+            // a caixa travada não tem data-permissao: o que o perfil já tinha gravado continua como estava
+            if (original?.permissoes.includes(AUTOMATICA)) marcadas.add(AUTOMATICA);
             const permissoes = catalogo.map(c => c.codigo).filter(c => marcadas.has(c));
             const ativo = $('p-ativo').checked;
-            const original = perfisCache.find(x => x.id === perfilAtual.id);
             if (perfilAtual.id && !ativo && original?.ativo && perfilAtual.qtdUsuarios > 0 &&
                 !confirm(`Este perfil tem ${perfilAtual.qtdUsuarios} usuário(s). Eles perdem as permissões do perfil enquanto ele estiver desativado. Continuar?`)) return;
             try {

@@ -81,13 +81,18 @@
         gravar: (k, v) => { try { if (v === null || v === '') sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch { /* sem armazenamento: vale só nesta página */ } } };
     const atendTem = acesso => (acesso?.permissoes || []).includes('atendimento.modo');
     const atendAtivoPara = acesso => atendTem(acesso) && ss.ler(ATEND_CHAVE) !== '0';
-    const atendBloqueia = arquivo => ATEND_BLOQUEADAS.includes(String(arquivo || '').toLowerCase());
+    // as agendas só ficam escondidas de quem não é administrativo (decisão do dono, 2026-11-26)
+    const ATEND_LIVRES_ADMIN = ['tarefas.html', 'tarefas_admin.html'];
+    const atendBloqueia = (arquivo, acesso) => {
+        const a = String(arquivo || '').toLowerCase();
+        return ATEND_BLOQUEADAS.includes(a) && !(ATEND_LIVRES_ADMIN.includes(a) && (acesso?.permissoes || []).includes('administrativo.ver'));
+    };
     window.Atendimento = {
         disponivel: () => atendTem(auth()?.acesso),
         ativo: () => atendAtivoPara(auth()?.acesso),
         cliente: () => ss.ler(ATEND_CLIENTE) || '',
         definirCliente: nome => ss.gravar(ATEND_CLIENTE, String(nome || '').trim()),
-        paginasBloqueadas: ATEND_BLOQUEADAS.slice(),
+        get paginasBloqueadas() { return ATEND_BLOQUEADAS.filter(p => atendBloqueia(p, auth()?.acesso)); },   // as deste usuário
         alternar: () => { ss.gravar(ATEND_CHAVE, atendAtivoPara(auth()?.acesso) ? '0' : '1'); window.dispatchEvent?.(new CustomEvent('atendimento-mudou')); }
     };
     // página → permissões exigidas (todas; um item { algum: [...] } é atendido por qualquer uma da lista). A ordem define a página padrão após o login.
@@ -183,15 +188,15 @@
         const tem = acesso?.permissoes || [];
         return tem.length === PERMISSOES_BAIXA_QR.length && PERMISSOES_BAIXA_QR.every(c => tem.includes(c));
     };
-    const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html')) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html' && p !== 'tarefas_admin.html'
-        && !(atendAtivoPara(acesso) && atendBloqueia(p))
+    const primeiraPaginaDe = acesso => somenteBaixa(acesso) && !(atendAtivoPara(acesso) && atendBloqueia('baixa_qr.html', acesso)) ? 'baixa_qr.html' : Object.keys(PAGINAS).find(p => p !== 'graficos_pedidos.html' && p !== 'tarefas_admin.html'
+        && !(atendAtivoPara(acesso) && atendBloqueia(p, acesso))
         && PAGINAS[p].every(item => atendeItem(item, acesso?.permissoes || []))) || null;
     // Destino da logo do menu: o Início, se este acesso pode vê-lo (permissão da página e modo atendimento); senão a primeira página de sempre
     const INICIO = 'inicio.html';
-    const paginaDaMarcaDe = acesso => PAGINAS[INICIO].every(item => atendeItem(item, acesso?.permissoes || [])) && !(atendAtivoPara(acesso) && atendBloqueia(INICIO)) ? INICIO : primeiraPaginaDe(acesso);
+    const paginaDaMarcaDe = acesso => PAGINAS[INICIO].every(item => atendeItem(item, acesso?.permissoes || [])) && !(atendAtivoPara(acesso) && atendBloqueia(INICIO, acesso)) ? INICIO : primeiraPaginaDe(acesso);
     const podePagina = arquivo => {
         const exige = PAGINAS[String(arquivo || '').toLowerCase()];
-        if (atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivo)) return false;
+        if (atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivo, auth()?.acesso)) return false;
         return !exige || exige.every(item => atendeItem(item, auth()?.acesso?.permissoes || []));
     };
     // Permissões do usuário para a tela se montar (quem decide de verdade é o backend)
@@ -256,7 +261,7 @@
         const destino = window.Acesso.primeiraPagina();
         const bloco = document.createElement('section');
         bloco.id = 'sem-acesso-pagina';
-        const pelaModo = atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivoAtual());
+        const pelaModo = atendAtivoPara(auth()?.acesso) && atendBloqueia(arquivoAtual(), auth()?.acesso);
         bloco.innerHTML = (pelaModo ? '<h2>Modo atendimento ligado</h2><p>Esta tela mostra dados gerais da empresa e fica escondida enquanto há cliente acompanhando.</p><button type="button" class="btn btn-primary" id="atend-desligar">Desligar modo atendimento</button><br>' : '<h2>Sem acesso</h2><p>Seu usuário não tem permissão para esta página.</p>') +
             (destino ? `<a href="${destino}">Ir para o início</a>` : '<a href="login.html" class="sair">Sair</a>');
         bloco.querySelector('#atend-desligar')?.addEventListener('click', () => { window.Atendimento.alternar(); location.reload(); });
