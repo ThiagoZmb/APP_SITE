@@ -16,10 +16,26 @@ function regrasCompras(estado) {
   const proximo = (lista, campo) => lista.reduce((m, x) => Math.max(m, x[campo]), 0) + 1;
   const remover = (lista, apagar) => { const fica = lista.filter(x => !apagar(x)); const n = lista.length - fica.length; lista.splice(0, lista.length, ...fica); return { affectedRows: n }; };
   return [
-    // saldo a caminho
-    [/AS falta FROM web_pedidos_compra_itens i JOIN web_pedidos_compra p/, (sql, codigos) => comprasItens
-      .filter(i => ['enviado', 'parcial'].includes(pedido(i.pedido_numero)?.situacao) && (!codigos.length || codigos.map(Number).includes(i.produto_codigo)))
-      .map(i => ({ codigo: i.produto_codigo, falta: String(i.qtd - chegou(i.id)) }))],
+    // itens com as baixas (LEFT JOIN: uma linha por baixa), com os três filtros usados
+    [/LEFT JOIN web_pedidos_compra_baixas b ON b\.item_id = i\.id/, (sql, params) => {
+      const aberto = i => ['enviado', 'parcial'].includes(pedido(i.pedido_numero)?.situacao);
+      let itens;
+      if (/WHERE i\.pedido_numero = \?/.test(sql)) itens = comprasItens.filter(i => i.pedido_numero === Number(params[0]));
+      else if (/WHERE p\.fornecedor = \?/.test(sql)) itens = comprasItens.filter(i => aberto(i) && norm(pedido(i.pedido_numero).fornecedor) === norm(params[0]) && pedido(i.pedido_numero).criado_em <= params[1])
+        .sort((a, b) => a.pedido_numero - b.pedido_numero || a.id - b.id);
+      else itens = comprasItens.filter(i => aberto(i) && (!params.length || params.map(Number).includes(i.produto_codigo)));
+      return itens.flatMap(i => {
+        const baixas = comprasBaixas.filter(b => b.item_id === i.id);
+        return (baixas.length ? baixas : [{ qtd: null }]).map(b => ({ item_id: i.id, numero: i.pedido_numero, codigo: i.produto_codigo, qtd: i.qtd, chegou: b.qtd }));
+      });
+    }],
+    [/INSERT INTO web_pedidos_compra_baixas/, (sql, [item_id, nota, fornecedor, qtd, quando]) => {
+      comprasBaixas.push({ id: proximo(comprasBaixas, 'id'), item_id, nota, fornecedor, qtd, quando }); return { affectedRows: 1 }; }],
+    [/WHERE b\.nota = \? AND b\.fornecedor = \?/, (sql, [nota, forn]) => comprasBaixas.filter(b => b.nota === nota && norm(b.fornecedor) === norm(forn))
+      .map(b => { const i = comprasItens.find(x => x.id === b.item_id); return { numero: i.pedido_numero, codigo: i.produto_codigo }; })],
+    [/DELETE FROM web_pedidos_compra_baixas WHERE nota = \? AND fornecedor = \?/, (sql, [nota, forn]) => remover(comprasBaixas, b => b.nota === nota && norm(b.fornecedor) === norm(forn))],
+    [/UPDATE web_pedidos_compra SET situacao = \? WHERE numero = \?/, (sql, [s, n]) => { pedido(n).situacao = s; return { affectedRows: 1 }; }],
+    [/SELECT CODIGO, NOME_PRODUTO, NOME_PRODUTO_FORNECEDOR, QTD_ESTOQUE, AGUARDANDO/, () => estoque.map(e => ({ ...e }))],
     [/UPDATE estoque SET AGUARDANDO = \? WHERE CODIGO = \?/, (sql, [v, c]) => { const e = estoque.find(x => x.CODIGO === Number(c)); if (e) e.AGUARDANDO = v; return { affectedRows: e ? 1 : 0 }; }],
     // sugestão
     [/SELECT CODIGO, FORNECEDOR, SITUACAO, AGUARDANDO FROM estoque/, () => estoque.map(e => ({ ...e }))],

@@ -38,6 +38,7 @@ const { criarCripto } = require('./portal/cripto');
 const { criarEmail } = require('./portal/email');
 const { registrarEstoqueMovimentos } = require('./rotas/estoque_movimentos');
 const { registrarPedidosCompra } = require('./rotas/pedidos_compra');
+const { aCaminhoPorProduto } = require('./rotas/pedidos_compra_banco');
 const { registrarEstoqueQr } = require('./rotas/estoque_qr');
 const { registrarRegras } = require('./rotas/regras');
 const { registrarEstoqueAnalises } = require('./rotas/estoque_analises');
@@ -1280,14 +1281,18 @@ registro.rota('get', '/estoque', ['estoque.ver'], async (req, res) => {
     const where = [], params = [];
     if (classe) { where.push('CLASSE = ?'); params.push(classe); }
     if (busca) { where.push('(CAST(CODIGO AS CHAR) LIKE ? OR NOME_PRODUTO LIKE ?)'); params.push(`%${busca}%`, `%${busca}%`); }
-    const [rows] = await pool.execute(
-      `SELECT CODIGO, NOME_PRODUTO, NOME_PRODUTO_FORNECEDOR, QTD_ESTOQUE, AGUARDANDO, MIN_ESTOQUE, SITUACAO, CLASSE, UNIDADE
+    const [[rows], aCaminho] = await Promise.all([
+      pool.execute(
+        `SELECT CODIGO, NOME_PRODUTO, NOME_PRODUTO_FORNECEDOR, QTD_ESTOQUE, AGUARDANDO, MIN_ESTOQUE, SITUACAO, CLASSE, UNIDADE
        FROM estoque ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-       ORDER BY SITUACAO ASC, NOME_PRODUTO ASC`, params);
+       ORDER BY SITUACAO ASC, NOME_PRODUTO ASC`, params),
+      aCaminhoPorProduto(pool)
+    ]);
     res.json(rows.map(r => ({
       codigo: r.CODIGO, produto: r.NOME_PRODUTO, prodFornecedor: r.NOME_PRODUTO_FORNECEDOR,
       qtd: numEstq(r.QTD_ESTOQUE), aguardando: r.AGUARDANDO ?? '', minimo: numEstq(r.MIN_ESTOQUE),
-      situacao: r.SITUACAO, classe: r.CLASSE, unidade: r.UNIDADE
+      situacao: r.SITUACAO, classe: r.CLASSE, unidade: r.UNIDADE,
+      ...(aCaminho.has(Number(r.CODIGO)) ? { aCaminho: aCaminho.get(Number(r.CODIGO)) } : {})   // pedidos ao fornecedor
     })));
   } catch (err) {
     console.error('Erro /estoque:', err.message);

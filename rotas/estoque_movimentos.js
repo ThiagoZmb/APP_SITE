@@ -7,6 +7,7 @@
 const express = require('express');
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal, horaLocal } = require('./transacao');
 const { lerNFe, ErroNFe } = require('./nfe_xml');
+const { baixarPorEntrada, desfazerBaixas } = require('./pedidos_compra_banco');   // a chegada abate o pedido ao fornecedor, na mesma transação
 const { travarProdutos, conferirSaldo, gravarSaidas } = require('./estoque_saida');   // saída compartilhada com a baixa do plano de corte (rotas/corte.js)
 
 const VER = 'estoque.ver';
@@ -251,7 +252,9 @@ function registrarEstoqueMovimentos({ rota, pool }) {
              atualizado_em = VALUES(atualizado_em), atualizado_por = VALUES(atualizado_por)`,
           [fornecedor, cod, txt(it.nomeFabricante, 190), p.CODIGO, fator, agoraLocal(), req.user.nome]);
       }
-      return { itens: resumo, codigosAtualizados };
+      // pedidos ao fornecedor: abate o que chegou (vale para quem não tem permissão de pedidos)
+      const pedidosAtualizados = await baixarPorEntrada(conn, { nota: numero, fornecedor, data, chegada: soma, quando: agoraLocal() });
+      return { itens: resumo, codigosAtualizados, ...(pedidosAtualizados.length ? { pedidosAtualizados } : {}) };
     });
     if (resultado) res.status(201).json(resultado);
   });
@@ -396,6 +399,7 @@ function registrarEstoqueMovimentos({ rota, pool }) {
       for (const r of resumo) await conn.execute('UPDATE estoque SET QTD_ESTOQUE = QTD_ESTOQUE - ? WHERE CODIGO = ?', [r.qtd, r.codigo]);
       await conn.execute('DELETE FROM entrada_estoque WHERE NOTA_FISCAL = ? AND FABRICANTE = ?', [numero, fornecedor]);
       await conn.execute('DELETE FROM nf_entrada WHERE NUMERO = ? AND RAZAO_FABRICANTE = ?', [numero, fornecedor]);
+      await desfazerBaixas(conn, { nota: numero, fornecedor });
       const saidaResumo = resumo.map(({ produto, antes, depois }) => ({ produto, antes, depois }));
       await gravarEstorno(conn, req, 'entrada', `${numero} · ${fornecedor}`, motivo, { nota: nf || null, linhas, resumo: saidaResumo });
       return saidaResumo;

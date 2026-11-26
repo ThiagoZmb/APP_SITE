@@ -2,28 +2,82 @@
 // SQL dos pedidos a fornecedor usado pelas rotas próprias e pela entrada de
 // estoque. Recebe `db` (pool ou conexão da transação) e não depende de rotas.
 // ==========================================================================
+const { distribuirBaixa, situacaoPelaChegada } = require('../calculo/pedidos_compra');
+
 const marcas = lista => lista.map(() => '?').join(', ');
 
+// As leituras que decidem gravação usam FOR UPDATE (leitura atual): na transação de quem desfaz uma entrada
+// a fotografia do banco é anterior às travas, e uma leitura comum não veria o que outro acabou de gravar.
+
+// uma linha por item do pedido e por baixa → [{ itemId, numero, codigo, qtd, chegou }] por item, na ordem recebida
+function somarBaixas(linhas) {
+  const itens = new Map();
+  for (const l of linhas) {
+    const id = Number(l.item_id);
+    if (!itens.has(id)) itens.set(id, { itemId: id, numero: Number(l.numero), codigo: Number(l.codigo), qtd: Number(l.qtd) || 0, chegou: 0 });
+    itens.get(id).chegou += Number(l.chegou) || 0;
+  }
+  return [...itens.values()];
+}
+const SQL_ITENS = `SELECT i.id AS item_id, i.pedido_numero AS numero, i.produto_codigo AS codigo, i.qtd, b.qtd AS chegou FROM web_pedidos_compra_itens i
+  JOIN web_pedidos_compra p ON p.numero = i.pedido_numero LEFT JOIN web_pedidos_compra_baixas b ON b.item_id = i.id`;
+
 // Map código → unidades que ainda faltam chegar (pedidos enviados ou que chegaram em parte)
-async function aCaminhoPorProduto(db, codigos) {
+async function aCaminhoPorProduto(db, codigos, { travar = false } = {}) {
   if (codigos && !codigos.length) return new Map();
   const [linhas] = await db.execute(
-    `SELECT i.produto_codigo AS codigo, i.qtd - COALESCE(b.chegou, 0) AS falta FROM web_pedidos_compra_itens i JOIN web_pedidos_compra p ON p.numero = i.pedido_numero
-     LEFT JOIN (SELECT item_id, SUM(qtd) AS chegou FROM web_pedidos_compra_baixas GROUP BY item_id) b ON b.item_id = i.id
-     WHERE p.situacao IN ('enviado', 'parcial')${codigos ? ` AND i.produto_codigo IN (${marcas(codigos)})` : ''}`, codigos || []);
+    `${SQL_ITENS} WHERE p.situacao IN ('enviado', 'parcial')${codigos ? ` AND i.produto_codigo IN (${marcas(codigos)})` : ''}${travar ? ' FOR UPDATE' : ''}`, codigos || []);
   const mapa = new Map();
-  for (const l of linhas) {
-    const falta = Number(l.falta) || 0;
-    if (falta > 0) mapa.set(Number(l.codigo), (mapa.get(Number(l.codigo)) || 0) + falta);
-  }
+  for (const i of somarBaixas(linhas)) if (i.qtd > i.chegou) mapa.set(i.codigo, (mapa.get(i.codigo) || 0) + i.qtd - i.chegou);
   return mapa;
 }
 
 // única escrita em tabela antiga deste módulo: 'Aguardando' enquanto há material a caminho (varchar(10) no banco)
 async function marcarAguardando(conn, codigos) {
   const unicos = [...new Set(codigos.map(Number))];
-  const caminho = await aCaminhoPorProduto(conn, unicos);
+  const caminho = await aCaminhoPorProduto(conn, unicos, { travar: true });
   for (const codigo of unicos) await conn.execute('UPDATE estoque SET AGUARDANDO = ? WHERE CODIGO = ?', [caminho.has(codigo) ? 'Aguardando' : '', codigo]);
+}
+
+// situação do pedido conforme o que já chegou; devolve a situação que ficou (ou null se o pedido não existe)
+async function recalcularSituacao(conn, numero) {
+  const [[p]] = await conn.execute('SELECT numero, situacao FROM web_pedidos_compra WHERE numero = ? FOR UPDATE', [numero]);
+  if (!p) return null;
+  const [linhas] = await conn.execute(`${SQL_ITENS} WHERE i.pedido_numero = ? FOR UPDATE`, [numero]);
+  const nova = situacaoPelaChegada(p.situacao, somarBaixas(linhas));
+  if (nova !== p.situacao) await conn.execute('UPDATE web_pedidos_compra SET situacao = ? WHERE numero = ?', [nova, numero]);
+  return nova;
+}
+
+// Entrada de nota (na transação dela, com o estoque já travado): abate dos pedidos do fornecedor, do mais antigo ao mais novo,
+// criados até a data da nota. chegada = Map código → quantidade. Devolve [{ numero, situacao }] dos pedidos tocados.
+async function baixarPorEntrada(conn, { nota, fornecedor, data, chegada, quando }) {
+  const codigos = [...chegada.keys()].map(Number);
+  const [linhas] = await conn.execute(
+    `${SQL_ITENS} WHERE p.fornecedor = ? AND p.situacao IN ('enviado', 'parcial') AND p.criado_em <= ? ORDER BY i.pedido_numero, i.id FOR UPDATE`,
+    [fornecedor, `${data} 23:59:59`]);
+  const abertos = somarBaixas(linhas).map(i => ({ itemId: i.itemId, pedidoId: i.numero, produtoCodigo: i.codigo, falta: i.qtd - i.chegou }));
+  const baixas = distribuirBaixa(abertos, chegada);
+  for (const x of baixas) {
+    await conn.execute('INSERT INTO web_pedidos_compra_baixas (item_id, nota, fornecedor, qtd, quando) VALUES (?, ?, ?, ?, ?)', [x.itemId, nota, fornecedor, x.qtd, quando]);
+  }
+  const pedidos = [];
+  for (const numero of [...new Set(baixas.map(x => x.pedidoId))].sort((a, b) => a - b)) pedidos.push({ numero, situacao: await recalcularSituacao(conn, numero) });
+  // a entrada limpa a marca de todo produto da nota: volta onde ainda há material a caminho
+  const caminho = await aCaminhoPorProduto(conn, codigos, { travar: true });
+  for (const codigo of caminho.keys()) await conn.execute('UPDATE estoque SET AGUARDANDO = ? WHERE CODIGO = ?', ['Aguardando', codigo]);
+  return pedidos;
+}
+
+// Entrada desfeita: apaga o que aquela nota abateu, recalcula os pedidos tocados e a marca dos produtos
+async function desfazerBaixas(conn, { nota, fornecedor }) {
+  const [tocados] = await conn.execute(
+    `SELECT i.pedido_numero AS numero, i.produto_codigo AS codigo FROM web_pedidos_compra_baixas b JOIN web_pedidos_compra_itens i ON i.id = b.item_id
+     WHERE b.nota = ? AND b.fornecedor = ? FOR UPDATE`, [nota, fornecedor]);
+  if (!tocados.length) return;
+  await conn.execute('DELETE FROM web_pedidos_compra_baixas WHERE nota = ? AND fornecedor = ?', [nota, fornecedor]);
+  for (const numero of [...new Set(tocados.map(t => Number(t.numero)))].sort((a, b) => a - b)) await recalcularSituacao(conn, numero);
+  await marcarAguardando(conn, tocados.map(t => t.codigo));
 }
 
 // unidades por caixa por produto: o último pedido do fornecedor; senão o fator inteiro (> 1) que a entrada por XML aprendeu
@@ -70,4 +124,4 @@ async function carregarPedido(db, numero) {
   };
 }
 
-module.exports = { marcas, aCaminhoPorProduto, marcarAguardando, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido };
+module.exports = { marcas, aCaminhoPorProduto, marcarAguardando, baixarPorEntrada, desfazerBaixas, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido };
