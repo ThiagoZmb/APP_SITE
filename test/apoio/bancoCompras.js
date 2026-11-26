@@ -46,9 +46,8 @@ function regrasCompras(estado) {
     [/SELECT produto_codigo AS codigo, fator FROM web_estoque_ligacoes/, (sql, [forn]) => estado.ligacoes.filter(l => norm(l.fornecedor) === norm(forn))
       .sort((a, b) => String(b.atualizado_em || '').localeCompare(String(a.atualizado_em || ''))).map(l => ({ codigo: l.produto_codigo, fator: String(l.fator) }))],
     // produtos e fornecedores
-    [/FROM estoque WHERE SITUACAO = 'Ativo' AND \(NOME_PRODUTO LIKE \? OR CODIGO = \?\)/, (sql, [like, cod]) => {
-      const termo = String(like).replace(/%/g, '').toLowerCase();
-      return estoque.filter(e => e.SITUACAO === 'Ativo' && (e.NOME_PRODUTO.toLowerCase().includes(termo) || e.CODIGO === Number(cod))); }],
+    [/FROM estoque WHERE SITUACAO = 'Ativo' AND FORNECEDOR = \?/, (sql, [forn]) => estoque.filter(e => e.SITUACAO === 'Ativo' && norm(e.FORNECEDOR) === norm(forn))
+      .sort((a, b) => a.NOME_PRODUTO.localeCompare(b.NOME_PRODUTO))],
     [/SELECT RAZAO_FABRICANTE FROM cadastro_fornecedores ORDER BY/, () => estado.fornecedores],
     [/SELECT CODIGO, NOME_PRODUTO, UNIDADE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE CODIGO IN/, (sql, cods) => estoque.filter(e => cods.map(Number).includes(e.CODIGO))],
     // pedidos

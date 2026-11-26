@@ -70,17 +70,18 @@ function registrarPedidosCompra({ rota, pool }) {
     } catch (err) { falha(res, 'GET /pedidos_compra/sugestao', err); }
   });
 
+  // a combo "Adicionar item": todos os itens ativos do fornecedor escolhido
   rota('get', '/pedidos_compra/produtos', VER, async (req, res) => {
-    const busca = String(req.query.busca || '').trim().slice(0, 100);
     const fornecedor = String(req.query.fornecedor || '').trim().slice(0, 190);
+    if (!fornecedor) return res.json([]);
     try {
       const [[linhas], porCaixa] = await Promise.all([
-        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' AND (NOME_PRODUTO LIKE ? OR CODIGO = ?)
-                      ORDER BY NOME_PRODUTO LIMIT 50`, [`%${busca}%`, parseInt(busca, 10) || 0]),
+        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' AND FORNECEDOR = ?
+                      ORDER BY NOME_PRODUTO`, [fornecedor]),
         porCaixaDoFornecedor(pool, fornecedor)
       ]);
-      res.json(linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO, codFornecedor: l.COD_FORNECEDOR || '', nomeFornecedor: l.NOME_PRODUTO_FORNECEDOR || '', unidade: l.UNIDADE || '', qtd: Number(l.QTD_ESTOQUE) || 0,
-        porCaixa: porCaixa.get(Number(l.CODIGO)) || 1 })));
+      res.json(linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO, codFornecedor: l.COD_FORNECEDOR || '', nomeFornecedor: l.NOME_PRODUTO_FORNECEDOR || '', unidade: l.UNIDADE || '',
+        qtd: Number(l.QTD_ESTOQUE) || 0, porCaixa: porCaixa.get(Number(l.CODIGO)) || 1 })));
     } catch (err) { falha(res, 'GET /pedidos_compra/produtos', err); }
   });
 

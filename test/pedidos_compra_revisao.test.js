@@ -42,6 +42,7 @@ const padrao = caminho => caminho === '/pedidos_compra' ? []
   : caminho === '/pedidos_compra/fornecedores' ? [{ fornecedor: 'A', qtdSugeridos: 0 }, { fornecedor: 'B', qtdSugeridos: 0 }]
   : caminho === '/pedidos_compra/1' ? pedido(1, 'A', 'Produto do um')
   : caminho === '/pedidos_compra/2' ? pedido(2, 'B', 'Produto do dois')
+  : caminho.startsWith('/pedidos_compra/produtos') ? []
   : { itens: [] };
 
 test('trocar de fornecedor num rascunho salvo pergunta antes de descartar os itens', async () => {
@@ -55,7 +56,7 @@ test('trocar de fornecedor num rascunho salvo pergunta antes de descartar os ite
   assert.equal(perguntas.length, 1);
   assert.equal($('fornecedor').value, 'A', 'respondeu não: volta o fornecedor');
   assert.match($('tb-itens').innerHTML, /Produto do um/);
-  assert.ok(!pedidos.some(p => p.includes('sugestao')));
+  assert.ok(!pedidos.some(p => p.endsWith('fornecedor=B')), 'nada do outro fornecedor foi carregado');
 });
 
 test('abrir dois pedidos depressa: vale o último, sem mistura', async () => {
@@ -109,4 +110,46 @@ test('a tela mostra o código e a descrição do fornecedor; sem descrição, o 
   await assentar();
   const det = $('tb-detalhe').innerHTML;
   assert.ok(det.includes('<td>F-CCC</td><td>OUTRA DESCRICAO</td>'), det);
+});
+
+const doFornecedor = [
+  { codigo: 5, produto: 'PERFIL 1036 BRONZE', codFornecedor: 'B-1', nomeFornecedor: 'ESTRUTURAL 1036 BZ', unidade: 'un', qtd: 40, porCaixa: 1 },
+  { codigo: 6, produto: 'ROLDANA', codFornecedor: '', nomeFornecedor: 'ROLDANA DUPLA', unidade: 'un', qtd: 2, porCaixa: 50 }];
+const sugestaoA = { itens: [{ codigo: 6, produto: 'ROLDANA', codFornecedor: '', nomeFornecedor: 'ROLDANA DUPLA', unidade: 'un', qtd: 2, minimo: 10,
+  diasCobertura: 4, aCaminho: 0, porCaixa: 50, sugerido: 100, marcado: true, aviso: '' }] };
+
+test('combo: todos os itens com os dois nomes, os que faltam primeiro; o escolhido sai da combo', () => {
+  const nada = P.opcoesCombo(doFornecedor, sugestaoA.itens, [], null);
+  assert.deepEqual(nada.map(o => [o.codigo, o.texto]), [[6, 'ROLDANA | ROLDANA DUPLA  [sugerido: 100 un]'], [5, 'PERFIL 1036 BRONZE | ESTRUTURAL 1036 BZ']]);
+  assert.deepEqual(P.opcoesCombo(doFornecedor, sugestaoA.itens, [6], null).map(o => o.codigo), [5]);
+  const rascunho = [{ ...sugestaoA.itens[0], marcado: false, aviso: 'em rascunho nº 3' }];
+  assert.match(P.opcoesCombo(doFornecedor, rascunho, [], null).find(o => o.codigo === 6).texto, /\[em rascunho nº 3\]$/);
+  assert.match(P.opcoesCombo(doFornecedor, rascunho, [], 3)[0].texto, /\[sugerido: 100 un\]$/, 'o próprio rascunho aberto não conta como aviso');
+  const iguais = P.opcoesCombo([doFornecedor[0], { ...doFornecedor[0], codigo: 8 }], [], [], null);
+  assert.equal(new Set(iguais.map(o => o.texto)).size, 2, 'textos repetidos ganham o código');
+});
+
+test('escolher o fornecedor deixa a lista vazia; escolher na combo adiciona com a quantidade sugerida e o ✕ tira', async () => {
+  const { $, abrir } = tela(caminho => caminho.startsWith('/pedidos_compra/produtos') ? doFornecedor
+    : caminho.startsWith('/pedidos_compra/sugestao') ? sugestaoA : padrao(caminho));
+  await assentar();
+  $('btn-novo').ouvintes.click();
+  await assentar();
+  $('fornecedor').value = 'A';
+  $('fornecedor').ouvintes.change();
+  await assentar();
+  assert.ok(!$('tb-itens').innerHTML.includes('ROLDANA'), 'nada entra sozinho');
+  assert.match($('itens-fornecedor').innerHTML, /ROLDANA \| ROLDANA DUPLA {2}\[sugerido: 100 un\][\s\S]*PERFIL 1036 BRONZE \| ESTRUTURAL 1036 BZ/);
+  $('busca-item').value = 'ROLDANA | ROLDANA DUPLA  [sugerido: 100 un]';
+  $('busca-item').ouvintes.change();
+  assert.match($('tb-itens').innerHTML, /ROLDANA DUPLA/);
+  assert.match($('tb-itens').innerHTML, /l-qtd[^>]*value="2"/);   // 100 un em caixas de 50
+  assert.equal($('busca-item').value, '');
+  assert.ok(!$('itens-fornecedor').innerHTML.includes('ROLDANA'));
+  $('busca-item').value = '1036';                                 // trecho que só acha um
+  $('busca-item').ouvintes.change();
+  assert.match($('tb-itens').innerHTML, /ESTRUTURAL 1036 BZ/);
+  $('tb-itens').ouvintes.click({ target: { closest: sel => sel === '.l-tirar' ? { closest: () => ({ dataset: { k: '0' } }) } : null } });
+  assert.ok(!$('tb-itens').innerHTML.includes('ROLDANA DUPLA'));
+  assert.match($('itens-fornecedor').innerHTML, /ROLDANA DUPLA/);
 });

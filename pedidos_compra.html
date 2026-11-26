@@ -43,17 +43,19 @@
         #tb-lista tr[data-numero] { cursor: pointer; }
         #tb-lista tr[data-numero]:hover { background: var(--primary-light); }
         .vazio { text-align: center; padding: 40px; color: var(--text-light); }
-        input.curto { width: 78px; text-align: right; }
+        input.curto { width: 62px; text-align: right; }
+        /* lista do pedido: colunas apertadas para o ✕ caber sem rolar */
+        body #v-form table th, body #v-form table td { padding-left: 6px; padding-right: 6px; }
+        body #v-form table thead th { white-space: normal; vertical-align: bottom; }
+        .l-total { white-space: normal; }
         input.curto, .form-group input, .form-group select, .form-group textarea { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; background: var(--white); }
         .form-group { margin-bottom: 14px; max-width: 640px; }
         .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; }
         .form-group textarea { min-height: 70px; resize: vertical; }
-        input[type="checkbox"] { width: 18px; height: 18px; }
         .aviso-item { display: block; color: var(--text-light); font-size: 12px; margin-top: 2px; }
-        .l-total { white-space: nowrap; color: var(--text-light); font-size: 13px; }
+        .l-total { color: var(--text-light); font-size: 13px; }
         .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
-        #achados { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 14px; }
         .dica { font-size: 12px; color: var(--text-light); }
         #resumo-detalhe { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 14px; }
         #obs-detalhe { margin-top: 12px; font-size: 14px; white-space: pre-wrap; }
@@ -86,7 +88,7 @@
     <script src="situacoes.js?v=202612051000"></script>
     <script src="layout.js?v=202612051000" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
-    <script src="pedidos_compra.js?v=202612051200" defer></script>
+    <script src="pedidos_compra.js?v=202612051300" defer></script>
 </head>
 <body>
     <div class="container">
@@ -133,15 +135,14 @@
                     <button type="button" class="btn btn-secondary" id="btn-voltar">← Voltar</button>
                 </div>
                 <div class="form-group"><label for="fornecedor">Fornecedor</label><select id="fornecedor"></select></div>
+                <div class="form-group"><label for="busca-item">Adicionar item</label><input id="busca-item" list="itens-fornecedor" autocomplete="off" disabled placeholder="Escolha o fornecedor primeiro"><datalist id="itens-fornecedor"></datalist></div>
                 <div class="tabela-wrap">
                     <table>
-                        <thead><tr><th></th><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th></tr></thead>
+                        <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th><th></th></tr></thead>
                         <tbody id="tb-itens"></tbody>
                     </table>
                 </div>
-                <p class="dica">Com mais de 1 unidade por caixa, em "Pedir" informe o número de caixas.</p>
-                <div class="form-group" style="margin-top:14px"><label for="busca-item">Adicionar item</label><input type="search" id="busca-item" placeholder="Código ou nome do produto" autocomplete="off"></div>
-                <div id="achados"></div>
+                <p class="dica" style="margin:6px 0 14px">Com mais de 1 unidade por caixa, em "Pedir" informe o número de caixas.</p>
                 <div class="form-group"><label for="observacao">Observação (sai no PDF)</label><textarea id="observacao" maxlength="2000"></textarea></div>
                 <div class="acoes">
                     <button type="button" class="btn btn-primary" id="btn-salvar" data-perm="compras.criar">Salvar rascunho</button>

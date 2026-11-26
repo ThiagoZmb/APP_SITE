@@ -38,6 +38,25 @@
   const descricao = i => i.nomeFornecedor || i.produto;
   const codigo = i => i.codFornecedor || '—';
 
+  // Opções da combo "Adicionar item": os itens do fornecedor que ainda não estão na lista, os que faltam primeiro.
+  // O texto leva o nome da casa e o do fornecedor (digitar um trecho de qualquer um filtra a lista).
+  function opcoesCombo(produtos, sugestao, usados, numeroAberto) {
+    const info = new Map(sugestao.map(i => [i.codigo, i]));
+    const proprio = numeroAberto ? `em rascunho nº ${numeroAberto}` : '';   // o rascunho aberto não avisa sobre si mesmo
+    const nomes = i => `${i.produto} | ${i.nomeFornecedor || '—'}`;
+    const vezes = new Map();
+    for (const p of produtos) vezes.set(nomes(p), (vezes.get(nomes(p)) || 0) + 1);
+    const ja = new Set(usados);
+    return produtos.filter(p => !ja.has(p.codigo)).map(p => {
+      const s = info.get(p.codigo);
+      const aviso = s && s.aviso !== proprio ? s.aviso : '';
+      const sugerido = !!s && s.sugerido !== null && !aviso;
+      const nota = !s ? '' : sugerido ? `sugerido: ${s.sugerido}${p.unidade ? ' ' + p.unidade : ''}` : aviso || (s.aCaminho ? `a caminho: ${s.aCaminho}` : 'no mínimo');
+      const base = vezes.get(nomes(p)) > 1 ? `${nomes(p)} (cód. ${p.codigo})` : nomes(p);
+      return { codigo: p.codigo, texto: nota ? `${base}  [${nota}]` : base, sugerido };
+    }).sort((a, b) => b.sugerido - a.sugerido);
+  }
+
   function itensParaEnviar(linhas) {
     const itens = [];
     for (const l of linhas) {
@@ -45,7 +64,7 @@
       if (!totalUnidades(l.quantidade, l.porCaixa)) return { erro: `Informe a quantidade (inteira, maior que zero) de "${descricao(l)}".` };
       itens.push({ produtoCodigo: l.codigo, quantidade: inteiro(l.quantidade), porCaixa: porCaixaDe(l.porCaixa) });
     }
-    return itens.length ? { itens } : { erro: 'Marque pelo menos um item e informe a quantidade.' };
+    return itens.length ? { itens } : { erro: 'Adicione pelo menos um item e informe a quantidade.' };
   }
 
   // ============ TELA (só no navegador) ============
@@ -56,7 +75,7 @@
     const toast = C.criarToast(doc, win);
     const podeCriar = () => !!(win.Acesso && win.Acesso.pode('compras.criar'));
     // pedido aberto: numero null = novo; chave identifica o pedido novo para o duplo clique não gravar dois
-    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], ocupado: false, seq: 0, buscaSeq: 0, temporizador: null, alterado: false };
+    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], produtos: [], sugestao: [], combo: [], ocupado: false, seq: 0, alterado: false };
     const novaChave = () => (win.crypto?.randomUUID ? win.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const data = v => (v ? dataBR(String(v).slice(0, 10)) : '—');
     const selo = s => win.Situacoes.selo('compra', s, ROTULOS[s] || s);
@@ -103,6 +122,7 @@
         desenharLinhas();
         botoesForm();
         mostrar('form');
+        await carregarItens(p.fornecedor);
       } else desenharDetalhe(p);
     }
 
@@ -146,12 +166,42 @@
       Object.assign(estado, { numero: null, chave: novaChave(), situacao: 'rascunho', fornecedor: '', linhas: [], alterado: false, seq: estado.seq + 1 });
       $('observacao').value = '';
       $('titulo-form').textContent = 'Novo pedido';
-      $('busca-item').value = '';
-      $('achados').innerHTML = '';
+      limparCombo();
       desenharLinhas();
       botoesForm();
       mostrar('form');
       await preencherFornecedores('');
+    }
+
+    function limparCombo() {
+      Object.assign(estado, { produtos: [], sugestao: [], combo: [] });
+      $('busca-item').value = '';
+      $('busca-item').disabled = true;
+      $('busca-item').placeholder = 'Escolha o fornecedor primeiro';
+      $('itens-fornecedor').innerHTML = '';
+    }
+
+    function desenharCombo() {
+      estado.combo = opcoesCombo(estado.produtos, estado.sugestao, estado.linhas.map(l => l.codigo), estado.numero);
+      $('itens-fornecedor').innerHTML = estado.combo.map(o => `<option value="${esc(o.texto)}"></option>`).join('');
+    }
+
+    // todos os itens do fornecedor + o que está faltando (só para avisar na combo)
+    async function carregarItens(fornecedor) {
+      const seq = estado.seq;
+      limparCombo();
+      if (!fornecedor) return;
+      $('busca-item').placeholder = 'Carregando itens…';
+      const q = '?fornecedor=' + encodeURIComponent(fornecedor);
+      const [produtos, sugestao] = await Promise.allSettled([chamar('/pedidos_compra/produtos' + q), chamar('/pedidos_compra/sugestao' + q)]);
+      if (seq !== estado.seq) return;
+      const falhou = [produtos, sugestao].find(r => r.status === 'rejected');
+      if (falhou) toast(falhou.reason.message, 'erro');
+      estado.produtos = produtos.value || [];
+      estado.sugestao = sugestao.value?.itens || [];
+      $('busca-item').disabled = !estado.produtos.length;
+      $('busca-item').placeholder = estado.produtos.length ? 'Abra a lista ou digite parte do nome' : 'Nenhum item ativo deste fornecedor';
+      desenharCombo();
     }
 
     async function trocarFornecedor() {
@@ -160,78 +210,67 @@
       estado.fornecedor = novo;
       estado.linhas = [];
       estado.alterado = false;
-      const seq = ++estado.seq;
-      $('achados').innerHTML = '';
-      desenharLinhas(novo ? 'Buscando o que pedir…' : undefined);
-      if (!novo) return;
-      try {
-        const d = await chamar('/pedidos_compra/sugestao?fornecedor=' + encodeURIComponent(novo));
-        if (seq !== estado.seq) return;
-        // itens que a pessoa acrescentou enquanto a sugestão carregava ficam
-        const jaTem = new Set(estado.linhas.map(l => l.codigo));
-        estado.linhas = [...d.itens.filter(i => !jaTem.has(i.codigo)).map(i => ({ ...i, porCaixa: String(i.porCaixa), quantidade: caixasDe(i.sugerido, i.porCaixa) })), ...estado.linhas];
-        desenharLinhas('Nenhum item precisa ser pedido a este fornecedor. Use "Adicionar item" se quiser.');
-      } catch (err) {
-        if (seq !== estado.seq) return;
-        toast(err.message, 'erro');
-        desenharLinhas('Não foi possível buscar a sugestão.');
-      }
+      estado.seq++;
+      desenharLinhas();
+      await carregarItens(novo);
     }
 
     const ouTraco = v => (v === null || v === undefined ? '—' : esc(v));
-    function desenharLinhas(vazio) {
+    function desenharLinhas() {
       $('tb-itens').innerHTML = estado.linhas.length ? estado.linhas.map((l, k) =>
-        `<tr data-k="${k}"><td><input type="checkbox" class="l-marca" aria-label="Incluir ${esc(descricao(l))}"${l.marcado ? ' checked' : ''}></td><td>${esc(codigo(l))}</td>` +
+        `<tr data-k="${k}"><td>${esc(codigo(l))}</td>` +
         `<td>${esc(descricao(l))}${l.aviso ? `<small class="aviso-item">${esc(l.aviso)}</small>` : ''}</td>` +
         `<td class="num">${ouTraco(l.qtd)}</td><td class="num">${l.minimo ? esc(l.minimo) : '—'}</td>` +
         `<td class="num">${l.diasCobertura === null || l.diasCobertura === undefined ? '—' : esc(l.diasCobertura) + ' dias'}</td><td class="num">${ouTraco(l.aCaminho)}</td>` +
         `<td class="num"><input class="curto l-caixa" inputmode="numeric" aria-label="Unidades por caixa" value="${esc(l.porCaixa)}"></td>` +
         `<td class="num"><input class="curto l-qtd" inputmode="numeric" aria-label="Quantidade a pedir" value="${esc(l.quantidade)}"></td>` +
-        `<td class="l-total">${esc(textoTotal(l.quantidade, l.porCaixa, l.unidade))}</td></tr>`).join('')
-        : `<tr><td colspan="10" class="vazio">${esc(vazio || 'Escolha o fornecedor para ver o que pedir.')}</td></tr>`;
+        `<td class="l-total">${esc(textoTotal(l.quantidade, l.porCaixa, l.unidade))}</td>` +
+        `<td><button type="button" class="btn btn-secondary btn-mini l-tirar" aria-label="Tirar ${esc(descricao(l))}">✕</button></td></tr>`).join('')
+        : '<tr><td colspan="10" class="vazio">Escolha os itens em "Adicionar item".</td></tr>';
     }
 
     function digitou(e) {
       const tr = e.target.closest('tr[data-k]');
       if (!tr) return;
       const l = estado.linhas[Number(tr.dataset.k)];
-      const marca = tr.querySelector('.l-marca');
-      if (e.target === marca) l.marcado = marca.checked;
-      else {
-        if (e.target.classList.contains('l-qtd')) { l.quantidade = e.target.value; marca.checked = l.marcado = txt(l.quantidade) !== ''; }
-        if (e.target.classList.contains('l-caixa')) l.porCaixa = e.target.value;
-        tr.querySelector('.l-total').textContent = textoTotal(l.quantidade, l.porCaixa, l.unidade);
-      }
+      if (e.target.classList.contains('l-qtd')) l.quantidade = e.target.value;
+      if (e.target.classList.contains('l-caixa')) l.porCaixa = e.target.value;
+      tr.querySelector('.l-total').textContent = textoTotal(l.quantidade, l.porCaixa, l.unidade);
       estado.alterado = true;
     }
 
-    async function buscarItem() {
-      const busca = txt($('busca-item').value);
-      const seq = ++estado.buscaSeq;
-      if (!busca) { $('achados').innerHTML = ''; return; }
-      let lista;
-      try { lista = await chamar(`/pedidos_compra/produtos?busca=${encodeURIComponent(busca)}&fornecedor=${encodeURIComponent(estado.fornecedor)}`); }
-      catch (err) { return toast(err.message, 'erro'); }
-      if (seq !== estado.buscaSeq) return;
-      estado.achados = lista;
-      $('achados').innerHTML = lista.length
-        ? lista.map((p, k) => `<button type="button" class="btn btn-secondary btn-mini" data-k="${k}">${esc(codigo(p))} · ${esc(descricao(p))}</button>`).join('')
-        : '<span class="dica">Nenhum item ativo encontrado.</span>';
-    }
-
-    function adicionar(e) {
-      const b = e.target.closest('button[data-k]');
+    function tirar(e) {
+      const b = e.target.closest('.l-tirar');
       if (!b) return;
-      const p = estado.achados[Number(b.dataset.k)];
-      const ja = estado.linhas.find(l => l.codigo === p.codigo);
-      if (ja) ja.marcado = true;
-      else estado.linhas.push({ codigo: p.codigo, produto: p.produto, codFornecedor: p.codFornecedor, nomeFornecedor: p.nomeFornecedor, unidade: p.unidade, qtd: p.qtd, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
-        marcado: true, porCaixa: String(p.porCaixa), quantidade: '' });
+      estado.linhas.splice(Number(b.closest('tr[data-k]').dataset.k), 1);
       estado.alterado = true;
-      $('achados').innerHTML = '';
+      desenharLinhas();
+      desenharCombo();
+    }
+
+    // escolheu na combo (ou digitou um trecho que só acha um item): entra na lista, já com a quantidade sugerida
+    function escolher() {
+      const digitado = txt($('busca-item').value);
+      if (!digitado) return;
+      let opcao = estado.combo.find(o => o.texto === $('busca-item').value);
+      if (!opcao) {
+        const achou = estado.combo.filter(o => o.texto.toLowerCase().includes(digitado.toLowerCase()));
+        if (!achou.length) return toast('Nenhum item deste fornecedor com esse texto (ou ele já está na lista).', 'info');
+        if (achou.length > 1) return;
+        opcao = achou[0];
+      }
+      const p = estado.produtos.find(x => x.codigo === opcao.codigo);
+      const s = estado.sugestao.find(x => x.codigo === opcao.codigo);
+      const linha = { codigo: p.codigo, produto: p.produto, codFornecedor: p.codFornecedor, nomeFornecedor: p.nomeFornecedor, unidade: p.unidade, qtd: p.qtd,
+        minimo: s?.minimo ?? null, diasCobertura: s?.diasCobertura ?? null, aCaminho: s?.aCaminho ?? null,
+        aviso: s && s.aviso !== `em rascunho nº ${estado.numero}` ? s.aviso : '', marcado: true, porCaixa: String(p.porCaixa),
+        quantidade: opcao.sugerido ? caixasDe(s.sugerido, p.porCaixa) : '' };
+      estado.linhas.push(linha);
+      estado.alterado = true;
       $('busca-item').value = '';
       desenharLinhas();
-      $('tb-itens').querySelector(`tr[data-k="${estado.linhas.findIndex(l => l.codigo === p.codigo)}"] .l-qtd`).focus();
+      desenharCombo();
+      if (!linha.quantidade) $('tb-itens').querySelector(`tr[data-k="${estado.linhas.length - 1}"] .l-qtd`)?.focus();
     }
 
     function botoesForm() { $('btn-excluir').hidden = !estado.numero; }
@@ -288,8 +327,8 @@
     $('fornecedor').addEventListener('change', trocarFornecedor);
     $('tb-itens').addEventListener('input', digitou);
     $('observacao').addEventListener('input', () => { estado.alterado = true; });
-    $('busca-item').addEventListener('input', () => { win.clearTimeout(estado.temporizador); estado.temporizador = win.setTimeout(buscarItem, 300); });
-    $('achados').addEventListener('click', adicionar);
+    $('tb-itens').addEventListener('click', tirar);
+    $('busca-item').addEventListener('change', escolher);
     $('btn-salvar').addEventListener('click', () => ocupado(async () => { if (await salvar()) toast('Rascunho salvo.', 'ok'); }));
     $('btn-pdf').addEventListener('click', () => ocupado(async () => {
       if (podeCriar()) { if (!(await salvar())) return; }
@@ -312,5 +351,5 @@
     abrirLista();
   }
 
-  return { ROTULOS, totalUnidades, textoTotal, caixasDe, itensParaEnviar, iniciar };
+  return { ROTULOS, totalUnidades, textoTotal, caixasDe, itensParaEnviar, opcoesCombo, iniciar };
 });

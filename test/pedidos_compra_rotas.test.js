@@ -100,11 +100,14 @@ test('unidades por caixa: último pedido, senão o fator do XML, senão 1', asyn
   assert.equal(await porCaixa(), 100);
 });
 
-test('fornecedores com a contagem de sugeridos; produtos só ativos', async t => {
+test('fornecedores com a contagem de sugeridos; a combo recebe todos os itens ativos do fornecedor', async t => {
   const { banco, chamar } = await prepararCompras(t);
   banco.estoque[0].QTD_ESTOQUE = 1; banco.estoque[0].AGUARDANDO = '';
   assert.deepEqual(await json(await chamar('/pedidos_compra/fornecedores')),
     [{ fornecedor: FORN, qtdSugeridos: 1 }, { fornecedor: 'OUTRO FORNECEDOR SA', qtdSugeridos: 0 }]);
-  const p = await json(await chamar('/pedidos_compra/produtos?busca=par'));
-  assert.deepEqual(p, [{ codigo: 3, produto: 'Parafuso', codFornecedor: 'PAR-100', nomeFornecedor: 'PARAFUSO', unidade: 'Un', qtd: 500, porCaixa: 1 }]);
+  banco.estoque.push({ CODIGO: 9, NOME_PRODUTO: 'De outro', NOME_PRODUTO_FORNECEDOR: 'X', COD_FORNECEDOR: 'X', UNIDADE: 'Un', QTD_ESTOQUE: 0, SITUACAO: 'Ativo', FORNECEDOR: 'OUTRO FORNECEDOR SA' });
+  const p = await json(await chamar('/pedidos_compra/produtos?fornecedor=' + encodeURIComponent(FORN)));
+  assert.deepEqual(p.map(i => i.codigo), [3, 1]);   // ativos deste fornecedor, em ordem de nome (o 2 é inativo)
+  assert.deepEqual(p[0], { codigo: 3, produto: 'Parafuso', codFornecedor: 'PAR-100', nomeFornecedor: 'PARAFUSO', unidade: 'Un', qtd: 500, porCaixa: 1 });
+  assert.deepEqual(await json(await chamar('/pedidos_compra/produtos')), []);
 });
