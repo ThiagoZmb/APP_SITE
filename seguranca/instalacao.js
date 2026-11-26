@@ -618,6 +618,45 @@ const TABELAS = [
      criado_em DATETIME NULL,
      atualizado_em DATETIME NULL,
      UNIQUE KEY uk_tarefas_admin_cat_nome (nome)
+   ) ${OPCOES}`,
+  // pedidos a fornecedor (2026-11-26): cabeçalho, itens (quantidade em unidades do estoque) e o que cada nota de entrada abateu
+  `CREATE TABLE IF NOT EXISTS \`web_pedidos_compra\` (
+     numero INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     chave VARCHAR(64) NOT NULL,
+     fornecedor VARCHAR(190) NOT NULL,
+     situacao VARCHAR(12) NOT NULL,
+     observacao TEXT NULL,
+     criado_em DATETIME NOT NULL,
+     criado_por VARCHAR(190) NULL,
+     enviado_em DATETIME NULL,
+     enviado_por VARCHAR(190) NULL,
+     fechado_em DATETIME NULL,
+     fechado_por VARCHAR(190) NULL,
+     UNIQUE KEY uk_pedidos_compra_chave (chave),
+     KEY idx_pedidos_compra_forn (fornecedor, situacao)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_pedidos_compra_itens\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     pedido_numero INT NOT NULL,
+     produto_codigo INT NOT NULL,
+     nome_produto VARCHAR(255) NOT NULL,
+     cod_fornecedor VARCHAR(190) NULL,
+     nome_fornecedor VARCHAR(255) NULL,
+     unidade VARCHAR(45) NULL,
+     qtd INT NOT NULL,
+     por_caixa INT NOT NULL DEFAULT 1,
+     KEY idx_compras_itens_pedido (pedido_numero),
+     KEY idx_compras_itens_produto (produto_codigo)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_pedidos_compra_baixas\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     item_id INT NOT NULL,
+     nota VARCHAR(190) NOT NULL,
+     fornecedor VARCHAR(190) NOT NULL,
+     qtd INT NOT NULL,
+     quando DATETIME NOT NULL,
+     KEY idx_compras_baixas_nota (nota, fornecedor),
+     KEY idx_compras_baixas_item (item_id)
    ) ${OPCOES}`
 ];
 
@@ -1492,4 +1531,8 @@ const REGRAS_PEDIDOS_ACOES = [
 ];
 const acrescentarPermissoesPedidosAcoes = pool => desdobrarPermissoes(pool, 'permissoes_pedidos_acoes', REGRAS_PEDIDOS_ACOES);
 
-module.exports = { acrescentarPermissoesTarefasAdmin, unificarCategoriasAgendas, MARCADOR_CATEGORIAS, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+// Pedidos a fornecedor (2026-11-26): quem cadastra o estoque (estoque.editar) passa a ver e criar pedidos
+const REGRAS_COMPRAS = [{ de: 'estoque.editar', para: ['compras.ver', 'compras.criar'] }];
+const acrescentarPermissoesCompras = pool => desdobrarPermissoes(pool, 'permissoes_compras', REGRAS_COMPRAS);
+
+module.exports = { acrescentarPermissoesCompras, acrescentarPermissoesTarefasAdmin, unificarCategoriasAgendas, MARCADOR_CATEGORIAS, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
