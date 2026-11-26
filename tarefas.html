@@ -13,7 +13,7 @@
         .barra-semana { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
         /* a agenda usa a largura e a altura da janela */
         html body .container > main { max-width: none !important; }
-        main > .welcome-subtitle { margin-bottom: 8px !important; }
+        main > .welcome-title { margin-bottom: 12px !important; }
         @media (min-width: 961px) { html body .container > main { padding-left: 20px !important; padding-right: 20px !important; padding-bottom: 24px !important; } }
         .barra-semana .btn { min-height: 40px; min-width: 40px; }
         .rotulos { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-left: 6px; }
@@ -54,7 +54,7 @@
             .toast { min-width: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202612031200">
+    <link rel="stylesheet" href="tema.css?v=202612041000">
     <script src="layout.js?v=202611301000" defer></script>
     <script src="entregas_comum.js?v=202611281000" defer></script>
     <script src="calculo/agenda_horario.js?v=202612021200" defer></script>
@@ -79,7 +79,6 @@
         </nav>
         <main>
             <h1 class="welcome-title">Minha semana</h1>
-            <p class="welcome-subtitle">Seu caderno de tarefas. Só você vê o que escreve aqui.</p>
 
             <div class="ag-corpo">
             <aside class="ag-lateral" id="lateral" aria-label="Categorias">

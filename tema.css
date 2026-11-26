@@ -1175,10 +1175,9 @@ body .btn.ag-perigo, body .btn-mini.ag-cat-excluir { background: var(--danger-bg
 .agenda.ag-com-grade > .quadro.alvo-soltar:not(.q-tar, .q-not) { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--primary-color); }
 .agenda.ag-com-grade .q-cab { flex: none; padding: 0 0 4px; }
 .agenda.ag-com-grade .q-num { width: 30px; height: 30px; font-size: 16px; }
-/* "dia todo": altura limitada com rolagem própria; o "+ Novo item" fica sempre à vista, no pé */
-.agenda.ag-com-grade > .quadro:not(.q-tar, .q-not) > .linhas { flex: 1 1 auto; min-height: 34px; max-height: clamp(96px, 18vh, 190px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding: 2px 3px; gap: 2px; }
+/* "dia todo": cresce com os itens, todos sempre visíveis, sem rolagem própria (a grade de horas encolhe até o mínimo e a página rola) */
+.agenda.ag-com-grade > .quadro:not(.q-tar, .q-not) > .linhas { flex: 1 1 auto; min-height: 34px; padding: 2px 3px; gap: 2px; }
 .agenda.ag-com-grade > .quadro:not(.q-tar, .q-not) .linha { flex: none; }
-.agenda.ag-com-grade > .quadro:not(.q-tar, .q-not) .linha:last-child:not(.salva) { position: sticky; bottom: -2px; z-index: 2; background: var(--white); }
 .agenda.ag-com-grade > .quadro:not(.q-tar, .q-not) .linha:focus-within { box-shadow: inset 0 0 0 2px var(--primary-color); }
 /* mouse: o '⋯' do 'dia todo' fica por cima do fim do texto (só ao passar o mouse ou com o foco), para o texto ficar com a largura */
 @media (pointer: fine) {

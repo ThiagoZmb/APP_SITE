@@ -78,7 +78,7 @@ test('páginas: categorias numa coluna à esquerda, recolhível (fechada) na tel
     assert.match(lateral, /id="btn-categorias" data-perm="tarefas_admin\.usar"/, f);
     assert.ok(h.indexOf('</aside>') < h.indexOf('id="semana"'), f + ': antes do calendário');
     assert.match(h, /agenda_comum\.js\?v=202612031200/, f);
-    assert.match(h, /tema\.css\?v=202612031200/, f);
+    assert.match(h, /tema\.css\?v=202612041000/, f);
   }
 });
 
