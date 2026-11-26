@@ -31,7 +31,7 @@ function montarSugestao({ analise, diasDados, produtos, aCaminho, rascunhos, por
     const sugerido = quantidadeSugerida({ ...a, diasDados, aCaminho: caminho, porCaixa: caixa });
     const marcaAntiga = !!p.aguardando && !caminho;
     const aviso = rascunhos.has(a.codigo) ? `em rascunho nº ${rascunhos.get(a.codigo)}` : marcaAntiga ? AVISO_MARCA : '';
-    saida.push({ codigo: a.codigo, produto: a.produto, unidade: a.unidade, qtd: a.qtd, minimo: a.minimo, diasCobertura: a.diasCobertura,
+    saida.push({ codigo: a.codigo, produto: a.produto, codFornecedor: p.codFornecedor || '', nomeFornecedor: p.nomeFornecedor || '', unidade: a.unidade, qtd: a.qtd, minimo: a.minimo, diasCobertura: a.diasCobertura,
       aCaminho: caminho, porCaixa: caixa, sugerido, marcado: sugerido !== null && !aviso, aviso });
   }
   return saida;

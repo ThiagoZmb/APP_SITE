@@ -25,12 +25,12 @@ test('quem entra', () => {
 test('montar a sugestão: inativo fora; rascunho e marca antiga vêm desmarcados com aviso', () => {
   const analise = [1, 2, 3, 4, 5].map(codigo => ({ codigo, produto: 'P' + codigo, unidade: 'un', qtd: 4, minimo: 10, consumoDia: 0,
     prazoDias: 15, diasCobertura: null, alerta: 'sem_consumo', consumoAno: 0 }));
-  const produtos = new Map([[1, { situacao: 'Ativo', aguardando: '' }], [2, { situacao: 'Inativo', aguardando: '' }],
+  const produtos = new Map([[1, { situacao: 'Ativo', aguardando: '', codFornecedor: 'F-1', nomeFornecedor: 'NOME DO FORNECEDOR' }], [2, { situacao: 'Inativo', aguardando: '' }],
     [3, { situacao: 'Ativo', aguardando: 'Aguardando' }], [4, { situacao: 'Ativo', aguardando: '' }]]);   // o 5 é de outro fornecedor
   const itens = montarSugestao({ analise, diasDados: 90, produtos, aCaminho: new Map(), rascunhos: new Map([[4, 9]]), porCaixa: new Map([[1, 4]]) });
   const de = c => itens.find(i => i.codigo === c);
   assert.deepEqual(itens.map(i => i.codigo).sort(), [1, 3, 4]);
-  assert.deepEqual(de(1), { codigo: 1, produto: 'P1', unidade: 'un', qtd: 4, minimo: 10, diasCobertura: null, aCaminho: 0, porCaixa: 4, sugerido: 8, marcado: true, aviso: '' });
+  assert.deepEqual(de(1), { codigo: 1, produto: 'P1', codFornecedor: 'F-1', nomeFornecedor: 'NOME DO FORNECEDOR', unidade: 'un', qtd: 4, minimo: 10, diasCobertura: null, aCaminho: 0, porCaixa: 4, sugerido: 8, marcado: true, aviso: '' });
   assert.equal(de(3).marcado, false); assert.equal(de(3).aviso, 'marcado como aguardando fora destes pedidos');
   assert.equal(de(4).marcado, false); assert.equal(de(4).aviso, 'em rascunho nº 9');
 });

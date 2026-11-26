@@ -34,11 +34,15 @@
   // sugestão (em unidades) → o que vai no campo "Pedir" (caixas, quando há mais de 1 por caixa)
   const caixasDe = (unidades, porCaixa) => (unidades ? String(Math.ceil(unidades / (porCaixa || 1))) : '');
 
+  // o pedido fala a língua do fornecedor; sem descrição cadastrada, vale o nome da casa
+  const descricao = i => i.nomeFornecedor || i.produto;
+  const codigo = i => i.codFornecedor || '—';
+
   function itensParaEnviar(linhas) {
     const itens = [];
     for (const l of linhas) {
       if (!l.marcado) continue;
-      if (!totalUnidades(l.quantidade, l.porCaixa)) return { erro: `Informe a quantidade (inteira, maior que zero) de "${l.produto}".` };
+      if (!totalUnidades(l.quantidade, l.porCaixa)) return { erro: `Informe a quantidade (inteira, maior que zero) de "${descricao(l)}".` };
       itens.push({ produtoCodigo: l.codigo, quantidade: inteiro(l.quantidade), porCaixa: porCaixaDe(l.porCaixa) });
     }
     return itens.length ? { itens } : { erro: 'Marque pelo menos um item e informe a quantidade.' };
@@ -91,7 +95,7 @@
       if (seq !== estado.seq) return;
       Object.assign(estado, { numero: p.numero, situacao: p.situacao, fornecedor: p.fornecedor, alterado: false });
       if (p.situacao === 'rascunho' && podeCriar()) {
-        estado.linhas = p.itens.map(i => ({ codigo: i.codigo, produto: i.produto, unidade: i.unidade, qtd: null, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
+        estado.linhas = p.itens.map(i => ({ codigo: i.codigo, produto: i.produto, codFornecedor: i.codFornecedor, nomeFornecedor: i.nomeFornecedor, unidade: i.unidade, qtd: null, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
           marcado: true, porCaixa: String(i.porCaixa), quantidade: String(i.qtd / i.porCaixa) }));
         $('observacao').value = p.observacao;
         $('titulo-form').textContent = `Pedido nº ${p.numero} (rascunho)`;
@@ -106,7 +110,7 @@
     function desenharDetalhe(p) {
       $('titulo-detalhe').textContent = `Pedido nº ${p.numero}`;
       $('resumo-detalhe').innerHTML = `${selo(p.situacao)} <span>${esc(p.fornecedor)} · criado ${esc(data(p.criadoEm))}${p.enviadoEm ? ' · enviado ' + esc(data(p.enviadoEm)) : ''}</span>`;
-      $('tb-detalhe').innerHTML = p.itens.map(i => `<tr><td>${esc(i.codigo)}</td><td>${esc(i.produto)}</td><td class="num">${esc(textoTotal(i.qtd / i.porCaixa, i.porCaixa, i.unidade))}</td>` +
+      $('tb-detalhe').innerHTML = p.itens.map(i => `<tr><td>${esc(codigo(i))}</td><td>${esc(descricao(i))}</td><td class="num">${esc(textoTotal(i.qtd / i.porCaixa, i.porCaixa, i.unidade))}</td>` +
         `<td class="num">${esc(i.chegou)}</td><td class="num">${i.falta ? esc(i.falta) : '✔'}</td></tr>`).join('');
       $('obs-detalhe').textContent = p.observacao ? 'Observação: ' + p.observacao : '';
       const chegou = p.itens.some(i => i.chegou > 0);
@@ -177,8 +181,8 @@
     const ouTraco = v => (v === null || v === undefined ? '—' : esc(v));
     function desenharLinhas(vazio) {
       $('tb-itens').innerHTML = estado.linhas.length ? estado.linhas.map((l, k) =>
-        `<tr data-k="${k}"><td><input type="checkbox" class="l-marca" aria-label="Incluir ${esc(l.produto)}"${l.marcado ? ' checked' : ''}></td><td>${esc(l.codigo)}</td>` +
-        `<td>${esc(l.produto)}${l.aviso ? `<small class="aviso-item">${esc(l.aviso)}</small>` : ''}</td>` +
+        `<tr data-k="${k}"><td><input type="checkbox" class="l-marca" aria-label="Incluir ${esc(descricao(l))}"${l.marcado ? ' checked' : ''}></td><td>${esc(codigo(l))}</td>` +
+        `<td>${esc(descricao(l))}${l.aviso ? `<small class="aviso-item">${esc(l.aviso)}</small>` : ''}</td>` +
         `<td class="num">${ouTraco(l.qtd)}</td><td class="num">${l.minimo ? esc(l.minimo) : '—'}</td>` +
         `<td class="num">${l.diasCobertura === null || l.diasCobertura === undefined ? '—' : esc(l.diasCobertura) + ' dias'}</td><td class="num">${ouTraco(l.aCaminho)}</td>` +
         `<td class="num"><input class="curto l-caixa" inputmode="numeric" aria-label="Unidades por caixa" value="${esc(l.porCaixa)}"></td>` +
@@ -211,7 +215,7 @@
       if (seq !== estado.buscaSeq) return;
       estado.achados = lista;
       $('achados').innerHTML = lista.length
-        ? lista.map((p, k) => `<button type="button" class="btn btn-secondary btn-mini" data-k="${k}">${esc(p.codigo)} · ${esc(p.produto)}</button>`).join('')
+        ? lista.map((p, k) => `<button type="button" class="btn btn-secondary btn-mini" data-k="${k}">${esc(codigo(p))} · ${esc(descricao(p))}</button>`).join('')
         : '<span class="dica">Nenhum item ativo encontrado.</span>';
     }
 
@@ -221,7 +225,7 @@
       const p = estado.achados[Number(b.dataset.k)];
       const ja = estado.linhas.find(l => l.codigo === p.codigo);
       if (ja) ja.marcado = true;
-      else estado.linhas.push({ codigo: p.codigo, produto: p.produto, unidade: p.unidade, qtd: p.qtd, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
+      else estado.linhas.push({ codigo: p.codigo, produto: p.produto, codFornecedor: p.codFornecedor, nomeFornecedor: p.nomeFornecedor, unidade: p.unidade, qtd: p.qtd, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
         marcado: true, porCaixa: String(p.porCaixa), quantidade: '' });
       estado.alterado = true;
       $('achados').innerHTML = '';

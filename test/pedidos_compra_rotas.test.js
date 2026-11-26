@@ -10,7 +10,8 @@ const situacao = (chamar, n, acao) => chamar(`/pedidos_compra/${n}/situacao`, 'P
 test('criar, enviar e cancelar: marca Aguardando, mostra a caminho e desmarca', async t => {
   const { banco, chamar } = await prepararCompras(t);
   banco.estoque[0].QTD_ESTOQUE = 1; banco.estoque[0].AGUARDANDO = '';
-  assert.equal((await sugestao(chamar)).find(i => i.codigo === 1).sugerido, 1);   // mínimo 2, estoque 1
+  const s = (await sugestao(chamar)).find(i => i.codigo === 1);
+  assert.deepEqual([s.sugerido, s.codFornecedor, s.nomeFornecedor], [1, 'PS-01', 'PERFIL SLIM 6M']);   // mínimo 2, estoque 1
   const { numero } = await json(await chamar('/pedidos_compra', 'POST', corpo()));
   assert.deepEqual([banco.comprasItens[0].nome_produto, banco.comprasItens[0].cod_fornecedor, banco.comprasItens[0].nome_fornecedor, banco.comprasItens[0].unidade, banco.comprasItens[0].qtd],
     ['Perfil Slim', 'PS-01', 'PERFIL SLIM 6M', 'Barra', 20]);
@@ -105,5 +106,5 @@ test('fornecedores com a contagem de sugeridos; produtos só ativos', async t =>
   assert.deepEqual(await json(await chamar('/pedidos_compra/fornecedores')),
     [{ fornecedor: FORN, qtdSugeridos: 1 }, { fornecedor: 'OUTRO FORNECEDOR SA', qtdSugeridos: 0 }]);
   const p = await json(await chamar('/pedidos_compra/produtos?busca=par'));
-  assert.deepEqual(p, [{ codigo: 3, produto: 'Parafuso', unidade: 'Un', qtd: 500, porCaixa: 1 }]);
+  assert.deepEqual(p, [{ codigo: 3, produto: 'Parafuso', codFornecedor: 'PAR-100', nomeFornecedor: 'PARAFUSO', unidade: 'Un', qtd: 500, porCaixa: 1 }]);
 });

@@ -91,3 +91,22 @@ test('as consultas das análises saem juntas', async () => {
   await carregarAnalises(pool, { hoje: '2026-11-26', janela: 90, verValores: false });
   assert.equal(maximo, 6);
 });
+
+test('a tela mostra o código e a descrição do fornecedor; sem descrição, o nome da casa', async () => {
+  const { $, abrir } = tela(caminho => caminho === '/pedidos_compra/1' ? { numero: 1, fornecedor: 'A', situacao: 'rascunho', observacao: '', itens: [
+    { codigo: 71, produto: 'Casa um', codFornecedor: 'F-AAA', nomeFornecedor: 'DESCRICAO DO FORNECEDOR', unidade: 'un', qtd: 2, porCaixa: 1, chegou: 0, falta: 2 },
+    { codigo: 72, produto: 'Casa dois', codFornecedor: '', nomeFornecedor: '', unidade: 'un', qtd: 2, porCaixa: 1, chegou: 0, falta: 2 }] }
+    : caminho === '/pedidos_compra/2' ? { numero: 2, fornecedor: 'A', situacao: 'enviado', observacao: '', criadoEm: '2026-11-26', enviadoEm: null, itens: [
+      { codigo: 73, produto: 'Casa tres', codFornecedor: 'F-CCC', nomeFornecedor: 'OUTRA DESCRICAO', unidade: 'un', qtd: 2, porCaixa: 1, chegou: 0, falta: 2 }] }
+    : padrao(caminho));
+  await assentar();
+  abrir(1);
+  await assentar();
+  const form = $('tb-itens').innerHTML;
+  for (const s of ['<td>F-AAA</td>', 'DESCRICAO DO FORNECEDOR', '<td>—</td>', 'Casa dois']) assert.ok(form.includes(s), s);
+  assert.ok(!form.includes('Casa um') && !form.includes('<td>71</td>'));
+  abrir(2);
+  await assentar();
+  const det = $('tb-detalhe').innerHTML;
+  assert.ok(det.includes('<td>F-CCC</td><td>OUTRA DESCRICAO</td>'), det);
+});

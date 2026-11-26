@@ -29,7 +29,7 @@ function registrarPedidosCompra({ rota, pool }) {
   async function dadosSugestao() {
     const [analise, [estoque], aCaminho, rascunhos] = await Promise.all([
       carregarAnalises(pool, { hoje: hojeLocal(), janela: JANELA, verValores: false, classe: '' }),
-      pool.execute('SELECT CODIGO, FORNECEDOR, SITUACAO, AGUARDANDO FROM estoque'),
+      pool.execute('SELECT CODIGO, FORNECEDOR, SITUACAO, AGUARDANDO, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque'),
       aCaminhoPorProduto(pool),
       rascunhosPorProduto(pool)
     ]);
@@ -37,7 +37,7 @@ function registrarPedidosCompra({ rota, pool }) {
     for (const e of estoque) {
       const k = norm(e.FORNECEDOR);
       if (!porFornecedor.has(k)) porFornecedor.set(k, new Map());
-      porFornecedor.get(k).set(Number(e.CODIGO), { situacao: e.SITUACAO, aguardando: e.AGUARDANDO || '' });
+      porFornecedor.get(k).set(Number(e.CODIGO), { situacao: e.SITUACAO, aguardando: e.AGUARDANDO || '', codFornecedor: e.COD_FORNECEDOR || '', nomeFornecedor: e.NOME_PRODUTO_FORNECEDOR || '' });
     }
     return { sugerir: (fornecedor, porCaixa) => montarSugestao({ analise: analise.itens, diasDados: analise.diasDados,
       produtos: porFornecedor.get(norm(fornecedor)) || new Map(), aCaminho, rascunhos, porCaixa }) };
@@ -75,11 +75,11 @@ function registrarPedidosCompra({ rota, pool }) {
     const fornecedor = String(req.query.fornecedor || '').trim().slice(0, 190);
     try {
       const [[linhas], porCaixa] = await Promise.all([
-        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE FROM estoque WHERE SITUACAO = 'Ativo' AND (NOME_PRODUTO LIKE ? OR CODIGO = ?)
+        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' AND (NOME_PRODUTO LIKE ? OR CODIGO = ?)
                       ORDER BY NOME_PRODUTO LIMIT 50`, [`%${busca}%`, parseInt(busca, 10) || 0]),
         porCaixaDoFornecedor(pool, fornecedor)
       ]);
-      res.json(linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO, unidade: l.UNIDADE || '', qtd: Number(l.QTD_ESTOQUE) || 0,
+      res.json(linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO, codFornecedor: l.COD_FORNECEDOR || '', nomeFornecedor: l.NOME_PRODUTO_FORNECEDOR || '', unidade: l.UNIDADE || '', qtd: Number(l.QTD_ESTOQUE) || 0,
         porCaixa: porCaixa.get(Number(l.CODIGO)) || 1 })));
     } catch (err) { falha(res, 'GET /pedidos_compra/produtos', err); }
   });

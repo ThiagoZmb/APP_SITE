@@ -38,7 +38,7 @@ function regrasCompras(estado) {
     [/SELECT CODIGO, NOME_PRODUTO, NOME_PRODUTO_FORNECEDOR, QTD_ESTOQUE, AGUARDANDO/, () => estoque.map(e => ({ ...e }))],
     [/UPDATE estoque SET AGUARDANDO = \? WHERE CODIGO = \?/, (sql, [v, c]) => { const e = estoque.find(x => x.CODIGO === Number(c)); if (e) e.AGUARDANDO = v; return { affectedRows: e ? 1 : 0 }; }],
     // sugestão
-    [/SELECT CODIGO, FORNECEDOR, SITUACAO, AGUARDANDO FROM estoque/, () => estoque.map(e => ({ ...e }))],
+    [/SELECT CODIGO, FORNECEDOR, SITUACAO, AGUARDANDO, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque/, () => estoque.map(e => ({ ...e }))],
     [/WHERE p\.situacao = 'rascunho'/, () => comprasItens.filter(i => pedido(i.pedido_numero)?.situacao === 'rascunho').map(i => ({ codigo: i.produto_codigo, numero: i.pedido_numero }))],
     [/SELECT i\.produto_codigo AS codigo, i\.por_caixa FROM web_pedidos_compra_itens i/, (sql, [forn]) => comprasItens
       .filter(i => { const p = pedido(i.pedido_numero); return p && norm(p.fornecedor) === norm(forn) && p.situacao !== 'cancelado'; })
