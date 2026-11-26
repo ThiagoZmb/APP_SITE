@@ -227,8 +227,8 @@
         }
     </style>
     <link rel="stylesheet" href="tema.css?v=202612041000">
-    <script src="layout.js?v=202611301000" defer></script>
-    <script src="situacoes.js?v=202611191300"></script>
+    <script src="layout.js?v=202612051000" defer></script>
+    <script src="situacoes.js?v=202612051000"></script>
     <script src="olho_resumos.js?v=202611191200"></script>
 </head>
 <body>
@@ -261,6 +261,7 @@
                 <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
                 <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
                 <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+                <a class="aba-est" data-perm="compras.ver" href="pedidos_compra.html">Pedidos a fornecedor</a>
                 <a class="aba-est" data-aba="analises" data-perm="administrativo.ver" href="movimentacao_estoque.html?aba=analises">Análises</a>
                 <a class="aba-est" data-perm="estoque.editar" href="etiquetas_qr.html">Etiquetas de QR</a>
             </nav>
@@ -527,7 +528,7 @@
                     <td><div class="prod-nome">${escapeHtml(it.produto)}${alerta ? Situacoes.selo('estoque_saldo', alerta, ROTULO_ALERTA[alerta]) : ''}</div>
                         <div class="prod-forn col-forn">${escapeHtml(it.prodFornecedor || '')}</div></td>
                     <td class="num"><b>${numero(it.qtd)}</b> <span class="cod">${escapeHtml(it.unidade || '')}</span></td>
-                    <td class="num">${escapeHtml(it.aguardando || '—')}</td>
+                    <td class="num">${escapeHtml(it.aCaminho || it.aguardando || '—')}</td>
                 </tr>`;
             }).join('');
         }

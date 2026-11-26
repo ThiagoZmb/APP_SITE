@@ -131,8 +131,8 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="tema.css?v=202612041000">
-    <script src="situacoes.js?v=202611191300"></script>
-    <script src="layout.js?v=202611301000" defer></script>
+    <script src="situacoes.js?v=202612051000"></script>
+    <script src="layout.js?v=202612051000" defer></script>
     <!-- notas_compra.js: só lerPacote/marcarImportada (nota de compra vinda da SEFAZ pelo serviço local 127.0.0.1:3917) -->
     <script src="notas_compra.js?v=202610301200" defer></script>
 </head>
@@ -151,6 +151,7 @@
                 <a class="aba-est" data-aba="saida" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
                 <a class="aba-est" data-aba="ajuste" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
                 <a class="aba-est" data-aba="historico" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+                <a class="aba-est" data-perm="compras.ver" href="pedidos_compra.html">Pedidos a fornecedor</a>
                 <a class="aba-est" data-aba="analises" data-perm="administrativo.ver" href="movimentacao_estoque.html?aba=analises">Análises</a>
             </nav>
             <p class="welcome-subtitle">Entrada por nota fiscal, saída, ajuste de inventário e histórico dos movimentos</p>
@@ -764,6 +765,7 @@
             limparEntrada();
             atualizarHistoricos(listaEntradas);
             if (r.codigosAtualizados?.length) toast('Código do fornecedor atualizado no cadastro: ' + r.codigosAtualizados.map(c => `${c.produto} (${c.de || 'vazio'} → ${c.para})`).join('; '), 'info');
+            if (r.pedidosAtualizados?.length) toast('Pedido(s) ao fornecedor atualizado(s): ' + r.pedidosAtualizados.map(p => `nº ${p.numero} (${p.situacao === 'recebido' ? 'Recebido' : 'Chegou em parte'})`).join('; '), 'info');
             analisesDesatualizadas = true;
             await mostrarResultado('Nota lançada', r.itens);
         });

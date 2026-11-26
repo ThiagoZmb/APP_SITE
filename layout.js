@@ -110,6 +110,7 @@
         'movimentacao_estoque.html': ['estoque.ver', { algum: ['estoque.movimentar', 'estoque.desfazer', 'estoque.ajustar'] }],
         'baixa_qr.html': ['estoque.ver', 'estoque.movimentar'],
         'etiquetas_qr.html': ['estoque.ver', 'estoque.editar'],
+        'pedidos_compra.html': ['estoque.ver', 'compras.ver'],
         'produtos.html': ['produtos.ver'],
         'fornecedores.html': ['fornecedores.ver'],
         'notas_fiscais.html': ['notas.ver'],
@@ -276,7 +277,7 @@
         const nav = container.querySelector(':scope > nav, :scope > .sidebar');
         const header = container.querySelector(':scope > header');
         const a = auth();
-        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html', 'movimentacao_estoque.html': 'estoque.html', 'calendario_dia.html': 'calendario.html' };   // subpáginas acendem o item do menu de origem
+        const PAGINA_PAI = { 'cliente_analise.html': 'clientes.html', 'graficos_pedidos.html': 'painel_inicial.html', 'movimentacao_estoque.html': 'estoque.html', 'pedidos_compra.html': 'estoque.html', 'calendario_dia.html': 'calendario.html' };   // subpáginas acendem o item do menu de origem
         const arquivo = arquivoAtual();
         const atual = PAGINA_PAI[arquivo] || arquivo;
         observar();

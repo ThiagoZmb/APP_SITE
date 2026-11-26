@@ -17,6 +17,7 @@ Funcionalidades (páginas HTML na raiz):
 - Clientes e análise de cliente (`clientes.html`, `cliente_analise.html`).
 - Produtos/cadastro (`produtos.html`), orçamentos e pedidos com cálculo de preço de portas, serralheria e venda avulsa (`orcamentos.html`, `calculo/precos.js`, `rotas/ped_orc.js`), geração de PDF (pdfkit).
 - Estoque: entrada manual e por XML de NF-e, saída, ajuste, histórico, estornos, análises (previsão de falta, curva ABC, itens parados) (`estoque.html`, `movimentacao_estoque.html`, `rotas/estoque_*.js`, `rotas/nfe_xml.js`).
+- **Pedidos a fornecedor** (aba do Estoque: `pedidos_compra.html/.js`, `rotas/pedidos_compra.js`, `calculo/pedidos_compra.js`): sugere o que comprar (mínimo e consumo), monta o pedido com unidades por caixa, gera PDF sem preços (envio por e-mail é manual) e acompanha a chegada pela entrada de nota; grava `estoque.AGUARDANDO`. Permissões `compras.ver`/`compras.criar`. Regras em `docs/regras/pedidos-compra.md`. **Tela verificada só no Edge headless com banco simulado.**
 - Financeiro / fluxo de caixa (`financeiro.html`) e gráficos de pedidos (`graficos_pedidos.html`). **Recebimento dividido** (Pix + cartão numa operação só, `fluxo_divisao.js`, `rotas/fluxo_varios.js`): regras em `docs/regras/recebimento-dividido.md`. **Lançar em várias datas** (mesmo movimento Entrada/Saída em 2 a 24 datas, `fluxo_datas.js`, `POST /fluxo/salvar_datas`): mesma doc.
 - Custos e **formação de preço** (`custos.html`, `custos_precos.js`, `rotas/custos.js`, `rotas/precos_formacao.js`): calcula custo real dos materiais pelas compras e sugere o `VALOR_FIXO`.
 - **Entregas** (`entregas.html`, `minhas_entregas.html`, `rotas/entregas.js`): fila de pedidos Pronto, agenda (motorista, retirada, outro estado), baixa pelo motorista no celular com foto do canhoto, ocorrências e histórico; **o administrativo (`administrativo.ver`) vê em "Minhas entregas" as entregas de todos os motoristas (filtro "Todos / Só as minhas") e dá a baixa em nome do motorista (Agendada ou Em rota; também pelo detalhe de Entregas)**; também aparece em Início, Pedidos (selo) e Financeiro do cliente (somente leitura). Regras na seção 5, "Entregas".
@@ -65,6 +66,8 @@ rotas/                   Módulos de rotas registrados pelo index.js
   estoque_saida.js       Saída de estoque compartilhada (travarProdutos, conferirSaldo, gravarSaidas): usada por POST /estoque/saida e pela baixa das varas novas do plano de corte
   estoque_analises.js    Previsão de falta, ABC, parados
   estoque_qr.js          Baixa por QR: GET /estoque/por_codigo/:codigo (só codigo/nome/unidade/qtd; 409 se o código se repete) e GET /estoque/etiquetas (somente leitura; a baixa usa POST /estoque/saida)
+  pedidos_compra.js      Pedidos a fornecedor: /pedidos_compra (lista, fornecedores, sugestão, produtos, gravar, situação, PDF; PDF em pdf/pedido_compra.js)
+  pedidos_compra_banco.js  SQL dos pedidos usado também pela entrada/desfazer (baixa) e por GET /estoque (a caminho)
   nfe_xml.js             Leitura do XML da NF-e (recusa DOCTYPE)
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
@@ -226,6 +229,10 @@ Com a chave o usuário ganha `valores.ver` junto; **sem ela somem** `paineis.ver
 ### Permissões por ação (2026-11-17)
 Uma caixa por ação na tela de usuários/perfis: o catálogo traz `descricao` (linha obrigatória em `DESCRICOES`, `seguranca/permissoes.js`) e `administrativa` (selo "Só administrativo"). `entregas.programar` foi desdobrada em `entregas.reagendar` (**só administrativo**; vale também para mudar data/tipo/motorista de entrega já programada pelo "Editar entrega"), `entregas.cancelar`, `entregas.criar`, `entregas.dividir`, `entregas.encerrar_saldo`, `entregas.concluir` e `entregas.checklist_assinado`; `pedidos.data_pronto` saiu de `pedidos.situacao` e `pedidos.desconto` de `orcamentos.criar`. Migração `desdobrarPermissoes` (marcadores `permissoes_entregas_acoes`/`permissoes_pedidos_acoes`, só `INSERT IGNORE` em `web_*`): quem tinha a antiga ganha as novas e as exceções são copiadas com o mesmo tipo; o reagendar só vai a perfil administrativo. **Ação nova sensível = permissão própria `area.acao` + descrição + migração a partir da que a cobria.**
 > Regras completas: `docs/regras/permissoes-por-acao.md` (ler antes de mexer em permissões).
+
+### Pedidos a fornecedor (tabelas `web_pedidos_compra*`)
+A entrada de nota abate os pedidos enviados do mesmo fornecedor (mais antigo primeiro) na mesma transação, e desfazer a entrada devolve; só rascunho é editado; sem dinheiro; única escrita em tabela antiga é `estoque.AGUARDANDO`; travar `estoque` antes do pedido.
+> Regras completas: `docs/regras/pedidos-compra.md` (ler antes de mexer neste módulo).
 
 ### Baixa de estoque por QR (celular)
 O QR é o `estoque.CODIGO_BARRA` (o banco não garante unicidade: repetido = 409); a resposta usa `qtd` e nunca `saldo` (o `redeDeValores` apagaria); a mesma `chave` vale até a baixa dar certo (409 = "já registrada"); só `estoque.ver` + `estoque.movimentar` e nenhuma outra permissão entra direto em `baixa_qr.html`. **NÃO testado em aparelho real (Android e iPhone): câmera, leitura de QR, QR gerado e impressão das etiquetas.**

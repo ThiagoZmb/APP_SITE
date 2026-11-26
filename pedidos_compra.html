@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://elegance-backend-hrho.onrender.com; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'self' blob:; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - Pedidos a fornecedor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
+        [hidden] { display: none !important; }
+        body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; color: var(--text-dark); text-decoration: none; }
+        .menu-item.active { background: var(--gradient-primary); color: var(--on-primary); box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .painel { background: var(--white); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: var(--shadow-light); position: relative; overflow: hidden; padding: 22px; }
+        .painel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-primary); }
+        .abas-estoque { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); }
+        .aba-est { padding: 12px 14px; font-size: 14px; font-weight: 600; color: var(--text-light); text-decoration: none; border-bottom: 3px solid transparent; }
+        .aba-est.on { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .topo { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .topo h2 { font-size: 22px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: var(--secondary-color); padding: 10px; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; white-space: nowrap; }
+        tbody td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        th.num, td.num { text-align: right; }
+        #tb-lista tr[data-numero] { cursor: pointer; }
+        #tb-lista tr[data-numero]:hover { background: var(--primary-light); }
+        .vazio { text-align: center; padding: 40px; color: var(--text-light); }
+        input.curto { width: 78px; text-align: right; }
+        input.curto, .form-group input, .form-group select, .form-group textarea { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; background: var(--white); }
+        .form-group { margin-bottom: 14px; max-width: 640px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; }
+        .form-group textarea { min-height: 70px; resize: vertical; }
+        input[type="checkbox"] { width: 18px; height: 18px; }
+        .aviso-item { display: block; color: var(--text-light); font-size: 12px; margin-top: 2px; }
+        .l-total { white-space: nowrap; color: var(--text-light); font-size: 13px; }
+        .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        #achados { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 14px; }
+        .dica { font-size: 12px; color: var(--text-light); }
+        #resumo-detalhe { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 14px; }
+        #obs-detalhe { margin-top: 12px; font-size: 14px; white-space: pre-wrap; }
+        .btn { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--primary-light); color: var(--primary-color); }
+        .btn-perigo { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
+        .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; }
+        .btn:disabled { opacity: .6; cursor: wait; }
+
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: 380px; padding: 14px 18px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .painel { padding: 16px; }
+        }
+    </style>
+    <link rel="stylesheet" href="tema.css?v=202612041000">
+    <script src="situacoes.js?v=202612051000"></script>
+    <script src="layout.js?v=202612051000" defer></script>
+    <script src="entregas_comum.js?v=202611201000" defer></script>
+    <script src="pedidos_compra.js?v=202612051000" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">Estoque</h1>
+            <nav class="abas-estoque" aria-label="Estoque">
+                <a class="aba-est" href="estoque.html">Itens do estoque</a>
+                <a class="aba-est" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=entrada">Entrada de nota</a>
+                <a class="aba-est" data-perm="estoque.movimentar" href="movimentacao_estoque.html?aba=saida">Saída</a>
+                <a class="aba-est" data-perm="estoque.ajustar" href="movimentacao_estoque.html?aba=ajuste">Ajuste</a>
+                <a class="aba-est" href="movimentacao_estoque.html?aba=historico">Histórico</a>
+                <a class="aba-est on" data-perm="compras.ver" href="pedidos_compra.html">Pedidos a fornecedor</a>
+            </nav>
+
+            <section class="painel" id="v-lista">
+                <div class="topo">
+                    <h2>Pedidos a fornecedor</h2>
+                    <button type="button" class="btn btn-primary" id="btn-novo" data-perm="compras.criar">+ Novo pedido</button>
+                </div>
+                <div class="tabela-wrap">
+                    <table>
+                        <thead><tr><th>Nº</th><th>Fornecedor</th><th>Criado</th><th>Enviado</th><th>Situação</th><th class="num">Itens</th></tr></thead>
+                        <tbody id="tb-lista"><tr><td colspan="6" class="vazio">Carregando…</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="painel" id="v-form" hidden>
+                <div class="topo">
+                    <h2 id="titulo-form">Novo pedido</h2>
+                    <button type="button" class="btn btn-secondary" id="btn-voltar">← Voltar</button>
+                </div>
+                <div class="form-group"><label for="fornecedor">Fornecedor</label><select id="fornecedor"></select></div>
+                <div class="tabela-wrap">
+                    <table>
+                        <thead><tr><th></th><th>Cód</th><th>Produto</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th></tr></thead>
+                        <tbody id="tb-itens"></tbody>
+                    </table>
+                </div>
+                <p class="dica">Com mais de 1 unidade por caixa, em "Pedir" informe o número de caixas.</p>
+                <div class="form-group" style="margin-top:14px"><label for="busca-item">Adicionar item</label><input type="search" id="busca-item" placeholder="Código ou nome do produto" autocomplete="off"></div>
+                <div id="achados"></div>
+                <div class="form-group"><label for="observacao">Observação (sai no PDF)</label><textarea id="observacao" maxlength="2000"></textarea></div>
+                <div class="acoes">
+                    <button type="button" class="btn btn-primary" id="btn-salvar" data-perm="compras.criar">Salvar rascunho</button>
+                    <button type="button" class="btn btn-secondary" id="btn-pdf">Gerar PDF</button>
+                    <button type="button" class="btn btn-secondary" id="btn-enviar" data-perm="compras.criar">Marcar como enviado</button>
+                    <button type="button" class="btn btn-perigo" id="btn-excluir" data-perm="compras.criar" hidden>Excluir rascunho</button>
+                </div>
+            </section>
+
+            <section class="painel" id="v-detalhe" hidden>
+                <div class="topo">
+                    <h2 id="titulo-detalhe">Pedido</h2>
+                    <button type="button" class="btn btn-secondary" id="btn-voltar-detalhe">← Voltar</button>
+                </div>
+                <div id="resumo-detalhe"></div>
+                <div class="tabela-wrap">
+                    <table>
+                        <thead><tr><th>Cód</th><th>Produto</th><th class="num">Pedido</th><th class="num">Chegou</th><th class="num">Falta</th></tr></thead>
+                        <tbody id="tb-detalhe"></tbody>
+                    </table>
+                </div>
+                <p id="obs-detalhe"></p>
+                <div class="acoes">
+                    <button type="button" class="btn btn-secondary" id="btn-pdf-detalhe">Gerar PDF</button>
+                    <button type="button" class="btn btn-secondary" id="btn-encerrar" data-perm="compras.criar" hidden>Encerrar sem o restante</button>
+                    <button type="button" class="btn btn-perigo" id="btn-cancelar" data-perm="compras.criar" hidden>Cancelar pedido</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

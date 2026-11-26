@@ -34,6 +34,8 @@
     retalho: { disponivel: 'ok', reservado: 'info', usado: 'neutro', descartado: 'neutro' },
     // web_notas_fiscais.situacao e notas de compra pela SEFAZ
     nota: { ativa: 'ok', cancelada: 'perigo', resumo: 'aviso', ciencia: 'info', completa: 'ok', importada: 'neutro' },
+    // web_pedidos_compra.situacao (pedido ao fornecedor); rascunho em destaque para não ser esquecido
+    compra: { rascunho: 'aviso', enviado: 'info', parcial: 'info', recebido: 'ok', encerrado: 'neutro', cancelado: 'neutro' },
     // estoque: item, saldo, previsão, movimento
     estoque_item: { ativo: 'ok', inativo: 'neutro' },
     estoque_saldo: { normal: 'ok', no_minimo: 'aviso', minimo: 'aviso', em_falta: 'perigo', falta: 'perigo', inativo: 'neutro' },
