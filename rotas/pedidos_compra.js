@@ -9,6 +9,8 @@ const { carregarAnalises } = require('./estoque_analises');
 const { montarSugestao, acaoPermitida, validarPedido } = require('../calculo/pedidos_compra');
 const { marcas, aCaminhoPorProduto, marcarAguardando, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido } = require('./pedidos_compra_banco');
 
+const { desenharPedidoCompra, novoDocumento } = require('../pdf/pedido_compra');
+
 const VER = ['estoque.ver', 'compras.ver'];
 const CRIAR = [...VER, 'compras.criar'];
 const NAO_ENCONTRADO = 'Pedido não encontrado.';
@@ -88,6 +90,19 @@ function registrarPedidosCompra({ rota, pool }) {
       if (!pedido) return res.status(404).json({ error: NAO_ENCONTRADO });
       res.json(pedido);
     } catch (err) { falha(res, 'GET /pedidos_compra/:numero', err); }
+  });
+
+  rota('get', '/pedidos_compra/:numero/pdf', VER, async (req, res) => {
+    try {
+      const pedido = await carregarPedido(pool, numeroDe(req));
+      if (!pedido) return res.status(404).json({ error: NAO_ENCONTRADO });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="Pedido_compra_${pedido.numero}.pdf"`);
+      const doc = novoDocumento();
+      doc.pipe(res);
+      desenharPedidoCompra(doc, pedido);
+      doc.end();
+    } catch (err) { falha(res, 'GET /pedidos_compra/:numero/pdf', err); }
   });
 
   // valida o corpo e confere o fornecedor no cadastro (fora da transação); responde o erro e devolve null
