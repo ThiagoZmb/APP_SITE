@@ -14,10 +14,10 @@ function tela(responder) {
   const el = () => {
     const ouvintes = {};
     return { value: '', innerHTML: '', textContent: '', hidden: false, ouvintes, add() {}, focus() {},
-      addEventListener: (tipo, fn) => { ouvintes[tipo] = fn; },
+      addEventListener: (tipo, fn) => { ouvintes[tipo] = fn; }, setAttribute() {},
       querySelector: () => el() };
   };
-  const doc = { getElementById: id => { if (!elementos.has(id)) elementos.set(id, el()); return elementos.get(id); }, createElement: el, body: { appendChild() {} } };
+  const doc = { getElementById: id => { if (!elementos.has(id)) elementos.set(id, el()); return elementos.get(id); }, createElement: el, body: { appendChild() {} }, addEventListener() {} };
   const win = {
     document: doc, Situacoes, Acesso: { pode: () => true }, resposta: false,
     confirm: t => { perguntas.push(t); return win.resposta; },
@@ -129,7 +129,7 @@ test('combo: todos os itens com os dois nomes, os que faltam primeiro; o escolhi
   assert.equal(new Set(iguais.map(o => o.texto)).size, 2, 'textos repetidos ganham o código');
 });
 
-test('escolher o fornecedor deixa a lista vazia; escolher na combo adiciona com a quantidade sugerida e o ✕ tira', async () => {
+test('combo própria: dois nomes em colunas separadas; clicar adiciona, o ✕ devolve; teclado escolhe e Esc fecha', async () => {
   const { $, abrir } = tela(caminho => caminho.startsWith('/pedidos_compra/produtos') ? doFornecedor
     : caminho.startsWith('/pedidos_compra/sugestao') ? sugestaoA : padrao(caminho));
   await assentar();
@@ -138,18 +138,39 @@ test('escolher o fornecedor deixa a lista vazia; escolher na combo adiciona com 
   $('fornecedor').value = 'A';
   $('fornecedor').ouvintes.change();
   await assentar();
+  const lista = () => $('combo-lista').innerHTML;
+  const tecla = key => $('busca-item').ouvintes.keydown({ key, preventDefault() {} });
+  const digitar = v => { $('busca-item').value = v; $('busca-item').ouvintes.input(); };
   assert.ok(!$('tb-itens').innerHTML.includes('ROLDANA'), 'nada entra sozinho');
-  assert.match($('itens-fornecedor').innerHTML, /ROLDANA \| ROLDANA DUPLA {2}\[sugerido: 100 un\][\s\S]*PERFIL 1036 BRONZE \| ESTRUTURAL 1036 BZ/);
-  $('busca-item').value = 'ROLDANA | ROLDANA DUPLA  [sugerido: 100 un]';
-  $('busca-item').ouvintes.change();
+  assert.equal($('combo-lista').hidden, true);
+  $('busca-item').ouvintes.click();
+  assert.equal($('combo-lista').hidden, false);
+  assert.match(lista(), /<span class="c-nome">ROLDANA<\/span><span class="c-forn">ROLDANA DUPLA<\/span><span class="c-nota">sugerido: 100 un<\/span>[\s\S]*<span class="c-nome">PERFIL 1036 BRONZE<\/span><span class="c-forn">ESTRUTURAL 1036 BZ<\/span>/);
+
+  $('combo-lista').ouvintes.click({ target: { closest: () => ({ dataset: { i: '0' } }) } });
   assert.match($('tb-itens').innerHTML, /ROLDANA DUPLA/);
   assert.match($('tb-itens').innerHTML, /l-qtd[^>]*value="2"/);   // 100 un em caixas de 50
-  assert.equal($('busca-item').value, '');
-  assert.ok(!$('itens-fornecedor').innerHTML.includes('ROLDANA'));
-  $('busca-item').value = '1036';                                 // trecho que só acha um
-  $('busca-item').ouvintes.change();
+  assert.equal($('combo-lista').hidden, true);
+
+  digitar('1036');
+  assert.equal($('combo-lista').hidden, false);
+  assert.match(lista(), /PERFIL 1036 BRONZE/);
+  tecla('Escape');
+  assert.equal($('combo-lista').hidden, true);
+  assert.ok(!$('tb-itens').innerHTML.includes('1036'), 'Esc não adiciona');
+  digitar('xyz');
+  assert.match(lista(), /Nenhum item/);
+  tecla('Enter');
+  digitar('1036');
+  tecla('Enter');
   assert.match($('tb-itens').innerHTML, /ESTRUTURAL 1036 BZ/);
+  assert.equal($('busca-item').value, '');
+
   $('tb-itens').ouvintes.click({ target: { closest: sel => sel === '.l-tirar' ? { closest: () => ({ dataset: { k: '0' } }) } : null } });
   assert.ok(!$('tb-itens').innerHTML.includes('ROLDANA DUPLA'));
-  assert.match($('itens-fornecedor').innerHTML, /ROLDANA DUPLA/);
+  digitar('roldana');
+  tecla('ArrowDown');
+  assert.match(lista(), /class="ativo"[^>]*>|aria-selected="true"/);
+  tecla('Enter');
+  assert.match($('tb-itens').innerHTML, /ROLDANA DUPLA/);
 });

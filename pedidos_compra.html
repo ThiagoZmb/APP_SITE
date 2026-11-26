@@ -53,6 +53,20 @@
         .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-light); margin-bottom: 6px; text-transform: uppercase; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; }
         .form-group textarea { min-height: 70px; resize: vertical; }
+        /* combo "Adicionar item": o campo tem a largura dos outros; a lista é larga, com um nome em cada coluna */
+        #v-form { overflow: visible !important; }
+        #v-form::before { border-radius: 20px 20px 0 0; }
+        .form-group.combo { position: relative; max-width: none; }
+        .combo-campo { position: relative; max-width: 640px; }
+        .combo-seta { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-light); }
+        #combo-lista { position: absolute; z-index: 30; left: 0; top: calc(100% + 4px); width: 100%; max-height: 420px; overflow: auto; list-style: none;
+            background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); }
+        #combo-lista li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 170px; column-gap: 40px; align-items: baseline; padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color); cursor: pointer; font-size: 14px; color: var(--text-dark); }
+        #combo-lista li:hover, #combo-lista li.ativo { background: var(--primary-light); }
+        #combo-lista .c-nota { color: var(--primary-color); font-size: 12px; font-weight: 600; }
+        #combo-lista li.c-vazio { display: block; cursor: default; color: var(--text-light); }
+        @media (max-width: 900px) { #combo-lista li { grid-template-columns: 1fr; row-gap: 2px; } #combo-lista .c-forn { color: var(--text-light); } }
         .aviso-item { display: block; color: var(--text-light); font-size: 12px; margin-top: 2px; }
         .l-total { color: var(--text-light); font-size: 13px; }
         .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
@@ -88,7 +102,7 @@
     <script src="situacoes.js?v=202612051000"></script>
     <script src="layout.js?v=202612051000" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
-    <script src="pedidos_compra.js?v=202612051300" defer></script>
+    <script src="pedidos_compra.js?v=202612051400" defer></script>
 </head>
 <body>
     <div class="container">
@@ -135,7 +149,10 @@
                     <button type="button" class="btn btn-secondary" id="btn-voltar">← Voltar</button>
                 </div>
                 <div class="form-group"><label for="fornecedor">Fornecedor</label><select id="fornecedor"></select></div>
-                <div class="form-group"><label for="busca-item">Adicionar item</label><input id="busca-item" list="itens-fornecedor" autocomplete="off" disabled placeholder="Escolha o fornecedor primeiro"><datalist id="itens-fornecedor"></datalist></div>
+                <div class="form-group combo"><label for="busca-item">Adicionar item</label>
+                    <div class="combo-campo"><input id="busca-item" role="combobox" aria-expanded="false" aria-controls="combo-lista" autocomplete="off" disabled placeholder="Escolha o fornecedor primeiro"><span class="combo-seta" aria-hidden="true">▾</span></div>
+                    <ul id="combo-lista" role="listbox" hidden></ul>
+                </div>
                 <div class="tabela-wrap">
                     <table>
                         <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th><th></th></tr></thead>

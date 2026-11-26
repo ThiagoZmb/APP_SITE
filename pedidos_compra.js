@@ -52,8 +52,9 @@
       const aviso = s && s.aviso !== proprio ? s.aviso : '';
       const sugerido = !!s && s.sugerido !== null && !aviso;
       const nota = !s ? '' : sugerido ? `sugerido: ${s.sugerido}${p.unidade ? ' ' + p.unidade : ''}` : aviso || (s.aCaminho ? `a caminho: ${s.aCaminho}` : 'no mínimo');
-      const base = vezes.get(nomes(p)) > 1 ? `${nomes(p)} (cód. ${p.codigo})` : nomes(p);
-      return { codigo: p.codigo, texto: nota ? `${base}  [${nota}]` : base, sugerido };
+      const repetido = vezes.get(nomes(p)) > 1 ? ` (cód. ${p.codigo})` : '';
+      const base = nomes(p) + repetido;
+      return { codigo: p.codigo, nome: p.produto + repetido, fornecedor: p.nomeFornecedor || '—', nota, texto: nota ? `${base}  [${nota}]` : base, sugerido };
     }).sort((a, b) => b.sugerido - a.sugerido);
   }
 
@@ -75,7 +76,7 @@
     const toast = C.criarToast(doc, win);
     const podeCriar = () => !!(win.Acesso && win.Acesso.pode('compras.criar'));
     // pedido aberto: numero null = novo; chave identifica o pedido novo para o duplo clique não gravar dois
-    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], produtos: [], sugestao: [], combo: [], ocupado: false, seq: 0, alterado: false };
+    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], produtos: [], sugestao: [], combo: [], visiveis: [], marcado: -1, ocupado: false, seq: 0, alterado: false };
     const novaChave = () => (win.crypto?.randomUUID ? win.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const data = v => (v ? dataBR(String(v).slice(0, 10)) : '—');
     const selo = s => win.Situacoes.selo('compra', s, ROTULOS[s] || s);
@@ -178,12 +179,49 @@
       $('busca-item').value = '';
       $('busca-item').disabled = true;
       $('busca-item').placeholder = 'Escolha o fornecedor primeiro';
-      $('itens-fornecedor').innerHTML = '';
+      fecharLista();
     }
 
+    // lista própria (a do navegador não deixa mudar a largura): nome da casa | nome do fornecedor | aviso
+    const listaAberta = () => !$('combo-lista').hidden;
+    function fecharLista() {
+      $('combo-lista').hidden = true;
+      $('combo-lista').innerHTML = '';
+      estado.marcado = -1;
+      $('busca-item').setAttribute('aria-expanded', 'false');
+    }
+    function abrirCombo() {
+      if ($('busca-item').disabled) return;
+      const filtro = txt($('busca-item').value).toLowerCase();
+      estado.visiveis = estado.combo.filter(o => o.texto.toLowerCase().includes(filtro));
+      if (estado.marcado >= estado.visiveis.length) estado.marcado = estado.visiveis.length - 1;
+      $('combo-lista').innerHTML = estado.visiveis.length ? estado.visiveis.map((o, k) =>
+        `<li role="option" data-i="${k}" aria-selected="${k === estado.marcado}"${k === estado.marcado ? ' class="ativo"' : ''}>` +
+        `<span class="c-nome">${esc(o.nome)}</span><span class="c-forn">${esc(o.fornecedor)}</span><span class="c-nota">${esc(o.nota)}</span></li>`).join('')
+        : '<li class="c-vazio">Nenhum item deste fornecedor com esse texto (ou ele já está na lista).</li>';
+      $('combo-lista').hidden = false;
+      $('busca-item').setAttribute('aria-expanded', 'true');
+    }
     function desenharCombo() {
       estado.combo = opcoesCombo(estado.produtos, estado.sugestao, estado.linhas.map(l => l.codigo), estado.numero);
-      $('itens-fornecedor').innerHTML = estado.combo.map(o => `<option value="${esc(o.texto)}"></option>`).join('');
+      if (listaAberta()) abrirCombo();
+    }
+
+    function teclaNaCombo(e) {
+      if (e.key === 'Escape' || e.key === 'Tab') return fecharLista();
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!listaAberta()) abrirCombo();
+        estado.marcado = Math.max(0, Math.min(estado.visiveis.length - 1, estado.marcado + (e.key === 'ArrowDown' ? 1 : -1)));
+        abrirCombo();
+        $('combo-lista').querySelector('.ativo')?.scrollIntoView?.({ block: 'nearest' });
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!listaAberta()) return abrirCombo();
+        const opcao = estado.visiveis[estado.marcado] || (estado.visiveis.length === 1 ? estado.visiveis[0] : null);
+        if (opcao) escolher(opcao);
+      }
     }
 
     // todos os itens do fornecedor + o que está faltando (só para avisar na combo)
@@ -248,17 +286,8 @@
       desenharCombo();
     }
 
-    // escolheu na combo (ou digitou um trecho que só acha um item): entra na lista, já com a quantidade sugerida
-    function escolher() {
-      const digitado = txt($('busca-item').value);
-      if (!digitado) return;
-      let opcao = estado.combo.find(o => o.texto === $('busca-item').value);
-      if (!opcao) {
-        const achou = estado.combo.filter(o => o.texto.toLowerCase().includes(digitado.toLowerCase()));
-        if (!achou.length) return toast('Nenhum item deste fornecedor com esse texto (ou ele já está na lista).', 'info');
-        if (achou.length > 1) return;
-        opcao = achou[0];
-      }
+    // escolheu na combo: entra na lista, já com a quantidade sugerida
+    function escolher(opcao) {
       const p = estado.produtos.find(x => x.codigo === opcao.codigo);
       const s = estado.sugestao.find(x => x.codigo === opcao.codigo);
       const linha = { codigo: p.codigo, produto: p.produto, codFornecedor: p.codFornecedor, nomeFornecedor: p.nomeFornecedor, unidade: p.unidade, qtd: p.qtd,
@@ -268,6 +297,7 @@
       estado.linhas.push(linha);
       estado.alterado = true;
       $('busca-item').value = '';
+      fecharLista();
       desenharLinhas();
       desenharCombo();
       if (!linha.quantidade) $('tb-itens').querySelector(`tr[data-k="${estado.linhas.length - 1}"] .l-qtd`)?.focus();
@@ -328,7 +358,11 @@
     $('tb-itens').addEventListener('input', digitou);
     $('observacao').addEventListener('input', () => { estado.alterado = true; });
     $('tb-itens').addEventListener('click', tirar);
-    $('busca-item').addEventListener('change', escolher);
+    $('busca-item').addEventListener('click', abrirCombo);
+    $('busca-item').addEventListener('input', () => { estado.marcado = -1; abrirCombo(); });
+    $('busca-item').addEventListener('keydown', teclaNaCombo);
+    $('combo-lista').addEventListener('click', e => { const li = e.target.closest('li[data-i]'); if (li) escolher(estado.visiveis[Number(li.dataset.i)]); });
+    doc.addEventListener('click', e => { if (!e.target.closest?.('.combo')) fecharLista(); });
     $('btn-salvar').addEventListener('click', () => ocupado(async () => { if (await salvar()) toast('Rascunho salvo.', 'ok'); }));
     $('btn-pdf').addEventListener('click', () => ocupado(async () => {
       if (podeCriar()) { if (!(await salvar())) return; }
