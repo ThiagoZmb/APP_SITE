@@ -108,6 +108,20 @@ test('fornecedores com a contagem de sugeridos; a combo recebe todos os itens at
   banco.estoque.push({ CODIGO: 9, NOME_PRODUTO: 'De outro', NOME_PRODUTO_FORNECEDOR: 'X', COD_FORNECEDOR: 'X', UNIDADE: 'Un', QTD_ESTOQUE: 0, SITUACAO: 'Ativo', FORNECEDOR: 'OUTRO FORNECEDOR SA' });
   const p = await json(await chamar('/pedidos_compra/produtos?fornecedor=' + encodeURIComponent(FORN)));
   assert.deepEqual(p.map(i => i.codigo), [3, 1]);   // ativos deste fornecedor, em ordem de nome (o 2 é inativo)
-  assert.deepEqual(p[0], { codigo: 3, produto: 'Parafuso', codFornecedor: 'PAR-100', nomeFornecedor: 'PARAFUSO', unidade: 'Un', qtd: 500, porCaixa: 1 });
+  assert.deepEqual(p[0], { codigo: 3, produto: 'Parafuso', codFornecedor: 'PAR-100', nomeFornecedor: 'PARAFUSO', unidade: 'Un', qtd: 500, porCaixa: 1, aCaminho: 0, pedidos: [], aguardando: false });
   assert.deepEqual(await json(await chamar('/pedidos_compra/produtos')), []);
+});
+
+test('a combo recebe o que está para chegar, com o número do pedido, e a marca sem pedido na web', async t => {
+  const { banco, chamar } = await prepararCompras(t);
+  banco.estoque[2].AGUARDANDO = 'Aguardando';
+  const { numero } = await json(await chamar('/pedidos_compra', 'POST', corpo()));
+  const ver = async () => json(await chamar('/pedidos_compra/produtos?fornecedor=' + encodeURIComponent(FORN)));
+  banco.estoque[0].AGUARDANDO = '';
+  assert.equal((await ver()).find(i => i.codigo === 1).aCaminho, 0, 'rascunho não está para chegar');
+  await json(await situacao(chamar, numero, 'enviar'));
+  const lista = await ver();
+  const um = lista.find(i => i.codigo === 1), tres = lista.find(i => i.codigo === 3);
+  assert.deepEqual([um.aCaminho, um.pedidos, um.aguardando], [20, [numero], false]);
+  assert.deepEqual([tres.aCaminho, tres.pedidos, tres.aguardando], [0, [], true]);
 });

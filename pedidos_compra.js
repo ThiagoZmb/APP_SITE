@@ -38,6 +38,12 @@
   const descricao = i => i.nomeFornecedor || i.produto;
   const codigo = i => i.codFornecedor || '—';
 
+  // coluna "A chegar" da combo: pedidos daqui; senão a marca antiga do cadastro
+  function textoChegar({ aCaminho, pedidos = [], aguardando }) {
+    if (aCaminho) return `${aCaminho}${pedidos.length ? ` (${pedidos.length > 1 ? 'pedidos' : 'pedido'} ${pedidos.join(', ')})` : ''}`;
+    return aguardando ? 'Aguardando (sem pedido aqui)' : '—';
+  }
+
   // Opções da combo "Adicionar item": os itens do fornecedor que ainda não estão na lista, os que faltam primeiro.
   // O texto leva o nome da casa e o do fornecedor (digitar um trecho de qualquer um filtra a lista).
   function opcoesCombo(produtos, sugestao, usados, numeroAberto) {
@@ -51,10 +57,10 @@
       const s = info.get(p.codigo);
       const aviso = s && s.aviso !== proprio ? s.aviso : '';
       const sugerido = !!s && s.sugerido !== null && !aviso;
-      const nota = !s ? '' : sugerido ? `sugerido: ${s.sugerido}${p.unidade ? ' ' + p.unidade : ''}` : aviso || (s.aCaminho ? `a caminho: ${s.aCaminho}` : 'no mínimo');
+      const nota = !s ? '' : sugerido ? `sugerido: ${s.sugerido}${p.unidade ? ' ' + p.unidade : ''}` : aviso.startsWith('em rascunho') ? aviso : aviso || s.aCaminho ? '' : 'no mínimo';
       const repetido = vezes.get(nomes(p)) > 1 ? ` (cód. ${p.codigo})` : '';
       const base = nomes(p) + repetido;
-      return { codigo: p.codigo, nome: p.produto + repetido, fornecedor: p.nomeFornecedor || '—', nota, texto: nota ? `${base}  [${nota}]` : base, sugerido };
+      return { codigo: p.codigo, estoque: `${p.qtd}${p.unidade ? ' ' + p.unidade : ''}`, chegar: textoChegar(p), nome: p.produto + repetido, fornecedor: p.nomeFornecedor || '—', nota, texto: nota ? `${base}  [${nota}]` : base, sugerido };
     }).sort((a, b) => b.sugerido - a.sugerido);
   }
 
@@ -195,9 +201,9 @@
       const filtro = txt($('busca-item').value).toLowerCase();
       estado.visiveis = estado.combo.filter(o => o.texto.toLowerCase().includes(filtro));
       if (estado.marcado >= estado.visiveis.length) estado.marcado = estado.visiveis.length - 1;
-      $('combo-lista').innerHTML = estado.visiveis.length ? estado.visiveis.map((o, k) =>
+      $('combo-lista').innerHTML = estado.visiveis.length ? '<li class="c-titulo" aria-hidden="true"><span>Seu nome</span><span>Nome do fornecedor</span><span>Estoque</span><span>A chegar</span><span></span></li>' + estado.visiveis.map((o, k) =>
         `<li role="option" data-i="${k}" aria-selected="${k === estado.marcado}"${k === estado.marcado ? ' class="ativo"' : ''}>` +
-        `<span class="c-nome">${esc(o.nome)}</span><span class="c-forn">${esc(o.fornecedor)}</span><span class="c-nota">${esc(o.nota)}</span></li>`).join('')
+        `<span class="c-nome">${esc(o.nome)}</span><span class="c-forn">${esc(o.fornecedor)}</span><span class="c-qtd" data-rot="Estoque">${esc(o.estoque)}</span><span class="c-chegar" data-rot="A chegar">${esc(o.chegar)}</span><span class="c-nota">${esc(o.nota)}</span></li>`).join('')
         : '<li class="c-vazio">Nenhum item deste fornecedor com esse texto (ou ele já está na lista).</li>';
       $('combo-lista').hidden = false;
       $('busca-item').setAttribute('aria-expanded', 'true');
@@ -385,5 +391,5 @@
     abrirLista();
   }
 
-  return { ROTULOS, totalUnidades, textoTotal, caixasDe, itensParaEnviar, opcoesCombo, iniciar };
+  return { ROTULOS, totalUnidades, textoTotal, caixasDe, itensParaEnviar, textoChegar, opcoesCombo, iniciar };
 });

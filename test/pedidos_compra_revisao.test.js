@@ -113,7 +113,7 @@ test('a tela mostra o código e a descrição do fornecedor; sem descrição, o 
 });
 
 const doFornecedor = [
-  { codigo: 5, produto: 'PERFIL 1036 BRONZE', codFornecedor: 'B-1', nomeFornecedor: 'ESTRUTURAL 1036 BZ', unidade: 'un', qtd: 40, porCaixa: 1 },
+  { codigo: 5, produto: 'PERFIL 1036 BRONZE', codFornecedor: 'B-1', nomeFornecedor: 'ESTRUTURAL 1036 BZ', unidade: 'un', qtd: 40, porCaixa: 1, aCaminho: 12, pedidos: [3, 7], aguardando: false },
   { codigo: 6, produto: 'ROLDANA', codFornecedor: '', nomeFornecedor: 'ROLDANA DUPLA', unidade: 'un', qtd: 2, porCaixa: 50 }];
 const sugestaoA = { itens: [{ codigo: 6, produto: 'ROLDANA', codFornecedor: '', nomeFornecedor: 'ROLDANA DUPLA', unidade: 'un', qtd: 2, minimo: 10,
   diasCobertura: 4, aCaminho: 0, porCaixa: 50, sugerido: 100, marcado: true, aviso: '' }] };
@@ -145,7 +145,7 @@ test('combo própria: dois nomes em colunas separadas; clicar adiciona, o ✕ de
   assert.equal($('combo-lista').hidden, true);
   $('busca-item').ouvintes.click();
   assert.equal($('combo-lista').hidden, false);
-  assert.match(lista(), /<span class="c-nome">ROLDANA<\/span><span class="c-forn">ROLDANA DUPLA<\/span><span class="c-nota">sugerido: 100 un<\/span>[\s\S]*<span class="c-nome">PERFIL 1036 BRONZE<\/span><span class="c-forn">ESTRUTURAL 1036 BZ<\/span>/);
+  assert.match(lista(), /<span class="c-nome">ROLDANA<\/span><span class="c-forn">ROLDANA DUPLA<\/span><span class="c-qtd" data-rot="Estoque">2 un<\/span><span class="c-chegar" data-rot="A chegar">—<\/span><span class="c-nota">sugerido: 100 un<\/span>[\s\S]*<span class="c-nome">PERFIL 1036 BRONZE<\/span><span class="c-forn">ESTRUTURAL 1036 BZ<\/span><span class="c-qtd" data-rot="Estoque">40 un<\/span><span class="c-chegar" data-rot="A chegar">12 \(pedidos 3, 7\)<\/span>/);
 
   $('combo-lista').ouvintes.click({ target: { closest: () => ({ dataset: { i: '0' } }) } });
   assert.match($('tb-itens').innerHTML, /ROLDANA DUPLA/);
@@ -173,4 +173,10 @@ test('combo própria: dois nomes em colunas separadas; clicar adiciona, o ✕ de
   assert.match(lista(), /class="ativo"[^>]*>|aria-selected="true"/);
   tecla('Enter');
   assert.match($('tb-itens').innerHTML, /ROLDANA DUPLA/);
+});
+
+test('coluna "A chegar": um pedido, marca sem pedido na web e nada', () => {
+  assert.equal(P.textoChegar({ aCaminho: 5, pedidos: [4], aguardando: false }), '5 (pedido 4)');
+  assert.equal(P.textoChegar({ aCaminho: 0, pedidos: [], aguardando: true }), 'Aguardando (sem pedido aqui)');
+  assert.equal(P.textoChegar({ aCaminho: 0, pedidos: [], aguardando: false }), '—');
 });

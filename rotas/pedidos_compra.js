@@ -7,7 +7,7 @@ const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao
 const { travarProdutos } = require('./estoque_saida');
 const { carregarAnalises } = require('./estoque_analises');
 const { montarSugestao, acaoPermitida, validarPedido } = require('../calculo/pedidos_compra');
-const { marcas, aCaminhoPorProduto, marcarAguardando, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido } = require('./pedidos_compra_banco');
+const { marcas, abertosPorProduto, aCaminhoPorProduto, marcarAguardando, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido } = require('./pedidos_compra_banco');
 
 const { desenharPedidoCompra, novoDocumento } = require('../pdf/pedido_compra');
 
@@ -75,13 +75,15 @@ function registrarPedidosCompra({ rota, pool }) {
     const fornecedor = String(req.query.fornecedor || '').trim().slice(0, 190);
     if (!fornecedor) return res.json([]);
     try {
-      const [[linhas], porCaixa] = await Promise.all([
-        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR FROM estoque WHERE SITUACAO = 'Ativo' AND FORNECEDOR = ?
+      const [[linhas], porCaixa, abertos] = await Promise.all([
+        pool.execute(`SELECT CODIGO, NOME_PRODUTO, UNIDADE, QTD_ESTOQUE, COD_FORNECEDOR, NOME_PRODUTO_FORNECEDOR, AGUARDANDO FROM estoque WHERE SITUACAO = 'Ativo' AND FORNECEDOR = ?
                       ORDER BY NOME_PRODUTO`, [fornecedor]),
-        porCaixaDoFornecedor(pool, fornecedor)
+        porCaixaDoFornecedor(pool, fornecedor),
+        abertosPorProduto(pool)
       ]);
       res.json(linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO, codFornecedor: l.COD_FORNECEDOR || '', nomeFornecedor: l.NOME_PRODUTO_FORNECEDOR || '', unidade: l.UNIDADE || '',
-        qtd: Number(l.QTD_ESTOQUE) || 0, porCaixa: porCaixa.get(Number(l.CODIGO)) || 1 })));
+        qtd: Number(l.QTD_ESTOQUE) || 0, porCaixa: porCaixa.get(Number(l.CODIGO)) || 1,
+        aCaminho: abertos.get(Number(l.CODIGO))?.falta || 0, pedidos: abertos.get(Number(l.CODIGO))?.pedidos || [], aguardando: !!l.AGUARDANDO && !abertos.has(Number(l.CODIGO)) })));
     } catch (err) { falha(res, 'GET /pedidos_compra/produtos', err); }
   });
 

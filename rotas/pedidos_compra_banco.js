@@ -22,15 +22,24 @@ function somarBaixas(linhas) {
 const SQL_ITENS = `SELECT i.id AS item_id, i.pedido_numero AS numero, i.produto_codigo AS codigo, i.qtd, b.qtd AS chegou FROM web_pedidos_compra_itens i
   JOIN web_pedidos_compra p ON p.numero = i.pedido_numero LEFT JOIN web_pedidos_compra_baixas b ON b.item_id = i.id`;
 
-// Map código → unidades que ainda faltam chegar (pedidos enviados ou que chegaram em parte)
-async function aCaminhoPorProduto(db, codigos, { travar = false } = {}) {
+// Map código → { falta, pedidos }: o que ainda falta chegar (pedidos enviados ou que chegaram em parte) e em quais pedidos
+async function abertosPorProduto(db, codigos, { travar = false } = {}) {
   if (codigos && !codigos.length) return new Map();
   const [linhas] = await db.execute(
     `${SQL_ITENS} WHERE p.situacao IN ('enviado', 'parcial')${codigos ? ` AND i.produto_codigo IN (${marcas(codigos)})` : ''}${travar ? ' FOR UPDATE' : ''}`, codigos || []);
   const mapa = new Map();
-  for (const i of somarBaixas(linhas)) if (i.qtd > i.chegou) mapa.set(i.codigo, (mapa.get(i.codigo) || 0) + i.qtd - i.chegou);
+  for (const i of somarBaixas(linhas)) {
+    if (i.qtd <= i.chegou) continue;
+    const a = mapa.get(i.codigo) || { falta: 0, pedidos: [] };
+    a.falta += i.qtd - i.chegou;
+    if (!a.pedidos.includes(i.numero)) a.pedidos.push(i.numero);
+    mapa.set(i.codigo, a);
+  }
+  for (const a of mapa.values()) a.pedidos.sort((x, y) => x - y);
   return mapa;
 }
+// Map código → unidades que ainda faltam chegar
+const aCaminhoPorProduto = async (db, codigos, opcoes) => new Map([...await abertosPorProduto(db, codigos, opcoes)].map(([codigo, a]) => [codigo, a.falta]));
 
 // única escrita em tabela antiga deste módulo: 'Aguardando' enquanto há material a caminho (varchar(10) no banco)
 async function marcarAguardando(conn, codigos) {
@@ -124,4 +133,4 @@ async function carregarPedido(db, numero) {
   };
 }
 
-module.exports = { marcas, aCaminhoPorProduto, marcarAguardando, baixarPorEntrada, desfazerBaixas, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido };
+module.exports = { marcas, abertosPorProduto, aCaminhoPorProduto, marcarAguardando, baixarPorEntrada, desfazerBaixas, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido };

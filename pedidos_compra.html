@@ -61,12 +61,14 @@
         .combo-seta { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-light); }
         #combo-lista { position: absolute; z-index: 30; left: 0; top: calc(100% + 4px); width: 100%; max-height: 420px; overflow: auto; list-style: none;
             background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-heavy); }
-        #combo-lista li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 170px; column-gap: 40px; align-items: baseline; padding: 10px 14px;
+        #combo-lista li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 100px 170px 140px; column-gap: 28px; align-items: baseline; padding: 10px 14px;
             border-bottom: 1px solid var(--border-color); cursor: pointer; font-size: 14px; color: var(--text-dark); }
         #combo-lista li:hover, #combo-lista li.ativo { background: var(--primary-light); }
         #combo-lista .c-nota { color: var(--primary-color); font-size: 12px; font-weight: 600; }
+        #combo-lista li.c-titulo { position: sticky; top: 0; z-index: 1; background: var(--secondary-color); cursor: default; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-light); }
+        #combo-lista .c-chegar { font-size: 13px; }
         #combo-lista li.c-vazio { display: block; cursor: default; color: var(--text-light); }
-        @media (max-width: 900px) { #combo-lista li { grid-template-columns: 1fr; row-gap: 2px; } #combo-lista .c-forn { color: var(--text-light); } }
+        @media (max-width: 1100px) { #combo-lista li { grid-template-columns: 1fr; row-gap: 2px; } #combo-lista li.c-titulo { display: none; } #combo-lista .c-forn { color: var(--text-light); } #combo-lista [data-rot]::before { content: attr(data-rot) ": "; color: var(--text-light); } }
         .aviso-item { display: block; color: var(--text-light); font-size: 12px; margin-top: 2px; }
         .l-total { color: var(--text-light); font-size: 13px; }
         .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
@@ -102,7 +104,7 @@
     <script src="situacoes.js?v=202612051000"></script>
     <script src="layout.js?v=202612051000" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
-    <script src="pedidos_compra.js?v=202612051400" defer></script>
+    <script src="pedidos_compra.js?v=202612051500" defer></script>
 </head>
 <body>
     <div class="container">
