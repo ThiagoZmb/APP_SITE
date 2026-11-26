@@ -14,6 +14,8 @@
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
   // categorias, legenda, menu, "Mover para" e arraste: a parte nova, igual nas duas agendas (agenda_comum.js)
   const AG = typeof module === 'object' && module.exports ? require('./agenda_comum.js') : raiz.AgendaComum;
+  // datas da repetição (a mesma conta do servidor) para a prévia da janela "Repetir..."
+  const R = typeof module === 'object' && module.exports ? require('./calculo/agenda_repeticao.js') : raiz.AgendaRepeticao;
 
   // ordem de leitura, do teclado e da tela: da esquerda para a direita (o CSS só decide quantas colunas cabem)
   const DIAS = [['seg', 'Segunda'], ['ter', 'Terça'], ['qua', 'Quarta'], ['qui', 'Quinta'], ['sex', 'Sexta'], ['sab', 'Sábado'], ['dom', 'Domingo']];
@@ -85,20 +87,29 @@
   // `dados` = o que o servidor já tem; `alvo` = o que a pessoa quer. As operações entram numa fila (uma por vez), o que
   // impede dois POSTs da mesma linha; se uma falha, o alvo fica guardado e a próxima tentativa grava a diferença.
   // `temAlarme`: há alarme gravado no servidor (mesmo com os alarmes em stand by): ir para Notas o tira, então a tela pergunta antes
-  function criarLinha(chamar, inicial, { rascunhos, chave } = {}) {
+  // Série (repetição): `serieId` liga os itens; `escolha` = a quais itens da série vale o texto digitado ({ texto, escopo }), feita
+  // pela pessoa na pergunta da tela; vale só para aquele texto e some quando o servidor confirma. `aoSerie(serie, id)` leva à tela o
+  // que mudou nos outros itens da série (resposta do servidor).
+  function criarLinha(chamar, inicial, { rascunhos, chave, aoSerie } = {}) {
     const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: doAlarme(inicial.alarme),
-      categoriaId: inicial.categoriaId ?? null, temAlarme: inicial.temAlarme !== undefined ? !!inicial.temAlarme : !!inicial.alarme };
+      categoriaId: inicial.categoriaId ?? null, temAlarme: inicial.temAlarme !== undefined ? !!inicial.temAlarme : !!inicial.alarme,
+      serieId: inicial.serieId ?? null, seriePos: inicial.seriePos ?? null };
     const alvo = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };
     let fila = Promise.resolve();
     let naFila = 0;
     const escrito = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };   // o último digitado/marcado, antes mesmo de entrar na fila
     let enviado = null;   // texto de um POST sem resposta: pode ter chegado ao servidor
+    let escolha = null;
+    // o escopo a mandar com este texto ("este" = o PUT/DELETE de sempre)
+    const escopoDe = texto => (escolha && escolha.texto === texto && escolha.escopo !== 'este' ? escolha.escopo : null);
+    const cumprida = () => { if (escolha && escolha.texto === dados.texto) escolha = null; };
 
     function guardar() {
       if (!rascunhos) return;
       if (!enviado && escrito.texto === dados.texto && (!dados.id || (escrito.feita === dados.feita && escrito.alarme === dados.alarme))) return rascunhos.remover(chave);
       rascunhos.gravar(chave, { id: dados.id, quadro: dados.quadro, data: dados.data, texto: escrito.texto, feita: escrito.feita,
-        ...(escrito.alarme !== dados.alarme ? { alarme: escrito.alarme } : {}), ...(enviado ? { enviado } : {}) });
+        ...(escrito.alarme !== dados.alarme ? { alarme: escrito.alarme } : {}), ...(enviado ? { enviado } : {}),
+        ...(escolha && escolha.texto === escrito.texto ? { escopo: escolha.escopo } : {}) });
     }
     function anotar(texto, feita) {
       if (texto !== undefined) escrito.texto = limpar(texto);
@@ -106,14 +117,18 @@
       guardar();
     }
 
-    const esquecer = () => { dados.id = null; dados.texto = ''; dados.feita = false; dados.alarme = null; };
+    const esquecer = () => { dados.id = null; dados.texto = ''; dados.feita = false; dados.alarme = null; dados.serieId = null; dados.seriePos = null; };
     async function excluir() {
-      try { await chamar('/minha_semana/' + dados.id, { metodo: 'DELETE' }); } catch (e) { if (e.status !== 404) throw e; }
+      const id = dados.id, escopo = escopoDe('');
+      let r = null;
+      try { r = await chamar('/minha_semana/' + id + (escopo ? '?escopo=' + escopo : ''), { metodo: 'DELETE' }); } catch (e) { if (e.status !== 404) throw e; }
       esquecer();
+      escolha = null;
       alvo.feita = false;
       alvo.alarme = null;   // o alarme era da tarefa apagada
       if (!escrito.texto) { escrito.feita = false; escrito.alarme = null; }
       guardar();
+      if (r && r.serie) aoSerie?.(r.serie, id);
     }
     async function criar() {
       const texto = alvo.texto;
@@ -136,15 +151,29 @@
       if (alvo.feita !== dados.feita) corpo.feita = alvo.feita;
       if (alvo.alarme !== dados.alarme) corpo.alarme = alvo.alarme;
       if (!Object.keys(corpo).length) return;
-      try {
-        await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo });
-      } catch (e) {
+      const sumiu = e => {
         if (e.status !== 404) throw e;
         esquecer();   // apagada em outro aparelho: o que está escrito aqui vira uma linha nova
         return sincronizar();
+      };
+      // texto para "este e os próximos" ou "todos": num PUT só dele (a série não leva caixinha nem alarme)
+      const escopo = 'texto' in corpo ? escopoDe(corpo.texto) : null;
+      if (escopo) {
+        let r;
+        try { r = await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo: { texto: corpo.texto, escopo } }); } catch (e) { return sumiu(e); }
+        dados.texto = corpo.texto;
+        cumprida();
+        guardar();
+        if (r && r.serie) aoSerie?.(r.serie, dados.id);
+        delete corpo.texto;
+        if (!Object.keys(corpo).length) return;
       }
+      try {
+        await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo });
+      } catch (e) { return sumiu(e); }
       Object.assign(dados, corpo);
       if ('alarme' in corpo) dados.temAlarme = !!corpo.alarme;
+      cumprida();
       guardar();
     }
     async function sincronizar() {
@@ -163,19 +192,29 @@
       get texto() { return alvo.texto; },
       get feita() { return alvo.feita; },
       get alarme() { return alvo.alarme; },
+      get escolha() { return escolha; },
       // há algo que o servidor ainda não tem?
       pendente: () => naFila > 0 || alvo.texto !== dados.texto || (!!dados.id && (alvo.feita !== dados.feita || alvo.alarme !== dados.alarme)),
       anotar,
-      salvarTexto: t => { anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
+      // `escopo` (item de série): 'este' | 'proximos' | 'todos', escolhido na pergunta da tela; sem ele vale a escolha já feita para este texto
+      salvarTexto: (t, escopo) => { if (escopo) escolha = { texto: limpar(t), escopo }; anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
+      // a série mudou este item (texto/categoria) por outro item: só para linha sem nada pendente (a tela confere)
+      adotar: l => {
+        if (l.texto !== undefined) { dados.texto = l.texto; alvo.texto = l.texto; escrito.texto = l.texto; }
+        if (l.categoriaId !== undefined) dados.categoriaId = l.categoriaId;
+        guardar();
+      },
       marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
       alarmar: q => { escrito.alarme = doAlarme(q); guardar(); return enfileirar(() => { alvo.alarme = doAlarme(q); }); },
       // trocar a categoria e mover: pela mesma fila (nunca antes de o texto chegar ao servidor). Se falhar, nada muda aqui e a
       // tela avisa; não vira erro da linha (o texto está salvo). { ok } | { ok: false, mensagem } | { ok: false, sumiu } (apagada)
-      colorir: id => acao(async () => {
+      // `escopo` 'proximos'/'todos': a categoria vale para a série (a tela perguntou antes)
+      colorir: (id, escopo) => acao(async () => {
         if (!dados.id) return { ok: false, mensagem: 'Salve o item antes.' };
-        if (id === dados.categoriaId) return { ok: true };
-        await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo: { categoriaId: id } });
+        if (id === dados.categoriaId && !(escopo && escopo !== 'este')) return { ok: true };
+        const r = await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo: { categoriaId: id, ...(escopo && escopo !== 'este' ? { escopo } : {}) } });
         dados.categoriaId = id;
+        if (r && r.serie) aoSerie?.(r.serie, dados.id);
         return { ok: true };
       }),
       mover: destino => acao(async () => {
@@ -185,8 +224,22 @@
         const l = r && r.quadro ? r : { ...corpo, feita: corpo.quadro === 'notas' ? false : dados.feita, alarme: corpo.quadro === 'notas' ? null : undefined };
         dados.quadro = l.quadro; dados.data = l.data ?? null; dados.feita = !!l.feita;
         if (l.alarme !== undefined) { dados.alarme = doAlarme(l.alarme); dados.temAlarme = !!l.alarme; }
+        // nota não se repete: o servidor tira da série
+        if (l.serieId !== undefined) { dados.serieId = l.serieId; dados.seriePos = l.seriePos ?? null; } else if (corpo.quadro === 'notas') dados.serieId = dados.seriePos = null;
         for (const f of ['feita', 'alarme']) { alvo[f] = dados[f]; escrito[f] = dados[f]; }
         return { ok: true, linha: r && r.quadro ? r : null };   // a linha como o servidor gravou, para a tela refazer a faixa
+      }),
+      // "Repetir...": pela mesma fila, só com tudo salvo. O servidor devolve a série inteira ({ linha, linhas, qtd }).
+      repetir: regra => acao(async () => {
+        if (!dados.id || !semPendencia()) return { ok: false, mensagem: 'Espere o texto ser salvo antes de repetir.' };
+        if (dados.serieId) return { ok: false, jaEmSerie: true, mensagem: 'Este item já se repete.' };
+        let r;
+        try { r = await chamar(`/minha_semana/${dados.id}/repetir`, { metodo: 'POST', corpo: regra }); } catch (e) {
+          if (e.status === 409) return { ok: false, jaEmSerie: !!e.dados?.jaEmSerie, mensagem: e.message || 'Este item já se repete.' };
+          throw e;
+        }
+        Object.assign(dados, { quadro: r.linha.quadro, data: r.linha.data ?? null, serieId: r.linha.serieId ?? null, seriePos: r.linha.seriePos ?? null });
+        return { ok: true, resposta: r };
       })
     };
     // nada além do que o servidor já tem (o texto da tela é conferido pela tela, em AG.podeArrastar)
@@ -245,14 +298,17 @@
     });
   }
 
-  // recria a linha de um rascunho, pela mesma fila de sempre, e manda salvar
-  function retomar(chamar, { chave, entrada, base }, rascunhos) {
-    const linha = criarLinha(chamar, base || { quadro: entrada.quadro, data: entrada.data, texto: '', feita: false }, { rascunhos, chave });
+  // recria a linha de um rascunho, pela mesma fila de sempre, e manda salvar.
+  // Item de série com texto mudado e sem a escolha (só este / próximos / todos) guardada: o texto NÃO é enviado sozinho
+  // (`decidir`: a tela mostra o texto e pede a escolha); caixinha e alarme seguem como sempre.
+  function retomar(chamar, { chave, entrada, base }, rascunhos, opcoes = {}) {
+    const linha = criarLinha(chamar, base || { quadro: entrada.quadro, data: entrada.data, texto: '', feita: false }, { ...opcoes, rascunhos, chave });
+    const decidir = !!base?.serieId && !base.sumiu && limpar(entrada.texto) !== base.texto && !entrada.escopo;
     linha.anotar(entrada.texto, entrada.feita);
-    let pronto = linha.salvarTexto(entrada.texto);
+    let pronto = decidir ? Promise.resolve() : linha.salvarTexto(entrada.texto, entrada.escopo);
     if (entrada.texto && entrada.quadro !== 'notas' && !!entrada.feita !== !!base?.feita) pronto = linha.marcar(entrada.feita);
     if (entrada.texto && entrada.quadro !== 'notas' && entrada.alarme !== undefined) pronto = linha.alarmar(entrada.alarme);
-    return { linha, pronto };
+    return { linha, pronto, decidir };
   }
 
   // dias de semanas que não são a aberta: salva sem desenhar. O que falhar continua guardado e aparece naquela semana.
@@ -266,9 +322,9 @@
         const r = await chamar('/minha_semana?inicio=' + inicio);
         for (const c of casarRascunhos(dela, r.linhas || [], inicio)) {
           if (c.descartar) { rascunhos.remover(c.chave); delete herdados[c.chave]; continue; }
-          const { linha, pronto } = retomar(chamar, c, rascunhos);
+          const { linha, pronto, decidir } = retomar(chamar, c, rascunhos);
           await pronto;
-          if (!linha.erro) { delete herdados[c.chave]; continue; }
+          if (!linha.erro && !decidir) { delete herdados[c.chave]; continue; }   // série sem escolha: fica para quando a semana abrir
           falhou = true;
           herdados[c.chave] = rascunhos.ler()[c.chave] || c.entrada;
         }
@@ -296,9 +352,9 @@
     svg.append(p);
     return svg;
   }
-  // seis pontinhos da alça e os três do marcador (menu)
-  const PONTOS_ALCA = 'M2 2h1.6v1.6H2zM5.4 2H7v1.6H5.4zM2 6.2h1.6v1.6H2zM5.4 6.2H7v1.6H5.4zM2 10.4h1.6V12H2zM5.4 10.4H7V12H5.4z';
-  const PONTOS_MENU = 'M5 12h.01M12 12h.01M19 12h.01';
+  // seis pontinhos da alça e os três do marcador (menu), cheios e grandes o bastante para aparecer sobre qualquer cor de faixa
+  const PONTOS_ALCA = 'M1.2 1.2h2.4v2.4H1.2zM5.4 1.2h2.4v2.4H5.4zM1.2 5.8h2.4v2.4H1.2zM5.4 5.8h2.4v2.4H5.4zM1.2 10.4h2.4v2.4H1.2zM5.4 10.4h2.4v2.4H5.4z';
+  const PONTOS_MENU = 'M3 12a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0M9.8 12a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0M16.6 12a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0-4.4 0';
 
   function iniciar(win) {
     const doc = win.document;
@@ -357,16 +413,18 @@
       li.classList.toggle('salva', salva);
       li.dataset.cor = salva ? AG.corDe(linha.dados.categoriaId, estado.categorias) : '';
       item.alca.hidden = item.marcador.hidden = !salva;
-      item.marcador.setAttribute('aria-label', `Opções do item (categoria: ${AG.nomeDe(linha.dados.categoriaId, estado.categorias)})`);
-      // a legenda esconde a categoria, mas nunca o que está sendo escrito ou deu erro
-      li.hidden = salva && !legenda.visivel(linha.dados.categoriaId, estado.categorias) && !linha.erro && !linha.pendente() && !li.contains(doc.activeElement);
+      item.serie.hidden = !salva || !linha.dados.serieId;
+      item.marcador.setAttribute('aria-label', `Opções do item (categoria: ${AG.nomeDe(linha.dados.categoriaId, estado.categorias)}${linha.dados.serieId ? '; repete' : ''})`);
+      // a legenda esconde a categoria, mas nunca o que está sendo escrito, esperando a escolha da série ou deu erro
+      li.hidden = salva && !legenda.visivel(linha.dados.categoriaId, estado.categorias) && !linha.erro && !item.decidir && !linha.pendente() && !li.contains(doc.activeElement);
     }
 
     function pintar(item) {
       const { linha, li, aviso: msg, input, caixa } = item;
       pintarFaixa(item);
       pintarSino(item);
-      li.classList.toggle('erro', linha.erro);
+      li.classList.toggle('erro', linha.erro || !!item.decidir);
+      item.decisao.hidden = !item.decidir || linha.erro;
       msg.hidden = !linha.erro;
       msg.textContent = linha.erro ? `Não salvou: ${linha.mensagem.replace(/\.$/, '')}. Aperte Enter na linha para tentar de novo.` : '';
       if (!caixa) return;
@@ -381,7 +439,83 @@
       li.remove();
       estado.linhas = estado.linhas.filter(i => i !== item);
     }
-    const salvar = item => item.linha.salvarTexto(item.input.value).then(() => { pintar(item); tirarVazia(item); });
+    // Grava o texto da linha. Item de série com o texto mudado pergunta antes a quais itens vale, mas SÓ quando a pessoa termina
+    // (Enter, ou sair da linha: `modo` 'enter'/'blur'); nunca a cada tecla nem quando nada mudou. Sem a escolha (troca de semana,
+    // aba escondida, Cancelar) nada é enviado: o texto fica no campo e no rascunho, e a linha mostra o aviso com "Escolher"/"Desfazer".
+    // Depois de um Cancelar, sair da linha de novo não pergunta outra vez pelo mesmo texto (só Enter ou "Escolher").
+    function salvar(item, modo) {
+      const { linha, input } = item;
+      const novo = limpar(input.value);
+      if (AG.precisaEscopo(linha.dados, novo) && linha.escolha?.texto !== novo) {
+        if (item.perguntando) return Promise.resolve();
+        if (modo === 'enter' || (modo === 'blur' && item.cancelado !== novo)) return perguntarSerie(item);
+        item.decidir = true;
+        pintar(item);
+        return Promise.resolve();
+      }
+      item.decidir = false;
+      item.cancelado = null;
+      return linha.salvarTexto(input.value).then(() => { pintar(item); tirarVazia(item); });
+    }
+    async function perguntarSerie(item) {
+      const { linha, input } = item;
+      const novo = limpar(input.value);
+      item.perguntando = true;
+      const escopo = await ui.perguntarEscopo(novo
+        ? { titulo: 'Mudar item que se repete', texto: `Mudar o texto para “${novo}”. Vale para quais repetições?` }
+        : { titulo: 'Apagar item que se repete', texto: `Apagar “${linha.dados.texto}”. Vale para quais repetições?`, nota: 'Nos próximos e em todos, os itens já concluídos não são apagados.' });
+      item.perguntando = false;
+      if (!escopo) {   // Cancelar: nada é gravado; o texto digitado fica no campo
+        item.decidir = true;
+        item.cancelado = novo;
+        pintar(item);
+        return;
+      }
+      item.decidir = false;
+      item.cancelado = null;
+      pintar(item);
+      await linha.salvarTexto(input.value, escopo);
+      pintar(item);
+      tirarVazia(item);
+    }
+    // aviso da linha de série esperando a escolha: "Escolher" pergunta de novo; "Desfazer" volta ao texto salvo
+    function criarDecisao(item) {
+      const caixa = criar('div', 'linha-duvida');
+      caixa.setAttribute('role', 'status');
+      caixa.hidden = true;
+      const b = (rotulo, acao) => { const x = criar('button', 'btn btn-secondary btn-mini', rotulo); x.type = 'button'; x.addEventListener('click', acao); return x; };
+      caixa.append(criar('p', '', 'Não salvo: falta escolher a quais repetições a mudança vale.'),
+        b('Escolher', () => perguntarSerie(item)),
+        b('Desfazer', () => {
+          item.input.value = item.linha.dados.texto;
+          item.linha.anotar(item.input.value);
+          item.decidir = false;
+          item.cancelado = null;
+          ajustar(item.input);
+          pintar(item);
+          item.input.focus();
+        }));
+      return caixa;
+    }
+    // a série mudou outros itens (resposta do servidor): os que estão na tela e livres são atualizados; o resto aparece ao recarregar
+    const livre = item => !item.linha.pendente() && !item.linha.erro && !item.decidir && !item.editor && !item.li.contains(doc.activeElement)
+      && limpar(item.input.value) === item.linha.dados.texto;
+    function aplicarSerie(serie, origem) {
+      for (const l of serie.alteradas || []) {
+        const it = l.id !== origem && estado.linhas.find(i => i.linha.dados.id === l.id);
+        if (!it || !livre(it)) continue;
+        it.linha.adotar(l);
+        it.input.value = it.linha.dados.texto;
+        ajustar(it.input);
+        pintar(it);
+      }
+      for (const id of serie.apagadas || []) {
+        const it = id !== origem && estado.linhas.find(i => i.linha.dados.id === id);
+        if (it && livre(it)) remover(it);
+      }
+      const texto = AG.resumoSerie(serie);
+      if (texto) toast(texto, 'ok');
+    }
     // ---------- alarme da linha ----------
     function criarSino(item) {
       const botao = criar('button', 'sino');
@@ -466,10 +600,15 @@
       remover(item);
       toast('Este item foi apagado em outro aparelho.', 'erro');
     }
-    function colorir(item, id) {
+    async function colorir(item, id) {
       if (id === (estado.categorias.has(item.linha.dados.categoriaId) ? item.linha.dados.categoriaId : null)) return;
+      let escopo;
+      if (item.linha.dados.serieId) {   // item de série: a quais repetições vale a categoria nova?
+        escopo = await ui.perguntarEscopo({ titulo: 'Trocar a categoria do item que se repete', texto: `Trocar para “${AG.nomeDe(id, estado.categorias)}”. Vale para quais repetições?` });
+        if (!escopo) return;
+      }
       item.li.classList.add('movendo');
-      item.linha.colorir(id).then(r => {
+      item.linha.colorir(id, escopo).then(r => {
         item.li.classList.remove('movendo');
         if (r.sumiu) return sumiu(item);
         if (!r.ok) toast(`Não foi possível trocar a categoria. ${r.mensagem}`, 'erro');
@@ -504,7 +643,33 @@
         aoEscolher: id => colorir(item, id),
         aoMover: () => ui.abrirMover({ texto: item.input.value, atual: item.linha.dados, aoMover: d => moverItem(item, d),
           destinos: estado.quadros.map(q => ({ quadro: q.quadro, data: q.data, rotulo: q.rotulo })) }),
+        aoRepetir: AG.podeRepetir(item.linha.dados) ? () => abrirRepetirDo(item) : null,
         aoCategorias: abrirCategorias });
+    }
+    // ---------- "Repetir...": cada data vira um item próprio; o item vai para a primeira data ----------
+    function colocar(l) {
+      const q = quadroDe(l);
+      if (!q) return;
+      const nova = novaLinha(q, l, null, q.lista.lastElementChild);
+      inserirNaOrdem(q, nova.li, l.id);
+    }
+    function abrirRepetirDo(item) {
+      if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de repetir.', 'erro'); return; }
+      const d = item.linha.dados;
+      // referência da repetição mensal: a data do item; em Tarefas, hoje (o servidor faz a mesma conta)
+      const inicio = d.quadro === 'dia' ? d.data : isoLocal(new Date());
+      ui.abrirRepetir({ texto: item.input.value, inicio, fim: somarDias(inicio, 6), diaDoMes: Number(inicio.slice(8, 10)), maxMeses: R.MAX_MESES, resumo: R.resumo,
+        calcular: regra => { const v = R.validarRegra(regra); return v.ok ? R.datasDaRegra(v.regra, inicio) : v; },
+        aoConfirmar: async regra => {
+          const r = await item.linha.repetir(regra);
+          if (r.sumiu) { sumiu(item); return; }
+          if (r.jaEmSerie) { toast('Este item já se repete. A semana foi recarregada.', 'erro'); irPara(estado.mostrada); return; }
+          if (!r.ok) throw new Error(r.mensagem || 'Não foi possível repetir.');
+          remover(item);
+          for (const l of r.resposta.linhas) colocar(l);
+          const ds = r.resposta.linhas.map(l => l.data);
+          toast(`Repete em ${ds.length} dias, de ${R.dataBR(ds[0])} a ${R.dataBR(ds[ds.length - 1])}.`, 'ok');
+        } });
     }
     // ---------- janela "Categorias" (só as desta pessoa) ----------
     const BASE_CAT = '/minha_semana/categorias';
@@ -525,21 +690,31 @@
     const ajustarTodos = () => { for (const item of estado.linhas) ajustar(item.input); };
 
     function novaLinha(q, dados, rascunho, antesDe = null) {
-      const volta = rascunho ? retomar(chamar, rascunho, rascunhos) : null;
+      const opcoes = { aoSerie: aplicarSerie };
+      const volta = rascunho ? retomar(chamar, rascunho, rascunhos, opcoes) : null;
       const linha = volta ? volta.linha
-        : criarLinha(chamar, { quadro: q.quadro, data: q.data, texto: '', feita: false, ...dados }, { rascunhos, chave: novaChave() });
+        : criarLinha(chamar, { quadro: q.quadro, data: q.data, texto: '', feita: false, ...dados }, { ...opcoes, rascunhos, chave: novaChave() });
       const li = criar('li', 'linha');
-      const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso'), alca: criar('span', 'alca'), marcador: criar('button', 'marcador') };
+      const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso'), alca: criar('span', 'alca'), marcador: criar('button', 'marcador'),
+        serie: criar('span', 'ag-serie', '↻'), lado: criar('span', 'ag-lado'), decidir: !!volta?.decidir, perguntando: false, cancelado: null };
       porLi.set(li, item);
+      // ↻ = item que se repete (o leitor de tela ouve "Item que se repete"); fica embaixo do "⋯" para não roubar largura do texto
+      item.serie.setAttribute('role', 'img');
+      item.serie.setAttribute('aria-label', 'Item que se repete');
+      item.serie.title = 'Item que se repete';
+      item.decisao = criarDecisao(item);
       // alça: segurar e arrastar para outro dia, Tarefas ou Notas (só a faixa já salva); pelo teclado, "Mover para..." no menu
       item.alca.title = 'Arrastar para outro dia';
       item.alca.setAttribute('aria-hidden', 'true');
       item.alca.append(icone(doc, PONTOS_ALCA, '0 0 9 14', true));
-      li.append(item.alca);
+      // alça e caixinha numa coluna só (no computador ficam uma em cima da outra, para o texto ganhar largura; no toque, lado a lado)
+      item.esq = criar('span', 'ag-esq');
+      item.esq.append(item.alca);
+      li.append(item.esq);
       item.marcador.type = 'button';
       item.marcador.setAttribute('aria-haspopup', 'menu');
       item.marcador.setAttribute('aria-expanded', 'false');
-      item.marcador.append(icone(doc, PONTOS_MENU));
+      item.marcador.append(icone(doc, PONTOS_MENU, '0 0 24 24', true));
       item.marcador.addEventListener('click', () => abrirMenuDo(item));
       if (q.quadro !== 'notas') {   // nota é anotação: sem caixinha
         item.caixa = criar('input');
@@ -553,7 +728,7 @@
           salvar(item);   // o texto vai primeiro (no iPhone o toque na caixinha não tira o foco da linha)
           linha.marcar(marcada).then(() => pintar(item));
         });
-        li.append(item.caixa);
+        item.esq.append(item.caixa);
       }
       if (alarmesAtivos() && q.quadro !== 'notas') item.sino = criarSino(item);
       const input = item.input;
@@ -576,11 +751,12 @@
         pintarSino(item);
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);   // sempre uma vazia no fim
       });
-      input.addEventListener('blur', () => { salvar(item); });
-      // Enter salva e vai para a próxima linha; nunca entra uma quebra no texto
+      input.addEventListener('blur', () => { salvar(item, 'blur'); });
+      // Enter salva e vai para a próxima linha; nunca entra uma quebra no texto (item de série: a pergunta fica com o foco)
       const enter = () => {
         if (input.readOnly) return;
-        salvar(item);
+        salvar(item, 'enter');
+        if (item.perguntando) return;
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);
         li.nextElementSibling?.querySelector('textarea').focus();
       };
@@ -594,12 +770,13 @@
         ev.preventDefault();
         enter();
       });
-      li.append(input, item.marcador, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso);
+      item.lado.append(item.marcador, item.serie);
+      li.append(input, item.lado, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso, item.decisao);
       q.lista.insertBefore(li, antesDe);
       estado.linhas.push(item);
       pintar(item);
       ajustar(input);
-      if (volta) {
+      if (volta && !volta.decidir) {
         li.classList.add('erro');
         item.aviso.textContent = 'Texto que não tinha sido salvo. Salvando…';
         item.aviso.hidden = false;
@@ -670,13 +847,15 @@
       travar(true);
       aviso.hidden = true;
       // antes de trocar: grava o que está escrito e espera as filas
-      await Promise.all(estado.linhas.map(salvar));
+      await Promise.all(estado.linhas.map(i => salvar(i)));
       if (geracao !== estado.geracao) return;
-      if (estado.linhas.some(i => i.linha.erro)) {
+      if (estado.linhas.some(i => i.linha.erro || i.decidir)) {
         travar(false);
         estado.alvo = estado.mostrada;
         mostrarSemana(estado.mostrada);
-        toast('Há texto que não foi salvo. A semana não foi trocada.', 'erro');
+        toast(estado.linhas.some(i => i.decidir && !i.linha.erro)
+          ? 'Há item que se repete esperando você escolher se a mudança vale só para ele ou para as repetições. A semana não foi trocada.'
+          : 'Há texto que não foi salvo. A semana não foi trocada.', 'erro');
         return;
       }
       estado.linhas = [];

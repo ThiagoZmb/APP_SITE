@@ -74,6 +74,22 @@
     return limparTexto(input.value) === d.texto;
   }
   const limparTexto = t => String(t ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
+  // ---------- repetição (série) ----------
+  // a pergunta "só este / este e os próximos / todos" só aparece em item de série cujo texto mudou de verdade (apagar = texto vazio)
+  const precisaEscopo = (dados, textoNovo) => !!(dados && dados.id && dados.serieId) && limparTexto(textoNovo) !== dados.texto;
+  // "Repetir..." só para item salvo dos dias ou de Tarefas que ainda não está numa série
+  const podeRepetir = dados => !!(dados && dados.id) && dados.quadro !== 'notas' && !dados.serieId;
+  // resumo depois de uma mudança em série (a resposta do servidor: alteradas/apagadas, concluídas e diferentes)
+  function resumoSerie(serie) {
+    if (!serie) return '';
+    const n = x => `${x} ${x === 1 ? 'item' : 'itens'}`;
+    const partes = [];
+    if (serie.apagadas) partes.push(`Apagado${serie.apagadas.length === 1 ? '' : 's'} ${n(serie.apagadas.length)} da série.`);
+    else if (serie.alteradas) partes.push(`Mudou em ${n(serie.alteradas.length)} da série.`);
+    if (serie.concluidas) partes.push(`${n(serie.concluidas)} já ${serie.concluidas === 1 ? 'concluído ficou' : 'concluídos ficaram'}.`);
+    if (serie.diferentes) partes.push(`${n(serie.diferentes)} ${serie.diferentes === 1 ? 'ficou' : 'ficaram'} como ${serie.diferentes === 1 ? 'estava' : 'estavam'}, porque alguém ${serie.diferentes === 1 ? 'o deixou diferente' : 'os deixou diferentes'}.`);
+    return partes.join(' ');
+  }
   // a atualização automática da compartilhada espera: arraste em andamento, menu ou janela aberta
   const podeAtualizar = ({ arrastando, menuAberto, janelaAberta }) => !arrastando && !menuAberto && !janelaAberta;
   // rolagem automática perto da borda (celular): mais rápida quanto mais perto; 0 fora da faixa
@@ -108,8 +124,8 @@
     let menuAtual = null;
     let janelas = 0;
 
-    // ---------- janela padrão (DESIGN.md: dlg-padrao); Esc = Cancelar ----------
-    function janela({ titulo, subtitulo, aoCancelar }) {
+    // ---------- janela padrão (DESIGN.md: dlg-padrao); Esc = Cancelar (menos enquanto `ocupada()`: gravação em andamento) ----------
+    function janela({ titulo, subtitulo, aoCancelar, ocupada }) {
       const dlg = criar('dialog', 'dlg-padrao ag-janela');
       const cab = criar('div', 'dlg-cab'), corpo = criar('div', 'dlg-corpo'), rodape = criar('div', 'dlg-rodape');
       const h = criar('h3', '', titulo);
@@ -120,7 +136,7 @@
       dlg.append(cab, corpo, rodape);
       let aberta = true;
       const fechar = () => { if (!aberta) return; aberta = false; janelas--; dlg.close(); dlg.remove(); };
-      dlg.addEventListener('cancel', ev => { ev.preventDefault(); fechar(); aoCancelar?.(); });
+      dlg.addEventListener('cancel', ev => { ev.preventDefault(); if (ocupada?.()) return; fechar(); aoCancelar?.(); });
       doc.body.append(dlg);
       janelas++;
       dlg.showModal();
@@ -138,6 +154,99 @@
       });
     }
 
+    // ---------- item de série: a mudança vale só para este, para este e os próximos ou para todos? ----------
+    // Resolve 'este' | 'proximos' | 'todos', ou null (Cancelar ou Esc: nada é gravado e o texto digitado fica no campo).
+    function perguntarEscopo({ titulo, texto, nota }) {
+      return new Promise(resolve => {
+        const j = janela({ titulo, aoCancelar: () => resolve(null) });
+        j.corpo.append(criar('p', 'ag-texto', texto));
+        if (nota) j.corpo.append(criar('p', 'ag-nota', nota));
+        const opcoes = criar('div', 'ag-escopo');
+        const op = (rotulo, valor) => botao(valor === 'este' ? 'btn btn-primary' : 'btn btn-secondary', rotulo, () => { j.fechar(); resolve(valor); });
+        const so = op('Só este', 'este');
+        opcoes.append(so, op('Este e os próximos', 'proximos'), op('Todos', 'todos'));
+        j.corpo.append(opcoes);
+        j.rodape.append(botao('btn btn-secondary', 'Cancelar', () => { j.fechar(); resolve(null); }));
+        so.focus();
+      });
+    }
+
+    // ---------- "Repetir...": todos os dias (de/até, pular fins de semana) ou todo mês (dia N, por X meses) ----------
+    // `calcular(regra)` = datas da regra (calculo/agenda_repeticao.js, a mesma conta do servidor) para a prévia;
+    // `aoConfirmar(regra)` devolve Promise: enquanto grava, o botão fica travado (sem clique duplo) e Esc não fecha.
+    // `inicio`/`fim`: as datas que a janela já traz (o dia do item e uma semana depois), para abrir com uma prévia válida
+    function abrirRepetir({ texto, inicio, fim, diaDoMes, calcular, resumo, maxMeses, aoConfirmar }) {
+      let ocupado = false;
+      const j = janela({ titulo: 'Repetir', subtitulo: texto, ocupada: () => ocupado });
+      const nome = 'ag-rep-' + Math.random().toString(36).slice(2, 8);
+      const campoData = (valor, rotulo) => { const c = criar('input', 'ag-mover-data'); c.type = 'date'; c.value = valor; c.setAttribute('aria-label', rotulo); return c; };
+      const campoNum = (valor, min, max, rotulo) => { const c = criar('input', 'ag-mover-data ag-num'); c.type = 'number'; c.min = String(min); c.max = String(max); c.step = '1'; c.inputMode = 'numeric'; c.value = String(valor); c.setAttribute('aria-label', rotulo); return c; };
+      const radio = (valor, marcado) => { const r = criar('input'); r.type = 'radio'; r.name = nome; r.value = valor; r.checked = marcado; return r; };
+      // todos os dias
+      const rDia = radio('diaria', true);
+      const de = campoData(inicio, 'Repetir de'), ate = campoData(fim || inicio, 'Repetir até');
+      const pular = criar('input'); pular.type = 'checkbox';
+      const blocoDia = criar('div', 'ag-rep-op');
+      const tituloDia = criar('label', 'ag-rep-titulo'); tituloDia.append(rDia, criar('span', '', 'Todos os dias'));
+      const linhaDia = criar('div', 'ag-rep-campos');
+      const l1 = criar('label', 'ag-rep-campo'); l1.append(criar('span', '', 'de'), de);
+      const l2 = criar('label', 'ag-rep-campo'); l2.append(criar('span', '', 'até'), ate);
+      linhaDia.append(l1, l2);
+      const lPular = criar('label', 'ag-rep-check'); lPular.append(pular, criar('span', '', 'Pular fins de semana'));
+      blocoDia.append(tituloDia, linhaDia, lPular);
+      // todo mês
+      const rMes = radio('mensal', false);
+      const dia = campoNum(diaDoMes, 1, 31, 'Dia do mês'), meses = campoNum(Math.min(12, maxMeses), 2, maxMeses, 'Quantos meses');
+      const blocoMes = criar('div', 'ag-rep-op');
+      const tituloMes = criar('label', 'ag-rep-titulo'); tituloMes.append(rMes, criar('span', '', 'Todo mês'));
+      const linhaMes = criar('div', 'ag-rep-campos');
+      const l3 = criar('label', 'ag-rep-campo'); l3.append(criar('span', '', 'no dia'), dia);
+      const l4 = criar('label', 'ag-rep-campo'); l4.append(criar('span', '', 'por'), meses, criar('span', '', 'meses'));
+      linhaMes.append(l3, l4);
+      blocoMes.append(tituloMes, linhaMes);
+      const previa = criar('p', 'ag-previa');
+      previa.setAttribute('aria-live', 'polite');
+      const erro = criar('p', 'ag-erro');
+      erro.setAttribute('role', 'alert');
+      j.corpo.append(blocoDia, blocoMes, previa, erro);
+      const inteiro = c => (/^\d+$/.test(c.value) ? Number(c.value) : NaN);
+      const regra = () => (rDia.checked ? { tipo: 'diaria', de: de.value, ate: ate.value, pularFimDeSemana: pular.checked } : { tipo: 'mensal', dia: inteiro(dia), meses: inteiro(meses) });
+      const avaliar = () => {
+        blocoDia.classList.toggle('ag-rep-ativa', rDia.checked);
+        blocoMes.classList.toggle('ag-rep-ativa', rMes.checked);
+        const r = calcular(regra());
+        previa.textContent = r.ok ? resumo(r.datas) : '';
+        erro.textContent = r.ok ? '' : r.motivo;
+        return r;
+      };
+      // mexer num campo escolhe a opção dele
+      for (const c of [de, ate, pular]) c.addEventListener('input', () => { rDia.checked = true; avaliar(); });
+      for (const c of [dia, meses]) c.addEventListener('input', () => { rMes.checked = true; avaliar(); });
+      for (const r of [rDia, rMes]) r.addEventListener('change', avaliar);
+      const cancelar = botao('btn btn-secondary', 'Cancelar', () => { if (!ocupado) j.fechar(); });
+      const ok = botao('btn btn-primary', 'Repetir');
+      const confirmarRepetir = () => {
+        if (ocupado) return;
+        const r = avaliar();
+        if (!r.ok) return;
+        ocupado = true;
+        ok.disabled = cancelar.disabled = true;
+        ok.textContent = 'Criando…';
+        Promise.resolve().then(() => aoConfirmar(regra())).then(() => { ocupado = false; j.fechar(); }, e => {
+          ocupado = false;
+          ok.disabled = cancelar.disabled = false;
+          ok.textContent = 'Repetir';
+          erro.textContent = e?.message || 'Não foi possível repetir.';
+        });
+      };
+      ok.addEventListener('click', confirmarRepetir);
+      for (const c of [de, ate, dia, meses]) c.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); confirmarRepetir(); } });
+      j.rodape.append(cancelar, ok);
+      avaliar();
+      rDia.focus();
+      return { fechar: () => { ocupado = false; j.fechar(); } };
+    }
+
     // ---------- menu da faixa: categoria (escolha única) e "Mover para..." ----------
     function fecharMenu(devolverFoco = true) {
       const m = menuAtual;
@@ -150,7 +259,7 @@
       m.ancora.setAttribute('aria-expanded', 'false');
       if (devolverFoco && m.ancora.isConnected) m.ancora.focus();
     }
-    function abrirMenu({ ancora, categorias, atual, aoEscolher, aoMover, aoCategorias }) {
+    function abrirMenu({ ancora, categorias, atual, aoEscolher, aoMover, aoRepetir, aoCategorias }) {
       fecharMenu(false);
       const el = criar('div', 'ag-menu');
       el.setAttribute('role', 'menu');
@@ -174,6 +283,7 @@
       for (const c of lista) opcao(c.nome, c.cor, c.id === atual, () => aoEscolher(c.id));
       el.append(criar('hr', 'ag-menu-sep'));
       opcao('Mover para…', '', false, aoMover, 'menuitem');
+      if (aoRepetir) opcao('Repetir…', '', false, aoRepetir, 'menuitem');   // só item que ainda não se repete (podeRepetir)
       if (aoCategorias) opcao('Editar categorias…', '', false, aoCategorias, 'menuitem');
       doc.body.append(el);
       // posição: embaixo do marcador; sem espaço, em cima; nunca fora da tela
@@ -435,12 +545,12 @@
     }
 
     return {
-      confirmar, abrirMenu, fecharMenu, abrirMover, abrirCategorias, desenharLegenda, ligarArraste, amostra,
+      confirmar, perguntarEscopo, abrirRepetir, abrirMenu, fecharMenu, abrirMover, abrirCategorias, desenharLegenda, ligarArraste, amostra,
       menuAberto: () => !!menuAtual,
       janelaAberta: () => janelas > 0
     };
   }
 
   return { CORES, SEM, MAX_NOME, corValida, nomeDaCor, indexar, corDe, nomeDe, limparNome, conferirNome, chaveLegenda, criarLegenda,
-    mesmoLugar, corpoMover, pedeConfirmacaoNotas, podeArrastar, podeAtualizar, velocidadeRolagem, rotuloMes, SEMANA_CURTA, criarUi };
+    mesmoLugar, corpoMover, pedeConfirmacaoNotas, podeArrastar, podeAtualizar, precisaEscopo, podeRepetir, resumoSerie, velocidadeRolagem, rotuloMes, SEMANA_CURTA, criarUi };
 });

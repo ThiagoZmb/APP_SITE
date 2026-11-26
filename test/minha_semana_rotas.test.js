@@ -77,7 +77,7 @@ test('usuário sem nenhuma permissão cria e lê a própria linha', async t => {
   const eu = como(7);
   const r = await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: TEXTO });
   assert.equal(r.status, 201);
-  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null, categoriaId: null });
+  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null, categoriaId: null, serieId: null, seriePos: null });
   const g = await eu.get(SEMANA);
   assert.equal(g.status, 200);
   assert.deepEqual(g.corpo, { linhas: [r.corpo], categorias: [] });
@@ -205,7 +205,7 @@ test('resposta não perde campo na rede de valores (usuário sem valores.ver)', 
   const eu = como(7);
   await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: 'a' });
   const g = await eu.get(SEMANA);
-  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme', 'categoriaId']);
+  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme', 'categoriaId', 'serieId', 'seriePos']);
   assert.ok(!logs.some(l => l.includes('[valores]')));
 });
 

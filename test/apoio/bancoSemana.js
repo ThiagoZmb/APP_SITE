@@ -31,12 +31,41 @@ function criarBancoSemana() {
   };
   const naSemana = (l, de, ate) => l.quadro !== 'dia' || (l.data >= de && l.data <= ate);
   const avisoDe = (t, usuario) => avisos.find(a => a.tarefa_id === t.id && a.usuario_codigo === usuario && a.alarme === t.alarme);
+  // "id IN (?, ?, ...)": os ids são os últimos parâmetros
+  const ids = (sql, params) => { const n = (/id IN \(([^)]*)\)/.exec(sql)[1].match(/\?/g) || []).length; return params.slice(params.length - n).map(Number); };
+  // UPDATE ... SET a = ?, b = ?, [versao = versao + 1] WHERE [usuario_codigo = ? AND] id IN (...)
+  function atualizarIn(tabela, sql, params, comDono) {
+    const [, sets] = /SET (.*) WHERE /.exec(sql);
+    const lista = ids(sql, params);
+    const p = [...params];
+    const mudancas = sets.split(', ').map(c => (c === 'versao = versao + 1' ? ['versao', null, true] : [c.split(' = ')[0], p.shift(), false]));
+    const dono = comDono ? p.shift() : undefined;
+    const alvo = tabela.filter(l => lista.includes(l.id) && (!comDono || l.usuario_codigo === dono));
+    for (const l of alvo) for (const [c, v, soma] of mudancas) l[c] = soma ? l[c] + 1 : v;
+    return { affectedRows: alvo.length };
+  }
+  // INSERT de várias linhas: `por` parâmetros em cada grupo de VALUES
+  const grupos = (params, por) => Array.from({ length: params.length / por }, (_, i) => params.slice(i * por, (i + 1) * por));
 
   const f = criarPoolFalso([
+    // ----- pessoal: série (várias linhas, por série, por lista de ids) -----
+    [/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_id, serie_id, serie_pos\) VALUES /, (sql, params) => {
+      let primeiro = 0;
+      for (const [usuario_codigo, data, texto, , , categoria_id, serie_id, serie_pos] of grupos(params, 8)) {
+        const id = ++seq.pessoal;
+        primeiro ||= id;
+        pessoais.push({ id, usuario_codigo, quadro: 'dia', data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id, serie_id, serie_pos });
+      }
+      return { insertId: primeiro, affectedRows: params.length / 8 };
+    }],
+    [/^SELECT .* FROM web_tarefas WHERE usuario_codigo = \? AND serie_id = \? ORDER BY serie_pos, id/, (sql, [u, s]) =>
+      pessoais.filter(l => l.usuario_codigo === u && l.serie_id === s).sort((a, b) => a.serie_pos - b.serie_pos || a.id - b.id).map(copia)],
+    [/^UPDATE web_tarefas SET .* WHERE usuario_codigo = \? AND id IN \(/, (sql, params) => atualizarIn(pessoais, sql, params, true)],
+    [/^DELETE FROM web_tarefas WHERE usuario_codigo = \? AND id IN \(/, (sql, params) => { const [u] = params; const lista = ids(sql, params); return apagar(pessoais, l => l.usuario_codigo === u && lista.includes(l.id)); }],
     // ----- pessoal -----
     [/^INSERT INTO web_tarefas \(/, (sql, [usuario_codigo, quadro, data, texto, , , categoria_id]) => {
       const id = ++seq.pessoal;
-      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: categoria_id ?? null });
+      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: categoria_id ?? null, serie_id: null, serie_pos: null });
       return { insertId: id, affectedRows: 1 };
     }],
     // ----- categorias da pessoal (sempre com o dono) -----
@@ -76,10 +105,25 @@ function criarBancoSemana() {
     [/^SELECT .* FROM web_tarefas WHERE id = \? AND usuario_codigo = \?/, (sql, [id, u]) => pessoais.filter(l => l.id === Number(id) && l.usuario_codigo === u).map(copia)],
     [/^UPDATE web_tarefas SET /, (sql, params) => atualizar(pessoais, sql, params)],
     [/^DELETE FROM web_tarefas WHERE id = \? AND usuario_codigo = \?/, (sql, [id, u]) => apagar(pessoais, l => l.id === Number(id) && l.usuario_codigo === u)],
+    // ----- compartilhada: série -----
+    [/^INSERT INTO web_tarefas_admin \(quadro, data, texto, criada_por_codigo, criada_por, feita, versao, criado_em, atualizado_em, categoria_id, serie_id, serie_pos\) VALUES /, (sql, params) => {
+      let primeiro = 0;
+      for (const [data, texto, criada_por_codigo, criada_por, , , categoria_id, serie_id, serie_pos] of grupos(params, 9)) {
+        const id = ++seq.admin;
+        primeiro ||= id;
+        admin.push({ id, quadro: 'dia', data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id, serie_id, serie_pos });
+      }
+      return { insertId: primeiro, affectedRows: params.length / 9 };
+    }],
+    [/^SELECT .* FROM web_tarefas_admin WHERE serie_id = \? ORDER BY serie_pos, id/, (sql, [s]) =>
+      admin.filter(l => l.serie_id === s).sort((a, b) => a.serie_pos - b.serie_pos || a.id - b.id).map(copia)],
+    [/^UPDATE web_tarefas_admin SET .* WHERE id IN \(/, (sql, params) => atualizarIn(admin, sql, params, false)],
+    [/^DELETE FROM web_tarefas_admin WHERE id IN \(/, (sql, params) => { const lista = ids(sql, params); return apagar(admin, l => lista.includes(l.id)); }],
+    [/^DELETE FROM web_tarefas_admin_avisos WHERE tarefa_id IN \(/, (sql, params) => apagar(avisos, a => params.map(Number).includes(a.tarefa_id))],
     // ----- compartilhada -----
     [/^INSERT INTO web_tarefas_admin \(/, (sql, [quadro, data, texto, criada_por_codigo, criada_por, , , categoria_id]) => {
       const id = ++seq.admin;
-      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id: categoria_id ?? null });
+      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id: categoria_id ?? null, serie_id: null, serie_pos: null });
       return { insertId: id, affectedRows: 1 };
     }],
     [/^SELECT .* FROM web_tarefas_admin t LEFT JOIN web_tarefas_admin_avisos/, (sql, [u]) => admin
@@ -101,6 +145,25 @@ function criarBancoSemana() {
       return { affectedRows: 2 };
     }]
   ]);
+  // trava de linha como no InnoDB: "SELECT ... WHERE id = ? ... FOR UPDATE" numa transação espera a outra transação que já travou
+  // a mesma linha terminar (COMMIT ou ROLLBACK). Sem isso o teste do clique duplo não provaria nada.
+  const travas = new Map();
+  const conexao = f.getConnection;
+  f.getConnection = async () => {
+    const c = await conexao();
+    const minhas = new Set();
+    const liberar = () => { for (const k of minhas) { travas.get(k).soltar(); travas.delete(k); } minhas.clear(); };
+    const execute = async (sql, params = []) => {
+      const m = /^SELECT .* FROM (web_tarefas(?:_admin)?) WHERE id = \?.* FOR UPDATE$/.exec(sql);
+      if (m) {
+        const k = m[1] + ':' + Number(params[0]);
+        while (travas.has(k) && !minhas.has(k)) await travas.get(k).espera;
+        if (!travas.has(k)) { let soltar; const espera = new Promise(r => { soltar = r; }); travas.set(k, { espera, soltar }); minhas.add(k); }
+      }
+      return c.execute(sql, params);
+    };
+    return { ...c, execute, query: execute, commit: async () => { await c.commit(); liberar(); }, rollback: async () => { await c.rollback(); liberar(); }, release: () => { liberar(); c.release(); } };
+  };
   return { f, pessoais, admin, avisos, catPessoais, catAdmin };
 }
 

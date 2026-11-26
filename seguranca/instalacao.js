@@ -675,6 +675,14 @@ async function instalarTabelas(pool) {
   const [[ca] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas_admin' AND COLUMN_NAME = 'categoria_id'");
   if (!Number(ca?.n)) await pool.execute('ALTER TABLE web_tarefas_admin ADD COLUMN categoria_id INT NULL');
+  // repetição dos itens das agendas: série (identificador aleatório de 32 hex) e posição na série (1 = o item original).
+  // As duas colunas e o índice entram num ALTER só (atômico no MySQL): ou tudo existe ou nada, então basta conferir serie_id.
+  const [[sp] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = 'serie_id'");
+  if (!Number(sp?.n)) await pool.execute('ALTER TABLE web_tarefas ADD COLUMN serie_id CHAR(32) NULL, ADD COLUMN serie_pos SMALLINT NULL, ADD KEY ix_tarefas_serie (usuario_codigo, serie_id)');
+  const [[sa] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas_admin' AND COLUMN_NAME = 'serie_id'");
+  if (!Number(sa?.n)) await pool.execute('ALTER TABLE web_tarefas_admin ADD COLUMN serie_id CHAR(32) NULL, ADD COLUMN serie_pos SMALLINT NULL, ADD KEY ix_tarefas_admin_serie (serie_id)');
   await migrarEntregasVarias(pool);
 }
 

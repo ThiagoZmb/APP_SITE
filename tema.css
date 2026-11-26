@@ -1021,20 +1021,24 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .agenda .linha.salva:not([data-cor=""]):not(.feita) { color-scheme: light; }
 .agenda .linha.salva.feita { background: var(--faixa-feita); border-color: var(--faixa-borda); color: var(--text-mid); }
 .agenda .linha.salva.feita textarea { color: var(--text-mid); text-decoration: line-through; font-weight: 400; }
-.agenda .linha.salva.feita .alca, .agenda .linha.salva.feita .marcador { color: var(--text-mid); }
+.agenda .linha.salva.feita .alca, .agenda .linha.salva.feita .marcador, .agenda .linha.salva.feita .ag-serie { color: var(--text-mid); }
 .agenda .linha:focus-within { box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--primary-ring); }
 .agenda .linha input[type="checkbox"] { flex: none; margin: 7px 4px 0 2px; accent-color: var(--faixa-texto, var(--primary-color)); }
 .agenda .linha:not(.salva) input[type="checkbox"] { display: none; }
 .agenda .linha.erro { border: 1px solid var(--danger-color); }
 .agenda .linha.arrastando { opacity: .35; }
 .agenda .linha.movendo { opacity: .6; }
-.agenda .alca { flex: none; align-self: stretch; display: inline-flex; align-items: center; justify-content: center; width: 14px; min-height: 28px; color: inherit; opacity: .55; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-.agenda .alca svg { width: 8px; height: 14px; }
-.agenda .linha.salva:hover .alca, .agenda .alca:active { opacity: 1; }
-.agenda .marcador { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; cursor: pointer; opacity: .7; }
-.agenda .marcador svg { width: 16px; height: 16px; }
-.agenda .marcador:hover, .agenda .marcador:focus-visible, .agenda .marcador[aria-expanded="true"] { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+/* alça, "⋯" e ↻ na tinta da própria faixa, SEM transparência: mesmo contraste do texto (>= 4,5:1 nas 10 cores, na concluída e na neutra) */
+.agenda .alca { flex: none; align-self: stretch; display: inline-flex; align-items: center; justify-content: center; width: 14px; min-height: 28px; color: inherit; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.agenda .alca svg { width: 9px; height: 14px; }
+.agenda .ag-lado { flex: none; display: inline-flex; flex-direction: column; align-items: center; }
+.agenda .marcador { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; cursor: pointer; }
+.agenda .marcador svg { width: 18px; height: 18px; }
+.agenda .marcador:hover, .agenda .marcador:focus-visible, .agenda .marcador[aria-expanded="true"] { background: color-mix(in srgb, currentColor 18%, transparent); }
 .agenda .marcador:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+/* ↻ = item que se repete (role="img" + aria-label); embaixo do "⋯", sem tomar largura do texto e sem roubar o clique do botão */
+.agenda .ag-serie { margin-top: -7px; padding-bottom: 2px; color: inherit; font-size: 13px; font-weight: 700; line-height: 13px; pointer-events: none; user-select: none; -webkit-user-select: none; }
+.agenda .ag-serie[hidden] { display: none; }
 .agenda .linha-aviso, .agenda .linha-hora, .agenda .linha-autor, .agenda .linha-duvida { flex-basis: 100%; padding-left: 16px; padding-right: 4px; }
 .agenda .linha.salva .linha-autor, .agenda .linha.salva .linha-hora { color: inherit; }   /* tinta da faixa (ou Tinta Média na concluída): contraste AA */
 .agenda .linha.salva .linha-aviso, .agenda .linha.salva .linha-duvida { margin: 0 -2px -1px -1px; padding: 4px 6px 4px 16px; background: var(--white); border-radius: 0 0 var(--radius-sm) var(--radius-sm); color: var(--danger-fg); }
@@ -1084,8 +1088,40 @@ body .olho-resumos[aria-pressed="true"] { color: var(--primary-color); border-co
 .ag-cat .ag-amostra { width: 16px; height: 16px; }
 .ag-cat .ag-cat-nome { flex: 1 1 140px; min-width: 0; }
 body .btn.ag-perigo, body .btn-mini.ag-cat-excluir { background: var(--danger-bg) !important; color: var(--danger-fg) !important; border: 1px solid var(--danger-borda) !important; }
+/* pergunta "Só este / Este e os próximos / Todos" e janela "Repetir..." */
+.ag-nota { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-mid); }
+.ag-escopo { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.ag-escopo .btn { width: 100%; min-height: 40px; justify-content: center; }
+.ag-rep-op { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.ag-rep-op.ag-rep-ativa { border-color: var(--primary-color); background: var(--surface-2); }
+.ag-rep-titulo, .ag-rep-check { display: inline-flex; align-items: center; gap: 9px; min-height: 32px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.ag-rep-check { font-weight: 400; color: var(--text-mid); }
+.ag-rep-titulo input, .ag-rep-check input { margin: 0; accent-color: var(--primary-color); }
+.ag-rep-campos { display: flex; flex-wrap: wrap; gap: 8px 14px; padding-left: 24px; }
+.ag-rep-campo { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-mid); }
+.ag-rep-check { padding-left: 24px; }
+.ag-num { width: 76px; font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; }
+.ag-previa { margin: 4px 0 0; font-size: 13.5px; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.ag-previa:empty { display: none; }
+/* alça + caixinha (.ag-esq): no toque e por padrão, lado a lado como sempre (a coluna não existe para o layout) */
+.agenda .ag-esq { display: contents; }
+/* computador (ponteiro fino): caixinha em cima e a alça (pontos na horizontal) embaixo, numa coluna de 16px; "⋯" mais estreito.
+   O texto ganha largura nas sete colunas; o toque (pointer: coarse) não muda. */
+@media (pointer: fine) {
+    .agenda .linha { column-gap: 1px; padding-right: 0; }
+    .agenda .linha.salva { padding-left: 2px; }
+    .agenda .linha.salva .ag-esq { display: flex; flex-direction: column-reverse; justify-content: flex-end; align-items: center; align-self: stretch; flex: none; width: 16px; margin-right: 2px; }
+    .agenda .linha:not(.salva) .ag-esq { display: none; }
+    .agenda .ag-esq .alca { width: 16px; flex: 1 1 auto; min-height: 10px; align-items: flex-start; padding-top: 1px; }
+    .agenda .ag-esq .alca svg { display: none; }
+    .agenda .ag-esq .alca::before { content: ""; width: 12px; height: 8px; background: radial-gradient(circle, currentColor 1.15px, transparent 1.45px) 0 0 / 4px 4px; }
+    .agenda .ag-esq:not(:has(input)) .alca { padding-top: 10px; }   /* Notas: sem caixinha, os pontos na altura da 1ª linha */
+    .agenda .linha.salva .ag-esq input[type="checkbox"] { width: 13px; height: 13px; margin: 8px 0 1px; }
+    .agenda .marcador { width: 20px; }
+    .agenda .linha-aviso, .agenda .linha-hora, .agenda .linha-autor, .agenda .linha-duvida { padding-left: 10px; }
+}
 @media (pointer: coarse) {
-    .ag-menu-item, .ag-mover-op { min-height: 44px; } .ag-leg { min-height: 44px; }
+    .ag-menu-item, .ag-mover-op { min-height: 44px; } .ag-leg { min-height: 44px; } .ag-escopo .btn, .ag-rep-titulo, .ag-rep-check { min-height: 44px; }
     .agenda .linha { min-height: 44px; } .agenda .linha textarea { height: 42px; padding: 11px 0; } .agenda .linha input[type="checkbox"] { margin-top: 14px; }
     .agenda .marcador { width: 40px; height: 42px; } .agenda .alca { width: 28px; min-height: 42px; }
 }
