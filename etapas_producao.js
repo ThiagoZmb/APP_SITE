@@ -300,11 +300,13 @@
         estado.pedidos[i] = aplicarOtimista(antes, etapa, corpo.estado, auth.user.nome);
       }
       estado.salvando.add(chave); desenhar();
+      let ficouPronto = false;
       try {
         const d = await chamar(`/etapas/pedido/${encodeURIComponent(p.numero)}/${encodeURIComponent(etapa)}`, { metodo: 'PUT', corpo });
         const atual = doNumero(p.numero);
         if (atual) Object.assign(atual, { etapas: d.etapas, qtdConcluidas: d.qtdConcluidas, qtdEtapas: d.qtdEtapas, situacao: d.situacao, prontoEm: d.dataPronto || atual.prontoEm });
         estado.versao = '';   // a próxima consulta traz a fila inteira de novo
+        ficouPronto = !!d.situacaoMudou && d.situacao === 'Pronto';   // o servidor só muda se não estava Pronto
         if (d.situacaoMudou) {
           toast(`Pedido nº ${p.numero}: situação agora é "${d.situacao}".`, 'ok');
           if (!estado.filtros.abertos && d.situacao !== 'Em Produção') estado.pedidos = estado.pedidos.filter(x => String(x.numero) !== String(p.numero));
@@ -317,6 +319,7 @@
         estado.salvando.delete(chave);
         desenhar();
       }
+      if (ficouPronto && win.EtiquetaZebra) await win.EtiquetaZebra.perguntarDepoisDePronto(p.numero, { apiBase: C.API_BASE, loginUrl: C.LOGIN_URL, token: () => (getAuth() || {}).token || '', pode });
     }
 
     async function finalizar(p) {

@@ -84,7 +84,7 @@ function montarTela({ permissoes = ['pedidos.data_pronto', 'pedidos.situacao'], 
     body: corpoDoc, createElement: t => new El(t),
     getElementById: id => corpoDoc.querySelector('#' + id), querySelector: s => corpoDoc.querySelector(s)
   };
-  const log = { chamadas: [], recargas: 0, perguntasData: [], perguntasEntrega: [], confirms: [], estadoNaChamada: [] };
+  const log = { chamadas: [], recargas: 0, perguntasData: [], perguntasEntrega: [], confirms: [], estadoNaChamada: [], prontos: [] };
   const win = {
     document: doc, CalendarioLote: L,
     Acesso: { pode: p => permissoes.includes(p) },
@@ -106,7 +106,8 @@ function montarTela({ permissoes = ['pedidos.data_pronto', 'pedidos.situacao'], 
       if (respostas[n]) throw respostas[n];
       return {};
     },
-    recarregar: async () => { log.recargas++; tela.desenhar(tela.numeros); }
+    recarregar: async () => { log.recargas++; tela.desenhar(tela.numeros); },
+    aoPronto: async ns => { log.prontos.push({ ns, recargas: log.recargas }); }
   });
   // imita o renderLista do painel: preparar, linhas com a célula do lote, depoisDeDesenhar
   tela.desenhar = numeros => {
@@ -387,5 +388,23 @@ test('calendario_lote.js: perguntas e execução com resumo são compartilhadas 
   for (const arq of ['calendario.js', 'painel_lote.js']) {
     const js = ler(arq);
     for (const f of ['perguntarData', 'perguntarSituacao', 'rodarLote']) assert.match(js, new RegExp(`\\.${f}\\(`), `${arq} usa ${f}`);
+  }
+});
+
+test('lote "Pronto": uma só chamada de aoPronto, depois de recarregar, só com os que deram certo', async () => {
+  const t = montarTela({ respostas: { 2: new Error('falhou') } });
+  t.tela.desenhar([1, 2, 3]);
+  t.clicarTodos();
+  await t.acao('Pronto');
+  assert.deepEqual(t.log.prontos, [{ ns: ['1', '3'], recargas: 1 }]);
+});
+
+test('lote: outra situação, cancelamento ou tudo falhando não chamam aoPronto', async () => {
+  for (const [opcoes, nome] of [[{}, 'Em Produção'], [{ confirmar: false }, 'Pronto'], [{ respostas: { 1: new Error('x') } }, 'Pronto']]) {
+    const t = montarTela(opcoes);
+    t.tela.desenhar([1]);
+    t.marcar(1);
+    await t.acao(nome);
+    assert.deepEqual(t.log.prontos, [], nome);
   }
 });

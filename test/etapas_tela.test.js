@@ -108,7 +108,7 @@ test('etapas_producao.html: CSP igual à das páginas vizinhas, tema.css por úl
   assert.equal(css[css.length - 1], cal.match(/href="(tema\.css\?v=\d+)"/)[1]);
   assert.ok(css[0].startsWith('etapas_producao.css?v='));
   const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-  assert.deepEqual(scripts, ['layout.js', 'situacoes.js', 'entregas_comum.js', 'etapas_producao.js']);
+  assert.deepEqual(scripts, ['layout.js', 'situacoes.js', 'entregas_comum.js', 'etiqueta_zebra.js', 'etapas_producao.js']);
   assert.equal((h.match(/<script/g) || []).length, scripts.length, 'nenhum script inline');
   assert.doesNotMatch(h, /\son[a-z]+=/i);
   assert.doesNotMatch(h, /\sstyle=/i);
@@ -124,7 +124,7 @@ test('etapas_producao.html: CSP igual à das páginas vizinhas, tema.css por úl
 
 test('etapas_producao.html: o ?v= do etapas_producao.js mudou junto com a remoção da atualização automática (senão o navegador roda o JS antigo com polling em cache)', () => {
   const h = ler('etapas_producao.html');
-  assert.match(h, /etapas_producao\.js\?v=202611191800/);
+  assert.match(h, /etapas_producao\.js\?v=202612011000/);
 });
 
 test('etapas_producao.js: SEM atualização automática (só ao abrir e no botão Atualizar); menu por botão direito/Shift+F10 e "⋯"; finalizar pergunta a data de pronto', () => {

@@ -524,7 +524,7 @@ test('entregas.html: botões de divisão (entregas.dividir) e de encerrar saldo 
   assert.doesNotMatch(h, /\sstyle="/);
   assert.doesNotMatch(h, /R\$|valor|preço/i);
   assert.match(h, /entregas_comum\.js\?v=202611201000/);
-  assert.match(h, /entregas\.js\?v=202611271100/);
+  assert.match(h, /entregas\.js\?v=202612011000/);
   assert.match(ler('minhas_entregas.html'), /minhas_entregas\.js\?v=202611271100/);
   assert.match(ler('minhas_entregas.html'), /entregas_comum\.js\?v=202611201000/);
   const js = ler('entregas.js');
@@ -568,7 +568,7 @@ test('selos "X de Y entregues" no Início, Pedidos e Financeiro do cliente (só 
   assert.ok(ler('clientes.html').includes('${seloAndamento(p)}'));
   const p = ler('painel_inicial.html');
   assert.ok(p.includes("err.dados.aviso === 'entregas_abertas'") && p.includes('confirmarEntregasAbertas: true'));
-  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202611271000/, f);
+  for (const f of ['inicio.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /inicio_menu\.js\?v=202612011000/, f);
 });
 
 test('portal: as páginas mostram o rótulo "entrega" que a API já devolve (inclusive "Entregue parcialmente: X de Y")', () => {

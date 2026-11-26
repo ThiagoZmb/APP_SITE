@@ -53,7 +53,9 @@
           d = await r.json().catch(() => ({}));
         }
         if (!r.ok) throw new Error(d.error || `Erro HTTP: ${r.status}`);
-        cfg.recarregar();
+        await cfg.recarregar();
+        // só depois de gravado (a situação atual fica desativada no menu, então não era Pronto antes)
+        if (nome === 'Pronto' && window.EtiquetaZebra) await window.EtiquetaZebra.perguntarDepoisDePronto(x.numero, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token, pode: cfg.pode });
       } catch (err) { alert(err.message); }
     }
 

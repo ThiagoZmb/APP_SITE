@@ -227,6 +227,7 @@
       await carregar();   // recarrega o mês (ou a pesquisa) mantendo filtros; o pedido pode ter mudado de dia
       $('cal-corpo').removeAttribute('aria-busy');
       aposDesenho();
+      return r;
     }
 
     async function loteDataPronto() {
@@ -241,7 +242,9 @@
       if (!numeros.length || !podeLote.situacao) return;
       const corpo = await L.perguntarSituacao(win, nome, numeros.length);
       if (!corpo) return;
-      await executarAcao(`situação ${nome}`, numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/situacao`, { metodo: 'POST', corpo }));
+      const r = await executarAcao(`situação ${nome}`, numeros, n => chamar(`/ped_orc/Pedido/${encodeURIComponent(n)}/situacao`, { metodo: 'POST', corpo }));
+      // uma pergunta só, no fim, com os que passaram a Pronto (o servidor recusa quem já estava)
+      if (nome === 'Pronto' && win.EtiquetaZebra) await win.EtiquetaZebra.perguntarDepoisDePronto(L.numerosAlterados(numeros, r), { apiBase: K.C.API_BASE, loginUrl: K.C.LOGIN_URL, token: () => (getAuth() || {}).token || '', pode: p => win.Acesso.pode(p) });
     }
 
     doc.addEventListener('click', aoSelecionar);

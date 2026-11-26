@@ -98,6 +98,12 @@
       numerosFalha: falhas.map(f => f.numero) };
   }
 
+  // números que o lote de fato alterou (para a pergunta das etiquetas depois de "Pronto"); sessão expirada = nenhum (a tela vai para o login)
+  function numerosAlterados(numeros, r) {
+    if (r.falhas.some(f => f.erro === 'Sessão expirada')) return [];
+    return numeros.map(String).filter(n => !r.numerosFalha.includes(n));
+  }
+
   const esc0 = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   // HTML do resumo (dado do servidor só entra por esc)
   function htmlResumo(r, esc = esc0) {
@@ -148,5 +154,5 @@
     return r;
   }
 
-  return { perguntarData, perguntarSituacao, rodarLote, SITUACOES_LOTE, MAX_FALHAS_VISIVEIS, numerosNaOrdem, intervalo, aplicarSelecao, manterVisiveis, textoSelecionados, corpoSituacao, motivoErro, executarLote, resumoLote, htmlResumo, htmlBarra };
+  return { perguntarData, perguntarSituacao, rodarLote, SITUACOES_LOTE, MAX_FALHAS_VISIVEIS, numerosNaOrdem, intervalo, aplicarSelecao, manterVisiveis, textoSelecionados, corpoSituacao, motivoErro, executarLote, resumoLote, numerosAlterados, htmlResumo, htmlBarra };
 });

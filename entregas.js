@@ -1108,6 +1108,7 @@
       $('erro-retirada').textContent = erro || '';
       if (erro) return;
       const e = estado.det.entrega, arq = $('r-foto').files[0];
+      let marcouPronto = false;
       return ocupado(async () => {
         const corpo = comDataBaixa({ entregueA: txt($('r-entregue').value), anexoIds: arq ? [await enviarFoto(e.id, arq)] : [] });
         // pedido Em Produção: o servidor AVISA (409 + aviso 'pedido_nao_pronto') e não grava nada; confirmado, reenvia com marcarPronto
@@ -1118,9 +1119,13 @@
           if (!(err && err.status === 409 && err.dados && err.dados.aviso === 'pedido_nao_pronto')) throw err;
           if (!win.confirm(TEXTO_PEDIDO_NAO_PRONTO)) return;
           await chamar(`/entregas/${encodeURIComponent(e.id)}/retirada`, { metodo: 'POST', corpo: { ...corpo, marcarPronto: true } });
+          marcouPronto = true;
         }
         toast('Retirada registrada.', 'ok');
         await recarregarTudo(e.id);
+      }).then(async () => {
+        // fora do ocupado(): a tela já está liberada e recarregada
+        if (marcouPronto && win.EtiquetaZebra) await win.EtiquetaZebra.perguntarDepoisDePronto(e.numero, { apiBase: C.API_BASE, loginUrl: C.LOGIN_URL, token: () => (getAuth() || {}).token || '', pode });
       });
     }
     // baixa da administração: mesma rota/regra da baixa do motorista (POST /minhas_entregas/:id/baixa); o servidor grava a autoria "em nome do motorista"

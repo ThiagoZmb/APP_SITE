@@ -3,7 +3,9 @@
 // por item, medidas, estado de destino geral) -> o servidor monta o ZPL com esses ajustes (POST /etiquetas/pedido/:n) -> o serviço local o envia RAW
 // à impressora. Os ajustes valem só para esta impressão: nada é gravado. O texto digitado vai ao servidor, que valida e
 // monta o ZPL; a tela nunca manda texto para a impressora. Sem o serviço local não há plano B pelo navegador.
-// EtiquetaZebra.imprimir(numero, { apiBase, loginUrl, token })
+// EtiquetaZebra.imprimir(numero, { apiBase, loginUrl, token }) -> false se não dá para imprimir neste PC/sessão (sem serviço local ou 401).
+// EtiquetaZebra.perguntarDepoisDePronto(numero ou [numeros], { apiBase, loginUrl, token, pode }): chamada pelas telas DEPOIS que o servidor
+// confirmou a mudança para Pronto; só pergunta a quem tem pedidos.pdf. Com vários, uma pergunta só e depois uma janela por vez.
 (function () {
   'use strict';
   const LOCAL = 'http://127.0.0.1:3917';
@@ -153,15 +155,16 @@ const MAX_ETIQUETAS = 200; // mesmo teto do servidor (calculo/etiqueta_edicao.js
     try {
       if (!(await servicoLocalAtivo())) {
         alert('Serviço local não encontrado neste PC. A impressão na Zebra só funciona no computador com o serviço do Elegance instalado e em execução.');
-        return;
+        return false;
       }
       const base = `${cfg.apiBase}/etiquetas/pedido/${encodeURIComponent(numero)}`;
       const dados = await lerResposta(await fetch(base + '/itens', { headers: { Authorization: 'Bearer ' + cfg.token() } }), cfg);
-      if (!dados) return;
+      if (!dados) return false;
+      let semSessao = false;
       await janela(numero, dados, async escolha => {
         const r = await fetch(base, { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.token(), 'Content-Type': 'application/json' }, body: JSON.stringify(escolha) });
         const d = await lerResposta(r, cfg).catch(err => ({ erro: err.message }));
-        if (!d) return null; // 401: já foi para o login
+        if (!d) { semSessao = true; return null; } // 401: já foi para o login
         if (d.erro) return d.erro;
         const p = await fetch(LOCAL + '/etiqueta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zpl: d.zpl }) });
         const resp = await p.json().catch(() => ({}));
@@ -169,8 +172,28 @@ const MAX_ETIQUETAS = 200; // mesmo teto do servidor (calculo/etiqueta_edicao.js
         alert(`${d.quantidade} etiqueta(s) enviada(s) para ${resp.impressora}${resp.porta ? ' (porta ' + resp.porta + ')' : ''}.`);
         return null;
       });
-    } catch (err) { alert('Não foi possível imprimir as etiquetas: ' + err.message); }
+      return !semSessao;
+    } catch (err) { alert('Não foi possível imprimir as etiquetas: ' + err.message); return true; } // erro deste pedido: o próximo do lote ainda pode sair
   }
 
-  window.EtiquetaZebra = { imprimir, qtdInicial };
+  async function oferecer(lista, cfg) {
+    const texto = lista.length === 1 ? `Pedido ${lista[0]} marcado como Pronto.` : `Pedidos ${lista.join(', ')} marcados como Pronto.`;
+    if (!confirm(`${texto} Imprimir as etiquetas agora?`)) return;
+    for (let i = 0; i < lista.length; i++) {
+      // o próximo só abre depois de a janela anterior fechar; Cancelar aqui para o resto
+      if (i && !confirm(`Abrir agora as etiquetas do pedido ${lista[i]} (${i + 1} de ${lista.length})? Cancelar para parar.`)) return;
+      if (await imprimir(lista[i], cfg) === false) return;
+    }
+  }
+
+  let fila = Promise.resolve(); // duas mudanças quase juntas (ex.: etapas): uma pergunta/janela de cada vez
+  function perguntarDepoisDePronto(numeros, cfg) {
+    const pode = cfg.pode || (p => !!(window.Acesso && window.Acesso.pode(p)));
+    const lista = [].concat(numeros).map(String).filter(Boolean);
+    if (!lista.length || !pode('pedidos.pdf')) return Promise.resolve();
+    fila = fila.then(() => oferecer(lista, cfg)).catch(err => alert('Não foi possível imprimir as etiquetas: ' + err.message));
+    return fila;
+  }
+
+  window.EtiquetaZebra = { imprimir, qtdInicial, perguntarDepoisDePronto };
 })();

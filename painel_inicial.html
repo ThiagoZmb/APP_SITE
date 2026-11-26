@@ -293,15 +293,15 @@
     <script src="desconto_pedido_tela.js?v=202611161500" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
-    <script src="etiqueta_zebra.js?v=202611201300" defer></script>
+    <script src="etiqueta_zebra.js?v=202612011000" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="desenho_pedido.js?v=202611231500" defer></script>
     <script src="impressao_pdf.js?v=202611231000" defer></script>
     <script src="vendor/jspdf.umd.min.js" defer></script>
     <script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
     <script src="impressao_lista.js?v=202611241100" defer></script>
-    <script src="calendario_lote.js?v=202611281200" defer></script>
-    <script src="painel_lote.js?v=202611281200" defer></script>
+    <script src="calendario_lote.js?v=202612011000" defer></script>
+    <script src="painel_lote.js?v=202612011000" defer></script>
     <script src="comparativo_ranking.js?v=202611051800" defer></script>
     <script src="ranking.js?v=202611051800" defer></script>
     <script src="olho_resumos.js?v=202611191200"></script>
@@ -1058,7 +1058,9 @@
                     await enviar(true);
                 }
                 await carregar();
-            } catch (err) { alert(err.message); }
+            } catch (err) { alert(err.message); return; }
+            // só depois de gravado (a situação atual fica desativada no menu, então não era Pronto antes)
+            if (nome === 'Pronto') await window.EtiquetaZebra.perguntarDepoisDePronto(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) });
         }
         // Imprimir sem sair da tela: baixa o PDF com o token, põe num iframe escondido (blob) e chama a impressão do navegador.
         // O navegador sempre mostra a janela de impressão (nenhum site imprime em silêncio); com o Chrome aberto por um atalho com
@@ -1266,7 +1268,8 @@
             cliente = new URLSearchParams(location.search).get('cliente') || '';
             $('f-cliente').value = cliente;
             lote = window.PainelLote.criar({ win: window, esc, api, tipo: () => tipoLista, recarregar: () => carregar(),
-                nomes: () => new Map(pedidos.map(x => [String(x.numero), x.cliente || ''])) });
+                nomes: () => new Map(pedidos.map(x => [String(x.numero), x.cliente || ''])),
+                aoPronto: numeros => window.EtiquetaZebra.perguntarDepoisDePronto(numeros, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken, pode: p => Acesso.pode(p) }) });
             carregar().then(() => { if (!document.querySelector('dialog[open]')) $('search-input').focus(); });
         });
     </script>

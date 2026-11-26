@@ -261,7 +261,7 @@ test('visual: janela sem estilo inline nem innerHTML, reaproveita dp-* e os ez-*
   const htmls = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html'));
   const temas = new Set(htmls.flatMap(f => [...ler(f).matchAll(/tema\.css\?v=(\d+)/g)].map(m => m[1])));
   assert.equal(temas.size, 1);
-  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202611201300/, f);
+  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202612011000/, f);
 });
 
 test('total acima de 200 etiquetas bloqueia o envio na própria janela, dizendo o total e o limite', async () => {

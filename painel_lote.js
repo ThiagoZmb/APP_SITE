@@ -12,7 +12,7 @@
   'use strict';
   const COLUNAS_DA_TABELA = 10;
 
-  // cfg = { win, esc, api(url, opções), tipo() = aba atual, nomes() = Map número -> cliente, recarregar() }
+  // cfg = { win, esc, api(url, opções), tipo() = aba atual, nomes() = Map número -> cliente, recarregar(), aoPronto?(números) = lote de "Pronto" gravado }
   function criar(cfg) {
     const { win, api } = cfg, doc = win.document, L = win.CalendarioLote;
     const $ = id => doc.getElementById(id);
@@ -115,6 +115,7 @@
       pintar();
       resumo.scrollIntoView({ block: 'nearest' });
       resumo.focus({ preventScroll: true });
+      return r;
     }
 
     // uma ação por vez, da pergunta ao fim do envio
@@ -131,7 +132,11 @@
     });
     const loteSituacao = nome => pode.situacao && acao(async numeros => {
       const dados = await L.perguntarSituacao(win, nome, numeros.length);
-      if (dados) await executar(`situação ${nome}`, numeros, enviar('situacao', dados));
+      if (!dados) return;
+      const r = await executar(`situação ${nome}`, numeros, enviar('situacao', dados));
+      // uma pergunta só, no fim, com os que passaram a Pronto (o servidor recusa quem já estava)
+      const prontos = nome === 'Pronto' ? L.numerosAlterados(numeros, r) : [];
+      if (prontos.length && cfg.aoPronto) await cfg.aoPronto(prontos);
     });
 
     tabela.addEventListener('change', ev => {   // caixa do cabeçalho: todos os visíveis
