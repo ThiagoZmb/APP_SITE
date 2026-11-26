@@ -1,4 +1,5 @@
 // Minha semana (caderno de tarefas pessoal): validações e datas, funções puras.
+const { validarHorario } = require('./agenda_horario');
 const QUADROS = ['dia', 'tarefas', 'notas'];
 const MAX_TEXTO = 300;
 
@@ -60,20 +61,27 @@ function validarCategoria(corpo, { parcial = false } = {}) {
 // id de categoria: inteiro positivo de INT (o banco recusaria acima disso) ou null (sem categoria)
 const categoriaValida = v => v === null || (Number.isInteger(v) && v > 0 && v < 2 ** 31);
 
+// horário (calculo/agenda_horario.js): só nos itens dos dias; null = dia todo
+const SO_DIA_TEM_HORARIO = 'Só os itens dos dias têm horário.';
+
 function validarNova(corpo) {
-  const { quadro, data, texto, categoriaId } = corpo || {};
+  const { quadro, data, texto, categoriaId, horario } = corpo || {};
   if (!QUADROS.includes(quadro)) return { ok: false, motivo: 'Quadro inválido.' };
   if (quadro === 'dia' && !validarData(data)) return { ok: false, motivo: 'Data inválida.' };
   const t = limparTexto(texto);
   if (!t.ok) return t;
   if (categoriaId !== undefined && !categoriaValida(categoriaId)) return { ok: false, motivo: 'Categoria inválida.' };
-  return { ok: true, valor: { quadro, data: quadro === 'dia' ? data : null, texto: t.texto, categoriaId: categoriaId ?? null } };
+  const h = validarHorario(horario);
+  if (!h.ok) return h;
+  if (h.valor && quadro !== 'dia') return { ok: false, motivo: SO_DIA_TEM_HORARIO };
+  return { ok: true, valor: { quadro, data: quadro === 'dia' ? data : null, texto: t.texto, categoriaId: categoriaId ?? null, horario: h.valor ?? null } };
 }
 
 // `alarme`: 'AAAA-MM-DD HH:MM' ou null (remove). A rota ainda recusa alarme no quadro notas.
 // Mover: `quadro` (e `data`, só no quadro dia). Notas não têm caixinha nem alarme.
+// `horario`: { inicio, fim } ou null (dia todo); a rota ainda recusa horário em item que fica fora dos dias.
 function validarMudanca(corpo) {
-  const { texto, feita, alarme, quadro, data, categoriaId } = corpo || {};
+  const { texto, feita, alarme, quadro, data, categoriaId, horario } = corpo || {};
   const valor = {};
   if (quadro !== undefined) {
     if (!QUADROS.includes(quadro)) return { ok: false, motivo: 'Quadro inválido.' };
@@ -82,8 +90,14 @@ function validarMudanca(corpo) {
     valor.data = quadro === 'dia' ? data : null;
     if (quadro === 'notas' && feita === true) return { ok: false, motivo: 'Notas não têm caixinha.' };
     if (quadro === 'notas' && alarme) return { ok: false, motivo: 'Notas não têm alarme.' };
+    if (quadro !== 'dia' && horario) return { ok: false, motivo: SO_DIA_TEM_HORARIO };
   } else if (data !== undefined) {
     return { ok: false, motivo: 'Informe para onde mover.' };
+  }
+  if (horario !== undefined) {
+    const h = validarHorario(horario);
+    if (!h.ok) return h;
+    valor.horario = h.valor;
   }
   if (categoriaId !== undefined) {
     if (!categoriaValida(categoriaId)) return { ok: false, motivo: 'Categoria inválida.' };
@@ -106,4 +120,4 @@ function validarMudanca(corpo) {
   return { ok: true, valor };
 }
 
-module.exports = { QUADROS, MAX_TEXTO, CORES, MAX_NOME, MAX_CATEGORIAS, chaveNome, validarCategoria, validarData, diasDaSemana, validarNova, validarMudanca };
+module.exports = { QUADROS, MAX_TEXTO, CORES, MAX_NOME, MAX_CATEGORIAS, SO_DIA_TEM_HORARIO, chaveNome, validarCategoria, validarData, diasDaSemana, validarNova, validarMudanca };

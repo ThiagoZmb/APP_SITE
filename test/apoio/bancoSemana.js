@@ -1,10 +1,11 @@
-// Banco em memória das duas semanas (web_tarefas, web_tarefas_admin, web_tarefas_admin_avisos) e dos alarmes.
+// Banco em memória das duas semanas (web_tarefas, web_tarefas_admin, web_tarefas_admin_avisos), das categorias (lista única e a
+// antiga pessoal, só para a migração) e dos alarmes.
 // Entende só o SQL das rotas rotas/minha_semana.js, rotas/semana_admin.js e rotas/alarmes.js; obedece aos parâmetros
 // (usuário, versão, id): se a rota esquecer um filtro, o teste correspondente falha.
 const { criarPoolFalso } = require('./poolFalso');
 
 function criarBancoSemana() {
-  const pessoais = [], admin = [], avisos = [], catPessoais = [], catAdmin = [];
+  const pessoais = [], admin = [], avisos = [], catPessoais = [], catAdmin = [], auditoria = [];
   const seq = { pessoal: 0, admin: 0, catPessoal: 0, catAdmin: 0 };
   // como o utf8mb4_unicode_ci: "Médico" e "medico" são o mesmo nome (a chave única recusa)
   const chave = n => String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -49,23 +50,23 @@ function criarBancoSemana() {
 
   const f = criarPoolFalso([
     // ----- pessoal: série (várias linhas, por série, por lista de ids) -----
-    [/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_id, serie_id, serie_pos\) VALUES /, (sql, params) => {
+    [/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_unica_id, serie_id, serie_pos, hora_inicio, hora_fim\) VALUES /, (sql, params) => {
       let primeiro = 0;
-      for (const [usuario_codigo, data, texto, , , categoria_id, serie_id, serie_pos] of grupos(params, 8)) {
+      for (const [usuario_codigo, data, texto, , , categoria_unica_id, serie_id, serie_pos, hora_inicio, hora_fim] of grupos(params, 10)) {
         const id = ++seq.pessoal;
         primeiro ||= id;
-        pessoais.push({ id, usuario_codigo, quadro: 'dia', data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id, serie_id, serie_pos });
+        pessoais.push({ id, usuario_codigo, quadro: 'dia', data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: null, categoria_unica_id, serie_id, serie_pos, hora_inicio, hora_fim });
       }
-      return { insertId: primeiro, affectedRows: params.length / 8 };
+      return { insertId: primeiro, affectedRows: params.length / 10 };
     }],
     [/^SELECT .* FROM web_tarefas WHERE usuario_codigo = \? AND serie_id = \? ORDER BY serie_pos, id/, (sql, [u, s]) =>
       pessoais.filter(l => l.usuario_codigo === u && l.serie_id === s).sort((a, b) => a.serie_pos - b.serie_pos || a.id - b.id).map(copia)],
     [/^UPDATE web_tarefas SET .* WHERE usuario_codigo = \? AND id IN \(/, (sql, params) => atualizarIn(pessoais, sql, params, true)],
     [/^DELETE FROM web_tarefas WHERE usuario_codigo = \? AND id IN \(/, (sql, params) => { const [u] = params; const lista = ids(sql, params); return apagar(pessoais, l => l.usuario_codigo === u && lista.includes(l.id)); }],
     // ----- pessoal -----
-    [/^INSERT INTO web_tarefas \(/, (sql, [usuario_codigo, quadro, data, texto, , , categoria_id]) => {
+    [/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_unica_id, hora_inicio, hora_fim\) VALUES \(\?, \?, \?, \?, 0, \?, \?, \?, \?, \?\)$/, (sql, [usuario_codigo, quadro, data, texto, , , categoria_unica_id, hora_inicio, hora_fim]) => {
       const id = ++seq.pessoal;
-      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: categoria_id ?? null, serie_id: null, serie_pos: null });
+      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: null, categoria_unica_id: categoria_unica_id ?? null, serie_id: null, serie_pos: null, hora_inicio: hora_inicio ?? null, hora_fim: hora_fim ?? null });
       return { insertId: id, affectedRows: 1 };
     }],
     // ----- categorias da pessoal (sempre com o dono) -----
@@ -83,12 +84,30 @@ function criarBancoSemana() {
       return atualizar(catPessoais, sql, params);
     }],
     [/^DELETE FROM web_tarefas_categorias WHERE id = \? AND usuario_codigo = \?$/, (sql, [id, u]) => apagar(catPessoais, c => c.id === Number(id) && c.usuario_codigo === u)],
+    // ----- migração para a lista única (seguranca/instalacao.js unificarCategoriasAgendas) -----
+    [/^SELECT id FROM web_auditoria WHERE acao = 'agendas_categorias_unicas' LIMIT 1$/, () => auditoria.filter(a => a.acao === 'agendas_categorias_unicas').map((a, i) => ({ id: i + 1 }))],
+    [/^SELECT id, nome, cor FROM web_tarefas_admin_categorias ORDER BY id FOR UPDATE$/, () => [...catAdmin].sort((a, b) => a.id - b.id).map(copia)],
+    [/^SELECT id, usuario_codigo, nome, cor FROM web_tarefas_categorias ORDER BY id$/, () => [...catPessoais].sort((a, b) => a.id - b.id).map(copia)],
+    [/^INSERT INTO web_tarefas_admin_categorias \(nome, cor, criado_por_codigo, criado_em, atualizado_em\) VALUES \(\?, \?, \?, NOW\(\), NOW\(\)\)$/, (sql, [nome, cor, criado_por_codigo]) => {
+      if (duplicado(catAdmin, nome)) throw erroDup();
+      const id = seq.catAdmin = Math.max(seq.catAdmin, ...catAdmin.map(c => c.id)) + 1;   // linhas postas direto no teste também contam
+      catAdmin.push({ id, nome, cor, criado_por_codigo });
+      return { insertId: id, affectedRows: 1 };
+    }],
+    [/^SELECT id FROM web_tarefas_admin_categorias WHERE nome = \?$/, (sql, [nome]) => catAdmin.filter(c => chave(c.nome) === chave(nome)).map(c => ({ id: c.id }))],
+    [/^UPDATE web_tarefas SET categoria_unica_id = \? WHERE categoria_unica_id IS NULL AND \(usuario_codigo, categoria_id\) IN \(/, (sql, [id, ...pares]) => {
+      const lista = grupos(pares, 2).map(([u, c]) => u + ':' + c);
+      const alvo = pessoais.filter(l => l.categoria_unica_id == null && lista.includes(l.usuario_codigo + ':' + l.categoria_id));
+      for (const l of alvo) l.categoria_unica_id = id;
+      return { affectedRows: alvo.length };
+    }],
+    [/^INSERT INTO web_auditoria \(quando, quem, acao, alvo, detalhe\) VALUES \(NOW\(\), \?, \?, \?, \?\)$/, (sql, [quem, acao, alvo, detalhe]) => { auditoria.push({ quem, acao, alvo, detalhe }); return { affectedRows: 1 }; }],
     // ----- categorias da compartilhada (lista única) -----
     [/^SELECT id, nome, cor FROM web_tarefas_admin_categorias ORDER BY nome, id$/, () => [...catAdmin].sort(porNome).map(copia)],
     [/^SELECT id FROM web_tarefas_admin_categorias WHERE id = \?$/, (sql, [id]) => catAdmin.filter(c => c.id === Number(id)).map(c => ({ id: c.id }))],
     [/^INSERT INTO web_tarefas_admin_categorias \(nome, cor, criado_por_codigo, criado_em, atualizado_em\) VALUES \(\?, \?, \?, \?, \?\)$/, (sql, [nome, cor, criado_por_codigo]) => {
       if (duplicado(catAdmin, nome)) throw erroDup();
-      const id = ++seq.catAdmin;
+      const id = seq.catAdmin = Math.max(seq.catAdmin, ...catAdmin.map(c => c.id)) + 1;   // linhas postas direto no teste também contam
       catAdmin.push({ id, nome, cor, criado_por_codigo });
       return { insertId: id, affectedRows: 1 };
     }],
@@ -106,14 +125,14 @@ function criarBancoSemana() {
     [/^UPDATE web_tarefas SET /, (sql, params) => atualizar(pessoais, sql, params)],
     [/^DELETE FROM web_tarefas WHERE id = \? AND usuario_codigo = \?/, (sql, [id, u]) => apagar(pessoais, l => l.id === Number(id) && l.usuario_codigo === u)],
     // ----- compartilhada: série -----
-    [/^INSERT INTO web_tarefas_admin \(quadro, data, texto, criada_por_codigo, criada_por, feita, versao, criado_em, atualizado_em, categoria_id, serie_id, serie_pos\) VALUES /, (sql, params) => {
+    [/^INSERT INTO web_tarefas_admin \(quadro, data, texto, criada_por_codigo, criada_por, feita, versao, criado_em, atualizado_em, categoria_id, serie_id, serie_pos, hora_inicio, hora_fim\) VALUES /, (sql, params) => {
       let primeiro = 0;
-      for (const [data, texto, criada_por_codigo, criada_por, , , categoria_id, serie_id, serie_pos] of grupos(params, 9)) {
+      for (const [data, texto, criada_por_codigo, criada_por, , , categoria_id, serie_id, serie_pos, hora_inicio, hora_fim] of grupos(params, 11)) {
         const id = ++seq.admin;
         primeiro ||= id;
-        admin.push({ id, quadro: 'dia', data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id, serie_id, serie_pos });
+        admin.push({ id, quadro: 'dia', data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id, serie_id, serie_pos, hora_inicio, hora_fim });
       }
-      return { insertId: primeiro, affectedRows: params.length / 9 };
+      return { insertId: primeiro, affectedRows: params.length / 11 };
     }],
     [/^SELECT .* FROM web_tarefas_admin WHERE serie_id = \? ORDER BY serie_pos, id/, (sql, [s]) =>
       admin.filter(l => l.serie_id === s).sort((a, b) => a.serie_pos - b.serie_pos || a.id - b.id).map(copia)],
@@ -121,9 +140,9 @@ function criarBancoSemana() {
     [/^DELETE FROM web_tarefas_admin WHERE id IN \(/, (sql, params) => { const lista = ids(sql, params); return apagar(admin, l => lista.includes(l.id)); }],
     [/^DELETE FROM web_tarefas_admin_avisos WHERE tarefa_id IN \(/, (sql, params) => apagar(avisos, a => params.map(Number).includes(a.tarefa_id))],
     // ----- compartilhada -----
-    [/^INSERT INTO web_tarefas_admin \(/, (sql, [quadro, data, texto, criada_por_codigo, criada_por, , , categoria_id]) => {
+    [/^INSERT INTO web_tarefas_admin \(/, (sql, [quadro, data, texto, criada_por_codigo, criada_por, , , categoria_id, hora_inicio, hora_fim]) => {
       const id = ++seq.admin;
-      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id: categoria_id ?? null, serie_id: null, serie_pos: null });
+      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id: categoria_id ?? null, serie_id: null, serie_pos: null, hora_inicio: hora_inicio ?? null, hora_fim: hora_fim ?? null });
       return { insertId: id, affectedRows: 1 };
     }],
     [/^SELECT .* FROM web_tarefas_admin t LEFT JOIN web_tarefas_admin_avisos/, (sql, [u]) => admin
@@ -164,7 +183,7 @@ function criarBancoSemana() {
     };
     return { ...c, execute, query: execute, commit: async () => { await c.commit(); liberar(); }, rollback: async () => { await c.rollback(); liberar(); }, release: () => { liberar(); c.release(); } };
   };
-  return { f, pessoais, admin, avisos, catPessoais, catAdmin };
+  return { f, pessoais, admin, avisos, catPessoais, catAdmin, auditoria };
 }
 
 module.exports = { criarBancoSemana };

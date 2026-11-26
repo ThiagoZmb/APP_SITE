@@ -16,6 +16,8 @@
   const AG = typeof module === 'object' && module.exports ? require('./agenda_comum.js') : raiz.AgendaComum;
   // datas da repetição (a mesma conta do servidor) para a prévia da janela "Repetir..."
   const R = typeof module === 'object' && module.exports ? require('./calculo/agenda_repeticao.js') : raiz.AgendaRepeticao;
+  // horário dos itens dos dias (a mesma conta do servidor): grade, ordem da lista e sobrepostos lado a lado
+  const AH = typeof module === 'object' && module.exports ? require('./calculo/agenda_horario.js') : raiz.AgendaHorario;
 
   // ordem de leitura, do teclado e da tela: da esquerda para a direita (o CSS só decide quantas colunas cabem)
   const DIAS = [['seg', 'Segunda'], ['ter', 'Terça'], ['qua', 'Quarta'], ['qui', 'Quinta'], ['sex', 'Sexta'], ['sab', 'Sábado'], ['dom', 'Domingo']];
@@ -93,7 +95,7 @@
   function criarLinha(chamar, inicial, { rascunhos, chave, aoSerie } = {}) {
     const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: doAlarme(inicial.alarme),
       categoriaId: inicial.categoriaId ?? null, temAlarme: inicial.temAlarme !== undefined ? !!inicial.temAlarme : !!inicial.alarme,
-      serieId: inicial.serieId ?? null, seriePos: inicial.seriePos ?? null };
+      serieId: inicial.serieId ?? null, seriePos: inicial.seriePos ?? null, horario: inicial.horario ?? null };
     const alvo = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };
     let fila = Promise.resolve();
     let naFila = 0;
@@ -109,7 +111,9 @@
       if (!enviado && escrito.texto === dados.texto && (!dados.id || (escrito.feita === dados.feita && escrito.alarme === dados.alarme))) return rascunhos.remover(chave);
       rascunhos.gravar(chave, { id: dados.id, quadro: dados.quadro, data: dados.data, texto: escrito.texto, feita: escrito.feita,
         ...(escrito.alarme !== dados.alarme ? { alarme: escrito.alarme } : {}), ...(enviado ? { enviado } : {}),
-        ...(escolha && escolha.texto === escrito.texto ? { escopo: escolha.escopo } : {}) });
+        ...(escolha && escolha.texto === escrito.texto ? { escopo: escolha.escopo } : {}),
+        // item novo criado na grade: o horário volta junto com o texto
+        ...(!dados.id && dados.horario ? { horario: dados.horario } : {}) });
     }
     function anotar(texto, feita) {
       if (texto !== undefined) escrito.texto = limpar(texto);
@@ -136,7 +140,7 @@
       guardar();   // antes de enviar: se a página sair sem a resposta, dá para reconhecer a linha depois
       let r;
       try {
-        r = await chamar('/minha_semana', { metodo: 'POST', corpo: { quadro: dados.quadro, data: dados.data, texto } });
+        r = await chamar('/minha_semana', { metodo: 'POST', corpo: { quadro: dados.quadro, data: dados.data, texto, ...(dados.horario ? { horario: dados.horario } : {}) } });
       } catch (e) {
         if (e.status) enviado = null;   // o servidor respondeu com erro: não criou
         throw e;
@@ -202,6 +206,7 @@
       adotar: l => {
         if (l.texto !== undefined) { dados.texto = l.texto; alvo.texto = l.texto; escrito.texto = l.texto; }
         if (l.categoriaId !== undefined) dados.categoriaId = l.categoriaId;
+        if (l.horario !== undefined) dados.horario = l.horario;
         guardar();
       },
       marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
@@ -226,8 +231,18 @@
         if (l.alarme !== undefined) { dados.alarme = doAlarme(l.alarme); dados.temAlarme = !!l.alarme; }
         // nota não se repete: o servidor tira da série
         if (l.serieId !== undefined) { dados.serieId = l.serieId; dados.seriePos = l.seriePos ?? null; } else if (corpo.quadro === 'notas') dados.serieId = dados.seriePos = null;
+        // horário: o que o servidor gravou (fora dos dias não há)
+        dados.horario = l.horario !== undefined ? l.horario : corpo.quadro !== 'dia' ? null : corpo.horario !== undefined ? corpo.horario : dados.horario;
         for (const f of ['feita', 'alarme']) { alvo[f] = dados[f]; escrito[f] = dados[f]; }
         return { ok: true, linha: r && r.quadro ? r : null };   // a linha como o servidor gravou, para a tela refazer a faixa
+      }),
+      // horário (só item salvo dos dias, sem nada pendente): pela mesma fila; vale só para este item, mesmo em série
+      mudarHorario: h => acao(async () => {
+        if (!dados.id || !semPendencia()) return { ok: false, mensagem: 'Espere o texto ser salvo antes de mudar o horário.' };
+        if (dados.quadro !== 'dia') return { ok: false, mensagem: 'Só os itens dos dias têm horário.' };
+        const r = await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo: { horario: h } });
+        dados.horario = r && r.horario !== undefined ? r.horario : h;
+        return { ok: true };
       }),
       // "Repetir...": pela mesma fila, só com tudo salvo. O servidor devolve a série inteira ({ linha, linhas, qtd }).
       repetir: regra => acao(async () => {
@@ -302,7 +317,7 @@
   // Item de série com texto mudado e sem a escolha (só este / próximos / todos) guardada: o texto NÃO é enviado sozinho
   // (`decidir`: a tela mostra o texto e pede a escolha); caixinha e alarme seguem como sempre.
   function retomar(chamar, { chave, entrada, base }, rascunhos, opcoes = {}) {
-    const linha = criarLinha(chamar, base || { quadro: entrada.quadro, data: entrada.data, texto: '', feita: false }, { ...opcoes, rascunhos, chave });
+    const linha = criarLinha(chamar, base || { quadro: entrada.quadro, data: entrada.data, texto: '', feita: false, horario: entrada.horario ?? null }, { ...opcoes, rascunhos, chave });
     const decidir = !!base?.serieId && !base.sumiu && limpar(entrada.texto) !== base.texto && !entrada.escopo;
     linha.anotar(entrada.texto, entrada.feita);
     let pronto = decidir ? Promise.resolve() : linha.salvarTexto(entrada.texto, entrada.escopo);
@@ -383,7 +398,9 @@
     const rascunhos = criarRascunhos(() => win.localStorage, dono);
     // só o que já estava guardado ao abrir é retomado (o que nasce depois pertence às linhas da tela)
     const estado = { mostrada: null, alvo: segundaDe(new Date()), geracao: 0, linhas: [], herdados: rascunhos.ler(), recuperacao: null,
-      quadros: [], categorias: new Map(), arrastando: false };
+      quadros: [], categorias: new Map(), arrastando: false, grade: false, g: null };
+    // a lista de categorias é única (as duas agendas): só quem tem tarefas_admin.usar cria, renomeia, troca a cor e exclui
+    const podeGerir = () => (win.Acesso?.pode ? win.Acesso.pode('tarefas_admin.usar') : true);
     let sequencia = 0;
     const novaChave = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${++sequencia}`;
     const semana = $('semana');
@@ -404,8 +421,9 @@
       const ordem = [...(lista || [])].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { sensitivity: 'base' }) || a.id - b.id);
       estado.categorias = AG.indexar(ordem);
       legenda.podar(estado.categorias);
-      ui.desenharLegenda($('legenda'), { categorias: estado.categorias, legenda, aoMudar: () => estado.linhas.forEach(pintar) });
+      ui.desenharLegenda($('legenda'), { categorias: estado.categorias, legenda, aoMudar: () => { estado.linhas.forEach(pintar); reorganizarTudo(); } });
       estado.linhas.forEach(pintar);
+      reorganizarTudo();
     }
     function pintarFaixa(item) {
       const { linha, li } = item;
@@ -414,6 +432,12 @@
       li.dataset.cor = salva ? AG.corDe(linha.dados.categoriaId, estado.categorias) : '';
       item.alca.hidden = item.marcador.hidden = !salva;
       item.serie.hidden = !salva || !linha.dados.serieId;
+      // horário (só nos dias): escrito na faixa; o leitor de tela ouve o dia e o horário
+      const h = item.quadro.quadro === 'dia' ? linha.dados.horario : null;
+      item.hora.textContent = AH.rotulo(h);
+      item.hora.hidden = !h;
+      li.classList.toggle('com-hora', !!h);
+      item.input.setAttribute('aria-label', item.quadro.rotulo + (h ? ', ' + AH.rotulo(h) : ''));
       item.marcador.setAttribute('aria-label', `Opções do item (categoria: ${AG.nomeDe(linha.dados.categoriaId, estado.categorias)}${linha.dados.serieId ? '; repete' : ''})`);
       // a legenda esconde a categoria, mas nunca o que está sendo escrito, esperando a escolha da série ou deu erro
       li.hidden = salva && !legenda.visivel(linha.dados.categoriaId, estado.categorias) && !linha.erro && !item.decidir && !linha.pendente() && !li.contains(doc.activeElement);
@@ -585,16 +609,128 @@
 
     // ---------- menu da faixa, trocar a categoria e mover ----------
     const quadroDe = d => estado.quadros.find(q => q.quadro === d.quadro && (q.quadro !== 'dia' || q.data === d.data)) || null;
-    // a posição em que o servidor devolve (ordem de criação), antes da linha vazia do fim
-    function inserirNaOrdem(q, li, id) {
-      const depois = [...q.lista.children].find(el => el !== li && (!porLi.get(el)?.linha.dados.id || porLi.get(el).linha.dados.id > id));
+    // a posição na lista do dia: "dia todo" na ordem de criação, depois por horário; sempre antes da linha vazia do fim
+    function inserirNaOrdem(q, li) {
+      for (const p of ['top', 'height', 'left', 'width', '--alto']) li.style.removeProperty(p);   // posição da grade não vale na lista
+      li.classList.remove('curto');
+      const d = porLi.get(li)?.linha.dados || {};
+      const ultima = q.lista.lastElementChild;
+      if (!d.id) { if (li !== ultima) q.lista.insertBefore(li, ultima && !porLi.get(ultima)?.linha.dados.id ? ultima : null); return; }
+      const depois = [...q.lista.children].find(el => el !== li && AH.comparar(d, porLi.get(el)?.linha.dados || {}) < 0);
+      if (depois === li.nextElementSibling && li.parentNode === q.lista) return;   // já está no lugar (não tira o foco)
       q.lista.insertBefore(li, depois || null);
     }
     function remover(item) {
       ui.fecharMenu(false);
       fecharEditor(item);
+      const daGrade = item.li.parentNode === item.quadro.grade;
       item.li.remove();
       estado.linhas = estado.linhas.filter(i => i !== item);
+      if (daGrade) reorganizar(item.quadro);
+    }
+
+    // ---------- grade de horários (tela larga) e lista por dia (estreita) ----------
+    const querGrade = () => AG.querGrade(semana.parentElement.clientWidth, win.matchMedia('(max-width: 700px)').matches);
+    // onde a faixa fica: com horário e na grade = coluna do dia; senão, a lista do dia (ordem: dia todo, depois por horário)
+    function lugarCerto(item) {
+      const { linha, li, quadro: q } = item;
+      const naGrade = estado.grade && !!q.grade && q.quadro === 'dia' && !!linha.dados.horario;
+      const antes = li.parentNode;
+      const foco = li.contains(doc.activeElement) ? doc.activeElement : null;
+      if (naGrade) {
+        if (antes !== q.grade) q.grade.append(li);
+      } else if (antes !== q.lista || linha.dados.id) inserirNaOrdem(q, li);
+      if (foco && !li.contains(doc.activeElement)) foco.focus();
+      if (naGrade || antes === q.grade) reorganizar(q);
+    }
+    // sobrepostos lado a lado e a ordem do Tab pelo horário (sem tirar o foco de ninguém)
+    function reorganizar(q) {
+      if (!q.grade) return;
+      const itens = estado.linhas.filter(i => i.quadro === q && i.li.parentNode === q.grade && i.linha.dados.horario);
+      const visiveis = itens.filter(i => !i.li.hidden);
+      const chave = (i, n) => i.linha.dados.id || 1e9 + n;
+      const lugares = AH.distribuir(visiveis.map((i, n) => ({ id: chave(i, n), horario: i.linha.dados.horario })));
+      visiveis.forEach((i, n) => {
+        const e = AG.estiloGrade(i.linha.dados.horario, lugares.get(chave(i, n)));
+        Object.assign(i.li.style, { top: e.top, height: e.height, left: e.left, width: e.width });
+        i.li.style.setProperty('--alto', e.height);
+        i.li.classList.toggle('curto', e.curto);
+      });
+      if (!q.grade.contains(doc.activeElement)) {
+        const ordem = [...itens].sort((a, b) => AH.comparar(a.linha.dados, b.linha.dados));
+        if (ordem.some((i, n) => q.grade.children[n] !== i.li)) for (const i of ordem) q.grade.append(i.li);
+      }
+    }
+    const reorganizarTudo = () => { for (const q of estado.quadros) reorganizar(q); };
+    // a barra de rolagem da grade não pode desalinhar as colunas dos dias de cima
+    function ajustarBarra() {
+      const el = estado.g?.el;
+      if (el) semana.style.setProperty('--ag-sb', Math.max(0, el.offsetWidth - el.clientWidth - 2 * el.clientLeft) + 'px');
+    }
+    function montarGradeDaSemana() {
+      const dias = estado.quadros.filter(q => q.quadro === 'dia');
+      const g = ui.montarGrade({ dias: dias.map(q => ({ rotulo: q.rotulo, hoje: q.hoje })) });
+      g.canto = criar('div', 'ag-canto', 'dia todo');
+      g.canto.setAttribute('aria-hidden', 'true');
+      dias.forEach((q, n) => { q.col = g.colunas[n].col; q.grade = g.colunas[n].lista; });
+      semana.insertBefore(g.canto, dias[0].sec);
+      dias[6].sec.after(g.el);
+      semana.classList.add('ag-com-grade');
+      estado.g = g;
+      ui.marcarAgora(g.agora);
+      ajustarBarra();
+      g.el.scrollTop = 7 * AG.PX_HORA - 6;   // abre perto das 07:00
+    }
+    function desmontarGrade() {
+      if (!estado.g) return;
+      estado.g.el.remove();
+      estado.g.canto.remove();
+      estado.g = null;
+      for (const q of estado.quadros) { q.grade = null; q.col = null; }
+      semana.classList.remove('ag-com-grade');
+      semana.style.removeProperty('--ag-sb');
+    }
+    // mudou a largura: entra ou sai da grade sem recarregar (as faixas trocam de lugar com o que já têm)
+    function aplicarModo() {
+      if (!estado.quadros.length || !estado.quadros[0].sec?.isConnected) return;
+      const g = querGrade();
+      if (g === estado.grade) { ajustarBarra(); return; }
+      estado.grade = g;
+      if (g) montarGradeDaSemana();
+      for (const item of [...estado.linhas]) lugarCerto(item);
+      if (!g) desmontarGrade();
+      ajustarTodos();
+    }
+    // clique num horário vazio da grade: item novo ali (1h), escrito na própria grade
+    function criarNoHorario(q, minuto) {
+      if (semana.getAttribute('aria-busy') === 'true') return;
+      const item = novaLinha(q, { horario: AH.novoEm(minuto) });
+      item.input.focus();
+    }
+    async function mudarHorario(item, h) {
+      const d = item.linha.dados;
+      if (AG.mesmoHorario(d.horario, h)) { lugarCerto(item); return; }
+      if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de mudar o horário.', 'erro'); lugarCerto(item); return; }
+      item.li.classList.add('movendo');
+      const r = await item.linha.mudarHorario(h);
+      item.li.classList.remove('movendo');
+      if (r.sumiu) return sumiu(item);
+      if (!r.ok) toast(`Não foi possível mudar o horário. ${String(r.mensagem || '').replace(/\.$/, '')}.`, 'erro');
+      pintar(item);
+      lugarCerto(item);
+    }
+    function abrirHorarioDo(item) {
+      if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de mudar o horário.', 'erro'); return; }
+      ui.abrirHorario({ texto: item.input.value, horario: item.linha.dados.horario, aoSalvar: async h => {
+        if (AG.mesmoHorario(item.linha.dados.horario, h)) return;
+        item.li.classList.add('movendo');
+        const r = await item.linha.mudarHorario(h);
+        item.li.classList.remove('movendo');
+        if (r.sumiu) { sumiu(item); return; }
+        if (!r.ok) throw new Error(r.mensagem || 'Não foi possível salvar o horário.');
+        pintar(item);
+        lugarCerto(item);
+      } });
     }
     function sumiu(item) {
       remover(item);
@@ -615,21 +751,26 @@
         pintar(item);
       });
     }
+    // `destino.horario`: undefined = mantém; null = dia todo; { inicio, fim } = horário novo (grade)
     async function moverItem(item, destino) {
       const d = item.linha.dados;
-      if (AG.mesmoLugar(d, destino)) return;
+      if (AG.mesmoLugar(d, destino)) {
+        if (destino.horario !== undefined && !AG.mesmoHorario(d.horario, destino.horario)) return mudarHorario(item, destino.horario);
+        return;
+      }
       if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de mover.', 'erro'); return; }
       if (AG.pedeConfirmacaoNotas(d, destino) && !(await ui.confirmar({ titulo: 'Mover para Notas', sim: 'Mover',
         texto: 'Notas não têm alarme nem caixinha. Ao mover, o alarme deste item é apagado e ele deixa de estar concluído.' }))) return;
-      const origem = { lista: item.li.parentNode, depois: item.li.nextSibling };
       const q = quadroDe(destino);
-      if (q) inserirNaOrdem(q, item.li, d.id);
+      // na lista o item já aparece no destino enquanto grava; na grade ele espera a resposta (a posição depende do horário)
+      const vaiPraGrade = estado.grade && destino.quadro === 'dia' && !!(destino.horario !== undefined ? destino.horario : d.horario);
+      if (q && !vaiPraGrade) inserirNaOrdem(q, item.li);
       item.li.classList.add('movendo');
       const r = await item.linha.mover(destino);
       item.li.classList.remove('movendo');
       if (r.sumiu) return sumiu(item);
       if (!r.ok) {
-        origem.lista.insertBefore(item.li, origem.depois && origem.depois.parentNode === origem.lista ? origem.depois : origem.lista.lastElementChild);
+        lugarCerto(item);   // nada mudou nos dados: volta para onde estava (lista ou grade)
         toast(`Não foi possível mover. ${r.mensagem.replace(/\.$/, '')}. O item voltou ao lugar.`, 'erro');
         return;
       }
@@ -643,15 +784,15 @@
         aoEscolher: id => colorir(item, id),
         aoMover: () => ui.abrirMover({ texto: item.input.value, atual: item.linha.dados, aoMover: d => moverItem(item, d),
           destinos: estado.quadros.map(q => ({ quadro: q.quadro, data: q.data, rotulo: q.rotulo })) }),
+        aoHorario: AG.podeHorario(item.linha.dados) ? () => abrirHorarioDo(item) : null,
         aoRepetir: AG.podeRepetir(item.linha.dados) ? () => abrirRepetirDo(item) : null,
-        aoCategorias: abrirCategorias });
+        aoCategorias: podeGerir() ? abrirCategorias : null });
     }
-    // ---------- "Repetir...": cada data vira um item próprio; o item vai para a primeira data ----------
+    // ---------- "Repetir...": cada data vira um item próprio (com o mesmo horário); o item vai para a primeira data ----------
     function colocar(l) {
       const q = quadroDe(l);
       if (!q) return;
-      const nova = novaLinha(q, l, null, q.lista.lastElementChild);
-      inserirNaOrdem(q, nova.li, l.id);
+      novaLinha(q, l, null, q.lista.lastElementChild);   // a faixa vai para o lugar certo (lista ou grade) sozinha
     }
     function abrirRepetirDo(item) {
       if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de repetir.', 'erro'); return; }
@@ -671,11 +812,12 @@
           toast(`Repete em ${ds.length} dias, de ${R.dataBR(ds[0])} a ${R.dataBR(ds[ds.length - 1])}.`, 'ok');
         } });
     }
-    // ---------- janela "Categorias" (só as desta pessoa) ----------
+    // ---------- janela "Categorias" (a lista única das duas agendas; só quem tem tarefas_admin.usar) ----------
     const BASE_CAT = '/minha_semana/categorias';
     function abrirCategorias() {
+      if (!podeGerir()) return;
       const lista = () => [...estado.categorias.values()];
-      ui.abrirCategorias({ categorias: () => estado.categorias, subtitulo: 'Só você vê as suas categorias.', api: {
+      ui.abrirCategorias({ categorias: () => estado.categorias, subtitulo: 'A mesma lista na Minha semana e na Semana compartilhada: mesmo nome, mesma cor. Seus itens continuam só seus.', api: {
         criar: (nome, cor) => chamar(BASE_CAT, { metodo: 'POST', corpo: { nome, cor } }).then(c => aplicarCategorias([...lista(), c])),
         mudar: (id, campos) => chamar(`${BASE_CAT}/${id}`, { metodo: 'PUT', corpo: campos }).then(c => aplicarCategorias(lista().map(x => (x.id === id ? c : x)))),
         excluir: id => chamar(`${BASE_CAT}/${id}`, { metodo: 'DELETE' }).then(() => {
@@ -696,8 +838,14 @@
         : criarLinha(chamar, { quadro: q.quadro, data: q.data, texto: '', feita: false, ...dados }, { ...opcoes, rascunhos, chave: novaChave() });
       const li = criar('li', 'linha');
       const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso'), alca: criar('span', 'alca'), marcador: criar('button', 'marcador'),
-        serie: criar('span', 'ag-serie', '↻'), lado: criar('span', 'ag-lado'), decidir: !!volta?.decidir, perguntando: false, cancelado: null };
+        serie: criar('span', 'ag-serie', '↻'), lado: criar('span', 'ag-lado'), decidir: !!volta?.decidir, perguntando: false, cancelado: null,
+        hora: criar('span', 'ag-hora'), puxar: criar('span', 'ag-puxar') };
       porLi.set(li, item);
+      // horário escrito na faixa (só nos dias) e, na grade, a borda de baixo que se puxa para mudar a duração
+      item.hora.hidden = true;
+      item.puxar.setAttribute('aria-hidden', 'true');
+      item.puxar.title = 'Puxar para mudar a duração';
+      li.append(item.hora);
       // ↻ = item que se repete (o leitor de tela ouve "Item que se repete"); fica embaixo do "⋯" para não roubar largura do texto
       item.serie.setAttribute('role', 'img');
       item.serie.setAttribute('aria-label', 'Item que se repete');
@@ -757,6 +905,7 @@
         if (input.readOnly) return;
         salvar(item, 'enter');
         if (item.perguntando) return;
+        if (li.parentNode !== q.lista) { input.blur(); return; }   // na grade: Enter termina o item
         if (input.value.trim() && q.lista.lastElementChild === li) novaLinha(q);
         li.nextElementSibling?.querySelector('textarea').focus();
       };
@@ -771,10 +920,11 @@
         enter();
       });
       item.lado.append(item.marcador, item.serie);
-      li.append(input, item.lado, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso, item.decisao);
-      q.lista.insertBefore(li, antesDe);
+      li.append(input, item.lado, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso, item.decisao, item.puxar);
+      q.lista.insertBefore(li, antesDe && antesDe.parentNode === q.lista ? antesDe : null);
       estado.linhas.push(item);
       pintar(item);
+      if (linha.dados.id || linha.dados.horario) lugarCerto(item);
       ajustar(input);
       if (volta && !volta.decidir) {
         li.classList.add('erro');
@@ -818,6 +968,13 @@
         q.lista = criar('ul', 'linhas');
         sec.append(titulo, q.lista);
         semana.append(sec);
+      }
+      // tela larga: a grade de horários entre os dias e Tarefas/Notas (antes das faixas, que vão direto para o lugar certo)
+      estado.g = null;
+      estado.grade = querGrade();
+      semana.classList.remove('ag-com-grade');
+      if (estado.grade) montarGradeDaSemana();
+      for (const q of quadros) {
         const minhas = linhas.filter(l => l.quadro === q.quadro && (q.quadro !== 'dia' || l.data === q.data));
         for (const l of minhas) novaLinha(q, l, porId.get(l.id));
         const extras = soltos.filter(c => c.entrada.quadro === q.quadro && (q.quadro !== 'dia' || c.entrada.data === q.data));
@@ -882,24 +1039,53 @@
       desenhar(inicio, Array.isArray(resposta.linhas) ? resposta.linhas : [], Array.isArray(resposta.categorias) ? resposta.categorias : []);
     }
 
-    // arraste pela alça: soltar num dia, em Tarefas ou em Notas (Esc ou pointercancel desfazem)
+    // arraste pela alça: soltar num dia, em Tarefas ou em Notas (Esc ou pointercancel desfazem). Na grade, o horário segue o
+    // ponteiro (15 min); soltar no "dia todo" de um dia (com a grade na tela) tira o horário; Tarefas e Notas também tiram.
+    const horarioDe = li => porLi.get(li)?.linha.dados.horario || null;
+    const naoPode = li => { if (porLi.get(li)?.linha.dados.id) toast('Espere o texto ser salvo antes de mover.', 'erro'); };
     ui.ligarArraste({ raiz: semana,
       podeArrastar: li => { const it = porLi.get(li); return !!it && AG.podeArrastar(it); },
-      aoNegar: li => { if (porLi.get(li)?.linha.dados.id) toast('Espere o texto ser salvo antes de mover.', 'erro'); },
-      aoSoltar: (li, sec) => { const it = porLi.get(li), q = estado.quadros.find(x => x.sec === sec); if (it && q) moverItem(it, { quadro: q.quadro, data: q.data }); },
+      aoNegar: naoPode,
+      grade: { horarioDe, rolador: () => estado.g?.el || null },
+      aoSoltar: (li, alvo, extra = {}) => {
+        const it = porLi.get(li);
+        if (!it) return;
+        if (extra.horario) {
+          const q = estado.quadros.find(x => x.col === alvo);
+          if (q) moverItem(it, { quadro: 'dia', data: q.data, horario: extra.horario });
+          return;
+        }
+        const q = estado.quadros.find(x => x.sec === alvo);
+        if (q) moverItem(it, { quadro: q.quadro, data: q.data, ...(estado.grade && q.quadro === 'dia' ? { horario: null } : {}) });
+      },
       aoMudar: sim => { estado.arrastando = sim; if (sim) ui.fecharMenu(false); } });
+    // puxar a borda de baixo de um item da grade: muda o fim, em passos de 15 min
+    ui.ligarRedimensionar({ raiz: semana, horarioDe, aoNegar: naoPode,
+      podeMudar: li => { const it = porLi.get(li); return !!it && AG.podeArrastar(it); },
+      aoMudar: sim => { estado.arrastando = sim; if (sim) ui.fecharMenu(false); },
+      aoFim: (li, h) => { const it = porLi.get(li); if (it) mudarHorario(it, h); } });
+    // clique num horário vazio da grade cria um item ali
+    semana.addEventListener('click', ev => {
+      const col = ev.target.closest?.('.ag-col');
+      if (!col || !estado.grade || ev.target.closest('.linha')) return;
+      const q = estado.quadros.find(x => x.col === col);
+      if (q) criarNoHorario(q, (ev.clientY - col.getBoundingClientRect().top) / AG.PX_MIN);
+    });
+    // a linha da hora atual anda sozinha
+    win.setInterval(() => ui.marcarAgora(estado.g?.agora), 60000);
 
     $('btn-anterior').addEventListener('click', () => irPara(somarDias(estado.alvo, -7)));
     $('btn-proxima').addEventListener('click', () => irPara(somarDias(estado.alvo, 7)));
     $('btn-hoje').addEventListener('click', () => irPara(segundaDe(new Date())));
     $('btn-tentar').addEventListener('click', () => irPara(estado.alvo));
     $('btn-categorias').addEventListener('click', abrirCategorias);
+    $('btn-categorias').hidden = !podeGerir();   // só quem gere a lista única (o servidor também recusa: 403)
     win.addEventListener('beforeunload', ev => {
       if (!estado.linhas.some(i => i.linha.pendente() || limpar(i.input.value) !== i.linha.dados.texto)) return;
       ev.preventDefault();
       ev.returnValue = '';
     });
-    win.addEventListener('resize', ajustarTodos);   // mudou a largura da coluna, mudam as quebras
+    win.addEventListener('resize', () => { aplicarModo(); ajustarTodos(); });   // grade ou lista; mudou a largura da coluna, mudam as quebras
     doc.fonts?.ready.then(ajustarTodos);
     ligarSaida(win, () => { for (const item of estado.linhas) if (!item.input.readOnly) salvar(item); });
     irPara(estado.alvo);

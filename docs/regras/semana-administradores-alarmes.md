@@ -7,12 +7,16 @@ Arquivos: `tarefas_admin.html`, `tarefas_admin.js`, `agenda_comum.js` (parte nov
 A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Só a parte nova (paleta, legenda, menu da faixa, janelas e arraste) fica em um arquivo único, `agenda_comum.js`, e o visual dela no bloco AGENDAS do `tema.css`. Quadros, texto, datas, grade, faixas, menu, legenda e arraste seguem `docs/regras/minha-semana.md`.
 
 ## Categorias e mover (compartilhada)
-- Lista única (`web_tarefas_admin_categorias`, nome único `uk_tarefas_admin_cat_nome`): quem tem `tarefas_admin.usar` cria, renomeia, troca a cor e exclui. `GET/POST /semana_admin/categorias`, `PUT/DELETE /semana_admin/categorias/:id` (sem a permissão: 403 sem tocar no banco; inexistente: 404; nome repetido: 409). Mesmas regras de nome e cor da pessoal; nome fora do log e da auditoria.
-- Categoria pessoal nunca vale aqui e a compartilhada nunca vale na pessoal: `categoriaId` de outra lista = 400, nada gravado.
-- Excluir a categoria (transação) deixa os itens "Sem categoria" **sem mudar a versão deles** (texto, concluído e alarme continuam os mesmos); nunca apaga item.
+- **Lista única das duas agendas** (desde 2026-11-26; regras completas e migração em `docs/regras/minha-semana.md`, "Categorias"): a tabela `web_tarefas_admin_categorias` vale aqui e na Minha semana de todos; mesmo nome = mesma cor. Quem tem `tarefas_admin.usar` cria, renomeia, troca a cor e exclui, por `/semana_admin/categorias` ou `/minha_semana/categorias` (`rotas/agenda_categorias.js`; sem a permissão: 403 sem tocar no banco; inexistente: 404; nome repetido: 409). Nome fora do log e da auditoria.
+- `categoriaId` fora da lista única = 400, nada gravado.
+- Excluir a categoria (transação) tira a categoria dos itens daqui **sem mudar a versão deles** e também dos itens pessoais de todos; nunca apaga item.
 - Trocar a categoria e **mover** (`quadro` + `data` no `PUT`) levam a versão que a pessoa via: se outra pessoa mudou antes, 409 com a linha atual, **nada gravado por cima**; a tela adota o atual (põe o item onde ele está agora) e avisa. Item apagado por outra pessoa (404): sai da tela com aviso. Ir para Notas zera concluído, "feita por" e alarme e apaga os avisos do alarme (a tela pergunta antes se havia alarme).
 - A atualização de 60 s também traz a lista de categorias (legenda e cores mudam se outra pessoa mexeu) e leva para o lugar novo o item que outra pessoa moveu. **Não roda com um arraste em andamento, com o menu da faixa ou qualquer janela aberta** (tenta no minuto seguinte; confere de novo depois que a resposta chega).
 - Legenda guardada no navegador em `semana_admin_legenda:<id>`, separada da pessoal.
+
+## Horário e grade na compartilhada
+- Mesmas regras da pessoal (`docs/regras/minha-semana.md`, "Horário e grade"): colunas `hora_inicio`/`hora_fim` em `web_tarefas_admin`, `horario` no `POST`/`PUT`, grade na tela larga, lista por horário no celular, clicar/arrastar/puxar a borda/"Horário…".
+- **Mudar o horário leva a versão** como qualquer gravação: versão velha = 409 com a linha atual, nada por cima; a tela adota o atual (põe a faixa no horário que a outra pessoa deixou) e avisa. A atualização de 60 s traz horários mudados por outra pessoa (a faixa muda de lugar) e **não roda durante arraste, puxar a borda, menu ou janela aberta**.
 
 ## Repetir (série) na compartilhada
 - Mesmas regras da pessoal (`docs/regras/minha-semana.md`, "Repetir"): colunas `serie_id`/`serie_pos` em `web_tarefas_admin` (índice `ix_tarefas_admin_serie`), menu **Repetir…**, datas, limites, ↻, pergunta **Só este / Este e os próximos / Todos**, Cancelar/Desfazer, rascunho com a escolha, Notas tira da série, caixinha/arraste/alarme só daquele dia. Uma série da pessoal nunca vale aqui (tabelas separadas; mesmo `serie_id` plantado na outra tabela não é tocado).
@@ -29,7 +33,7 @@ A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do do
 
 ## Rotas e versão
 - `GET /semana_admin?inicio=` (`{ linhas, categorias }`), `POST /semana_admin`, `PUT /semana_admin/:id` (`texto`, `feita`, `alarme`, `categoriaId`, mover com `quadro` + `data`, sempre com `versao`), `DELETE /semana_admin/:id` (`versao` no corpo ou na URL).
-- Linha: `id, quadro, data, texto, feita, alarme, versao, criadaPor, feitaPor, categoriaId`. Autor e "feita por" vêm do login (nome gravado na linha; nenhuma tabela do VB).
+- Linha: `id, quadro, data, texto, feita, alarme, versao, criadaPor, feitaPor, categoriaId, serieId, seriePos, horario`. Autor e "feita por" vêm do login (nome gravado na linha; nenhuma tabela do VB).
 - Versão diferente: **409** `{ error, atual }` sem gravar. Linha inexistente: 404. Cada gravação soma 1 à versão (linha travada com `FOR UPDATE`).
 - Texto fora de log e auditoria. Não há registro de quem apagou.
 

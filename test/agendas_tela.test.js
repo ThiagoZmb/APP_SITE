@@ -202,7 +202,8 @@ test('XSS: nome de categoria e texto só por textContent/value; sem innerHTML; r
   assert.match(ag, /setPointerCapture/);
   assert.match(ag, /pointercancel/);
   assert.match(ag, /'Escape'/);
-  assert.doesNotMatch(ag, /import |require\(|https?:\/\//, 'sem biblioteca externa');
+  // sem biblioteca externa: só o módulo próprio do horário (calculo/agenda_horario.js, o mesmo do servidor)
+  assert.doesNotMatch(ag, /import |require\((?!'\.\/calculo\/agenda_horario\.js'\))|https?:\/\//, 'sem biblioteca externa');
 });
 
 // contraste WCAG lido do tema.css: texto sobre a faixa (tinta escura) e sobre a faixa concluída (Tinta Média), nas 10 cores e na neutra

@@ -683,7 +683,84 @@ async function instalarTabelas(pool) {
   const [[sa] = []] = await pool.execute(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas_admin' AND COLUMN_NAME = 'serie_id'");
   if (!Number(sa?.n)) await pool.execute('ALTER TABLE web_tarefas_admin ADD COLUMN serie_id CHAR(32) NULL, ADD COLUMN serie_pos SMALLINT NULL, ADD KEY ix_tarefas_admin_serie (serie_id)');
+  // horário opcional dos itens dos dias (minutos desde 00:00, 0 a 1440; NULL = dia todo). Os dois num ALTER só: basta conferir hora_inicio.
+  const [[hp] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = 'hora_inicio'");
+  if (!Number(hp?.n)) await pool.execute('ALTER TABLE web_tarefas ADD COLUMN hora_inicio SMALLINT NULL, ADD COLUMN hora_fim SMALLINT NULL');
+  const [[ha] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas_admin' AND COLUMN_NAME = 'hora_inicio'");
+  if (!Number(ha?.n)) await pool.execute('ALTER TABLE web_tarefas_admin ADD COLUMN hora_inicio SMALLINT NULL, ADD COLUMN hora_fim SMALLINT NULL');
+  // lista única de categorias das duas agendas: os itens pessoais apontam para web_tarefas_admin_categorias pela coluna NOVA
+  // categoria_unica_id (a antiga categoria_id, com os ids pessoais, fica intocada; o servidor antigo ainda a usa durante o deploy)
+  const [[cu] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = 'categoria_unica_id'");
+  if (!Number(cu?.n)) await pool.execute('ALTER TABLE web_tarefas ADD COLUMN categoria_unica_id INT NULL, ADD KEY ix_tarefas_cat_unica (categoria_unica_id)');
+  await unificarCategoriasAgendas(pool);
   await migrarEntregasVarias(pool);
+}
+
+// Agendas: junta as categorias pessoais (web_tarefas_categorias) na lista única (web_tarefas_admin_categorias). Uma vez só (marcador
+// em web_auditoria), numa transação: interrompida, nada fica gravado e roda de novo na próxima subida. Nada é apagado.
+// - Nome igual (o banco compara sem maiúsculas e acentos) a um da lista única: vale a categoria (e a cor) da lista única.
+// - O mesmo nome em pessoas diferentes: vale a categoria pessoal mais antiga (menor id), com o nome e a cor dela.
+// - Os itens pessoais ganham o id da lista única em categoria_unica_id (só onde está vazio e só os da dona da categoria);
+//   categoria_id (ids pessoais) nunca é reescrita, então nada é remapeado duas vezes (os ids das duas tabelas se repetem).
+// - Acima de 30 categorias no total, todas ficam. Nomes nunca vão para o log nem para a auditoria (só contagens).
+const MARCADOR_CATEGORIAS = 'agendas_categorias_unicas';
+async function unificarCategoriasAgendas(pool) {
+  const { chaveNome } = require('../calculo/minha_semana');
+  const [feito] = await pool.execute(`SELECT id FROM web_auditoria WHERE acao = '${MARCADOR_CATEGORIAS}' LIMIT 1`);
+  if (feito.length) return { feito: false };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // trava a lista única: outra subida ao mesmo tempo espera aqui e, ao seguir, encontra o marcador
+    const [unicas] = await conn.execute('SELECT id, nome, cor FROM web_tarefas_admin_categorias ORDER BY id FOR UPDATE');
+    const [deNovo] = await conn.execute(`SELECT id FROM web_auditoria WHERE acao = '${MARCADOR_CATEGORIAS}' LIMIT 1`);
+    if (deNovo.length) { await conn.rollback(); return { feito: false }; }
+    const [pessoais] = await conn.execute('SELECT id, usuario_codigo, nome, cor FROM web_tarefas_categorias ORDER BY id');
+    const porNome = new Map(unicas.map(c => [chaveNome(c.nome), Number(c.id)]));
+    const destino = new Map();   // id da lista única -> [[usuario, id pessoal], ...]
+    let criadas = 0;
+    for (const p of pessoais) {
+      const k = chaveNome(p.nome);
+      let id = porNome.get(k);
+      if (id === undefined) {
+        try {
+          const [r] = await conn.execute(
+            'INSERT INTO web_tarefas_admin_categorias (nome, cor, criado_por_codigo, criado_em, atualizado_em) VALUES (?, ?, ?, NOW(), NOW())',
+            [p.nome, p.cor, p.usuario_codigo]);
+          id = Number(r.insertId);
+          criadas++;
+        } catch (err) {
+          // o banco achou igual um nome que a comparação daqui achou diferente: vale a categoria que já está lá
+          if (err?.code !== 'ER_DUP_ENTRY' && err?.errno !== 1062) throw err;
+          const [[existente]] = await conn.execute('SELECT id FROM web_tarefas_admin_categorias WHERE nome = ?', [p.nome]);
+          if (!existente) throw err;
+          id = Number(existente.id);
+        }
+        porNome.set(k, id);
+      }
+      if (!destino.has(id)) destino.set(id, []);
+      destino.get(id).push([Number(p.usuario_codigo), Number(p.id)]);
+    }
+    let itens = 0;
+    for (const [id, pares] of destino) {
+      const [r] = await conn.execute(
+        `UPDATE web_tarefas SET categoria_unica_id = ? WHERE categoria_unica_id IS NULL AND (usuario_codigo, categoria_id) IN (${pares.map(() => '(?, ?)').join(', ')})`,
+        [id, ...pares.flat()]);
+      itens += Number(r?.affectedRows) || 0;
+    }
+    await conn.execute('INSERT INTO web_auditoria (quando, quem, acao, alvo, detalhe) VALUES (NOW(), ?, ?, ?, ?)',
+      ['sistema', MARCADOR_CATEGORIAS, '', JSON.stringify({ pessoais: pessoais.length, criadas, juntadas: pessoais.length - criadas, itens })]);
+    await conn.commit();
+    return { feito: true, pessoais: pessoais.length, criadas, itens };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 // Várias entregas por pedido (etapa 2): web_entregas criada antes de `sequencia`/`hash_itens` e com UNIQUE(numero).
@@ -1415,4 +1492,4 @@ const REGRAS_PEDIDOS_ACOES = [
 ];
 const acrescentarPermissoesPedidosAcoes = pool => desdobrarPermissoes(pool, 'permissoes_pedidos_acoes', REGRAS_PEDIDOS_ACOES);
 
-module.exports = { acrescentarPermissoesTarefasAdmin, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesTarefasAdmin, unificarCategoriasAgendas, MARCADOR_CATEGORIAS, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };

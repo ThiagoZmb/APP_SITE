@@ -77,7 +77,7 @@ test('usuário sem nenhuma permissão cria e lê a própria linha', async t => {
   const eu = como(7);
   const r = await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: TEXTO });
   assert.equal(r.status, 201);
-  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null, categoriaId: null, serieId: null, seriePos: null });
+  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null, categoriaId: null, serieId: null, seriePos: null, horario: null });
   const g = await eu.get(SEMANA);
   assert.equal(g.status, 200);
   assert.deepEqual(g.corpo, { linhas: [r.corpo], categorias: [] });
@@ -131,7 +131,8 @@ test('todo SELECT, UPDATE e DELETE filtra por usuario_codigo; texto não vai par
   await eu.get(SEMANA);
   await eu.del('/minha_semana/1');
   const sqls = banco.f.chamadas.filter(c => /web_tarefas/.test(c.sql));
-  for (const c of sqls) if (!/^INSERT/.test(c.sql)) assert.match(c.sql, /usuario_codigo = \?/, c.sql);
+  // a lista única de categorias (só nomes e cores) é a mesma para todos: única leitura sem dono
+  for (const c of sqls) if (!/^INSERT/.test(c.sql) && !/FROM web_tarefas_admin_categorias/.test(c.sql)) assert.match(c.sql, /usuario_codigo = \?/, c.sql);
   assert.ok(!banco.f.chamadas.some(c => /web_auditoria/.test(c.sql)));
   assert.ok(!logs.join('\n').includes('TEXTO-PRIVADO'));
 });
@@ -194,7 +195,7 @@ test('semana cruzando o ano e o mês; datas reais; validações puras', () => {
   assert.equal(diasDaSemana('2028-02-28')[1], '2028-02-29');
   assert.equal(validarData('2028-02-29'), true);
   for (const s of ['2026-02-29', '2026-13-01', '2026-1-1', '', null, undefined, 20261125]) assert.equal(validarData(s), false, String(s));
-  assert.deepEqual(validarNova({ quadro: 'notas', texto: ' a\nb ' }), { ok: true, valor: { quadro: 'notas', data: null, texto: 'a b', categoriaId: null } });
+  assert.deepEqual(validarNova({ quadro: 'notas', texto: ' a\nb ' }), { ok: true, valor: { quadro: 'notas', data: null, texto: 'a b', categoriaId: null, horario: null } });
   assert.equal(validarNova(undefined).ok, false);
   assert.deepEqual(validarMudanca({ feita: false }), { ok: true, valor: { feita: false } });
   assert.equal(validarMudanca(null).ok, false);
@@ -205,7 +206,7 @@ test('resposta não perde campo na rede de valores (usuário sem valores.ver)', 
   const eu = como(7);
   await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: 'a' });
   const g = await eu.get(SEMANA);
-  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme', 'categoriaId', 'serieId', 'seriePos']);
+  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme', 'categoriaId', 'serieId', 'seriePos', 'horario']);
   assert.ok(!logs.some(l => l.includes('[valores]')));
 });
 

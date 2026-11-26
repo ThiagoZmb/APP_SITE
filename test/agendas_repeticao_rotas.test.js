@@ -55,7 +55,7 @@ test('pessoal: repetir todos os dias; o item vira a 1ª ocorrência (vai para a 
   assert.deepEqual([r.corpo.linha.id, r.corpo.linha.data, r.corpo.linha.feita], [1, '2026-11-27', true], 'o próprio item (mantém o concluído)');
   assert.equal(banco.pessoais[0].alarme, '2026-11-24 09:00:00', 'o alarme do próprio item fica');
   for (const l of banco.pessoais.slice(1)) {
-    assert.deepEqual([l.usuario_codigo, l.quadro, l.texto, l.categoria_id, l.feita, l.alarme, l.serie_id], [1, 'dia', 'Extrato', 1, 0, null, serie]);
+    assert.deepEqual([l.usuario_codigo, l.quadro, l.texto, l.categoria_unica_id, l.feita, l.alarme, l.serie_id], [1, 'dia', 'Extrato', 1, 0, null, serie]);
   }
   assert.ok(transacao(banco), 'numa transação');
   const g = await ana.get('/minha_semana?inicio=2026-11-23');
@@ -110,12 +110,12 @@ test('pessoal: texto em série: só este, este e os próximos, todos; categoria 
   assert.equal(r.corpo.texto, 'Do 3 em diante', 'a resposta é a linha clicada');
   await ana.post('/minha_semana/categorias', { nome: 'RH', cor: 'verde' });
   r = await ana.put('/minha_semana/2', { categoriaId: 1, escopo: 'todos' });
-  assert.deepEqual(banco.pessoais.map(l => l.categoria_id), [1, 1, 1, 1, 1]);
+  assert.deepEqual(banco.pessoais.map(l => l.categoria_unica_id), [1, 1, 1, 1, 1]);
   assert.ok(transacao(banco));
   for (const corpo of [{ texto: 'x', feita: true, escopo: 'todos' }, { quadro: 'tarefas', escopo: 'todos' }, { texto: 'x', escopo: 'tudo' }])
     assert.equal((await ana.put('/minha_semana/2', corpo)).status, 400, JSON.stringify(corpo));
   assert.equal((await ana.put('/minha_semana/2', { categoriaId: 99, escopo: 'todos' })).status, 400, 'categoria alheia');
-  assert.deepEqual(banco.pessoais.map(l => l.categoria_id), [1, 1, 1, 1, 1]);
+  assert.deepEqual(banco.pessoais.map(l => l.categoria_unica_id), [1, 1, 1, 1, 1]);
 });
 
 test('pessoal: apagar em série não apaga os concluídos (só o próprio item, se pedido); "só este" apaga mesmo concluído', async t => {
@@ -229,7 +229,7 @@ test('texto fora do log; falha do banco no meio da série = 500 só com o códig
   const { como, banco, logs } = await preparar(t);
   await como(1).post('/minha_semana', { quadro: 'dia', data: '2026-12-01', texto: 'TEXTO-PRIVADO' });
   const original = banco.f.execute;
-  const falhar = async (sql, p) => { if (/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_id, serie_id, serie_pos\)/.test(sql)) { const e = new Error('TEXTO-PRIVADO dup'); e.code = 'ER_X'; throw e; } return original(sql, p); };
+  const falhar = async (sql, p) => { if (/^INSERT INTO web_tarefas \(usuario_codigo, quadro, data, texto, feita, criado_em, atualizado_em, categoria_unica_id, serie_id, serie_pos, hora_inicio, hora_fim\)/.test(sql)) { const e = new Error('TEXTO-PRIVADO dup'); e.code = 'ER_X'; throw e; } return original(sql, p); };
   pool.getConnection = async () => ({ execute: falhar, query: falhar, beginTransaction: async () => banco.f.chamadas.push({ sql: 'BEGIN' }), commit: async () => banco.f.chamadas.push({ sql: 'COMMIT' }), rollback: async () => banco.f.chamadas.push({ sql: 'ROLLBACK' }), release() {} });
   const r = await como(1).post('/minha_semana/1/repetir', DIARIA('2026-12-01', '2026-12-03'));
   assert.deepEqual([r.status, r.corpo], [500, { error: 'Erro de servidor' }]);

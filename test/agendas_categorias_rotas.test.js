@@ -62,94 +62,117 @@ test('validarMudanca: mover exige quadro (e data no dia); categoria é número o
     assert.equal(validarMudanca(c).ok, false, JSON.stringify(c));
 });
 
-// ---------- categorias da Minha semana ----------
-test('pessoal: cria, lista (por nome), renomeia, troca a cor; o GET da semana traz as categorias', async t => {
-  const { como } = await preparar(t);
-  const ana = como(1);
+// ---------- lista única de categorias (a mesma na Minha semana e na Semana compartilhada) ----------
+test('lista única: criar pela Minha semana aparece na compartilhada (e vice-versa); lista por nome; renomeia e troca a cor', async t => {
+  const { como, banco } = await preparar(t);
+  const ana = como(1), joao = como(2);
   const a = await ana.post('/minha_semana/categorias', { nome: 'Médico', cor: 'rosa', usuario_codigo: 2 });
   assert.deepEqual([a.status, a.corpo], [201, { id: 1, nome: 'Médico', cor: 'rosa' }]);
-  const b = await ana.post('/minha_semana/categorias', { nome: 'Banco', cor: 'azul' });
+  const b = await joao.post('/semana_admin/categorias', { nome: 'Banco', cor: 'azul' });
   assert.equal(b.status, 201);
-  assert.deepEqual((await ana.get('/minha_semana/categorias')).corpo, { categorias: [{ id: 2, nome: 'Banco', cor: 'azul' }, { id: 1, nome: 'Médico', cor: 'rosa' }] });
-  const r = await ana.put('/minha_semana/categorias/1', { nome: 'Saúde' });
+  const lista = { categorias: [{ id: 2, nome: 'Banco', cor: 'azul' }, { id: 1, nome: 'Médico', cor: 'rosa' }] };
+  assert.deepEqual((await ana.get('/minha_semana/categorias')).corpo, lista);
+  assert.deepEqual((await como(3).get('/minha_semana/categorias')).corpo, lista, 'quem não gere também lê');
+  assert.deepEqual((await joao.get('/semana_admin/categorias')).corpo, lista);
+  const r = await joao.put('/minha_semana/categorias/1', { nome: 'Saúde' });
   assert.deepEqual([r.status, r.corpo], [200, { id: 1, nome: 'Saúde', cor: 'rosa' }]);
-  assert.deepEqual((await ana.put('/minha_semana/categorias/1', { cor: 'verde' })).corpo, { id: 1, nome: 'Saúde', cor: 'verde' });
-  const g = await ana.get('/minha_semana' + SEMANA);
-  assert.deepEqual(g.corpo.categorias.map(c => c.nome), ['Banco', 'Saúde']);
+  assert.deepEqual((await ana.put('/semana_admin/categorias/1', { cor: 'verde' })).corpo, { id: 1, nome: 'Saúde', cor: 'verde' });
+  const g = await como(3).get('/minha_semana' + SEMANA);
+  assert.deepEqual(g.corpo.categorias.map(c => [c.nome, c.cor]), [['Banco', 'azul'], ['Saúde', 'verde']]);
   assert.deepEqual(g.corpo.linhas, []);
+  assert.equal(banco.catPessoais.length, 0, 'a tabela antiga não recebe nada');
 });
 
-test('pessoal: nome repetido (maiúsculas/acentos) = 409; inválido = 400; limite de 30 categorias', async t => {
+test('lista única: nome repetido (maiúsculas/acentos, de qualquer pessoa e pelas duas bases) = 409; inválido = 400; limite de 30', async t => {
   const { como, banco } = await preparar(t);
-  const ana = como(1);
+  const ana = como(1), joao = como(2);
   await ana.post('/minha_semana/categorias', { nome: 'Médico', cor: 'rosa' });
   assert.equal((await ana.post('/minha_semana/categorias', { nome: 'MEDICO', cor: 'azul' })).status, 409);
+  assert.equal((await joao.post('/minha_semana/categorias', { nome: 'medico', cor: 'azul' })).status, 409, 'outra pessoa também não repete: a lista é uma só');
+  assert.equal((await joao.post('/semana_admin/categorias', { nome: 'Médico', cor: 'azul' })).status, 409);
   await ana.post('/minha_semana/categorias', { nome: 'Banco', cor: 'azul' });
   assert.equal((await ana.put('/minha_semana/categorias/2', { nome: 'médico' })).status, 409);
   assert.equal((await ana.put('/minha_semana/categorias/2', { nome: 'Banco' })).status, 200, 'o próprio nome não é repetição');
-  assert.equal((await como(2).post('/minha_semana/categorias', { nome: 'Médico', cor: 'rosa' })).status, 201, 'outra pessoa pode ter o mesmo nome');
   for (const c of [{ nome: '', cor: 'azul' }, { nome: 'x', cor: 'preto' }, { nome: 'a'.repeat(31), cor: 'azul' }])
     assert.equal((await ana.post('/minha_semana/categorias', c)).status, 400, JSON.stringify(c));
   assert.equal((await ana.put('/minha_semana/categorias/2', {})).status, 400);
-  for (let i = banco.catPessoais.filter(c => c.usuario_codigo === 1).length; i < 30; i++)
-    assert.equal((await ana.post('/minha_semana/categorias', { nome: 'C' + i, cor: 'lima' })).status, 201);
+  for (let i = banco.catAdmin.length; i < 30; i++)
+    assert.equal((await (i % 2 ? ana : joao).post('/minha_semana/categorias', { nome: 'C' + i, cor: 'lima' })).status, 201);
   assert.equal((await ana.post('/minha_semana/categorias', { nome: 'Mais uma', cor: 'lima' })).status, 400);
+  assert.equal((await joao.post('/semana_admin/categorias', { nome: 'Mais uma', cor: 'lima' })).status, 400);
 });
 
-test('pessoal: categoria de outra pessoa = 404 (ver, mudar, excluir); nem o administrador vê', async t => {
+test('sem tarefas_admin.usar: lê a lista e escolhe uma no item, mas criar, renomear, trocar a cor e excluir = 403 sem tocar no banco', async t => {
   const { como, banco } = await preparar(t);
-  await como(1).post('/minha_semana/categorias', { nome: 'Segredo', cor: 'roxo' });
-  const joao = como(2);
-  assert.deepEqual((await joao.get('/minha_semana/categorias')).corpo, { categorias: [] });
-  assert.equal((await joao.put('/minha_semana/categorias/1', { nome: 'Invadi' })).status, 404);
-  assert.equal((await joao.del('/minha_semana/categorias/1')).status, 404);
-  assert.deepEqual(banco.catPessoais.map(c => [c.nome, c.usuario_codigo]), [['Segredo', 1]]);
+  await como(1).post('/minha_semana/categorias', { nome: 'Fretes', cor: 'laranja' });
+  const ze = como(3);
+  assert.deepEqual((await ze.get('/minha_semana/categorias')).corpo.categorias, [{ id: 1, nome: 'Fretes', cor: 'laranja' }]);
+  const antes = banco.f.chamadas.length;
+  for (const r of [await ze.post('/minha_semana/categorias', { nome: 'x', cor: 'azul' }), await ze.put('/minha_semana/categorias/1', { cor: 'azul' }),
+    await ze.put('/minha_semana/categorias/1', { nome: 'Invadi' }), await ze.del('/minha_semana/categorias/1')]) {
+    assert.equal(r.status, 403);
+    assert.ok(!JSON.stringify(r.corpo).includes('Fretes'));
+  }
+  assert.equal(banco.f.chamadas.length, antes, 'nada foi ao banco');
+  assert.deepEqual(banco.catAdmin.map(c => [c.nome, c.cor]), [['Fretes', 'laranja']]);
   for (const id of ['abc', '0', '1.5'])
-    assert.equal((await joao.put('/minha_semana/categorias/' + id, { cor: 'azul' })).status, 404, id);
+    assert.equal((await como(1).put('/minha_semana/categorias/' + id, { cor: 'azul' })).status, 404, id);
+  // escolher uma da lista no próprio item vale para quem não gere a lista
+  const item = await ze.post('/minha_semana', { quadro: 'tarefas', texto: 'frete do Zé', categoriaId: 1 });
+  assert.deepEqual([item.status, item.corpo.categoriaId], [201, 1]);
+  assert.deepEqual((await ze.put('/minha_semana/' + item.corpo.id, { categoriaId: null })).corpo.categoriaId, null);
+  assert.equal(banco.pessoais[0].categoria_unica_id, null);
 });
 
-test('pessoal: categoriaId de outro dono ou da compartilhada é recusado no POST e no PUT, nada gravado', async t => {
+test('pessoal: categoriaId que não existe na lista única é recusado no POST e no PUT, nada gravado', async t => {
   const { como, banco } = await preparar(t);
-  const ana = como(1), joao = como(2);
-  await joao.post('/minha_semana/categorias', { nome: 'Do João', cor: 'azul' });   // id 1 (pessoal do João)
-  await ana.post('/semana_admin/categorias', { nome: 'Compartilhada', cor: 'verde' });   // id 1 (compartilhada)
-  await ana.post('/minha_semana/categorias', { nome: 'Minha', cor: 'rosa' });   // id 2
-  assert.equal((await ana.post('/minha_semana', { quadro: 'tarefas', texto: 'x', categoriaId: 1 })).status, 400);
+  const ana = como(1);
+  await ana.post('/semana_admin/categorias', { nome: 'Geral', cor: 'verde' });   // id 1 (lista única)
+  banco.catPessoais.push({ id: 2, usuario_codigo: 1, nome: 'Antiga pessoal', cor: 'rosa' });   // tabela antiga: não vale mais
+  assert.equal((await ana.post('/minha_semana', { quadro: 'tarefas', texto: 'x', categoriaId: 2 })).status, 400);
   assert.equal(banco.pessoais.length, 0);
-  const ok = await ana.post('/minha_semana', { quadro: 'tarefas', texto: 'x', categoriaId: 2 });
-  assert.deepEqual([ok.status, ok.corpo.categoriaId], [201, 2]);
-  const r = await ana.put('/minha_semana/1', { categoriaId: 1 });
-  assert.equal(r.status, 400);
-  assert.equal(banco.pessoais[0].categoria_id, 2);
+  const ok = await ana.post('/minha_semana', { quadro: 'tarefas', texto: 'x', categoriaId: 1 });
+  assert.deepEqual([ok.status, ok.corpo.categoriaId], [201, 1]);
+  assert.deepEqual([banco.pessoais[0].categoria_unica_id, banco.pessoais[0].categoria_id], [1, null], 'grava na coluna nova; a antiga fica como está');
+  assert.equal((await ana.put('/minha_semana/1', { categoriaId: 2 })).status, 400);
+  assert.equal(banco.pessoais[0].categoria_unica_id, 1);
   assert.equal((await ana.put('/minha_semana/1', { categoriaId: 99, texto: 'mudou?' })).status, 400);
   assert.equal(banco.pessoais[0].texto, 'x', 'nada do PUT recusado é gravado');
   assert.deepEqual((await ana.put('/minha_semana/1', { categoriaId: null })).corpo.categoriaId, null);
 });
 
-test('pessoal: excluir a categoria deixa os itens "Sem categoria" (nunca apaga item); itens de outra pessoa intocados', async t => {
+test('excluir a categoria tira dos itens das DUAS agendas (de todas as pessoas), sem apagar item e sem mudar a versão', async t => {
   const { como, banco, logs } = await preparar(t);
-  const ana = como(1);
-  await ana.post('/minha_semana/categorias', { nome: 'NOME-PRIVADO', cor: 'azul' });
+  const ana = como(1), ze = como(3);
+  await ana.post('/minha_semana/categorias', { nome: 'NOME-PRIVADO', cor: 'azul' });   // id 1
+  await ana.post('/minha_semana/categorias', { nome: 'Outra', cor: 'verde' });   // id 2
   await ana.post('/minha_semana', { quadro: 'dia', data: '2026-11-24', texto: 'a', categoriaId: 1 });
-  await ana.post('/minha_semana', { quadro: 'notas', texto: 'b', categoriaId: 1 });
-  banco.pessoais.push({ id: 50, usuario_codigo: 2, quadro: 'notas', data: null, texto: 'alheia', feita: 0, alarme: null, categoria_id: 1 });
-  const r = await ana.del('/minha_semana/categorias/1');
+  await ze.post('/minha_semana', { quadro: 'notas', texto: 'do Zé', categoriaId: 1 });
+  await ze.post('/minha_semana', { quadro: 'notas', texto: 'outra', categoriaId: 2 });
+  await ana.post('/semana_admin', { quadro: 'tarefas', texto: 'comp', categoriaId: 1 });
+  banco.pessoais.push({ id: 50, usuario_codigo: 2, quadro: 'notas', data: null, texto: 'legado', feita: 0, alarme: null, categoria_id: 1, categoria_unica_id: null });
+  const r = await ana.del('/semana_admin/categorias/1');
   assert.deepEqual([r.status, r.corpo], [200, { ok: true }]);
-  assert.deepEqual(banco.pessoais.map(l => [l.id, l.categoria_id]), [[1, null], [2, null], [50, 1]]);
-  assert.equal(banco.catPessoais.length, 0);
+  assert.deepEqual(banco.pessoais.map(l => [l.texto, l.categoria_unica_id]), [['a', null], ['do Zé', null], ['outra', 2], ['legado', null]]);
+  assert.equal(banco.pessoais[3].categoria_id, 1, 'a coluna antiga não é mexida');
+  assert.deepEqual([banco.admin[0].categoria_id, banco.admin[0].versao, banco.admin[0].texto], [null, 1, 'comp']);
+  assert.deepEqual(banco.catAdmin.map(c => c.nome), ['Outra']);
   assert.equal((await ana.del('/minha_semana/categorias/1')).status, 404);
-  const g = await ana.get('/minha_semana' + SEMANA);
-  assert.deepEqual(g.corpo.linhas.map(l => [l.texto, l.categoriaId]), [['a', null], ['b', null]]);
+  const g = await ze.get('/minha_semana' + SEMANA);
+  assert.deepEqual(g.corpo.linhas.map(l => [l.texto, l.categoriaId]), [['do Zé', null], ['outra', 2]]);
   assert.ok(banco.f.chamadas.some(c => c.sql === 'BEGIN') && banco.f.chamadas.some(c => c.sql === 'COMMIT'), 'numa transação');
   assert.ok(!logs.join('\n').includes('NOME-PRIVADO'));
   assert.ok(!banco.f.chamadas.some(c => /web_auditoria/.test(c.sql)));
+  // pela base da Minha semana também
+  assert.equal((await ana.del('/minha_semana/categorias/2')).status, 200);
+  assert.equal(banco.pessoais[2].categoria_unica_id, null);
 });
 
 test('pessoal: categoria que sumiu no meio do caminho aparece como "Sem categoria" na leitura', async t => {
   const { como, banco } = await preparar(t);
   const ana = como(1);
   await ana.post('/minha_semana', { quadro: 'tarefas', texto: 'a' });
-  banco.pessoais[0].categoria_id = 77;
+  banco.pessoais[0].categoria_unica_id = 77;
   assert.equal((await ana.get('/minha_semana' + SEMANA)).corpo.linhas[0].categoriaId, null);
 });
 
@@ -200,22 +223,20 @@ test('compartilhada: lista única; quem tem a permissão cria, renomeia, troca a
   assert.equal((await ana.put('/semana_admin/categorias/9', { cor: 'azul' })).status, 404);
 });
 
-test('compartilhada: categoria pessoal nunca vale aqui; excluir deixa os itens sem categoria, sem mudar a versão', async t => {
+test('compartilhada: a mesma categoria vale nas duas agendas; trocar leva a versão; inexistente = 400', async t => {
   const { como, banco } = await preparar(t);
   const ana = como(1);
-  await ana.post('/minha_semana/categorias', { nome: 'Pessoal', cor: 'rosa' });   // pessoal id 1
-  assert.equal((await ana.post('/semana_admin', { quadro: 'tarefas', texto: 'x', categoriaId: 1 })).status, 400);
-  await ana.post('/semana_admin/categorias', { nome: 'Geral', cor: 'azul' });   // compartilhada id 1
-  await ana.post('/semana_admin/categorias', { nome: 'Outra', cor: 'verde' });   // compartilhada id 2
+  await ana.post('/minha_semana/categorias', { nome: 'Geral', cor: 'azul' });   // id 1, criada pela Minha semana
+  await ana.post('/semana_admin/categorias', { nome: 'Outra', cor: 'verde' });   // id 2
   const l = await ana.post('/semana_admin', { quadro: 'tarefas', texto: 'x', categoriaId: 1 });
   assert.deepEqual([l.status, l.corpo.categoriaId], [201, 1]);
   assert.equal((await ana.put('/semana_admin/1', { categoriaId: 2, versao: 1 })).corpo.versao, 2);
   assert.equal((await ana.put('/semana_admin/1', { categoriaId: 5, versao: 2 })).status, 400);
-  // a pessoal não aceita categoria da compartilhada
   await ana.post('/minha_semana', { quadro: 'notas', texto: 'p' });
-  assert.equal((await ana.put('/minha_semana/1', { categoriaId: 2 })).status, 400);
+  assert.deepEqual((await ana.put('/minha_semana/1', { categoriaId: 2 })).corpo.categoriaId, 2, 'a pessoal usa a mesma lista');
   assert.equal((await ana.del('/semana_admin/categorias/2')).status, 200);
   assert.deepEqual([banco.admin[0].categoria_id, banco.admin[0].versao, banco.admin[0].texto], [null, 2, 'x']);
+  assert.equal(banco.pessoais[0].categoria_unica_id, null);
 });
 
 test('compartilhada: mover leva a versão; versão velha = 409 com o atual e nada gravado; ir para Notas zera concluído, alarme e avisos', async t => {

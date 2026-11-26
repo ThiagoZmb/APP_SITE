@@ -282,7 +282,7 @@ test('tarefas_admin.html: mesma casca e CSP da pessoal, mesma versão do layout.
   assert.equal(/layout\.js\?v=\d+/.exec(h)[0], /layout\.js\?v=\d+/.exec(p)[0]);
   const folhas = [...h.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(m => m[1]);
   assert.match(folhas.at(-1), /^tema\.css\?v=\d+$/);
-  assert.deepEqual([...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]), ['layout.js', 'entregas_comum.js', 'agenda_comum.js', 'calculo/agenda_repeticao.js', 'tarefas_admin.js']);
+  assert.deepEqual([...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]), ['layout.js', 'entregas_comum.js', 'calculo/agenda_horario.js', 'agenda_comum.js', 'calculo/agenda_repeticao.js', 'tarefas_admin.js']);
   assert.equal(/agenda_comum\.js\?v=\d+/.exec(h)[0], /agenda_comum\.js\?v=\d+/.exec(p)[0], 'mesma versão da parte compartilhada');
   assert.doesNotMatch(h, / on\w+="|<script(?![^>]*src=)/);
   for (const id of new Set([...ler('tarefas_admin.js').matchAll(/\$\('([a-z0-9-]+)'\)/g)].map(m => m[1]))) assert.ok(h.includes(`id="${id}"`), id);

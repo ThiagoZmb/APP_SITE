@@ -1129,3 +1129,52 @@ body .btn.ag-perigo, body .btn-mini.ag-cat-excluir { background: var(--danger-bg
     .agenda .linha textarea { font-size: 16px; }   /* abaixo de 16px o iPhone amplia a tela ao tocar */
     .agenda .q-cab { flex-direction: row; justify-content: flex-start; gap: 10px; padding-left: 4px; }
 }
+
+/* ----- AGENDAS: horário e grade de horários (agenda_comum.js montarGrade; calculo/agenda_horario.js). 1h = 48px (AG.PX_HORA). -----
+   Tela larga (área >= 880px, fora do celular): canto "dia todo" + 7 dias em cima, a grade 00:00-24:00 embaixo (rola sozinha), Tarefas e Notas
+   no fim. 15 trilhas: 52px das horas + 2 por dia. --ag-sb = largura da barra de rolagem da grade, para as colunas de cima e de baixo baterem. */
+.agenda .ag-hora { flex-basis: 100%; order: -1; padding: 3px 4px 0 18px; font-size: 11px; line-height: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: inherit; }
+.agenda .linha:not(.salva) .ag-hora { padding-left: 4px; color: var(--primary-color); }
+.agenda .ag-puxar { display: none; }
+.agenda.ag-com-grade { grid-template-columns: 52px repeat(14, minmax(0, 1fr)); padding-right: var(--ag-sb, 0px); }
+.agenda.ag-com-grade > .quadro { grid-column: span 2; }
+.agenda.ag-com-grade > .q-tar { grid-column: 2 / 9; }
+.agenda.ag-com-grade > .q-not { grid-column: 9 / 16; }
+.agenda .ag-canto { grid-column: 1; align-self: end; padding: 0 6px 12px 0; text-align: right; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-light); }
+.agenda .ag-grade { grid-column: 1 / -1; margin-right: calc(-1 * var(--ag-sb, 0px)); height: clamp(320px, calc(100vh - 300px), 720px); overflow-y: auto; overscroll-behavior: contain; background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius); }
+.agenda .ag-grade-corpo { display: grid; grid-template-columns: 51px repeat(14, minmax(0, 1fr)); column-gap: 8px; height: calc(24 * 48px); }
+.agenda .ag-horas { position: relative; grid-column: 1; }
+.agenda .ag-hora-rot { position: absolute; right: 6px; transform: translateY(-50%); font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-light); }
+.agenda .ag-col { position: relative; grid-column: span 2; cursor: copy;
+    background: repeating-linear-gradient(to bottom, var(--border-color) 0 1px, transparent 1px 24px, color-mix(in srgb, var(--border-color) 45%, transparent) 24px 25px, transparent 25px 48px); }
+.agenda .ag-col.hoje { background-color: var(--surface-2); }
+.agenda .ag-col.alvo-soltar { box-shadow: inset 0 0 0 1px var(--primary-color); }
+.agenda .ag-col > .linhas { position: absolute; inset: 0; display: block; margin: 0; padding: 0; }
+.agenda .ag-col .linha { position: absolute; min-height: 0; overflow: hidden; z-index: 1; align-content: flex-start; cursor: default; box-shadow: 0 0 0 1px var(--white); }
+.agenda .ag-col .linha:not(.salva) { background: var(--white); border: 1px dashed var(--primary-color); }
+.agenda .ag-col .linha:focus-within { height: auto !important; min-height: var(--alto, 0); z-index: 3; box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--primary-ring); }
+.agenda .ag-col .linha textarea { padding: 1px 0 2px; }
+.agenda .ag-col .linha.curto .ag-hora { order: 2; flex-basis: auto; padding: 4px 2px 0; }
+.agenda .ag-col .linha.curto textarea { order: 1; }
+.agenda .ag-col .linha.curto .ag-lado { order: 3; }
+.agenda .ag-col .linha.salva .ag-puxar { display: block; position: absolute; left: 20px; right: 0; bottom: 0; height: 6px; cursor: ns-resize; touch-action: none; z-index: 2; }
+.agenda .ag-col .linha.salva .ag-puxar:hover, .agenda .ag-col .linha.puxando .ag-puxar { background: color-mix(in srgb, currentColor 22%, transparent); }
+.agenda .ag-col .linha.puxando { z-index: 4; }
+.agenda .ag-agora { position: absolute; left: -5px; right: 0; height: 2px; background: var(--danger-color); z-index: 5; pointer-events: none; }
+.agenda .ag-agora::before { content: ""; position: absolute; left: 0; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger-color); }
+.ag-sombra { position: absolute; left: 2px; right: 2px; z-index: 6; pointer-events: none; padding: 2px 6px; border: 2px dashed var(--primary-color); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--primary-color) 16%, transparent); color: var(--text-dark); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ag-hora-campo { width: 120px; font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; }
+/* na grade a faixa pode ter só 20-24px: alça e caixinha lado a lado no alto (em coluna, a alça ficaria cortada embaixo) */
+@media (pointer: fine) {
+    .agenda .ag-col .linha.salva .ag-esq { flex-direction: row; align-self: flex-start; align-items: center; width: auto; height: 20px; gap: 1px; margin-right: 2px; }
+    .agenda .ag-col .ag-esq .alca { flex: none; width: 10px; min-height: 20px; align-items: center; padding-top: 0; }
+    .agenda .ag-col .ag-esq .alca::before { width: 8px; height: 12px; }
+    .agenda .ag-col .linha.salva .ag-esq input[type="checkbox"] { margin: 0 1px; }
+    .agenda .ag-col .ag-hora { padding-left: 4px; }
+    /* "⋯" e ↻ só aparecem ao passar o mouse ou com o foco na faixa (o Tab chega nele): o texto fica com a largura */
+    .agenda .ag-col .linha.salva:not(:hover):not(:focus-within) .ag-lado { position: absolute; right: 0; top: 0; opacity: 0; }
+}
+.agenda .ag-col .linha textarea { overflow-wrap: break-word; word-break: normal; }
+/* na grade, autoria, avisos e dúvidas vêm depois do texto (a faixa é curta e corta o que sobra); a autoria aparece com o foco */
+.agenda .ag-col .linha > .linha-autor, .agenda .ag-col .linha > .linha-aviso, .agenda .ag-col .linha > .linha-duvida, .agenda .ag-col .linha > .linha-hora { order: 5; }
+.agenda .ag-col .linha:not(:focus-within) > .linha-autor { display: none; }

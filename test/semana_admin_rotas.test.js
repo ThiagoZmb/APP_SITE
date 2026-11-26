@@ -45,7 +45,7 @@ test('dois administradores veem e mexem na mesma linha; autoria e feitaPor vêm 
   const ana = como(1), joao = como(2);
   const r = await ana.post('/semana_admin', { quadro: 'dia', data: '2026-11-25', texto: ' Ligar\ncedo ', criadaPor: 'Outro', criada_por: 'Outro', criada_por_codigo: 99, feitaPor: 'Outro', versao: 40, feita: true });
   assert.equal(r.status, 201);
-  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: 'Ligar cedo', feita: false, alarme: null, versao: 1, criadaPor: 'Ana', feitaPor: null, categoriaId: null, serieId: null, seriePos: null });
+  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: 'Ligar cedo', feita: false, alarme: null, versao: 1, criadaPor: 'Ana', feitaPor: null, categoriaId: null, serieId: null, seriePos: null, horario: null });
   assert.deepEqual((await joao.get(SEMANA)).corpo, { linhas: [r.corpo], categorias: [] });
   const marcada = await joao.put('/semana_admin/1', { feita: true, versao: 1, feitaPor: 'Impostor' });
   assert.equal(marcada.status, 200);
@@ -81,7 +81,7 @@ test('versão velha: 409 com a linha atual, nada é gravado (PUT e DELETE); linh
   const r = await ana.put('/semana_admin/1', { texto: 'da Ana', feita: true, versao: 1 });
   assert.equal(r.status, 409);
   assert.ok(r.corpo.error);
-  assert.deepEqual(r.corpo.atual, { id: 1, quadro: 'tarefas', data: null, texto: 'TEXTO-RESERVADO do João', feita: false, alarme: null, versao: 2, criadaPor: 'Ana', feitaPor: null, categoriaId: null, serieId: null, seriePos: null });
+  assert.deepEqual(r.corpo.atual, { id: 1, quadro: 'tarefas', data: null, texto: 'TEXTO-RESERVADO do João', feita: false, alarme: null, versao: 2, criadaPor: 'Ana', feitaPor: null, categoriaId: null, serieId: null, seriePos: null, horario: null });
   const d = await ana.del('/semana_admin/1', { versao: 1 });
   assert.equal(d.status, 409);
   assert.equal(d.corpo.atual.versao, 2);

@@ -52,12 +52,13 @@
             .toast { min-width: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202612011200">
+    <link rel="stylesheet" href="tema.css?v=202612021200">
     <script src="layout.js?v=202611301000" defer></script>
     <script src="entregas_comum.js?v=202611281000" defer></script>
-    <script src="agenda_comum.js?v=202612011200" defer></script>
+    <script src="calculo/agenda_horario.js?v=202612021200" defer></script>
+    <script src="agenda_comum.js?v=202612021200" defer></script>
     <script src="calculo/agenda_repeticao.js?v=202612011200" defer></script>
-    <script src="tarefas.js?v=202612011200" defer></script>
+    <script src="tarefas.js?v=202612021200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -86,7 +87,7 @@
                     <span class="rotulo-mes" id="rotulo-mes"></span>
                     <span class="rotulo-semana" id="rotulo-semana"></span>
                 </div>
-                <button type="button" class="btn btn-secondary btn-mini" id="btn-categorias">Categorias</button>
+                <button type="button" class="btn btn-secondary btn-mini" id="btn-categorias" data-perm="tarefas_admin.usar">Categorias</button>
             </div>
             <div class="ag-legenda" id="legenda" role="group" aria-label="Mostrar e esconder categorias" hidden></div>
             <div class="aviso-semana" id="aviso-semana" role="alert" hidden>

@@ -11,6 +11,8 @@
   else raiz.AgendaComum = lib;
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
+  // horário dos itens dos dias (a mesma conta do servidor): calculo/agenda_horario.js, carregado antes deste arquivo
+  const AH = typeof module === 'object' && module.exports ? require('./calculo/agenda_horario.js') : self.AgendaHorario;
 
   // ---------- paleta fixa (o banco guarda o código; as cores são variáveis --cat-* do tema.css) ----------
   const CORES = [['vermelho', 'Vermelho'], ['laranja', 'Laranja'], ['amarelo', 'Amarelo'], ['lima', 'Lima'], ['verde', 'Verde'],
@@ -63,7 +65,26 @@
   // ---------- mover ----------
   const lugar = d => `${d.quadro}|${d.quadro === 'dia' ? d.data : ''}`;
   const mesmoLugar = (dados, destino) => lugar(dados) === lugar(destino);
-  const corpoMover = destino => ({ quadro: destino.quadro, data: destino.quadro === 'dia' ? destino.data : null });
+  // `destino.horario`: undefined = mantém o horário; null = dia todo; { inicio, fim } = novo horário (só nos dias)
+  const corpoMover = destino => ({ quadro: destino.quadro, data: destino.quadro === 'dia' ? destino.data : null,
+    ...(destino.quadro === 'dia' && destino.horario !== undefined ? { horario: destino.horario } : {}) });
+
+  // ---------- horário e grade (tela larga) ----------
+  const PX_HORA = 48;                 // altura de uma hora na grade (o CSS usa a mesma, --ag-hora)
+  const PX_MIN = PX_HORA / 60;
+  const ALTO_MIN = 20;                // item curto continua clicável
+  const LARGURA_GRADE = 880;          // área da semana (sem o menu lateral); a grade monta a própria fileira de sete dias
+  const mesmoHorario = (a, b) => (!a && !b) || (!!a && !!b && a.inicio === b.inicio && a.fim === b.fim);
+  // "Horário..." só em item salvo dos dias
+  const podeHorario = d => !!(d && d.id) && d.quadro === 'dia';
+  // grade só com largura e fora do celular; no estreito, lista por dia ("dia todo" primeiro, depois por horário)
+  const querGrade = (largura, celular) => largura >= LARGURA_GRADE && !celular;
+  // posição do item na coluna do dia: topo e altura pelo horário; sobrepostos dividem a largura (calculo/agenda_horario.js distribuir)
+  function estiloGrade(h, { col = 0, cols = 1 } = {}) {
+    const i = AH.paraMin(h.inicio), f = AH.paraMin(h.fim);
+    const p = n => `${(n * 100).toFixed(4)}%`;
+    return { top: `${i * PX_MIN}px`, height: `${Math.max((f - i) * PX_MIN, ALTO_MIN)}px`, left: `calc(${p(col / cols)} + 1px)`, width: `calc(${p(1 / cols)} - 3px)`, curto: f - i < 45 };
+  }
   // Notas não têm caixinha nem alarme: havendo alarme gravado, a tela pergunta antes (o concluído sai sem perguntar)
   const pedeConfirmacaoNotas = (dados, destino) => destino.quadro === 'notas' && dados.quadro !== 'notas' && !!(dados.temAlarme || dados.alarme);
   // só linha salva e sem nada pendente se arrasta ou se move: o texto digitado nunca anda sem ter sido gravado
@@ -259,7 +280,7 @@
       m.ancora.setAttribute('aria-expanded', 'false');
       if (devolverFoco && m.ancora.isConnected) m.ancora.focus();
     }
-    function abrirMenu({ ancora, categorias, atual, aoEscolher, aoMover, aoRepetir, aoCategorias }) {
+    function abrirMenu({ ancora, categorias, atual, aoEscolher, aoMover, aoHorario, aoRepetir, aoCategorias }) {
       fecharMenu(false);
       const el = criar('div', 'ag-menu');
       el.setAttribute('role', 'menu');
@@ -283,8 +304,9 @@
       for (const c of lista) opcao(c.nome, c.cor, c.id === atual, () => aoEscolher(c.id));
       el.append(criar('hr', 'ag-menu-sep'));
       opcao('Mover para…', '', false, aoMover, 'menuitem');
+      if (aoHorario) opcao('Horário…', '', false, aoHorario, 'menuitem');   // só item salvo dos dias (podeHorario); teclado e celular
       if (aoRepetir) opcao('Repetir…', '', false, aoRepetir, 'menuitem');   // só item que ainda não se repete (podeRepetir)
-      if (aoCategorias) opcao('Editar categorias…', '', false, aoCategorias, 'menuitem');
+      if (aoCategorias) opcao('Editar categorias…', '', false, aoCategorias, 'menuitem');   // só quem gere a lista única
       doc.body.append(el);
       // posição: embaixo do marcador; sem espaço, em cima; nunca fora da tela
       const r = ancora.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
@@ -357,6 +379,93 @@
       (radios.find(([r]) => !r.disabled)?.[0] || campo).focus();
     }
 
+    // ---------- "Horário...": dia todo (sem horário) ou das HH:MM às HH:MM; serve a teclado e celular ----------
+    // `aoSalvar(horario | null)` devolve Promise: enquanto grava, os botões travam e Esc não fecha. 24:00 se escreve 00:00 no fim.
+    function abrirHorario({ texto, horario, aoSalvar }) {
+      let ocupado = false;
+      const j = janela({ titulo: 'Horário', subtitulo: texto, ocupada: () => ocupado });
+      const nome = 'ag-hor-' + Math.random().toString(36).slice(2, 8);
+      const radio = (valor, marcado, rotulo) => {
+        const l = criar('label', 'ag-rep-titulo');
+        const r = criar('input'); r.type = 'radio'; r.name = nome; r.value = valor; r.checked = marcado;
+        l.append(r, criar('span', '', rotulo));
+        return { l, r };
+      };
+      const campo = (valor, rotulo) => { const c = criar('input', 'ag-mover-data ag-hora-campo'); c.type = 'time'; c.step = '900'; c.value = valor; c.setAttribute('aria-label', rotulo); return c; };
+      const todo = radio('todo', !horario, 'Dia todo (sem horário)');
+      const com = radio('hora', !!horario, 'Com horário');
+      const ini = campo(horario ? horario.inicio : '09:00', 'Início');
+      const fim = campo(horario ? (horario.fim === '24:00' ? '00:00' : horario.fim) : '10:00', 'Fim');
+      const bloco = criar('div', 'ag-rep-op');
+      const campos = criar('div', 'ag-rep-campos');
+      const l1 = criar('label', 'ag-rep-campo'); l1.append(criar('span', '', 'das'), ini);
+      const l2 = criar('label', 'ag-rep-campo'); l2.append(criar('span', '', 'às'), fim);
+      campos.append(l1, l2);
+      bloco.append(com.l, campos);
+      const blocoTodo = criar('div', 'ag-rep-op');
+      blocoTodo.append(todo.l);
+      const erro = criar('p', 'ag-erro');
+      erro.setAttribute('role', 'alert');
+      j.corpo.append(blocoTodo, bloco, erro);
+      const marcar = () => { blocoTodo.classList.toggle('ag-rep-ativa', todo.r.checked); bloco.classList.toggle('ag-rep-ativa', com.r.checked); };
+      for (const c of [ini, fim]) c.addEventListener('input', () => { com.r.checked = true; marcar(); });
+      for (const r of [todo.r, com.r]) r.addEventListener('change', marcar);
+      marcar();
+      const valor = () => {
+        if (todo.r.checked) return { ok: true, valor: null };
+        const f = fim.value === '00:00' ? '24:00' : fim.value;
+        if (!ini.value || !fim.value) return { ok: false, motivo: 'Escolha o início e o fim.' };
+        return AH.validarHorario({ inicio: ini.value, fim: f });
+      };
+      const cancelar = botao('btn btn-secondary', 'Cancelar', () => { if (!ocupado) j.fechar(); });
+      const ok = botao('btn btn-primary', 'Salvar');
+      const salvar = () => {
+        if (ocupado) return;
+        const v = valor();
+        if (!v.ok) { erro.textContent = v.motivo; return; }
+        ocupado = true;
+        ok.disabled = cancelar.disabled = true;
+        Promise.resolve().then(() => aoSalvar(v.valor)).then(() => { ocupado = false; j.fechar(); }, e => {
+          ocupado = false;
+          ok.disabled = cancelar.disabled = false;
+          erro.textContent = e?.message || 'Não foi possível salvar o horário.';
+        });
+      };
+      ok.addEventListener('click', salvar);
+      for (const c of [ini, fim]) c.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); salvar(); } });
+      j.rodape.append(cancelar, ok);
+      (horario ? ini : todo.r).focus();
+      return { fechar: () => { ocupado = false; j.fechar(); } };
+    }
+
+    // ---------- grade de horários (tela larga): horas na lateral esquerda e uma coluna por dia, 00:00 a 24:00 ----------
+    // Devolve { el (o quadro que rola), colunas: [{ col, lista }], agora (linha da hora atual ou null) }. As faixas com horário
+    // ficam em `lista` (ul) de cada coluna, posicionadas por estiloGrade.
+    function montarGrade({ dias }) {
+      const el = criar('div', 'ag-grade');
+      const corpo = criar('div', 'ag-grade-corpo');
+      const horas = criar('div', 'ag-horas');
+      horas.setAttribute('aria-hidden', 'true');
+      for (let h = 1; h < 24; h++) { const r = criar('span', 'ag-hora-rot', `${String(h).padStart(2, '0')}:00`); r.style.top = `${h * PX_HORA}px`; horas.append(r); }
+      corpo.append(horas);
+      let agora = null;
+      const colunas = dias.map(d => {
+        const col = criar('div', 'ag-col' + (d.hoje ? ' hoje' : ''));
+        const lista = criar('ul', 'linhas');
+        lista.setAttribute('aria-label', `${d.rotulo}, com horário`);
+        col.append(lista);
+        if (d.hoje) { agora = criar('div', 'ag-agora'); agora.setAttribute('aria-hidden', 'true'); col.append(agora); }
+        corpo.append(col);
+        return { col, lista };
+      });
+      el.append(corpo);
+      return { el, colunas, agora };
+    }
+    // a linha da hora atual (relógio do aparelho)
+    function marcarAgora(agora, quando = new Date()) {
+      if (agora) agora.style.top = `${(quando.getHours() * 60 + quando.getMinutes()) * PX_MIN}px`;
+    }
+
     // ---------- "Categorias": criar, renomear, trocar a cor e excluir (com confirmação) ----------
     // `api`: { criar(nome, cor), mudar(id, campos), excluir(id) } devolvem Promise (rejeitam com Error de mensagem simples)
     function abrirCategorias({ categorias, api, subtitulo }) {
@@ -395,7 +504,7 @@
           const sel = seletorCor(c.cor, cor => { pinta.dataset.cor = cor; api.mudar(c.id, { cor }).then(() => { msg.textContent = ''; }, e => { falhou(e); desenhar(); }); }, 'Cor de ' + c.nome);
           const apagar = botao('btn btn-mini ag-cat-excluir', 'Excluir', async () => {
             const ok = await confirmar({ titulo: 'Excluir categoria', sim: 'Excluir', perigo: true,
-              texto: `Excluir a categoria “${c.nome}”? Os itens dela ficam “Sem categoria”; nenhum item é apagado.` });
+              texto: `Excluir a categoria “${c.nome}”? Ela sai da lista das duas agendas, e os itens dela, na Minha semana de todos e na Semana compartilhada, ficam “Sem categoria”. Nenhum item é apagado.` });
             if (!ok) return;
             api.excluir(c.id).then(() => { msg.textContent = ''; desenhar(); }, e => { falhou(e); desenhar(); });
           });
@@ -462,8 +571,13 @@
 
     // ---------- arraste (Pointer Events): pela alça; mouse começa ao mover, toque ao segurar ou mover ----------
     // Esc, pointercancel ou soltar fora de um quadro desfazem. Durante o arraste a tela rola perto da borda.
-    function ligarArraste({ raiz, podeArrastar: pode, aoNegar, aoSoltar, aoMudar, seletorAlca = '.alca', seletorAlvo = '.quadro' }) {
+    // `grade` (tela larga): { horarioDe(li), rolador() }. Sobre uma coluna da grade o destino é o dia + o horário que segue o
+    // ponteiro em passos de 15 min (mesma duração; do "dia todo", 1h); uma sombra mostra onde vai cair. aoSoltar(li, alvo, { horario }).
+    function ligarArraste({ raiz, podeArrastar: pode, aoNegar, aoSoltar, aoMudar, seletorAlca = '.alca', seletorAlvo = '.quadro', grade = null }) {
       let st = null;
+      const sombra = criar('div', 'ag-sombra');
+      sombra.setAttribute('aria-hidden', 'true');
+      const esconderSombra = () => { sombra.remove(); };
       const fim = () => {
         if (!st) return;
         const s = st;
@@ -471,6 +585,7 @@
         win.clearTimeout(s.timer);
         win.cancelAnimationFrame(s.raf);
         s.fantasma?.remove();
+        esconderSombra();
         s.li.classList.remove('arrastando');
         s.alvo?.classList.remove('alvo-soltar');
         try { s.alca.releasePointerCapture(s.id); } catch { /* já solta */ }
@@ -478,20 +593,47 @@
         if (s.ativo) aoMudar?.(false);
         return s;
       };
-      const marcarAlvo = () => {
-        const el = doc.elementFromPoint(st.x, st.y);
-        const q = el?.closest?.(seletorAlvo);
-        const novo = q && raiz.contains(q) ? q : null;
+      const trocarAlvo = novo => {
         if (novo === st.alvo) return;
         st.alvo?.classList.remove('alvo-soltar');
         st.alvo = novo;
         novo?.classList.add('alvo-soltar');
+      };
+      const marcarAlvo = () => {
+        const el = doc.elementFromPoint(st.x, st.y);
+        const col = grade && el?.closest?.('.ag-col');
+        if (col && raiz.contains(col)) {
+          const r = col.getBoundingClientRect();
+          st.horario = AH.mover(st.base, (st.y - r.top) / PX_MIN - st.agarre);
+          trocarAlvo(col);
+          const e = estiloGrade(st.horario);
+          sombra.style.top = e.top;
+          sombra.style.height = e.height;
+          sombra.textContent = AH.rotulo(st.horario);
+          if (sombra.parentNode !== col) col.append(sombra);
+          if (st.fantasma) st.fantasma.hidden = true;
+          return;
+        }
+        st.horario = null;
+        esconderSombra();
+        if (st.fantasma) st.fantasma.hidden = false;
+        const q = el?.closest?.(seletorAlvo);
+        trocarAlvo(q && raiz.contains(q) ? q : null);
       };
       const posicionar = () => { st.fantasma.style.transform = `translate(${st.x - st.dx}px, ${st.y - st.dy}px)`; };
       const rolar = () => {
         if (!st?.ativo) return;
         const v = velocidadeRolagem(st.y, win.innerHeight);
         if (v) { win.scrollBy(0, v); marcarAlvo(); }
+        // dentro da grade (que rola sozinha): perto da borda de cima ou de baixo dela
+        const sc = grade?.rolador?.();
+        if (sc) {
+          const r = sc.getBoundingClientRect();
+          if (st.x >= r.left && st.x <= r.right && st.y >= r.top - 24 && st.y <= r.bottom + 24) {
+            const w = velocidadeRolagem(st.y - r.top, r.height, 40, 14);
+            if (w) { sc.scrollTop += w; marcarAlvo(); }
+          }
+        }
         st.raf = win.requestAnimationFrame(rolar);
       };
       const comecar = () => {
@@ -499,13 +641,18 @@
         st.ativo = true;
         const r = st.li.getBoundingClientRect();
         st.dx = st.x0 - r.left; st.dy = st.y0 - r.top;
+        // na grade: o horário de partida e onde, dentro do item, o ponteiro segurou (para o item não pular)
+        const h = grade?.horarioDe?.(st.li) || null;
+        st.base = h || { inicio: '00:00', fim: AH.paraHora(AH.DURACAO) };
+        st.agarre = h && st.li.closest('.ag-col') ? Math.max(0, (st.y0 - r.top) / PX_MIN) : 0;
         const f = criar('div', 'ag-fantasma');
         f.dataset.cor = st.li.dataset.cor || '';
-        f.style.width = r.width + 'px';
+        f.style.width = Math.min(r.width, 260) + 'px';
         f.textContent = st.texto;
         f.setAttribute('aria-hidden', 'true');
         doc.body.append(f);
         st.fantasma = f;
+        sombra.dataset.cor = st.li.dataset.cor || '';
         st.li.classList.add('arrastando');
         posicionar();
         marcarAlvo();
@@ -518,7 +665,7 @@
         const li = alca.closest('li');
         ev.preventDefault();   // sem seleção de texto nem foco roubado
         if (!pode(li)) { aoNegar?.(li); return; }
-        st = { li, alca, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, ativo: false, alvo: null,
+        st = { li, alca, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, ativo: false, alvo: null, horario: null,
           texto: li.querySelector('textarea')?.value || '', timer: 0, raf: 0,
           tecla: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fim(); } } };
         try { alca.setPointerCapture(ev.pointerId); } catch { /* navegador antigo */ }
@@ -537,20 +684,74 @@
       raiz.addEventListener('pointerup', ev => {
         if (!st || ev.pointerId !== st.id) return;
         const s = fim();
-        if (s.ativo && s.alvo) aoSoltar(s.li, s.alvo);
+        if (s.ativo && s.alvo) aoSoltar(s.li, s.alvo, s.horario ? { horario: s.horario } : {});
       });
       raiz.addEventListener('pointercancel', ev => { if (st && ev.pointerId === st.id) fim(); });
       raiz.addEventListener('lostpointercapture', ev => { if (st && ev.pointerId === st.id && !st.ativo) fim(); });
       return { ativo: () => !!st?.ativo, cancelar: fim };
     }
 
+    // ---------- puxar a borda de baixo de um item da grade: muda o fim (duração), em passos de 15 min ----------
+    // `podeMudar(li)` (só item salvo e sem nada pendente); Esc ou pointercancel desfazem; aoFim(li, horario) só se mudou.
+    function ligarRedimensionar({ raiz, podeMudar, aoNegar, horarioDe, aoMudar, aoFim, seletor = '.ag-puxar' }) {
+      let st = null;
+      const mostrar = (li, h) => {
+        li.style.height = estiloGrade(h).height;
+        li.style.setProperty('--alto', li.style.height);
+        const rot = li.querySelector('.ag-hora');
+        if (rot) rot.textContent = AH.rotulo(h);
+      };
+      const fim = desfazer => {
+        if (!st) return null;
+        const s = st;
+        if (desfazer) mostrar(s.li, s.h0);
+        st = null;
+        s.li.classList.remove('puxando');
+        try { s.alca.releasePointerCapture(s.id); } catch { /* já solta */ }
+        doc.removeEventListener('keydown', s.tecla, true);
+        aoMudar?.(false);
+        return s;
+      };
+      raiz.addEventListener('pointerdown', ev => {
+        const p = ev.target?.closest?.(seletor);
+        if (!p || !raiz.contains(p) || st || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+        const li = p.closest('li');
+        ev.preventDefault();
+        ev.stopPropagation();
+        const h0 = horarioDe(li);
+        if (!h0 || !podeMudar(li)) { aoNegar?.(li); return; }
+        st = { li, alca: p, id: ev.pointerId, col: li.closest('.ag-col'), h0, h: h0,
+          tecla: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fim(true); } } };
+        try { p.setPointerCapture(ev.pointerId); } catch { /* navegador antigo */ }
+        doc.addEventListener('keydown', st.tecla, true);
+        li.classList.add('puxando');
+        aoMudar?.(true);
+      });
+      raiz.addEventListener('pointermove', ev => {
+        if (!st || ev.pointerId !== st.id) return;
+        ev.preventDefault();
+        const r = st.col.getBoundingClientRect();
+        st.h = AH.redimensionar(st.h0, (ev.clientY - r.top) / PX_MIN);
+        mostrar(st.li, st.h);
+      });
+      raiz.addEventListener('pointerup', ev => {
+        if (!st || ev.pointerId !== st.id) return;
+        const s = fim(false);
+        if (!mesmoHorario(s.h, s.h0)) aoFim(s.li, s.h);
+      });
+      raiz.addEventListener('pointercancel', ev => { if (st && ev.pointerId === st.id) fim(true); });
+      return { ativo: () => !!st, cancelar: () => fim(true) };
+    }
+
     return {
-      confirmar, perguntarEscopo, abrirRepetir, abrirMenu, fecharMenu, abrirMover, abrirCategorias, desenharLegenda, ligarArraste, amostra,
+      confirmar, perguntarEscopo, abrirRepetir, abrirHorario, abrirMenu, fecharMenu, abrirMover, abrirCategorias, desenharLegenda, ligarArraste, ligarRedimensionar,
+      montarGrade, marcarAgora, amostra,
       menuAberto: () => !!menuAtual,
       janelaAberta: () => janelas > 0
     };
   }
 
   return { CORES, SEM, MAX_NOME, corValida, nomeDaCor, indexar, corDe, nomeDe, limparNome, conferirNome, chaveLegenda, criarLegenda,
-    mesmoLugar, corpoMover, pedeConfirmacaoNotas, podeArrastar, podeAtualizar, precisaEscopo, podeRepetir, resumoSerie, velocidadeRolagem, rotuloMes, SEMANA_CURTA, criarUi };
+    mesmoLugar, corpoMover, pedeConfirmacaoNotas, podeArrastar, podeAtualizar, precisaEscopo, podeRepetir, resumoSerie, velocidadeRolagem, rotuloMes, SEMANA_CURTA,
+    PX_HORA, PX_MIN, LARGURA_GRADE, mesmoHorario, podeHorario, querGrade, estiloGrade, criarUi };
 });
