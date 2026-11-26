@@ -179,13 +179,13 @@ test('layout: Minha semana aparece para quem não tem permissão nenhuma e some 
   assert.doesNotMatch(desligado.item, / hidden/);
 });
 
-test('tarefas.html carrega tema.css por último entre as folhas, layout.js e entregas_comum.js, e a CSP não tem cdn.jsdelivr', () => {
+test('tarefas.html carrega tema.css por último entre as folhas, layout.js, entregas_comum.js e agenda_comum.js, e a CSP não tem cdn.jsdelivr', () => {
   const h = ler('tarefas.html');
   const folhas = [...h.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(m => m[1]);
   assert.equal(folhas.at(-1), /href="(tema\.css\?v=\d+)"/.exec(ler('tintas.html'))[1]);
   assert.ok(h.lastIndexOf('<style') < h.indexOf('href="tema.css'));
   const scripts = [...h.matchAll(/<script src="([^"?]+)\?v=\d+" defer><\/script>/g)].map(m => m[1]);
-  assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'tarefas.js']);
+  assert.deepEqual(scripts, ['layout.js', 'entregas_comum.js', 'agenda_comum.js', 'tarefas.js']);
   assert.equal(/layout\.js\?v=\d+/.exec(h)[0], /layout\.js\?v=\d+/.exec(ler('tintas.html'))[0]);
   const csp = /Content-Security-Policy" content="([^"]+)"/.exec(h)[1];
   const base = /Content-Security-Policy" content="([^"]+)"/.exec(ler('tintas.html'))[1];
@@ -390,8 +390,9 @@ test('linha: textarea que cresce, maxlength 300, Enter sem quebra (e sem atrapal
   assert.match(js, /scrollHeight/);
   assert.match(js, /addEventListener\('resize'/);
   assert.doesNotMatch(js, /input\.textContent|input\.innerText/);
-  assert.match(h, /\.linha textarea \{[^}]*resize: none;[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere/);
-  assert.match(h, /tarefas\.js\?v=202611291400/);
+  // a faixa (linha) agora fica no bloco AGENDAS do tema.css, igual nas duas páginas
+  assert.match(ler('tema.css'), /\.agenda \.linha textarea \{[^}]*resize: none;[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere/);
+  assert.match(h, /tarefas\.js\?v=202611301200/);
 });
 
 test('semQuebra: texto colado com várias linhas vira uma linha só, mantendo os espaços digitados', () => {

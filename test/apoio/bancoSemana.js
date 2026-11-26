@@ -4,8 +4,13 @@
 const { criarPoolFalso } = require('./poolFalso');
 
 function criarBancoSemana() {
-  const pessoais = [], admin = [], avisos = [];
-  const seq = { pessoal: 0, admin: 0 };
+  const pessoais = [], admin = [], avisos = [], catPessoais = [], catAdmin = [];
+  const seq = { pessoal: 0, admin: 0, catPessoal: 0, catAdmin: 0 };
+  // como o utf8mb4_unicode_ci: "Médico" e "medico" são o mesmo nome (a chave única recusa)
+  const chave = n => String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const duplicado = (lista, nome, id) => lista.some(c => c.id !== id && chave(c.nome) === chave(nome));
+  const erroDup = () => { const e = new Error('Duplicate entry'); e.code = 'ER_DUP_ENTRY'; e.errno = 1062; return e; };
+  const porNome = (a, b) => chave(a.nome).localeCompare(chave(b.nome)) || a.id - b.id;
   const copia = l => ({ ...l });
   const dt = v => (typeof v === 'string' && /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v + ':00' : v);   // como o MySQL devolve DATETIME com dateStrings
 
@@ -29,11 +34,41 @@ function criarBancoSemana() {
 
   const f = criarPoolFalso([
     // ----- pessoal -----
-    [/^INSERT INTO web_tarefas \(/, (sql, [usuario_codigo, quadro, data, texto]) => {
+    [/^INSERT INTO web_tarefas \(/, (sql, [usuario_codigo, quadro, data, texto, , , categoria_id]) => {
       const id = ++seq.pessoal;
-      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null });
+      pessoais.push({ id, usuario_codigo, quadro, data, texto, feita: 0, alarme: null, alarme_visto: null, alarme_adiado: null, categoria_id: categoria_id ?? null });
       return { insertId: id, affectedRows: 1 };
     }],
+    // ----- categorias da pessoal (sempre com o dono) -----
+    [/^SELECT id, nome, cor FROM web_tarefas_categorias WHERE usuario_codigo = \? ORDER BY nome, id$/, (sql, [u]) => catPessoais.filter(c => c.usuario_codigo === u).sort(porNome).map(copia)],
+    [/^SELECT id FROM web_tarefas_categorias WHERE id = \? AND usuario_codigo = \?$/, (sql, [id, u]) => catPessoais.filter(c => c.id === Number(id) && c.usuario_codigo === u).map(c => ({ id: c.id }))],
+    [/^INSERT INTO web_tarefas_categorias \(usuario_codigo, nome, cor, criado_em, atualizado_em\) VALUES \(\?, \?, \?, \?, \?\)$/, (sql, [usuario_codigo, nome, cor]) => {
+      if (duplicado(catPessoais.filter(c => c.usuario_codigo === usuario_codigo), nome)) throw erroDup();
+      const id = ++seq.catPessoal;
+      catPessoais.push({ id, usuario_codigo, nome, cor });
+      return { insertId: id, affectedRows: 1 };
+    }],
+    [/^UPDATE web_tarefas_categorias SET /, (sql, params) => {
+      const alvo = catPessoais.find(c => c.id === Number(params.at(-2)) && c.usuario_codigo === params.at(-1));
+      if (alvo && /nome = \?/.test(sql) && duplicado(catPessoais.filter(c => c.usuario_codigo === alvo.usuario_codigo), params[0], alvo.id)) throw erroDup();
+      return atualizar(catPessoais, sql, params);
+    }],
+    [/^DELETE FROM web_tarefas_categorias WHERE id = \? AND usuario_codigo = \?$/, (sql, [id, u]) => apagar(catPessoais, c => c.id === Number(id) && c.usuario_codigo === u)],
+    // ----- categorias da compartilhada (lista única) -----
+    [/^SELECT id, nome, cor FROM web_tarefas_admin_categorias ORDER BY nome, id$/, () => [...catAdmin].sort(porNome).map(copia)],
+    [/^SELECT id FROM web_tarefas_admin_categorias WHERE id = \?$/, (sql, [id]) => catAdmin.filter(c => c.id === Number(id)).map(c => ({ id: c.id }))],
+    [/^INSERT INTO web_tarefas_admin_categorias \(nome, cor, criado_por_codigo, criado_em, atualizado_em\) VALUES \(\?, \?, \?, \?, \?\)$/, (sql, [nome, cor, criado_por_codigo]) => {
+      if (duplicado(catAdmin, nome)) throw erroDup();
+      const id = ++seq.catAdmin;
+      catAdmin.push({ id, nome, cor, criado_por_codigo });
+      return { insertId: id, affectedRows: 1 };
+    }],
+    [/^UPDATE web_tarefas_admin_categorias SET /, (sql, params) => {
+      const alvo = catAdmin.find(c => c.id === Number(params.at(-1)));
+      if (alvo && /nome = \?/.test(sql) && duplicado(catAdmin, params[0], alvo.id)) throw erroDup();
+      return atualizar(catAdmin, sql, params);
+    }],
+    [/^DELETE FROM web_tarefas_admin_categorias WHERE id = \?$/, (sql, [id]) => apagar(catAdmin, c => c.id === Number(id))],
     [/^SELECT .* FROM web_tarefas WHERE usuario_codigo = \? AND \(quadro/, (sql, [u, de, ate]) => pessoais.filter(l => l.usuario_codigo === u && naSemana(l, de, ate)).map(copia)],
     [/^SELECT .* FROM web_tarefas WHERE usuario_codigo = \? AND feita = 0 AND alarme IS NOT NULL/, (sql, [u]) =>
       pessoais.filter(l => l.usuario_codigo === u && !l.feita && l.alarme && l.alarme_visto !== l.alarme)
@@ -42,9 +77,9 @@ function criarBancoSemana() {
     [/^UPDATE web_tarefas SET /, (sql, params) => atualizar(pessoais, sql, params)],
     [/^DELETE FROM web_tarefas WHERE id = \? AND usuario_codigo = \?/, (sql, [id, u]) => apagar(pessoais, l => l.id === Number(id) && l.usuario_codigo === u)],
     // ----- compartilhada -----
-    [/^INSERT INTO web_tarefas_admin \(/, (sql, [quadro, data, texto, criada_por_codigo, criada_por]) => {
+    [/^INSERT INTO web_tarefas_admin \(/, (sql, [quadro, data, texto, criada_por_codigo, criada_por, , , categoria_id]) => {
       const id = ++seq.admin;
-      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null });
+      admin.push({ id, quadro, data, texto, feita: 0, alarme: null, versao: 1, criada_por_codigo, criada_por, feita_por: null, categoria_id: categoria_id ?? null });
       return { insertId: id, affectedRows: 1 };
     }],
     [/^SELECT .* FROM web_tarefas_admin t LEFT JOIN web_tarefas_admin_avisos/, (sql, [u]) => admin
@@ -66,7 +101,7 @@ function criarBancoSemana() {
       return { affectedRows: 2 };
     }]
   ]);
-  return { f, pessoais, admin, avisos };
+  return { f, pessoais, admin, avisos, catPessoais, catAdmin };
 }
 
 module.exports = { criarBancoSemana };

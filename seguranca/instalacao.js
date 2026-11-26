@@ -598,6 +598,26 @@ const TABELAS = [
      visto TINYINT NOT NULL DEFAULT 0,
      adiado DATETIME NULL,
      PRIMARY KEY (tarefa_id, usuario_codigo)
+   ) ${OPCOES}`,
+  // ----- Agendas: categorias com cor. Cada pessoa tem as suas na Minha semana; a Semana compartilhada tem uma lista única.
+  // `cor` guarda o código da paleta (calculo/minha_semana.js CORES), nunca hexadecimal. Nome único na lista (o _ci ignora maiúsculas e acentos). -----
+  `CREATE TABLE IF NOT EXISTS \`web_tarefas_categorias\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     usuario_codigo INT NOT NULL,
+     nome VARCHAR(30) NOT NULL,
+     cor VARCHAR(20) NOT NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     UNIQUE KEY uk_tarefas_cat_nome (usuario_codigo, nome)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_tarefas_admin_categorias\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     nome VARCHAR(30) NOT NULL,
+     cor VARCHAR(20) NOT NULL,
+     criado_por_codigo INT NULL,
+     criado_em DATETIME NULL,
+     atualizado_em DATETIME NULL,
+     UNIQUE KEY uk_tarefas_admin_cat_nome (nome)
    ) ${OPCOES}`
 ];
 
@@ -647,6 +667,14 @@ async function instalarTabelas(pool) {
       `SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = '${coluna}'`);
     if (!Number(al?.n)) await pool.execute(`ALTER TABLE web_tarefas ADD COLUMN ${coluna} DATETIME NULL`);
   }
+  // categoria dos itens das duas agendas (opcional; NULL = sem categoria): as tabelas já existem no banco publicado
+  // (nomes literais: o teste de instalação confere que só tabela web_* é alterada)
+  const [[cp] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas' AND COLUMN_NAME = 'categoria_id'");
+  if (!Number(cp?.n)) await pool.execute('ALTER TABLE web_tarefas ADD COLUMN categoria_id INT NULL');
+  const [[ca] = []] = await pool.execute(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_tarefas_admin' AND COLUMN_NAME = 'categoria_id'");
+  if (!Number(ca?.n)) await pool.execute('ALTER TABLE web_tarefas_admin ADD COLUMN categoria_id INT NULL');
   await migrarEntregasVarias(pool);
 }
 

@@ -77,10 +77,10 @@ test('usuário sem nenhuma permissão cria e lê a própria linha', async t => {
   const eu = como(7);
   const r = await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: TEXTO });
   assert.equal(r.status, 201);
-  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null });
+  assert.deepEqual(r.corpo, { id: 1, quadro: 'dia', data: '2026-11-25', texto: TEXTO, feita: false, alarme: null, categoriaId: null });
   const g = await eu.get(SEMANA);
   assert.equal(g.status, 200);
-  assert.deepEqual(g.corpo, { linhas: [r.corpo] });
+  assert.deepEqual(g.corpo, { linhas: [r.corpo], categorias: [] });
   assert.equal(g.corpo.linhas[0].feita, false);
 });
 
@@ -116,7 +116,7 @@ test('outro usuário não vê, não altera e não exclui, nem sendo administrado
   const { como, banco } = await preparar(t, { permissoes: { 8: ['administrativo.ver', 'admin.usuarios', 'valores.ver'] } });
   await como(7).post('/minha_semana', { quadro: 'tarefas', texto: 'segredo' });
   const outro = como(8);
-  assert.deepEqual((await outro.get(SEMANA)).corpo, { linhas: [] });
+  assert.deepEqual((await outro.get(SEMANA)).corpo, { linhas: [], categorias: [] });
   assert.equal((await outro.put('/minha_semana/1', { texto: 'invadi' })).status, 404);
   assert.equal((await outro.put('/minha_semana/1', { feita: true })).status, 404);
   assert.equal((await outro.del('/minha_semana/1')).status, 404);
@@ -150,7 +150,7 @@ test('usuario do corpo ou da URL é ignorado', async t => {
   const r = await como(7).post('/minha_semana?usuario_codigo=8', { quadro: 'tarefas', texto: 'a', usuario_codigo: 8, usuario: 8 });
   assert.equal(r.status, 201);
   assert.equal(banco.linhas[0].usuario_codigo, 7);
-  assert.deepEqual((await como(8).get(SEMANA + '&usuario_codigo=7')).corpo, { linhas: [] });
+  assert.deepEqual((await como(8).get(SEMANA + '&usuario_codigo=7')).corpo, { linhas: [], categorias: [] });
 });
 
 test('recusa 400 o que não vale; id inválido é 404', async t => {
@@ -178,7 +178,8 @@ test('recusa 400 o que não vale; id inválido é 404', async t => {
   assert.deepEqual([comData.status, comData.corpo.data], [201, null]);
   assert.equal(banco.linhas[1].data, null);
 
-  for (const corpo of [{}, { feita: 'sim' }, { feita: 1 }, { texto: '' }, { texto: 'a'.repeat(301) }, { quadro: 'notas' }])
+  // mover exige quadro válido (e data no dia): agendas_categorias_rotas.test.js
+  for (const corpo of [{}, { feita: 'sim' }, { feita: 1 }, { texto: '' }, { texto: 'a'.repeat(301) }, { quadro: 'x' }, { quadro: 'dia' }, { data: '2026-11-25' }])
     assert.equal((await eu.put('/minha_semana/1', corpo)).status, 400, JSON.stringify(corpo));
   for (const q of ['', '?inicio=', '?inicio=ontem', '?inicio=2026-02-30', '?inicio=2026-11-23&inicio=2026-11-30'])
     assert.equal((await eu.get('/minha_semana' + q)).status, 400, q);
@@ -193,7 +194,7 @@ test('semana cruzando o ano e o mês; datas reais; validações puras', () => {
   assert.equal(diasDaSemana('2028-02-28')[1], '2028-02-29');
   assert.equal(validarData('2028-02-29'), true);
   for (const s of ['2026-02-29', '2026-13-01', '2026-1-1', '', null, undefined, 20261125]) assert.equal(validarData(s), false, String(s));
-  assert.deepEqual(validarNova({ quadro: 'notas', texto: ' a\nb ' }), { ok: true, valor: { quadro: 'notas', data: null, texto: 'a b' } });
+  assert.deepEqual(validarNova({ quadro: 'notas', texto: ' a\nb ' }), { ok: true, valor: { quadro: 'notas', data: null, texto: 'a b', categoriaId: null } });
   assert.equal(validarNova(undefined).ok, false);
   assert.deepEqual(validarMudanca({ feita: false }), { ok: true, valor: { feita: false } });
   assert.equal(validarMudanca(null).ok, false);
@@ -204,7 +205,7 @@ test('resposta não perde campo na rede de valores (usuário sem valores.ver)', 
   const eu = como(7);
   await eu.post('/minha_semana', { quadro: 'dia', data: '2026-11-25', texto: 'a' });
   const g = await eu.get(SEMANA);
-  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme']);
+  assert.deepEqual(Object.keys(g.corpo.linhas[0]), ['id', 'quadro', 'data', 'texto', 'feita', 'alarme', 'categoriaId']);
   assert.ok(!logs.some(l => l.includes('[valores]')));
 });
 

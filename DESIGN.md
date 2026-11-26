@@ -175,6 +175,12 @@ Padrão único (aprovado em `docs/padrao-cores-situacoes.md`): cada situação t
 `--serie-1` a `--serie-8` em ordem fixa, todas com luminosidade e croma parecidos (sóbrias): cobre `#e8895a`, azul-aço `#6fa8dc`, verde-água `#5db8a8`, ouro `#d9b25a`, lavanda `#9a8cd9`, rosa `#d98aa8`, sálvia `#9db87a`, cinza `#8e99a8`; "Outros" `#4a5260`. O 1º é o acento. **Valor com significado de estado (entrada/saída, pago/recebido, em risco) usa a semântica, não a série.** Em canvas e Chart.js a cor precisa ser literal (`var()` não vale): use os hexadecimais acima, com o comentário "valores do tema.css".
 - Grade de eixo `#2a303a`; fatia de rosca separada por `#181c22`; linha de resultado/total em `#e7eaef`.
 
+### Categorias das agendas (cor escolhida pela pessoa)
+Exceção deliberada à regra "nenhuma outra cor existe" (pedido do dono, 2026-11-26): na Minha semana e na Semana compartilhada cada categoria tem uma cor de uma **paleta fixa de 10**, sem significado de estado. O banco guarda só o código (`vermelho`, `laranja`...), nunca o hexadecimal; a tela pinta por `data-cor` e as variáveis `--cat-*` do `tema.css` (bloco AGENDAS).
+- Faixa (fundo sólido) com **Tinta de Faixa** `--cat-tinta` `#14161a`: vermelho `#ee7d7d`, laranja `#eb9a5c`, amarelo `#e3c25e`, lima `#b4cf6a`, verde `#6fcf97`, turquesa `#5cc6be`, azul `#7cb0f0`, lavanda `#aaa3f0`, roxo `#c78de6`, rosa `#ee90bf`.
+- Concluída: mesma cor em versão suave (`--cat-<cor>-suave`, 22% sobre o painel), texto em Tinta Média riscado e filete de 1px na cor cheia. Sem categoria: neutra `--cat-neutra` `#2f3640` (suave `#242931`) com texto claro.
+- O nome da categoria aparece na legenda, no menu da faixa e no rótulo do botão do menu (estado nunca só por cor). Usar estas cores fora das agendas é proibido.
+
 ### Ícones em emoji
 Os atalhos e cartões usam emoji (coloridos por natureza). O `tema.css` aplica uma camada `mix-blend-mode: color` que deixa o emoji monocromático no tom do papel do ícone: **cobre por padrão**; entrada = verde, saída/falta = rosa-vermelho, mínimo = amarelo-dourado (variável `--icone-tom`). Emoji solto dentro de texto ou botão não é tratado.
 
@@ -198,6 +204,9 @@ A área `#cv-visualizacao` e as funções de canvas do desenho (`orcamentos.html
 | Toast: branco sobre `#1f6b46` / sobre `#a8344a` | 6,5 / 6,5 | 4,5 |
 | Borda de controle `#667180` sobre fundo / elevado | 3,7 / 3,2 | 3 (1.4.11) |
 | Tinta Apagada `#6b7685` sobre fundo (só desabilitado, exceção WCAG) | 4,0 | 3 |
+| Agendas: `#14161a` sobre as 10 faixas (vermelho … rosa) | 6,8 a 10,5 | 4,5 |
+| Agendas: Tinta Média sobre as 10 faixas concluídas (suaves) | 4,95 a 5,8 | 4,5 |
+| Agendas: Tinta sobre a neutra / Tinta Média sobre a neutra suave | 10,1 / 7,1 | 4,5 |
 
 ### Named Rules
 **The One Voice Rule.** O cobre é o único acento. Se uma tela parece ter dois, um deles é erro. As quatro cores de estado só dizem o que algo é e nunca enfeitam.
@@ -270,6 +279,12 @@ Cantos curtos e consistentes: **6px** (controles, botões, linhas de ranking), *
 
 ### Seleção em lote em listas
 - Padrão (`lote.css`; calendário na visão Lista e aba Pedidos): caixa nativa em cada linha (em tabela, coluna estreita à esquerda com a caixa "todos os visíveis" no cabeçalho, indeterminada com parte marcada), barra fixa no rodapé da janela `.cal-lote` só quando há seleção ("N selecionados | ações | Limpar seleção") e resumo `.cal-lote-resumo` com o que deu certo e o que falhou. Ctrl/Shift+clique selecionam e Esc limpa.
+
+### Agendas (semana em faixas coloridas)
+- `tarefas.html` e `tarefas_admin.html` (`agenda_comum.js` + bloco AGENDAS do `tema.css`, classe `.agenda` na grade): cabeçalho do dia com o dia curto em maiúsculas (11,5px, Tinta Suave) e o número em mono 18px; **hoje** no círculo cobre com `--on-primary`. Tarefas e Notas com o rótulo em maiúsculas.
+- Item = faixa (raio 6px) com o fundo da categoria; alça de seis pontos à esquerda (arrastar; `touch-action: none`), caixinha, texto editável no lugar e botão "⋯" à direita (menu: categoria e "Mover para…", que também serve a quem usa teclado). A linha vazia do fim de cada quadro não tem faixa (borda tracejada no foco).
+- Legenda no topo (caixas com amostra e nome); botão "Categorias" abre a janela de criar, renomear, trocar a cor e excluir (com confirmação). Destino do arraste: o quadro ganha borda cobre e fundo elevado; a faixa arrastada fica a 35% e um "fantasma" segue o ponteiro.
+- Foco da faixa: anel externo (`--white` + `--primary-ring`), para não depender da cor da categoria.
 
 ### Impressão de listas
 - Padrão para imprimir uma lista como está na tela (`impressao_lista.js` + `impressao_lista.css`, botão `.btn.btn-secondary.btn-mini` "Imprimir" ao lado de "Atualizar"): o JS monta um bloco `#area-impressao` só com cabeçalho (título, data/hora, filtros ativos, total de linhas, aviso de parcial), tabela e rodapé; a classe `imprimindo-lista` no body esconde o resto da página no `@media print`. A4 paisagem, cabeçalho da tabela repetido em cada página (`table-header-group`), linha sem quebrar (`break-inside: avoid`).

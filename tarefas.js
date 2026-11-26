@@ -12,8 +12,9 @@
 })(typeof self !== 'undefined' ? self : this, function (raiz) {
   'use strict';
   const C = typeof module === 'object' && module.exports ? require('./entregas_comum.js') : raiz.EntregasComum;
+  // categorias, legenda, menu, "Mover para" e arraste: a parte nova, igual nas duas agendas (agenda_comum.js)
+  const AG = typeof module === 'object' && module.exports ? require('./agenda_comum.js') : raiz.AgendaComum;
 
-  const MIN_LINHAS = 8;
   // ordem de leitura, do teclado e da tela: da esquerda para a direita (o CSS só decide quantas colunas cabem)
   const DIAS = [['seg', 'Segunda'], ['ter', 'Terça'], ['qua', 'Quarta'], ['qui', 'Quinta'], ['sex', 'Sexta'], ['sab', 'Sábado'], ['dom', 'Domingo']];
 
@@ -83,8 +84,10 @@
   // ---------- uma linha do caderno ----------
   // `dados` = o que o servidor já tem; `alvo` = o que a pessoa quer. As operações entram numa fila (uma por vez), o que
   // impede dois POSTs da mesma linha; se uma falha, o alvo fica guardado e a próxima tentativa grava a diferença.
+  // `temAlarme`: há alarme gravado no servidor (mesmo com os alarmes em stand by): ir para Notas o tira, então a tela pergunta antes
   function criarLinha(chamar, inicial, { rascunhos, chave } = {}) {
-    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: doAlarme(inicial.alarme) };
+    const dados = { id: inicial.id ?? null, quadro: inicial.quadro, data: inicial.data ?? null, texto: inicial.texto || '', feita: !!inicial.feita, alarme: doAlarme(inicial.alarme),
+      categoriaId: inicial.categoriaId ?? null, temAlarme: inicial.temAlarme !== undefined ? !!inicial.temAlarme : !!inicial.alarme };
     const alvo = { texto: dados.texto, feita: dados.feita, alarme: dados.alarme };
     let fila = Promise.resolve();
     let naFila = 0;
@@ -141,6 +144,7 @@
         return sincronizar();
       }
       Object.assign(dados, corpo);
+      if ('alarme' in corpo) dados.temAlarme = !!corpo.alarme;
       guardar();
     }
     async function sincronizar() {
@@ -164,8 +168,42 @@
       anotar,
       salvarTexto: t => { anotar(t); return enfileirar(() => { alvo.texto = limpar(t); }); },
       marcar: b => { anotar(undefined, b); return enfileirar(() => { alvo.feita = !!b; }); },
-      alarmar: q => { escrito.alarme = doAlarme(q); guardar(); return enfileirar(() => { alvo.alarme = doAlarme(q); }); }
+      alarmar: q => { escrito.alarme = doAlarme(q); guardar(); return enfileirar(() => { alvo.alarme = doAlarme(q); }); },
+      // trocar a categoria e mover: pela mesma fila (nunca antes de o texto chegar ao servidor). Se falhar, nada muda aqui e a
+      // tela avisa; não vira erro da linha (o texto está salvo). { ok } | { ok: false, mensagem } | { ok: false, sumiu } (apagada)
+      colorir: id => acao(async () => {
+        if (!dados.id) return { ok: false, mensagem: 'Salve o item antes.' };
+        if (id === dados.categoriaId) return { ok: true };
+        await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo: { categoriaId: id } });
+        dados.categoriaId = id;
+        return { ok: true };
+      }),
+      mover: destino => acao(async () => {
+        if (!dados.id || !semPendencia()) return { ok: false, mensagem: 'Espere o texto ser salvo antes de mover.' };
+        const corpo = AG.corpoMover(destino);
+        const r = await chamar('/minha_semana/' + dados.id, { metodo: 'PUT', corpo });
+        const l = r && r.quadro ? r : { ...corpo, feita: corpo.quadro === 'notas' ? false : dados.feita, alarme: corpo.quadro === 'notas' ? null : undefined };
+        dados.quadro = l.quadro; dados.data = l.data ?? null; dados.feita = !!l.feita;
+        if (l.alarme !== undefined) { dados.alarme = doAlarme(l.alarme); dados.temAlarme = !!l.alarme; }
+        for (const f of ['feita', 'alarme']) { alvo[f] = dados[f]; escrito[f] = dados[f]; }
+        return { ok: true, linha: r && r.quadro ? r : null };   // a linha como o servidor gravou, para a tela refazer a faixa
+      })
     };
+    // nada além do que o servidor já tem (o texto da tela é conferido pela tela, em AG.podeArrastar)
+    const semPendencia = () => alvo.texto === dados.texto && escrito.texto === dados.texto && alvo.feita === dados.feita && escrito.feita === dados.feita
+      && alvo.alarme === dados.alarme && escrito.alarme === dados.alarme;
+    // uma ação que não muda o texto: entra na fila e devolve o resultado em vez de marcar erro na linha
+    function acao(fazer) {
+      naFila++;
+      const feito = fila.then(async () => {
+        try { return await fazer(); } catch (e) {
+          if (e.status === 404) return { ok: false, sumiu: true };
+          return { ok: false, mensagem: e.message || 'Erro ao salvar.' };
+        } finally { naFila--; guardar(); }
+      });
+      fila = feito.then(() => {});
+      return feito;
+    }
     function enfileirar(aplicar) {
       naFila++;
       fila = fila.then(async () => {
@@ -247,6 +285,21 @@
   }
 
   // ============ TELA (só no navegador) ============
+  const SVG = 'http://www.w3.org/2000/svg';
+  function icone(doc, d, viewBox = '0 0 24 24', preenchido = false) {
+    const svg = doc.createElementNS(SVG, 'svg');
+    const attrs = preenchido ? { viewBox, fill: 'currentColor', 'aria-hidden': 'true' }
+      : { viewBox, fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' };
+    for (const [k, v] of Object.entries(attrs)) svg.setAttribute(k, v);
+    const p = doc.createElementNS(SVG, 'path');
+    p.setAttribute('d', d);
+    svg.append(p);
+    return svg;
+  }
+  // seis pontinhos da alça e os três do marcador (menu)
+  const PONTOS_ALCA = 'M2 2h1.6v1.6H2zM5.4 2H7v1.6H5.4zM2 6.2h1.6v1.6H2zM5.4 6.2H7v1.6H5.4zM2 10.4h1.6V12H2zM5.4 10.4H7V12H5.4z';
+  const PONTOS_MENU = 'M5 12h.01M12 12h.01M19 12h.01';
+
   function iniciar(win) {
     const doc = win.document;
     const $ = id => doc.getElementById(id);
@@ -273,11 +326,15 @@
     const gravou = metodo => { if (metodo === 'PUT' || metodo === 'DELETE') win.dispatchEvent(new win.CustomEvent('alarmes-mudou')); };
     const rascunhos = criarRascunhos(() => win.localStorage, dono);
     // só o que já estava guardado ao abrir é retomado (o que nasce depois pertence às linhas da tela)
-    const estado = { mostrada: null, alvo: segundaDe(new Date()), geracao: 0, linhas: [], herdados: rascunhos.ler(), recuperacao: null };
+    const estado = { mostrada: null, alvo: segundaDe(new Date()), geracao: 0, linhas: [], herdados: rascunhos.ler(), recuperacao: null,
+      quadros: [], categorias: new Map(), arrastando: false };
     let sequencia = 0;
     const novaChave = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${++sequencia}`;
     const semana = $('semana');
     const aviso = $('aviso-semana');
+    const ui = AG.criarUi(doc, win);
+    const legenda = AG.criarLegenda(() => win.localStorage, 'minha_semana_legenda:' + dono);
+    const porLi = new WeakMap();
 
     const criar = (tag, classe, texto) => {
       const e = doc.createElement(tag);
@@ -286,8 +343,28 @@
       return e;
     };
 
+    // ---------- categorias: legenda no topo, cor de cada faixa ----------
+    function aplicarCategorias(lista) {
+      const ordem = [...(lista || [])].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { sensitivity: 'base' }) || a.id - b.id);
+      estado.categorias = AG.indexar(ordem);
+      legenda.podar(estado.categorias);
+      ui.desenharLegenda($('legenda'), { categorias: estado.categorias, legenda, aoMudar: () => estado.linhas.forEach(pintar) });
+      estado.linhas.forEach(pintar);
+    }
+    function pintarFaixa(item) {
+      const { linha, li } = item;
+      const salva = !!linha.dados.id;
+      li.classList.toggle('salva', salva);
+      li.dataset.cor = salva ? AG.corDe(linha.dados.categoriaId, estado.categorias) : '';
+      item.alca.hidden = item.marcador.hidden = !salva;
+      item.marcador.setAttribute('aria-label', `Opções do item (categoria: ${AG.nomeDe(linha.dados.categoriaId, estado.categorias)})`);
+      // a legenda esconde a categoria, mas nunca o que está sendo escrito ou deu erro
+      li.hidden = salva && !legenda.visivel(linha.dados.categoriaId, estado.categorias) && !linha.erro && !linha.pendente() && !li.contains(doc.activeElement);
+    }
+
     function pintar(item) {
       const { linha, li, aviso: msg, input, caixa } = item;
+      pintarFaixa(item);
       pintarSino(item);
       li.classList.toggle('erro', linha.erro);
       msg.hidden = !linha.erro;
@@ -297,19 +374,20 @@
       if (!input.value.trim() && !linha.dados.id) caixa.checked = false;
       li.classList.toggle('feita', caixa.checked);
     }
-    const salvar = item => item.linha.salvarTexto(item.input.value).then(() => pintar(item));
+    // linha que ficou vazia no meio do quadro (texto apagado e excluído) sai da tela; sempre sobra a vazia do fim
+    function tirarVazia(item) {
+      const { linha, li, input, quadro: q } = item;
+      if (linha.dados.id || input.value.trim() || linha.pendente() || linha.erro || li.contains(doc.activeElement) || q.lista.lastElementChild === li || !li.isConnected) return;
+      li.remove();
+      estado.linhas = estado.linhas.filter(i => i !== item);
+    }
+    const salvar = item => item.linha.salvarTexto(item.input.value).then(() => { pintar(item); tirarVazia(item); });
     // ---------- alarme da linha ----------
     function criarSino(item) {
       const botao = criar('button', 'sino');
       botao.type = 'button';
       botao.title = 'Alarme';
-      const SVG = 'http://www.w3.org/2000/svg';
-      const icone = doc.createElementNS(SVG, 'svg');
-      for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) icone.setAttribute(k, v);
-      const traco = doc.createElementNS(SVG, 'path');
-      traco.setAttribute('d', 'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 8H4c0-1 2-2 2-8M10 21h4');
-      icone.append(traco);
-      botao.append(icone);
+      botao.append(icone(doc, 'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 8H4c0-1 2-2 2-8M10 21h4'));
       botao.addEventListener('click', () => { if (!item.editor) abrirEditor(item); });
       return { botao, hora: criar('p', 'linha-hora') };
     }
@@ -371,16 +449,98 @@
       campo.focus();
     }
 
+    // ---------- menu da faixa, trocar a categoria e mover ----------
+    const quadroDe = d => estado.quadros.find(q => q.quadro === d.quadro && (q.quadro !== 'dia' || q.data === d.data)) || null;
+    // a posição em que o servidor devolve (ordem de criação), antes da linha vazia do fim
+    function inserirNaOrdem(q, li, id) {
+      const depois = [...q.lista.children].find(el => el !== li && (!porLi.get(el)?.linha.dados.id || porLi.get(el).linha.dados.id > id));
+      q.lista.insertBefore(li, depois || null);
+    }
+    function remover(item) {
+      ui.fecharMenu(false);
+      fecharEditor(item);
+      item.li.remove();
+      estado.linhas = estado.linhas.filter(i => i !== item);
+    }
+    function sumiu(item) {
+      remover(item);
+      toast('Este item foi apagado em outro aparelho.', 'erro');
+    }
+    function colorir(item, id) {
+      if (id === (estado.categorias.has(item.linha.dados.categoriaId) ? item.linha.dados.categoriaId : null)) return;
+      item.li.classList.add('movendo');
+      item.linha.colorir(id).then(r => {
+        item.li.classList.remove('movendo');
+        if (r.sumiu) return sumiu(item);
+        if (!r.ok) toast(`Não foi possível trocar a categoria. ${r.mensagem}`, 'erro');
+        pintar(item);
+      });
+    }
+    async function moverItem(item, destino) {
+      const d = item.linha.dados;
+      if (AG.mesmoLugar(d, destino)) return;
+      if (!AG.podeArrastar(item)) { toast('Espere o texto ser salvo antes de mover.', 'erro'); return; }
+      if (AG.pedeConfirmacaoNotas(d, destino) && !(await ui.confirmar({ titulo: 'Mover para Notas', sim: 'Mover',
+        texto: 'Notas não têm alarme nem caixinha. Ao mover, o alarme deste item é apagado e ele deixa de estar concluído.' }))) return;
+      const origem = { lista: item.li.parentNode, depois: item.li.nextSibling };
+      const q = quadroDe(destino);
+      if (q) inserirNaOrdem(q, item.li, d.id);
+      item.li.classList.add('movendo');
+      const r = await item.linha.mover(destino);
+      item.li.classList.remove('movendo');
+      if (r.sumiu) return sumiu(item);
+      if (!r.ok) {
+        origem.lista.insertBefore(item.li, origem.depois && origem.depois.parentNode === origem.lista ? origem.depois : origem.lista.lastElementChild);
+        toast(`Não foi possível mover. ${r.mensagem.replace(/\.$/, '')}. O item voltou ao lugar.`, 'erro');
+        return;
+      }
+      if (!q) { remover(item); toast(`Movido para ${diaMes(destino.data)}.`, 'ok'); return; }
+      // caixinha e alarme dependem do quadro: a faixa é refeita no destino com o que o servidor devolveu
+      novaLinha(q, r.linha || { ...item.linha.dados }, null, item.li);
+      remover(item);
+    }
+    function abrirMenuDo(item) {
+      ui.abrirMenu({ ancora: item.marcador, categorias: estado.categorias, atual: item.linha.dados.categoriaId,
+        aoEscolher: id => colorir(item, id),
+        aoMover: () => ui.abrirMover({ texto: item.input.value, atual: item.linha.dados, aoMover: d => moverItem(item, d),
+          destinos: estado.quadros.map(q => ({ quadro: q.quadro, data: q.data, rotulo: q.rotulo })) }),
+        aoCategorias: abrirCategorias });
+    }
+    // ---------- janela "Categorias" (só as desta pessoa) ----------
+    const BASE_CAT = '/minha_semana/categorias';
+    function abrirCategorias() {
+      const lista = () => [...estado.categorias.values()];
+      ui.abrirCategorias({ categorias: () => estado.categorias, subtitulo: 'Só você vê as suas categorias.', api: {
+        criar: (nome, cor) => chamar(BASE_CAT, { metodo: 'POST', corpo: { nome, cor } }).then(c => aplicarCategorias([...lista(), c])),
+        mudar: (id, campos) => chamar(`${BASE_CAT}/${id}`, { metodo: 'PUT', corpo: campos }).then(c => aplicarCategorias(lista().map(x => (x.id === id ? c : x)))),
+        excluir: id => chamar(`${BASE_CAT}/${id}`, { metodo: 'DELETE' }).then(() => {
+          for (const it of estado.linhas) if (it.linha.dados.categoriaId === id) it.linha.dados.categoriaId = null;   // o servidor já tirou
+          aplicarCategorias(lista().filter(x => x.id !== id));
+        })
+      } });
+    }
+
     // o campo cresce com o texto, para ele aparecer inteiro em coluna estreita
     const ajustar = campo => { campo.style.height = 'auto'; campo.style.height = campo.scrollHeight + 'px'; };
     const ajustarTodos = () => { for (const item of estado.linhas) ajustar(item.input); };
 
-    function novaLinha(q, dados, rascunho) {
+    function novaLinha(q, dados, rascunho, antesDe = null) {
       const volta = rascunho ? retomar(chamar, rascunho, rascunhos) : null;
       const linha = volta ? volta.linha
         : criarLinha(chamar, { quadro: q.quadro, data: q.data, texto: '', feita: false, ...dados }, { rascunhos, chave: novaChave() });
       const li = criar('li', 'linha');
-      const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso') };
+      const item = { linha, li, quadro: q, input: criar('textarea'), caixa: null, aviso: criar('p', 'linha-aviso'), alca: criar('span', 'alca'), marcador: criar('button', 'marcador') };
+      porLi.set(li, item);
+      // alça: segurar e arrastar para outro dia, Tarefas ou Notas (só a faixa já salva); pelo teclado, "Mover para..." no menu
+      item.alca.title = 'Arrastar para outro dia';
+      item.alca.setAttribute('aria-hidden', 'true');
+      item.alca.append(icone(doc, PONTOS_ALCA, '0 0 9 14', true));
+      li.append(item.alca);
+      item.marcador.type = 'button';
+      item.marcador.setAttribute('aria-haspopup', 'menu');
+      item.marcador.setAttribute('aria-expanded', 'false');
+      item.marcador.append(icone(doc, PONTOS_MENU));
+      item.marcador.addEventListener('click', () => abrirMenuDo(item));
       if (q.quadro !== 'notas') {   // nota é anotação: sem caixinha
         item.caixa = criar('input');
         item.caixa.type = 'checkbox';
@@ -401,6 +561,7 @@
       input.maxLength = 300;
       input.autocomplete = 'off';
       input.enterKeyHint = 'next';
+      input.placeholder = '+ Novo item';
       input.value = volta ? rascunho.entrada.texto : linha.dados.texto;
       input.setAttribute('aria-label', q.rotulo);
       input.addEventListener('input', () => {
@@ -433,8 +594,8 @@
         ev.preventDefault();
         enter();
       });
-      li.append(input, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso);
-      q.lista.append(li);
+      li.append(input, item.marcador, ...(item.sino ? [item.sino.botao, item.sino.hora] : []), item.aviso);
+      q.lista.insertBefore(li, antesDe);
       estado.linhas.push(item);
       pintar(item);
       ajustar(input);
@@ -444,9 +605,10 @@
         item.aviso.hidden = false;
         volta.pronto.then(() => pintar(item));
       }
+      return item;
     }
 
-    function desenhar(inicio, linhas) {
+    function desenhar(inicio, linhas, categorias) {
       const hoje = isoLocal(new Date());
       const quadros = DIAS.map(([area, nome], i) => {
         const data = somarDias(inicio, i);
@@ -456,6 +618,8 @@
       quadros.push({ area: 'not', nome: 'Notas', quadro: 'notas', data: null, rotulo: 'Notas' });
       semana.replaceChildren();
       estado.linhas = [];
+      estado.quadros = quadros;
+      aplicarCategorias(categorias);
       const porId = new Map(), soltos = [];
       for (const c of casarRascunhos(estado.herdados, linhas, inicio)) {
         delete estado.herdados[c.chave];
@@ -465,9 +629,15 @@
       }
       for (const q of quadros) {
         const sec = criar('section', `quadro q-${q.area}${q.hoje ? ' hoje' : ''}`);
-        const titulo = criar('h2', '', q.nome);
-        if (q.dia) titulo.append(' ', criar('span', 'q-data', q.dia));
-        if (q.hoje) titulo.append(' ', criar('span', 'q-hoje', 'Hoje'));
+        q.sec = sec;
+        let titulo;
+        if (q.dia) {   // dia da semana curto e o número grande; hoje num círculo
+          titulo = criar('h2', 'q-cab');
+          const sem = criar('span', 'q-sem', AG.SEMANA_CURTA[q.area]), num = criar('span', 'q-num', q.data.slice(8, 10));
+          sem.setAttribute('aria-hidden', 'true');
+          num.setAttribute('aria-hidden', 'true');
+          titulo.append(sem, num, criar('span', 'ag-sr', `${q.nome} ${q.dia}${q.hoje ? ', hoje' : ''}`));
+        } else titulo = criar('h2', 'q-cab-fixo', q.nome);
         q.lista = criar('ul', 'linhas');
         sec.append(titulo, q.lista);
         semana.append(sec);
@@ -475,8 +645,7 @@
         for (const l of minhas) novaLinha(q, l, porId.get(l.id));
         const extras = soltos.filter(c => c.entrada.quadro === q.quadro && (q.quadro !== 'dia' || c.entrada.data === q.data));
         for (const c of extras) novaLinha(q, null, c);
-        const usadas = minhas.length + extras.length;
-        for (let n = usadas; n < Math.max(MIN_LINHAS, usadas + 1); n++) novaLinha(q);
+        novaLinha(q);   // uma vazia no fim, para escrever (o item novo nasce sem categoria)
       }
       estado.mostrada = inicio;
       ajustarTodos();   // com a página inteira montada a largura é a final (barra de rolagem)
@@ -488,11 +657,16 @@
       semana.setAttribute('aria-busy', String(sim));
       for (const item of estado.linhas) { item.input.readOnly = sim; pintar(item); }
     }
+    function mostrarSemana(inicio) {
+      $('rotulo-mes').textContent = AG.rotuloMes(inicio);
+      $('rotulo-semana').textContent = rotuloSemana(inicio);
+    }
 
     async function irPara(inicio) {
       const geracao = ++estado.geracao;
       estado.alvo = inicio;
-      $('rotulo-semana').textContent = rotuloSemana(inicio);
+      mostrarSemana(inicio);
+      ui.fecharMenu(false);
       travar(true);
       aviso.hidden = true;
       // antes de trocar: grava o que está escrito e espera as filas
@@ -501,7 +675,7 @@
       if (estado.linhas.some(i => i.linha.erro)) {
         travar(false);
         estado.alvo = estado.mostrada;
-        $('rotulo-semana').textContent = rotuloSemana(estado.mostrada);
+        mostrarSemana(estado.mostrada);
         toast('Há texto que não foi salvo. A semana não foi trocada.', 'erro');
         return;
       }
@@ -526,13 +700,21 @@
       }
       if (geracao !== estado.geracao) return;
       semana.setAttribute('aria-busy', 'false');
-      desenhar(inicio, Array.isArray(resposta.linhas) ? resposta.linhas : []);
+      desenhar(inicio, Array.isArray(resposta.linhas) ? resposta.linhas : [], Array.isArray(resposta.categorias) ? resposta.categorias : []);
     }
+
+    // arraste pela alça: soltar num dia, em Tarefas ou em Notas (Esc ou pointercancel desfazem)
+    ui.ligarArraste({ raiz: semana,
+      podeArrastar: li => { const it = porLi.get(li); return !!it && AG.podeArrastar(it); },
+      aoNegar: li => { if (porLi.get(li)?.linha.dados.id) toast('Espere o texto ser salvo antes de mover.', 'erro'); },
+      aoSoltar: (li, sec) => { const it = porLi.get(li), q = estado.quadros.find(x => x.sec === sec); if (it && q) moverItem(it, { quadro: q.quadro, data: q.data }); },
+      aoMudar: sim => { estado.arrastando = sim; if (sim) ui.fecharMenu(false); } });
 
     $('btn-anterior').addEventListener('click', () => irPara(somarDias(estado.alvo, -7)));
     $('btn-proxima').addEventListener('click', () => irPara(somarDias(estado.alvo, 7)));
     $('btn-hoje').addEventListener('click', () => irPara(segundaDe(new Date())));
     $('btn-tentar').addEventListener('click', () => irPara(estado.alvo));
+    $('btn-categorias').addEventListener('click', abrirCategorias);
     win.addEventListener('beforeunload', ev => {
       if (!estado.linhas.some(i => i.linha.pendente() || limpar(i.input.value) !== i.linha.dados.texto)) return;
       ev.preventDefault();

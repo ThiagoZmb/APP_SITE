@@ -2,9 +2,17 @@
 
 > **Alarmes EM STAND BY** (decisão do dono, até o sistema ir para o HostGator): desligados pela chave `ALARMES_ATIVOS = false` em `layout.js`, sem apagar código, tabelas nem dados (sem sino, sem janela, sem `GET /alarmes`; o alarme gravado fica intacto). Para religar: trocar para `true` e subir o `?v=`.
 
-Arquivos: `tarefas_admin.html`, `tarefas_admin.js`, `rotas/semana_admin.js`, `rotas/alarmes.js`, `calculo/alarmes.js`, `alarmes.js` (carregado pelo `layout.js` em todas as telas). Tabelas `web_tarefas_admin` e `web_tarefas_admin_avisos`; colunas `alarme`, `alarme_visto` e `alarme_adiado` em `web_tarefas`. Testes: `test/semana_admin_rotas.test.js`, `test/semana_admin_tela.test.js`, `test/alarmes_rotas.test.js`, `test/alarmes_tela.test.js` (banco em memória: `test/apoio/bancoSemana.js`). Desenho aprovado: `docs/superpowers/specs/2026-11-25-semana-administradores-alarmes-design.md`.
+Arquivos: `tarefas_admin.html`, `tarefas_admin.js`, `agenda_comum.js` (parte nova, igual nas duas agendas), `rotas/semana_admin.js`, `rotas/alarmes.js`, `calculo/alarmes.js`, `alarmes.js` (carregado pelo `layout.js` em todas as telas). Tabelas `web_tarefas_admin`, `web_tarefas_admin_avisos` e `web_tarefas_admin_categorias`; colunas `alarme`, `alarme_visto` e `alarme_adiado` em `web_tarefas`; `categoria_id` em `web_tarefas` e `web_tarefas_admin`. Testes: `test/semana_admin_rotas.test.js`, `test/semana_admin_tela.test.js`, `test/alarmes_rotas.test.js`, `test/alarmes_tela.test.js`, `test/agendas_categorias_rotas.test.js`, `test/agendas_tela.test.js` (banco em memória: `test/apoio/bancoSemana.js`). Desenhos aprovados: `docs/superpowers/specs/2026-11-25-semana-administradores-alarmes-design.md` e `docs/superpowers/specs/2026-11-26-agendas-categorias-arrastar-design.md`.
 
-A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Quadros, texto, datas e grade seguem `docs/regras/minha-semana.md`.
+A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do dono): ajuste de tela feito em `tarefas.js`/`tarefas.html` precisa ser repetido em `tarefas_admin.js`/`tarefas_admin.html`. Só a parte nova (paleta, legenda, menu da faixa, janelas e arraste) fica em um arquivo único, `agenda_comum.js`, e o visual dela no bloco AGENDAS do `tema.css`. Quadros, texto, datas, grade, faixas, menu, legenda e arraste seguem `docs/regras/minha-semana.md`.
+
+## Categorias e mover (compartilhada)
+- Lista única (`web_tarefas_admin_categorias`, nome único `uk_tarefas_admin_cat_nome`): quem tem `tarefas_admin.usar` cria, renomeia, troca a cor e exclui. `GET/POST /semana_admin/categorias`, `PUT/DELETE /semana_admin/categorias/:id` (sem a permissão: 403 sem tocar no banco; inexistente: 404; nome repetido: 409). Mesmas regras de nome e cor da pessoal; nome fora do log e da auditoria.
+- Categoria pessoal nunca vale aqui e a compartilhada nunca vale na pessoal: `categoriaId` de outra lista = 400, nada gravado.
+- Excluir a categoria (transação) deixa os itens "Sem categoria" **sem mudar a versão deles** (texto, concluído e alarme continuam os mesmos); nunca apaga item.
+- Trocar a categoria e **mover** (`quadro` + `data` no `PUT`) levam a versão que a pessoa via: se outra pessoa mudou antes, 409 com a linha atual, **nada gravado por cima**; a tela adota o atual (põe o item onde ele está agora) e avisa. Item apagado por outra pessoa (404): sai da tela com aviso. Ir para Notas zera concluído, "feita por" e alarme e apaga os avisos do alarme (a tela pergunta antes se havia alarme).
+- A atualização de 60 s também traz a lista de categorias (legenda e cores mudam se outra pessoa mexeu) e leva para o lugar novo o item que outra pessoa moveu. **Não roda com um arraste em andamento, com o menu da faixa ou qualquer janela aberta** (tenta no minuto seguinte; confere de novo depois que a resposta chega).
+- Legenda guardada no navegador em `semana_admin_legenda:<id>`, separada da pessoal.
 
 ## Quem entra
 - Permissão `tarefas_admin.usar` ("Semana compartilhada", área Pessoal), em `PERMISSOES_ADMINISTRATIVAS`: sem a chave `administrativo.ver` ela não vale, nem com exceção "liberar".
@@ -13,8 +21,8 @@ A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do do
 - Sem ela: 403 nas quatro rotas, nenhum alarme compartilhado, menu escondido. No modo atendimento a página só some para quem não tem `administrativo.ver` (para o administrativo ela continua no menu e abre). Nunca é a primeira página depois do login.
 
 ## Rotas e versão
-- `GET /semana_admin?inicio=`, `POST /semana_admin`, `PUT /semana_admin/:id` (`texto`, `feita`, `alarme`, `versao`), `DELETE /semana_admin/:id` (`versao` no corpo ou na URL).
-- Linha: `id, quadro, data, texto, feita, alarme, versao, criadaPor, feitaPor`. Autor e "feita por" vêm do login (nome gravado na linha; nenhuma tabela do VB).
+- `GET /semana_admin?inicio=` (`{ linhas, categorias }`), `POST /semana_admin`, `PUT /semana_admin/:id` (`texto`, `feita`, `alarme`, `categoriaId`, mover com `quadro` + `data`, sempre com `versao`), `DELETE /semana_admin/:id` (`versao` no corpo ou na URL).
+- Linha: `id, quadro, data, texto, feita, alarme, versao, criadaPor, feitaPor, categoriaId`. Autor e "feita por" vêm do login (nome gravado na linha; nenhuma tabela do VB).
 - Versão diferente: **409** `{ error, atual }` sem gravar. Linha inexistente: 404. Cada gravação soma 1 à versão (linha travada com `FOR UPDATE`).
 - Texto fora de log e auditoria. Não há registro de quem apagou.
 
@@ -41,4 +49,4 @@ A Semana compartilhada é uma **cópia separada** da Minha semana (escolha do do
 - O navegador pode bloquear o som enquanto a pessoa não tiver clicado na página.
 - Várias abas abertas: cada uma mostra a sua janela e toca; OK numa fecha as outras.
 - Excluir e depois marcar a mesma linha por outra pessoa só aparece na próxima atualização (até 1 minuto).
-- **Não testado**: banco MySQL real (o SQL de avisos com `ON DUPLICATE KEY UPDATE` e o `ADD COLUMN` só foram exercitados no banco simulado), celular de verdade, som, e uso por duas pessoas reais.
+- **Não testado**: banco MySQL real (o SQL de avisos com `ON DUPLICATE KEY UPDATE`, os `ADD COLUMN` e as tabelas de categorias só foram exercitados no banco simulado), celular de verdade, som, e uso por duas pessoas reais. Categorias, faixas, legenda, arraste (mouse e toque emulado), conflito no arraste e atualização esperando o arraste: verificados no Edge headless com API simulada (1600 e 390 px).

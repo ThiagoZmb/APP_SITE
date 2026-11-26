@@ -197,7 +197,7 @@ test('falha do banco: 500 sem texto no log', async t => {
 test('instalarTabelas acrescenta as colunas do alarme em web_tarefas só se faltarem e cria a tabela de avisos', async () => {
   const faltando = criarPoolFalso();
   await instalarTabelas(faltando);
-  const alters = faltando.chamadas.map(c => c.sql).filter(s => /^ALTER TABLE web_tarefas /.test(s));
+  const alters = faltando.chamadas.map(c => c.sql).filter(s => /^ALTER TABLE web_tarefas ADD COLUMN alarme/.test(s));   // categoria_id: agendas_categorias_rotas.test.js
   assert.deepEqual(alters, [
     'ALTER TABLE web_tarefas ADD COLUMN alarme DATETIME NULL',
     'ALTER TABLE web_tarefas ADD COLUMN alarme_visto DATETIME NULL',
