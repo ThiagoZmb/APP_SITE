@@ -72,6 +72,7 @@
 
     // ---------- lista ----------
     async function abrirLista() {
+      estado.seq++;
       mostrar('lista');
       let lista;
       try { lista = await chamar('/pedidos_compra'); }
@@ -83,16 +84,18 @@
     }
 
     async function abrirPedido(numero) {
+      const seq = ++estado.seq;   // vale o último pedido clicado
       let p;
       try { p = await chamar('/pedidos_compra/' + numero); }
       catch (err) { return toast(err.message, 'erro'); }
-      Object.assign(estado, { numero: p.numero, situacao: p.situacao, fornecedor: p.fornecedor, alterado: false, seq: estado.seq + 1 });
+      if (seq !== estado.seq) return;
+      Object.assign(estado, { numero: p.numero, situacao: p.situacao, fornecedor: p.fornecedor, alterado: false });
       if (p.situacao === 'rascunho' && podeCriar()) {
         estado.linhas = p.itens.map(i => ({ codigo: i.codigo, produto: i.produto, unidade: i.unidade, qtd: null, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
           marcado: true, porCaixa: String(i.porCaixa), quantidade: String(i.qtd / i.porCaixa) }));
         $('observacao').value = p.observacao;
         $('titulo-form').textContent = `Pedido nº ${p.numero} (rascunho)`;
-        await preencherFornecedores(p.fornecedor);
+        if (!(await preencherFornecedores(p.fornecedor))) return;
         desenharLinhas();
         botoesForm();
         mostrar('form');
@@ -122,15 +125,17 @@
 
     // ---------- formulário ----------
     async function preencherFornecedores(selecionado) {
-      const sel = $('fornecedor');
+      const sel = $('fornecedor'), seq = estado.seq;
       sel.innerHTML = '<option value="">Carregando…</option>';
       let lista = [];
       try { lista = await chamar('/pedidos_compra/fornecedores'); }
       catch (err) { toast(err.message, 'erro'); }
+      if (seq !== estado.seq) return false;
       sel.innerHTML = '<option value="">Escolha o fornecedor</option>' + lista.map(f =>
         `<option value="${esc(f.fornecedor)}">${esc(f.fornecedor)}${f.qtdSugeridos ? ` (${esc(f.qtdSugeridos)} sugeridos)` : ''}</option>`).join('');
       if (selecionado && !lista.some(f => f.fornecedor === selecionado)) sel.add(new win.Option(selecionado, selecionado));
       sel.value = selecionado || '';
+      return true;
     }
 
     async function novoPedido() {
@@ -147,7 +152,7 @@
 
     async function trocarFornecedor() {
       const novo = $('fornecedor').value;
-      if (estado.alterado && !win.confirm('Trocar de fornecedor descarta os itens da lista. Continuar?')) { $('fornecedor').value = estado.fornecedor; return; }
+      if (estado.linhas.length && (estado.alterado || estado.numero) && !win.confirm('Trocar de fornecedor descarta os itens da lista. Continuar?')) { $('fornecedor').value = estado.fornecedor; return; }
       estado.fornecedor = novo;
       estado.linhas = [];
       estado.alterado = false;
