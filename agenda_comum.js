@@ -73,7 +73,9 @@
   const PX_HORA = 48;                 // altura de uma hora na grade (o CSS usa a mesma, --ag-hora)
   const PX_MIN = PX_HORA / 60;
   const ALTO_MIN = 20;                // item curto continua clicável
-  const LARGURA_GRADE = 880;          // área da semana (sem o menu lateral); a grade monta a própria fileira de sete dias
+  const LARGURA_GRADE = 760;          // área da semana (sem o menu lateral e a coluna de categorias); ~99px por dia no mínimo
+  const ALTO_GRADE_MIN = 320;         // janela baixa: a página rola
+  const FOLGA_BAIXO = 12;
   const mesmoHorario = (a, b) => (!a && !b) || (!!a && !!b && a.inicio === b.inicio && a.fim === b.fim);
   // "Horário..." só em item salvo dos dias
   const podeHorario = d => !!(d && d.id) && d.quadro === 'dia';
@@ -84,6 +86,32 @@
     const i = AH.paraMin(h.inicio), f = AH.paraMin(h.fim);
     const p = n => `${(n * 100).toFixed(4)}%`;
     return { top: `${i * PX_MIN}px`, height: `${Math.max((f - i) * PX_MIN, ALTO_MIN)}px`, left: `calc(${p(col / cols)} + 1px)`, width: `calc(${p(1 / cols)} - 3px)`, curto: f - i < 45 };
+  }
+  // a grade vai do topo dela (na página) até o fim da janela
+  const alturaGrade = (janela, topo) => Math.max(ALTO_GRADE_MIN, Math.floor(janela - topo - FOLGA_BAIXO));
+  // Abre a grade em `alvo` (perto das 07:00, ou onde a pessoa deixou). O navegador descarta o scrollTop pedido enquanto a grade
+  // não tem layout: enquanto não pegar, tenta de novo (próximo quadro, quando ela ganhar tamanho ou quando a tela chamar
+  // aplicar()). Depois que pega não mexe mais; `aoRolar(topo)` guarda a posição para a próxima montagem.
+  function manterRolagem(el, win, { alvo, aoRolar }) {
+    let pronta = false, observador = null;
+    el.addEventListener('scroll', () => { if (pronta) aoRolar?.(el.scrollTop); });
+    const aplicar = () => {
+      if (pronta) return true;
+      if (!el.clientHeight || el.scrollHeight <= el.clientHeight) return false;
+      pronta = true;
+      observador?.disconnect();
+      el.scrollTop = alvo;
+      return true;
+    };
+    if (!aplicar()) {
+      if (win.ResizeObserver) {
+        observador = new win.ResizeObserver(aplicar);
+        observador.observe(el);
+        if (el.firstElementChild) observador.observe(el.firstElementChild);
+      }
+      win.requestAnimationFrame?.(aplicar);
+    }
+    return { aplicar };
   }
   // Notas não têm caixinha nem alarme: havendo alarme gravado, a tela pergunta antes (o concluído sai sem perguntar)
   const pedeConfirmacaoNotas = (dados, destino) => destino.quadro === 'notas' && dados.quadro !== 'notas' && !!(dados.temAlarme || dados.alarme);
@@ -558,15 +586,25 @@
       if (!lista.length) return;
       const item = (k, nome, cor) => {
         const l = criar('label', 'ag-leg');
+        l.dataset.cor = cor || '';   // a própria caixa de marcar leva a cor da categoria
+        l.title = nome;              // nome longo é cortado com "..."
         const c = criar('input');
         c.type = 'checkbox';
         c.checked = !legenda.ocultas().has(k);
         c.addEventListener('change', () => { legenda.mostrar(k, c.checked); aoMudar(); });
-        l.append(c, amostra(cor), criar('span', 'ag-leg-nome', nome));
+        l.append(c, criar('span', 'ag-leg-nome', nome));
         alvo.append(l);
       };
       for (const c of lista) item(String(c.id), c.nome, c.cor);
       item('sem', SEM, '');
+    }
+
+    // tela estreita: a coluna de categorias é um bloco recolhível, fechado ao abrir (na larga o botão não aparece)
+    function ligarLateral({ botao: alternar, lateral }) {
+      alternar.addEventListener('click', () => {
+        const aberta = lateral.classList.toggle('aberta');
+        alternar.setAttribute('aria-expanded', String(aberta));
+      });
     }
 
     // ---------- arraste (Pointer Events): pela alça; mouse começa ao mover, toque ao segurar ou mover ----------
@@ -629,7 +667,7 @@
         const sc = grade?.rolador?.();
         if (sc) {
           const r = sc.getBoundingClientRect();
-          if (st.x >= r.left && st.x <= r.right && st.y >= r.top - 24 && st.y <= r.bottom + 24) {
+          if (st.x >= r.left && st.x <= r.right && st.y >= r.top && st.y <= r.bottom + 24) {
             const w = velocidadeRolagem(st.y - r.top, r.height, 40, 14);
             if (w) { sc.scrollTop += w; marcarAlvo(); }
           }
@@ -745,7 +783,7 @@
 
     return {
       confirmar, perguntarEscopo, abrirRepetir, abrirHorario, abrirMenu, fecharMenu, abrirMover, abrirCategorias, desenharLegenda, ligarArraste, ligarRedimensionar,
-      montarGrade, marcarAgora, amostra,
+      montarGrade, marcarAgora, amostra, ligarLateral,
       menuAberto: () => !!menuAtual,
       janelaAberta: () => janelas > 0
     };
@@ -753,5 +791,5 @@
 
   return { CORES, SEM, MAX_NOME, corValida, nomeDaCor, indexar, corDe, nomeDe, limparNome, conferirNome, chaveLegenda, criarLegenda,
     mesmoLugar, corpoMover, pedeConfirmacaoNotas, podeArrastar, podeAtualizar, precisaEscopo, podeRepetir, resumoSerie, velocidadeRolagem, rotuloMes, SEMANA_CURTA,
-    PX_HORA, PX_MIN, LARGURA_GRADE, mesmoHorario, podeHorario, querGrade, estiloGrade, criarUi };
+    PX_HORA, PX_MIN, LARGURA_GRADE, mesmoHorario, podeHorario, querGrade, estiloGrade, alturaGrade, manterRolagem, criarUi };
 });

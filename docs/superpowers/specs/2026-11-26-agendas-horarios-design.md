@@ -11,7 +11,7 @@ Vale para **Minha semana** e **Semana compartilhada**. Aprovado pelo dono em 202
 
 ## B) Grade de horários
 - Horário de início e fim **opcional, só em itens dos dias** (`hora_inicio`/`hora_fim` SMALLINT em minutos desde 00:00, 0 a 1440, em `web_tarefas` e `web_tarefas_admin`). API: `horario: { inicio: 'HH:MM', fim: 'HH:MM' } | null`. Sem horário = "dia todo" (todos os itens existentes).
-- Tela larga (área da semana >= 880px, sem o menu lateral; ~1220px de janela): horas na lateral esquerda; em cima, cabeçalho do dia e a faixa "dia todo"; embaixo a grade 00:00–24:00 com rolagem própria, aberta perto das 07:00, linha da hora atual no dia de hoje. Itens sobrepostos lado a lado; texto cortado na faixa e inteiro ao focar (e no campo, para leitor de tela).
+- Tela larga (área da semana >= 760px, sem o menu lateral e a coluna de categorias): horas na lateral esquerda; em cima, cabeçalho do dia e a faixa "dia todo"; embaixo a grade 00:00–24:00 com rolagem própria, aberta perto das 07:00, linha da hora atual no dia de hoje. Itens sobrepostos lado a lado; texto cortado na faixa e inteiro ao focar (e no campo, para leitor de tela).
 - Clicar num horário vazio cria o item ali (1h, início em passos de 15 min). Arrastar pela alça muda dia e horário (15 min); puxar a borda de baixo muda a duração. Do "dia todo" para a grade ganha horário (1h); da grade para o "dia todo" perde; para Tarefas/Notas perde (o servidor tira).
 - Menu "⋯" → **Horário…** (dia todo / das … às …), para teclado e celular.
 - Tela estreita/celular: sem grade; lista por dia, "dia todo" primeiro e depois por horário, com o horário escrito na faixa.

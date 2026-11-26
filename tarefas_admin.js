@@ -489,7 +489,7 @@
     const rascunhos = criarRascunhos(() => win.localStorage, dono);
     // só o que já estava guardado ao abrir é retomado (o que nasce depois pertence às linhas da tela)
     const estado = { mostrada: null, alvo: segundaDe(new Date()), geracao: 0, linhas: [], herdados: rascunhos.ler(), recuperacao: null,
-      quadros: [], removidos: new Set(), atualizando: false, proibido: false, relogio: null, categorias: new Map(), listaCategorias: '[]', arrastando: false,
+      quadros: [], removidos: new Set(), atualizando: false, proibido: false, relogio: null, categorias: new Map(), rolagem: null, listaCategorias: '[]', arrastando: false,
       grade: false, g: null };
     // a lista de categorias é única (as duas agendas); quem usa esta página tem tarefas_admin.usar, mas a conferência é a mesma da pessoal
     const podeGerir = () => (win.Acesso?.pode ? win.Acesso.pode('tarefas_admin.usar') : true);
@@ -508,7 +508,7 @@
       return e;
     };
 
-    // ---------- categorias (lista única, a mesma para todos): legenda no topo, cor de cada faixa ----------
+    // ---------- categorias (lista única, a mesma para todos): legenda na coluna à esquerda, cor de cada faixa ----------
     function aplicarCategorias(lista) {
       const ordem = [...(lista || [])].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR', { sensitivity: 'base' }) || a.id - b.id);
       estado.listaCategorias = JSON.stringify(ordem);
@@ -812,10 +812,23 @@
       estado.g = g;
       ui.marcarAgora(g.agora);
       ajustarBarra();
-      g.el.scrollTop = 7 * AG.PX_HORA - 6;   // abre perto das 07:00
+      ajustarAltura();
+      // o "dia todo" cresce e encolhe com os itens: a grade acompanha para continuar indo até o fim da janela
+      if (win.ResizeObserver) { g.observador = new win.ResizeObserver(ajustarAltura); g.observador.observe(dias[0].sec); }
+      // abre perto das 07:00 (ou onde a pessoa deixou), mesmo que a grade ainda não tenha layout neste instante
+      g.rolagem = AG.manterRolagem(g.el, win, { alvo: estado.rolagem ?? 7 * AG.PX_HORA - 6, aoRolar: v => { estado.rolagem = v; } });
+    }
+    // a grade ocupa o que sobra da janela abaixo do cabeçalho e do "dia todo" (offsetTop: não conta a animação de entrada)
+    function ajustarAltura() {
+      const el = estado.g?.el;
+      if (!el?.isConnected) return;
+      let topo = 0;
+      for (let e = el; e; e = e.offsetParent) topo += e.offsetTop;
+      el.style.height = AG.alturaGrade(win.innerHeight, topo) + 'px';
     }
     function desmontarGrade() {
       if (!estado.g) return;
+      estado.g.observador?.disconnect();
       estado.g.el.remove();
       estado.g.canto.remove();
       estado.g = null;
@@ -827,7 +840,7 @@
     function aplicarModo() {
       if (estado.proibido || !estado.quadros.length || !estado.quadros[0].sec?.isConnected) return;
       const g = querGrade();
-      if (g === estado.grade) { ajustarBarra(); return; }
+      if (g === estado.grade) { ajustarBarra(); ajustarAltura(); return; }
       estado.grade = g;
       if (g) montarGradeDaSemana();
       for (const item of [...estado.linhas]) lugarCerto(item);
@@ -1084,6 +1097,7 @@
       });
       quadros.push({ area: 'tar', nome: 'Tarefas', quadro: 'tarefas', data: null, rotulo: 'Tarefas' });
       quadros.push({ area: 'not', nome: 'Notas', quadro: 'notas', data: null, rotulo: 'Notas' });
+      estado.g?.observador?.disconnect();
       semana.replaceChildren();
       estado.linhas = [];
       estado.quadros = quadros;
@@ -1124,6 +1138,8 @@
       }
       estado.mostrada = inicio;
       ajustarTodos();   // com a página inteira montada a largura é a final (barra de rolagem)
+      ajustarAltura();
+      estado.g?.rolagem.aplicar();
       // no celular os quadros ficam um embaixo do outro: a semana atual abre em hoje
       if (win.matchMedia('(max-width: 700px)').matches) semana.querySelector('.quadro.hoje')?.scrollIntoView({ block: 'start' });
     }
@@ -1186,7 +1202,7 @@
       semana.replaceChildren();
       semana.setAttribute('aria-busy', 'false');
       $('barra-semana').hidden = true;
-      $('legenda').hidden = true;
+      $('lateral').hidden = true;
       $('legenda').replaceChildren();
       $('btn-tentar').hidden = true;
       $('aviso-texto').textContent = 'Você não tem mais acesso à Semana compartilhada.';
@@ -1285,6 +1301,7 @@
     $('btn-proxima').addEventListener('click', () => irPara(somarDias(estado.alvo, 7)));
     $('btn-hoje').addEventListener('click', () => irPara(segundaDe(new Date())));
     $('btn-tentar').addEventListener('click', () => irPara(estado.alvo));
+    ui.ligarLateral({ botao: $('lateral-alternar'), lateral: $('lateral') });
     $('btn-categorias').addEventListener('click', abrirCategorias);
     $('btn-categorias').hidden = !podeGerir();
     win.addEventListener('beforeunload', ev => {

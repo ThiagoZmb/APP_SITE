@@ -11,12 +11,15 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         [hidden] { display: none !important; }
         body { color: var(--text-dark); min-height: 100vh; }
-        .barra-semana { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+        .barra-semana { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        /* a agenda usa a largura e a altura da janela */
+        html body .container > main { max-width: none !important; }
+        main > .welcome-subtitle { margin-bottom: 8px !important; }
+        @media (min-width: 961px) { html body .container > main { padding-left: 20px !important; padding-right: 20px !important; padding-bottom: 24px !important; } }
         .barra-semana .btn { min-height: 40px; min-width: 40px; }
         .rotulos { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-left: 6px; }
         .rotulo-mes { font-size: 17px; font-weight: 700; }
         .rotulo-semana { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-light); }
-        #btn-categorias { margin-left: auto; }
         /* ordem de leitura = ordem do DOM (Segunda -> Domingo, Tarefas, Notas); a largura que vale é a da área, já sem o menu lateral */
         .semana-area { container-type: inline-size; }
         .semana { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -50,19 +53,18 @@
         @media (max-width: 700px) {
             .semana { display: flex; flex-direction: column; }
             .q-tar, .q-not { grid-column: auto; }
-            #btn-categorias { margin-left: 0; }
             .rotulos { flex-basis: 100%; margin-left: 0; order: -1; }
             #toasts { left: 16px; right: 16px; bottom: 16px; }
             .toast { min-width: 0; }
         }
     </style>
-    <link rel="stylesheet" href="tema.css?v=202612021200">
+    <link rel="stylesheet" href="tema.css?v=202612031200">
     <script src="layout.js?v=202611301000" defer></script>
     <script src="entregas_comum.js?v=202611281000" defer></script>
     <script src="calculo/agenda_horario.js?v=202612021200" defer></script>
-    <script src="agenda_comum.js?v=202612021200" defer></script>
+    <script src="agenda_comum.js?v=202612031200" defer></script>
     <script src="calculo/agenda_repeticao.js?v=202612011200" defer></script>
-    <script src="tarefas_admin.js?v=202612021200" defer></script>
+    <script src="tarefas_admin.js?v=202612031200" defer></script>
 </head>
 <body>
     <div class="container">
@@ -83,6 +85,16 @@
             <h1 class="welcome-title">Semana compartilhada</h1>
             <p class="welcome-subtitle">Caderno compartilhado: o que você escreve aqui, todos os administradores veem.</p>
 
+            <div class="ag-corpo">
+            <aside class="ag-lateral" id="lateral" aria-label="Categorias">
+                <button type="button" class="ag-lat-alternar" id="lateral-alternar" aria-expanded="false" aria-controls="lateral-corpo">Categorias</button>
+                <h2 class="ag-lat-titulo">Categorias</h2>
+                <div class="ag-lat-corpo" id="lateral-corpo">
+                    <div class="ag-legenda" id="legenda" role="group" aria-label="Mostrar e esconder categorias" hidden></div>
+                    <button type="button" class="btn btn-secondary btn-mini" id="btn-categorias" data-perm="tarefas_admin.usar">Gerenciar categorias</button>
+                </div>
+            </aside>
+            <div class="ag-principal">
             <div class="barra-semana" id="barra-semana">
                 <button type="button" class="btn btn-secondary btn-mini" id="btn-anterior" aria-label="Semana anterior">‹</button>
                 <button type="button" class="btn btn-secondary btn-mini" id="btn-hoje">Hoje</button>
@@ -91,14 +103,14 @@
                     <span class="rotulo-mes" id="rotulo-mes"></span>
                     <span class="rotulo-semana" id="rotulo-semana"></span>
                 </div>
-                <button type="button" class="btn btn-secondary btn-mini" id="btn-categorias" data-perm="tarefas_admin.usar">Categorias</button>
             </div>
-            <div class="ag-legenda" id="legenda" role="group" aria-label="Mostrar e esconder categorias" hidden></div>
             <div class="aviso-semana" id="aviso-semana" role="alert" hidden>
                 <span id="aviso-texto"></span>
                 <button type="button" class="btn btn-secondary btn-mini" id="btn-tentar">Tentar de novo</button>
             </div>
             <div class="semana-area"><div class="semana agenda" id="semana"></div></div>
+            </div>
+            </div>
         </main>
     </div>
     <div id="toasts" aria-live="polite"></div>

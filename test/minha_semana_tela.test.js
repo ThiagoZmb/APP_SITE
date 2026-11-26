@@ -392,7 +392,7 @@ test('linha: textarea que cresce, maxlength 300, Enter sem quebra (e sem atrapal
   assert.doesNotMatch(js, /input\.textContent|input\.innerText/);
   // a faixa (linha) agora fica no bloco AGENDAS do tema.css, igual nas duas páginas
   assert.match(ler('tema.css'), /\.agenda \.linha textarea \{[^}]*resize: none;[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere/);
-  assert.match(h, /tarefas\.js\?v=202612021200/);
+  assert.match(h, /tarefas\.js\?v=202612031200/);
 });
 
 test('semQuebra: texto colado com várias linhas vira uma linha só, mantendo os espaços digitados', () => {

@@ -38,7 +38,7 @@ test('parte comum: posição na grade (1h = 48px, sobrepostos dividem a largura)
   assert.equal(AG.podeHorario({ id: 1, quadro: 'tarefas' }), false);
   assert.equal(AG.podeHorario({ id: null, quadro: 'dia' }), false);
   assert.equal(AG.querGrade(1200, false), true);
-  assert.equal(AG.querGrade(879, false), false);
+  assert.equal(AG.querGrade(759, false), false);
   assert.equal(AG.querGrade(1200, true), false, 'celular: lista por dia');
   assert.deepEqual(AG.corpoMover({ quadro: 'dia', data: '2026-11-24' }), { quadro: 'dia', data: '2026-11-24' }, 'sem horário no destino = mantém');
   assert.deepEqual(AG.corpoMover({ quadro: 'dia', data: '2026-11-24', horario: null }), { quadro: 'dia', data: '2026-11-24', horario: null });
