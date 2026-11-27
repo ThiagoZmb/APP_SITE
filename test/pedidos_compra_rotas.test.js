@@ -125,3 +125,23 @@ test('a combo recebe o que está para chegar, com o número do pedido, e a marca
   assert.deepEqual([um.aCaminho, um.pedidos, um.aguardando], [20, [numero], false]);
   assert.deepEqual([tres.aCaminho, tres.pedidos, tres.aguardando], [0, [], true]);
 });
+
+const ADMIN = [...TODAS, 'administrativo.ver', 'valores.ver'];
+const urlPrecos = '/pedidos_compra/ultimos_precos?fornecedor=' + encodeURIComponent(FORN);
+
+test('últimos preços: só dos produtos do fornecedor, e nada é gravado', async t => {
+  const { banco, chamar } = await prepararCompras(t, { permissoes: ADMIN });
+  const entrada = (id, DATA, FABRICANTE, NOME_PRODUTO, VALOR_UNITARIO) => ({ id, DATA, FABRICANTE, NOME_PRODUTO, VALOR_UNITARIO });
+  banco.entradas.push(entrada(1, '2026-10-01', FORN, 'Perfil Slim', 40), entrada(2, '2026-11-01', 'OUTRO FORNECEDOR SA', 'Perfil Slim', 55),
+    entrada(3, '2026-09-01', 'OUTRO FORNECEDOR SA', 'Parafuso', 0.085), entrada(4, '2026-11-02', FORN, 'Parafuso', 0));
+  assert.deepEqual(await json(await chamar(urlPrecos)), { precos: [{ codigo: 1, precoUnitario: 40, data: '2026-10-01' }, { codigo: 3, precoUnitario: 0.085, data: '2026-09-01' }] });
+  assert.deepEqual(await json(await chamar('/pedidos_compra/ultimos_precos')), { precos: [] });
+  assert.deepEqual(await json(await chamar('/pedidos_compra/ultimos_precos?fornecedor=NINGUEM')), { precos: [] });
+});
+
+test('últimos preços: 403 sem administrativo.ver, sem compras.ver ou sem estoque.ver', async t => {
+  for (const falta of ['administrativo.ver', 'compras.ver', 'estoque.ver']) {
+    const { chamar } = await prepararCompras(t, { permissoes: ADMIN.filter(p => p !== falta) });
+    assert.equal((await chamar(urlPrecos)).status, 403, falta);
+  }
+});

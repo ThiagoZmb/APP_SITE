@@ -3,6 +3,8 @@
 // pela entrada de nota, situações e validação). Quantidades em unidades do estoque.
 // Regras: docs/regras/pedidos-compra.md
 // ==========================================================================
+const { chaveMySQL } = require('./nomes');
+
 const DIAS_FOLGA = 30;       // a sugestão cobre o prazo de reposição + esta folga
 const MIN_DIAS_DADOS = 30;   // com menos histórico que isso o consumo não é usado
 const MAX_ITENS = 300;
@@ -88,4 +90,21 @@ function validarPedido(corpo) {
   return { fornecedor, observacao, itens };
 }
 
-module.exports = { quantidadeSugerida, entraNaSugestao, montarSugestao, distribuirBaixa, situacaoPelaChegada, acaoPermitida, validarPedido, AVISO_MARCA, MAX_ITENS };
+// Último preço de compra de cada produto. compras = linhas de entrada_estoque já em ordem DATA, id (a última vence).
+// Vale a mais recente do fornecedor escolhido; sem nenhuma dele, a mais recente de qualquer um. Preço <= 0 não conta.
+function ultimosPrecos(produtos, compras, fornecedor) {
+  const norm = t => String(t ?? '').trimEnd().toLowerCase();
+  const doFornecedor = new Map(), deQualquer = new Map();
+  for (const c of compras) {
+    if (!(Number(c.VALOR_UNITARIO) > 0)) continue;
+    const k = chaveMySQL(c.NOME_PRODUTO);
+    deQualquer.set(k, c);
+    if (norm(c.FABRICANTE) === norm(fornecedor)) doFornecedor.set(k, c);
+  }
+  return produtos.flatMap(p => {
+    const k = chaveMySQL(p.produto), c = doFornecedor.get(k) || deQualquer.get(k);
+    return c ? [{ codigo: p.codigo, precoUnitario: Number(c.VALOR_UNITARIO), data: String(c.DATA).slice(0, 10) }] : [];
+  });
+}
+
+module.exports = { ultimosPrecos, quantidadeSugerida, entraNaSugestao, montarSugestao, distribuirBaixa, situacaoPelaChegada, acaoPermitida, validarPedido, AVISO_MARCA, MAX_ITENS };

@@ -37,14 +37,18 @@ function linhaUnica(rotulo, valor, larguraMax, alturas) {
 }
 
 // negrito simulado: a mesma linha impressa duas vezes, 2 dots deslocada
-const negrito = (x, y, altura, texto) =>
-  [0, 2].map(d => `^FO${x + d},${y}^A0N,${altura},${altura}^FD${texto}^FS`).join('\n');
+const negrito = (x, y, altura, texto, largura = altura) =>
+  [0, 2].map(d => `^FO${x + d},${y}^A0N,${altura},${largura}^FD${texto}^FS`).join('\n');
+
+// filete (sublinhado) do rótulo, logo abaixo do texto; `largura` = largura do caractere na fonte
+const filete = (x, y, rotulo, altura, largura = altura) =>
+  `^FO${x},${y + altura + 2}^GB${Math.ceil(rotulo.length * AVANCO_ROTULO * largura) + 2},3,3^FS`;
 
 // linha única; se tem rótulo, desenha o filete (sublinhado) logo abaixo dele
 function linha(x, y, rotulo, valor, larguraMax, alturas) {
   const { altura, texto } = linhaUnica(rotulo, valor, larguraMax, alturas);
   const partes = [negrito(x, y, altura, texto)];
-  if (rotulo) partes.push(`^FO${x},${y + altura + 2}^GB${Math.ceil(rotulo.length * AVANCO_ROTULO * altura) + 2},3,3^FS`);
+  if (rotulo) partes.push(filete(x, y, rotulo, altura));
   return partes.join('\n');
 }
 
@@ -123,8 +127,55 @@ function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
 // ---------- Rio de Janeiro ----------
 // Um PAR por volume, nesta ordem: etiqueta do pedido (igual em todos os volumes) e etiqueta de destino ("Volume i/N"),
 // para cada caixa receber o seu par. Mesmo tamanho e mesma caixa do logo; sem código de barras e sem dinheiro.
-const Y_RJ = { cliente: 130, final: 206, oc: 282, consultor: 348, volumes: 414, destino: 150, nfe: 250, volume: 340 };
+// Etiqueta 1 em posições fixas; Cliente e Cliente Final reservam espaço para duas linhas (40 + 6 + 40 = 86 dots).
+const Y_RJ = { cliente: 114, final: 208, oc: 306, consultor: 364, volumes: 422, destino: 150, nfe: 250, volume: 340 };
 const MAX_VOLUMES_RJ = 100;
+const MAX_NOME_RJ = 255; // teto do cadastro (razão social 255, cliente final 190): na prática nada é cortado
+
+// quebra entre palavras em linhas de até `cap` caracteres (só parte a palavra que não cabe numa linha); null se passar de duas
+function emDuasLinhas(texto, cap) {
+  const linhas = [''];
+  for (let palavra of texto.split(' ')) {
+    const atual = linhas[linhas.length - 1];
+    const junta = atual ? `${atual} ${palavra}` : palavra;
+    if (junta.length <= cap) linhas[linhas.length - 1] = junta;
+    else if (palavra.length <= cap) linhas.push(palavra);
+    else {
+      const sobra = cap - atual.length - (atual ? 1 : 0);
+      if (sobra > 0) {
+        linhas[linhas.length - 1] = (atual ? atual + ' ' : '') + palavra.slice(0, sobra);
+        palavra = palavra.slice(sobra);
+      }
+      for (let i = 0; i < palavra.length; i += cap) linhas.push(palavra.slice(i, i + cap));
+    }
+    if (linhas.length > 2) return null;
+  }
+  return linhas;
+}
+
+// Nome SEMPRE completo (regra do dono): uma linha em 60/52/44/36; senão duas linhas em 40 ou 36; senão duas linhas de
+// altura 36 com o caractere mais estreito (condensado). Nunca trunca nem põe "...".
+function nomeCompleto(y, rotulo, valor, larguraMax, alturas) {
+  const texto = `${rotulo} ${valor}`;
+  if (alturas.some(h => larguraEstimada(texto, h) <= larguraMax)) return linha(MARGEM, y, rotulo, valor, larguraMax, alturas);
+  let w = 40, linhas;
+  while (!(linhas = emDuasLinhas(texto, Math.floor(larguraMax / (AVANCO * w))))) w = w > MIN_FONTE ? MIN_FONTE : w - 1;
+  const h = Math.max(MIN_FONTE, w);
+  return [
+    ...linhas.map((l, i) => negrito(MARGEM, y + i * (h + 6), h, l, w)),
+    filete(MARGEM, y, rotulo, h, w)
+  ].join('\n');
+}
+
+// Consultor também é nome: uma linha, estreitando o caractere quando nem a menor altura couber (nunca "...").
+function consultorCompleto(y, valor, larguraMax) {
+  const rotulo = 'Consultor:';
+  const texto = `${rotulo} ${valor}`;
+  const alturas = [48, 44, 40, MIN_FONTE];
+  if (alturas.some(h => larguraEstimada(texto, h) <= larguraMax)) return linha(MARGEM, y, rotulo, valor, larguraMax, alturas);
+  const w = Math.floor(larguraMax / (AVANCO * texto.length));
+  return [negrito(MARGEM, y, MIN_FONTE, texto, w), filete(MARGEM, y, rotulo, MIN_FONTE, w)].join('\n');
+}
 
 // dados = { numero, cliente (razão social), clienteFinal, oc, consultor, nfe (opcionais), volumes (1 a 100) }
 //   →  { zpl, quantidade } (quantidade = 2 x volumes). Campo opcional vazio não imprime linha.
@@ -134,15 +185,16 @@ function montarEtiquetasRj({ numero, cliente, clienteFinal, oc, consultor, nfe, 
   const ALTURAS = [60, 52, 44, MIN_FONTE];
   const texto = v => limpar(v).slice(0, MAX_TEXTO);
   const opcional = (y, rotulo, valor, alturas) => (texto(valor) ? linha(MARGEM, y, rotulo, texto(valor), util, alturas) : '');
+  const nome = (y, rotulo, v) => nomeCompleto(y, rotulo, limpar(v).slice(0, MAX_NOME_RJ).trim() || '—', util, ALTURAS);
   const n = Math.min(MAX_VOLUMES_RJ, volumesDe(volumes));
   const bloco = partes => ['^XA^CI28^PW800^LL480', logo(LOGO_COMPACTO), ...partes, '^XZ'].filter(Boolean).join('\n');
 
   const pedido = bloco([
     linha(272, 30, '', `Pedido: ${num}`, LARGURA - 272 - MARGEM, [64, 56, 48, 40, 32]),
-    linha(MARGEM, Y_RJ.cliente, 'Cliente:', texto(cliente) || '—', util, ALTURAS),
-    linha(MARGEM, Y_RJ.final, 'Cliente Final:', texto(clienteFinal) || '—', util, ALTURAS),
+    nome(Y_RJ.cliente, 'Cliente:', cliente),
+    nome(Y_RJ.final, 'Cliente Final:', clienteFinal),
     opcional(Y_RJ.oc, 'OC:', oc, [48, 44, 40, MIN_FONTE]),
-    opcional(Y_RJ.consultor, 'Consultor:', consultor, [48, 44, 40, MIN_FONTE]),
+    texto(consultor) ? consultorCompleto(Y_RJ.consultor, texto(consultor), util) : '',
     linha(MARGEM, Y_RJ.volumes, 'Volumes totais:', String(n), util, [48])
   ]);
   const blocos = [];

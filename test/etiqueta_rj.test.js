@@ -9,7 +9,7 @@ const LOGO = require('../calculo/etiqueta_logo');
 const BASE = { numero: '23425', cliente: 'ITAPLAN COMERCIO', clienteFinal: 'ALEX FABIANO', oc: 'OC-778', consultor: 'Marcos', nfe: '10234', volumes: 1 };
 const rj = (extra = {}) => montarEtiquetasRj({ ...BASE, ...extra });
 const blocos = zpl => zpl.split('^XZ').filter(b => b.includes('^XA'));
-const textos = zpl => [...zpl.matchAll(/\^FO(\d+),(\d+)\^A0N,(\d+),\d+\^FD([^^]*)\^FS/g)].map(m => ({ x: +m[1], y: +m[2], h: +m[3], texto: m[4] }));
+const textos = zpl => [...zpl.matchAll(/\^FO(\d+),(\d+)\^A0N,(\d+),(\d+)\^FD([^^]*)\^FS/g)].map(m => ({ x: +m[1], y: +m[2], h: +m[3], w: +m[4], texto: m[5] }));
 const unicos = zpl => [...new Set(textos(zpl).map(t => t.texto))];
 const filetes = zpl => [...zpl.matchAll(/\^FO(\d+),(\d+)\^GB(\d+),3,3\^FS/g)].map(m => ({ x: +m[1], y: +m[2], w: +m[3] }));
 
@@ -73,14 +73,14 @@ test('RJ: texto do banco e digitado é saneado (nada de ^ ~ \\ vira comando)', (
   assert.ok(zpl.includes('OC: 1XA') && zpl.includes('Consultor: B') && zpl.includes('NFe: JA'));
 });
 
-test('RJ: linha única; nada passa da largura nem da altura da etiqueta e as linhas não se sobrepõem', () => {
+test('RJ: nada passa da largura nem da altura da etiqueta e as linhas não se sobrepõem', () => {
   const grande = 'W'.repeat(200);
   const { zpl } = rj({ numero: '1234567890', cliente: grande, clienteFinal: grande, oc: 'W'.repeat(30), consultor: 'W'.repeat(30), nfe: 'W'.repeat(20), volumes: 100 });
   for (const b of [blocos(zpl)[0], blocos(zpl)[199]]) {
     const ts = textos(b);
     for (const t of ts) {
-      assert.equal(ts.filter(o => o.y === t.y).length, 2, 'uma linha só (duas passadas do negrito)');
-      assert.ok(t.x + t.texto.length * 0.6 * t.h <= 782, t.texto);
+      assert.equal(ts.filter(o => o.y === t.y).length, 2, 'um texto por linha (duas passadas do negrito)');
+      assert.ok(t.x + t.texto.length * 0.6 * t.w <= 782, t.texto);
       assert.ok(t.y + t.h + 5 <= 480, t.texto);
     }
     const ys = [...new Set(ts.map(t => t.y))].sort((a, z) => a - z);
@@ -88,6 +88,72 @@ test('RJ: linha única; nada passa da largura nem da altura da etiqueta e as lin
     assert.ok(ys.filter(y => y !== 30).every(y => y >= 108), 'abaixo da caixa do logo');
   }
   assert.ok(zpl.includes('^FDVolume 100/100^FS'));
+});
+
+// ---------- nomes sempre completos (Cliente e Cliente Final) ----------
+// linhas impressas de um campo: do rótulo até o próximo campo, sem repetir a passada do negrito
+function campo(bloco, rotulo, proximo) {
+  const ts = textos(bloco).filter((t, i) => i % 2 === 0);
+  const ini = ts.findIndex(t => t.texto.startsWith(rotulo));
+  const fim = ts.findIndex(t => t.texto.startsWith(proximo));
+  assert.ok(ini >= 0 && fim > ini, rotulo);
+  return ts.slice(ini, fim);
+}
+const semEspacos = s => s.replace(/ /g, '');
+function conferirEtiqueta1(cliente, clienteFinal) {
+  const b = blocos(rj({ cliente, clienteFinal }).zpl)[0];
+  assert.ok(!b.includes('...'), 'nunca reticências');
+  for (const [rotulo, proximo, valor] of [['Cliente:', 'Cliente Final:', cliente], ['Cliente Final:', 'OC:', clienteFinal]]) {
+    const ls = campo(b, rotulo, proximo);
+    assert.ok(ls.length <= 2, 'no máximo duas linhas');
+    assert.ok(ls[0].texto.startsWith(rotulo + ' '));
+    assert.equal(semEspacos(ls.map(l => l.texto).join(' ')), semEspacos(`${rotulo} ${valor}`), 'nome completo');
+    assert.equal(new Set(ls.map(l => `${l.h},${l.w}`)).size, 1, 'mesma fonte nas duas linhas');
+    const filete = filetes(b).find(f => f.y === ls[0].y + ls[0].h + 2);
+    assert.ok(filete && filete.w <= rotulo.length * 0.6 * ls[0].w, 'rótulo sublinhado na linha 1');
+    if (ls[1]) assert.ok(!filetes(b).some(f => f.y === ls[1].y + ls[1].h + 2));
+  }
+  for (const t of textos(b)) assert.ok(t.x + t.texto.length * 0.6 * t.w <= 782, 'cabe na largura: ' + t.texto);
+  const caixas = [
+    ...textos(b).filter((t, i) => i % 2 === 0 && t.y !== 30).map(t => [t.y, t.y + t.h]),
+    ...filetes(b).map(f => [f.y, f.y + 3])
+  ].sort((a, z) => a[0] - z[0]);
+  assert.ok(caixas[0][0] >= 108, 'abaixo do logo');
+  for (let i = 1; i < caixas.length; i++) assert.ok(caixas[i - 1][1] <= caixas[i][0], `sem sobreposição em y ${caixas[i][0]}`);
+  assert.ok(caixas[caixas.length - 1][1] < 480);
+  return b;
+}
+
+test('RJ: nome que não cabe numa linha vai para duas, quebrando entre palavras', () => {
+  const nome = 'Thiago Fernandes de Oliveira Esquadrias Ltda';
+  const b = conferirEtiqueta1(nome, nome);
+  for (const [rotulo, proximo] of [['Cliente:', 'Cliente Final:'], ['Cliente Final:', 'OC:']]) {
+    const ls = campo(b, rotulo, proximo);
+    assert.equal(ls.length, 2);
+    assert.ok(ls[0].h >= 36 && ls[0].w === ls[0].h, 'sem condensar');
+    assert.equal(ls.map(l => l.texto).join(' '), `${rotulo} ${nome}`, 'nenhuma palavra partida');
+  }
+});
+
+test('RJ: nomes muito longos (até 255 caracteres) saem completos, condensados na largura', () => {
+  for (const tamanho of [100, 150, 200, 255]) {
+    const nome = 'Construtora Incorporadora Participacoes '.repeat(10).slice(0, tamanho).trim();
+    const b = conferirEtiqueta1(nome, nome);
+    const l = campo(b, 'Cliente:', 'Cliente Final:')[0];
+    assert.ok(l.h === 36 || l.h === 40);
+    if (tamanho >= 100) assert.ok(l.h === 36 && l.w < 36, 'condensado');
+  }
+});
+
+test('RJ: palavra maior que a linha é partida sem perder caracteres', () => {
+  conferirEtiqueta1('X'.repeat(60), 'Ana ' + 'Y'.repeat(190));
+  conferirEtiqueta1('W'.repeat(200), 'W'.repeat(200));
+});
+
+test('RJ: posições fixas; os campos de baixo não mudam com o tamanho do nome', () => {
+  const longo = 'Nome Muito Comprido '.repeat(9).trim();
+  const ys = b => textos(b).filter(t => /^(Cliente:|Cliente Final:|OC:|Consultor:|Volumes)/.test(t.texto)).map(t => t.y);
+  assert.deepEqual(ys(blocos(rj().zpl)[0]), ys(blocos(rj({ cliente: longo, clienteFinal: longo }).zpl)[0]));
 });
 
 test('RJ: o logo vai compactado, e descompactado é exatamente o mesmo bitmap da etiqueta de item', () => {
@@ -101,7 +167,7 @@ test('RJ: o logo vai compactado, e descompactado é exatamente o mesmo bitmap da
 });
 
 test('RJ: o caso máximo (100 volumes, textos no limite) cabe no limite do serviço local', () => {
-  const grande = 'Ç'.repeat(200); // 2 bytes por caractere em UTF-8
+  const grande = 'Ç'.repeat(255); // 2 bytes por caractere em UTF-8; 255 = teto do cadastro
   const { zpl, quantidade } = rj({ numero: '1234567890', cliente: grande, clienteFinal: grande, oc: 'Ç'.repeat(30), consultor: 'Ç'.repeat(30), nfe: 'Ç'.repeat(20), volumes: RJ_MAX_VOLUMES });
   assert.equal(quantidade, 200);
   assert.deepEqual(validarZpl(zpl), { ok: true });
@@ -123,4 +189,11 @@ test('validarRj: volumes inteiro de 1 a 100 (teto de 200 etiquetas); textos opci
     assert.match(validarRj({ volumes: 1, [campo]: 12 }).erro, new RegExp(rotulo));
   }
   for (const corpo of [undefined, null, 'x', []]) assert.equal(validarRj(corpo).ok, false);
+});
+
+test('Consultor sai sempre inteiro, mesmo no limite de 30 caracteres (nunca "...")', () => {
+  const consultor = 'Maria Aparecida dos Santos Lim'; // 30
+  const { zpl } = rj({ consultor });
+  assert.ok(unicos(zpl).includes('Consultor: ' + consultor));
+  assert.ok(!unicos(zpl).some(t => t.includes('...')));
 });

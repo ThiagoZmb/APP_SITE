@@ -59,3 +59,34 @@ test('ligações: aba no estoque, página no layout, entrada avisa, mesma versã
   const versao = a => ler(a).match(/layout\.js\?v=(\d+)/)[1];
   assert.equal(versao('pedidos_compra.html'), versao('estoque.html'));
 });
+
+test('estimativa: unidades × último preço; sem preço ou sem quantidade não vira zero', () => {
+  assert.equal(P.estimativa(100, 0.5), 50);
+  assert.equal(P.estimativa(null, 0.5), null);
+  assert.equal(P.estimativa(10, undefined), null);
+  assert.equal(P.estimativa(10, 0), null);
+  assert.equal(P.dinheiro(1234.5), 'R$ 1.234,50');
+  assert.equal(P.dinheiro(0.085, 4), 'R$ 0,085');
+  assert.equal(P.dinheiro(null), '—');
+  assert.equal(P.diaMes('2026-11-05'), '05/11');
+});
+
+test('estimativa do pedido: soma o que tem e avisa quando é parcial', () => {
+  assert.equal(P.textoEstimativaPedido([100, 20]), 'Estimativa do pedido: R$ 120,00');
+  assert.equal(P.textoEstimativaPedido([100, null]), 'Estimativa do pedido: R$ 100,00 (parcial: 1 item sem preço)');
+  assert.equal(P.textoEstimativaPedido([100, null, null]), 'Estimativa do pedido: R$ 100,00 (parcial: 2 itens sem preço)');
+  assert.equal(P.textoEstimativaPedido([null, null]), 'Estimativa do pedido: —');
+  assert.equal(P.textoEstimativaPedido([]), 'Estimativa do pedido: —');
+});
+
+test('tela: colunas e total de custo só com administrativo.ver, fora do olho dos resumos', () => {
+  const html = ler('pedidos_compra.html');
+  assert.equal((html.match(/<th class="num" data-perm="administrativo\.ver">/g) || []).length, 4);
+  for (const id of ['estimativa-form', 'estimativa-detalhe']) {
+    const bloco = html.match(new RegExp('<div[^>]*id="' + id + '"[^>]*>'))[0];
+    assert.match(bloco, /data-perm="administrativo\.ver"/);
+    assert.doesNotMatch(bloco, /data-resumo/);
+  }
+  assert.match(html, /Último preço de compra, sem IPI nem frete\./);
+  assert.match(ler('pedidos_compra.js'), /if \(!verCusto\(\) \|\| !fornecedor\) return;/);
+});

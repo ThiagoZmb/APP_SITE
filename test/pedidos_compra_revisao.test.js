@@ -15,7 +15,7 @@ function tela(responder) {
     const ouvintes = {};
     return { value: '', innerHTML: '', textContent: '', hidden: false, ouvintes, add() {}, focus() {},
       addEventListener: (tipo, fn) => { ouvintes[tipo] = fn; }, setAttribute() {},
-      querySelector: () => el() };
+      querySelector: () => el(), querySelectorAll: () => [] };
   };
   const doc = { getElementById: id => { if (!elementos.has(id)) elementos.set(id, el()); return elementos.get(id); }, createElement: el, body: { appendChild() {} }, addEventListener() {} };
   const win = {
@@ -179,4 +179,69 @@ test('coluna "A chegar": um pedido, marca sem pedido na web e nada', () => {
   assert.equal(P.textoChegar({ aCaminho: 5, pedidos: [4], aguardando: false }), '5 (pedido 4)');
   assert.equal(P.textoChegar({ aCaminho: 0, pedidos: [], aguardando: true }), 'Aguardando (sem pedido aqui)');
   assert.equal(P.textoChegar({ aCaminho: 0, pedidos: [], aguardando: false }), '—');
+});
+
+const urls = pedidos => pedidos.filter(p => p.startsWith('/pedidos_compra/ultimos_precos'));
+const comPrecos = (precos = [{ codigo: 1, precoUnitario: 10, data: '2026-11-05' }]) => caminho =>
+  caminho.startsWith('/pedidos_compra/ultimos_precos') ? { precos } : padrao(caminho);
+
+test('estimativa no rascunho: o preço chega depois das linhas, aparece e entra no total', async () => {
+  let soltar;
+  const segura = new Promise(r => { soltar = r; });
+  const { $, pedidos, abrir } = tela(async caminho => {
+    if (caminho.startsWith('/pedidos_compra/ultimos_precos')) await segura;
+    return comPrecos()(caminho);
+  });
+  await assentar();
+  abrir(1);
+  await assentar();
+  assert.equal($('total-form').textContent, 'Estimativa do pedido: —');
+  const antes = $('tb-itens').innerHTML;
+  soltar();
+  await assentar();
+  assert.equal($('total-form').textContent, 'Estimativa do pedido: R$ 20,00');
+  assert.equal($('tb-itens').innerHTML, antes, 'a lista não é redesenhada: o que foi digitado fica');
+  assert.deepEqual(urls(pedidos), ['/pedidos_compra/ultimos_precos?fornecedor=A']);
+});
+
+test('estimativa: sem administrativo.ver não chama a rota nem cria as colunas', async () => {
+  const { $, win, pedidos, abrir } = tela(comPrecos());
+  win.Acesso = { pode: p => p !== 'administrativo.ver' };
+  await assentar();
+  abrir(1);
+  await assentar();
+  assert.deepEqual(urls(pedidos), []);
+  assert.ok(!$('tb-itens').innerHTML.includes('l-preco'));
+});
+
+test('estimativa: resposta atrasada do pedido anterior não é aplicada', async () => {
+  let soltar;
+  const segura = new Promise(r => { soltar = r; });
+  const { $, abrir } = tela(async caminho => {
+    if (caminho === '/pedidos_compra/ultimos_precos?fornecedor=A') { await segura; return { precos: [{ codigo: 2, precoUnitario: 999, data: '2026-01-01' }] }; }
+    if (caminho.startsWith('/pedidos_compra/ultimos_precos')) return { precos: [] };
+    return padrao(caminho);
+  });
+  await assentar();
+  abrir(1);
+  await assentar();
+  abrir(2);
+  await assentar();
+  soltar();
+  await assentar();
+  assert.equal($('total-form').textContent, 'Estimativa do pedido: —');
+  assert.ok(!$('tb-itens').innerHTML.includes('999'));
+});
+
+test('estimativa no pedido enviado: preço, data e total; item sem preço deixa o total parcial', async () => {
+  const enviado = { numero: 1, fornecedor: 'A', situacao: 'enviado', observacao: '', criadoEm: '2026-11-26', enviadoEm: null, itens: [
+    { codigo: 1, produto: 'Um', unidade: 'un', qtd: 100, porCaixa: 50, chegou: 0, falta: 100 },
+    { codigo: 9, produto: 'Sem preço', unidade: 'un', qtd: 1, porCaixa: 1, chegou: 0, falta: 1 }] };
+  const { $, abrir } = tela(caminho => (caminho === '/pedidos_compra/1' ? enviado : comPrecos()(caminho)));
+  await assentar();
+  abrir(1);
+  await assentar();
+  assert.match($('tb-detalhe').innerHTML, /R\$ 10,00<small>05\/11<\/small><\/td><td class="num preco">R\$ 1\.000,00<\/td>/);
+  assert.match($('tb-detalhe').innerHTML, /<td class="num preco">—<\/td><td class="num preco">—<\/td>/);
+  assert.equal($('total-detalhe').textContent, 'Estimativa do pedido: R$ 1.000,00 (parcial: 1 item sem preço)');
 });

@@ -82,3 +82,24 @@ test('validar pedido', () => {
     assert.equal(typeof validarPedido(ruim).erro, 'string', JSON.stringify(ruim)?.slice(0, 80));
   }
 });
+
+test('último preço: prefere o fornecedor escolhido, senão a compra mais recente; zero é ignorado; sem compra não aparece', () => {
+  const { ultimosPrecos } = require('../calculo/pedidos_compra');
+  const produtos = ['Pérfil A', 'Perfil B', 'Perfil C', 'Perfil D', 'Sem compra'].map((produto, i) => ({ codigo: i + 1, produto }));
+  const compra = (NOME_PRODUTO, DATA, FABRICANTE, VALOR_UNITARIO) => ({ NOME_PRODUTO, DATA, FABRICANTE, VALOR_UNITARIO });
+  // já na ordem DATA, id (como a consulta devolve)
+  const compras = [
+    compra('PERFIL A', '2026-01-10', 'forn x  ', '10.50'),   // mesmo fornecedor (caixa e espaço no fim) e nome sem acento
+    compra('Perfil B', '2026-02-01', 'Outro', 7),
+    compra('Perfil C', '2026-02-02', 'FORN X', 0),
+    compra('Perfil B', '2026-03-01', 'Mais um', 8),
+    compra('Pérfil A', '2026-04-01', 'Outro', 99),
+    compra('Perfil C', '2026-04-02', 'Outro', 3),
+    compra('Perfil D', '2026-05-01', 'FORN X', -1)
+  ];
+  assert.deepEqual(ultimosPrecos(produtos, compras, 'FORN X'), [
+    { codigo: 1, precoUnitario: 10.5, data: '2026-01-10' },
+    { codigo: 2, precoUnitario: 8, data: '2026-03-01' },
+    { codigo: 3, precoUnitario: 3, data: '2026-04-02' }
+  ]);
+});

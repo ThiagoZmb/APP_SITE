@@ -45,6 +45,10 @@ function regrasCompras(estado) {
       .sort((a, b) => b.id - a.id).map(i => ({ codigo: i.produto_codigo, por_caixa: i.por_caixa }))],
     [/SELECT produto_codigo AS codigo, fator FROM web_estoque_ligacoes/, (sql, [forn]) => estado.ligacoes.filter(l => norm(l.fornecedor) === norm(forn))
       .sort((a, b) => String(b.atualizado_em || '').localeCompare(String(a.atualizado_em || ''))).map(l => ({ codigo: l.produto_codigo, fator: String(l.fator) }))],
+    // último preço de compra
+    [/SELECT CODIGO, NOME_PRODUTO FROM estoque WHERE FORNECEDOR = \?/, (sql, [forn]) => estoque.filter(e => norm(e.FORNECEDOR) === norm(forn))],
+    [/SELECT DATA, FABRICANTE, NOME_PRODUTO, VALOR_UNITARIO FROM entrada_estoque WHERE NOME_PRODUTO IN/, (sql, nomes) => estado.entradas
+      .filter(e => nomes.map(norm).includes(norm(e.NOME_PRODUTO))).sort((a, b) => a.DATA.localeCompare(b.DATA) || a.id - b.id)],
     // produtos e fornecedores
     [/FROM estoque WHERE SITUACAO = 'Ativo' AND FORNECEDOR = \?/, (sql, [forn]) => estoque.filter(e => e.SITUACAO === 'Ativo' && norm(e.FORNECEDOR) === norm(forn))
       .sort((a, b) => a.NOME_PRODUTO.localeCompare(b.NOME_PRODUTO))],

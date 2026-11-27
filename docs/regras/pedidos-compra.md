@@ -12,7 +12,8 @@ Aba "Pedidos a fornecedor" do Estoque (`pedidos_compra.html/.js`). Desenho aprov
 ## Regras
 - **Permissões:** `compras.ver` (ver, sugestão, PDF) e `compras.criar` (gravar), sempre com `estoque.ver`. Não são administrativas: quem monta o pedido vê os dias de cobertura. Migração `permissoes_compras`: quem tem `estoque.editar` ganha as duas.
 - **Código e descrição são os do fornecedor** (`COD_FORNECEDOR`, `NOME_PRODUTO_FORNECEDOR`) na tela e no PDF; sem descrição, o nome da casa; sem código, "—" (decisão do dono).
-- **Sem dinheiro.** Nomes de campo JSON não podem casar com `REGEX_VALOR` (use `chegou`, `falta`).
+- **Dinheiro só na estimativa.** As rotas de pedido e o PDF não têm preços, e nada de preço é gravado; nelas os nomes de campo JSON não podem casar com `REGEX_VALOR` (use `chegou`, `falta`).
+- **Estimativa de valor** (desenho: `docs/superpowers/specs/2026-11-27-estimativa-pedido-compra-design.md`): `GET /pedidos_compra/ultimos_precos?fornecedor=` (`estoque.ver` + `compras.ver` + `administrativo.ver`) devolve `precoUnitario` e `data` dos produtos do estoque daquele fornecedor: `VALOR_UNITARIO` da entrada mais recente (`entrada_estoque`, ligada por `NOME_PRODUTO`) do próprio fornecedor, senão de qualquer um; zero ou negativo é ignorado. Na tela (novo, rascunho e detalhe, só com `administrativo.ver`): "Últ. preço", "Estimativa" (unidades × preço) e o total do pedido, sempre com o preço de hoje, sem IPI nem frete. Preço ausente é "—", nunca zero; faltando preço ou quantidade o total diz "parcial". Item cujo `FORNECEDOR` no estoque deixou de ser o do pedido aparece sem preço.
 - **Montagem do pedido** (decisão do dono, 2026-11-26): ao escolher o fornecedor a lista começa vazia; a combo "Adicionar item" traz todos os itens ativos dele (`NOME_PRODUTO | NOME_PRODUTO_FORNECEDOR`), os sugeridos primeiro com a quantidade, e só entra o que for escolhido. A lista da combo mostra também o estoque atual e o que está para chegar (com o número do pedido; sem pedido na web, a marca "Aguardando"). Substitui a lista pré-preenchida do desenho original e o "qualquer item do estoque".
 - **Sugestão** (só itens ativos do fornecedor do cadastro do item): mínimo > 0 e estoque ≤ mínimo; ou alerta `comprar` das análises (janela 90 dias); ou zerado com saída nos últimos 12 meses. Quantidade = maior entre `mínimo − estoque` e `consumo/dia × (prazo + 30) − estoque` (consumo só com 30 dias de histórico), menos o a caminho, em caixas inteiras. Item em rascunho ou marcado `Aguardando` sem pedido na web aparece desmarcado, com aviso.
 - **Caixas:** o pedido guarda unidades do estoque e `por_caixa`. Valor inicial: último pedido não cancelado do fornecedor; senão o `fator` inteiro > 1 de `web_estoque_ligacoes`; senão 1.
@@ -22,4 +23,4 @@ Aba "Pedidos a fornecedor" do Estoque (`pedidos_compra.html/.js`). Desenho aprov
 - **Travas:** sempre as linhas de `estoque` antes das do pedido; leituras que decidem gravação usam `FOR UPDATE`.
 
 ## Fora do escopo
-E-mail pelo sistema, preços, cotação, importar os pedidos antigos do VB.
+E-mail pelo sistema, preços no PDF ou gravados no pedido, cotação, importar os pedidos antigos do VB.

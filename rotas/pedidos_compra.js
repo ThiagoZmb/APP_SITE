@@ -1,18 +1,20 @@
 // ==========================================================================
 // Pedidos a fornecedor: sugestão do que comprar, rascunho, envio, encerramento
 // e cancelamento. Tabelas web_pedidos_compra*; a chegada é reconhecida pela
-// entrada de estoque. Sem preços. Regras: docs/regras/pedidos-compra.md
+// entrada de estoque. Nenhum preço é gravado; o último preço de compra só é lido
+// para a estimativa (rota própria, administrativo.ver). Regras: docs/regras/pedidos-compra.md
 // ==========================================================================
 const { ErroUsuario, emTransacao, agoraLocal, hojeLocal } = require('./transacao');
 const { travarProdutos } = require('./estoque_saida');
 const { carregarAnalises } = require('./estoque_analises');
-const { montarSugestao, acaoPermitida, validarPedido } = require('../calculo/pedidos_compra');
+const { montarSugestao, acaoPermitida, validarPedido, ultimosPrecos } = require('../calculo/pedidos_compra');
 const { marcas, abertosPorProduto, aCaminhoPorProduto, marcarAguardando, porCaixaDoFornecedor, rascunhosPorProduto, carregarPedido } = require('./pedidos_compra_banco');
 
 const { desenharPedidoCompra, novoDocumento } = require('../pdf/pedido_compra');
 
 const VER = ['estoque.ver', 'compras.ver'];
 const CRIAR = [...VER, 'compras.criar'];
+const CUSTO = [...VER, 'administrativo.ver'];   // preço de compra é informação administrativa
 const NAO_ENCONTRADO = 'Pedido não encontrado.';
 const MUDOU = 'O pedido mudou de situação. Atualize a página.';
 const JANELA = 90;
@@ -85,6 +87,21 @@ function registrarPedidosCompra({ rota, pool }) {
         qtd: Number(l.QTD_ESTOQUE) || 0, porCaixa: porCaixa.get(Number(l.CODIGO)) || 1,
         aCaminho: abertos.get(Number(l.CODIGO))?.falta || 0, pedidos: abertos.get(Number(l.CODIGO))?.pedidos || [], aguardando: !!l.AGUARDANDO && !abertos.has(Number(l.CODIGO)) })));
     } catch (err) { falha(res, 'GET /pedidos_compra/produtos', err); }
+  });
+
+  // estimativa de valor: último preço de compra dos itens do fornecedor (somente leitura; nada é gravado)
+  rota('get', '/pedidos_compra/ultimos_precos', CUSTO, async (req, res) => {
+    const fornecedor = String(req.query.fornecedor || '').trim().slice(0, 190);
+    if (!fornecedor) return res.json({ precos: [] });
+    try {
+      const [linhas] = await pool.execute('SELECT CODIGO, NOME_PRODUTO FROM estoque WHERE FORNECEDOR = ?', [fornecedor]);
+      const produtos = linhas.map(l => ({ codigo: Number(l.CODIGO), produto: l.NOME_PRODUTO }));
+      const nomes = [...new Set(produtos.map(p => p.produto).filter(Boolean))];
+      let compras = [];
+      if (nomes.length) [compras] = await pool.execute(
+        `SELECT DATA, FABRICANTE, NOME_PRODUTO, VALOR_UNITARIO FROM entrada_estoque WHERE NOME_PRODUTO IN (${marcas(nomes)}) ORDER BY DATA, id`, nomes);
+      res.json({ precos: ultimosPrecos(produtos, compras, fornecedor) });
+    } catch (err) { falha(res, 'GET /pedidos_compra/ultimos_precos', err); }
   });
 
   rota('get', '/pedidos_compra/:numero', VER, async (req, res) => {

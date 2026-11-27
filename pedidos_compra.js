@@ -1,6 +1,7 @@
 // ==========================================================================
 // pedidos_compra.html — pedidos a fornecedor: sugestão do que comprar, montagem, PDF e acompanhamento.
-// Rotas: /pedidos_compra (rotas/pedidos_compra.js). Sem preços. Regras: docs/regras/pedidos-compra.md
+// Rotas: /pedidos_compra (rotas/pedidos_compra.js). Regras: docs/regras/pedidos-compra.md
+// Preço só como estimativa (último preço de compra) para quem tem administrativo.ver; o PDF não tem preços.
 // Funções puras testadas no Node (test/pedidos_compra_tela.test.js); o desenho da tela fica no fim (só no navegador).
 // Dado vindo da API só entra na tela por esc() ou value/textContent.
 // ==========================================================================
@@ -31,6 +32,19 @@
     const q = inteiro(quantidade);
     return `${q} ${q === 1 ? 'caixa' : 'caixas'} × ${c} = ${total}${un}`;
   }
+  // ---- estimativa (último preço de compra): sem preço ou sem quantidade é null, nunca zero ----
+  const estimativa = (unidades, preco) => (unidades > 0 && preco > 0 ? unidades * preco : null);
+  const dinheiro = (v, casas = 2) => (v === null || v === undefined ? '—'
+    : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: casas }));
+  const diaMes = d => `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}`;
+  // valores = a estimativa de cada item da lista (null quando falta preço ou quantidade)
+  function textoEstimativaPedido(valores) {
+    const com = valores.filter(v => v !== null), sem = valores.length - com.length;
+    if (!com.length) return 'Estimativa do pedido: —';
+    const total = dinheiro(com.reduce((s, v) => s + v, 0));
+    return `Estimativa do pedido: ${total}${sem ? ` (parcial: ${sem} ${sem === 1 ? 'item' : 'itens'} sem preço)` : ''}`;
+  }
+
   // sugestão (em unidades) → o que vai no campo "Pedir" (caixas, quando há mais de 1 por caixa)
   const caixasDe = (unidades, porCaixa) => (unidades ? String(Math.ceil(unidades / (porCaixa || 1))) : '');
 
@@ -81,8 +95,9 @@
     const { chamar } = C.criarApi(win);
     const toast = C.criarToast(doc, win);
     const podeCriar = () => !!(win.Acesso && win.Acesso.pode('compras.criar'));
+    const verCusto = () => !!(win.Acesso && win.Acesso.pode('administrativo.ver'));
     // pedido aberto: numero null = novo; chave identifica o pedido novo para o duplo clique não gravar dois
-    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], produtos: [], sugestao: [], combo: [], visiveis: [], marcado: -1, ocupado: false, seq: 0, alterado: false };
+    const estado = { numero: null, chave: '', situacao: 'rascunho', fornecedor: '', linhas: [], produtos: [], sugestao: [], combo: [], visiveis: [], marcado: -1, ocupado: false, seq: 0, alterado: false, precos: new Map(), itensDetalhe: [] };
     const novaChave = () => (win.crypto?.randomUUID ? win.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const data = v => (v ? dataBR(String(v).slice(0, 10)) : '—');
     const selo = s => win.Situacoes.selo('compra', s, ROTULOS[s] || s);
@@ -119,7 +134,7 @@
       try { p = await chamar('/pedidos_compra/' + numero); }
       catch (err) { return toast(err.message, 'erro'); }
       if (seq !== estado.seq) return;
-      Object.assign(estado, { numero: p.numero, situacao: p.situacao, fornecedor: p.fornecedor, alterado: false });
+      Object.assign(estado, { numero: p.numero, situacao: p.situacao, fornecedor: p.fornecedor, alterado: false, precos: new Map() });
       if (p.situacao === 'rascunho' && podeCriar()) {
         estado.linhas = p.itens.map(i => ({ codigo: i.codigo, produto: i.produto, codFornecedor: i.codFornecedor, nomeFornecedor: i.nomeFornecedor, unidade: i.unidade, qtd: null, minimo: null, diasCobertura: null, aCaminho: null, aviso: '',
           marcado: true, porCaixa: String(i.porCaixa), quantidade: String(i.qtd / i.porCaixa) }));
@@ -137,13 +152,49 @@
     function desenharDetalhe(p) {
       $('titulo-detalhe').textContent = `Pedido nº ${p.numero}`;
       $('resumo-detalhe').innerHTML = `${selo(p.situacao)} <span>${esc(p.fornecedor)} · criado ${esc(data(p.criadoEm))}${p.enviadoEm ? ' · enviado ' + esc(data(p.enviadoEm)) : ''}</span>`;
-      $('tb-detalhe').innerHTML = p.itens.map(i => `<tr><td>${esc(codigo(i))}</td><td>${esc(descricao(i))}</td><td class="num">${esc(textoTotal(i.qtd / i.porCaixa, i.porCaixa, i.unidade))}</td>` +
-        `<td class="num">${esc(i.chegou)}</td><td class="num">${i.falta ? esc(i.falta) : '✔'}</td></tr>`).join('');
+      estado.itensDetalhe = p.itens;
+      desenharItensDetalhe();
       $('obs-detalhe').textContent = p.observacao ? 'Observação: ' + p.observacao : '';
       const chegou = p.itens.some(i => i.chegou > 0);
       $('btn-cancelar').hidden = !(p.situacao === 'enviado' && !chegou);
       $('btn-encerrar').hidden = !['enviado', 'parcial'].includes(p.situacao);
       mostrar('detalhe');
+      carregarPrecos(p.fornecedor);
+    }
+
+    function desenharItensDetalhe() {
+      $('tb-detalhe').innerHTML = estado.itensDetalhe.map(i => `<tr><td>${esc(codigo(i))}</td><td>${esc(descricao(i))}</td><td class="num">${esc(textoTotal(i.qtd / i.porCaixa, i.porCaixa, i.unidade))}</td>` +
+        `<td class="num">${esc(i.chegou)}</td><td class="num">${i.falta ? esc(i.falta) : '✔'}</td>` +
+        (verCusto() ? `<td class="num preco">${celulaPreco(i.codigo)}</td><td class="num preco">${esc(dinheiro(estimativa(i.qtd, precoDe(i.codigo))))}</td>` : '') + '</tr>').join('');
+      $('total-detalhe').textContent = textoEstimativaPedido(estado.itensDetalhe.map(i => estimativa(i.qtd, precoDe(i.codigo))));
+    }
+
+    // ---------- estimativa (último preço de compra) ----------
+    const precoDe = codigoItem => estado.precos.get(codigoItem)?.precoUnitario;
+    function celulaPreco(codigoItem) {
+      const p = estado.precos.get(codigoItem);
+      return p ? `${esc(dinheiro(p.precoUnitario, 4))}<small>${esc(diaMes(p.data))}</small>` : '—';
+    }
+    const estimativaLinha = l => estimativa(totalUnidades(l.quantidade, l.porCaixa), precoDe(l.codigo));
+    function totalForm() { $('total-form').textContent = textoEstimativaPedido(estado.linhas.map(estimativaLinha)); }
+
+    // sem a permissão nem chama a rota; a resposta de um fornecedor ou pedido anterior é descartada (estado.seq)
+    async function carregarPrecos(fornecedor) {
+      const seq = estado.seq;
+      if (!verCusto() || !fornecedor) return;
+      let r;
+      try { r = await chamar('/pedidos_compra/ultimos_precos?fornecedor=' + encodeURIComponent(fornecedor)); }
+      catch (err) { if (seq === estado.seq) toast('Não foi possível buscar os últimos preços: ' + err.message, 'erro'); return; }
+      if (seq !== estado.seq) return;
+      estado.precos = new Map((r?.precos || []).map(p => [p.codigo, p]));
+      if ($('v-detalhe').hidden === false) return desenharItensDetalhe();
+      // no formulário só as células de preço mudam: o que está sendo digitado fica como está
+      for (const tr of $('tb-itens').querySelectorAll('tr[data-k]')) {
+        const l = estado.linhas[Number(tr.dataset.k)];
+        tr.querySelector('.l-preco').innerHTML = celulaPreco(l.codigo);
+        tr.querySelector('.l-estimativa').textContent = dinheiro(estimativaLinha(l));
+      }
+      totalForm();
     }
 
     async function mudarSituacao(acao, pergunta) {
@@ -170,7 +221,7 @@
     }
 
     async function novoPedido() {
-      Object.assign(estado, { numero: null, chave: novaChave(), situacao: 'rascunho', fornecedor: '', linhas: [], alterado: false, seq: estado.seq + 1 });
+      Object.assign(estado, { numero: null, chave: novaChave(), situacao: 'rascunho', fornecedor: '', linhas: [], alterado: false, precos: new Map(), seq: estado.seq + 1 });
       $('observacao').value = '';
       $('titulo-form').textContent = 'Novo pedido';
       limparCombo();
@@ -235,6 +286,7 @@
       const seq = estado.seq;
       limparCombo();
       if (!fornecedor) return;
+      carregarPrecos(fornecedor);   // em paralelo; a falha dos preços não impede montar o pedido
       $('busca-item').placeholder = 'Carregando itens…';
       const q = '?fornecedor=' + encodeURIComponent(fornecedor);
       const [produtos, sugestao] = await Promise.allSettled([chamar('/pedidos_compra/produtos' + q), chamar('/pedidos_compra/sugestao' + q)]);
@@ -253,6 +305,7 @@
       if (estado.linhas.length && (estado.alterado || estado.numero) && !win.confirm('Trocar de fornecedor descarta os itens da lista. Continuar?')) { $('fornecedor').value = estado.fornecedor; return; }
       estado.fornecedor = novo;
       estado.linhas = [];
+      estado.precos = new Map();
       estado.alterado = false;
       estado.seq++;
       desenharLinhas();
@@ -269,8 +322,10 @@
         `<td class="num"><input class="curto l-caixa" inputmode="numeric" aria-label="Unidades por caixa" value="${esc(l.porCaixa)}"></td>` +
         `<td class="num"><input class="curto l-qtd" inputmode="numeric" aria-label="Quantidade a pedir" value="${esc(l.quantidade)}"></td>` +
         `<td class="l-total">${esc(textoTotal(l.quantidade, l.porCaixa, l.unidade))}</td>` +
+        (verCusto() ? `<td class="num preco l-preco">${celulaPreco(l.codigo)}</td><td class="num preco l-estimativa">${esc(dinheiro(estimativaLinha(l)))}</td>` : '') +
         `<td><button type="button" class="btn btn-secondary btn-mini l-tirar" aria-label="Tirar ${esc(descricao(l))}">✕</button></td></tr>`).join('')
-        : '<tr><td colspan="10" class="vazio">Escolha os itens em "Adicionar item".</td></tr>';
+        : `<tr><td colspan="${verCusto() ? 12 : 10}" class="vazio">Escolha os itens em "Adicionar item".</td></tr>`;
+      totalForm();
     }
 
     function digitou(e) {
@@ -280,6 +335,8 @@
       if (e.target.classList.contains('l-qtd')) l.quantidade = e.target.value;
       if (e.target.classList.contains('l-caixa')) l.porCaixa = e.target.value;
       tr.querySelector('.l-total').textContent = textoTotal(l.quantidade, l.porCaixa, l.unidade);
+      if (verCusto()) tr.querySelector('.l-estimativa').textContent = dinheiro(estimativaLinha(l));
+      totalForm();
       estado.alterado = true;
     }
 
@@ -391,5 +448,5 @@
     abrirLista();
   }
 
-  return { ROTULOS, totalUnidades, textoTotal, caixasDe, itensParaEnviar, textoChegar, opcoesCombo, iniciar };
+  return { ROTULOS, estimativa, dinheiro, diaMes, textoEstimativaPedido, totalUnidades, textoTotal, caixasDe, itensParaEnviar, textoChegar, opcoesCombo, iniciar };
 });

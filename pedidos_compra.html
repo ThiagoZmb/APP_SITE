@@ -71,6 +71,9 @@
         @media (max-width: 1100px) { #combo-lista li { grid-template-columns: 1fr; row-gap: 2px; } #combo-lista li.c-titulo { display: none; } #combo-lista .c-forn { color: var(--text-light); } #combo-lista [data-rot]::before { content: attr(data-rot) ": "; color: var(--text-light); } }
         .aviso-item { display: block; color: var(--text-light); font-size: 12px; margin-top: 2px; }
         .l-total { color: var(--text-light); font-size: 13px; }
+        td.preco { white-space: nowrap; font-variant-numeric: tabular-nums; }
+        td.preco small { display: block; color: var(--text-light); font-size: 12px; }
+        .estimativa { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; justify-content: flex-end; margin: 10px 0; font-size: 15px; }
         .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
         .dica { font-size: 12px; color: var(--text-light); }
         #resumo-detalhe { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 14px; }
@@ -104,7 +107,7 @@
     <script src="situacoes.js?v=202612051000"></script>
     <script src="layout.js?v=202612051000" defer></script>
     <script src="entregas_comum.js?v=202611201000" defer></script>
-    <script src="pedidos_compra.js?v=202612051500" defer></script>
+    <script src="pedidos_compra.js?v=202612061000" defer></script>
 </head>
 <body>
     <div class="container">
@@ -157,10 +160,11 @@
                 </div>
                 <div class="tabela-wrap">
                     <table>
-                        <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th><th></th></tr></thead>
+                        <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Estoque</th><th class="num">Mínimo</th><th class="num">Acaba em</th><th class="num">A caminho</th><th class="num">Un. por caixa</th><th class="num">Pedir</th><th>Total</th><th class="num" data-perm="administrativo.ver">Últ. preço</th><th class="num" data-perm="administrativo.ver">Estimativa</th><th></th></tr></thead>
                         <tbody id="tb-itens"></tbody>
                     </table>
                 </div>
+                <div class="estimativa" id="estimativa-form" data-perm="administrativo.ver"><b id="total-form"></b><span class="dica">Último preço de compra, sem IPI nem frete.</span></div>
                 <p class="dica" style="margin:6px 0 14px">Com mais de 1 unidade por caixa, em "Pedir" informe o número de caixas.</p>
                 <div class="form-group"><label for="observacao">Observação (sai no PDF)</label><textarea id="observacao" maxlength="2000"></textarea></div>
                 <div class="acoes">
@@ -179,10 +183,11 @@
                 <div id="resumo-detalhe"></div>
                 <div class="tabela-wrap">
                     <table>
-                        <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Pedido</th><th class="num">Chegou</th><th class="num">Falta</th></tr></thead>
+                        <thead><tr><th>Cód. fornecedor</th><th>Descrição do fornecedor</th><th class="num">Pedido</th><th class="num">Chegou</th><th class="num">Falta</th><th class="num" data-perm="administrativo.ver">Últ. preço</th><th class="num" data-perm="administrativo.ver">Estimativa</th></tr></thead>
                         <tbody id="tb-detalhe"></tbody>
                     </table>
                 </div>
+                <div class="estimativa" id="estimativa-detalhe" data-perm="administrativo.ver"><b id="total-detalhe"></b><span class="dica">Último preço de compra, sem IPI nem frete.</span></div>
                 <p id="obs-detalhe"></p>
                 <div class="acoes">
                     <button type="button" class="btn btn-secondary" id="btn-pdf-detalhe">Gerar PDF</button>
