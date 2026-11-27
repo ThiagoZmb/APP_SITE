@@ -55,7 +55,7 @@ function carregar(respostas) {
   const janelaGlobal = {};
   vm.runInNewContext(modulo, { window: janelaGlobal, document, fetch: fetchFalso, alert: m => avisos.push(m), location: loc,
     localStorage: { removeItem: k => removidos.push(k) }, AbortController, setTimeout, clearTimeout });
-  const imprimir = () => janelaGlobal.EtiquetaZebra.imprimir('23425', { apiBase: 'https://api', loginUrl: 'login.html', token: () => 'tk' });
+  const imprimir = (qual = 'imprimir') => janelaGlobal.EtiquetaZebra[qual]('23425',{ apiBase: 'https://api', loginUrl: 'login.html', token: () => 'tk' });
   const emitir = (el, tipo, extra = {}) => (el.listeners[tipo] || []).forEach(fn => fn({ target: el, preventDefault() {}, stopPropagation() {}, ...extra }));
   const tecla = (key, extra = {}) => (docListeners.keydown || []).forEach(fn => fn({ key, target: document.activeElement, preventDefault() {}, stopPropagation() {}, ...extra }));
   const janela = () => document.body.filhos.filter(f => !f.removido).pop();
@@ -261,7 +261,7 @@ test('visual: janela sem estilo inline nem innerHTML, reaproveita dp-* e os ez-*
   const htmls = fs.readdirSync(path.join(__dirname, '..')).filter(n => n.endsWith('.html'));
   const temas = new Set(htmls.flatMap(f => [...ler(f).matchAll(/tema\.css\?v=(\d+)/g)].map(m => m[1])));
   assert.equal(temas.size, 1);
-  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202612011000/, f);
+  for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html']) assert.match(ler(f), /etiqueta_zebra\.js\?v=202612021000/, f);
 });
 
 test('total acima de 200 etiquetas bloqueia o envio na própria janela, dizendo o total e o limite', async () => {
@@ -285,4 +285,111 @@ test('o alerta de sucesso diz o total de etiquetas enviadas', async () => {
   t.emitir(t.botao('Imprimir'), 'click');
   await fim;
   assert.match(t.avisos[0], /^3 etiqueta\(s\) enviada\(s\) para ZDesigner ZD220 \(porta USB001\)\.$/);
+});
+
+// ---------- Etiquetas Rio de Janeiro ----------
+const URL_RJ = 'https://api/etiquetas/pedido/23425/rj';
+function cenarioRj({ post = { status: 200, corpo: { zpl: '^XA^XZ', quantidade: 6 } }, local = { status: 200, corpo: { ok: true, impressora: 'ZDesigner ZD220', porta: 'USB001' } }, ping = { status: 200 } } = {}) {
+  const t = carregar(u => (PING(u) ? ping : u === URL_RJ ? post : local));
+  t.imprimirRj = () => t.imprimir('imprimirRj');
+  return t;
+}
+const sub = t => t.janela().children[0].children[1].textContent;
+const erroDe = t => achar(t.janela(), n => n.className === 'ez-erro');
+
+test('menus: "Etiquetas Rio de Janeiro (Zebra)" no submenu Imprimir, com pedidos.pdf chamando EtiquetaZebra.imprimirRj', () => {
+  for (const [nome, fonte] of [['inicio_menu.js', menu], ['painel_inicial.html', painel]]) {
+    const i = fonte.indexOf('Etiquetas Rio de Janeiro (Zebra)');
+    assert.ok(i > 0, nome);
+    const linha = fonte.slice(fonte.lastIndexOf('\n', i), fonte.indexOf('\n', i));
+    assert.ok(linha.includes("'pedidos.pdf'") && linha.includes('EtiquetaZebra.imprimirRj') && /, imp\);/.test(linha), nome);
+  }
+});
+
+test('RJ: serviço local sem resposta avisa e não abre a janela', async () => {
+  const t = cenarioRj({ ping: new Error('recusado') });
+  assert.equal(await t.imprimirRj(), false);
+  assert.match(t.avisos[0], /Serviço local não encontrado neste PC/);
+  assert.equal(t.document.body.filhos.length, 0);
+});
+
+test('RJ: janela acessível com OC, Consultor, NFe e Volumes totais; resumo atualiza; foco preso; Esc não envia nada', async () => {
+  const t = cenarioRj();
+  const fim = t.imprimirRj();
+  await t.esperarJanela();
+  const caixa = t.janela().children[0];
+  assert.equal(caixa.attrs.role, 'dialog');
+  assert.equal(caixa.attrs['aria-modal'], 'true');
+  assert.equal(t.porId('ez-titulo').textContent, 'Etiquetas Rio de Janeiro (Zebra)');
+  assert.deepEqual(['ez-rj-oc', 'ez-rj-consultor', 'ez-rj-nfe'].map(id => t.porId(id).maxLength), [30, 30, 20]);
+  assert.equal(t.porId('ez-rj-volumes').value, '1');
+  assert.equal(t.porId('ez-rj-volumes').max, '100');
+  const rotulos = []; achar(t.janela(), n => { if (n.tag === 'label') rotulos.push(n.textContent); return false; });
+  assert.deepEqual(rotulos, ['OC', 'Consultor', 'NFe', 'Volumes totais']);
+  assert.match(sub(t), /Pedido nº 23425 · 2 etiqueta\(s\) vão sair \(1 volume\(s\), 2 por volume\)/);
+  t.porId('ez-rj-volumes').value = '7'; t.emitir(t.porId('ez-rj-volumes'), 'input');
+  assert.match(sub(t), /14 etiqueta\(s\) vão sair \(7 volume\(s\)/);
+  assert.equal(t.document.activeElement, t.porId('ez-rj-oc'));
+  t.botao('Imprimir').focus(); t.tecla('Tab');
+  assert.equal(t.document.activeElement, t.porId('ez-rj-oc'));
+  t.tecla('Tab', { shiftKey: true });
+  assert.equal(t.document.activeElement, t.botao('Imprimir'));
+  t.tecla('Escape');
+  await fim;
+  assert.ok(!t.chamadas.some(c => c.metodo === 'POST'));
+  assert.deepEqual(t.docListeners.keydown, []);
+});
+
+test('RJ: Imprimir manda os campos ao servidor e só depois o ZPL ao serviço local', async () => {
+  const t = cenarioRj();
+  const fim = t.imprimirRj();
+  await t.esperarJanela();
+  t.porId('ez-rj-oc').value = 'OC 1'; t.porId('ez-rj-consultor').value = 'Ana'; t.porId('ez-rj-nfe').value = '55'; t.porId('ez-rj-volumes').value = '3';
+  t.emitir(t.botao('Imprimir'), 'click');
+  await fim;
+  const post = t.chamadas.find(c => c.url === URL_RJ);
+  assert.equal(post.metodo, 'POST');
+  assert.equal(post.auth, 'Bearer tk');
+  assert.deepEqual(JSON.parse(post.corpo), { oc: 'OC 1', consultor: 'Ana', nfe: '55', volumes: 3 });
+  const envio = t.chamadas.find(c => c.url === 'http://127.0.0.1:3917/etiqueta');
+  assert.deepEqual(JSON.parse(envio.corpo), { zpl: '^XA^XZ' });
+  assert.ok(t.chamadas.indexOf(post) < t.chamadas.indexOf(envio));
+  assert.match(t.avisos[0], /^6 etiqueta\(s\) enviada\(s\) para ZDesigner ZD220 \(porta USB001\)\.$/);
+});
+
+test('RJ: volumes inválidos bloqueiam o envio; erros do servidor e do serviço local ficam na janela', async () => {
+  const t = cenarioRj();
+  const fim = t.imprimirRj();
+  await t.esperarJanela();
+  for (const ruim of ['0', '101', '1.5', '', 'abc']) {
+    t.porId('ez-rj-volumes').value = ruim;
+    t.emitir(t.botao('Imprimir'), 'click');
+    assert.match(erroDe(t).textContent, /Volumes totais.*1 a 100/, ruim);
+    assert.equal(t.document.activeElement, t.porId('ez-rj-volumes'));
+  }
+  assert.ok(!t.chamadas.some(c => c.metodo === 'POST'));
+  t.tecla('Escape');
+  await fim;
+  for (const [opcoes, msg] of [[{ post: { status: 404, corpo: { error: 'Pedido não encontrado.' } } }, /Pedido não encontrado/],
+    [{ local: { status: 500, corpo: { error: 'Nenhuma impressora Zebra encontrada.' } } }, /Nenhuma impressora Zebra/]]) {
+    const u = cenarioRj(opcoes);
+    const f = u.imprimirRj();
+    await u.esperarJanela();
+    u.emitir(u.botao('Imprimir'), 'click');
+    await u.turnos();
+    assert.match(erroDe(u).textContent, msg);
+    assert.equal(u.janela().removido, false);
+    u.tecla('Escape');
+    await f;
+  }
+});
+
+test('RJ: 401 limpa a sessão e vai para o login', async () => {
+  const t = cenarioRj({ post: { status: 401 } });
+  const fim = t.imprimirRj();
+  await t.esperarJanela();
+  t.emitir(t.botao('Imprimir'), 'click');
+  assert.equal(await fim, false);
+  assert.deepEqual(t.removidos, ['auth']);
+  assert.equal(t.loc.href, 'login.html');
 });

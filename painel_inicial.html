@@ -293,7 +293,7 @@
     <script src="desconto_pedido_tela.js?v=202611161500" defer></script>
     <script src="historico_pedido_tela.js?v=202611171200" defer></script>
     <script src="danfe_pedido.js?v=202611051300" defer></script>
-    <script src="etiqueta_zebra.js?v=202612011000" defer></script>
+    <script src="etiqueta_zebra.js?v=202612021000" defer></script>
     <script src="checklist_pedido.js?v=202611051700" defer></script>
     <script src="desenho_pedido.js?v=202611231500" defer></script>
     <script src="impressao_pdf.js?v=202611231000" defer></script>
@@ -1107,6 +1107,7 @@
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(numero, true)), imp);
             if (ehPedido) add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(`${API_BASE}/dados_pdf_vidros?numero=${encodeURIComponent(numero)}`), imp);
             if (ehPedido) add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }), imp);
+            if (ehPedido) add('pedidos.pdf', '🏷️', 'Etiquetas Rio de Janeiro (Zebra)', () => window.EtiquetaZebra.imprimirRj(numero, { apiBase: API_BASE, loginUrl: LOGIN_URL, token: getToken }), imp);
             if (ehPedido) add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${API_BASE}/checklist/pdf`), imp);
             sep();
             if (ehPedido && !cancelado) add('corte.ver', '✂️', 'Corte de perfil', () => { location.href = `corte.html?numero=${encodeURIComponent(numero)}`; });

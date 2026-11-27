@@ -199,3 +199,42 @@ test('etiquetas: texto digitado com ^ ~ nunca chega ao ZPL como comando (medidas
   assert.equal((await postar('/etiquetas/pedido/23425', { itens: [{ item: '1', incluirMedidas: true, medidas: '1^XZ' }] })).status, 400);
   assert.equal((await postar('/etiquetas/pedido/23425', { uf: '~D' })).status, 400);
 });
+
+// ---------- Rio de Janeiro: POST /etiquetas/pedido/:numero/rj ----------
+const RJ = '/etiquetas/pedido/23425/rj';
+
+test('etiquetas RJ: POST devolve 2N etiquetas em pares, com dados do banco e digitados, sem dinheiro e sem ler itens', async t => {
+  const { postar, f } = await preparar(t, { itens: 0 }); // não depende dos itens do pedido
+  const r = await postar(RJ, { volumes: 2, oc: 'OC 9', consultor: 'Ana', nfe: '123' });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.deepEqual(Object.keys(j).sort(), ['quantidade', 'zpl']);
+  assert.equal(j.quantidade, 4);
+  assert.equal(blocosZpl(j.zpl).length, 4);
+  for (const texto of ['Pedido: 23425', 'Cliente: Fulano Ação Ltda', 'Cliente Final: Beltrano', 'OC: OC 9', 'Consultor: Ana', 'Volumes totais: 2', 'NFe: 123', 'Volume 1/2', 'Volume 2/2']) {
+    assert.ok(textosZpl(j.zpl).includes(texto), texto);
+  }
+  for (const n of nomes(j)) assert.ok(!REGEX_VALOR.test(n), n);
+  assert.ok(!f.chamadas.some(c => /ped_orc_lista_itens|ped_orc_itens_v4|cadastro_clientes/.test(c.sql)), 'só o cabeçalho (sem restrição de estado)');
+});
+
+test('etiquetas RJ: 400 para volumes/campos inválidos e número ruim; 404 para pedido inexistente', async t => {
+  let { postar } = await preparar(t);
+  for (const corpo of [{}, { volumes: 0 }, { volumes: 101 }, { volumes: 1, oc: 'x'.repeat(31) }]) {
+    const r = await postar(RJ, corpo);
+    assert.equal(r.status, 400, JSON.stringify(corpo));
+    assert.ok((await r.json()).error);
+  }
+  assert.equal((await postar('/etiquetas/pedido/abc/rj', { volumes: 1 })).status, 400);
+  ({ postar } = await preparar(t, { existe: false }));
+  assert.equal((await postar(RJ, { volumes: 1 })).status, 404);
+});
+
+test('etiquetas RJ: sem pedidos.pdf é 403; restrito a outros estados é 403; dentro do estado passa', async t => {
+  let { postar } = await preparar(t, { perfil: 'Sem acesso' });
+  assert.equal((await postar(RJ, { volumes: 1 })).status, 403);
+  ({ postar } = await preparar(t, { estados: ['SP'], estadoCliente: 'RJ' }));
+  assert.equal((await postar(RJ, { volumes: 1 })).status, 403);
+  ({ postar } = await preparar(t, { estados: ['SP'], estadoCliente: 'SP' }));
+  assert.equal((await postar(RJ, { volumes: 1 })).status, 200);
+});

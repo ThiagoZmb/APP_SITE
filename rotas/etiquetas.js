@@ -3,8 +3,9 @@
 // GET  /etiquetas/pedido/:numero         ZPL padrão (1 etiqueta por item, "VOL 1/1", sem medidas, sem destino)
 // GET  /etiquetas/pedido/:numero/itens   dados para a janela de edição (itens, medidas sugeridas, UF sugerida do cliente)
 // POST /etiquetas/pedido/:numero         ZPL com os ajustes da janela ({ itens: [{ item, qtd (= volumes = nº de etiquetas do item), medidas, incluirMedidas }], uf }); N etiquetas por item, total até 200; nada é gravado
-const { montarEtiquetas } = require('../calculo/etiqueta_zpl');
-const { validarEdicao, normalizarUf, sugerirMedidas } = require('../calculo/etiqueta_edicao');
+// POST /etiquetas/pedido/:numero/rj      etiquetas "Rio de Janeiro" ({ volumes (1 a 100), oc, consultor, nfe }); um par por volume; não lê os itens
+const { montarEtiquetas, montarEtiquetasRj } = require('../calculo/etiqueta_zpl');
+const { validarEdicao, validarRj, normalizarUf, sugerirMedidas } = require('../calculo/etiqueta_edicao');
 const { textoVB } = require('../pdf/ped_orc');
 
 const PERMISSAO = ['pedidos.pdf'];
@@ -14,15 +15,21 @@ const SQL_MEDIDAS = "SELECT ITEM_PEDIDO, ALTURA, LARGURA FROM ped_orc_itens_v4 W
 const SQL_ESTADO = 'SELECT ESTADO FROM cadastro_clientes WHERE RAZAO_SOCIAL = ? LIMIT 1';
 
 function registrarEtiquetas({ rota, pool, foraDosEstados }) {
-  // Carrega o pedido e confere acesso. Já responde (404/403/400) e devolve null quando não dá para seguir.
-  // opcoes.sugestoes: também lê o estado do cliente e as medidas (só a janela de edição precisa).
-  async function carregar(req, res, { sugestoes = false } = {}) {
+  // Número e cabeçalho do Pedido. Já responde (400/404) e devolve null quando não dá para seguir.
+  async function abrirPedido(req, res) {
     const numero = String(req.params.numero ?? '').trim();
     if (!/^\d{1,10}$/.test(numero)) { res.status(400).json({ error: 'Número de pedido inválido.' }); return null; }
     const [cabs] = await pool.execute(SQL_CABECALHO, [numero]);
     if (cabs.length === 0) { res.status(404).json({ error: 'Pedido não encontrado.' }); return null; }
-    const cab = cabs[0];
-    const restrito = (req.acesso.estados || []).length > 0;
+    return { numero, cab: cabs[0], restrito: (req.acesso.estados || []).length > 0 };
+  }
+
+  // Carrega o pedido com os itens e confere acesso. Já responde (404/403/400) e devolve null quando não dá para seguir.
+  // opcoes.sugestoes: também lê o estado do cliente e as medidas (só a janela de edição precisa).
+  async function carregar(req, res, { sugestoes = false } = {}) {
+    const pedido = await abrirPedido(req, res);
+    if (!pedido) return null;
+    const { numero, cab, restrito } = pedido;
     const [est, [itens], medidas] = await Promise.all([
       restrito || sugestoes ? pool.execute(SQL_ESTADO, [cab.RAZAO_SOCIAL]).then(x => x[0]) : [],
       pool.execute(SQL_ITENS, [numero]),
@@ -90,6 +97,21 @@ function registrarEtiquetas({ rota, pool, foraDosEstados }) {
       if (!v.ok) return res.status(400).json({ error: v.erro });
       responder(res, dados, v);
     } catch (err) { falhou(res, 'POST /etiquetas/pedido')(err); }
+  });
+
+  rota('post', '/etiquetas/pedido/:numero/rj', PERMISSAO, async (req, res) => {
+    try {
+      const pedido = await abrirPedido(req, res);
+      if (!pedido) return;
+      const { numero, cab, restrito } = pedido;
+      if (restrito) {
+        const [est] = await pool.execute(SQL_ESTADO, [cab.RAZAO_SOCIAL]);
+        if (foraDosEstados(req, res, est[0]?.ESTADO)) return;
+      }
+      const v = validarRj(req.body);
+      if (!v.ok) return res.status(400).json({ error: v.erro });
+      res.json(montarEtiquetasRj({ numero, cliente: cab.RAZAO_SOCIAL, clienteFinal: cab.CLIENTE_FINAL, oc: v.oc, consultor: v.consultor, nfe: v.nfe, volumes: v.volumes }));
+    } catch (err) { falhou(res, 'POST /etiquetas/pedido/:numero/rj')(err); }
   });
 }
 

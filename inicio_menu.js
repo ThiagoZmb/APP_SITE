@@ -90,6 +90,7 @@
       add('pedidos.pdf', '🖨️', 'Imprimir guia de produção', () => imprimirPdf(urlPdf(n, true)), imp);
       add('pedidos.pdf', '🖨️', 'Imprimir vidros', () => imprimirPdf(urlVidros(n)), imp);
       add('pedidos.pdf', '🏷️', 'Imprimir etiquetas (Zebra)', () => window.EtiquetaZebra.imprimir(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }), imp);
+      add('pedidos.pdf', '🏷️', 'Etiquetas Rio de Janeiro (Zebra)', () => window.EtiquetaZebra.imprimirRj(n, { apiBase: cfg.apiBase, loginUrl: cfg.loginUrl, token: cfg.token }), imp);
       add('pedidos.checklist', '✅', 'Imprimir checklist', () => imprimirPdf(`${cfg.apiBase}/checklist/pdf`), imp);
       sep();
       add('orcamentos.criar valores.ver', '✏️', 'Editar pedido', () => { location.href = `orcamentos.html?abrir=Pedido/${enc(n)}&voltar=${enc(cfg.voltar || 'inicio.html')}`; });

@@ -62,10 +62,25 @@ function codigoDeBarras(num) {
   return `^FO${x},368^BY${largura},3,80^BCN,80,N,N,N,A^FD${num}^FS`;
 }
 
-const logo = () => [
+const logo = (dados = LOGO.hex) => [
   '^FO14,14^GB240,94,3,B,3^FS', // caixa arredondada em volta do logo
-  `^FO22,20^GFA,${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha},${LOGO.hex}^FS`
+  `^FO22,20^GFA,${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha * LOGO.altura},${LOGO.bytesPorLinha},${dados}^FS`
 ].join('\n');
+
+// Compactação ASCII do ^GFA (ZPL II): "," completa a linha com zeros e ":" repete a linha anterior. O desenho é o mesmo.
+// Usada só nas etiquetas do Rio, para 200 etiquetas (o logo se repete em cada uma) caberem no 1 MB do serviço local.
+function compactarGfa(hex, bytesPorLinha) {
+  const n = bytesPorLinha * 2;
+  let anterior = '', saida = '';
+  for (let i = 0; i < hex.length; i += n) {
+    const l = hex.slice(i, i + n);
+    const semZeros = l.replace(/0+$/, '');
+    saida += l === anterior ? ':' : (semZeros.length < n ? semZeros + ',' : l);
+    anterior = l;
+  }
+  return saida;
+}
+const LOGO_COMPACTO = compactarGfa(LOGO.hex, LOGO.bytesPorLinha);
 
 // volumes válidos: inteiro 1 a 999; qualquer outra coisa = 1
 const volumesDe = v => { const n = Number(v); return Number.isInteger(n) && n >= 1 && n <= MAX_VOLUMES ? n : 1; };
@@ -105,4 +120,38 @@ function montarEtiquetas({ numero, cliente, clienteFinal, itens, uf }) {
   return { zpl: blocos.join('\n'), quantidade: blocos.length };
 }
 
-module.exports = { sanearZpl, montarEtiquetas };
+// ---------- Rio de Janeiro ----------
+// Um PAR por volume, nesta ordem: etiqueta do pedido (igual em todos os volumes) e etiqueta de destino ("Volume i/N"),
+// para cada caixa receber o seu par. Mesmo tamanho e mesma caixa do logo; sem código de barras e sem dinheiro.
+const Y_RJ = { cliente: 130, final: 206, oc: 282, consultor: 348, volumes: 414, destino: 150, nfe: 250, volume: 340 };
+const MAX_VOLUMES_RJ = 100;
+
+// dados = { numero, cliente (razão social), clienteFinal, oc, consultor, nfe (opcionais), volumes (1 a 100) }
+//   →  { zpl, quantidade } (quantidade = 2 x volumes). Campo opcional vazio não imprime linha.
+function montarEtiquetasRj({ numero, cliente, clienteFinal, oc, consultor, nfe, volumes }) {
+  const num = String(numero ?? '').replace(/\D/g, '');
+  const util = LARGURA - 2 * MARGEM;
+  const ALTURAS = [60, 52, 44, MIN_FONTE];
+  const texto = v => limpar(v).slice(0, MAX_TEXTO);
+  const opcional = (y, rotulo, valor, alturas) => (texto(valor) ? linha(MARGEM, y, rotulo, texto(valor), util, alturas) : '');
+  const n = Math.min(MAX_VOLUMES_RJ, volumesDe(volumes));
+  const bloco = partes => ['^XA^CI28^PW800^LL480', logo(LOGO_COMPACTO), ...partes, '^XZ'].filter(Boolean).join('\n');
+
+  const pedido = bloco([
+    linha(272, 30, '', `Pedido: ${num}`, LARGURA - 272 - MARGEM, [64, 56, 48, 40, 32]),
+    linha(MARGEM, Y_RJ.cliente, 'Cliente:', texto(cliente) || '—', util, ALTURAS),
+    linha(MARGEM, Y_RJ.final, 'Cliente Final:', texto(clienteFinal) || '—', util, ALTURAS),
+    opcional(Y_RJ.oc, 'OC:', oc, [48, 44, 40, MIN_FONTE]),
+    opcional(Y_RJ.consultor, 'Consultor:', consultor, [48, 44, 40, MIN_FONTE]),
+    linha(MARGEM, Y_RJ.volumes, 'Volumes totais:', String(n), util, [48])
+  ]);
+  const blocos = [];
+  for (let i = 1; i <= n; i++) blocos.push(pedido, bloco([
+    linha(MARGEM, Y_RJ.destino, 'Destino:', 'Rio de Janeiro', util, [52]),
+    opcional(Y_RJ.nfe, 'NFe:', nfe, ALTURAS),
+    linha(MARGEM, Y_RJ.volume, 'Volume', `${i}/${n}`, util, [90])
+  ]));
+  return { zpl: blocos.join('\n'), quantidade: blocos.length };
+}
+
+module.exports = { sanearZpl, montarEtiquetas, montarEtiquetasRj };

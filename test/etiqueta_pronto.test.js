@@ -153,7 +153,7 @@ test('lote do calendário, lote da lista, etapas e baixa com marcarPronto chamam
 test('todas as páginas que marcam Pronto carregam etiqueta_zebra.js (?v= novo) e a CSP libera o serviço local', () => {
   for (const f of ['inicio.html', 'painel_inicial.html', 'calendario.html', 'calendario_dia.html', 'etapas_producao.html', 'entregas.html']) {
     const h = ler(f);
-    assert.match(h, /etiqueta_zebra\.js\?v=202612011000/, f);
+    assert.match(h, /etiqueta_zebra\.js\?v=202612021000/, f);
     const csp = /Content-Security-Policy" content="([^"]+)"/.exec(h)[1];
     assert.match(csp, /connect-src[^;]*http:\/\/127\.0\.0\.1:3917/, f);
     assert.doesNotMatch(csp, /upgrade-insecure-requests/, f);

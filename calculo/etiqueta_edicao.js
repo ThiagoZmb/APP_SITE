@@ -1,6 +1,7 @@
 // Edição de última hora das etiquetas da Zebra (volumes = nº de etiquetas por item, medidas e estado de destino geral). Funções puras, sem banco.
 // Os ajustes valem só para a impressão em curso: nada disso é gravado. O servidor valida aqui e monta o ZPL em
 // calculo/etiqueta_zpl.js; o texto digitado na tela nunca vai direto para a impressora.
+const { sanearZpl } = require('./etiqueta_zpl');
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 const QTD_MIN = 1;
 const QTD_MAX = 999;
@@ -72,6 +73,27 @@ function validarEdicao(corpo, itensDoPedido) {
   return { ok: true, uf, porItem, total };
 }
 
+// Etiquetas "Rio de Janeiro": corpo = { volumes (1 a 100, obrigatório), oc, consultor, nfe (textos opcionais) }.
+// Cada volume imprime um par, por isso o máximo de volumes é metade do teto de etiquetas.
+const RJ_MAX_VOLUMES = MAX_ETIQUETAS / 2;
+const RJ_TEXTOS = [['oc', 'OC', 30], ['consultor', 'Consultor', 30], ['nfe', 'NFe', 20]];
+
+// -> { ok: true, volumes, oc, consultor, nfe } | { ok: false, erro }   (textos já saneados; vazio = '')
+function validarRj(corpo) {
+  if (!ehObjeto(corpo)) return { ok: false, erro: 'Corpo inválido: envie um objeto com "volumes", "oc", "consultor" e "nfe".' };
+  const volumes = normalizarQtd(corpo.volumes);
+  if (!volumes || volumes > RJ_MAX_VOLUMES) return { ok: false, erro: `Volumes totais inválido: informe um número inteiro de ${QTD_MIN} a ${RJ_MAX_VOLUMES}.` };
+  const saida = { ok: true, volumes };
+  for (const [chave, rotulo, max] of RJ_TEXTOS) {
+    const v = corpo[chave] ?? '';
+    if (typeof v !== 'string') return { ok: false, erro: `${rotulo} inválido: envie um texto.` };
+    const t = sanearZpl(v).replace(/\s+/g, ' ').trim();
+    if (t.length > max) return { ok: false, erro: `${rotulo} muito longo: use até ${max} caracteres.` };
+    saida[chave] = t;
+  }
+  return saida;
+}
+
 // medida legível: número positivo de até 5 dígitos inteiros, com no máximo 2 decimais (vírgula ou ponto); o resto não é sugerido
 function numeroLegivel(v) {
   const s = String(v ?? '').trim();
@@ -92,4 +114,4 @@ function sugerirMedidas(linhas) {
   return distintas.size === 1 ? [...distintas][0] : '';
 }
 
-module.exports = { UFS, QTD_MIN, QTD_MAX, MAX_ETIQUETAS, MEDIDAS_MAX, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, sugerirMedidas };
+module.exports = { UFS, QTD_MIN, QTD_MAX, MAX_ETIQUETAS, MEDIDAS_MAX, RJ_MAX_VOLUMES, normalizarUf, normalizarQtd, normalizarMedidas, validarEdicao, validarRj, sugerirMedidas };

@@ -1,0 +1,234 @@
+<!doctype html>
+<!--
+  BAIXA DE EPIs - arquivo único (HTML + CSS + JS), sem dependências e sem internet.
+  Abrir: dois cliques no arquivo, ou "Open with Live Server" no VS Code.
+  Dados: salvos no navegador (localStorage, chave "baixa_epis_v1"). Use Backup/Restaurar para levar os dados.
+  Integrar ao seu programa: copie o <style>, o conteúdo do <body> e o <script>. Toda a persistência está em
+  criarBanco() (collection/doc/exportar/importar): troque só ela se quiser usar sua API ou banco de dados.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baixa de EPIs</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1a1d23;--mu:#6b7280;--bd:#e1e4ea;--ac:#d9480f;--acx:#fff;--bad:#c92a2a;--ok:#2b8a3e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161a;--card:#1e2127;--tx:#e8eaed;--mu:#9aa0aa;--bd:#2e323b;--ac:#ff8a4c;--acx:#1a1a1a;--bad:#ff6b6b;--ok:#69db7c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14161a;--card:#1e2127;--tx:#e8eaed;--mu:#9aa0aa;--bd:#2e323b;--ac:#ff8a4c;--acx:#1a1a1a;--bad:#ff6b6b;--ok:#69db7c;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 Arial,Helvetica,sans-serif}
+.w{max-width:860px;margin:0 auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:20px;margin:4px 0}h2{font-size:16px;margin:0 0 10px}
+#st{font-size:12px;color:var(--mu)}
+nav{display:flex;gap:6px;overflow-x:auto;margin:10px 0}
+nav button{flex:0 0 auto;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+nav button.on{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:bold}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
+label{display:block;margin-bottom:10px;font-size:13px;color:var(--mu)}
+input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit;margin-top:4px}
+.row{display:flex;flex-wrap:wrap;gap:8px}.row input{flex:1 1 140px;margin:0}
+button{font:inherit;padding:8px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+button.pri{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:bold}
+button.dng{color:var(--bad);border-color:var(--bad)}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);white-space:nowrap}th{font-size:12px;color:var(--mu)}
+td input.sm{width:80px;display:inline-block;margin:0}
+.li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.mu{color:var(--mu)}small{font-size:12px;color:var(--mu)}.bad{color:var(--bad)}
+#toast{min-height:20px;color:var(--ok);font-size:13px;margin-bottom:6px}#toast.e{color:var(--bad)}
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
+.kpi b{display:block;font-size:26px}.kpi span{font-size:12px;color:var(--mu)}
+.hb{display:flex;align-items:center;gap:8px;margin:6px 0}.hb .lb{flex:0 0 120px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr{flex:1;background:var(--bg);border-radius:6px;height:14px}.tr i{display:block;height:100%;background:var(--ac);border-radius:6px}.tr i.bad{background:var(--bad)}
+.hb>b{flex:0 0 40px;text-align:right;font-size:13px}
+.vb{display:flex;align-items:flex-end;gap:10px;height:170px}.vb div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;font-size:12px}.vb i{width:100%;background:var(--ac);border-radius:6px 6px 0 0;min-height:2px}.vb span{color:var(--mu);margin-top:4px}
+input.ck{width:auto;margin:0;cursor:pointer}
+.bd{background:var(--bad);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px}
+button:hover{filter:brightness(1.1)}tr:hover td{background:var(--bg)}
+header>span{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="w">
+<header><h1>Baixa de EPIs</h1><span><button data-act="backup" title="Baixar cópia de segurança (.json)">Backup</button><button data-act="restaurar" title="Restaurar a partir de um backup">Restaurar</button><button data-act="tema" title="Alternar tema claro/escuro">◐ Tema</button><span id="st"></span><input type="file" id="fi" accept=".json" hidden></span></header>
+<nav id="nav"></nav>
+<div id="toast"></div>
+<main id="app"></main>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const byName=(a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR');
+const dt=t=>new Date(t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+const T=[['resumo','Resumo'],['baixa','Registrar baixa'],['estoque','Estoque'],['funcs','Funcionários'],['hist','Histórico']];
+let db,F=[],E=[],M=[],tab='resumo',hist={f:'',e:''},pend=false,armed=null,tt,sel=new Set(),qv='';
+
+function applyQ(){document.querySelectorAll('tr[data-s]').forEach(r=>r.style.display=r.dataset.s.includes(qv)?'':'none')}
+function nLow(){const s=stock();return E.filter(e=>(s[e.id]||0)<=(e.minimo||0)).length}
+const consumo=()=>{const u={},n=Date.now();M.forEach(m=>{if(m.tipo==='baixa'&&n-m.ts<=2592e6)u[m.epiId]=(u[m.epiId]||0)+m.qtd});return u};
+try{const t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(_){}
+const fn=id=>F.find(f=>f.id===id);
+const v=id=>document.getElementById(id)?.value.trim();
+function stock(){const s={};M.forEach(m=>{s[m.epiId]=(s[m.epiId]||0)+(m.tipo==='entrada'?m.qtd:-m.qtd)});return s}
+let lastErr=false;
+function toast(t,err=true){lastErr=err;const el=$('#toast');el.textContent=t;el.className=err?'e':'';clearTimeout(tt);tt=setTimeout(()=>el.textContent='',3500)}
+const who=m=>{const f=fn(m.funcId);return esc(m.funcNome||'-')+(f&&!f.ativo?' <small>(excluído)</small>':'')};
+const delbar=l=>l.length?`<div class="row" style="margin-bottom:8px"><button class="dng" data-act="delm" id="delbtn">Excluir selecionadas (${sel.size})</button></div>`:'';
+function tbl(l,del){return l.length?`<div class="sc"><table><tr>${del?'<th><input type="checkbox" class="ck" data-all="1" title="Selecionar todas">':''}<th>Data<th>Tipo<th>Funcionário<th>EPI<th>Qtd</tr>${l.map(m=>`<tr data-s="${esc(((m.funcNome||'')+' '+m.epiNome+' '+(m.epiCa||'')+' '+(m.obs||'')+' '+m.tipo+' '+dt(m.ts)).toLowerCase())}">${del?`<td><input type="checkbox" class="ck" data-id="${m.id}"${sel.has(m.id)?' checked':''}>`:''}<td>${dt(m.ts)}<td>${m.tipo==='baixa'?'Baixa':'Entrada'}<td>${m.tipo==='baixa'?who(m):'-'}<td>${esc(m.epiNome)}${m.epiCa?' <small>C.A. '+esc(m.epiCa)+'</small>':''}${m.obs?'<br><small>'+esc(m.obs)+'</small>':''}<td>${m.qtd}</tr>`).join('')}</table></div>`:'<p class="mu">Nada registrado ainda.</p>'}
+
+function vBaixa(){
+  const s=stock(),a=F.filter(f=>f.ativo).sort(byName),last=M.filter(m=>m.tipo==='baixa').slice(0,8);
+  return `<section class="card"><h2>Nova baixa</h2>
+  <label>Funcionário<select id="bf">${a.length?a.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join(''):'<option value="">Cadastre um funcionário primeiro</option>'}</select></label>
+  <label>EPI<select id="be">${E.length?E.map(e=>`<option value="${e.id}">${esc(e.nome)}${e.ca?' – C.A. '+esc(e.ca):''} (estoque: ${s[e.id]||0})</option>`).join(''):'<option value="">Cadastre um EPI primeiro</option>'}</select></label>
+  <label>Quantidade<input id="bq" type="number" min="1" value="1"></label>
+  <label>Observação (opcional)<input id="bo" maxlength="80" placeholder="Ex.: troca por desgaste"></label>
+  <button class="pri" data-act="baixa">Registrar baixa</button></section>
+  <section class="card"><h2>Últimas baixas</h2>${delbar(last)}${tbl(last,1)}</section>`}
+
+function vEstoque(){
+  const use=consumo();
+  const s=stock();
+  return `<section class="card"><h2>Novo EPI</h2><div class="row"><input id="en" placeholder="Nome (ex.: Luva nitrílica)"><input id="ec" inputmode="numeric" placeholder="Nº do C.A. (obrigatório)"><input id="ei" type="number" min="0" placeholder="Estoque inicial"><input id="em" type="number" min="0" placeholder="Mínimo"><button class="pri" data-act="addepi">Adicionar</button></div></section>
+  <section class="card"><h2>Estoque</h2>${E.length?`<input id="q" placeholder="Buscar EPI ou C.A." value="${esc(qv)}" style="margin-bottom:8px"><div class="sc"><table><tr><th>EPI<th>C.A.<th>Em estoque<th>Mínimo<th>Dura (est.)<th>Entrada</tr>${E.map(e=>{const q=s[e.id]||0,low=q<=(e.minimo||0);return `<tr data-s="${esc((e.nome+' '+(e.ca||'')).toLowerCase())}"><td>${esc(e.nome)}<td>${e.ca?esc(e.ca):'<small class="bad">sem C.A.</small>'}<td><b class="${low?'bad':''}">${q}</b>${low?' <small class="bad">baixo</small>':''}<td>${e.minimo||0}<td>${use[e.id]?Math.round(q/(use[e.id]/30))+' dias':'—'}<td><input class="sm" id="in-${e.id}" type="number" min="1" placeholder="Qtd"> <button data-act="entrada" data-id="${e.id}">+ Entrada</button> <button class="dng" data-act="dele" data-id="${e.id}">Excluir</button></tr>`}).join('')}</table></div>`:'<p class="mu">Cadastre o primeiro EPI.</p>'}</section>`}
+
+function vFuncs(){
+  const a=F.filter(f=>f.ativo).sort(byName),x=F.filter(f=>!f.ativo).sort(byName);
+  const n=id=>M.filter(m=>m.funcId===id&&m.tipo==='baixa').length;
+  const ul=id=>{const m=M.find(x=>x.funcId===id&&x.tipo==='baixa');return m?' · última: '+new Date(m.ts).toLocaleDateString('pt-BR'):''};
+  const li=(f,btns)=>`<div class="li"><span>${esc(f.nome)} <small>${n(f.id)} baixas${ul(f.id)}</small></span><span><button data-act="verhist" data-id="${f.id}">Histórico</button> ${btns}</span></div>`;
+  return `<section class="card"><h2>Novo funcionário</h2><div class="row"><input id="fnm" placeholder="Nome"><button class="pri" data-act="addf">Adicionar</button></div></section>
+  <section class="card"><h2>Ativos (${a.length})</h2>${a.length?a.map(f=>li(f,`<button class="dng" data-act="delf" data-id="${f.id}">Excluir</button>`)).join(''):'<p class="mu">Nenhum funcionário ativo.</p>'}</section>
+  ${x.length?`<section class="card"><h2>Excluídos <small>(histórico mantido)</small></h2>${x.map(f=>li(f,`<button data-act="restf" data-id="${f.id}">Restaurar</button>`)).join('')}</section>`:''}`}
+
+const histList=()=>M.filter(m=>(!hist.f||m.funcId===hist.f)&&(!hist.e||m.epiId===hist.e)&&(!hist.p||Date.now()-m.ts<=hist.p*864e5));
+const epiOpts=()=>{const o=[...E];M.forEach(m=>{if(m.epiId&&!o.some(x=>x.id===m.epiId))o.push({id:m.epiId,nome:m.epiNome,ativo:false})});return o};
+function vHist(){
+  const opt=(arr,sel,all)=>`<option value="">${all}</option>`+arr.map(o=>`<option value="${o.id}"${o.id===sel?' selected':''}>${esc(o.nome)}${o.ativo===false?' (excluído)':''}</option>`).join('');
+  const l=histList();
+  return `<section class="card"><h2>Histórico</h2><div class="row" style="margin-bottom:10px"><select id="hf" style="flex:1 1 160px;margin:0">${opt([...F].sort(byName),hist.f,'Todos os funcionários')}</select><select id="he" style="flex:1 1 160px;margin:0">${opt(epiOpts(),hist.e,'Todos os EPIs')}</select><select id="hp" style="flex:1 1 130px;margin:0">${[[0,'Todo o período'],[7,'Últimos 7 dias'],[30,'Últimos 30 dias'],[90,'Últimos 90 dias']].map(([d,t])=>`<option value="${d}"${(hist.p||0)===d?' selected':''}>${t}</option>`).join('')}</select></div><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar funcionário, EPI, C.A. ou observação" value="${esc(qv)}"><button data-act="csv">Exportar CSV</button></div>${delbar(l)}${tbl(l,1)}</section>`}
+
+function vResumo(){
+  const s=stock(),now=Date.now(),b=M.filter(m=>m.tipo==='baixa');
+  const sum=l=>l.reduce((a,m)=>a+m.qtd,0);
+  const low=E.filter(e=>(s[e.id]||0)<=(e.minimo||0));
+  const kpi=(n,l,c='')=>`<div class="kpi"><b class="${c}">${n}</b><span>${l}</span></div>`;
+  const hb=(rows,empty)=>{const mx=Math.max(1,...rows.map(r=>r[1]));return rows.length?rows.map(r=>`<div class="hb"><span class="lb" title="${r[0]}">${r[0]}</span><div class="tr"><i class="${r[2]||''}" style="width:${r[1]/mx*100}%"></i></div><b>${r[1]}</b></div>`).join(''):`<p class="mu">${empty}</p>`};
+  const top=(key,nm)=>{const o={};b.forEach(m=>{const k=m[key];if(!k)return;(o[k]=o[k]||{n:nm(m),q:0}).q+=m.qtd});return Object.values(o).sort((x,y)=>y.q-x.q).slice(0,6).map(x=>[esc(x.n),x.q])};
+  const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);ms.push({k:d.getFullYear()*12+d.getMonth(),l:d.toLocaleString('pt-BR',{month:'short'}).replace('.',''),q:0})}
+  b.forEach(m=>{const d=new Date(m.ts),x=ms.find(y=>y.k===d.getFullYear()*12+d.getMonth());if(x)x.q+=m.qtd});
+  const mx=Math.max(1,...ms.map(x=>x.q));
+  const nf=m=>(m.funcNome||'-')+(fn(m.funcId)?.ativo===false?' (excluído)':'');
+  return `<div class="kg">${kpi(sum(b),'unidades baixadas (total)')}${kpi(sum(b.filter(m=>now-m.ts<=2592e6)),'baixas nos últimos 30 dias')}${kpi(F.filter(f=>f.ativo).length,'funcionários ativos')}${kpi(low.length,'EPIs com estoque baixo',low.length?'bad':'')}</div>
+  ${low.length?`<section class="card"><b class="bad">Atenção:</b> estoque no mínimo ou abaixo em ${low.map(e=>esc(e.nome)).join(', ')}.</section>`:''}
+  <section class="card"><h2>Baixas por mês <small>(unidades, últimos 6 meses)</small></h2><div class="vb">${ms.map(x=>`<div><b>${x.q}</b><i style="height:${x.q/mx*120}px"></i><span>${x.l}</span></div>`).join('')}</div></section>
+  <section class="card"><h2>Baixas por funcionário <small>(top 6)</small></h2>${hb(top('funcId',nf),'Sem baixas ainda.')}</section>
+  <section class="card"><h2>Baixas por EPI <small>(top 6)</small></h2>${hb(top('epiId',m=>m.epiNome),'Sem baixas ainda.')}</section>
+  <section class="card"><h2>Estoque atual por EPI <small>(vermelho = no mínimo ou abaixo)</small></h2>${hb(E.map(e=>{const q=s[e.id]||0;return [esc(e.nome),q,q<=(e.minimo||0)?'bad':'']}),'Cadastre os EPIs na aba Estoque.')}</section>`;
+}
+function render(){
+  pend=false;
+  sel.forEach(id=>{if(!M.some(m=>m.id===id))sel.delete(id)});
+  $('#nav').innerHTML=T.map(([k,l])=>`<button data-tab="${k}" class="${k===tab?'on':''}">${l}${k==='estoque'&&nLow()?` <span class="bd">${nLow()}</span>`:''}</button>`).join('');
+  $('#app').innerHTML=({resumo:vResumo,baixa:vBaixa,estoque:vEstoque,funcs:vFuncs,hist:vHist})[tab]();applyQ();
+}
+function sched(){
+  const a=document.activeElement;
+  if(a&&$('#app').contains(a)&&/INPUT|SELECT/.test(a.tagName))pend=true;else render();
+}
+document.addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(pend&&!(a&&/INPUT|SELECT/.test(a.tagName)))render()},400));
+
+const add=(c,d)=>db.collection(c).add(d);
+const acts={
+  async baixa(){
+    const f=fn(v('bf')),e=E.find(x=>x.id===v('be')),q=parseInt(v('bq'));
+    if(!f||!e)return toast('Escolha o funcionário e o EPI.');
+    if(!(q>0))return toast('Quantidade inválida.');
+    if(q>(stock()[e.id]||0))return toast('Estoque insuficiente.');
+    await add('movs',{tipo:'baixa',epiId:e.id,epiNome:e.nome,epiCa:e.ca||'',funcId:f.id,funcNome:f.nome,obs:v('bo')||'',qtd:q,ts:Date.now()});
+    toast('Baixa registrada.',false);
+  },
+  async addf(){
+    const n=v('fnm');if(!n)return toast('Digite o nome.');
+    if(F.some(f=>f.ativo&&f.nome.toLowerCase()===n.toLowerCase()))return toast('Esse funcionário já existe.');
+    await add('funcs',{nome:n,ativo:true,criadoEm:Date.now()});
+  },
+  async delf(id){await db.doc('funcs/'+id).update({ativo:false,excluidoEm:Date.now()});toast('Funcionário excluído. O histórico foi mantido.',false)},
+  async restf(id){await db.doc('funcs/'+id).update({ativo:true})},
+  backup(){baixarArq('backup-epis-'+new Date().toISOString().slice(0,10)+'.json',db.exportar(),'application/json');toast('Backup baixado.',false)},
+  restaurar(){$('#fi').click()},
+  async csv(){const x=s=>{s=String(s??'');if(/^[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};const rows=[['Data','Tipo','Funcionário','EPI','C.A.','Qtd','Observação'],...histList().map(m=>[dt(m.ts),m.tipo==='baixa'?'Baixa':'Entrada',m.funcNome||'',m.epiNome,m.epiCa||'',m.qtd,m.obs||''])];baixarArq('historico-epis.csv','\ufeff'+rows.map(r=>r.map(x).join(';')).join('\r\n'),'text/csv;charset=utf-8')},
+  async tema(){const r=document.documentElement,dk=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dk?'light':'dark';try{localStorage.setItem('tema',r.dataset.theme)}catch(_){}},
+  async delm(){const ids=[...sel],s=stock();ids.forEach(id=>{const m=M.find(x=>x.id===id);if(m)s[m.epiId]=(s[m.epiId]||0)+(m.tipo==='entrada'?-m.qtd:m.qtd)});const bad=E.find(e=>(s[e.id]||0)<0);if(bad)return toast('Não dá para excluir: o estoque de '+bad.nome+' ficaria negativo.');await Promise.all(ids.map(id=>db.doc('movs/'+id).delete()));sel.clear();toast(ids.length+(ids.length>1?' registros excluídos':' registro excluído')+'. O estoque foi atualizado.',false)},
+  async dele(id){const ids=M.filter(m=>m.epiId===id).map(m=>m.id);await Promise.all(ids.map(x=>db.doc('movs/'+x).delete()));await db.doc('epis/'+id).delete();toast('EPI excluído do estoque junto com o histórico dele ('+ids.length+' registros).',false)},
+  verhist(id){hist={f:id,e:''};tab='hist';sel.clear()},
+  async addepi(){
+    const n=v('en'),ca=v('ec'),i=parseInt(v('ei'))||0,m=parseInt(v('em'))||0;
+    if(!n)return toast('Digite o nome do EPI.');
+    if(!/^\d{1,7}$/.test(ca))return toast('Informe o número do C.A. (somente números).');
+    if(E.some(e=>e.nome.toLowerCase()===n.toLowerCase()))return toast('Esse EPI já existe.');
+    const r=await add('epis',{nome:n,ca:ca,minimo:m,criadoEm:Date.now()});
+    if(i>0)await add('movs',{tipo:'entrada',epiId:r.id,epiNome:n,epiCa:ca,qtd:i,ts:Date.now()});
+  },
+  async entrada(id){
+    const e=E.find(x=>x.id===id),q=parseInt(v('in-'+id));
+    if(!e||!(q>0))return toast('Informe a quantidade da entrada.');
+    await add('movs',{tipo:'entrada',epiId:id,epiNome:e.nome,epiCa:e.ca||'',qtd:q,ts:Date.now()});
+    toast('Entrada registrada.',false);
+  }
+};
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tab){tab=b.dataset.tab;sel.clear();return render()}
+  const a=b.dataset.act,id=b.dataset.id;if(!a||!db)return;
+  const key=a+(id||'');if(a==='delm'&&!sel.size)return toast('Selecione ao menos um registro.');if(/^del[fme]$/.test(a)&&armed!==key){armed=key;const t=b.textContent;b.textContent=a==='dele'?'Apagar EPI e histórico?':'Confirmar?';setTimeout(()=>{armed=null;if(b.isConnected)b.textContent=a==='delm'?`Excluir selecionadas (${sel.size})`:t},4000);return}
+  armed=null;
+  lastErr=false;
+  try{await acts[a](id)}catch(x){toast('Erro: '+(x.message||x))}
+  if(!lastErr)render();
+});
+document.addEventListener('input',e=>{if(e.target.id==='q'){qv=e.target.value.toLowerCase();applyQ()}});
+document.addEventListener('change',e=>{
+  if(e.target.classList.contains('ck')){const t=e.target;if(t.dataset.all){document.querySelectorAll('input.ck[data-id]').forEach(c=>{c.checked=t.checked;t.checked?sel.add(c.dataset.id):sel.delete(c.dataset.id)})}else{t.checked?sel.add(t.dataset.id):sel.delete(t.dataset.id)}const d=$('#delbtn');if(d)d.textContent=`Excluir selecionadas (${sel.size})`}
+  if(e.target.id==='hf'){hist.f=e.target.value;sel.clear();render()}
+  if(e.target.id==='he'){hist.e=e.target.value;sel.clear();render()}
+  if(e.target.id==='hp'){hist.p=+e.target.value;sel.clear();render()}
+});
+
+/* ===== ARMAZENAMENTO LOCAL (localStorage) - troque só esta parte para usar outro banco ===== */
+const CHAVE='baixa_epis_v1';
+function criarBanco(){
+  let dados;try{dados=JSON.parse(localStorage.getItem(CHAVE))||{}}catch(_){dados={}}
+  const subs={},col=c=>dados[c]||(dados[c]={});
+  const snap=c=>({docs:Object.entries(col(c)).map(([id,v])=>({id,data:()=>({...v})}))});
+  const emit=c=>(subs[c]||[]).forEach(f=>f(snap(c)));
+  const salvar=()=>{try{localStorage.setItem(CHAVE,JSON.stringify(dados))}catch(_){toast('Não foi possível salvar neste navegador.')}};
+  const novoId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  return{
+    collection:c=>({
+      async add(d){const id=novoId();col(c)[id]=d;salvar();emit(c);return{id}},
+      onSnapshot(f){(subs[c]=subs[c]||[]).push(f);setTimeout(()=>f(snap(c)))}
+    }),
+    doc:p=>{const[c,id]=p.split('/');return{
+      async update(d){if(col(c)[id]){Object.assign(col(c)[id],d);salvar();emit(c)}},
+      async delete(){delete col(c)[id];salvar();emit(c)}}},
+    exportar:()=>JSON.stringify(dados),
+    importar(t){const d=JSON.parse(t);if(!d||typeof d!=='object'||Array.isArray(d))throw new Error('inválido');dados=d;salvar();['funcs','epis','movs'].forEach(emit)}
+  };
+}
+function baixarArq(nome,texto,tipo){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([texto],{type:tipo}));a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+db=criarBanco();
+$('#st').textContent='Dados salvos neste navegador';
+let first=true;
+const sub=(c,set)=>db.collection(c).onSnapshot(s=>{set(s.docs.map(d=>({id:d.id,...d.data()})));if(first){first=false;render()}else sched()});
+sub('funcs',x=>F=x);
+sub('epis',x=>E=x.sort(byName));
+sub('movs',x=>M=x.sort((a,b)=>b.ts-a.ts));
+$('#fi').addEventListener('change',async e=>{const a=e.target.files[0];e.target.value='';if(!a)return;try{db.importar(await a.text());toast('Backup restaurado.',false)}catch(_){toast('Arquivo de backup inválido.')}});
+</script>
+</body>
+</html>
