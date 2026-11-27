@@ -1,6 +1,6 @@
 # EPIs: entrega, estoque e foto da ficha assinada (projeto)
 
-Data: 2026-11-27. Situação: aguardando aprovação do dono.
+Data: 2026-11-27. Situação: aprovado pelo dono em 2026-11-27.
 
 ## Para que serve
 
@@ -60,7 +60,7 @@ Quem registra entregas precisa escolher o funcionário sem ter `funcionarios.ver
 - Foto reduzida no aparelho antes do envio; o servidor aceita JPEG ou PNG de até 1 MB, como nas entregas.
 - Entrega cancelada não pode ser reaberta nem receber foto.
 - O nome do funcionário, do EPI e o C.A. são copiados para a entrega: mudar o cadastro depois não altera o histórico.
-- O arquivo `epi.html` sai da raiz quando a tela nova estiver pronta (ele nunca foi para o git; se quiser guardá-lo, movo para fora do projeto).
+- O arquivo `epi.html` sai da raiz quando a tela nova estiver pronta (foi incluído no git em 2026-11-27, então continua recuperável pelo histórico).
 
 ## Como se encaixa no código
 

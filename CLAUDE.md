@@ -24,6 +24,7 @@ Funcionalidades (páginas HTML na raiz):
 - **Balão do calendário de Entregas** lista os itens do pedido (`rotas/pedido_itens.js`, `textoItens` em `entregas_comum.js`; `GET /entregas` devolve `itens`/`qtdItens`, sem dinheiro). Regras em `docs/regras/entregas.md`.
 - **Checklist externo de entregas** (`entrega_checklist.js`, `rotas/entrega_checklist.js`, `calculo/entrega_checklist.js`, `pdf/entrega_checklist.js`): folha "CHECKLIST EXTERNO – ENTREGAS" em PDF de uma página, gerada no servidor por entrega (automática ou com a edição salva em `web_entrega_checklist`) ou em branco; botão no detalhe da entrega, "Folha em branco" no topo de Entregas e no cartão do motorista. Permissão `entregas.checklist`. Regras na seção 5, "Entregas".
 - **Fornecedores e funcionários** (`fornecedores.html`, `funcionarios.html`, `rotas/fornecedores.js`, `rotas/funcionarios.js`): cadastros das tabelas do VB `cadastro_fornecedores` e `funcionarios`, com busca e CEP (ViaCEP). Regras na seção 5, "Cadastros".
+- **EPIs** (`epis.html`, `epis.js`, `rotas/epis.js`, `calculo/epis.js`; menu Gestão, abaixo de Funcionários): entrega de EPI a funcionário (vários EPIs, foto da ficha assinada), estoque próprio, histórico com CSV e Resumo atrás do olho; tabelas `web_epi*`, o cadastro de funcionários é só lido. Permissões `epi.ver/registrar/gerir` (só o Administrador no início). Regras na seção 5, "EPIs". **Tela verificada só no Edge headless com banco simulado.**
 - **Tintas** (`tintas.html`, `tintas.js`, `rotas/tintas.js`): cadastro da tabela do VB `tintas` (fabricante, classe, tipo, conjunto, cor, valor, % da mistura, rendimento), com busca, cor e exclusão. Regras na seção 5, "Tintas".
 - **Notas fiscais sem itens** (`notas_fiscais.html`, `notas_fiscais.js`, `rotas/notas_fiscais.js`, `calculo/notas_fiscais.js`): registro de notas de entrada (fornecedor) e de saída (cliente) só pelo cabeçalho, em tabela própria `web_notas_fiscais`; não mexe em estoque, caixa nem tabelas do VB. Regras na seção 5, "Notas fiscais".
 - **Central de Gestão, entrega 1** (`gestao.html`, `gestao.js`, `rotas/gestao.js`, `calculo/gestao_caixa.js`): metas de faturamento e despesa por mês, caixa realizado x previsto, orçamento por categoria, comparativos e alertas calculados na hora. Só lê o VB. Regras na seção 5, "Gestão".
@@ -72,6 +73,7 @@ rotas/                   Módulos de rotas registrados pelo index.js
   custos.js              Formação de preço, parte A (custos dos materiais)
   precos_formacao.js     Formação de preço, partes B+C (grava VALOR_FIXO, com histórico/desfazer)
   fornecedores.js / funcionarios.js   Cadastros de fornecedores e de funcionários (rotas; validação em calculo/cadastros.js e calculo/documentos.js = CPF/CNPJ)
+  epis.js                EPIs: /epis (catálogo, entrada), /epis/entregas (registrar, cancelar, fotos), /epis/funcionarios (só código e nome) e /epis/resumo (validação e contas em calculo/epis.js)
   minha_semana.js        Minha semana: GET/POST /minha_semana, PUT/DELETE /minha_semana/:id (mover, categoria e `escopo` da série), POST /minha_semana/:id/repetir e /minha_semana/categorias(/:id) (só login; sempre pelo usuário do token; validação em calculo/minha_semana.js)
   semana_admin.js        Semana compartilhada: GET/POST /semana_admin, PUT/DELETE /semana_admin/:id com versão (e `escopo` da série), POST /semana_admin/:id/repetir e /semana_admin/categorias(/:id) (tarefas_admin.usar)
   alarmes.js             Alarmes das duas semanas: GET /alarmes, POST /alarmes/:origem/:id/ok e /adiar (validação em calculo/alarmes.js)
@@ -142,6 +144,7 @@ agenda_comum.js          Parte nova comum às duas agendas: paleta de categorias
 alarmes.js               Janela dos alarmes em qualquer tela (carregado pelo layout.js)
 etapas_producao.html/.js/.css   Tela das etapas de produção (tabela de botões-estado; cartões no celular; menu próprio no botão direito/Shift+F10/"⋯")
 entregas.html/.js, entregas_comum.js, minhas_entregas.html/.js   Telas da equipe e do motorista (entregas_comum.js = rótulos e helpers compartilhados)
+epis.html/.js            Tela de EPIs (registrar entrega, histórico, estoque, resumo)
 baixa_qr.html/.js        Tela do celular: câmera + jsQR, cartão do item, quantidade e "Dar baixa" (lógica pura testada no Node)
 etiquetas_qr.html/.js    Folha de etiquetas com QR para imprimir (itens ativos com código de barras)
 vendor/                  Bibliotecas de terceiros copiadas (sem build): jsQR.js 1.4.0 (Apache-2.0) e qrcode.js 1.4.4 (MIT); ver vendor/LEIA-ME.txt
@@ -245,6 +248,10 @@ Data = `ped_orc.DATA_PRONTO` (só Pedido); "em aberto" = tudo menos Entregue/Ret
 ### Cadastros (fornecedores e funcionários)
 Fornecedores (a razão social não muda depois de criada) e funcionários (SENHA e NIVEL do VB nunca saem; salário só com `valores.ver`).
 > Regras completas: `docs/regras/cadastros.md` (ler antes de mexer neste módulo).
+
+### EPIs (tabelas `web_epi*`)
+Estoque = entradas − itens de entregas não canceladas, nunca negativo (a entrega trava os EPIs em ordem de id como primeira leitura); nada é apagado (cancelar entrega, desativar EPI, ocultar foto); nome do funcionário, EPI e C.A. copiados; funcionários só lidos (`SITUACAO = 'Ativo'`); chave por envio; Resumo exige `administrativo.ver`.
+> Regras completas: `docs/regras/epis.md` (ler antes de mexer neste módulo).
 
 ### Tintas (tabela do VB `tintas`)
 Tabela do VB `tintas`; RENDIMENTO é texto com vírgula; cor em ARGB; o fabricante precisa existir em `cadastro_fornecedores`.

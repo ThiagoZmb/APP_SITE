@@ -19,7 +19,7 @@ const { bcryptLimitado, ErroOcupado, responderOcupado } = require('./seguranca/l
 const { chaveAdminConfere, limitadorAdmin } = require('./seguranca/chave_admin');
 const { redeDeValores, semValores, preservarValores, podeVerValores } = require('./seguranca/valores');
 const { filtroEstados } = require('./seguranca/acesso');
-const { acrescentarPermissoesCompras, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, acrescentarPermissoesProdutosDependencias, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesTarefasAdmin } = require('./seguranca/instalacao');
+const { acrescentarPermissoesCompras, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, acrescentarPermissoesProdutosDependencias, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, acrescentarPermissoesTintas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe, acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesGestao, acrescentarPermissoesCorte, acrescentarPermissoesAtendimento, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesTarefasAdmin, acrescentarPermissoesEpi } = require('./seguranca/instalacao');
 const { limparPortal } = require('./portal/limpeza');
 const { criarMedidor } = require('./desempenho/medidor');
 const { lerConfigPortal, avisarPortalDesativado } = require('./portal/config');
@@ -75,6 +75,7 @@ const { criarDisparador: criarMarcadorAtrasados } = require('./rotas/recebimento
 const { registrarCorte } = require('./rotas/corte');
 const { registrarCorteVidros } = require('./rotas/corte_vidros');
 const { registrarFuncionarios } = require('./rotas/funcionarios');
+const { registrarEpis } = require('./rotas/epis');
 const { registrarCustos } = require('./rotas/custos');
 const { registrarPrecosFormacao } = require('./rotas/precos_formacao');
 const { registrarEtiquetas } = require('./rotas/etiquetas');
@@ -1869,6 +1870,7 @@ registrarTotalPeriodo({ rota: registro.rota, pool });
 registrarEtapasProducao({ rota: registro.rota, pool });
 registrarFornecedores({ rota: registro.rota, pool });
 registrarFuncionarios({ rota: registro.rota, pool });
+registrarEpis({ rota: registro.rota, pool });
 registrarTintas({ rota: registro.rota, pool });
 registrarPesos({ rota: registro.rota, pool });
 registrarDanfe({ rota: registro.rota, pool, foraDosEstados });
@@ -1943,6 +1945,7 @@ async function iniciar() {
   if ((await acrescentarPermissoesPedidosAcoes(pool)).feito) console.log('[permissões] pedidos.data_pronto (de pedidos.situacao) e pedidos.desconto (de orcamentos.criar) acrescentadas');
   if ((await acrescentarPermissoesCompras(pool)).feito) console.log('[permissões] compras.ver e compras.criar concedidas a quem tem estoque.editar');
   if ((await acrescentarPermissoesTarefasAdmin(pool)).feito) console.log('[permissões] tarefas_admin.usar acrescentada ao Administrador');
+  if ((await acrescentarPermissoesEpi(pool)).feito) console.log('[permissões] epi.ver, epi.registrar e epi.gerir acrescentadas ao Administrador');
   await garantirAdministrador(pool, { adminInicial: process.env.WEB_ADMIN_INICIAL || '' });
   // retenção do portal do cliente: na subida e a cada 24 h (nunca nos testes); falha só é registrada, sem detalhe do banco
   if (process.env.NODE_ENV !== 'test') {

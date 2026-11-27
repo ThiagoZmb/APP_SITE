@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://elegance-backend-hrho.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegance Dashboard - EPIs</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* variáveis de cor, sombra e raio: tema.css (DESIGN.md) */
+        [hidden] { display: none !important; }
+        body { color: var(--text-dark); min-height: 100vh; padding: 20px; }
+        .container {
+            display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: 80px 1fr; grid-template-areas: "header header" "sidebar main";
+            min-height: calc(100vh - 40px); background: var(--white); border-radius: 20px; box-shadow: var(--shadow-heavy); overflow: hidden;
+        }
+        header { grid-area: header; background: var(--gradient-primary); color: var(--on-primary); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; box-shadow: var(--shadow-medium); }
+        .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        .logo::before { content: "◆"; font-size: 24px; opacity: 0.8; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-radius: 50px; background: rgba(255,255,255,0.1); }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
+        .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+        .user-cargo { font-size: 11px; opacity: 0.8; }
+        .sidebar { grid-area: sidebar; padding: 30px 0; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .menu-title { color: var(--text-light); margin: 0 30px 25px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .menu-item { padding: 15px 30px; margin: 0 20px 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; color: var(--text-dark); text-decoration: none; }
+        .menu-item.active { background: var(--gradient-primary); color: var(--on-primary); box-shadow: var(--shadow-medium); }
+        main { grid-area: main; padding: 40px; overflow-y: auto; min-width: 0; }
+        .welcome-title { font-size: 36px; margin-bottom: 8px; font-weight: 700; }
+        .welcome-subtitle { font-size: 16px; color: var(--text-light); margin-bottom: 24px; }
+
+        .abas { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }
+        body .epi-abas.abas { padding: 0 !important; }
+        .aba { border: none; background: none; min-height: 44px; cursor: pointer; white-space: nowrap; }
+        .contagem { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); }
+        .abas .olho-resumos { margin-left: auto; order: 9; }
+
+        .painel { background: var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 16px; min-width: 0; }
+        .painel h2 { font-size: 17px; margin-bottom: 12px; }
+        .painel h3 { font-size: 13px; color: var(--text-light); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+        .form-group { margin-bottom: 12px; min-width: 0; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea, .campo { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; font-size: 15px; color: var(--text-dark); background: var(--bg); border: 1px solid var(--border-control); border-radius: 6px; }
+        .linha2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 760px; }
+        .estreito { max-width: 760px; }
+        .epi-linha { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; margin-bottom: 8px; max-width: 760px; align-items: center; }
+        .rotulo { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-mid); }
+        .grade-epi { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: end; }
+        .grade-epi .form-group { margin-bottom: 0; }
+        .filtros { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .filtros .campo { width: auto; flex: 1 1 170px; }
+        .marcar { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; font-size: 14px; cursor: pointer; }
+        .cinza { color: var(--text-light); font-size: 12.5px; }
+        .erro-form { color: var(--danger-fg); font-size: 13px; min-height: 18px; margin: 4px 0; }
+        .vazio { text-align: center; padding: 32px; color: var(--text-light); }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { text-align: left; }
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        /* textos longos quebram linha (o tema deixa a célula em uma linha só) */
+        body tbody td.quebra { white-space: normal; max-width: 320px; min-width: 130px; overflow: visible; }
+        .botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+        .motivo { color: var(--danger-fg); font-size: 12.5px; margin-top: 2px; }
+        .entrada-epi { display: inline-flex; gap: 6px; align-items: center; }
+        .entrada-epi .curto { width: 84px; }
+        b.baixo { color: var(--warning-fg); }
+
+        .cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        .cartao { border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; background: var(--white); }
+        .cartao span { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-light); text-transform: uppercase; }
+        .cartao b { font-family: var(--font-mono); font-size: 17px; }
+        .aviso-pendente { background: var(--selo-aviso-bg); color: var(--selo-aviso-fg); border: 1px solid var(--warning-borda); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+        .hb { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+        .hb-nome { flex: 0 0 160px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hb-trilho { flex: 1; background: var(--bg); border-radius: 6px; height: 12px; }
+        .hb-trilho i { display: block; height: 100%; background: var(--primary-color); border-radius: 6px; }
+        .hb-trilho i.baixo { background: var(--warning-color); }
+        .hb b { flex: 0 0 48px; text-align: right; font-family: var(--font-mono); font-size: 13px; }
+        .vb { display: flex; align-items: flex-end; gap: 10px; height: 170px; max-width: 640px; }
+        .vb div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: 12px; }
+        .vb i { width: 100%; min-height: 2px; background: var(--primary-color); border-radius: 6px 6px 0 0; }
+        .vb span { color: var(--text-light); margin-top: 4px; }
+        .vb b { font-family: var(--font-mono); }
+
+        dialog { margin: auto; width: min(520px, calc(100vw - 24px)); color: var(--text-dark); }
+        #fotos-corpo figure { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+        #fotos-corpo img { max-width: 100%; border: 1px solid var(--border-color); border-radius: 6px; }
+        #fotos-corpo figcaption { font-size: 12px; color: var(--text-light); }
+
+        .btn { padding: 11px 18px; border: none; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+        .btn-primary { background: var(--gradient-primary); color: var(--on-primary); }
+        .btn-secondary { background: var(--secondary-color); color: var(--text-dark); border: 1px solid var(--border-color); }
+        .btn-perigo { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
+        .btn-mini { padding: 8px 12px; min-height: 36px; font-size: 13px; white-space: nowrap; }
+        .btn:disabled { opacity: .6; cursor: wait; }
+
+        #toasts { position: fixed; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .toast { min-width: 260px; max-width: min(380px, calc(100vw - 32px)); padding: 14px 18px; border-radius: 8px; color: white; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-heavy); }
+        .toast.ok { background: var(--success-color); }
+        .toast.erro { background: var(--danger-color); }
+        .toast.info { background: var(--text-dark); }
+
+        /* celular: cada linha das tabelas vira um cartão, com os botões à vista (o cabeçalho dá lugar ao rótulo de cada campo) */
+        @media (max-width: 640px) {
+            body .empilha thead { display: none; }
+            body .empilha table, body .empilha tbody, body .empilha tr, body .empilha tbody td { display: block; width: auto; }
+            body .empilha tr { border-bottom: 1px solid var(--border-strong); padding: 8px 0; }
+            body .empilha tbody td { white-space: normal; max-width: none; min-width: 0; text-align: left; border: 0 !important; padding: 4px 8px !important; overflow: visible; }
+            body .empilha td[data-rot]::before { content: attr(data-rot); display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-light); }
+            body .empilha td:empty { display: none; }
+            .tabela-wrap.empilha { max-height: none; }
+        }
+        @media (max-width: 1000px) { .grade-epi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { grid-template-columns: minmax(0, 1fr); grid-template-areas: "header" "main"; border-radius: 0; }
+            .sidebar { display: none; }
+            header { padding: 0 16px; }
+            .user-info { display: none; }
+            main { padding: 20px 16px; }
+            .welcome-title { font-size: 26px; }
+            .painel { padding: 14px; }
+            .linha2, .grade-epi { grid-template-columns: minmax(0, 1fr); }
+            .epi-linha { grid-template-columns: minmax(0, 1fr) 70px auto; }
+            .hb-nome { flex-basis: 104px; }
+        }
+    </style>
+    <link rel="stylesheet" href="camera_captura.css?v=202611271000">
+    <link rel="stylesheet" href="tema.css?v=202612041000">
+    <script src="olho_resumos.js?v=202611191200"></script>
+    <script src="situacoes.js?v=202612051000"></script>
+    <script src="layout.js?v=202612061100" defer></script>
+    <script src="entregas_comum.js?v=202611201000" defer></script>
+    <script src="camera_captura.js?v=202611271000" defer></script>
+    <script src="epis.js?v=202612061100" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo" id="user-empresa"></div>
+            <div class="user-profile">
+                <div class="user-avatar" id="user-avatar">E</div>
+                <div class="user-info">
+                    <span id="user-name">Usuário</span>
+                    <span class="user-cargo" id="user-cargo"></span>
+                </div>
+            </div>
+        </header>
+        <nav class="sidebar">
+            <div class="menu-title">Menu Principal</div>
+        </nav>
+        <main>
+            <h1 class="welcome-title">EPIs</h1>
+            <p class="welcome-subtitle">Entrega de equipamentos de proteção, estoque e foto da ficha assinada.</p>
+
+            <div class="abas epi-abas" role="tablist" data-olho-destino>
+                <button type="button" class="aba" role="tab" data-aba="registrar" data-perm="epi.registrar">Registrar entrega</button>
+                <button type="button" class="aba" role="tab" data-aba="historico">Histórico</button>
+                <button type="button" class="aba" role="tab" data-aba="estoque">Estoque <span class="contagem" id="qtd-baixo" title="EPIs no estoque mínimo ou abaixo" hidden></span></button>
+                <button type="button" class="aba" role="tab" data-aba="resumo" data-perm="administrativo.ver" data-resumo>Resumo</button>
+            </div>
+
+            <div id="aba-registrar" data-perm="epi.registrar" hidden>
+                <section class="painel">
+                    <h2>Nova entrega</h2>
+                    <form id="form-entrega" novalidate>
+                        <div class="linha2">
+                            <div class="form-group"><label for="r-funcionario">Funcionário</label><select id="r-funcionario"><option value="">Carregando…</option></select></div>
+                            <div class="form-group"><label for="r-data">Data da entrega</label><input type="date" id="r-data" min="2000-01-01"></div>
+                        </div>
+                        <span class="rotulo">EPIs e quantidades</span>
+                        <div id="r-itens"></div>
+                        <p class="form-group"><button type="button" class="btn btn-secondary btn-mini" id="r-mais">+ Outro EPI</button></p>
+                        <div class="form-group estreito"><label for="r-obs">Observação (opcional)</label><input id="r-obs" maxlength="200" placeholder="Ex.: troca por desgaste"></div>
+                        <div class="form-group estreito"><label for="r-fotos">Foto da ficha assinada (opcional, pode anexar depois)</label><input type="file" id="r-fotos" accept="image/*" multiple></div>
+                        <p class="erro-form" id="r-erro" role="alert"></p>
+                        <button type="submit" class="btn btn-primary" id="r-salvar">Registrar entrega</button>
+                    </form>
+                </section>
+                <section class="painel">
+                    <h2>Últimas entregas registradas</h2>
+                    <div class="tabela-wrap empilha" id="r-ultimas"><p class="vazio">Carregando…</p></div>
+                </section>
+            </div>
+
+            <div id="aba-historico" hidden>
+                <section class="painel">
+                    <h2>Histórico</h2>
+                    <div class="filtros">
+                        <select class="campo" id="h-funcionario" aria-label="Funcionário"><option value="">Todos os funcionários</option></select>
+                        <select class="campo" id="h-epi" aria-label="EPI"><option value="">Todos os EPIs</option></select>
+                        <select class="campo" id="h-periodo" aria-label="Período"><option value="0">Todo o período</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365">Último ano</option></select>
+                        <label class="marcar"><input type="checkbox" id="h-semfoto"> Sem foto</label>
+                    </div>
+                    <div class="filtros">
+                        <input class="campo" type="search" id="h-busca" data-foco-busca placeholder="Buscar funcionário, EPI, C.A. ou observação" aria-label="Buscar no histórico">
+                        <button type="button" class="btn btn-secondary" id="h-csv">Exportar CSV</button>
+                    </div>
+                    <p class="cinza" id="h-qtd"></p>
+                    <div class="tabela-wrap empilha" id="h-lista"><p class="vazio">Carregando…</p></div>
+                </section>
+            </div>
+
+            <div id="aba-estoque" hidden>
+                <section class="painel" data-perm="epi.gerir">
+                    <h2>Novo EPI</h2>
+                    <form id="form-epi" class="grade-epi" novalidate>
+                        <div class="form-group"><label for="n-nome">Nome</label><input id="n-nome" maxlength="80" placeholder="Ex.: Luva nitrílica" autocomplete="off"></div>
+                        <div class="form-group"><label for="n-ca">Nº do C.A.</label><input id="n-ca" maxlength="7" inputmode="numeric" placeholder="Obrigatório" autocomplete="off"></div>
+                        <div class="form-group"><label for="n-inicial">Estoque inicial</label><input type="number" id="n-inicial" min="0" step="1" inputmode="numeric"></div>
+                        <div class="form-group"><label for="n-minimo">Mínimo</label><input type="number" id="n-minimo" min="0" step="1" inputmode="numeric"></div>
+                        <button type="submit" class="btn btn-secondary">Adicionar</button>
+                    </form>
+                </section>
+                <section class="painel">
+                    <h2>Estoque</h2>
+                    <div class="filtros"><input class="campo" type="search" id="e-busca" placeholder="Buscar EPI ou C.A." aria-label="Buscar EPI ou C.A."></div>
+                    <div class="tabela-wrap empilha" id="e-lista"><p class="vazio">Carregando…</p></div>
+                </section>
+            </div>
+
+            <div id="aba-resumo" data-perm="administrativo.ver" data-resumo hidden>
+                <section class="painel" id="resumo-corpo"><p class="vazio">Carregando…</p></section>
+            </div>
+        </main>
+    </div>
+    <input type="file" id="arquivo-foto" accept="image/*" multiple hidden>
+
+    <dialog class="dlg-padrao" id="dlg-fotos" aria-labelledby="fotos-titulo">
+        <div class="dlg-cab"><h3 id="fotos-titulo">Fotos</h3></div>
+        <div class="dlg-corpo" id="fotos-corpo"></div>
+        <div class="dlg-rodape"><button type="button" class="btn btn-secondary" data-fechar>Fechar</button></div>
+    </dialog>
+
+    <dialog class="dlg-padrao" id="dlg-cancelar" aria-labelledby="c-titulo">
+        <form id="form-cancelar">
+            <div class="dlg-cab"><h3 id="c-titulo">Cancelar entrega</h3><p id="c-quem"></p><p>As unidades voltam ao estoque. A entrega continua no histórico, com as fotos, e não pode ser reaberta.</p></div>
+            <div class="dlg-corpo"><div class="form-group"><label for="c-motivo">Motivo</label><textarea id="c-motivo" maxlength="200" rows="3"></textarea></div><p class="erro-form" id="c-erro" role="alert"></p></div>
+            <div class="dlg-rodape"><button type="button" class="btn btn-secondary" data-fechar>Voltar</button><button type="submit" class="btn btn-perigo">Cancelar a entrega</button></div>
+        </form>
+    </dialog>
+
+    <dialog class="dlg-padrao" id="dlg-editar" aria-labelledby="ed-titulo">
+        <form id="form-editar" novalidate>
+            <div class="dlg-cab"><h3 id="ed-titulo">Editar EPI</h3><p>O histórico das entregas guarda o nome e o C.A. da época.</p></div>
+            <div class="dlg-corpo">
+                <div class="form-group"><label for="ed-nome">Nome</label><input id="ed-nome" maxlength="80"></div>
+                <div class="form-group"><label for="ed-ca">Nº do C.A.</label><input id="ed-ca" maxlength="7" inputmode="numeric"></div>
+                <div class="form-group"><label for="ed-minimo">Estoque mínimo</label><input type="number" id="ed-minimo" min="0" step="1" inputmode="numeric"></div>
+                <p class="erro-form" id="ed-erro" role="alert"></p>
+            </div>
+            <div class="dlg-rodape"><button type="button" class="btn btn-secondary" data-fechar>Fechar</button><button type="submit" class="btn btn-primary">Salvar</button></div>
+        </form>
+    </dialog>
+    <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

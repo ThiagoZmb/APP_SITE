@@ -67,6 +67,9 @@ const CATALOGO = [
   { codigo: 'danfe.ver', nome: 'Abrir a nota fiscal em PDF (DANFE) a partir do pedido', area: 'Cadastros' },
   { codigo: 'danfe.enviar', nome: 'Enviar os PDFs das notas fiscais (DANFE) para o sistema', area: 'Cadastros' },
   { codigo: 'danfe.vincular', nome: 'Vincular à mão uma nota fiscal (DANFE) a um pedido', area: 'Cadastros' },
+  { codigo: 'epi.ver', nome: 'Ver EPIs: estoque, histórico das entregas e fotos assinadas', area: 'EPIs' },
+  { codigo: 'epi.registrar', nome: 'Registrar entrega de EPI e anexar a foto assinada', area: 'EPIs' },
+  { codigo: 'epi.gerir', nome: 'Cadastrar EPI, dar entrada, cancelar entrega e remover foto', area: 'EPIs' },
   { codigo: 'gestao.ver', nome: 'Ver a Central de Gestão: metas, caixa e orçamento (também exige Valores financeiros)', area: 'Gestão' },
   { codigo: 'gestao.editar', nome: 'Definir metas e orçamentos na Central de Gestão (também exige Valores financeiros)', area: 'Gestão' },
   { codigo: 'corte.ver', nome: 'Ver o plano de corte dos pedidos e os retalhos', area: 'Plano de corte' },
@@ -153,6 +156,9 @@ const DESCRICOES = {
   'danfe.ver': 'Abre o PDF da nota fiscal (DANFE) ligada ao pedido.',
   'danfe.enviar': 'Envia os PDFs das notas (DANFE) para o sistema.',
   'danfe.vincular': 'Liga à mão uma nota (DANFE) a um pedido.',
+  'epi.ver': 'Abre a tela de EPIs, o estoque, o histórico e as fotos das fichas assinadas (a aba Resumo também exige Acesso administrativo).',
+  'epi.registrar': 'Registra a entrega de EPI a um funcionário (vê só código e nome dos ativos) e anexa a foto assinada. Também exige Ver EPIs.',
+  'epi.gerir': 'Cadastra, edita e desativa EPI, dá entrada no estoque, cancela entrega e remove (oculta) foto errada. Também exige Ver EPIs.',
   'gestao.ver': 'Abre a Central de Gestão. Só vale com Acesso administrativo.',
   'gestao.editar': 'Define metas e orçamentos na Central de Gestão. Só vale com Acesso administrativo.',
   'corte.ver': 'Vê os planos de corte de perfis e vidros e os retalhos.',
@@ -192,7 +198,7 @@ const TODAS = CATALOGO.map(p => p.codigo);
 
 const PERFIS_INICIAIS = [
   { nome: 'Administrador', descricao: 'Acesso total, inclusive usuários e permissões', permissoes: TODAS.filter(c => c !== 'atendimento.modo') },
-  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.data_pronto' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir' && c !== 'indicadores.ver' && c !== 'produtos.dependencias' && c !== 'tarefas_admin.usar') },
+  { nome: 'Interno completo', descricao: 'Tudo, menos administrar usuários', permissoes: TODAS.filter(c => c !== 'admin.usuarios' && c !== 'pedidos.criar' && c !== 'pedidos.cancelar' && c !== 'pedidos.situacao' && c !== 'pedidos.data_pronto' && c !== 'pedidos.excluir' &&c !== 'precos.editar' && c !== 'precos.gravar' && c !== 'entregas.baixar' && c !== 'funcionarios.ver' && c !== 'funcionarios.editar' && c !== 'gestao.ver' && c !== 'gestao.editar' && c !== 'corte.parametros' && c !== 'danfe.enviar' && c !== 'danfe.vincular' && c !== 'portal.gerir' && c !== 'etapas.finalizar' && c !== 'etapas.gerir' && c !== 'indicadores.ver' && c !== 'produtos.dependencias' && c !== 'tarefas_admin.usar' && !c.startsWith('epi.')) },
   { nome: 'Vendedor', descricao: 'Pedidos, orçamentos e clientes, com valores',
     permissoes: ['paineis.ver', 'pedidos.ver', 'pedidos.pdf', 'orcamentos.criar', 'orcamentos.salvar', 'pedidos.desconto', 'clientes.ver', 'clientes.editar', 'valores.ver', 'atendimento.modo'] },
   { nome: 'Estoquista', descricao: 'Estoque sem valores financeiros', permissoes: ['estoque.ver', 'estoque.movimentar'] },

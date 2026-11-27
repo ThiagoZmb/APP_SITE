@@ -657,6 +657,66 @@ const TABELAS = [
      quando DATETIME NOT NULL,
      KEY idx_compras_baixas_nota (nota, fornecedor),
      KEY idx_compras_baixas_item (item_id)
+   ) ${OPCOES}`,
+  // ----- EPIs: catálogo, entradas, entregas (nome e C.A. copiados) e fotos da ficha assinada; o cadastro de funcionários só é lido -----
+  `CREATE TABLE IF NOT EXISTS \`web_epis\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     nome VARCHAR(80) NOT NULL,
+     ca VARCHAR(7) NOT NULL,
+     minimo INT NOT NULL DEFAULT 0,
+     ativo TINYINT NOT NULL DEFAULT 1,
+     criado_em DATETIME NOT NULL,
+     criado_por VARCHAR(190) NOT NULL,
+     atualizado_em DATETIME NULL,
+     atualizado_por VARCHAR(190) NULL,
+     UNIQUE KEY uq_epi_nome (nome)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_epi_entradas\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     epi_id INT NOT NULL,
+     quantidade INT NOT NULL,
+     chave VARCHAR(64) NULL,
+     quando DATETIME NOT NULL,
+     quem VARCHAR(190) NOT NULL,
+     UNIQUE KEY uq_epi_entrada_chave (chave),
+     KEY idx_epi_entrada (epi_id)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_epi_entregas\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     funcionario_codigo INT NOT NULL,
+     funcionario_nome VARCHAR(190) NOT NULL,
+     data_entrega DATE NOT NULL,
+     observacao VARCHAR(255) NULL,
+     chave VARCHAR(64) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     criado_por VARCHAR(190) NOT NULL,
+     cancelada_em DATETIME NULL,
+     cancelada_por VARCHAR(190) NULL,
+     motivo_cancelamento VARCHAR(255) NULL,
+     UNIQUE KEY uq_epi_entrega_chave (chave),
+     KEY idx_epi_entrega_data (data_entrega)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_epi_entrega_itens\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     entrega_id INT NOT NULL,
+     epi_id INT NOT NULL,
+     nome VARCHAR(80) NOT NULL,
+     ca VARCHAR(7) NOT NULL,
+     quantidade INT NOT NULL,
+     KEY idx_epi_item_entrega (entrega_id),
+     KEY idx_epi_item_epi (epi_id)
+   ) ${OPCOES}`,
+  `CREATE TABLE IF NOT EXISTS \`web_epi_fotos\` (
+     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     entrega_id INT NOT NULL,
+     mime VARCHAR(30) NOT NULL,
+     dados MEDIUMBLOB NOT NULL,
+     chave VARCHAR(64) NOT NULL,
+     criado_em DATETIME NOT NULL,
+     criado_por VARCHAR(190) NOT NULL,
+     removida_em DATETIME NULL,
+     removida_por VARCHAR(190) NULL,
+     UNIQUE KEY uq_epi_foto_chave (entrega_id, chave)
    ) ${OPCOES}`
 ];
 
@@ -1008,6 +1068,9 @@ async function darAoAdministrador(pool, marcador, permissoes) {
 
 // Semana compartilhada: a permissão começa só no perfil Administrador
 const acrescentarPermissoesTarefasAdmin = pool => darAoAdministrador(pool, 'permissoes_tarefas_admin', ['tarefas_admin.usar']);
+
+// EPIs: ver, registrar e gerir começam só no perfil Administrador (o dono libera para os demais)
+const acrescentarPermissoesEpi = pool => darAoAdministrador(pool, 'permissoes_epi', ['epi.ver', 'epi.registrar', 'epi.gerir']);
 
 const acrescentarPermissoesPrecos = pool => darAoAdministrador(pool, 'permissoes_precos', ['precos.ver', 'precos.editar']);
 const acrescentarPermissoesPrecosGravar = pool => darAoAdministrador(pool, 'permissoes_precos_gravar', ['precos.gravar']);
@@ -1535,4 +1598,4 @@ const acrescentarPermissoesPedidosAcoes = pool => desdobrarPermissoes(pool, 'per
 const REGRAS_COMPRAS = [{ de: 'estoque.editar', para: ['compras.ver', 'compras.criar'] }];
 const acrescentarPermissoesCompras = pool => desdobrarPermissoes(pool, 'permissoes_compras', REGRAS_COMPRAS);
 
-module.exports = { acrescentarPermissoesCompras, acrescentarPermissoesTarefasAdmin, unificarCategoriasAgendas, MARCADOR_CATEGORIAS, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
+module.exports = { acrescentarPermissoesEpi, acrescentarPermissoesCompras, acrescentarPermissoesTarefasAdmin, unificarCategoriasAgendas, MARCADOR_CATEGORIAS, desdobrarPermissoes, REGRAS_ENTREGAS_ACOES, REGRAS_PEDIDOS_ACOES, acrescentarPermissoesEntregasAcoes, acrescentarPermissoesPedidosAcoes, acrescentarPermissoesProdutosDependencias, acrescentarPermissoesChecklistEntregas, acrescentarPermissoesAdministrativo, acrescentarPermissoesIndicadores, acrescentarPermissoesEtapas, acrescentarPermissoesPerfisDesenho, semearPerfilSecoes, acrescentarPermissoesChecklist, acrescentarPermissoesPortal, acrescentarPermissoesOrcSituacao, instalarTabelas, acrescentarPermissoesNotas, acrescentarPermissoesComprasNfe,acrescentarPermissoesPesos, acrescentarPermissoesDanfe, acrescentarPermissoesAtendimento, acrescentarPermissoesCorte, acrescentarPermissoesGestao, acrescentarPermissoesTintas, acrescentarPermissoesSituacao, acrescentarPermissoesCadastros, migrarAcessos, garantirAdministrador, acrescentarPermissoesEstoque, acrescentarPermissoesEntregas, acrescentarPermissoesPedOrc, acrescentarPermissoesPrecos, acrescentarPermissoesPrecosGravar, acrescentarPermissoesCancelarExcluir };
